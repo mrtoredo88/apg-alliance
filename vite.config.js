@@ -1,10 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: 'dist', // Принудительно заставляем собирать в папку dist
+    outDir: 'build', // Собираем строго в папку build
+  },
+  esbuild: {
+    loader: 'jsx',
+    include: /src\/.*\.js$/,
+    className: true,
   },
 });
