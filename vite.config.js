@@ -6,18 +6,18 @@ export default defineConfig({
   build: {
     outDir: 'build',
   },
-  // Этот блок принудительно заставляет Vite читать JSX внутри .js файлов,
-  // даже если сервер Vercel пытается капризничать
+  esbuild: {
+    // Включаем JSX для всех файлов .js и .jsx
+    loader: 'jsx',
+    include: /src\/.*\.(js|jsx)$/,
+    exclude: [],
+  },
   optimizeDeps: {
     esbuildOptions: {
       loader: {
         '.js': 'jsx',
+        '.jsx': 'jsx',
       },
     },
-  },
-  esbuild: {
-    loader: 'jsx',
-    include: /src\/.*\.js$/,
-    exclude: [],
   },
 });
