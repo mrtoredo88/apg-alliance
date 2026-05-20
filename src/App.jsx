@@ -73,9 +73,21 @@ export function App() {
   const currentLevel = getUserLevel();
 
   // ... (здесь твой остальной код с рендером UI)
-  return (
-    <div style={{ background: '#0d0d13', color: '#ffffff', minHeight: '100vh', padding: '20px 20px 90px 20px' }}>
-        {/* Здесь верни свой привычный JSX, который у тебя уже был */}
+return (
+    <div style={{ background: '#0d0d13', color: '#ffffff', minHeight: '100vh', padding: '20px' }}>
+      <h1>Тест работы приложения</h1>
+      <p>ID пользователя: {userId ? userId : "Загрузка..."}</p>
+      <h2 style={{ color: currentLevel.color }}>
+        🔑 Ключей: {userKeys} | Уровень: {currentLevel.title}
+      </h2>
+      
+      <button onClick={() => handleConfirmScan("Тест")}>
+        Добавить ключ (Тест)
+      </button>
+
+      {isScannerOpen && (
+        <Scanner onScan={(name) => handleConfirmScan(name)} />
+      )}
     </div>
   );
 }
