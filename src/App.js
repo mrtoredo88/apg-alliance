@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Scanner } from './Scanner';
+import { Scanner } from './Scanner.jsx';
 
 export function App() {
   // База данных ключей
