@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import { Scanner } from './Scanner';
 export function App() {
   // База данных ключей
   const [userKeys, setUserKeys] = useState(() => {
@@ -201,13 +201,12 @@ export function App() {
       {/* ==========================================
           🔥 НОВЫЙ КОМПОНЕНТ: МОДАЛЬНЫЙ QR-СКАНЕР
           ========================================== */}
-      {isScannerOpen && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(9, 9, 13, 0.95)', zIndex: 1000,
-          display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px',
-          boxSizing: 'border-box'
-        }}>
+     <Scanner 
+  isOpen={isScannerOpen} 
+  onClose={() => setIsScannerOpen(false)} 
+  mapPlaces={mapPlaces} 
+  onConfirm={handleConfirmScan} 
+/>
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>📷 Сканер Альянса</h3>
             <p style={{ color: '#aaa', fontSize: '14px', margin: 0 }}>Наведи камеру на QR-код на столе заведения</p>
