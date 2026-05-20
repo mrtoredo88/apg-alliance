@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Scanner } from './Scanner';
+
 export function App() {
   // База данных ключей
   const [userKeys, setUserKeys] = useState(() => {
@@ -7,15 +8,11 @@ export function App() {
     return savedKeys ? parseInt(savedKeys, 10) : 3;
   });
   
-  // --- НОВОЕ СОСТОЯНИЕ: ОТКРЫТ ЛИ QR-СКАНЕР ---
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-
-  // Состояния навигации и фильтров
   const [activeScreen, setActiveScreen] = useState('main');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPlace, setSelectedPlace] = useState(1);
 
-  // Синхронизация с БД
   useEffect(() => {
     localStorage.setItem('apg_user_keys', userKeys);
   }, [userKeys]);
@@ -55,7 +52,6 @@ export function App() {
   const currentPlaceInfo = mapPlaces.find(p => p.id === selectedPlace);
   const filteredPromotions = selectedCategory === 'all' ? promotions : promotions.filter(item => item.category === selectedCategory);
   
-  // Функция симуляции сканирования конкретного заведения
   const handleConfirmScan = (partnerName) => {
     setUserKeys(prev => prev + 1);
     setIsScannerOpen(false);
@@ -74,7 +70,6 @@ export function App() {
       boxSizing: 'border-box', position: 'relative'
     }}>
       
-      {/* ================= ЭКРАН 1: ГЛАВНАЯ ================= */}
       {activeScreen === 'main' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
@@ -124,25 +119,18 @@ export function App() {
             ))}
           </div>
 
-          {/* Кнопка теперь открывает наш крутой сканер */}
           <button onClick={() => setIsScannerOpen(true)} style={{ width: '100%', background: 'linear-gradient(90deg, #ff007f, #7f00ff)', border: 'none', color: 'white', padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: '600', marginTop: '24px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 0, 127, 0.3)' }}>
             ✨ Сканировать QR-код партнера
           </button>
         </div>
       )}
 
-      {/* ================= ЭКРАН 2: КАРТА ================= */}
       {activeScreen === 'map' && (
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', letterSpacing: '0.5px' }}>📍 Радар Альянса</h2>
           <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 20px 0' }}>Нажимай на неоновые точки заведений, чтобы найти их в городе.</p>
           
           <div style={{ width: '100%', height: '320px', background: '#09090d', borderRadius: '20px', position: 'relative', overflow: 'hidden', border: '1px solid rgba(127, 0, 255, 0.2)' }}>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', height: '90%', borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.03)' }} />
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '60%', height: '60%', borderRadius: '50%', border: '1px solid rgba(127, 0, 255, 0.05)' }} />
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '30%', height: '30%', borderRadius: '50%', border: '1px dashed rgba(0, 240, 255, 0.05)' }} />
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '12px', height: '12px', background: '#fff', borderRadius: '50%', boxShadow: '0 0 15px #fff', zIndex: 5 }} />
-
             {mapPlaces.map(place => (
               <div key={place.id} onClick={() => setSelectedPlace(place.id)} style={{ position: 'absolute', left: place.x, top: place.y, transform: 'translate(-50%, -50%)', cursor: 'pointer', zIndex: 10 }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#161625', border: `2px solid ${place.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', boxShadow: selectedPlace === place.id ? `0 0 20px ${place.color}` : `0 0 5px ${place.color}` }}>
@@ -154,12 +142,7 @@ export function App() {
 
           {currentPlaceInfo && (
             <div style={{ marginTop: '16px', background: 'linear-gradient(135deg, #1b1b2f 0%, #161625 100%)', borderRadius: '16px', padding: '16px', border: `1px solid ${currentPlaceInfo.color}33` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: currentPlaceInfo.color, fontWeight: '600', textTransform: 'uppercase' }}>{currentPlaceInfo.type}</span>
-                  <h3 style={{ margin: '4px 0 2px 0', fontSize: '17px' }}>{currentPlaceInfo.name}</h3>
-                </div>
-              </div>
+              <h3 style={{ margin: '4px 0 2px 0', fontSize: '17px' }}>{currentPlaceInfo.name}</h3>
               <button onClick={() => alert(`Маршрут к "${currentPlaceInfo.name}" построен!`)} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginTop: '8px', cursor: 'pointer' }}>
                 🗺️ Построить маршрут
               </button>
@@ -168,98 +151,25 @@ export function App() {
         </div>
       )}
 
-      {/* ================= ЭКРАН 3: ПРОФИЛЬ ================= */}
       {activeScreen === 'profile' && (
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', letterSpacing: '0.5px' }}>👤 Паспорт Жителя АПГ</h2>
-          <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 20px 0' }}>Твои цифровые регалии.</p>
-          
           <div style={{ background: 'linear-gradient(135deg, #1b1b2f 0%, #161625 100%)', borderRadius: '20px', padding: '24px 16px', textAlign: 'center', marginBottom: '24px' }}>
-            <div style={{ position: 'relative', width: '84px', height: '84px', margin: '0 auto 12px auto' }}>
-              <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'linear-gradient(135deg, #ff007f, #7f00ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '38px' }}>🤵</div>
-            </div>
             <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>Константин</h3>
             <div style={{ display: 'inline-block', padding: '6px 14px', borderRadius: '20px', background: `${currentLevel.color}15`, border: `1px solid ${currentLevel.color}44`, color: currentLevel.color, fontSize: '13px', fontWeight: '700' }}>
               {currentLevel.title}
             </div>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ background: '#161625', padding: '16px 12px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-              <span style={{ fontSize: '26px' }}>☕</span>
-              <div style={{ fontWeight: 'bold', fontSize: '13px', marginTop: '8px' }}>Кофейный Барон</div>
-              <div style={{ fontSize: '11px', color: '#ff007f', fontWeight: '600' }}>ОТКРЫТО 🎉</div>
-            </div>
-            <div style={{ background: '#161625', padding: '16px 12px', borderRadius: '16px', border: userKeys >= 5 ? '1px solid #7f00ff' : '1px solid transparent', textAlign: 'center', opacity: userKeys >= 5 ? 1 : 0.35 }}>
-              <span style={{ fontSize: '26px' }}>🍔</span>
-              <div style={{ fontWeight: 'bold', fontSize: '13px', marginTop: '8px' }}>Гурман Альянса</div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ==========================================
-          🔥 НОВЫЙ КОМПОНЕНТ: МОДАЛЬНЫЙ QR-СКАНЕР
-          ========================================== */}
-     <Scanner 
-  isOpen={isScannerOpen} 
-  onClose={() => setIsScannerOpen(false)} 
-  mapPlaces={mapPlaces} 
-  onConfirm={handleConfirmScan} 
-/>
-          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>📷 Сканер Альянса</h3>
-            <p style={{ color: '#aaa', fontSize: '14px', margin: 0 }}>Наведи камеру на QR-код на столе заведения</p>
-          </div>
+      <Scanner 
+        isOpen={isScannerOpen} 
+        onClose={() => setIsScannerOpen(false)} 
+        mapPlaces={mapPlaces} 
+        onConfirm={handleConfirmScan} 
+      />
 
-          {/* Стилизованная неоновая рамка видоискателя камеры */}
-          <div style={{
-            width: '220px', height: '220px', margin: '0 auto 40px auto',
-            border: '2px solid #00f0ff', borderRadius: '24px', position: 'relative',
-            boxShadow: '0 0 30px rgba(0, 240, 255, 0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '44px', opacity: 0.3, animation: 'pulse 1.5s infinite' }}>🔳</div>
-            
-            {/* Лазерная линия сканирования */}
-            <div style={{
-              position: 'absolute', left: '10%', right: '10%', height: '2px',
-              background: '#ff007f', boxShadow: '0 0 10px #ff007f',
-              top: '50%'
-            }} />
-          </div>
-
-          {/* Имитация считывания кодов разных заведений */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ color: '#666', fontSize: '12px', textAlign: 'center', textTransform: 'uppercase', fontWeight: 'bold' }}>
-              Имитировать сканирование в:
-            </div>
-            {mapPlaces.map(place => (
-              <button 
-                key={place.id}
-                onClick={() => handleConfirmScan(place.name)}
-                style={{
-                  background: '#161625', border: '1px solid rgba(255,255,255,0.05)',
-                  color: '#fff', padding: '12px', borderRadius: '12px',
-                  cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px',
-                  fontSize: '14px', fontWeight: '600'
-                }}
-              >
-                <span>{place.icon}</span> {place.name}
-              </button>
-            ))}
-          </div>
-
-          <button 
-            onClick={() => setIsScannerOpen(false)}
-            style={{ background: 'none', border: 'none', color: '#ff007f', marginTop: '30px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}
-          >
-            ❌ Закрыть сканер
-          </button>
-        </div>
-      )}
-
-      {/* ================= НИЖНЕЕ МЕНЮ ================= */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px',
         background: '#11111b', borderTop: '1px solid rgba(255, 255, 255, 0.1)',
@@ -275,7 +185,6 @@ export function App() {
           <span style={{ fontSize: '18px' }}>👤</span> Профиль
         </button>
       </div>
-
     </div>
   );
 }
