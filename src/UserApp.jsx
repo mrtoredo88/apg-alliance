@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner,
-  ModalRoot, ModalPage, ModalPageHeader
+  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
@@ -18,9 +17,6 @@ import { Scanner } from './Scanner.jsx';
 
 export function UserApp() {
   const [activePanel, setActivePanel] = useState('home');
-  const [activeModal, setActiveModal] = useState(null);
-  const [modalData, setModalData] = useState({ title: '', text: '' });
-  
   const [activePartner, setActivePartner] = useState(null);
   const [user, setUser] = useState(null);
   const [userKeys, setUserKeys] = useState(3);
@@ -39,11 +35,6 @@ export function UserApp() {
     fetchPartners();
     fetchEvents();
   }, []);
-
-  const openModal = (title, text) => {
-    setModalData({ title, text });
-    setActiveModal('achievement');
-  };
 
   const loadUserData = async (id) => {
     const userRef = doc(db, "users", id);
@@ -100,29 +91,20 @@ export function UserApp() {
     setIsScannerOpen(false);
   };
 
-  const modal = (
-    <ModalRoot activeModal={activeModal}>
-      <ModalPage 
-        id="achievement" 
-        onClose={() => setActiveModal(null)}
-        header={<ModalPageHeader>{modalData.title}</ModalPageHeader>}
-      >
-        <Div>{modalData.text}</Div>
-        <Div><Button stretched size="l" onClick={() => setActiveModal(null)}>Понятно</Button></Div>
-      </ModalPage>
-    </ModalRoot>
-  );
-
   return (
     <ConfigProvider>
       <AdaptivityProvider>
         <AppRoot>
-          <SplitLayout modal={modal}>
+          <SplitLayout>
             <SplitCol>
               <View activePanel={activePanel}>
+                
+                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  {!user ? <Spinner size="large" style={{ marginTop: 20 }} /> : (
+                  {!user ? (
+                    <Spinner size="large" style={{ marginTop: 20 }} />
+                  ) : (
                     <>
                       <Group>
                         <SimpleCell before={user.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}>
@@ -134,24 +116,97 @@ export function UserApp() {
                         </Div>
                       </Group>
 
+                      {/* Достижения */}
                       <Group header={<Header mode="secondary">Достижения</Header>}>
-                        <SimpleCell 
-                          before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}
-                          onClick={() => openModal("Первый ключ", userKeys >= 1 ? "Вы уже начали свое приключение!" : "Соберите 1 ключ, чтобы открыть достижение.")}
-                        >Первый ключ</SimpleCell>
-                        <SimpleCell 
-                          before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}
-                          onClick={() => openModal("Исследователь", userKeys >= 5 ? "Вы посетили 5 мест!" : `Еще ${5 - userKeys} ключей до достижения.`)}
-                        >Исследователь (5 ключей)</SimpleCell>
+                        <SimpleCell before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}>
+                          Первый ключ
+                        </SimpleCell>
+                        <SimpleCell before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}>
+                          Исследователь (5 ключей)
+                        </SimpleCell>
                       </Group>
-                      {/* ... остальной код (Избранное, Настройки, Главная) оставляем как было ... */}
+
+                      <Group header={<Header mode="secondary">Избранное</Header>}>
+                        {favorites.length > 0 ? (
+                          partners.filter(p => favorites.includes(p.id)).map(p => (
+                            <SimpleCell key={p.id} onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
+                              {p.name}
+                            </SimpleCell>
+                          ))
+                        ) : (
+                          <Placeholder>Здесь пока пусто</Placeholder>
+                        )}
+                      </Group>
+
+                      <Group header={<Header mode="secondary">Настройки</Header>}>
+                        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+                      </Group>
                     </>
                   )}
                 </Panel>
-                {/* ... остальные панели home и partner ... */}
+
+                {/* ГЛАВНАЯ */}
+                <Panel id="home">
+                  <PanelHeader>APG Alliance</PanelHeader>
+                  <Header mode="secondary">События</Header>
+                  <HorizontalScroll showArrows>
+                    <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
+                      {events.length > 0 ? events.map(e => (
+                        <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}>
+                          <Title level="3">{e.title}</Title>
+                        </Card>
+                      )) : <div style={{ padding: '0 16px', color: '#999' }}>Нет активных событий</div>}
+                    </div>
+                  </HorizontalScroll>
+
+                  <Header mode="secondary">Наши партнеры</Header>
+                  {loading ? <Spinner /> : (
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '12px', 
+                      padding: '8px 16px 24px' 
+                    }}>
+                      {partners.map((p) => (
+                        <div key={p.id} style={{ 
+                          background: 'var(--vkui--color_background_content)', 
+                          padding: '16px', 
+                          borderRadius: '16px', 
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center'
+                        }}>
+                          <Icon28StorefrontOutline />
+                          <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
+                          <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Смотреть</Button>
+                          <Button size="s" mode={favorites.includes(p.id) ? "secondary" : "outline"} stretched onClick={() => toggleFavorite(p.id)} style={{ marginTop: 8 }}>
+                            {favorites.includes(p.id) ? "В избранном ❤️" : "В избранное 🤍"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+
+                <Panel id="partner">
+                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
+                  <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>Все спецпредложения от {activePartner}.</Placeholder>
+                </Panel>
+
               </View>
             </SplitCol>
           </SplitLayout>
+          
+          <Tabbar>
+            <TabbarItem onClick={() => setActivePanel('home')} selected={activePanel === 'home'} text="Главная"><Icon28HomeOutline /></TabbarItem>
+            <TabbarItem onClick={() => setIsScannerOpen(true)} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
+            <TabbarItem onClick={() => setActivePanel('profile')} selected={activePanel === 'profile'} text="Профиль"><Icon28UserCircleOutline /></TabbarItem>
+          </Tabbar>
+
+          {isScannerOpen && <Scanner onScan={handleConfirmScan} />}
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>
