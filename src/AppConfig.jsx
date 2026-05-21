@@ -44,6 +44,10 @@ export const AppConfig = () => {
     fetchPartners();
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('apg_keys_count', keysCount.toString());
+  }, [keysCount]);
+
   return (
     <ConfigProvider>
       <AdaptivityProvider>
@@ -52,9 +56,9 @@ export const AppConfig = () => {
             <SplitCol>
               <View activePanel={activePanel}>
                 
+                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  {/* ... код профиля такой же ... */}
                   <Group>
                     <SimpleCell before={user?.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}>
                       <Title level="2" weight="1">{user ? `${user.first_name} ${user.last_name}` : "Исследователь"}</Title>
@@ -64,11 +68,20 @@ export const AppConfig = () => {
                       <Footnote style={{ marginTop: '10px' }}>Собрано {keysCount} из 10 ключей</Footnote>
                     </Div>
                   </Group>
+                  
+                  {/* ВОЗВРАЩАЕМ БЛОКИ ПРОФИЛЯ */}
+                  <Group header={<Header mode="secondary">Друзья</Header>}>
+                    <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                  </Group>
+                  
+                  <Group header={<Header mode="secondary">Настройки</Header>}>
+                    <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+                  </Group>
                 </Panel>
 
+                {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
-                  
                   <Header mode="secondary">События</Header>
                   <HorizontalScroll showArrows>
                     <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
@@ -83,8 +96,6 @@ export const AppConfig = () => {
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? (
                     <div style={{ padding: 20, textAlign: 'center' }}><Spinner /></div>
-                  ) : partners.length === 0 ? (
-                    <Placeholder>Партнеры пока не добавлены</Placeholder>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
                       {partners.map((p) => (
@@ -100,6 +111,7 @@ export const AppConfig = () => {
                   )}
                 </Panel>
 
+                {/* ПАРТНЕР */}
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>
