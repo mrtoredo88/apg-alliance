@@ -25,14 +25,18 @@ export const AdminPanel = () => {
     checkAccess();
   }, []);
 
-  const fetchPartners = async () => {
+const fetchPartners = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "partners"));
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("Данные в админке:", data); // ЭТО СУПЕР ВАЖНО, ПРОВЕРЬ КОНСОЛЬ
-      setPartners(data);
+      // Выводим информацию о подключении
+      console.log("DB config:", db.app.options); 
+      
+      const colRef = collection(db, "partners");
+      const snapshot = await getDocs(colRef);
+      
+      console.log("Путь коллекции:", colRef.path);
+      setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
-      console.error("Ошибка загрузки:", e);
+      console.error("Ошибка:", e);
     }
   };
 
