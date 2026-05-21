@@ -16,8 +16,8 @@ export const AppConfig = () => {
     vkBridge.send('VKWebAppInit');
   }, []);
 
-const openScanner = async () => {
-    // Используем современный асинхронный метод проверки
+  // ЕДИНСТВЕННАЯ ВЕРНАЯ ФУНКЦИЯ СКАНЕРА
+  const openScanner = async () => {
     const isSupported = await vkBridge.supportsAsync('VKWebAppOpenQR');
     
     if (!isSupported) {
@@ -29,18 +29,6 @@ const openScanner = async () => {
       .then((data) => {
         if (data.qr_data) {
           alert('Код успешно отсканирован: ' + data.qr_data);
-        }
-      })
-      .catch((error) => {
-        console.error('Ошибка сканера:', error);
-      });
-  };
-
-    vkBridge.send('VKWebAppOpenQR')
-      .then((data) => {
-        if (data.qr_data) {
-          alert('Код успешно отсканирован: ' + data.qr_data);
-          // Сюда мы позже добавим логику сохранения ключа
         }
       })
       .catch((error) => {
