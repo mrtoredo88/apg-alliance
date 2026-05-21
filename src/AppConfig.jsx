@@ -16,14 +16,13 @@ import { db } from './firebase';
 import { collection, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
 
 export const AppConfig = () => {
-  const [activePanel, setActivePanel] = useState('profile');
-  const [currentPartner, setCurrentPartner] = useState(null); // Весь объект партнера
+  const [activePanel, setActivePanel] = useState('home');
+  const [currentPartner, setCurrentPartner] = useState(null);
   const [user, setUser] = useState(null);
   const [keysCount, setKeysCount] = useState(0);
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Состояния для форм
   const [newPartnerName, setNewPartnerName] = useState('');
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -34,6 +33,7 @@ export const AppConfig = () => {
   useEffect(() => {
     const savedKeys = localStorage.getItem('apg_keys_count');
     if (savedKeys) setKeysCount(parseInt(savedKeys, 10));
+    
     vkBridge.send('VKWebAppInit');
     vkBridge.send('VKWebAppGetUserInfo').then(setUser).catch(() => {});
     fetchPartners();
@@ -57,12 +57,8 @@ export const AppConfig = () => {
 
   const handleUpdatePartner = async () => {
     if (!currentPartner) return;
-    await updateDoc(doc(db, "partners", currentPartner.id), { 
-      name: editName, 
-      description: editDesc, 
-      imageUrl: editImg 
-    });
-    alert("Данные обновлены!");
+    await updateDoc(doc(db, "partners", currentPartner.id), { name: editName, description: editDesc, imageUrl: editImg });
+    alert("Сохранено!");
     fetchPartners();
   };
 
@@ -73,6 +69,8 @@ export const AppConfig = () => {
           <SplitLayout>
             <SplitCol>
               <View activePanel={activePanel}>
+                
+                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   <Group>
@@ -81,7 +79,7 @@ export const AppConfig = () => {
                     </SimpleCell>
                     <Div><Progress value={keysCount * 10} /><Footnote>Собрано {keysCount} из 10 ключей</Footnote></Div>
                   </Group>
-                  
+
                   {user?.id === MY_VK_ID && (
                     <Group header={<Header mode="primary">Администрирование</Header>}>
                       <FormItem top="Добавить партнера"><Input value={newPartnerName} onChange={e => setNewPartnerName(e.target.value)} /></FormItem>
@@ -89,23 +87,36 @@ export const AppConfig = () => {
                     </Group>
                   )}
                   
-                  <Group header={<Header mode="secondary">Друзья</Header>}>
-                    <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить</CellButton>
+                  <Group header={<Header mode="secondary">Настройки</Header>}>
+                    <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                    <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
                   </Group>
                 </Panel>
 
+                {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
+                  <Header mode="secondary">События</Header>
+                  <HorizontalScroll showArrows>
+                    <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
+                      {[1, 2, 3].map(i => (
+                        <Card key={i} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}>
+                          <Title level="3">Событие {i}</Title>
+                        </Card>
+                      ))}
+                    </div>
+                  </HorizontalScroll>
+
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '16px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px' }}>
                       {partners.map((p) => (
                         <div key={p.id} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', textAlign: 'center' }}>
                           <Icon28StorefrontOutline />
                           <div style={{ fontWeight: '600' }}>{p.name}</div>
-                          <Button size="s" mode="primary" stretched onClick={() => {
-                            setCurrentPartner(p); setEditName(p.name); setEditDesc(p.description || ''); setEditImg(p.imageUrl || '');
-                            setActivePanel('partner');
+                          <Button size="s" mode="primary" stretched onClick={() => { 
+                            setCurrentPartner(p); setEditName(p.name); setEditDesc(p.description || ''); setEditImg(p.imageUrl || ''); 
+                            setActivePanel('partner'); 
                           }}>Смотреть</Button>
                         </div>
                       ))}
@@ -113,11 +124,11 @@ export const AppConfig = () => {
                   )}
                 </Panel>
 
+                {/* ПАРТНЕР */}
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{currentPartner?.name}</PanelHeader>
                   {currentPartner?.imageUrl && <img src={currentPartner.imageUrl} style={{ width: '100%', borderRadius: 12 }} alt="" />}
                   <Placeholder header={currentPartner?.name}>{currentPartner?.description || "Описание пока пустое"}</Placeholder>
-                  
                   {user?.id === MY_VK_ID && (
                     <Group header={<Header>Редактирование</Header>}>
                       <FormItem top="Название"><Input value={editName} onChange={e => setEditName(e.target.value)} /></FormItem>
@@ -133,6 +144,7 @@ export const AppConfig = () => {
           
           <Tabbar>
             <TabbarItem onClick={() => setActivePanel('home')} selected={activePanel === 'home'} text="Главная"><Icon28HomeOutline /></TabbarItem>
+            <TabbarItem onClick={() => vkBridge.send('VKWebAppOpenQR')} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
             <TabbarItem onClick={() => setActivePanel('profile')} selected={activePanel === 'profile'} text="Профиль"><Icon28UserCircleOutline /></TabbarItem>
           </Tabbar>
         </AppRoot>
