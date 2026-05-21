@@ -23,7 +23,7 @@ export function UserApp() {
   const [favorites, setFavorites] = useState([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [partners, setPartners] = useState([]);
-  const [events, setEvents] = useState([]); // Состояние для событий
+  const [events, setEvents] = useState([]); 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export function UserApp() {
       loadUserData(u.id.toString());
     });
     fetchPartners();
-    fetchEvents(); // Загрузка событий
+    fetchEvents();
   }, []);
 
   const loadUserData = async (id) => {
@@ -146,9 +146,23 @@ export function UserApp() {
 
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '12px', 
+                      padding: '8px 16px 24px' 
+                    }}>
                       {partners.map((p) => (
-                        <div key={p.id} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+                        <div key={p.id} style={{ 
+                          background: 'var(--vkui--color_background_content)', 
+                          padding: '16px', 
+                          borderRadius: '16px', 
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center'
+                        }}>
                           <Icon28StorefrontOutline />
                           <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                           <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Смотреть</Button>
