@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import vkBridge from '@vkontakte/vk-bridge';
-import { App } from './App.jsx'; // Теперь импортируем главный компонент App
+import { App } from './App.jsx'; // Рендерим именно Роутер!
 
 vkBridge.send('VKWebAppInit');
 
