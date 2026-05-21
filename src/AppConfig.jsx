@@ -2,40 +2,55 @@ import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Spacing, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll
+  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
 import { 
   Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
   Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline,
-  Icon28StorefrontOutline, Icon28BookOutline, Icon28PaletteOutline, Icon28VideoOutline, Icon28MusicOutline
+  Icon28StorefrontOutline // Иконка по умолчанию для партнеров
 } from '@vkontakte/icons';
+
+// Подключаем БД из вашего файла
+import { db } from './firebase'; 
+import { collection, getDocs } from 'firebase/firestore';
 
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
   const [activePartner, setActivePartner] = useState(null);
   const [user, setUser] = useState(null);
   const [keysCount, setKeysCount] = useState(0);
+  const [partners, setPartners] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Загрузка прогресса
     const savedKeys = localStorage.getItem('apg_keys_count');
     if (savedKeys) setKeysCount(parseInt(savedKeys, 10));
+
+    // 2. Инициализация ВК
     vkBridge.send('VKWebAppInit');
     vkBridge.send('VKWebAppGetUserInfo').then(setUser).catch(() => {});
+
+    // 3. Загрузка партнеров из Firestore
+    const fetchPartners = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "partners"));
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPartners(data);
+      } catch (e) {
+        console.error("Ошибка загрузки из Firestore:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPartners();
   }, []);
 
   useEffect(() => {
     localStorage.setItem('apg_keys_count', keysCount.toString());
   }, [keysCount]);
-
-  const partners = [
-    { name: 'Кафе "Вкус"', icon: <Icon28StorefrontOutline fill="#FF9800" /> },
-    { name: 'Магазин "Книги"', icon: <Icon28BookOutline fill="#2196F3" /> },
-    { name: 'Музей города', icon: <Icon28PaletteOutline fill="#9C27B0" /> },
-    { name: 'Кинотеатр', icon: <Icon28VideoOutline fill="#E91E63" /> },
-    { name: 'Концерт-холл', icon: <Icon28MusicOutline fill="#4CAF50" /> },
-  ];
 
   return (
     <ConfigProvider>
@@ -76,17 +91,23 @@ export const AppConfig = () => {
                   </HorizontalScroll>
 
                   <Header mode="secondary">Наши партнеры</Header>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
-                    {partners.map((p) => (
-                      <div key={p.name} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>{p.icon}</div>
-                        <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
-                        <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
-                          Смотреть
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}><Spinner /></div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
+                      {partners.map((p) => (
+                        <div key={p.id} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                            <Icon28StorefrontOutline />
+                          </div>
+                          <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
+                          <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
+                            Смотреть
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Panel>
 
                 <Panel id="partner">
