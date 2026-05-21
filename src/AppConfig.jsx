@@ -27,36 +27,8 @@ export const AppConfig = () => {
     <ConfigProvider>
       <AdaptivityProvider>
         <AppRoot>
-          <SplitLayout 
-            style={{ justifyContent: 'center' }}
-            tabbar={
-              <Tabbar>
-                <TabbarItem 
-                  onClick={() => setActivePanel('home')} 
-                  selected={activePanel === 'home'}
-                  text="Главная"
-                >
-                  <Icon28HomeOutline />
-                </TabbarItem>
-                
-                <TabbarItem 
-                  onClick={openScanner}
-                  text="Сканировать"
-                  style={{ backgroundColor: 'var(--vkui--color_background_accent)', borderRadius: '8px' }}
-                >
-                  <Icon28QrCodeOutline fill="white" />
-                </TabbarItem>
-                
-                <TabbarItem 
-                  onClick={() => setActivePanel('profile')} 
-                  selected={activePanel === 'profile'}
-                  text="Профиль"
-                >
-                  <Icon28UserCircleOutline />
-                </TabbarItem>
-              </Tabbar>
-            }
-          >
+          {/* Сначала идет макет контента */}
+          <SplitLayout>
             <SplitCol>
               <View activePanel={activePanel}>
                 
@@ -106,8 +78,34 @@ export const AppConfig = () => {
               </View>
             </SplitCol>
           </SplitLayout>
+
+          {/* А ТЕПЕРЬ ТАББАР ВСЕГДА ВНИЗУ */}
+          <Tabbar>
+            <TabbarItem 
+              onClick={() => setActivePanel('home')} 
+              selected={activePanel === 'home'}
+              text="Главная"
+            >
+              <Icon28HomeOutline />
+            </TabbarItem>
+            
+            <TabbarItem 
+              onClick={openScanner}
+              text="Сканировать"
+              style={{ backgroundColor: 'var(--vkui--color_background_accent)', borderRadius: '8px' }}
+            >
+              <Icon28QrCodeOutline fill="white" />
+            </TabbarItem>
+            
+            <TabbarItem 
+              onClick={() => setActivePanel('profile')} 
+              selected={activePanel === 'profile'}
+              text="Профиль"
+            >
+              <Icon28UserCircleOutline />
+            </TabbarItem>
+          </Tabbar>
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>
   );
-};
