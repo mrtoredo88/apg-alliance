@@ -5,57 +5,49 @@ import { collection, getDocs, updateDoc, doc, deleteDoc, addDoc } from 'firebase
 
 export const AdminPanel = () => {
   const [partners, setPartners] = useState([]);
-  const [editValues, setEditValues] = useState({});
-  const [newPartner, setNewPartner] = useState({ name: '', description: '', imageUrl: '' });
 
   useEffect(() => {
-    bridge.send('VKWebAppGetUserInfo')
-      .then(user => {
-        if (user.id !== 988504) window.location.hash = '/';
-        else fetchPartners();
-      })
-      .catch(() => fetchPartners());
+    // Безопасный вызов
+    const checkAccess = async () => {
+      try {
+        const user = await bridge.send('VKWebAppGetUserInfo');
+        if (user.id !== 988504) {
+          window.location.hash = '/';
+        } else {
+          fetchPartners();
+        }
+      } catch (err) {
+        // Если мы не в ВК, просто загружаем список (для разработки)
+        console.warn("Не в среде ВК, загрузка партнеров напрямую...");
+        fetchPartners();
+      }
+    };
+    checkAccess();
   }, []);
 
   const fetchPartners = async () => {
-    const snapshot = await getDocs(collection(db, "partners"));
-    setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-
-  const handleAdd = async () => {
-    if (!newPartner.name) return;
-    await addDoc(collection(db, "partners"), newPartner);
-    setNewPartner({ name: '', description: '', imageUrl: '' });
-    fetchPartners();
-  };
-
-  const handleUpdate = async (id) => {
-    const p = editValues[id];
-    if (!p) return;
-    await updateDoc(doc(db, "partners", id), {
-      name: p.name,
-      description: p.description,
-      imageUrl: p.imageUrl
-    });
-    alert("Обновлено!");
-    fetchPartners();
-  };
-
-  const handleChange = (id, field, value) => {
-    setEditValues(prev => ({
-      ...prev,
-      [id]: { ...(prev[id] || partners.find(p => p.id === id)), [field]: value }
-    }));
+    try {
+      const snapshot = await getDocs(collection(db, "partners"));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      console.log("Данные в админке:", data); // ЭТО СУПЕР ВАЖНО, ПРОВЕРЬ КОНСОЛЬ
+      setPartners(data);
+    } catch (e) {
+      console.error("Ошибка загрузки:", e);
+    }
   };
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Админ-панель</h1>
+      <p>Найдено партнеров: {partners.length}</p> 
+      
       {partners.map(p => (
         <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10 }}>
-          <input value={(editValues[p.id] || p).name} onChange={(e) => handleChange(p.id, 'name', e.target.value)} />
-          <button onClick={() => handleUpdate(p.id)}>Сохранить</button>
-          <button onClick={() => deleteDoc(doc(db, "partners", p.id)).then(fetchPartners)}>Удалить</button>
+          <h3>{p.name || "Без названия"}</h3>
+          <button onClick={async () => { 
+            await deleteDoc(doc(db, "partners", p.id)); 
+            fetchPartners(); 
+          }}>Удалить</button>
         </div>
       ))}
     </div>
