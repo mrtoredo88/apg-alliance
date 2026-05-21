@@ -3,9 +3,14 @@ import { db } from './firebase';
 import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 
 export const AdminPanel = () => {
-  const [partners, setPartners] = useState([]);
-  // Состояние для редактирования (храним временные значения полей)
-  const [editValues, setEditValues] = useState({});
+  // ... ваш код
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>Админка</h1>
+      {/* Если список пуст, добавьте хотя бы текст, чтобы понять, что страница загрузилась */}
+    </div>
+  );
+};
 
 useEffect(() => {
   bridge.send('VKWebAppGetUserInfo').then(user => {
