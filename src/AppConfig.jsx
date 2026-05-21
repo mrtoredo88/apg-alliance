@@ -10,13 +10,21 @@ import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28
 
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
+  const [user, setUser] = useState(null); // Состояние для хранения данных профиля ВК
 
-  // Инициализация VK Bridge при запуске
+  // Инициализация и запрос данных при старте
   useEffect(() => {
     vkBridge.send('VKWebAppInit');
+
+    vkBridge.send('VKWebAppGetUserInfo')
+      .then((data) => {
+        setUser(data);
+      })
+      .catch((error) => {
+        console.error('Ошибка получения данных пользователя:', error);
+      });
   }, []);
 
-  // ЕДИНСТВЕННАЯ ВЕРНАЯ ФУНКЦИЯ СКАНЕРА
   const openScanner = async () => {
     const isSupported = await vkBridge.supportsAsync('VKWebAppOpenQR');
     
@@ -49,17 +57,19 @@ export const AppConfig = () => {
                   <Group header={<Header mode="primary">Профиль участника</Header>}>
                     <Card mode="outline" style={{ margin: '12px', padding: '16px' }}>
                       <SimpleCell
-                        before={<Avatar size={64} src="https://vk.com/images/camera_200.png" />}
-                        description="ID: 988504"
+                        before={user ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}
+                        description={user ? `ID: ${user.id}` : "Загрузка данных..."}
                       >
-                        <Title level="2" weight="1">Гость города 🪐</Title>
+                        <Title level="2" weight="1">
+                          {user ? `${user.first_name} ${user.last_name}` : "Гость города 🪐"}
+                        </Title>
                       </SimpleCell>
                       
                       <Spacing size={16} />
                       
                       <div style={{ padding: '0 16px 16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <Footnote weight="2" style={{ color: 'var(--vkui--color_text_secondary)' }}>Прогресс</Footnote>
+                          <Footnote weight="2" style={{ color: 'var(--vkui--color_text_secondary)' }}>Прогресс уровня</Footnote>
                           <Footnote weight="2">60%</Footnote>
                         </div>
                         <Progress value={60} />
