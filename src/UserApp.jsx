@@ -25,7 +25,6 @@ export function UserApp() {
   const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [achievementInfo, setAchievementInfo] = useState(null);
 
   useEffect(() => {
     vkBridge.send('VKWebAppInit');
@@ -88,7 +87,6 @@ export function UserApp() {
     const userRef = doc(db, "users", user.id.toString());
     await updateDoc(userRef, { keys: increment(1) });
     setUserKeys(prev => prev + 1);
-    alert(`🎉 Успешно! Ты отсканировал "${partnerName}". +1 Ключ! 🔑`);
     setIsScannerOpen(false);
   };
 
@@ -116,27 +114,6 @@ export function UserApp() {
                           <Footnote style={{ marginTop: '10px' }}>Собрано {userKeys} из 10 ключей</Footnote>
                         </Div>
                       </Group>
-
-                      {/* Достижения (безопасная версия) */}
-                      <Group header={<Header mode="secondary">Достижения</Header>}>
-                        <SimpleCell 
-                          before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}
-                          onClick={() => setAchievementInfo({ title: "Первый ключ", text: userKeys >= 1 ? "Вы уже начали свое приключение!" : "Соберите 1 ключ, чтобы открыть." })}
-                        >Первый ключ</SimpleCell>
-                        <SimpleCell 
-                          before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}
-                          onClick={() => setAchievementInfo({ title: "Исследователь", text: userKeys >= 5 ? "Вы посетили 5 мест!" : `Еще ${5 - userKeys} до достижения.` })}
-                        >Исследователь (5 ключей)</SimpleCell>
-                      </Group>
-
-                      {/* Блок отображения информации об ачивке */}
-                      {achievementInfo && (
-                        <Div style={{ margin: '10px 0', background: '#f5f5f5', borderRadius: 8, padding: 12 }}>
-                          <Title level="3">{achievementInfo.title}</Title>
-                          <Footnote style={{ marginBottom: 10 }}>{achievementInfo.text}</Footnote>
-                          <Button mode="secondary" size="s" onClick={() => setAchievementInfo(null)}>Закрыть</Button>
-                        </Div>
-                      )}
 
                       <Group header={<Header mode="secondary">Избранное</Header>}>
                         {favorites.length > 0 ? (
@@ -193,6 +170,7 @@ export function UserApp() {
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>Все спецпредложения от {activePartner}.</Placeholder>
                 </Panel>
+
               </View>
             </SplitCol>
           </SplitLayout>
