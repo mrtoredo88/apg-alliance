@@ -71,7 +71,7 @@ export const AppConfig = () => {
                     icon={<Icon28HomeOutline width={56} height={56} />}
                     header="Добро пожаловать в APG Alliance"
                   >
-                    Здесь будут новости города и важные уведомления.
+                    Здесь будут события города и актуальные акции.
                   </Placeholder>
                 </Panel>
 
