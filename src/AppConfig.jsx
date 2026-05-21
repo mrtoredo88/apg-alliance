@@ -3,7 +3,7 @@ import {
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Spacing, Progress, Footnote,
   Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner,
-  Input, FormLayout, FormLayoutGroup 
+  Input, FormItem 
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
@@ -24,9 +24,8 @@ export const AppConfig = () => {
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Состояния для админки
   const [newPartnerName, setNewPartnerName] = useState('');
-  const MY_VK_ID = 988504; // <--- ВСТАВЬТЕ СЮДА СВОЙ ID ИЗ ВК
+  const MY_VK_ID = 988504; 
 
   useEffect(() => {
     const savedKeys = localStorage.getItem('apg_keys_count');
@@ -57,7 +56,7 @@ export const AppConfig = () => {
       await addDoc(collection(db, "partners"), { name: newPartnerName });
       alert("Партнер добавлен!");
       setNewPartnerName('');
-      fetchPartners(); // Обновляем список
+      fetchPartners();
     } catch (e) {
       alert("Ошибка: " + e.message);
     }
@@ -87,19 +86,18 @@ export const AppConfig = () => {
                     </Div>
                   </Group>
                   
-                  {/* Секция Администратора */}
                   {user?.id === MY_VK_ID && (
                     <Group header={<Header mode="primary">Панель администратора</Header>}>
-                      <FormLayout>
-                        <FormLayoutGroup mode="vertical">
-                          <Input 
-                            value={newPartnerName} 
-                            onChange={(e) => setNewPartnerName(e.target.value)} 
-                            placeholder="Название нового партнера" 
-                          />
-                          <Button size="m" onClick={handleAddPartner}>Добавить партнера</Button>
-                        </FormLayoutGroup>
-                      </FormLayout>
+                      <FormItem top="Добавить партнера">
+                        <Input 
+                          value={newPartnerName} 
+                          onChange={(e) => setNewPartnerName(e.target.value)} 
+                          placeholder="Название нового партнера" 
+                        />
+                      </FormItem>
+                      <Div>
+                        <Button size="m" stretched onClick={handleAddPartner}>Добавить партнера</Button>
+                      </Div>
                     </Group>
                   )}
                   
