@@ -6,48 +6,57 @@ import {
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
-import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
-         Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline } from '@vkontakte/icons';
+import { 
+  Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
+  Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline,
+  Icon28CupOutline, Icon28BookOutline, Icon28PaletteOutline, Icon28TheaterOutline, Icon28MusicOutline
+} from '@vkontakte/icons';
 
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
-  const [activePartner, setActivePartner] = useState(null); // Для хранения выбранного партнера
+  const [activePartner, setActivePartner] = useState(null);
   const [user, setUser] = useState(null);
   const [keysCount, setKeysCount] = useState(0);
 
   // Инициализация при старте
   useEffect(() => {
-    // 1. Восстанавливаем ключи из localStorage
     const savedKeys = localStorage.getItem('apg_keys_count');
     if (savedKeys) setKeysCount(parseInt(savedKeys, 10));
 
-    // 2. Инициализируем VK Bridge и получаем данные пользователя
     vkBridge.send('VKWebAppInit');
     vkBridge.send('VKWebAppGetUserInfo')
       .then(setUser)
       .catch(() => {
-        // Если запуск вне ВК, ставим заглушку для дебага
         setUser({ first_name: 'Тестовый', last_name: 'Пользователь', id: 0 });
       });
   }, []);
 
-  // Сохраняем ключи при каждом изменении
+  // Сохранение ключей
   useEffect(() => {
     localStorage.setItem('apg_keys_count', keysCount.toString());
   }, [keysCount]);
 
-  // Функция сканирования
+  // Сканер
   const openScanner = async () => {
     try {
       const data = await vkBridge.send('VKWebAppOpenQR');
       if (data.qr_data) {
         setKeysCount(prev => prev + 1);
-        alert('Ключ успешно найден!');
+        alert('Ключ найден! Прогресс обновлен.');
       }
     } catch (e) {
       console.error(e);
     }
   };
+
+  // Данные партнеров (вынесено для удобства)
+  const partners = [
+    { name: 'Кафе "Вкус"', icon: <Icon28CupOutline fill="#FF9800" /> },
+    { name: 'Магазин "Книги"', icon: <Icon28BookOutline fill="#2196F3" /> },
+    { name: 'Музей города', icon: <Icon28PaletteOutline fill="#9C27B0" /> },
+    { name: 'Кинотеатр', icon: <Icon28TheaterOutline fill="#E91E63" /> },
+    { name: 'Концерт-холл', icon: <Icon28MusicOutline fill="#4CAF50" /> },
+  ];
 
   return (
     <ConfigProvider>
@@ -57,44 +66,41 @@ export const AppConfig = () => {
             <SplitCol>
               <View activePanel={activePanel}>
                 
-                {/* === ПАНЕЛЬ ПРОФИЛЯ === */}
+                {/* === ПРОФИЛЬ === */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   
-                  {/* Основная инфо */}
                   <Group>
                     <SimpleCell
                       before={user?.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}
                       description={user ? `ID: ${user.id}` : "Загрузка..."}
                     >
                       <Title level="2" weight="1">
-                        {user ? `${user.first_name} ${user.last_name}` : "Гость города 🪐"}
+                        {user ? `${user.first_name} ${user.last_name}` : "Исследователь 🪐"}
                       </Title>
                     </SimpleCell>
                     <Div>
                       <Progress value={keysCount * 10} />
-                      <Footnote style={{ marginTop: '8px', color: 'var(--vkui--color_text_secondary)' }}>
+                      <Footnote style={{ marginTop: '10px', color: 'var(--vkui--color_text_secondary)' }}>
                         {keysCount >= 10 
                           ? "🎉 Доступ к закрытому мероприятию открыт!" 
-                          : `Собрано ${keysCount} из 10 ключей до секретного мероприятия`}
+                          : `Собрано ${keysCount} из 10 ключей до секретного ивента`}
                       </Footnote>
                     </Div>
                   </Group>
 
-                  {/* Секция Друзей (ВЕРНУЛАСЬ) */}
-                  <Group header={<Header mode="secondary">Друзья в APG</Header>}>
+                  <Group header={<Header mode="secondary">Друзья</Header>}>
                     <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>
-                      Пригласить друзей из ВКонтакте
+                      Пригласить друзей
                     </CellButton>
                   </Group>
 
-                  {/* Настройки и Выход */}
                   <Group header={<Header mode="secondary">Настройки</Header>}>
                     <CellButton 
                       mode="danger" 
                       before={<Icon28DoorArrowRightOutline />} 
                       onClick={() => { 
-                        localStorage.clear(); // Сброс прогресса
+                        localStorage.clear(); 
                         window.location.reload(); 
                       }}
                     >
@@ -103,20 +109,18 @@ export const AppConfig = () => {
                   </Group>
                 </Panel>
 
-                {/* === ГЛАВНАЯ ПАНЕЛЬ === */}
+                {/* === ГЛАВНАЯ === */}
                 <Panel id="home">
-                  <PanelHeader>Главная</PanelHeader>
+                  <PanelHeader>APG Alliance</PanelHeader>
                   
-                  {/* ГОВОРИЗОНТАЛЬНАЯ КАРУСЕЛЬ АКЦИЙ (ВЕРНУЛАСЬ) */}
-                  <Header mode="secondary">События и топовые акции</Header>
+                  {/* Карусель */}
+                  <Header mode="secondary">События и акции</Header>
                   <HorizontalScroll showArrows>
                     <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
                       {[1, 2, 3].map(i => (
-                        <Card key={i} mode="outline" style={{ width: 220, height: 130, flexShrink: 0, position: 'relative' }}>
-                          <div style={{ padding: 12 }}>
-                            <Title level="3" weight="2" style={{ marginBottom: 4 }}>Супер-Акция #{i}</Title>
-                            <Footnote style={{ color: 'var(--vkui--color_text_secondary)' }}>Короткое описание события или бонуса для привлечения внимания.</Footnote>
-                          </div>
+                        <Card key={i} mode="shadow" style={{ width: 240, height: 110, flexShrink: 0, padding: 16, background: 'var(--vkui--color_background_content)' }}>
+                          <Title level="3" weight="2" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 6 }}>Событие #{i}</Title>
+                          <Footnote style={{ opacity: 0.8 }}>Участвуй и получи бонусные баллы APG сегодня!</Footnote>
                         </Card>
                       ))}
                     </div>
@@ -124,47 +128,58 @@ export const AppConfig = () => {
 
                   <Spacing size={16} />
 
-                  {/* Стена партнеров (Grid) */}
-                  <Header mode="secondary">Партнеры города</Header>
-                  <CardGrid size="s">
-                    {['Кафе "Вкус"', 'Магазин "Книги"', 'Музей "История"', 'Кинотеатр', 'Спортзал'].map((name) => (
-                      <Card key={name} mode="outline" style={{ padding: 15, textAlign: 'center' }}>
-                        <Title level="3" style={{ marginBottom: 10 }}>{name}</Title>
-                        <Button 
-                          size="s" 
-                          mode="outline" 
-                          stretched 
-                          onClick={() => { 
-                            setActivePartner(name); // Запоминаем кого открыли
-                            setActivePanel('partner'); // Переключаем панель
-                          }}
-                        >
-                          Смотреть акции
-                        </Button>
-                      </Card>
-                    ))}
-                  </CardGrid>
+                  {/* Сетка партнеров (Центрированная) */}
+                  <Header mode="secondary">Наши партнеры</Header>
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '0 8px 24px' }}>
+                    <CardGrid size="s" style={{ width: '100%', maxWidth: '600px' }}>
+                      {partners.map((p) => (
+                        <Card key={p.name} mode="shadow" style={{ padding: 16, textAlign: 'center', borderRadius: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                            {p.icon}
+                          </div>
+                          <div style={{ marginBottom: 14, fontWeight: '600', fontSize: '15px' }}>{p.name}</div>
+                          <Button 
+                            size="s" 
+                            mode="primary" 
+                            stretched 
+                            onClick={() => { 
+                              setActivePartner(p.name);
+                              setActivePanel('partner');
+                            }}
+                          >
+                            Смотреть
+                          </Button>
+                        </Card>
+                      ))}
+                    </CardGrid>
+                  </div>
+
+                  <Group header={<Header mode="secondary">Локации</Header>}>
+                    <Div>
+                      <Button before={<Icon28PlaceOutline />} stretched size="l" mode="secondary" onClick={() => alert('Карта загружается...')}>
+                        Карта всех точек
+                      </Button>
+                    </Div>
+                  </Group>
                 </Panel>
 
-                {/* === ПАНЕЛЬ КОНКРЕТНОГО ПАРТНЕРА === */}
+                {/* === ПАНЕЛЬ ПАРТНЕРА === */}
                 <Panel id="partner">
-                  <PanelHeader 
-                    before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}
-                  >
-                    {activePartner || "Партнер"}
+                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>
+                    {activePartner}
                   </PanelHeader>
                   
-                  <Group header={<Header mode="secondary">Актуальные предложения</Header>}>
+                  <Group>
                     <Placeholder 
-                      header="Спецпредложения" 
-                      icon={<Icon28KeyOutline width={56} height={56} />}
+                      header="Акции партнера" 
+                      icon={<Icon28KeyOutline width={56} height={56} fill="var(--vkui--color_background_accent)" />}
                     >
-                      Здесь будет список всех скидок, акций и секретных кодов от партнера {activePartner}.
+                      Скидка 10% для участников APG Alliance при предъявлении QR-кода профиля.
                     </Placeholder>
                     
                     <Div>
-                      <Button before={<Icon28PlaceOutline />} stretched size="l" mode="secondary">
-                        Показать {activePartner} на карте
+                      <Button before={<Icon28PlaceOutline />} stretched size="l" mode="outline">
+                        Маршрут до {activePartner}
                       </Button>
                     </Div>
                   </Group>
@@ -174,7 +189,7 @@ export const AppConfig = () => {
             </SplitCol>
           </SplitLayout>
 
-          {/* Нижняя навигация (Tabbar) */}
+          {/* Таббар */}
           <Tabbar>
             <TabbarItem 
               onClick={() => setActivePanel('home')} 
@@ -187,7 +202,7 @@ export const AppConfig = () => {
             <TabbarItem 
               onClick={openScanner} 
               text="Сканировать" 
-              style={{ backgroundColor: 'var(--vkui--color_background_accent)', borderRadius: '8px' }}
+              style={{ backgroundColor: 'var(--vkui--color_background_accent)', borderRadius: '12px', margin: '4px' }}
             >
               <Icon28QrCodeOutline fill="white" />
             </TabbarItem>
