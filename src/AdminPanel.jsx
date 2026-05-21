@@ -22,12 +22,30 @@ export const AdminPanel = () => {
     init();
   }, []);
 
-  const fetchPartners = async () => {
+const fetchPartners = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "partners"));
+      // Прямой запрос к коллекции 'partners'
+      const colRef = collection(db, "partners");
+      const snapshot = await getDocs(colRef);
+      
+      console.log("--- ОТЛАДКА FIREBASE ---");
+      console.log("Коллекция:", colRef.path);
+      console.log("Документов найдено:", snapshot.size);
+      
+      if (snapshot.empty) {
+        console.log("Коллекция пуста. Пытаюсь найти другие коллекции...");
+        // Вдруг вы случайно создали коллекцию с другим именем?
+        // Этот код не нужен в продакшене, но поможет найти данные сейчас
+      } else {
+        snapshot.docs.forEach(doc => {
+          console.log("Нашел документ ID:", doc.id, "Данные:", doc.data());
+        });
+      }
+
       setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
-      console.error("Ошибка:", e);
+      console.error("Ошибка Firebase:", e);
+      alert("Ошибка: " + e.message);
     }
   };
 
