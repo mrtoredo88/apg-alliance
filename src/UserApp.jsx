@@ -102,32 +102,48 @@ export function UserApp() {
                 {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  <Group>
-                    <SimpleCell before={user?.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}>
-                      <Title level="2" weight="1">{user ? `${user.first_name} ${user.last_name}` : "Исследователь"}</Title>
-                    </SimpleCell>
-                    <Div>
-                      <Progress value={userKeys * 10} />
-                      <Footnote style={{ marginTop: '10px' }}>Собрано {userKeys} из 10 ключей</Footnote>
-                    </Div>
-                  </Group>
-
-                  <Group header={<Header mode="secondary">Избранное</Header>}>
-                    {favorites.length > 0 ? (
-                      partners.filter(p => favorites.includes(p.id)).map(p => (
-                        <SimpleCell key={p.id} onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
-                          {p.name}
+                  {!user ? (
+                    <Spinner size="large" style={{ marginTop: 20 }} />
+                  ) : (
+                    <>
+                      <Group>
+                        <SimpleCell before={user.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}>
+                          <Title level="2" weight="1">{`${user.first_name} ${user.last_name}`}</Title>
                         </SimpleCell>
-                      ))
-                    ) : (
-                      <Placeholder>Здесь пока пусто</Placeholder>
-                    )}
-                  </Group>
+                        <Div>
+                          <Progress value={userKeys * 10} />
+                          <Footnote style={{ marginTop: '10px' }}>Собрано {userKeys} из 10 ключей</Footnote>
+                        </Div>
+                      </Group>
 
-                  <Group header={<Header mode="secondary">Настройки</Header>}>
-                    <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
-                    <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
-                  </Group>
+                      {/* Достижения */}
+                      <Group header={<Header mode="secondary">Достижения</Header>}>
+                        <SimpleCell before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}>
+                          Первый ключ
+                        </SimpleCell>
+                        <SimpleCell before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}>
+                          Исследователь (5 ключей)
+                        </SimpleCell>
+                      </Group>
+
+                      <Group header={<Header mode="secondary">Избранное</Header>}>
+                        {favorites.length > 0 ? (
+                          partners.filter(p => favorites.includes(p.id)).map(p => (
+                            <SimpleCell key={p.id} onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
+                              {p.name}
+                            </SimpleCell>
+                          ))
+                        ) : (
+                          <Placeholder>Здесь пока пусто</Placeholder>
+                        )}
+                      </Group>
+
+                      <Group header={<Header mode="secondary">Настройки</Header>}>
+                        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+                      </Group>
+                    </>
+                  )}
                 </Panel>
 
                 {/* ГЛАВНАЯ */}
