@@ -50,15 +50,16 @@ export const AdminPanel = () => {
         </div>
       )}
       
-      {partners.map(p => (
-        <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10, borderRadius: 8 }}>
-          <h3>{p.name || "Без названия (id: " + p.id + ")"}</h3>
-          <button onClick={async () => { 
-            await deleteDoc(doc(db, "partners", p.id)); 
-            fetchPartners(); 
-          }}>Удалить</button>
-        </div>
-      ))}
-    </div>
-  );
-};
+{partners.map(p => (
+  <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10, borderRadius: 8 }}>
+    <h3>{p.name || "Без названия"}</h3>
+    {/* Добавляем проверку существования полей */}
+    <p>{p.description || "Описание отсутствует"}</p>
+    {p.imageUrl && <img src={p.imageUrl} alt="партнер" style={{width: 50}} />}
+    
+    <button onClick={async () => { 
+      await deleteDoc(doc(db, "partners", p.id)); 
+      fetchPartners(); 
+    }}>Удалить</button>
+  </div>
+))}
