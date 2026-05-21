@@ -2,21 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Spacing, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, InfoRow, CellButton, CardGrid, HorizontalScroll, Div
+  Tabbar, TabbarItem, Placeholder, InfoRow, CellButton, CardGrid, HorizontalScroll, Div, PanelHeaderBack
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
-import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, Icon28PlaceOutline } from '@vkontakte/icons';
+import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
+         Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline } from '@vkontakte/icons';
 
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
+  const [activePartner, setActivePartner] = useState(null); // Для хранения выбранного партнера
   const [user, setUser] = useState(null);
   const [keysCount, setKeysCount] = useState(0);
 
   useEffect(() => {
     const savedKeys = localStorage.getItem('apg_keys_count');
     if (savedKeys) setKeysCount(parseInt(savedKeys, 10));
-    
     vkBridge.send('VKWebAppInit');
     vkBridge.send('VKWebAppGetUserInfo').then(setUser).catch(() => {});
   }, []);
@@ -29,7 +30,7 @@ export const AppConfig = () => {
     const data = await vkBridge.send('VKWebAppOpenQR');
     if (data.qr_data) {
       setKeysCount(prev => prev + 1);
-      alert(keysCount + 1 >= 10 ? 'Поздравляем! Доступ к закрытому мероприятию открыт!' : 'Ключ найден!');
+      alert('Ключ найден!');
     }
   };
 
@@ -41,6 +42,7 @@ export const AppConfig = () => {
             <SplitCol>
               <View activePanel={activePanel}>
                 
+                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   <Group>
@@ -49,54 +51,43 @@ export const AppConfig = () => {
                     </SimpleCell>
                     <Div>
                       <Progress value={keysCount * 10} />
-                      <Footnote style={{ marginTop: '8px' }}>
-                        {keysCount >= 10 
-                          ? "🎉 Доступ к закрытому мероприятию открыт!" 
-                          : `Собрано ${keysCount} из 10 ключей до доступа к закрытому мероприятию`}
-                      </Footnote>
+                      <Footnote style={{ marginTop: '8px' }}>Собрано {keysCount} из 10 ключей</Footnote>
                     </Div>
                   </Group>
-                  <Group>
-                     <CellButton mode={keysCount >= 10 ? 'primary' : 'secondary'} disabled={keysCount < 10}>
-                       {keysCount >= 10 ? "Перейти к мероприятию" : "Соберите 10 ключей"}
-                     </CellButton>
+
+                  <Group header={<Header mode="secondary">Друзья</Header>}>
+                    <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                  </Group>
+
+                  <Group header={<Header mode="secondary">Настройки</Header>}>
+                    <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Выйти</CellButton>
                   </Group>
                 </Panel>
 
+                {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>Главная</PanelHeader>
-                  
-                  {/* Горизонтальная карусель */}
-                  <Header mode="secondary">События и акции</Header>
-                  <HorizontalScroll showArrows>
-                    <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
-                      {[1, 2, 3].map(i => (
-                        <Card key={i} style={{ width: 200, height: 120, padding: 10, background: '#eee' }}>
-                          Акция #{i}
-                        </Card>
-                      ))}
-                    </div>
-                  </HorizontalScroll>
-
-                  {/* Стена партнеров */}
                   <Header mode="secondary">Наши партнеры</Header>
                   <CardGrid size="s">
-                    {['Кафе', 'Магазин', 'Музей'].map((name, i) => (
-                      <Card key={i} mode="outline" style={{ padding: 20 }}>
-                        {name}
-                        <Button size="s" mode="outline" style={{ marginTop: 10 }}>Смотреть</Button>
+                    {['Кафе "Вкус"', 'Магазин "Книги"', 'Музей "История"'].map((name) => (
+                      <Card key={name} mode="outline" style={{ padding: 15 }}>
+                        <Title level="3">{name}</Title>
+                        <Button size="s" mode="outline" onClick={() => { setActivePartner(name); setActivePanel('partner'); }}>
+                          Смотреть акции
+                        </Button>
                       </Card>
                     ))}
                   </CardGrid>
+                </Panel>
 
-                  {/* Карта */}
-                  <Group header={<Header mode="secondary">Где мы находимся</Header>}>
-                    <Div>
-                      <Button before={<Icon28PlaceOutline />} stretched size="m" onClick={() => alert('Открываю карту...')}>
-                        Показать на карте
-                      </Button>
-                    </Div>
-                  </Group>
+                {/* ПАНЕЛЬ ПАРТНЕРА */}
+                <Panel id="partner">
+                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>
+                    {activePartner || "Партнер"}
+                  </PanelHeader>
+                  <Placeholder header="Спецпредложения" icon={<Icon28KeyOutline />}>
+                    Здесь вы найдете все скидки от партнера {activePartner}.
+                  </Placeholder>
                 </Panel>
 
               </View>
