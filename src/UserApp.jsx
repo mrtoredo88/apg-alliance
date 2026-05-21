@@ -46,11 +46,18 @@ export function UserApp() {
     }
   };
 
-  const fetchPartners = async () => {
+const fetchPartners = async () => {
     setLoading(true);
-    const snapshot = await getDocs(collection(db, "partners"));
-    setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    setLoading(false);
+    try {
+      const snapshot = await getDocs(collection(db, "partners"));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      console.log("Загруженные партнеры:", data); // Проверьте консоль браузера
+      setPartners(data);
+    } catch (e) {
+      console.error("Ошибка при загрузке партнеров:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleFavorite = async (partnerId) => {
