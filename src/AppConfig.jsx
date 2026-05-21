@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Spacing, Progress, Footnote,
@@ -11,15 +11,27 @@ import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
 
+  // Инициализация VK Bridge при запуске
+  useEffect(() => {
+    vkBridge.send('VKWebAppInit');
+  }, []);
+
   const openScanner = () => {
+    // Проверяем, поддерживает ли платформа метод (защита от ошибок)
+    if (!vkBridge.supports('VKWebAppOpenQR')) {
+      alert('Ваша версия ВК не поддерживает сканер QR-кодов');
+      return;
+    }
+
     vkBridge.send('VKWebAppOpenQR')
       .then((data) => {
         if (data.qr_data) {
-          alert('Код: ' + data.qr_data);
+          alert('Код успешно отсканирован: ' + data.qr_data);
+          // Сюда мы позже добавим логику сохранения ключа
         }
       })
       .catch((error) => {
-        console.error('Ошибка:', error);
+        console.error('Ошибка сканера:', error);
       });
   };
 
@@ -27,7 +39,6 @@ export const AppConfig = () => {
     <ConfigProvider>
       <AdaptivityProvider>
         <AppRoot>
-          {/* Сначала идет макет контента */}
           <SplitLayout>
             <SplitCol>
               <View activePanel={activePanel}>
@@ -79,7 +90,6 @@ export const AppConfig = () => {
             </SplitCol>
           </SplitLayout>
 
-          {/* А ТЕПЕРЬ ТАББАР ВСЕГДА ВНИЗУ */}
           <Tabbar>
             <TabbarItem 
               onClick={() => setActivePanel('home')} 
@@ -109,4 +119,4 @@ export const AppConfig = () => {
       </AdaptivityProvider>
     </ConfigProvider>
   );
-  };
+};
