@@ -16,12 +16,25 @@ export const AppConfig = () => {
     vkBridge.send('VKWebAppInit');
   }, []);
 
-  const openScanner = () => {
-    // Проверяем, поддерживает ли платформа метод (защита от ошибок)
-    if (!vkBridge.supports('VKWebAppOpenQR')) {
+const openScanner = async () => {
+    // Используем современный асинхронный метод проверки
+    const isSupported = await vkBridge.supportsAsync('VKWebAppOpenQR');
+    
+    if (!isSupported) {
       alert('Ваша версия ВК не поддерживает сканер QR-кодов');
       return;
     }
+
+    vkBridge.send('VKWebAppOpenQR')
+      .then((data) => {
+        if (data.qr_data) {
+          alert('Код успешно отсканирован: ' + data.qr_data);
+        }
+      })
+      .catch((error) => {
+        console.error('Ошибка сканера:', error);
+      });
+  };
 
     vkBridge.send('VKWebAppOpenQR')
       .then((data) => {
