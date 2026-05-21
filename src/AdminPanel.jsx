@@ -1,53 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { db } from './firebase';
-import { collection, getDocs, updateDoc, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
 
 export const AdminPanel = () => {
   const [partners, setPartners] = useState([]);
+  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
-    // Безопасный вызов
-    const checkAccess = async () => {
+    const init = async () => {
       try {
         const user = await bridge.send('VKWebAppGetUserInfo');
         if (user.id !== 988504) {
           window.location.hash = '/';
-        } else {
-          fetchPartners();
+          return;
         }
-      } catch (err) {
-        // Если мы не в ВК, просто загружаем список (для разработки)
-        console.warn("Не в среде ВК, загрузка партнеров напрямую...");
-        fetchPartners();
+      } catch (e) {
+        console.warn("VK Bridge недоступен, продолжаем...");
       }
+      fetchPartners();
     };
-    checkAccess();
+    init();
   }, []);
 
-const fetchPartners = async () => {
+  const fetchPartners = async () => {
     try {
-      // Выводим информацию о подключении
-      console.log("DB config:", db.app.options); 
-      
       const colRef = collection(db, "partners");
       const snapshot = await getDocs(colRef);
       
-      console.log("Путь коллекции:", colRef.path);
-      setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPartners(docs);
+      
+      setDebugInfo(`Успешно. Документов в 'partners': ${docs.length}`);
+      console.log("Данные из Firebase:", docs);
     } catch (e) {
-      console.error("Ошибка:", e);
+      setDebugInfo("Ошибка: " + e.message);
+      console.error(e);
     }
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
       <h1>Админ-панель</h1>
-      <p>Найдено партнеров: {partners.length}</p> 
+      <p style={{ color: '#666', fontSize: '12px' }}>{debugInfo}</p>
+      
+      {partners.length === 0 && (
+        <div style={{ padding: 20, background: '#fff3cd' }}>
+          Список пуст. Проверьте, что в Firebase коллекция называется именно <b>partners</b>.
+        </div>
+      )}
       
       {partners.map(p => (
-        <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10 }}>
-          <h3>{p.name || "Без названия"}</h3>
+        <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10, borderRadius: 8 }}>
+          <h3>{p.name || "Без названия (id: " + p.id + ")"}</h3>
           <button onClick={async () => { 
             await deleteDoc(doc(db, "partners", p.id)); 
             fetchPartners(); 
