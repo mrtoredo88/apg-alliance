@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { db } from './firebase';
-import { collection, getDocs, updateDoc, doc, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, deleteDoc, addDoc } from 'firebase/firestore';
 
 export const AdminPanel = () => {
   const [partners, setPartners] = useState([]);
-  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
     const init = async () => {
@@ -16,7 +15,7 @@ export const AdminPanel = () => {
           return;
         }
       } catch (e) {
-        console.warn("VK Bridge недоступен, продолжаем...");
+        console.warn("VK Bridge недоступен");
       }
       fetchPartners();
     };
@@ -25,41 +24,28 @@ export const AdminPanel = () => {
 
   const fetchPartners = async () => {
     try {
-      const colRef = collection(db, "partners");
-      const snapshot = await getDocs(colRef);
-      
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPartners(docs);
-      
-      setDebugInfo(`Успешно. Документов в 'partners': ${docs.length}`);
-      console.log("Данные из Firebase:", docs);
+      const snapshot = await getDocs(collection(db, "partners"));
+      setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
-      setDebugInfo("Ошибка: " + e.message);
-      console.error(e);
+      console.error("Ошибка:", e);
     }
   };
 
   return (
-    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
+    <div style={{ padding: 20 }}>
       <h1>Админ-панель</h1>
-      <p style={{ color: '#666', fontSize: '12px' }}>{debugInfo}</p>
+      <p>Найдено партнеров: {partners.length}</p>
       
-      {partners.length === 0 && (
-        <div style={{ padding: 20, background: '#fff3cd' }}>
-          Список пуст. Проверьте, что в Firebase коллекция называется именно <b>partners</b>.
+      {partners.map(p => (
+        <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10, borderRadius: 8 }}>
+          <h3>{p.name || "Без названия"}</h3>
+          <p>{p.description || "Нет описания"}</p>
+          <button onClick={async () => { 
+            await deleteDoc(doc(db, "partners", p.id)); 
+            fetchPartners(); 
+          }}>Удалить</button>
         </div>
-      )}
-      
-{partners.map(p => (
-  <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10, borderRadius: 8 }}>
-    <h3>{p.name || "Без названия"}</h3>
-    {/* Добавляем проверку существования полей */}
-    <p>{p.description || "Описание отсутствует"}</p>
-    {p.imageUrl && <img src={p.imageUrl} alt="партнер" style={{width: 50}} />}
-    
-    <button onClick={async () => { 
-      await deleteDoc(doc(db, "partners", p.id)); 
-      fetchPartners(); 
-    }}>Удалить</button>
-  </div>
-))}
+      ))}
+    </div>
+  );
+};
