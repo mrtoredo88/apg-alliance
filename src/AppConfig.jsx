@@ -109,3 +109,4 @@ export const AppConfig = () => {
       </AdaptivityProvider>
     </ConfigProvider>
   );
+  };
