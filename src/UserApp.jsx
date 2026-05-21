@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner
+  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner, Alert
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
@@ -25,6 +25,7 @@ export function UserApp() {
   const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [popout, setPopout] = useState(null);
 
   useEffect(() => {
     vkBridge.send('VKWebAppInit');
@@ -35,6 +36,17 @@ export function UserApp() {
     fetchPartners();
     fetchEvents();
   }, []);
+
+  const showAchievement = (title, description) => {
+    setPopout(
+      <Alert
+        actions={[{ title: 'Понятно', autoclose: true, mode: 'default' }]}
+        onClose={() => setPopout(null)}
+        header={title}
+        text={description}
+      />
+    );
+  };
 
   const loadUserData = async (id) => {
     const userRef = doc(db, "users", id);
@@ -97,7 +109,7 @@ export function UserApp() {
         <AppRoot>
           <SplitLayout>
             <SplitCol>
-              <View activePanel={activePanel}>
+              <View activePanel={activePanel} popout={popout}>
                 
                 {/* ПРОФИЛЬ */}
                 <Panel id="profile">
@@ -116,14 +128,22 @@ export function UserApp() {
                         </Div>
                       </Group>
 
-                      {/* Достижения */}
                       <Group header={<Header mode="secondary">Достижения</Header>}>
-                        <SimpleCell before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}>
+                        <SimpleCell 
+                          before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}
+                          onClick={() => showAchievement("Первый ключ", userKeys >= 1 ? "Вы уже начали свое приключение!" : "Соберите 1 ключ, чтобы открыть достижение.")}
+                        >
                           Первый ключ
                         </SimpleCell>
-                        <SimpleCell before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}>
+                        <SimpleCell 
+                          before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}
+                          onClick={() => showAchievement("Исследователь", userKeys >= 5 ? "Вы посетили 5 мест!" : `Еще ${5 - userKeys} ключей до достижения.`)}
+                        >
                           Исследователь (5 ключей)
                         </SimpleCell>
+                        <Div>
+                          <Footnote>Прогресс до звания "Мастер": {Math.min(userKeys * 10, 100)}%</Footnote>
+                        </Div>
                       </Group>
 
                       <Group header={<Header mode="secondary">Избранное</Header>}>
@@ -162,23 +182,9 @@ export function UserApp() {
 
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 1fr', 
-                      gap: '12px', 
-                      padding: '8px 16px 24px' 
-                    }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '8px 16px 24px' }}>
                       {partners.map((p) => (
-                        <div key={p.id} style={{ 
-                          background: 'var(--vkui--color_background_content)', 
-                          padding: '16px', 
-                          borderRadius: '16px', 
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
-                          textAlign: 'center',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center'
-                        }}>
+                        <div key={p.id} style={{ background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <Icon28StorefrontOutline />
                           <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                           <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Смотреть</Button>
