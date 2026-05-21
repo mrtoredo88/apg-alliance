@@ -9,7 +9,7 @@ import vkBridge from '@vkontakte/vk-bridge';
 import { 
   Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
   Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline,
-  Icon28CupOutline, Icon28BookOutline, Icon28PaletteOutline, Icon28Theater, Icon28Music 
+  Icon28StorefrontOutline, Icon28BookOutline, Icon28PaletteOutline, Icon28VideoOutline, Icon28MusicOutline
 } from '@vkontakte/icons';
 
 export const AppConfig = () => {
@@ -30,11 +30,11 @@ export const AppConfig = () => {
   }, [keysCount]);
 
   const partners = [
-    { name: 'Кафе "Вкус"', icon: <Icon28CupOutline fill="#FF9800" /> },
+    { name: 'Кафе "Вкус"', icon: <Icon28StorefrontOutline fill="#FF9800" /> },
     { name: 'Магазин "Книги"', icon: <Icon28BookOutline fill="#2196F3" /> },
     { name: 'Музей города', icon: <Icon28PaletteOutline fill="#9C27B0" /> },
-    { name: 'Кинотеатр', icon: <Icon28Theater fill="#E91E63" /> },
-    { name: 'Концерт-холл', icon: <Icon28Music fill="#4CAF50" /> },
+    { name: 'Кинотеатр', icon: <Icon28VideoOutline fill="#E91E63" /> },
+    { name: 'Концерт-холл', icon: <Icon28MusicOutline fill="#4CAF50" /> },
   ];
 
   return (
@@ -45,7 +45,6 @@ export const AppConfig = () => {
             <SplitCol>
               <View activePanel={activePanel}>
                 
-                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   <Group>
@@ -63,10 +62,8 @@ export const AppConfig = () => {
                   </Group>
                 </Panel>
 
-                {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
-                  
                   <Header mode="secondary">События</Header>
                   <HorizontalScroll showArrows>
                     <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
@@ -79,22 +76,9 @@ export const AppConfig = () => {
                   </HorizontalScroll>
 
                   <Header mode="secondary">Наши партнеры</Header>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
-                    justifyContent: 'center', 
-                    gap: '12px', 
-                    padding: '8px 16px 24px' 
-                  }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
                     {partners.map((p) => (
-                      <div key={p.name} style={{ 
-                        width: '150px', 
-                        background: 'var(--vkui--color_background_content)',
-                        padding: '16px',
-                        borderRadius: '16px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                        textAlign: 'center'
-                      }}>
+                      <div key={p.name} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>{p.icon}</div>
                         <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                         <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
@@ -105,7 +89,6 @@ export const AppConfig = () => {
                   </div>
                 </Panel>
 
-                {/* ПАНЕЛЬ ПАРТНЕРА */}
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>
