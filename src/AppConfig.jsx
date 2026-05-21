@@ -2,47 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Spacing, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, InfoRow, CellButton, PanelHeaderBack
+  Tabbar, TabbarItem, Placeholder, InfoRow, CellButton, CardGrid, HorizontalScroll, Div
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
-import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28SettingsOutline, 
-         Icon28KeyOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline } from '@vkontakte/icons';
+import { Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, Icon28PlaceOutline } from '@vkontakte/icons';
 
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
   const [user, setUser] = useState(null);
+  const [keysCount, setKeysCount] = useState(0);
 
   useEffect(() => {
-    async function initBridge() {
-      try {
-        await vkBridge.send('VKWebAppInit');
-        const userData = await vkBridge.send('VKWebAppGetUserInfo');
-        setUser(userData);
-      } catch (error) {
-        setUser({ first_name: 'Гость', last_name: 'Города', id: 0 });
-      }
-    }
-    initBridge();
+    const savedKeys = localStorage.getItem('apg_keys_count');
+    if (savedKeys) setKeysCount(parseInt(savedKeys, 10));
+    
+    vkBridge.send('VKWebAppInit');
+    vkBridge.send('VKWebAppGetUserInfo').then(setUser).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('apg_keys_count', keysCount.toString());
+  }, [keysCount]);
+
   const openScanner = async () => {
-    try {
-      const data = await vkBridge.send('VKWebAppOpenQR');
-      if (data.qr_data) alert('Находка: ' + data.qr_data);
-    } catch (e) { console.error(e); }
-  };
-
-  // Функция приглашения друга
-  const inviteFriend = () => {
-    vkBridge.send('VKWebAppShowInviteBox')
-      .catch((e) => console.log('Приглашение отменено', e));
-  };
-
-  // Эмуляция выхода
-  const handleLogout = () => {
-    alert('Выход из системы...');
-    window.location.reload(); 
+    const data = await vkBridge.send('VKWebAppOpenQR');
+    if (data.qr_data) {
+      setKeysCount(prev => prev + 1);
+      alert(keysCount + 1 >= 10 ? 'Поздравляем! Доступ к закрытому мероприятию открыт!' : 'Ключ найден!');
+    }
   };
 
   return (
@@ -55,39 +43,60 @@ export const AppConfig = () => {
                 
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  
                   <Group>
                     <SimpleCell before={user?.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}>
                       <Title level="2" weight="1">{user ? `${user.first_name} ${user.last_name}` : "Загрузка..."}</Title>
                     </SimpleCell>
-                    <div style={{ padding: '0 16px 16px' }}>
-                      <Progress value={60} />
-                      <Footnote style={{ marginTop: '8px', color: 'var(--vkui--color_text_secondary)' }}>Уровень: Исследователь</Footnote>
-                    </div>
+                    <Div>
+                      <Progress value={keysCount * 10} />
+                      <Footnote style={{ marginTop: '8px' }}>
+                        {keysCount >= 10 
+                          ? "🎉 Доступ к закрытому мероприятию открыт!" 
+                          : `Собрано ${keysCount} из 10 ключей до доступа к закрытому мероприятию`}
+                      </Footnote>
+                    </Div>
                   </Group>
-
-                  {/* Список друзей */}
-                  <Group header={<Header mode="secondary">Друзья в APG</Header>}>
-                    <CellButton before={<Icon28UserAddOutline />} onClick={inviteFriend}>
-                      Пригласить друзей
-                    </CellButton>
-                    <SimpleCell before={<Avatar size={32} />}>Алексей Иванов</SimpleCell>
-                    <SimpleCell before={<Avatar size={32} />}>Мария Петрова</SimpleCell>
-                  </Group>
-
-                  {/* Настройки */}
-                  <Group header={<Header mode="secondary">Настройки</Header>}>
-                    <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={handleLogout}>
-                      Выйти из профиля
-                    </CellButton>
+                  <Group>
+                     <CellButton mode={keysCount >= 10 ? 'primary' : 'secondary'} disabled={keysCount < 10}>
+                       {keysCount >= 10 ? "Перейти к мероприятию" : "Соберите 10 ключей"}
+                     </CellButton>
                   </Group>
                 </Panel>
 
                 <Panel id="home">
                   <PanelHeader>Главная</PanelHeader>
-                  <Placeholder icon={<Icon28HomeOutline width={56} height={56} />}>
-                    Скоро здесь появятся задания!
-                  </Placeholder>
+                  
+                  {/* Горизонтальная карусель */}
+                  <Header mode="secondary">События и акции</Header>
+                  <HorizontalScroll showArrows>
+                    <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
+                      {[1, 2, 3].map(i => (
+                        <Card key={i} style={{ width: 200, height: 120, padding: 10, background: '#eee' }}>
+                          Акция #{i}
+                        </Card>
+                      ))}
+                    </div>
+                  </HorizontalScroll>
+
+                  {/* Стена партнеров */}
+                  <Header mode="secondary">Наши партнеры</Header>
+                  <CardGrid size="s">
+                    {['Кафе', 'Магазин', 'Музей'].map((name, i) => (
+                      <Card key={i} mode="outline" style={{ padding: 20 }}>
+                        {name}
+                        <Button size="s" mode="outline" style={{ marginTop: 10 }}>Смотреть</Button>
+                      </Card>
+                    ))}
+                  </CardGrid>
+
+                  {/* Карта */}
+                  <Group header={<Header mode="secondary">Где мы находимся</Header>}>
+                    <Div>
+                      <Button before={<Icon28PlaceOutline />} stretched size="m" onClick={() => alert('Открываю карту...')}>
+                        Показать на карте
+                      </Button>
+                    </Div>
+                  </Group>
                 </Panel>
 
               </View>
