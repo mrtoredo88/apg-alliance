@@ -25,8 +25,7 @@ export function UserApp() {
   const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]); 
   const [loading, setLoading] = useState(true);
-  // Состояние для модального окна достижений
-  const [achievementModal, setAchievementModal] = useState(null);
+  const [achievementInfo, setAchievementInfo] = useState(null);
 
   useEffect(() => {
     vkBridge.send('VKWebAppInit');
@@ -118,35 +117,25 @@ export function UserApp() {
                         </Div>
                       </Group>
 
-                      {/* Достижения */}
+                      {/* Достижения (безопасная версия) */}
                       <Group header={<Header mode="secondary">Достижения</Header>}>
                         <SimpleCell 
                           before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}
-                          onClick={() => setAchievementModal({ title: "Первый ключ", text: userKeys >= 1 ? "Вы уже начали свое приключение!" : "Соберите 1 ключ, чтобы открыть достижение." })}
-                        >
-                          Первый ключ
-                        </SimpleCell>
+                          onClick={() => setAchievementInfo({ title: "Первый ключ", text: userKeys >= 1 ? "Вы уже начали свое приключение!" : "Соберите 1 ключ, чтобы открыть." })}
+                        >Первый ключ</SimpleCell>
                         <SimpleCell 
                           before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}
-                          onClick={() => setAchievementModal({ title: "Исследователь", text: userKeys >= 5 ? "Вы посетили 5 мест!" : `Еще ${5 - userKeys} ключей до достижения.` })}
-                        >
-                          Исследователь (5 ключей)
-                        </SimpleCell>
-                        <Div>
-                          <Footnote>Прогресс до звания "Мастер": {Math.min(userKeys * 10, 100)}%</Footnote>
-                        </Div>
+                          onClick={() => setAchievementInfo({ title: "Исследователь", text: userKeys >= 5 ? "Вы посетили 5 мест!" : `Еще ${5 - userKeys} до достижения.` })}
+                        >Исследователь (5 ключей)</SimpleCell>
                       </Group>
 
-                      {/* Модальное окно достижений */}
-                      {achievementModal && (
-                        <Placeholder
-                          stretched
-                          header={achievementModal.title}
-                          icon={<Icon28KeyOutline width={56} height={56} />}
-                          action={<Button onClick={() => setAchievementModal(null)}>Закрыть</Button>}
-                        >
-                          {achievementModal.text}
-                        </Placeholder>
+                      {/* Блок отображения информации об ачивке */}
+                      {achievementInfo && (
+                        <Div style={{ margin: '10px 0', background: '#f5f5f5', borderRadius: 8, padding: 12 }}>
+                          <Title level="3">{achievementInfo.title}</Title>
+                          <Footnote style={{ marginBottom: 10 }}>{achievementInfo.text}</Footnote>
+                          <Button mode="secondary" size="s" onClick={() => setAchievementInfo(null)}>Закрыть</Button>
+                        </Div>
                       )}
 
                       <Group header={<Header mode="secondary">Избранное</Header>}>
@@ -204,7 +193,6 @@ export function UserApp() {
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>Все спецпредложения от {activePartner}.</Placeholder>
                 </Panel>
-
               </View>
             </SplitCol>
           </SplitLayout>
