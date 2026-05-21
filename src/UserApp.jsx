@@ -20,7 +20,7 @@ export function UserApp() {
   const [activePartner, setActivePartner] = useState(null);
   const [user, setUser] = useState(null);
   const [userKeys, setUserKeys] = useState(3);
-  const [favorites, setFavorites] = useState([]); // Состояние для избранного
+  const [favorites, setFavorites] = useState([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -115,13 +115,24 @@ export function UserApp() {
                 {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
+                  <Header mode="secondary">События</Header>
+                  <HorizontalScroll showArrows>
+                    <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
+                      {[1, 2, 3].map(i => (
+                        <Card key={i} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}>
+                          <Title level="3">Событие {i}</Title>
+                        </Card>
+                      ))}
+                    </div>
+                  </HorizontalScroll>
+
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
                       {partners.map((p) => (
                         <div key={p.id} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
                           <Icon28StorefrontOutline />
-                          <div style={{ marginBottom: 8, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
+                          <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                           <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Смотреть</Button>
                           <Button size="s" mode={favorites.includes(p.id) ? "secondary" : "outline"} stretched onClick={() => toggleFavorite(p.id)} style={{ marginTop: 8 }}>
                             {favorites.includes(p.id) ? "В избранном ❤️" : "В избранное 🤍"}
