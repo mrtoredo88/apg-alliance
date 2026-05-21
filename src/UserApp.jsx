@@ -23,6 +23,7 @@ export function UserApp() {
   const [favorites, setFavorites] = useState([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [partners, setPartners] = useState([]);
+  const [events, setEvents] = useState([]); // Состояние для событий
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function UserApp() {
       loadUserData(u.id.toString());
     });
     fetchPartners();
+    fetchEvents(); // Загрузка событий
   }, []);
 
   const loadUserData = async (id) => {
@@ -46,17 +48,26 @@ export function UserApp() {
     }
   };
 
-const fetchPartners = async () => {
+  const fetchPartners = async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "partners"));
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("Загруженные партнеры:", data); // Проверьте консоль браузера
       setPartners(data);
     } catch (e) {
       console.error("Ошибка при загрузке партнеров:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "events"));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setEvents(data);
+    } catch (e) {
+      console.error("Ошибка при загрузке событий:", e);
     }
   };
 
@@ -125,11 +136,11 @@ const fetchPartners = async () => {
                   <Header mode="secondary">События</Header>
                   <HorizontalScroll showArrows>
                     <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
-                      {[1, 2, 3].map(i => (
-                        <Card key={i} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}>
-                          <Title level="3">Событие {i}</Title>
+                      {events.length > 0 ? events.map(e => (
+                        <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}>
+                          <Title level="3">{e.title}</Title>
                         </Card>
-                      ))}
+                      )) : <div style={{ padding: '0 16px', color: '#999' }}>Нет активных событий</div>}
                     </div>
                   </HorizontalScroll>
 
