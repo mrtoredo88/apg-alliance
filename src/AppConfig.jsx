@@ -1,4 +1,4 @@
-import { AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, Group, Placeholder } from '@vkontakte/vkui';
+import { AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, Group, Placeholder, Header } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css'; // Обязательно импортируем стили!
 import { Card, SimpleCell, Avatar, Title, Text, Button, Spacing } from '@vkontakte/vkui';
 import { Icon28UserOutline, Icon28SettingsOutline } from '@vkontakte/icons';
