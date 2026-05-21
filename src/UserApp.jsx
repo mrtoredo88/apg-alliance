@@ -20,6 +20,7 @@ export function UserApp() {
   const [activePartner, setActivePartner] = useState(null);
   const [user, setUser] = useState(null);
   const [userKeys, setUserKeys] = useState(3);
+  const [favorites, setFavorites] = useState([]); // Состояние для избранного
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +37,13 @@ export function UserApp() {
   const loadUserData = async (id) => {
     const userRef = doc(db, "users", id);
     const docSnap = await getDoc(userRef);
-    if (docSnap.exists()) setUserKeys(docSnap.data().keys);
-    else await setDoc(userRef, { keys: 3 });
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      setUserKeys(data.keys);
+      setFavorites(data.favorites || []);
+    } else {
+      await setDoc(userRef, { keys: 3, favorites: [] });
+    }
   };
 
   const fetchPartners = async () => {
@@ -45,6 +51,17 @@ export function UserApp() {
     const snapshot = await getDocs(collection(db, "partners"));
     setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     setLoading(false);
+  };
+
+  const toggleFavorite = async (partnerId) => {
+    if (!user) return;
+    const userRef = doc(db, "users", user.id.toString());
+    let newFavorites = favorites.includes(partnerId) 
+      ? favorites.filter(id => id !== partnerId) 
+      : [...favorites, partnerId];
+    
+    await updateDoc(userRef, { favorites: newFavorites });
+    setFavorites(newFavorites);
   };
 
   const handleConfirmScan = async (partnerName) => {
@@ -76,6 +93,19 @@ export function UserApp() {
                       <Footnote style={{ marginTop: '10px' }}>Собрано {userKeys} из 10 ключей</Footnote>
                     </Div>
                   </Group>
+
+                  <Group header={<Header mode="secondary">Избранное</Header>}>
+                    {favorites.length > 0 ? (
+                      partners.filter(p => favorites.includes(p.id)).map(p => (
+                        <SimpleCell key={p.id} onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
+                          {p.name}
+                        </SimpleCell>
+                      ))
+                    ) : (
+                      <Placeholder>Здесь пока пусто</Placeholder>
+                    )}
+                  </Group>
+
                   <Group header={<Header mode="secondary">Настройки</Header>}>
                     <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
                     <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
@@ -85,32 +115,23 @@ export function UserApp() {
                 {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
-                  <Header mode="secondary">События</Header>
-                  <HorizontalScroll showArrows>
-                    <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
-                      {[1, 2, 3].map(i => (
-                        <Card key={i} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}>
-                          <Title level="3">Событие {i}</Title>
-                        </Card>
-                      ))}
-                    </div>
-                  </HorizontalScroll>
-
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
                       {partners.map((p) => (
                         <div key={p.id} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
                           <Icon28StorefrontOutline />
-                          <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
+                          <div style={{ marginBottom: 8, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                           <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Смотреть</Button>
+                          <Button size="s" mode={favorites.includes(p.id) ? "secondary" : "outline"} stretched onClick={() => toggleFavorite(p.id)} style={{ marginTop: 8 }}>
+                            {favorites.includes(p.id) ? "В избранном ❤️" : "В избранное 🤍"}
+                          </Button>
                         </div>
                       ))}
                     </div>
                   )}
                 </Panel>
 
-                {/* ПАРТНЕР */}
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>Все спецпредложения от {activePartner}.</Placeholder>
