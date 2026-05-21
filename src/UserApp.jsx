@@ -25,6 +25,8 @@ export function UserApp() {
   const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]); 
   const [loading, setLoading] = useState(true);
+  // Состояние для модального окна достижений
+  const [achievementModal, setAchievementModal] = useState(null);
 
   useEffect(() => {
     vkBridge.send('VKWebAppInit');
@@ -118,13 +120,34 @@ export function UserApp() {
 
                       {/* Достижения */}
                       <Group header={<Header mode="secondary">Достижения</Header>}>
-                        <SimpleCell before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}>
+                        <SimpleCell 
+                          before={<Icon28KeyOutline style={{ color: userKeys >= 1 ? 'gold' : 'gray' }}/>}
+                          onClick={() => setAchievementModal({ title: "Первый ключ", text: userKeys >= 1 ? "Вы уже начали свое приключение!" : "Соберите 1 ключ, чтобы открыть достижение." })}
+                        >
                           Первый ключ
                         </SimpleCell>
-                        <SimpleCell before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}>
+                        <SimpleCell 
+                          before={<Icon28StorefrontOutline style={{ color: userKeys >= 5 ? 'gold' : 'gray' }}/>}
+                          onClick={() => setAchievementModal({ title: "Исследователь", text: userKeys >= 5 ? "Вы посетили 5 мест!" : `Еще ${5 - userKeys} ключей до достижения.` })}
+                        >
                           Исследователь (5 ключей)
                         </SimpleCell>
+                        <Div>
+                          <Footnote>Прогресс до звания "Мастер": {Math.min(userKeys * 10, 100)}%</Footnote>
+                        </Div>
                       </Group>
+
+                      {/* Модальное окно достижений */}
+                      {achievementModal && (
+                        <Placeholder
+                          stretched
+                          header={achievementModal.title}
+                          icon={<Icon28KeyOutline width={56} height={56} />}
+                          action={<Button onClick={() => setAchievementModal(null)}>Закрыть</Button>}
+                        >
+                          {achievementModal.text}
+                        </Placeholder>
+                      )}
 
                       <Group header={<Header mode="secondary">Избранное</Header>}>
                         {favorites.length > 0 ? (
@@ -162,23 +185,9 @@ export function UserApp() {
 
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 1fr', 
-                      gap: '12px', 
-                      padding: '8px 16px 24px' 
-                    }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '8px 16px 24px' }}>
                       {partners.map((p) => (
-                        <div key={p.id} style={{ 
-                          background: 'var(--vkui--color_background_content)', 
-                          padding: '16px', 
-                          borderRadius: '16px', 
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
-                          textAlign: 'center',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center'
-                        }}>
+                        <div key={p.id} style={{ background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <Icon28StorefrontOutline />
                           <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                           <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Смотреть</Button>
