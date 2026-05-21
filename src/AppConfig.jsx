@@ -9,7 +9,7 @@ import vkBridge from '@vkontakte/vk-bridge';
 import { 
   Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
   Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline,
-  Icon28CupOutline, Icon28BookOutline, Icon28PaletteOutline, Icon28TheaterOutline, Icon28MusicOutline
+  Icon28CupOutline, Icon28BookOutline, Icon28PaletteOutline, Icon28Theater, Icon28Music 
 } from '@vkontakte/icons';
 
 export const AppConfig = () => {
@@ -33,8 +33,8 @@ export const AppConfig = () => {
     { name: 'Кафе "Вкус"', icon: <Icon28CupOutline fill="#FF9800" /> },
     { name: 'Магазин "Книги"', icon: <Icon28BookOutline fill="#2196F3" /> },
     { name: 'Музей города', icon: <Icon28PaletteOutline fill="#9C27B0" /> },
-    { name: 'Кинотеатр', icon: <Icon28TheaterOutline fill="#E91E63" /> },
-    { name: 'Концерт-холл', icon: <Icon28MusicOutline fill="#4CAF50" /> },
+    { name: 'Кинотеатр', icon: <Icon28Theater fill="#E91E63" /> },
+    { name: 'Концерт-холл', icon: <Icon28Music fill="#4CAF50" /> },
   ];
 
   return (
@@ -45,6 +45,7 @@ export const AppConfig = () => {
             <SplitCol>
               <View activePanel={activePanel}>
                 
+                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   <Group>
@@ -62,6 +63,7 @@ export const AppConfig = () => {
                   </Group>
                 </Panel>
 
+                {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
                   
@@ -77,7 +79,6 @@ export const AppConfig = () => {
                   </HorizontalScroll>
 
                   <Header mode="secondary">Наши партнеры</Header>
-                  {/* ГАРАНТИРОВАННАЯ ЦЕНТРОВКА */}
                   <div style={{ 
                     display: 'flex', 
                     flexWrap: 'wrap', 
@@ -104,6 +105,7 @@ export const AppConfig = () => {
                   </div>
                 </Panel>
 
+                {/* ПАНЕЛЬ ПАРТНЕРА */}
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>
