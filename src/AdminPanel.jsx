@@ -1,58 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import bridge from '@vkontakte/vk-bridge';
+import vkBridge from '@vkontakte/vk-bridge'; // Используем единообразно vkBridge
 import { db } from './firebase';
-import { collection, getDocs, updateDoc, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 
 export const AdminPanel = () => {
   const [partners, setPartners] = useState([]);
+  const [debug, setDebug] = useState("Инициализация...");
 
   useEffect(() => {
     const init = async () => {
       try {
-        const user = await bridge.send('VKWebAppGetUserInfo');
+        // 1. Обязательная инициализация моста
+        await vkBridge.send('VKWebAppInit');
+        
+        // 2. Получение данных пользователя
+        const user = await vkBridge.send('VKWebAppGetUserInfo');
+        
         if (user.id !== 988504) {
           window.location.hash = '/';
           return;
         }
+        
+        setDebug("Авторизация успешна, загрузка...");
+        fetchPartners();
       } catch (e) {
-        console.warn("VK Bridge недоступен");
+        console.error("Ошибка инициализации:", e);
+        setDebug("Ошибка доступа: " + e.message);
+        // Для отладки в браузере раскомментируйте строку ниже:
+        // fetchPartners();
       }
-      fetchPartners();
     };
     init();
   }, []);
 
-const fetchPartners = async () => {
+  const fetchPartners = async () => {
     try {
-      // Прямой запрос к коллекции 'partners'
       const colRef = collection(db, "partners");
       const snapshot = await getDocs(colRef);
       
-      console.log("--- ОТЛАДКА FIREBASE ---");
-      console.log("Коллекция:", colRef.path);
-      console.log("Документов найдено:", snapshot.size);
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPartners(docs);
+      setDebug(`Загружено партнеров: ${docs.length}`);
       
-      if (snapshot.empty) {
-        console.log("Коллекция пуста. Пытаюсь найти другие коллекции...");
-        // Вдруг вы случайно создали коллекцию с другим именем?
-        // Этот код не нужен в продакшене, но поможет найти данные сейчас
-      } else {
-        snapshot.docs.forEach(doc => {
-          console.log("Нашел документ ID:", doc.id, "Данные:", doc.data());
-        });
-      }
-
-      setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      console.log("Данные из Firebase в админке:", docs);
     } catch (e) {
       console.error("Ошибка Firebase:", e);
-      alert("Ошибка: " + e.message);
+      setDebug("Ошибка загрузки данных: " + e.message);
     }
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
       <h1>Админ-панель</h1>
-      <p>Найдено партнеров: {partners.length}</p>
+      <p style={{ color: '#666' }}>Статус: {debug}</p>
       
       {partners.map(p => (
         <div key={p.id} style={{ border: '1px solid #ccc', margin: 10, padding: 10, borderRadius: 8 }}>
