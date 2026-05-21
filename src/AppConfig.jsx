@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
   Group, Header, Card, SimpleCell, Avatar, Title, Button, Spacing, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner
+  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner,
+  Input, FormLayout, FormLayoutGroup 
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
@@ -13,7 +14,7 @@ import {
 } from '@vkontakte/icons';
 
 import { db } from './firebase'; 
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
 
 export const AppConfig = () => {
   const [activePanel, setActivePanel] = useState('profile');
@@ -22,6 +23,10 @@ export const AppConfig = () => {
   const [keysCount, setKeysCount] = useState(0);
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Состояния для админки
+  const [newPartnerName, setNewPartnerName] = useState('');
+  const MY_VK_ID = 988504; // <--- ВСТАВЬТЕ СЮДА СВОЙ ID ИЗ ВК
 
   useEffect(() => {
     const savedKeys = localStorage.getItem('apg_keys_count');
@@ -30,19 +35,33 @@ export const AppConfig = () => {
     vkBridge.send('VKWebAppInit');
     vkBridge.send('VKWebAppGetUserInfo').then(setUser).catch(() => {});
 
-    const fetchPartners = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "partners"));
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setPartners(data);
-      } catch (e) {
-        console.error("Ошибка Firebase:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchPartners();
   }, []);
+
+  const fetchPartners = async () => {
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, "partners"));
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPartners(data);
+    } catch (e) {
+      console.error("Ошибка Firebase:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddPartner = async () => {
+    if (!newPartnerName.trim()) return;
+    try {
+      await addDoc(collection(db, "partners"), { name: newPartnerName });
+      alert("Партнер добавлен!");
+      setNewPartnerName('');
+      fetchPartners(); // Обновляем список
+    } catch (e) {
+      alert("Ошибка: " + e.message);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('apg_keys_count', keysCount.toString());
@@ -56,7 +75,6 @@ export const AppConfig = () => {
             <SplitCol>
               <View activePanel={activePanel}>
                 
-                {/* ПРОФИЛЬ */}
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   <Group>
@@ -69,7 +87,22 @@ export const AppConfig = () => {
                     </Div>
                   </Group>
                   
-                  {/* ВОЗВРАЩАЕМ БЛОКИ ПРОФИЛЯ */}
+                  {/* Секция Администратора */}
+                  {user?.id === MY_VK_ID && (
+                    <Group header={<Header mode="primary">Панель администратора</Header>}>
+                      <FormLayout>
+                        <FormLayoutGroup mode="vertical">
+                          <Input 
+                            value={newPartnerName} 
+                            onChange={(e) => setNewPartnerName(e.target.value)} 
+                            placeholder="Название нового партнера" 
+                          />
+                          <Button size="m" onClick={handleAddPartner}>Добавить партнера</Button>
+                        </FormLayoutGroup>
+                      </FormLayout>
+                    </Group>
+                  )}
+                  
                   <Group header={<Header mode="secondary">Друзья</Header>}>
                     <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
                   </Group>
@@ -79,7 +112,6 @@ export const AppConfig = () => {
                   </Group>
                 </Panel>
 
-                {/* ГЛАВНАЯ */}
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
                   <Header mode="secondary">События</Header>
@@ -111,7 +143,6 @@ export const AppConfig = () => {
                   )}
                 </Panel>
 
-                {/* ПАРТНЕР */}
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>
