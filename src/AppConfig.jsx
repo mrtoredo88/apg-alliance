@@ -9,10 +9,9 @@ import vkBridge from '@vkontakte/vk-bridge';
 import { 
   Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
   Icon28PlaceOutline, Icon28UserAddOutline, Icon28DoorArrowRightOutline,
-  Icon28StorefrontOutline // Иконка по умолчанию для партнеров
+  Icon28StorefrontOutline 
 } from '@vkontakte/icons';
 
-// Подключаем БД из вашего файла
 import { db } from './firebase'; 
 import { collection, getDocs } from 'firebase/firestore';
 
@@ -25,32 +24,25 @@ export const AppConfig = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Загрузка прогресса
     const savedKeys = localStorage.getItem('apg_keys_count');
     if (savedKeys) setKeysCount(parseInt(savedKeys, 10));
-
-    // 2. Инициализация ВК
+    
     vkBridge.send('VKWebAppInit');
     vkBridge.send('VKWebAppGetUserInfo').then(setUser).catch(() => {});
 
-    // 3. Загрузка партнеров из Firestore
     const fetchPartners = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "partners"));
         const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setPartners(data);
       } catch (e) {
-        console.error("Ошибка загрузки из Firestore:", e);
+        console.error("Ошибка Firebase:", e);
       } finally {
         setLoading(false);
       }
     };
     fetchPartners();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('apg_keys_count', keysCount.toString());
-  }, [keysCount]);
 
   return (
     <ConfigProvider>
@@ -62,6 +54,7 @@ export const AppConfig = () => {
                 
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
+                  {/* ... код профиля такой же ... */}
                   <Group>
                     <SimpleCell before={user?.photo_200 ? <Avatar size={64} src={user.photo_200} /> : <Avatar size={64} />}>
                       <Title level="2" weight="1">{user ? `${user.first_name} ${user.last_name}` : "Исследователь"}</Title>
@@ -71,14 +64,11 @@ export const AppConfig = () => {
                       <Footnote style={{ marginTop: '10px' }}>Собрано {keysCount} из 10 ключей</Footnote>
                     </Div>
                   </Group>
-                  <Group header={<Header mode="secondary">Настройки</Header>}>
-                    <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
-                    <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
-                  </Group>
                 </Panel>
 
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
+                  
                   <Header mode="secondary">События</Header>
                   <HorizontalScroll showArrows>
                     <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
@@ -92,14 +82,14 @@ export const AppConfig = () => {
 
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}><Spinner /></div>
+                    <div style={{ padding: 20, textAlign: 'center' }}><Spinner /></div>
+                  ) : partners.length === 0 ? (
+                    <Placeholder>Партнеры пока не добавлены</Placeholder>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', padding: '8px 16px 24px' }}>
                       {partners.map((p) => (
                         <div key={p.id} style={{ width: '150px', background: 'var(--vkui--color_background_content)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                            <Icon28StorefrontOutline />
-                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Icon28StorefrontOutline /></div>
                           <div style={{ marginBottom: 12, fontSize: '14px', fontWeight: '600' }}>{p.name}</div>
                           <Button size="s" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>
                             Смотреть
@@ -113,7 +103,7 @@ export const AppConfig = () => {
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
                   <Placeholder header="Акции партнера" icon={<Icon28KeyOutline />}>
-                    Спецпредложения для участников APG Alliance.
+                    Все спецпредложения от {activePartner}.
                   </Placeholder>
                 </Panel>
 
