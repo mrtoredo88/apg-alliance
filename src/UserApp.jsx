@@ -131,7 +131,7 @@ const fetchPartners = async () => {
                 </Panel>
 
                 <Panel id="home">
-                  <PanelHeader>APG Alliance</PanelHeader>
+                  <PanelHeader>АПГ: Зеленоград</PanelHeader>
                   <Header mode="secondary">События</Header>
                   <HorizontalScroll showArrows>
                     <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
@@ -141,17 +141,30 @@ const fetchPartners = async () => {
 
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
-                      {partners.map((p) => (
-                        <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
-                          {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />}
-                          <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
-                          <Button size="m" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Открыть</Button>
-                          <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}</Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+// ... внутри Panel id="home"
+{partners.map((p) => (
+  <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
+    {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />}
+    <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
+    
+    {/* ВСТАВЛЯЙТЕ СЮДА: */}
+    <Button 
+      size="m" 
+      mode="primary" 
+      stretched 
+      onClick={() => { 
+        setActivePartner(p); // Сохраняем данные конкретного партнера
+        setActivePanel('partner'); // Переходим на страницу партнера
+      }}
+    >
+      Открыть
+    </Button>
+    
+    <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>
+      {favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}
+    </Button>
+  </div>
+))}
                 </Panel>
 
 <Panel id="partner">
