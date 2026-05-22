@@ -8,7 +8,7 @@ import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
 import { 
   Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, 
-  Icon28UserAddOutline, Icon28DoorArrowRightOutline, Icon28StorefrontOutline 
+  Icon28UserAddOutline, Icon28DoorArrowRightOutline, Icon28StorefrontOutline, Icon28HelpOutline 
 } from '@vkontakte/icons';
 
 import { db } from './firebase'; 
@@ -24,6 +24,7 @@ export function UserApp() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]); 
+  const [faq, setFaq] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function UserApp() {
     });
     fetchPartners();
     fetchEvents();
+    fetchFaq();
   }, []);
 
   const loadUserData = async (id) => {
@@ -54,9 +56,7 @@ export function UserApp() {
       const snapshot = await getDocs(collection(db, "partners"));
       const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
         const data = d.data();
-        if (data.name) {
-          return { id: d.id, name: data.name, logoUrl: data.logoUrl || null, description: data.description, link: data.link };
-        }
+        if (data.name) return { id: d.id, ...data };
         if (data.groupId) {
           try {
             const res = await vkBridge.send("VKWebAppCallAPIMethod", {
@@ -64,11 +64,11 @@ export function UserApp() {
               params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
             });
             if (res.response && res.response[0]) {
-              return { id: d.id, name: res.response[0].name, logoUrl: res.response[0].photo_200, description: data.description, link: data.link };
+              return { id: d.id, name: res.response[0].name, logoUrl: res.response[0].photo_200, ...data };
             }
           } catch (e) { console.error(e); }
         }
-        return { id: d.id, name: "Партнер", logoUrl: null, description: data.description, link: data.link };
+        return { id: d.id, name: "Партнер", logoUrl: null, ...data };
       }));
       setPartners(partnersList);
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -77,6 +77,11 @@ export function UserApp() {
   const fetchEvents = async () => {
     const snapshot = await getDocs(collection(db, "events"));
     setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+  };
+
+  const fetchFaq = async () => {
+    const snapshot = await getDocs(collection(db, "faq"));
+    setFaq(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   const toggleFavorite = async (partnerId) => {
@@ -116,10 +121,22 @@ export function UserApp() {
                       </Group>
                       <Group header={<Header mode="secondary">Действия</Header>}>
                         <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                        <CellButton before={<Icon28HelpOutline />} onClick={() => setActivePanel('faq')}>Помощь и FAQ</CellButton>
                         <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
                       </Group>
                     </>
                   )}
+                </Panel>
+
+                <Panel id="faq">
+                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('profile')} />}>Помощь</PanelHeader>
+                  <Group>
+                    {faq.map((item) => (
+                      <Group key={item.id} header={<Header mode="secondary">{item.question}</Header>}>
+                        <Div>{item.answer}</Div>
+                      </Group>
+                    ))}
+                  </Group>
                 </Panel>
 
                 <Panel id="home">
