@@ -154,10 +154,32 @@ const fetchPartners = async () => {
                   )}
                 </Panel>
 
-                <Panel id="partner">
-                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
-                  <Placeholder>Акции партнера {activePartner}</Placeholder>
-                </Panel>
+<Panel id="partner">
+  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>
+    {activePartner?.name}
+  </PanelHeader>
+  
+  {activePartner && (
+    <Div>
+      <Avatar size={96} src={activePartner.logoUrl} style={{ margin: '0 auto 16px', display: 'block' }} />
+      <Title level="1" style={{ textAlign: 'center', marginBottom: 16 }}>{activePartner.name}</Title>
+      <div style={{ marginBottom: 24, lineHeight: '1.5' }}>
+        {activePartner.description || "У этого партнера пока нет описания."}
+      </div>
+      
+      {activePartner.link && (
+        <Button 
+          size="l" 
+          mode="primary" 
+          stretched 
+          onClick={() => window.open(activePartner.link, '_blank')}
+        >
+          Перейти к партнеру
+        </Button>
+      )}
+    </Div>
+  )}
+</Panel>
               </View>
             </SplitCol>
           </SplitLayout>
