@@ -52,13 +52,23 @@ export function UserApp() {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "partners"));
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPartners(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+      const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
+        const data = d.data();
+        if (!data.groupId) return { id: d.id, name: "Партнер" };
+        
+        try {
+          const res = await vkBridge.send("VKWebAppCallAPIMethod", {
+            method: "groups.getById",
+            params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
+          });
+          const group = res.response[0];
+          return { id: d.id, name: group.name, logoUrl: group.photo_200 };
+        } catch {
+          return { id: d.id, name: "Ошибка загрузки" };
+        }
+      }));
+      setPartners(partnersList);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   const fetchEvents = async () => {
@@ -90,21 +100,18 @@ export function UserApp() {
           <SplitLayout style={{ height: '100vh' }}>
             <SplitCol>
               <View activePanel={activePanel}>
-                
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  {!user ? <Spinner size="large" style={{ marginTop: 20 }} /> : (
+                  {!user ? <Spinner size="large" /> : (
                     <>
                       <Group>
                         <SimpleCell before={<Avatar size={64} src={user.photo_200} />}>
                           <Title level="2">{`${user.first_name} ${user.last_name}`}</Title>
                         </SimpleCell>
-                        <Div><Progress value={userKeys * 10} /><Footnote>Собрано {userKeys} из 10 ключей</Footnote></Div>
+                        <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
                       </Group>
-                      
                       <Group header={<Header mode="secondary">Настройки</Header>}>
-                        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
-                        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+                        <CellButton mode="danger" onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить</CellButton>
                       </Group>
                     </>
                   )}
@@ -112,11 +119,11 @@ export function UserApp() {
 
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
-                  {loading ? <Spinner size="large" style={{ marginTop: 20 }} /> : (
+                  {loading ? <Spinner /> : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
                       {partners.map((p) => (
                         <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
-                          <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />
+                          {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline />}
                           <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
                           <Button size="m" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Открыть</Button>
                           <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}</Button>
@@ -133,7 +140,6 @@ export function UserApp() {
               </View>
             </SplitCol>
           </SplitLayout>
-          
           <Tabbar>
             <TabbarItem onClick={() => setActivePanel('home')} selected={activePanel === 'home'} text="Главная"><Icon28HomeOutline /></TabbarItem>
             <TabbarItem onClick={() => setIsScannerOpen(true)} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
