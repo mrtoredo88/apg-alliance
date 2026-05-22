@@ -48,19 +48,15 @@ export function UserApp() {
     }
   };
 
-const fetchPartners = async () => {
+  const fetchPartners = async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "partners"));
       const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
         const data = d.data();
-        
-        // ПРИОРИТЕТ 1: Данные из Firebase (если прописали вручную)
         if (data.name) {
-          return { id: d.id, name: data.name, logoUrl: data.logoUrl || null };
+          return { id: d.id, name: data.name, logoUrl: data.logoUrl || null, description: data.description, link: data.link };
         }
-
-        // ПРИОРИТЕТ 2: Если в Firebase нет имени, пробуем VK API
         if (data.groupId) {
           try {
             const res = await vkBridge.send("VKWebAppCallAPIMethod", {
@@ -68,15 +64,11 @@ const fetchPartners = async () => {
               params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
             });
             if (res.response && res.response[0]) {
-              return { id: d.id, name: res.response[0].name, logoUrl: res.response[0].photo_200 };
+              return { id: d.id, name: res.response[0].name, logoUrl: res.response[0].photo_200, description: data.description, link: data.link };
             }
-          } catch (e) {
-            console.error("Ошибка VK API:", e);
-          }
+          } catch (e) { console.error(e); }
         }
-        
-        // ПРИОРИТЕТ 3: Если ничего не вышло
-        return { id: d.id, name: "Партнер", logoUrl: null };
+        return { id: d.id, name: "Партнер", logoUrl: null, description: data.description, link: data.link };
       }));
       setPartners(partnersList);
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -141,58 +133,34 @@ const fetchPartners = async () => {
 
                   <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
-// ... внутри Panel id="home"
-{partners.map((p) => (
-  <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
-    {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />}
-    <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
-    
-    {/* ВСТАВЛЯЙТЕ СЮДА: */}
-    <Button 
-      size="m" 
-      mode="primary" 
-      stretched 
-      onClick={() => { 
-        setActivePartner(p); // Сохраняем данные конкретного партнера
-        setActivePanel('partner'); // Переходим на страницу партнера
-      }}
-    >
-      Открыть
-    </Button>
-    
-    <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>
-      {favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}
-    </Button>
-  </div>
-))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
+                      {partners.map((p) => (
+                        <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
+                          {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />}
+                          <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
+                          <Button size="m" mode="primary" stretched onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>Открыть</Button>
+                          <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Panel>
 
-<Panel id="partner">
-  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>
-    {activePartner?.name}
-  </PanelHeader>
-  
-  {activePartner && (
-    <Div>
-      <Avatar size={96} src={activePartner.logoUrl} style={{ margin: '0 auto 16px', display: 'block' }} />
-      <Title level="1" style={{ textAlign: 'center', marginBottom: 16 }}>{activePartner.name}</Title>
-      <div style={{ marginBottom: 24, lineHeight: '1.5' }}>
-        {activePartner.description || "У этого партнера пока нет описания."}
-      </div>
-      
-      {activePartner.link && (
-        <Button 
-          size="l" 
-          mode="primary" 
-          stretched 
-          onClick={() => window.open(activePartner.link, '_blank')}
-        >
-          Перейти к партнеру
-        </Button>
-      )}
-    </Div>
-  )}
-</Panel>
+                <Panel id="partner">
+                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>
+                    {activePartner?.name}
+                  </PanelHeader>
+                  {activePartner && (
+                    <Div>
+                      <Avatar size={96} src={activePartner.logoUrl} style={{ margin: '0 auto 16px', display: 'block' }} />
+                      <Title level="1" style={{ textAlign: 'center', marginBottom: 16 }}>{activePartner.name}</Title>
+                      <div style={{ marginBottom: 24, lineHeight: '1.5' }}>{activePartner.description || "У этого партнера пока нет описания."}</div>
+                      {activePartner.link && (
+                        <Button size="l" mode="primary" stretched onClick={() => window.open(activePartner.link, '_blank')}>Перейти к партнеру</Button>
+                      )}
+                    </Div>
+                  )}
+                </Panel>
               </View>
             </SplitCol>
           </SplitLayout>
