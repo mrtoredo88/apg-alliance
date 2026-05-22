@@ -48,34 +48,34 @@ export function UserApp() {
     }
   };
 
-  const fetchPartners = async () => {
-    setLoading(true);
-    try {
-      const snapshot = await getDocs(collection(db, "partners"));
-      const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
-        const data = d.data();
-        // 1. Приоритет данным из Firebase
-        if (data.name) {
-          return { id: d.id, name: data.name, logoUrl: data.logoUrl || null };
-        }
-        // 2. Если данных в Firebase нет, пробуем VK API
-        if (data.groupId) {
-          try {
-            const res = await vkBridge.send("VKWebAppCallAPIMethod", {
-              method: "groups.getById",
-              params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
-            });
-            const group = res.response[0];
-            return { id: d.id, name: group.name, logoUrl: group.photo_200 };
-          } catch (e) {
-            return { id: d.id, name: `Ошибка (${data.groupId})`, logoUrl: null };
-          }
-        }
-        return { id: d.id, name: "Партнер", logoUrl: null };
-      }));
-      setPartners(partnersList);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
-  };
+const fetchPartners = async () => {
+  setLoading(true);
+  try {
+    const snapshot = await getDocs(collection(db, "partners"));
+    const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
+      const data = d.data();
+      if (!data.groupId) return { id: d.id, name: "Нет ID группы" };
+      
+      try {
+        // Добавляем отладку
+        console.log("Запрашиваю данные для:", data.groupId);
+        const res = await vkBridge.send("VKWebAppCallAPIMethod", {
+          method: "groups.getById",
+          params: { group_id: data.groupId, fields: "photo_200,name", v: "5.199" }
+        });
+        
+        console.log("Ответ от VK для", data.groupId, ":", res); // <--- ЭТО ВАЖНО
+        
+        const group = res.response[0];
+        return { id: d.id, name: group.name, logoUrl: group.photo_200 };
+      } catch (e) {
+        console.error("Критическая ошибка для", data.groupId, ":", e);
+        return { id: d.id, name: `Ошибка (${data.groupId})` };
+      }
+    }));
+    setPartners(partnersList);
+  } catch (e) { console.error(e); } finally { setLoading(false); }
+};
 
   const fetchEvents = async () => {
     const snapshot = await getDocs(collection(db, "events"));
