@@ -52,24 +52,13 @@ export function UserApp() {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "partners"));
-      const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
-        const data = d.data();
-        if (!data.groupId) return { id: d.id, name: "Партнер", logoUrl: null };
-        
-        try {
-          const res = await vkBridge.send("VKWebAppCallAPIMethod", {
-            method: "groups.getById",
-            params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
-          });
-          const group = res.response[0];
-          return { id: d.id, name: group.name, logoUrl: group.photo_200 };
-        } catch (e) {
-          console.error("Ошибка VK API для", data.groupId, e);
-          return { id: d.id, name: "Ошибка загрузки", logoUrl: null };
-        }
-      }));
-      setPartners(partnersList);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPartners(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchEvents = async () => {
@@ -126,8 +115,8 @@ export function UserApp() {
                   {loading ? <Spinner size="large" style={{ marginTop: 20 }} /> : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
                       {partners.map((p) => (
-                        <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                          {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />}
+                        <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
+                          <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />
                           <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
                           <Button size="m" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Открыть</Button>
                           <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}</Button>
@@ -139,9 +128,8 @@ export function UserApp() {
 
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner}</PanelHeader>
-                  <Placeholder>Подробная информация о партнере {activePartner}.</Placeholder>
+                  <Placeholder>Акции партнера {activePartner}</Placeholder>
                 </Panel>
-
               </View>
             </SplitCol>
           </SplitLayout>
@@ -151,7 +139,6 @@ export function UserApp() {
             <TabbarItem onClick={() => setIsScannerOpen(true)} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
             <TabbarItem onClick={() => setActivePanel('profile')} selected={activePanel === 'profile'} text="Профиль"><Icon28UserCircleOutline /></TabbarItem>
           </Tabbar>
-
           {isScannerOpen && <Scanner onScan={handleConfirmScan} />}
         </AppRoot>
       </AdaptivityProvider>
