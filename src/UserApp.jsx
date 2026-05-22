@@ -109,24 +109,45 @@ export function UserApp() {
             <SplitCol>
               <View activePanel={activePanel}>
                 
-                <Panel id="profile">
-                  <PanelHeader>Профиль</PanelHeader>
-                  {!user ? <Spinner size="large" /> : (
-                    <>
-                      <Group>
-                        <SimpleCell before={<Avatar size={64} src={user.photo_200} />}>
-                          <Title level="2">{`${user.first_name} ${user.last_name}`}</Title>
-                        </SimpleCell>
-                        <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
-                      </Group>
-                      <Group header={<Header mode="secondary">Действия</Header>}>
-                        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
-                        <CellButton before={<Icon28HelpOutline />} onClick={() => setActivePanel('faq')}>Помощь и FAQ</CellButton>
-                        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
-                      </Group>
-                    </>
-                  )}
-                </Panel>
+<Panel id="profile">
+  <PanelHeader>Профиль</PanelHeader>
+  {!user ? <Spinner size="large" /> : (
+    <>
+      <Group>
+        <SimpleCell before={<Avatar size={64} src={user.photo_200} />}>
+          <Title level="2">{`${user.first_name} ${user.last_name}`}</Title>
+        </SimpleCell>
+        <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
+      </Group>
+
+      {/* --- НОВЫЙ БЛОК ИЗБРАННОГО --- */}
+      <Group header={<Header mode="secondary">Избранные партнеры</Header>}>
+        {favorites.length === 0 ? (
+          <Div>У вас пока нет избранных партнеров.</Div>
+        ) : (
+          partners
+            .filter(p => favorites.includes(p.id)) // Оставляем только тех, кто в избранном
+            .map(p => (
+              <SimpleCell 
+                key={p.id} 
+                before={<Avatar size={40} src={p.logoUrl} />}
+                onClick={() => { setActivePartner(p); setActivePanel('partner'); }}
+                multiline
+              >
+                {p.name}
+              </SimpleCell>
+            ))
+        )}
+      </Group>
+
+      <Group header={<Header mode="secondary">Действия</Header>}>
+        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+        <CellButton before={<Icon28HelpOutline />} onClick={() => setActivePanel('faq')}>Помощь и FAQ</CellButton>
+        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+      </Group>
+    </>
+  )}
+</Panel>
 
                 <Panel id="faq">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('profile')} />}>Помощь</PanelHeader>
