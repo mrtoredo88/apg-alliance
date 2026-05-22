@@ -48,29 +48,30 @@ export function UserApp() {
     }
   };
 
-const fetchPartners = async () => {
+  const fetchPartners = async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "partners"));
       const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
         const data = d.data();
-        if (!data.groupId) return { id: d.id, name: "Без ID группы" };
-        
-        try {
-          const res = await vkBridge.send("VKWebAppCallAPIMethod", {
-            method: "groups.getById",
-            params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
-          });
-          
-          if (res.response && res.response[0]) {
-             const group = res.response[0];
-             return { id: d.id, name: group.name, logoUrl: group.photo_200 };
-          }
-          throw new Error("Пустой ответ VK");
-        } catch (e) {
-          console.error("Ошибка VK для ID:", data.groupId, e);
-          return { id: d.id, name: `Ошибка (${data.groupId})` };
+        // 1. Приоритет данным из Firebase
+        if (data.name) {
+          return { id: d.id, name: data.name, logoUrl: data.logoUrl || null };
         }
+        // 2. Если данных в Firebase нет, пробуем VK API
+        if (data.groupId) {
+          try {
+            const res = await vkBridge.send("VKWebAppCallAPIMethod", {
+              method: "groups.getById",
+              params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
+            });
+            const group = res.response[0];
+            return { id: d.id, name: group.name, logoUrl: group.photo_200 };
+          } catch (e) {
+            return { id: d.id, name: `Ошибка (${data.groupId})`, logoUrl: null };
+          }
+        }
+        return { id: d.id, name: "Партнер", logoUrl: null };
       }));
       setPartners(partnersList);
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -105,7 +106,8 @@ const fetchPartners = async () => {
           <SplitLayout style={{ height: '100vh' }}>
             <SplitCol>
               <View activePanel={activePanel}>
-<Panel id="profile">
+                
+                <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   {!user ? <Spinner size="large" /> : (
                     <>
@@ -115,8 +117,6 @@ const fetchPartners = async () => {
                         </SimpleCell>
                         <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
                       </Group>
-                      
-                      {/* ВОЗВРАЩАЕМ КНОПКИ */}
                       <Group header={<Header mode="secondary">Действия</Header>}>
                         <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
                         <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
@@ -127,11 +127,19 @@ const fetchPartners = async () => {
 
                 <Panel id="home">
                   <PanelHeader>APG Alliance</PanelHeader>
+                  <Header mode="secondary">События</Header>
+                  <HorizontalScroll showArrows>
+                    <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
+                      {events.map(e => <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}><Title level="3">{e.title}</Title></Card>)}
+                    </div>
+                  </HorizontalScroll>
+
+                  <Header mode="secondary">Наши партнеры</Header>
                   {loading ? <Spinner /> : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
                       {partners.map((p) => (
                         <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
-                          {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline />}
+                          {p.logoUrl ? <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} /> : <Icon28StorefrontOutline width={40} height={40} style={{ marginBottom: 12, color: '#999' }} />}
                           <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
                           <Button size="m" mode="primary" stretched onClick={() => { setActivePartner(p.name); setActivePanel('partner'); }}>Открыть</Button>
                           <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★ В избранном" : "☆ В избранное"}</Button>
@@ -148,6 +156,7 @@ const fetchPartners = async () => {
               </View>
             </SplitCol>
           </SplitLayout>
+          
           <Tabbar>
             <TabbarItem onClick={() => setActivePanel('home')} selected={activePanel === 'home'} text="Главная"><Icon28HomeOutline /></TabbarItem>
             <TabbarItem onClick={() => setIsScannerOpen(true)} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
