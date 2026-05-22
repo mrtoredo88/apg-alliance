@@ -48,23 +48,28 @@ export function UserApp() {
     }
   };
 
-  const fetchPartners = async () => {
+const fetchPartners = async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "partners"));
       const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
         const data = d.data();
-        if (!data.groupId) return { id: d.id, name: "Партнер" };
+        if (!data.groupId) return { id: d.id, name: "Без ID группы" };
         
         try {
           const res = await vkBridge.send("VKWebAppCallAPIMethod", {
             method: "groups.getById",
             params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
           });
-          const group = res.response[0];
-          return { id: d.id, name: group.name, logoUrl: group.photo_200 };
-        } catch {
-          return { id: d.id, name: "Ошибка загрузки" };
+          
+          if (res.response && res.response[0]) {
+             const group = res.response[0];
+             return { id: d.id, name: group.name, logoUrl: group.photo_200 };
+          }
+          throw new Error("Пустой ответ VK");
+        } catch (e) {
+          console.error("Ошибка VK для ID:", data.groupId, e);
+          return { id: d.id, name: `Ошибка (${data.groupId})` };
         }
       }));
       setPartners(partnersList);
@@ -100,7 +105,7 @@ export function UserApp() {
           <SplitLayout style={{ height: '100vh' }}>
             <SplitCol>
               <View activePanel={activePanel}>
-                <Panel id="profile">
+<Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
                   {!user ? <Spinner size="large" /> : (
                     <>
@@ -110,8 +115,11 @@ export function UserApp() {
                         </SimpleCell>
                         <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
                       </Group>
-                      <Group header={<Header mode="secondary">Настройки</Header>}>
-                        <CellButton mode="danger" onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить</CellButton>
+                      
+                      {/* ВОЗВРАЩАЕМ КНОПКИ */}
+                      <Group header={<Header mode="secondary">Действия</Header>}>
+                        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
+                        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
                       </Group>
                     </>
                   )}
