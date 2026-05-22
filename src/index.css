@@ -1,0 +1,17 @@
+:root {
+  /* Премиальная палитра: Глубокий синий и мягкое золото */
+  --vkui--color_background_app: #f9f9f9;
+  --vkui--color_background_content: #ffffff;
+  --vkui--color_text_primary: #1a1a1a;
+  --vkui--color_text_accent: #c5a059; /* Золотой оттенок */
+  --vkui--color_background_accent: #1e2a44; /* Глубокий деловой синий */
+  
+  /* Скругления для "дружелюбного" вида */
+  --vkui--size_border_radius_paper--regular: 16px;
+  --vkui--size_border_radius_button--m: 12px;
+}
+
+/* Эффект легкой тени для карточек, чтобы они выглядели «парящими» */
+.vkuiCard {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05) !important;
+}
