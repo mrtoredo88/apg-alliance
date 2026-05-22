@@ -49,33 +49,38 @@ export function UserApp() {
   };
 
 const fetchPartners = async () => {
-  setLoading(true);
-  try {
-    const snapshot = await getDocs(collection(db, "partners"));
-    const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
-      const data = d.data();
-      if (!data.groupId) return { id: d.id, name: "Нет ID группы" };
-      
-      try {
-        // Добавляем отладку
-        console.log("Запрашиваю данные для:", data.groupId);
-        const res = await vkBridge.send("VKWebAppCallAPIMethod", {
-          method: "groups.getById",
-          params: { group_id: data.groupId, fields: "photo_200,name", v: "5.199" }
-        });
+    setLoading(true);
+    try {
+      const snapshot = await getDocs(collection(db, "partners"));
+      const partnersList = await Promise.all(snapshot.docs.map(async (d) => {
+        const data = d.data();
         
-        console.log("Ответ от VK для", data.groupId, ":", res); // <--- ЭТО ВАЖНО
+        // ПРИОРИТЕТ 1: Данные из Firebase (если прописали вручную)
+        if (data.name) {
+          return { id: d.id, name: data.name, logoUrl: data.logoUrl || null };
+        }
+
+        // ПРИОРИТЕТ 2: Если в Firebase нет имени, пробуем VK API
+        if (data.groupId) {
+          try {
+            const res = await vkBridge.send("VKWebAppCallAPIMethod", {
+              method: "groups.getById",
+              params: { group_id: data.groupId, fields: "photo_200", v: "5.199" }
+            });
+            if (res.response && res.response[0]) {
+              return { id: d.id, name: res.response[0].name, logoUrl: res.response[0].photo_200 };
+            }
+          } catch (e) {
+            console.error("Ошибка VK API:", e);
+          }
+        }
         
-        const group = res.response[0];
-        return { id: d.id, name: group.name, logoUrl: group.photo_200 };
-      } catch (e) {
-        console.error("Критическая ошибка для", data.groupId, ":", e);
-        return { id: d.id, name: `Ошибка (${data.groupId})` };
-      }
-    }));
-    setPartners(partnersList);
-  } catch (e) { console.error(e); } finally { setLoading(false); }
-};
+        // ПРИОРИТЕТ 3: Если ничего не вышло
+        return { id: d.id, name: "Партнер", logoUrl: null };
+      }));
+      setPartners(partnersList);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
 
   const fetchEvents = async () => {
     const snapshot = await getDocs(collection(db, "events"));
