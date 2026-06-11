@@ -28,24 +28,29 @@ export function UserApp() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    vkBridge.send('VKWebAppInit');
-    vkBridge.send('VKWebAppGetUserInfo').then((u) => {
-      setUser(u);
-      loadUserData(u.id.toString());
-    });
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchPartners(), fetchEvents(), fetchFaq()]);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    async function initApp() {
+      setLoading(true);
+      try {
+        vkBridge.send('VKWebAppInit');
+        // 1. Получаем данные пользователя ВК
+        const userInfo = await vkBridge.send('VKWebAppGetUserInfo');
+        setUser(userInfo);
+        
+        // 2. Параллельно грузим всё остальное
+        await Promise.all([
+          loadUserData(userInfo.id.toString()),
+          fetchPartners(),
+          fetchEvents(),
+          fetchFaq()
+        ]);
+      } catch (e) {
+        console.error("Ошибка инициализации:", e);
+      } finally {
+        setLoading(false);
+      }
     }
-  };
+    initApp();
+  }, []);
 
   const loadUserData = async (id) => {
     const userRef = doc(db, "users", id);
@@ -61,8 +66,7 @@ export function UserApp() {
 
   const fetchPartners = async () => {
     const snapshot = await getDocs(collection(db, "partners"));
-    const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    setPartners(list);
+    setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   const fetchEvents = async () => {
@@ -102,11 +106,11 @@ export function UserApp() {
                 
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  {loading ? <Spinner size="large" /> : !user ? <Div>Ошибка загрузки пользователя</Div> : (
+                  {loading ? <Spinner size="large" style={{ marginTop: 20 }} /> : (
                     <>
                       <Group>
-                        <SimpleCell before={<Avatar size={64} src={user.photo_200} />}>
-                          <Title level="2">{`${user.first_name} ${user.last_name}`}</Title>
+                        <SimpleCell before={<Avatar size={64} src={user?.photo_200} />}>
+                          <Title level="2">{user ? `${user.first_name} ${user.last_name}` : "Гость"}</Title>
                         </SimpleCell>
                         <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
                       </Group>
@@ -128,7 +132,6 @@ export function UserApp() {
                   )}
                 </Panel>
 
-                {/* Остальные панели (faq, home, partner) остаются без изменений */}
                 <Panel id="faq">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('profile')} />}>Помощь</PanelHeader>
                   <Group>
