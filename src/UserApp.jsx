@@ -32,19 +32,23 @@ export function UserApp() {
       setLoading(true);
       try {
         vkBridge.send('VKWebAppInit');
-        // 1. Получаем данные пользователя ВК
         const userInfo = await vkBridge.send('VKWebAppGetUserInfo');
         setUser(userInfo);
         
-        // 2. Параллельно грузим всё остальное
-        await Promise.all([
-          loadUserData(userInfo.id.toString()),
-          fetchPartners(),
-          fetchEvents(),
-          fetchFaq()
+        // Загружаем данные параллельно
+        const [pSnap, eSnap, fSnap] = await Promise.all([
+          getDocs(collection(db, "partners")),
+          getDocs(collection(db, "events")),
+          getDocs(collection(db, "faq"))
         ]);
+        
+        setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setFaq(fSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        
+        await loadUserData(userInfo.id.toString());
       } catch (e) {
-        console.error("Ошибка инициализации:", e);
+        console.error("Initialization error:", e);
       } finally {
         setLoading(false);
       }
@@ -53,45 +57,31 @@ export function UserApp() {
   }, []);
 
   const loadUserData = async (id) => {
-    const userRef = doc(db, "users", id);
-    const docSnap = await getDoc(userRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      setUserKeys(data.keys);
-      setFavorites(data.favorites || []);
-    } else {
-      await setDoc(userRef, { keys: 3, favorites: [] });
-    }
-  };
-
-  const fetchPartners = async () => {
-    const snapshot = await getDocs(collection(db, "partners"));
-    setPartners(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-
-  const fetchEvents = async () => {
-    const snapshot = await getDocs(collection(db, "events"));
-    setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-
-  const fetchFaq = async () => {
-    const snapshot = await getDocs(collection(db, "faq"));
-    setFaq(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    try {
+      const userRef = doc(db, "users", id);
+      const docSnap = await getDoc(userRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserKeys(data.keys || 0);
+        setFavorites(data.favorites || []);
+      } else {
+        await setDoc(userRef, { keys: 3, favorites: [] });
+      }
+    } catch (e) { console.error(e); }
   };
 
   const toggleFavorite = async (partnerId) => {
     if (!user) return;
-    const userRef = doc(db, "users", user.id.toString());
     const newFavorites = favorites.includes(partnerId) 
       ? favorites.filter(id => id !== partnerId) 
       : [...favorites, partnerId];
-    await updateDoc(userRef, { favorites: newFavorites });
     setFavorites(newFavorites);
+    await updateDoc(doc(db, "users", user.id.toString()), { favorites: newFavorites });
   };
 
   const handleConfirmScan = async () => {
-    const userRef = doc(db, "users", user.id.toString());
-    await updateDoc(userRef, { keys: increment(1) });
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.id.toString()), { keys: increment(1) });
     setUserKeys(prev => prev + 1);
     setIsScannerOpen(false);
   };
@@ -103,30 +93,48 @@ export function UserApp() {
           <SplitLayout style={{ height: '100vh' }}>
             <SplitCol>
               <View activePanel={activePanel}>
-                
+                <Panel id="home">
+                  <PanelHeader>АПГ: Зеленоград</PanelHeader>
+                  {loading ? <Spinner size="large" /> : (
+                    <>
+                      <Header mode="secondary">События</Header>
+                      <HorizontalScroll showArrows>
+                        <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
+                          {events.map(e => <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}><Title level="3">{e.title}</Title></Card>)}
+                        </div>
+                      </HorizontalScroll>
+                      <Header mode="secondary">Наши партнеры</Header>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
+                        {partners.map((p) => (
+                          <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
+                            <Button size="m" stretched onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>Открыть</Button>
+                            <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★" : "☆"}</Button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </Panel>
+
                 <Panel id="profile">
                   <PanelHeader>Профиль</PanelHeader>
-                  {loading ? <Spinner size="large" style={{ marginTop: 20 }} /> : (
+                  {loading ? <Spinner size="large" /> : !user ? <Div>Ошибка загрузки данных</Div> : (
                     <>
                       <Group>
                         <SimpleCell before={<Avatar size={64} src={user?.photo_200} />}>
-                          <Title level="2">{user ? `${user.first_name} ${user.last_name}` : "Гость"}</Title>
+                          <Title level="2">{`${user.first_name} ${user.last_name}`}</Title>
                         </SimpleCell>
                         <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
                       </Group>
-
                       <Group header={<Header mode="secondary">Избранные</Header>}>
-                        {favorites.length === 0 ? <Div>Список пуст</Div> : 
-                          partners.filter(p => favorites.includes(p.id)).map(p => (
-                            <SimpleCell key={p.id} onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>{p.name}</SimpleCell>
-                          ))
-                        }
+                        {partners.filter(p => favorites.includes(p.id)).map(p => (
+                          <SimpleCell key={p.id} onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>{p.name}</SimpleCell>
+                        ))}
                       </Group>
-
-                      <Group header={<Header mode="secondary">Действия</Header>}>
-                        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
-                        <CellButton before={<Icon28HelpOutline />} onClick={() => setActivePanel('faq')}>Помощь и FAQ</CellButton>
-                        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+                      <Group>
+                        <CellButton before={<Icon28HelpOutline />} onClick={() => setActivePanel('faq')}>Помощь</CellButton>
+                        <CellButton mode="danger" onClick={() => { localStorage.clear(); window.location.reload(); }}>Сброс</CellButton>
                       </Group>
                     </>
                   )}
@@ -143,39 +151,9 @@ export function UserApp() {
                   </Group>
                 </Panel>
 
-                <Panel id="home">
-                  <PanelHeader>АПГ: Зеленоград</PanelHeader>
-                  <Header mode="secondary">События</Header>
-                  <HorizontalScroll showArrows>
-                    <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
-                      {events.map(e => <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}><Title level="3">{e.title}</Title></Card>)}
-                    </div>
-                  </HorizontalScroll>
-
-                  <Header mode="secondary">Наши партнеры</Header>
-                  {loading ? <Spinner /> : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px' }}>
-                      {partners.map((p) => (
-                        <div key={p.id} style={{ background: '#fff', padding: '20px', borderRadius: '20px', textAlign: 'center', border: '1px solid #f0f0f0' }}>
-                          {p.logoUrl && <Avatar size={56} src={p.logoUrl} style={{ marginBottom: 12 }} />}
-                          <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>{p.name}</div>
-                          <Button size="m" mode="primary" stretched onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>Открыть</Button>
-                          <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★" : "☆"}</Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-
                 <Panel id="partner">
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner?.name}</PanelHeader>
-                  {activePartner && (
-                    <Div>
-                      <Title level="1">{activePartner.name}</Title>
-                      <Div>{activePartner.description}</Div>
-                      {activePartner.link && <Button size="l" stretched onClick={() => window.open(activePartner.link, '_blank')}>Перейти</Button>}
-                    </Div>
-                  )}
+                  {activePartner && <Div><Title level="1">{activePartner.name}</Title><Div>{activePartner.description}</Div></Div>}
                 </Panel>
               </View>
             </SplitCol>
@@ -186,7 +164,6 @@ export function UserApp() {
             <TabbarItem onClick={() => setIsScannerOpen(true)} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
             <TabbarItem onClick={() => setActivePanel('profile')} selected={activePanel === 'profile'} text="Профиль"><Icon28UserCircleOutline /></TabbarItem>
           </Tabbar>
-          {isScannerOpen && <Scanner onScan={handleConfirmScan} />}
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>
