@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  AdaptivityProvider, ConfigProvider, AppRoot, SplitLayout, SplitCol, View, Panel, PanelHeader, 
-  Group, Header, Card, SimpleCell, Avatar, Title, Button, Progress, Footnote,
-  Tabbar, TabbarItem, Placeholder, CellButton, Div, PanelHeaderBack, HorizontalScroll, Spinner
+import {
+  AdaptivityProvider,
+  ConfigProvider,
+  AppRoot,
+  SplitLayout,
+  SplitCol,
+  View,
+  Panel,
+  PanelHeader,
+  Group,
+  Header,
+  Card,
+  SimpleCell,
+  Avatar,
+  Button,
+  Progress,
+  Footnote,
+  Tabbar,
+  TabbarItem,
+  CellButton,
+  Div,
+  PanelHeaderBack,
+  HorizontalScroll,
+  Spinner
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
@@ -111,28 +131,50 @@ export function UserApp() {
                 
 <Panel id="profile">
   <PanelHeader>Профиль</PanelHeader>
-  {!user ? <Spinner size="large" /> : (
+
+  {!user ? (
+    <Group>
+      <Div style={{ textAlign: 'center', padding: 20 }}>
+        <Spinner size="large" />
+      </Div>
+    </Group>
+  ) : (
     <>
       <Group>
-        <SimpleCell before={<Avatar size={64} src={user.photo_200} />}>
-          <Title level="2">{${user.first_name} ${user.last_name}}</Title>
+        <SimpleCell
+          before={
+            <Avatar
+              size={64}
+              src={user?.photo_200 || ''}
+            />
+          }
+        >
+          {user?.first_name || ''} {user?.last_name || ''}
         </SimpleCell>
-        <Div><Progress value={userKeys * 10} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
+
+        <Div>
+          <Progress value={Math.min(Number(userKeys || 0) * 10, 100)} />
+          <Footnote>
+            Ключи: {Number(userKeys || 0)}/10
+          </Footnote>
+        </Div>
       </Group>
 
-      {/* --- НОВЫЙ БЛОК ИЗБРАННОГО --- */}
       <Group header={<Header mode="secondary">Избранные партнеры</Header>}>
         {favorites.length === 0 ? (
           <Div>У вас пока нет избранных партнеров.</Div>
         ) : (
           partners
-            .filter(p => favorites.includes(p.id)) // Оставляем только тех, кто в избранном
-            .map(p => (
-              <SimpleCell 
-                key={p.id} 
-                before={<Avatar size={40} src={p.logoUrl} />}
-                onClick={() => { setActivePartner(p); setActivePanel('partner'); }}
+            .filter((p) => favorites.includes(p.id))
+            .map((p) => (
+              <SimpleCell
+                key={p.id}
+                before={<Avatar size={40} src={p.logoUrl || ''} />}
                 multiline
+                onClick={() => {
+                  setActivePartner(p);
+                  setActivePanel('partner');
+                }}
               >
                 {p.name}
               </SimpleCell>
@@ -141,9 +183,30 @@ export function UserApp() {
       </Group>
 
       <Group header={<Header mode="secondary">Действия</Header>}>
-        <CellButton before={<Icon28UserAddOutline />} onClick={() => vkBridge.send('VKWebAppShowInviteBox')}>Пригласить друзей</CellButton>
-        <CellButton before={<Icon28HelpOutline />} onClick={() => setActivePanel('faq')}>Помощь и FAQ</CellButton>
-        <CellButton mode="danger" before={<Icon28DoorArrowRightOutline />} onClick={() => { localStorage.clear(); window.location.reload(); }}>Сбросить прогресс</CellButton>
+        <CellButton
+          before={<Icon28UserAddOutline />}
+          onClick={() => vkBridge.send('VKWebAppShowInviteBox')}
+        >
+          Пригласить друзей
+        </CellButton>
+
+        <CellButton
+          before={<Icon28HelpOutline />}
+          onClick={() => setActivePanel('faq')}
+        >
+          Помощь и FAQ
+        </CellButton>
+
+        <CellButton
+          mode="danger"
+          before={<Icon28DoorArrowRightOutline />}
+          onClick={() => {
+            localStorage.clear();
+            window.location.reload();
+          }}
+        >
+          Сбросить прогресс
+        </CellButton>
       </Group>
     </>
   )}
@@ -191,7 +254,9 @@ export function UserApp() {
                   {activePartner && (
                     <Div>
                       <Avatar size={96} src={activePartner.logoUrl} style={{ margin: '0 auto 16px', display: 'block' }} />
-                      <Title level="1" style={{ textAlign: 'center', marginBottom: 16 }}>{activePartner.name}</Title>
+                      <h2 style={{ textAlign: 'center', marginBottom: 16 }}>
+  {activePartner.name}
+</h2>
                       <div style={{ marginBottom: 24, lineHeight: '1.5' }}>{activePartner.description || "У этого партнера пока нет описания."}</div>
                       {activePartner.link && (
                         <Button size="l" mode="primary" stretched onClick={() => window.open(activePartner.link, '_blank')}>Перейти к партнеру</Button>
