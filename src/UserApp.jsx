@@ -55,7 +55,7 @@ export function UserApp() {
           await setDoc(userRef, { keys: 3, favorites: [] });
         }
       } catch (e) {
-        console.error("Критическая ошибка:", e);
+        console.error("Ошибка загрузки:", e);
       } finally {
         setLoading(false);
       }
@@ -94,15 +94,15 @@ export function UserApp() {
                       <Header mode="secondary">События</Header>
                       <HorizontalScroll showArrows>
                         <div style={{ display: 'flex', gap: 12, padding: '0 16px 16px' }}>
-                          {events.map(e => <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}><h3 style={{ margin: 0 }}>{e.title}</h3></Card>)}
+                          {events.map(e => <Card key={e.id} mode="shadow" style={{ width: 200, height: 100, padding: 16 }}><h3 style={{ margin: 0 }}>{e.title || "Без названия"}</h3></Card>)}
                         </div>
                       </HorizontalScroll>
                       <Header mode="secondary">Наши партнеры</Header>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16 }}>
                         {partners.map(p => (
                           <div key={p.id} style={{ background: '#fff', padding: 20, borderRadius: 20, textAlign: 'center', border: '1px solid #eee' }}>
-                            <Avatar size={56} src={p.logoUrl || ''} />
-                            <div style={{ margin: '12px 0', fontWeight: 600 }}>{p.name}</div>
+                            {p.logoUrl && <Avatar size={56} src={p.logoUrl} />}
+                            <div style={{ margin: '12px 0', fontWeight: 600 }}>{p.name || "Партнер"}</div>
                             <Button size="m" stretched onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>Открыть</Button>
                             <Button size="m" mode="tertiary" stretched onClick={() => toggleFavorite(p.id)}>{favorites.includes(p.id) ? "★" : "☆"}</Button>
                           </div>
@@ -118,13 +118,13 @@ export function UserApp() {
                     <>
                       <Group>
                         <SimpleCell before={<Avatar size={64} src={user?.photo_200 || ''} />}>
-                          {user ? `${user.first_name} ${user.last_name}` : "Загрузка..."}
+                          {user ? `${user.first_name || ''} ${user.last_name || ''}` : "Гость"}
                         </SimpleCell>
                         <Div><Progress value={Math.min(userKeys * 10, 100)} /><Footnote>Ключи: {userKeys}/10</Footnote></Div>
                       </Group>
                       <Group header={<Header mode="secondary">Избранные</Header>}>
                         {partners.filter(p => favorites.includes(p.id)).map(p => (
-                          <SimpleCell key={p.id} onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>{p.name}</SimpleCell>
+                          <SimpleCell key={p.id} onClick={() => { setActivePartner(p); setActivePanel('partner'); }}>{p.name || "Партнер"}</SimpleCell>
                         ))}
                       </Group>
                       <Group>
@@ -139,20 +139,20 @@ export function UserApp() {
                   <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('profile')} />}>Помощь</PanelHeader>
                   <Group>
                     {faq.map(item => (
-                      <Group key={item.id} header={<Header mode="secondary">{item.question}</Header>}>
-                        <Div>{item.answer}</Div>
+                      <Group key={item.id} header={<Header mode="secondary">{item.question || "Вопрос"}</Header>}>
+                        <Div>{item.answer || "Нет ответа"}</Div>
                       </Group>
                     ))}
                   </Group>
                 </Panel>
 
                 <Panel id="partner">
-                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner?.name}</PanelHeader>
+                  <PanelHeader before={<PanelHeaderBack onClick={() => setActivePanel('home')} />}>{activePartner?.name || "Партнер"}</PanelHeader>
                   {activePartner && (
                     <Div style={{ textAlign: 'center' }}>
-                      <Avatar size={96} src={activePartner.logoUrl || ''} />
+                      {activePartner.logoUrl && <Avatar size={96} src={activePartner.logoUrl} />}
                       <h2>{activePartner.name}</h2>
-                      <p>{activePartner.description}</p>
+                      <p>{activePartner.description || "Описание отсутствует"}</p>
                       {activePartner.link && <Button size="l" stretched onClick={() => window.open(activePartner.link, '_blank')}>Перейти</Button>}
                     </Div>
                   )}
