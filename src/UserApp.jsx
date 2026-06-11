@@ -166,7 +166,10 @@ export function UserApp() {
             <TabbarItem onClick={() => setIsScannerOpen(true)} text="Сканировать"><Icon28QrCodeOutline /></TabbarItem>
             <TabbarItem onClick={() => setActivePanel('profile')} selected={activePanel === 'profile'} text="Профиль"><Icon28UserCircleOutline /></TabbarItem>
           </Tabbar>
-          {isScannerOpen && Scanner && <Scanner onScan={handleConfirmScan} />}
+          {/* Исправлено: добавлена проверка typeof Scanner === 'function' */}
+          {isScannerOpen && typeof Scanner === 'function' && (
+            <Scanner onScan={handleConfirmScan} />
+          )}
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>
