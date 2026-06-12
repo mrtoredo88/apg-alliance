@@ -12,14 +12,11 @@ import {
   Group,
   Header,
   Card,
-  SimpleCell,
   Avatar,
   Button,
-  Progress,
   Footnote,
   Tabbar,
   TabbarItem,
-  CellButton,
   Div,
   HorizontalScroll,
   Spinner,
@@ -35,7 +32,6 @@ import {
   Icon28QrCodeOutline,
   Icon28HomeOutline,
   Icon28UserCircleOutline,
-  Icon28HelpOutline,
   Icon56ErrorTriangleOutline,
 } from '@vkontakte/icons';
 
@@ -51,9 +47,7 @@ import {
 } from 'firebase/firestore';
 
 import ScannerComponent from './Scanner.jsx';
-
-// Максимальное количество ключей для прогресс-бара
-const MAX_KEYS = 50;
+import { ProfilePanel } from './ProfilePanel.jsx';
 
 export function UserApp() {
   const [activePanel, setActivePanel] = useState('home');
@@ -80,7 +74,10 @@ export function UserApp() {
     try {
       vkBridge.send('VKWebAppInit');
 
-      const userData = await vkBridge.send('VKWebAppGetUserInfo');
+      const userData = await Promise.race([
+        vkBridge.send('VKWebAppGetUserInfo'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('VK timeout')), 3000))
+      ]).catch(() => ({ id: 'guest', first_name: 'Участник', last_name: 'АПК', photo_200: null }));
       if (!isMounted.current) return;
       setUser(userData);
 
@@ -115,12 +112,9 @@ export function UserApp() {
   }, []);
 
   useEffect(() => {
-    // Используем ref вместо boolean, чтобы избежать stale closure
     const isMounted = { current: true };
     initApp(isMounted);
-    return () => {
-      isMounted.current = false;
-    };
+    return () => { isMounted.current = false; };
   }, [initApp]);
 
   // ─── Избранное ───────────────────────────────────────────────────────────────
@@ -133,7 +127,6 @@ export function UserApp() {
       ? favorites.filter((id) => id !== partnerId)
       : [...favorites, partnerId];
 
-    // Оптимистичное обновление
     setFavorites(newFavorites);
 
     try {
@@ -141,7 +134,6 @@ export function UserApp() {
         favorites: newFavorites,
       });
     } catch (e) {
-      // Откат при ошибке Firebase
       console.error('Ошибка обновления избранного:', e);
       setFavorites(previousFavorites);
     }
@@ -152,7 +144,6 @@ export function UserApp() {
   const handleConfirmScan = async (placeIdentifier) => {
     if (!user) return;
 
-    // Валидация: идентификатор должен совпадать с реальным партнёром
     const isValid = partners.some(
       (p) => p.id === placeIdentifier || p.name === placeIdentifier
     );
@@ -175,11 +166,23 @@ export function UserApp() {
     }
   };
 
-  // ─── Вспомогательный рендер: глобальные состояния ───────────────────────────
+  // ─── Выход из аккаунта ───────────────────────────────────────────────────────
+
+  const handleLogout = () => {
+    setUser(null);
+    setUserKeys(0);
+    setFavorites([]);
+    setActivePanel('home');
+    // Переинициализируем приложение
+    const isMounted = { current: true };
+    initApp(isMounted);
+  };
+
+  // ─── Вспомогательный рендер ──────────────────────────────────────────────────
 
   const renderGlobalSpinner = () => (
     <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
-      <Spinner size="large" />
+      <Spinner size="l" />
     </Div>
   );
 
@@ -206,7 +209,7 @@ export function UserApp() {
   // ─── Рендер ──────────────────────────────────────────────────────────────────
 
   return (
-    <ConfigProvider platform="vkcom">
+    <ConfigProvider platform="vkcom" appearance="light">
       <AdaptivityProvider>
         <AppRoot>
           <SplitLayout style={{ height: '100vh' }}>
@@ -352,49 +355,18 @@ export function UserApp() {
                 </Panel>
 
                 {/* ── ПРОФИЛЬ ── */}
-                <Panel id="profile">
-                  <PanelHeader>Профиль</PanelHeader>
-
-                  {loading && renderGlobalSpinner()}
-                  {!loading && error && renderError()}
-                  {!loading && !error && user && (
-                    <>
-                      <Group>
-                        <SimpleCell
-                          before={
-                            <Avatar
-                              size={64}
-                              src={user.photo_200 ?? undefined}
-                            />
-                          }
-                        >
-                          {user.first_name} {user.last_name}
-                        </SimpleCell>
-
-                        <Div>
-                          <Progress
-                            value={Math.min(
-                              Math.round((userKeys / MAX_KEYS) * 100),
-                              100
-                            )}
-                          />
-                          <Footnote style={{ marginTop: 6 }}>
-                            Ключей: {userKeys} из {MAX_KEYS}
-                          </Footnote>
-                        </Div>
-                      </Group>
-
-                      <Group>
-                        <CellButton
-                          before={<Icon28HelpOutline />}
-                          onClick={() => setActivePanel('home')}
-                        >
-                          На главную
-                        </CellButton>
-                      </Group>
-                    </>
-                  )}
-                </Panel>
+                <ProfilePanel
+                  user={user}
+                  userKeys={userKeys}
+                  favorites={favorites}
+                  partners={partners}
+                  onToggleFavorite={toggleFavorite}
+                  onOpenPartner={(partner) => {
+                    setActivePartner(partner);
+                    setActivePanel('partner');
+                  }}
+                  onLogout={handleLogout}
+                />
 
               </View>
             </SplitCol>
