@@ -1,8 +1,8 @@
 import React from 'react';
 
-export const Scanner = ({ isOpen, onClose, mapPlaces, onConfirm }) => {
+export default function Scanner({ isOpen, onClose, mapPlaces, onConfirm }) {
   if (!isOpen) return null;
-  
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -10,7 +10,7 @@ export const Scanner = ({ isOpen, onClose, mapPlaces, onConfirm }) => {
       display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px'
     }}>
       <h3 style={{ textAlign: 'center', marginBottom: '20px' }}>📷 Сканер Альянса</h3>
-      
+
       {mapPlaces.map(place => (
         <button 
           key={place.id}
@@ -33,4 +33,4 @@ export const Scanner = ({ isOpen, onClose, mapPlaces, onConfirm }) => {
       </button>
     </div>
   );
-};
+}
