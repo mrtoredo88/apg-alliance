@@ -122,7 +122,7 @@ export function ProfilePanel({
   user, userKeys = 0, favorites = [], partners = [],
   onToggleFavorite, onOpenPartner, onLogout,
 }) {
-  const safeUser = user || { first_name: 'Участник', last_name: 'АПК', photo_200: null };
+  const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
 
   const currentLevel = getCurrentLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
@@ -157,7 +157,7 @@ export function ProfilePanel({
             <Title level="2" weight="semibold" style={{ color: '#000' }}>
               {safeUser.first_name} {safeUser.last_name}
             </Title>
-            <Caption style={{ color: '#99A2AD', marginTop: 2 }}>Участник АПК</Caption>
+            <Caption style={{ color: '#99A2AD', marginTop: 2 }}>Участник АПГ</Caption>
           </div>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
