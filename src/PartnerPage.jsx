@@ -1,11 +1,34 @@
-import React from 'react';
-import { Panel, PanelHeader, PanelHeaderBack, Avatar } from '@vkontakte/vkui';
+import React, { useState } from 'react';
+import { Panel, PanelHeader, PanelHeaderBack } from '@vkontakte/vkui';
 
 const T = {
   bg:'#0F0F1A',surface:'#1A1A2E',border:'rgba(255,255,255,0.07)',
   gold:'#C9A84C',goldL:'#E8C97A',blue:'#4A90D9',green:'#4BB34B',red:'#E64646',
   textPri:'#F0F0F0',textSec:'rgba(240,240,240,0.5)',
 };
+
+function PartnerLogo({ partner }) {
+  const [failed, setFailed] = useState(false);
+  const name = partner.name ?? '?';
+  const initial = name[0].toUpperCase();
+  const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const size = 88;
+
+  if (!partner.logoUrl || failed) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg, hsl(${hue},45%,22%), hsl(${hue},35%,34%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 800, color: 'rgba(255,255,255,0.92)', border: '3px solid rgba(255,255,255,0.15)' }}>
+        {initial}
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', padding: 3, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})` }}>
+      <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
+        <img src={partner.logoUrl} alt="" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    </div>
+  );
+}
 
 export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite }) {
   if (!partner) return null;
@@ -29,12 +52,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite }) {
           <div style={{position:'absolute',inset:0,backgroundImage:'radial-gradient(rgba(201,168,76,0.05) 1px,transparent 1px)',backgroundSize:'20px 20px'}}/>
           <div style={{position:'absolute',top:-40,right:-40,width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(201,168,76,0.1),transparent 70%)'}}/>
           <div style={{position:'relative',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
-            {partner.logoUrl
-              ? <div style={{width:88,height:88,borderRadius:'50%',padding:3,background:`linear-gradient(135deg,${T.gold},${T.goldL})`}}>
-                  <div style={{width:'100%',height:'100%',borderRadius:'50%',overflow:'hidden'}}><img src={partner.logoUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/></div>
-                </div>
-              : <div style={{width:88,height:88,borderRadius:'50%',background:T.gold+'18',border:`3px solid ${T.gold}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40}}>{partner.emoji??'🏪'}</div>
-            }
+            <PartnerLogo partner={partner} />
             <div style={{textAlign:'center'}}>
               <div style={{fontSize:22,fontWeight:800,color:T.textPri,marginBottom:4}}>{partner.name}</div>
               {partner.categoryLabel&&<div style={{display:'inline-flex',alignItems:'center',gap:6,background:T.gold+'18',border:`1px solid ${T.gold}40`,borderRadius:20,padding:'4px 12px'}}><span style={{fontSize:11,color:T.gold,fontWeight:700}}>✦ {partner.categoryLabel}</span></div>}

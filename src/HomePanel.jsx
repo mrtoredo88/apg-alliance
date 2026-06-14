@@ -18,6 +18,14 @@ const T = {
   white:    '#FFFFFF',
 };
 
+const GLASS = {
+  background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+};
+
 const CATEGORIES = [
   { id: 'all',    label: 'Все',         emoji: '✦' },
   { id: 'food',   label: 'Еда',         emoji: '🍽' },
@@ -40,11 +48,12 @@ function EventModal({ event, onClose }) {
       backdropFilter: 'blur(4px)',
     }} onClick={onClose}>
       <div style={{
-        background: T.surface,
+        background: 'rgba(12,12,28,0.96)',
+        backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
         borderRadius: '24px 24px 0 0',
         width: '100%', padding: '24px 20px 48px',
         maxHeight: '85vh', overflowY: 'auto',
-        border: `1px solid ${T.border}`,
+        border: '1px solid rgba(255,255,255,0.1)',
         borderBottom: 'none',
       }} onClick={e => e.stopPropagation()}>
 
@@ -172,14 +181,44 @@ function EventCard({ event, onClick, index = 0 }) {
   );
 }
 
+// ─── Логотип партнёра с fallback на инициалы ────────────────────────────────
+
+function PartnerLogo({ partner, size = 56 }) {
+  const [failed, setFailed] = useState(false);
+  const name = partner.name ?? '?';
+  const initial = name[0].toUpperCase();
+  const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+
+  if (!partner.logoUrl || failed) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        background: `linear-gradient(135deg, hsl(${hue},45%,20%), hsl(${hue},35%,30%))`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: Math.round(size * 0.38), fontWeight: 800,
+        color: 'rgba(255,255,255,0.9)',
+        border: '1.5px solid rgba(255,255,255,0.12)',
+      }}>
+        {initial}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={partner.logoUrl} alt={name}
+      onError={() => setFailed(true)}
+      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.12)', display: 'block', flexShrink: 0 }}
+    />
+  );
+}
+
 // ─── Карточка партнёра ────────────────────────────────────────────────────────
 
 function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 }) {
   return (
     <div style={{
-      background: T.surface,
+      ...GLASS,
       borderRadius: 20, padding: 16, textAlign: 'center',
-      border: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column', gap: 10,
       position: 'relative', overflow: 'hidden',
       animation: 'fadeInUp 0.45s ease both',
@@ -203,24 +242,11 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
       )}
 
       <div style={{ position: 'relative', display: 'inline-block', margin: '0 auto' }}>
-        {partner.logoUrl
-          ? <Avatar size={56} src={partner.logoUrl} style={{ border: `2px solid ${T.border}` }} />
-          : (
-            <div style={{
-              width: 56, height: 56, borderRadius: '50%',
-              background: 'rgba(201,168,76,0.1)',
-              border: `2px solid ${T.gold}44`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 24,
-            }}>
-              {partner.emoji ?? '🏪'}
-            </div>
-          )
-        }
+        <PartnerLogo partner={partner} size={56} />
         <button onClick={() => onToggleFavorite(partner.id)} style={{
           position: 'absolute', top: -4, right: -4,
-          background: isFavorite ? T.red : T.surface2,
-          border: `1px solid ${isFavorite ? T.red : T.border}`,
+          background: isFavorite ? T.red : 'rgba(255,255,255,0.1)',
+          border: `1px solid ${isFavorite ? T.red : 'rgba(255,255,255,0.15)'}`,
           borderRadius: '50%', width: 22, height: 22,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', fontSize: 10, padding: 0, color: '#fff',
@@ -330,7 +356,7 @@ function QuickActions({ onScan, onShare, onOpenLeaderboard, onOpenOffers }) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '0 16px' }}>
       {actions.map((a) => (
         <button key={a.label} onClick={a.onClick} style={{
-          background: T.surface, border: `1px solid ${T.border}`,
+          ...GLASS,
           borderRadius: 16, padding: '12px 4px',
           cursor: 'pointer', display: 'flex', flexDirection: 'column',
           alignItems: 'center', gap: 6,
@@ -388,7 +414,7 @@ function SkeletonHome() {
   return (
     <div>
       {/* Hero */}
-      <div style={{ margin: '8px 16px', borderRadius: 24, background: T.surface, padding: '22px 20px', border: `1px solid ${T.border}` }}>
+      <div style={{ margin: '8px 16px', borderRadius: 24, ...GLASS, padding: '22px 20px' }}>
         <Skel h={11} w={140} radius={6} style={{ marginBottom: 10 }} />
         <Skel h={26} w={190} radius={8} style={{ marginBottom: 4 }} />
         <Skel h={18} w={110} radius={8} style={{ marginBottom: 18 }} />
@@ -401,7 +427,7 @@ function SkeletonHome() {
       {/* QuickActions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '12px 16px' }}>
         {[0, 1, 2, 3].map(i => (
-          <div key={i} style={{ background: T.surface, borderRadius: 16, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: `1px solid ${T.border}` }}>
+          <div key={i} style={{ ...GLASS, borderRadius: 16, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <Skel w={38} h={38} radius={12} />
             <Skel w={32} h={10} radius={5} />
           </div>
@@ -413,7 +439,7 @@ function SkeletonHome() {
         <Skel h={18} w={140} radius={8} style={{ marginBottom: 12 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[0, 1, 2, 3].map(i => (
-            <div key={i} style={{ background: T.surface, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, border: `1px solid ${T.border}` }}>
+            <div key={i} style={{ ...GLASS, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
               <Skel w={56} h={56} radius={28} />
               <Skel h={13} w={80} radius={6} />
               <Skel h={10} w={56} radius={5} />
@@ -512,7 +538,7 @@ export function HomePanel({
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {taskPreview.map(t => (
-                    <button key={t.id} onClick={onOpenTasks} style={{ background: t.ready ? 'rgba(201,168,76,0.08)' : T.surface, border: `1px solid ${t.ready ? 'rgba(201,168,76,0.35)' : T.border}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                    <button key={t.id} onClick={onOpenTasks} style={{ ...GLASS, background: t.ready ? 'rgba(201,168,76,0.1)' : undefined, border: `1px solid ${t.ready ? 'rgba(201,168,76,0.35)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                       <span style={{ fontSize: 22, flexShrink: 0 }}>{t.emoji}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri }}>{t.title}</div>
@@ -551,7 +577,7 @@ export function HomePanel({
             </div>
 
             {events.length === 0 ? (
-              <div style={{ margin: '0 16px', background: T.surface, borderRadius: 24, padding: '28px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+              <div style={{ margin: '0 16px', ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
                 <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
                   <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                     <rect x="10" y="22" width="70" height="60" rx="12" fill="rgba(201,168,76,0.07)" stroke="rgba(201,168,76,0.22)" strokeWidth="1.5"/>
@@ -584,7 +610,7 @@ export function HomePanel({
 
             {/* Поиск */}
             <div style={{ padding: '20px 16px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: T.surface, borderRadius: 14, padding: '10px 14px', border: `1px solid ${T.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...GLASS, borderRadius: 14, padding: '10px 14px' }}>
                 <span style={{ fontSize: 15, opacity: 0.4, flexShrink: 0 }}>🔍</span>
                 <input
                   type="search"
@@ -607,11 +633,12 @@ export function HomePanel({
                     <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{
                       padding: '7px 14px', borderRadius: 20, cursor: 'pointer',
                       whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700,
+                      ...(activeCategory === cat.id ? {} : GLASS),
                       background: activeCategory === cat.id
                         ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
-                        : T.surface,
+                        : undefined,
                       color: activeCategory === cat.id ? '#0F0F1A' : T.textSec,
-                      border: activeCategory === cat.id ? 'none' : `1px solid ${T.border}`,
+                      border: activeCategory === cat.id ? 'none' : undefined,
                     }}>
                       {cat.emoji} {cat.label}
                     </button>
@@ -632,7 +659,7 @@ export function HomePanel({
               </div>
 
               {filteredPartners.length === 0 ? (
-                <div style={{ background: T.surface, borderRadius: 24, padding: '28px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                <div style={{ ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
                   <div style={{ animation: 'float 3s ease-in-out infinite' }}>
                     <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                       <circle cx="40" cy="38" r="26" fill="rgba(201,168,76,0.06)" stroke="rgba(201,168,76,0.22)" strokeWidth="2"/>

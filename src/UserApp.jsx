@@ -47,7 +47,7 @@ const writeCache = (partners, events) => {
 function Toast({ toasts }) {
   if (!toasts.length) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 72, left: 16, right: 16, zIndex: 600, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ position: 'fixed', bottom: 72, left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 448, zIndex: 600, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toasts.map(t => (
         <div key={t.id} style={{
           background: 'rgba(22,22,38,0.97)',
@@ -79,7 +79,7 @@ function NewEventsBanner({ count, onView, onDismiss }) {
   const label = count === 1 ? 'Новое событие!' : `${count} новых события!`;
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 300, padding: '12px 16px', animation: 'slideDown 0.4s ease' }}>
+    <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, zIndex: 300, padding: '12px 16px', animation: 'slideDown 0.4s ease' }}>
       <div style={{ background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, borderRadius: 18, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.5)' }}>
         <span style={{ fontSize: 24, flexShrink: 0 }}>🎉</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -489,42 +489,68 @@ export function UserApp() {
           </div>
         </div>
         {/* Tab bar */}
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}` }} />
+        <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, height: 60, background: 'rgba(8,8,24,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
       </div>
     );
   }
 
   // ─── Основное приложение ─────────────────────────────────────────────────────
 
-  const TAB_ITEMS = [
-    { id: 'home',    icon: '⌂', label: 'Главная' },
-    { id: 'scan',    icon: '◎', label: 'Скан' },
-    { id: 'profile', icon: '○', label: 'Профиль' },
-  ];
-  const pillIdx = isScannerOpen ? 1 : activePanel === 'profile' ? 2 : 0;
+  const pillIdx = isScannerOpen ? -1 : activePanel === 'profile' ? 2 : 0;
 
   const TabBar = () => (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}`, display: 'flex', zIndex: 100, overflow: 'hidden' }}>
-      {/* Скользящий pill */}
-      <div style={{
-        position: 'absolute',
-        top: 8, height: 42,
-        left: `calc(${pillIdx * 33.333}% + 10px)`,
-        width: 'calc(33.333% - 20px)',
-        background: 'rgba(201,168,76,0.1)',
-        border: '1px solid rgba(201,168,76,0.2)',
-        borderRadius: 13,
-        transition: 'left 0.32s cubic-bezier(0.34, 1.4, 0.64, 1)',
-        pointerEvents: 'none',
-      }} />
-      {TAB_ITEMS.map((item, idx) => {
-        const isActive = item.id === 'scan' ? isScannerOpen : item.id === 'profile' ? activePanel === 'profile' : pillIdx === 0 && item.id === 'home';
+    <div style={{
+      position: 'fixed', bottom: 0,
+      left: '50%', transform: 'translateX(-50%)',
+      width: '100%', maxWidth: 480, height: 60,
+      background: 'rgba(8,8,24,0.85)',
+      backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
+      display: 'flex', zIndex: 100, overflow: 'visible',
+    }}>
+      {/* Скользящий pill (только home/profile) */}
+      {pillIdx >= 0 && (
+        <div style={{
+          position: 'absolute', top: 8, height: 42,
+          left: `calc(${pillIdx * 33.333}% + 10px)`,
+          width: 'calc(33.333% - 20px)',
+          background: 'rgba(201,168,76,0.1)',
+          border: '1px solid rgba(201,168,76,0.2)',
+          borderRadius: 13,
+          transition: 'left 0.32s cubic-bezier(0.34, 1.4, 0.64, 1)',
+          pointerEvents: 'none',
+        }} />
+      )}
+
+      {/* Главная */}
+      {[
+        { id: 'home', icon: '⌂', label: 'Главная' },
+        null, // scan — special
+        { id: 'profile', icon: '○', label: 'Профиль' },
+      ].map((item, idx) => {
+        if (idx === 1) {
+          // Выпуклая кнопка скана
+          return (
+            <button key="scan"
+              onClick={() => { haptic('light'); setIsScannerOpen(true); }}
+              style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
+              <div style={{
+                width: 56, height: 56, marginTop: -18, borderRadius: '50%',
+                background: isScannerOpen ? 'rgba(201,168,76,0.3)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+                boxShadow: isScannerOpen ? 'none' : `0 4px 20px rgba(201,168,76,0.45), 0 0 0 4px rgba(8,8,24,0.9), 0 0 0 5.5px rgba(201,168,76,0.22)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, color: '#0F0F1A',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                transform: isScannerOpen ? 'scale(0.9)' : 'scale(1)',
+              }}>◎</div>
+              <span style={{ fontSize: 9, fontWeight: 700, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4, transition: 'color 0.2s' }}>Скан</span>
+            </button>
+          );
+        }
+        const isActive = item.id === 'profile' ? activePanel === 'profile' : pillIdx === 0;
         return (
           <button key={item.id}
-            onClick={() => {
-              haptic('light');
-              item.id === 'scan' ? setIsScannerOpen(true) : setActivePanel(item.id);
-            }}
+            onClick={() => { haptic('light'); setActivePanel(item.id); }}
             style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: isActive ? T.gold : T.textSec, fontSize: 9, fontWeight: 700, padding: 0, letterSpacing: 0.5, textTransform: 'uppercase', transition: 'color 0.2s', position: 'relative', zIndex: 1 }}>
             <span style={{ fontSize: 20, transition: 'transform 0.22s, filter 0.22s', transform: isActive ? 'scale(1.12)' : 'scale(1)', filter: isActive ? `drop-shadow(0 0 5px ${T.gold}99)` : 'none' }}>{item.icon}</span>
             {item.label}
@@ -538,7 +564,15 @@ export function UserApp() {
     <ConfigProvider appearance="dark">
       <AdaptivityProvider>
         <AppRoot>
-          <div style={{ paddingBottom: 60, minHeight: '100vh', background: T.bg }}>
+          {/* Depth orbs for liquid glass effect */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: '#08081A', overflow: 'hidden', pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', top: '-25%', left: '-20%', width: 450, height: 450, borderRadius: '50%', background: 'radial-gradient(circle, rgba(90,70,200,0.14) 0%, transparent 70%)' }} />
+            <div style={{ position: 'absolute', top: '30%', right: '-20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
+            <div style={{ position: 'absolute', bottom: '-10%', left: '10%', width: 420, height: 350, borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,50,180,0.11) 0%, transparent 70%)' }} />
+          </div>
+
+          {/* Max-width content container */}
+          <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 60, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
             <View activePanel={activePanel}>
 
               <HomePanel nav="home"
