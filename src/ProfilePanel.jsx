@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { PanelHeader, Avatar } from '@vkontakte/vkui';
+import { Avatar } from '@vkontakte/vkui';
+import vkBridge from '@vkontakte/vk-bridge';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress } from './levels.js';
 
 const T = {
@@ -154,9 +155,35 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     { label: 'Достижения',value: `${unlockedCount}/${achievements.length}`, emoji: '🏆' },
   ];
 
+  const handleSupport = async () => {
+    try {
+      await vkBridge.send('VKWebAppOpenApp', { app_id: 54601851 });
+    } catch {
+      // fallback — ничего
+    }
+  };
+
+  const handleWriteAdmin = async () => {
+    try {
+      await vkBridge.send('VKWebAppOpenLink', { link: 'https://vk.me/id988504' });
+    } catch {
+      window.open('https://vk.me/id988504', '_blank');
+    }
+  };
+
   return (
     <div style={{ background: T.bg, minHeight: '100%' }}>
-      <PanelHeader>Профиль</PanelHeader>
+      {/* Кастомный хедер */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(15,15,26,0.92)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '0 16px',
+        display: 'flex', alignItems: 'center', height: 52,
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>✦ Профиль</div>
+      </div>
 
       {/* ── Шапка профиля ── */}
       <div style={{ margin: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #0F0F2E, #1A1A4E)', padding: '24px 20px 20px', position: 'relative', overflow: 'hidden', border: `1px solid rgba(201,168,76,0.25)` }}>
@@ -394,8 +421,77 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {/* ── FAQ ── */}
       <FaqSection />
 
+      {/* ── Поддержка ── */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Поддержка</div>
+        <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+          {[
+            {
+              icon: '💬',
+              label: 'Написать нам',
+              sub: 'Ответим в течение дня',
+              action: handleWriteAdmin,
+              color: T.blue,
+            },
+            {
+              icon: '🏪',
+              label: 'Предложить партнёра',
+              sub: 'Знаете крутое место в Зеленограде?',
+              action: handleWriteAdmin,
+              color: T.green,
+            },
+            {
+              icon: '🐞',
+              label: 'Сообщить об ошибке',
+              sub: 'Поможем разобраться',
+              action: handleWriteAdmin,
+              color: T.red,
+            },
+          ].map((item, i, arr) => (
+            <button key={item.label} onClick={item.action}
+              style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: item.color + '18', border: `1px solid ${item.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                {item.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, color: T.textPri, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>{item.sub}</div>
+              </div>
+              <span style={{ color: T.textSec, fontSize: 16 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── О приложении ── */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ О приложении</div>
+        <div style={{ background: T.surface, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+          {/* Лого + название */}
+          <div style={{ padding: '18px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: `linear-gradient(135deg, ${T.gold}30, ${T.goldL}18)`, border: `1px solid ${T.gold}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>🗝️</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>АПГ — Альянс Партнёров</div>
+              <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>Программа лояльности Зеленограда</div>
+            </div>
+            <div style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: T.gold, background: T.gold + '15', border: `1px solid ${T.gold}30`, borderRadius: 8, padding: '4px 8px', flexShrink: 0 }}>v1.0</div>
+          </div>
+          {/* Строки */}
+          {[
+            { label: 'Версия',       value: '1.0.0' },
+            { label: 'Город',        value: 'Зеленоград' },
+            { label: 'Разработчик',  value: 'АПГ Team' },
+          ].map((row, i, arr) => (
+            <div key={row.label} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: T.textSec }}>{row.label}</span>
+              <span style={{ fontSize: 13, color: T.textPri, fontWeight: 600 }}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* ── Выход ── */}
-      <div style={{ padding: '12px 16px 0' }}>
+      <div style={{ padding: '16px 16px 0' }}>
         <button onClick={onLogout} style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.red}44`, background: T.red + '15', color: T.red, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Выйти из аккаунта
         </button>
@@ -411,7 +507,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         </button>
       </div>
 
-      <div style={{ height: 24 }} />
+      <div style={{ height: 90 }} />
 
       {/* ── Модалка подтверждения удаления ── */}
       {showDeleteConfirm && (
