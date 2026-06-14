@@ -459,9 +459,12 @@ function ApgLogo() {
         <line x1="6" y1="15" x2="24" y2="15" stroke="rgba(201,168,76,0.22)" strokeWidth="0.8"/>
         <circle cx="15" cy="15" r="2.8" fill="#C9A84C"/>
       </svg>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 17, letterSpacing: 2, lineHeight: 1 }}>АПГ</span>
-        <span style={{ color: 'rgba(201,168,76,0.5)', fontSize: 7.5, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', lineHeight: 1 }}>Альянс Партнёров</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 17, letterSpacing: 2, lineHeight: 1 }}>АПГ</span>
+          <span style={{ color: 'rgba(201,168,76,0.6)', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', lineHeight: 1 }}>Зеленоград</span>
+        </div>
+        <span style={{ color: 'rgba(201,168,76,0.45)', fontSize: 7.5, fontWeight: 600, letterSpacing: 1.2, textTransform: 'uppercase', lineHeight: 1 }}>Альянс Партнёров Города</span>
       </div>
     </div>
   );
