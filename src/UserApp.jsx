@@ -9,6 +9,7 @@ import { ProfilePanel } from './ProfilePanel.jsx';
 import { HomePanel } from './HomePanel.jsx';
 import { PartnerPage } from './PartnerPage.jsx';
 import { Onboarding } from './Onboarding.jsx';
+import { EventsPage } from './EventsPage.jsx';
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
@@ -175,7 +176,13 @@ export function UserApp() {
                 onToggleFavorite={toggleFavorite}
                 onScan={() => setIsScannerOpen(true)}
                 onShare={handleShare}
+                onOpenEvents={() => setActivePanel('events')}
                 onRetry={() => { const m = { current: true }; initApp(m); }}
+              />
+
+              <EventsPage nav="events"
+                events={events}
+                onBack={() => setActivePanel('home')}
               />
 
               <PartnerPage nav="partner"

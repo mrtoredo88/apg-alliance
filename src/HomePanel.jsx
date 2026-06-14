@@ -366,7 +366,7 @@ function ApgLogo() {
 export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [],
   loading = false, error = null,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onRetry,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onRetry,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -450,6 +450,14 @@ export function HomePanel({
                 <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>
                   <span style={{ color: T.gold }}>✦</span> Ближайшие события
                 </div>
+                {events.length > 0 && (
+                  <button onClick={onOpenEvents} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, color: T.gold, fontWeight: 700, padding: 0,
+                  }}>
+                    Все →
+                  </button>
+                )}
               </div>
             </div>
 
