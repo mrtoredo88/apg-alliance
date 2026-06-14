@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Panel, PanelHeader, PanelHeaderBack } from '@vkontakte/vkui';
+import { Panel } from '@vkontakte/vkui';
 
 const T = {
   bg:'#0F0F1A',surface:'#1A1A2E',border:'rgba(255,255,255,0.07)',
@@ -44,7 +44,18 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite }) {
 
   return (
     <Panel id="partner">
-      <PanelHeader before={<PanelHeaderBack onClick={onBack} />}>{partner.name}</PanelHeader>
+      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(15,15,26,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, height:52 }}>
+          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
+            {partner.categoryLabel && <div style={{ fontSize:11, color:T.gold, marginTop:1 }}>{partner.categoryLabel}</div>}
+          </div>
+          <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
+            {isFavorite ? '♥' : '♡'}
+          </button>
+        </div>
+      </div>
       <div style={{background:T.bg,minHeight:'100%'}}>
 
         {/* Шапка */}
@@ -100,7 +111,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite }) {
             {isFavorite?'♥ Убрать из избранного':'♡ Добавить в избранное'}
           </button>
         </div>
-        <div style={{height:24}}/>
+        <div style={{height:90}}/>
       </div>
     </Panel>
   );

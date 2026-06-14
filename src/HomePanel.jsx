@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
-import { Panel, PanelHeader, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
+import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 
 // ─── Дизайн-токены ────────────────────────────────────────────────────────────
 const T = {
@@ -558,9 +558,9 @@ export function HomePanel({
 
   return (
     <Panel id="home">
-      <PanelHeader style={{ background: T.bg }}>
+      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(15,15,26,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', alignItems:'center', height:52 }}>
         <ApgLogo />
-      </PanelHeader>
+      </div>
 
       <div style={{ background: T.bg, minHeight: '100%' }}>
 
