@@ -159,20 +159,58 @@ export function UserApp() {
     return m ? m[1] : null;
   })());
 
+  // Свайп между главными вкладками
+  const swipeX = useRef(null);
+  const swipeY = useRef(null);
+  const swipeDirRef = useRef(0); // 1 = вперёд, -1 = назад, 0 = тап
+  const TAB_ORDER = ['home', 'offers', 'tasks', 'profile'];
+
+  const handleSwipeStart = useCallback((e) => {
+    swipeX.current = e.touches[0].clientX;
+    swipeY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleSwipeEnd = useCallback((e) => {
+    if (swipeX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeX.current;
+    const dy = e.changedTouches[0].clientY - swipeY.current;
+    swipeX.current = null;
+    swipeY.current = null;
+    const curIdx = TAB_ORDER.indexOf(activePanel);
+    if (curIdx === -1) return;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (dx < 0 && curIdx < TAB_ORDER.length - 1) {
+      haptic('light');
+      swipeDirRef.current = 1;
+      setActivePanel(TAB_ORDER[curIdx + 1]);
+    } else if (dx > 0 && curIdx > 0) {
+      haptic('light');
+      swipeDirRef.current = -1;
+      setActivePanel(TAB_ORDER[curIdx - 1]);
+    }
+  }, [activePanel]);
+
   // Анимация переходов между панелями
   const prevPanelRef = useRef('home');
   useEffect(() => {
     if (prevPanelRef.current === activePanel) return;
     prevPanelRef.current = activePanel;
     const TAB_IDS = ['home', 'offers', 'tasks', 'profile'];
-    const anim = TAB_IDS.includes(activePanel)
-      ? 'tabFadeIn 0.22s cubic-bezier(0.2, 0, 0, 1) both'
-      : 'pageSlideIn 0.26s cubic-bezier(0.2, 0, 0, 1) both';
+    let anim;
+    if (TAB_IDS.includes(activePanel)) {
+      const dir = swipeDirRef.current;
+      if (dir === 1) anim = 'slideInRight 0.26s cubic-bezier(0.2, 0, 0, 1) both';
+      else if (dir === -1) anim = 'slideInLeft 0.26s cubic-bezier(0.2, 0, 0, 1) both';
+      else anim = 'tabFadeIn 0.22s cubic-bezier(0.2, 0, 0, 1) both';
+    } else {
+      anim = 'pageSlideIn 0.26s cubic-bezier(0.2, 0, 0, 1) both';
+    }
+    swipeDirRef.current = 0;
     const timer = setTimeout(() => {
       const el = document.getElementById(activePanel);
       if (el) {
         el.style.animation = 'none';
-        void el.offsetHeight; // reflow
+        void el.offsetHeight;
         el.style.animation = anim;
       }
     }, 0);
@@ -702,7 +740,11 @@ export function UserApp() {
           </div>
 
           {/* Max-width content container */}
-          <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 60, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+          <div
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 60, minHeight: '100vh', position: 'relative', zIndex: 1 }}
+            onTouchStart={handleSwipeStart}
+            onTouchEnd={handleSwipeEnd}
+          >
             <View activePanel={activePanel}>
 
               <HomePanel nav="home"
