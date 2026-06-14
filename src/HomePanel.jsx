@@ -128,7 +128,7 @@ function EventModal({ event, onClose }) {
 
 // ─── Карточка события ─────────────────────────────────────────────────────────
 
-function EventCard({ event, onClick }) {
+function EventCard({ event, onClick, index = 0 }) {
   const gradients = [
     'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
     'linear-gradient(135deg, #1a3a1a, #2d6a3a)',
@@ -144,6 +144,8 @@ function EventCard({ event, onClick }) {
       background: grad, flexShrink: 0, cursor: 'pointer',
       border: `1px solid ${T.border}`,
       position: 'relative',
+      animation: 'fadeInUp 0.4s ease both',
+      animationDelay: `${index * 0.08}s`,
     }}>
       {/* Золотая полоска сверху */}
       <div style={{ height: 2, background: `linear-gradient(90deg, ${T.gold}, transparent)` }} />
@@ -171,7 +173,7 @@ function EventCard({ event, onClick }) {
 
 // ─── Карточка партнёра ────────────────────────────────────────────────────────
 
-function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite }) {
+function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 }) {
   return (
     <div style={{
       background: T.surface,
@@ -179,6 +181,8 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite }) {
       border: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column', gap: 10,
       position: 'relative', overflow: 'hidden',
+      animation: 'fadeInUp 0.45s ease both',
+      animationDelay: `${index * 0.07}s`,
     }}>
       {/* Золотая точка если в избранном */}
       {isFavorite && (
@@ -252,6 +256,7 @@ function HeroBanner({ userKeys, userName }) {
       padding: '22px 20px 20px',
       position: 'relative', overflow: 'hidden',
       border: `1px solid rgba(201,168,76,0.3)`,
+      animation: 'fadeInUp 0.5s ease both',
     }}>
       {/* Декоративная сетка */}
       <div style={{
@@ -336,6 +341,26 @@ function QuickActions({ onScan }) {
   );
 }
 
+// ─── Логотип ─────────────────────────────────────────────────────────────────
+
+function ApgLogo() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+        <rect x="0.75" y="0.75" width="28.5" height="28.5" rx="8" fill="rgba(201,168,76,0.12)" stroke="rgba(201,168,76,0.45)" strokeWidth="1.5"/>
+        <polygon points="15,4 24,15 15,26 6,15" fill="rgba(201,168,76,0.07)" stroke="#C9A84C" strokeWidth="1.3"/>
+        <line x1="15" y1="4" x2="15" y2="26" stroke="rgba(201,168,76,0.22)" strokeWidth="0.8"/>
+        <line x1="6" y1="15" x2="24" y2="15" stroke="rgba(201,168,76,0.22)" strokeWidth="0.8"/>
+        <circle cx="15" cy="15" r="2.8" fill="#C9A84C"/>
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 17, letterSpacing: 2, lineHeight: 1 }}>АПГ</span>
+        <span style={{ color: 'rgba(201,168,76,0.5)', fontSize: 7.5, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', lineHeight: 1 }}>Альянс Партнёров</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
 export function HomePanel({
@@ -353,26 +378,61 @@ export function HomePanel({
   return (
     <Panel id="home">
       <PanelHeader style={{ background: T.bg }}>
-        <span style={{ color: T.gold, fontWeight: 800, letterSpacing: 1 }}>АПГ</span>
+        <ApgLogo />
       </PanelHeader>
 
       <div style={{ background: T.bg, minHeight: '100%' }}>
 
         {loading && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}>
-            <div style={{ fontSize: 40 }}>✦</div>
-            <span style={{ color: T.textSec, fontSize: 14 }}>Загружаем данные...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 320, flexDirection: 'column', gap: 18 }}>
+            <div style={{ position: 'relative', width: 72, height: 72 }}>
+              <div style={{
+                position: 'absolute', inset: 0, borderRadius: '50%',
+                border: '2px solid rgba(201,168,76,0.12)',
+                borderTopColor: '#C9A84C',
+                animation: 'spin 1.2s linear infinite',
+              }} />
+              <div style={{
+                position: 'absolute', inset: 8, borderRadius: '50%',
+                border: '1.5px solid rgba(201,168,76,0.07)',
+                borderBottomColor: 'rgba(201,168,76,0.35)',
+                animation: 'spin 2s linear infinite reverse',
+              }} />
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, color: '#C9A84C',
+                animation: 'pulse-glow 2s ease-in-out infinite',
+              }}>✦</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: T.textPri, fontSize: 15, fontWeight: 700, marginBottom: 4 }}>АПГ</div>
+              <div style={{ color: T.textSec, fontSize: 13 }}>Загружаем данные...</div>
+            </div>
           </div>
         )}
 
         {!loading && error && (
-          <div style={{ padding: 24, textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
-            <div style={{ color: T.textPri, fontWeight: 600, marginBottom: 8 }}>Нет подключения</div>
-            <button onClick={onRetry} style={{
-              padding: '12px 24px', borderRadius: 12, border: 'none',
-              background: T.gold, color: '#0F0F1A', fontWeight: 700, cursor: 'pointer',
-            }}>Повторить</button>
+          <div style={{ padding: '40px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+            <div style={{ animation: 'float 3s ease-in-out infinite' }}>
+              <svg width="100" height="100" viewBox="0 0 100 100" fill="none">
+                <circle cx="50" cy="50" r="46" fill="rgba(230,70,70,0.05)" stroke="rgba(230,70,70,0.18)" strokeWidth="1.5"/>
+                <path d="M22 52 C22 38 35 26 50 26 C65 26 78 38 78 52" stroke="rgba(230,70,70,0.35)" strokeWidth="3" strokeLinecap="round" fill="none"/>
+                <path d="M31 60 C31 50 40 41 50 41 C60 41 69 50 69 60" stroke="rgba(230,70,70,0.55)" strokeWidth="3" strokeLinecap="round" fill="none"/>
+                <line x1="43" y1="68" x2="57" y2="82" stroke="#E64646" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="57" y1="68" x2="43" y2="82" stroke="#E64646" strokeWidth="3" strokeLinecap="round"/>
+                <circle cx="50" cy="75" r="6" fill="rgba(230,70,70,0.1)"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ color: T.textPri, fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Нет подключения</div>
+              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px', marginBottom: 20 }}>Проверьте интернет и попробуйте снова</div>
+              <button onClick={onRetry} style={{
+                padding: '13px 36px', borderRadius: 14, border: 'none',
+                background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+                color: '#0F0F1A', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>Повторить</button>
+            </div>
           </div>
         )}
 
@@ -394,15 +454,33 @@ export function HomePanel({
             </div>
 
             {events.length === 0 ? (
-              <div style={{ margin: '0 16px', background: T.surface, borderRadius: 20, padding: 24, textAlign: 'center', border: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 32, marginBottom: 10 }}>📅</div>
-                <div style={{ color: T.textPri, fontWeight: 600, marginBottom: 6 }}>Скоро будут события</div>
-                <div style={{ color: T.textSec, fontSize: 13 }}>Партнёры АПГ готовят кое-что интересное</div>
+              <div style={{ margin: '0 16px', background: T.surface, borderRadius: 24, padding: '28px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
+                  <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
+                    <rect x="10" y="22" width="70" height="60" rx="12" fill="rgba(201,168,76,0.07)" stroke="rgba(201,168,76,0.22)" strokeWidth="1.5"/>
+                    <rect x="10" y="22" width="70" height="23" rx="12" fill="rgba(201,168,76,0.11)"/>
+                    <rect x="10" y="35" width="70" height="10" fill="rgba(201,168,76,0.11)"/>
+                    <rect x="25" y="12" width="7" height="19" rx="3.5" fill="rgba(201,168,76,0.65)"/>
+                    <rect x="58" y="12" width="7" height="19" rx="3.5" fill="rgba(201,168,76,0.65)"/>
+                    <circle cx="30" cy="56" r="3.5" fill="rgba(201,168,76,0.28)"/>
+                    <circle cx="45" cy="56" r="3.5" fill="rgba(201,168,76,0.28)"/>
+                    <circle cx="60" cy="56" r="3.5" fill="rgba(201,168,76,0.28)"/>
+                    <circle cx="30" cy="70" r="3" fill="rgba(201,168,76,0.2)"/>
+                    <circle cx="45" cy="70" r="5" fill="rgba(201,168,76,0.82)"/>
+                    <circle cx="60" cy="70" r="3" fill="rgba(201,168,76,0.2)"/>
+                    <rect x="76" y="10" width="5" height="5" rx="0.5" transform="rotate(45 78 12)" fill="rgba(201,168,76,0.7)"/>
+                    <rect x="4" y="14" width="4" height="4" rx="0.5" transform="rotate(45 6 16)" fill="rgba(201,168,76,0.4)"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Скоро будут события</div>
+                  <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Партнёры АПГ готовят кое-что интересное</div>
+                </div>
               </div>
             ) : (
               <HorizontalScroll>
                 <div style={{ display: 'flex', gap: 12, padding: '0 16px 4px' }}>
-                  {events.map(e => <EventCard key={e.id} event={e} onClick={setSelectedEvent} />)}
+                  {events.map((e, i) => <EventCard key={e.id} event={e} index={i} onClick={setSelectedEvent} />)}
                 </div>
               </HorizontalScroll>
             )}
@@ -440,15 +518,28 @@ export function HomePanel({
               </div>
 
               {filteredPartners.length === 0 ? (
-                <div style={{ background: T.surface, borderRadius: 20, padding: 24, textAlign: 'center', border: `1px solid ${T.border}` }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                  <div style={{ color: T.textSec, fontSize: 13 }}>В этой категории пока нет партнёров</div>
+                <div style={{ background: T.surface, borderRadius: 24, padding: '28px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                  <div style={{ animation: 'float 3s ease-in-out infinite' }}>
+                    <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
+                      <circle cx="40" cy="38" r="26" fill="rgba(201,168,76,0.06)" stroke="rgba(201,168,76,0.22)" strokeWidth="2"/>
+                      <circle cx="40" cy="38" r="16" fill="rgba(201,168,76,0.04)" stroke="rgba(201,168,76,0.11)" strokeWidth="1.5"/>
+                      <line x1="59" y1="57" x2="78" y2="76" stroke="rgba(201,168,76,0.45)" strokeWidth="4" strokeLinecap="round"/>
+                      <line x1="33" y1="38" x2="47" y2="38" stroke="rgba(201,168,76,0.35)" strokeWidth="2.5" strokeLinecap="round"/>
+                      <line x1="40" y1="31" x2="40" y2="45" stroke="rgba(201,168,76,0.35)" strokeWidth="2.5" strokeLinecap="round"/>
+                      <circle cx="22" cy="22" r="2.5" fill="rgba(201,168,76,0.3)"/>
+                      <circle cx="60" cy="18" r="2" fill="rgba(201,168,76,0.22)"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Ничего не найдено</div>
+                    <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>В этой категории пока нет партнёров</div>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {filteredPartners.map(p => (
+                  {filteredPartners.map((p, i) => (
                     <PartnerCard
-                      key={p.id} partner={p}
+                      key={p.id} partner={p} index={i}
                       isFavorite={favorites.includes(p.id)}
                       onOpen={onOpenPartner}
                       onToggleFavorite={onToggleFavorite}
