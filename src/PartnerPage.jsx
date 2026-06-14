@@ -83,6 +83,18 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite }) {
           </div>
         )}
 
+        {/* Галерея фото */}
+        {(partner.photos?.length ?? 0) > 0 && (
+          <div style={{margin:'12px 16px'}}>
+            <div style={{fontSize:13,color:T.gold,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>✦ Фотографии</div>
+            <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:4}}>
+              {partner.photos.map((url, i) => (
+                <img key={i} src={url} alt="" style={{width:160,height:110,borderRadius:14,objectFit:'cover',flexShrink:0,border:`1px solid ${T.border}`}} onError={e => e.target.style.display='none'} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Информация */}
         {infoRows.length>0&&(
           <div style={{margin:'12px 16px'}}>

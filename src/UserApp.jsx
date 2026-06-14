@@ -491,6 +491,7 @@ export function UserApp() {
         lastScanDate: todayKey,
         streak: newStreak,
       });
+      updateDoc(doc(db, 'partners', partner.id), { scanCount: increment(1) }).catch(() => {});
       setUserKeys(prev => prev + keysEarned);
       setStreak(newStreak);
       setKeyAnim(keysEarned);

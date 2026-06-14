@@ -67,6 +67,13 @@ function EventModal({ event, onClose }) {
         {/* Ручка */}
         <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 20px' }} />
 
+        {/* Обложка события */}
+        {event.imageUrl && (
+          <div style={{ margin: '-24px -20px 20px', overflow: 'hidden', borderRadius: '0' }}>
+            <img src={event.imageUrl} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display='none'} />
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div style={{ fontSize: 52 }}>{event.emoji ?? '🎉'}</div>
           <button onClick={onClose} style={{
