@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { PanelHeader, Progress, Avatar } from '@vkontakte/vkui';
+import { PanelHeader, Avatar } from '@vkontakte/vkui';
+import { LEVELS, getLevel, getNextLevel, getLevelProgress } from './levels.js';
 
 const T = {
   bg:       '#0F0F1A',
@@ -15,13 +16,6 @@ const T = {
   textSec:  'rgba(240,240,240,0.5)',
 };
 
-const LEVELS = [
-  { id: 1, title: 'Новичок',          minKeys: 0,  color: '#99A2AD', emoji: '🌱' },
-  { id: 2, title: 'Участник',         minKeys: 5,  color: T.blue,    emoji: '⚡' },
-  { id: 3, title: 'Активный',         minKeys: 15, color: T.green,   emoji: '🔥' },
-  { id: 4, title: 'VIP участник АПГ', minKeys: 30, color: T.gold,    emoji: '👑' },
-];
-
 const ACHIEVEMENTS = [
   { id: 'first_scan',     title: 'Первый шаг',   emoji: '🎯', color: T.blue,  cond: (k)    => k >= 1 },
   { id: 'five_keys',      title: 'Коллекционер', emoji: '🗝️', color: T.gold,  cond: (k)    => k >= 5 },
@@ -30,19 +24,6 @@ const ACHIEVEMENTS = [
   { id: 'five_favs',      title: 'Свой человек',  emoji: '❤️', color: T.red,   cond: (k, f) => f.length >= 5 },
   { id: 'vip',            title: 'VIP',           emoji: '👑', color: T.gold,  cond: (k)    => k >= 30 },
 ];
-
-function getLevel(keys) {
-  return [...LEVELS].reverse().find(l => keys >= l.minKeys) ?? LEVELS[0];
-}
-function getNextLevel(keys) {
-  return LEVELS.find(l => l.minKeys > keys) ?? null;
-}
-function getLevelProgress(keys) {
-  const cur = getLevel(keys);
-  const next = getNextLevel(keys);
-  if (!next) return 100;
-  return Math.round(((keys - cur.minKeys) / (next.minKeys - cur.minKeys)) * 100);
-}
 
 function AchievementBadge({ a, unlocked }) {
   return (
@@ -67,7 +48,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Зачем нужны ключи?',
-    a: 'Ключи определяют твой уровень в программе. Уровни: Новичок (0), Участник (5+), Активный (15+), VIP (30+). Чем выше уровень — тем больше привилегий.',
+    a: 'Ключи определяют твой уровень в программе. Уровни: 🌱 Новичок (0), ⭐ Участник (10+), 🔥 Активный (25+), 💎 Профи (50+), 👑 Амбассадор АПГ (100+). Чем выше уровень — тем больше привилегий.',
   },
   {
     q: 'Как воспользоваться предложением партнёра?',
@@ -204,7 +185,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           {/* Бейдж уровня */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: level.color + '20', border: `1px solid ${level.color}50`, borderRadius: 20, padding: '5px 14px' }}>
             <span style={{ fontSize: 14 }}>{level.emoji}</span>
-            <span style={{ fontSize: 12, color: level.color, fontWeight: 700 }}>{level.title}</span>
+            <span style={{ fontSize: 12, color: level.color, fontWeight: 700 }}>{level.label}</span>
           </div>
 
           {/* Прогресс */}
@@ -214,7 +195,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
               <span style={{ fontSize: 11, color: T.textSec }}>🗝️ {userKeys} ключей</span>
-              <span style={{ fontSize: 11, color: T.textSec }}>{nextLevel ? `До «${nextLevel.title}»: ${nextLevel.minKeys - userKeys}` : '🏆 Макс. уровень'}</span>
+              <span style={{ fontSize: 11, color: T.textSec }}>{nextLevel ? `До «${nextLevel.label}»: ${nextLevel.min - userKeys}` : '🏆 Макс. уровень'}</span>
             </div>
           </div>
         </div>
@@ -231,6 +212,59 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               <div style={{ fontSize: 10, color: T.textSec, marginTop: 3 }}>{s.label}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ── Путь участника ── */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Путь участника</div>
+        <div style={{ background: T.surface, borderRadius: 20, padding: '16px 16px', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {LEVELS.map((lvl, i) => {
+            const isReached  = userKeys >= lvl.min;
+            const isCurrent  = level.id === lvl.id;
+            const isLast     = i === LEVELS.length - 1;
+            return (
+              <div key={lvl.id} style={{ display: 'flex', gap: 12, position: 'relative' }}>
+                {/* Вертикальная линия */}
+                {!isLast && (
+                  <div style={{
+                    position: 'absolute', left: 19, top: 40, width: 2, height: 'calc(100% - 12px)',
+                    background: isReached ? lvl.color + '60' : 'rgba(255,255,255,0.08)',
+                    transition: 'background 0.4s ease',
+                  }} />
+                )}
+                {/* Иконка уровня */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: 14, flexShrink: 0,
+                  background: isReached ? lvl.color + '22' : 'rgba(255,255,255,0.04)',
+                  border: `2px solid ${isReached ? lvl.color + '80' : 'rgba(255,255,255,0.1)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: isReached ? 18 : 16,
+                  filter: isReached ? 'none' : 'grayscale(1)',
+                  opacity: isReached ? 1 : 0.45,
+                  boxShadow: isCurrent ? `0 0 0 3px ${lvl.color}40` : 'none',
+                  transition: 'all 0.3s ease',
+                }}>
+                  {lvl.emoji}
+                </div>
+                {/* Текст */}
+                <div style={{ flex: 1, paddingBottom: isLast ? 0 : 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: isReached ? T.textPri : T.textSec }}>{lvl.label}</span>
+                    {isCurrent && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: lvl.color, background: lvl.color + '20', border: `1px solid ${lvl.color}50`, borderRadius: 8, padding: '2px 7px', textTransform: 'uppercase', letterSpacing: 0.5 }}>сейчас</span>
+                    )}
+                    {isReached && !isCurrent && (
+                      <span style={{ fontSize: 12, color: T.green }}>✓</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>
+                    {lvl.min === 0 ? 'Стартовый уровень' : `от ${lvl.min} ключей`}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

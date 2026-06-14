@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TASKS } from './tasks.js';
+import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, PanelHeader, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 
 // ─── Дизайн-токены ────────────────────────────────────────────────────────────
@@ -283,11 +284,54 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
   );
 }
 
+// ─── Партнёр дня ─────────────────────────────────────────────────────────────
+
+function FeaturedPartnerCard({ partner, onOpen }) {
+  return (
+    <div style={{ margin: '0 16px 4px', animation: 'fadeInUp 0.4s ease both' }}>
+      <button onClick={() => onOpen(partner)} style={{
+        width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: 0, background: 'none',
+      }}>
+        <div style={{
+          borderRadius: 20,
+          background: 'linear-gradient(135deg, rgba(255,200,0,0.12) 0%, rgba(255,150,0,0.08) 100%)',
+          border: '1px solid rgba(255,200,0,0.3)',
+          padding: '14px 16px',
+          display: 'flex', alignItems: 'center', gap: 14,
+          boxShadow: '0 0 24px rgba(255,180,0,0.08)',
+        }}>
+          {/* Метка */}
+          <div style={{ flexShrink: 0 }}>
+            <PartnerLogo partner={partner} size={52} />
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <span style={{ fontSize: 9, fontWeight: 800, color: '#FFD700', letterSpacing: 1.2, textTransform: 'uppercase' }}>⭐ Партнёр дня</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, padding: '1px 6px' }}>+2 🗝️</span>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{partner.name}</div>
+            {partner.offer && (
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                🎁 {partner.offer}
+              </div>
+            )}
+          </div>
+
+          <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>›</div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
 // ─── Баннер ───────────────────────────────────────────────────────────────────
 
-function HeroBanner({ userKeys, userName }) {
-  const MAX_KEYS = 50;
-  const progress = Math.min(Math.round((userKeys / MAX_KEYS) * 100), 100);
+function HeroBanner({ userKeys, userName, streak }) {
+  const level    = getLevel(userKeys);
+  const nextLevel = getNextLevel(userKeys);
+  const pct      = getLevelProgress(userKeys);
+  const toNext   = getKeysToNext(userKeys);
 
   return (
     <div style={{
@@ -299,68 +343,69 @@ function HeroBanner({ userKeys, userName }) {
       border: `1px solid rgba(201,168,76,0.3)`,
       animation: 'fadeInUp 0.5s ease both',
     }}>
-      {/* Декоративная сетка */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage: 'radial-gradient(rgba(201,168,76,0.07) 1px, transparent 1px)',
-        backgroundSize: '20px 20px',
-      }} />
-      {/* Золотое свечение */}
-      <div style={{
-        position: 'absolute', top: -40, right: -40,
-        width: 140, height: 140, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(201,168,76,0.15), transparent 70%)',
-      }} />
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.07) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+      <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}22, transparent 70%)` }} />
 
       <div style={{ position: 'relative' }}>
         <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10, opacity: 0.85 }}>
           ✦ Альянс Партнёров Города
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: T.white, lineHeight: 1.15, letterSpacing: -0.5 }}>
-            {userName ?? 'участник'} 👋
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: T.white, lineHeight: 1.15, letterSpacing: -0.5 }}>
+              {userName ?? 'участник'} 👋
+            </div>
           </div>
+          {streak >= 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.35)', borderRadius: 12, padding: '6px 10px', gap: 1 }}>
+              <span style={{ fontSize: 18 }}>🔥</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#FF8C42' }}>{streak}</span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3 }}>дней</span>
+            </div>
+          )}
         </div>
 
-        {/* Ключи */}
-        <div style={{
-          background: 'rgba(0,0,0,0.35)',
-          borderRadius: 16, padding: '14px 16px',
-          border: '1px solid rgba(201,168,76,0.3)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-        }}>
-          {/* Счётчик */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, color: T.goldL, letterSpacing: -1, lineHeight: 1 }}>
-                  {userKeys}
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: T.gold, letterSpacing: 0.5 }}>🗝️ ключей</span>
+        {/* Уровень + ключи */}
+        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '14px 16px', border: `1px solid ${level.color}66`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 12px rgba(0,0,0,0.3)` }}>
+
+          {/* Верхняя строка: уровень и счётчик */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: `${level.color}30`, border: `1px solid ${level.color}80`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                {level.emoji}
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 3, letterSpacing: 0.3 }}>
-                Ваш баланс в программе лояльности
+              <div>
+                <div style={{ fontSize: 11, color: level.color, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{level.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: -0.5 }}>
+                  {userKeys} <span style={{ fontSize: 14, fontWeight: 700, color: T.goldL }}>🗝️</span>
+                </div>
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 1 }}>из</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.55)', lineHeight: 1 }}>{MAX_KEYS}</div>
-            </div>
+            {nextLevel && (
+              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '6px 10px', border: '1px solid rgba(255,255,255,0.18)' }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>следующий</div>
+                <div style={{ fontSize: 16 }}>{nextLevel.emoji}</div>
+                <div style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>{nextLevel.label}</div>
+              </div>
+            )}
           </div>
-          {/* Прогресс */}
-          <div style={{ height: 7, background: 'rgba(255,255,255,0.12)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+
+          {/* Прогресс-бар */}
+          <div style={{ height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
             <div style={{
-              height: '100%', width: `${progress}%`,
-              background: `linear-gradient(90deg, ${T.gold}, ${T.goldL})`,
-              borderRadius: 8, transition: 'width 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: `0 0 12px ${T.gold}99`,
+              height: '100%', width: `${pct}%`,
+              background: `linear-gradient(90deg, ${level.color}, ${T.goldL})`,
+              borderRadius: 8, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
+              boxShadow: `0 0 12px ${level.color}`,
             }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>0</span>
-            <span style={{ fontSize: 10, color: T.gold, fontWeight: 700 }}>{progress}%</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{MAX_KEYS}</span>
+
+          {/* Подпись */}
+          <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', fontWeight: 600 }}>
+            {nextLevel
+              ? `До ${nextLevel.emoji} ${nextLevel.label}: ещё ${toNext} ключей`
+              : '👑 Максимальный уровень — вы Амбассадор АПГ!'}
           </div>
         </div>
       </div>
@@ -370,10 +415,10 @@ function HeroBanner({ userKeys, userName }) {
 
 // ─── Быстрые действия ────────────────────────────────────────────────────────
 
-function QuickActions({ onScan, onShare, onOpenLeaderboard, onOpenOffers }) {
+function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks }) {
   const actions = [
-    { icon: '📷', label: 'QR-скан',  color: T.blue,  onClick: onScan },
-    { icon: '🎁', label: 'Акции',    color: T.green, onClick: onOpenOffers },
+    { icon: '🗓️', label: 'События', color: T.blue,  onClick: onOpenEvents },
+    { icon: '✦',  label: 'Задания', color: '#9B7EDF', onClick: onOpenTasks },
     { icon: '🏆', label: 'Рейтинг', color: T.gold,  onClick: onOpenLeaderboard },
     { icon: '👥', label: 'Позвать', color: T.red,   onClick: onShare },
   ];
@@ -482,13 +527,15 @@ function SkeletonHome() {
 
 export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [],
-  loading = false, error = null,
+  loading = false, error = null, streak = 0,
   completedTasks = [], referralCount = 0,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const featuredPartner = partners.find(p => p.featured === true) ?? null;
 
   const taskPreview = useMemo(() => {
     const statuses = TASKS.map(t => ({
@@ -545,11 +592,16 @@ export function HomePanel({
 
         {!loading && !error && (
           <>
-            <HeroBanner userKeys={userKeys} userName={user?.first_name} />
+            <HeroBanner userKeys={userKeys} userName={user?.first_name} streak={streak} />
 
             <div style={{ padding: '12px 0 4px' }}>
-              <QuickActions onScan={onScan} onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenOffers={onOpenOffers} />
+              <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} />
             </div>
+
+            {/* Партнёр дня */}
+            {featuredPartner && (
+              <FeaturedPartnerCard partner={featuredPartner} onOpen={onOpenPartner} />
+            )}
 
             {/* Задания — превью */}
             {taskPreview.length > 0 && (
@@ -564,19 +616,26 @@ export function HomePanel({
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {taskPreview.map(t => (
-                    <button key={t.id} onClick={onOpenTasks} style={{ ...GLASS, background: t.ready ? 'rgba(201,168,76,0.1)' : undefined, border: `1px solid ${t.ready ? 'rgba(201,168,76,0.35)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                    <button key={t.id} onClick={onOpenTasks} style={{
+                      background: t.ready ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.06)',
+                      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                      border: `1px solid ${t.ready ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.14)'}`,
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                      borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
+                    }}>
                       <span style={{ fontSize: 22, flexShrink: 0 }}>{t.emoji}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri }}>{t.title}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{t.title}</div>
                         {t.total && (
-                          <div style={{ marginTop: 5 }}>
-                            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', background: t.ready ? `linear-gradient(90deg, ${T.gold}, ${T.goldL})` : 'rgba(255,255,255,0.2)', borderRadius: 2, width: `${Math.round((t.prog / t.total) * 100)}%`, transition: 'width 0.5s' }} />
+                          <div style={{ marginTop: 6 }}>
+                            <div style={{ height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', background: t.ready ? `linear-gradient(90deg, ${T.gold}, ${T.goldL})` : 'rgba(255,255,255,0.45)', borderRadius: 2, width: `${Math.round((t.prog / t.total) * 100)}%`, transition: 'width 0.5s' }} />
                             </div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>{t.prog} / {t.total}</div>
                           </div>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: t.ready ? T.gold : T.textSec, background: t.ready ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: t.ready ? T.gold : 'rgba(255,255,255,0.9)', background: t.ready ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.1)', border: `1px solid ${t.ready ? 'rgba(201,168,76,0.3)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 8, padding: '4px 9px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                         {t.ready ? '🎁 Забрать' : `+${t.reward} 🗝️`}
                       </div>
                     </button>
@@ -637,7 +696,7 @@ export function HomePanel({
             {/* Поиск */}
             <div style={{ padding: '20px 16px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...GLASS, borderRadius: 14, padding: '10px 14px' }}>
-                <span style={{ fontSize: 15, opacity: 0.4, flexShrink: 0 }}>🔍</span>
+                <span style={{ fontSize: 15, opacity: 0.7, flexShrink: 0 }}>🔍</span>
                 <input
                   type="search"
                   placeholder="Найти партнёра..."
@@ -688,26 +747,28 @@ export function HomePanel({
               </div>
 
               {filteredPartners.length === 0 ? (
-                <div style={{ ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-                  <div style={{ animation: 'float 3s ease-in-out infinite' }}>
-                    <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
-                      <circle cx="40" cy="38" r="26" fill="rgba(201,168,76,0.06)" stroke="rgba(201,168,76,0.22)" strokeWidth="2"/>
-                      <circle cx="40" cy="38" r="16" fill="rgba(201,168,76,0.04)" stroke="rgba(201,168,76,0.11)" strokeWidth="1.5"/>
-                      <line x1="59" y1="57" x2="78" y2="76" stroke="rgba(201,168,76,0.45)" strokeWidth="4" strokeLinecap="round"/>
-                      <line x1="33" y1="38" x2="47" y2="38" stroke="rgba(201,168,76,0.35)" strokeWidth="2.5" strokeLinecap="round"/>
-                      <line x1="40" y1="31" x2="40" y2="45" stroke="rgba(201,168,76,0.35)" strokeWidth="2.5" strokeLinecap="round"/>
-                      <circle cx="22" cy="22" r="2.5" fill="rgba(201,168,76,0.3)"/>
-                      <circle cx="60" cy="18" r="2" fill="rgba(201,168,76,0.22)"/>
-                    </svg>
+                <div style={{ borderRadius: 24, padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ fontSize: 52, animation: 'float 3s ease-in-out infinite' }}>
+                    {searchQuery.trim() ? '🔍' : '🏪'}
                   </div>
                   <div>
-                    <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Ничего не найдено</div>
-                    <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>
+                    <div style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
+                      {searchQuery.trim() ? 'Ничего не найдено' : 'Пока нет партнёров'}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: '20px' }}>
                       {searchQuery.trim()
                         ? `По запросу «${searchQuery.trim()}» партнёры не найдены`
-                        : 'В этой категории пока нет партнёров'}
+                        : 'В этой категории пока нет партнёров — загляните позже'}
                     </div>
                   </div>
+                  {(searchQuery.trim() || activeCategory !== 'all') && (
+                    <button
+                      onClick={() => { setSearchQuery(''); setActiveCategory('all'); }}
+                      style={{ padding: '10px 24px', borderRadius: 12, background: 'rgba(201,168,76,0.15)', color: '#C9A84C', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(201,168,76,0.3)' }}
+                    >
+                      Сбросить фильтр
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

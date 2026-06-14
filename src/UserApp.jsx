@@ -141,6 +141,8 @@ export function UserApp() {
   const [error, setError]             = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [keyAnim, setKeyAnim] = useState(false);
   const [newEventsCount, setNewEventsCount] = useState(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
@@ -191,6 +193,7 @@ export function UserApp() {
     setNotificationsEnabled(data.notificationsEnabled ?? false);
     setReferralCount(data.referralCount ?? 0);
     setCompletedTasks(data.completedTasks ?? []);
+    setStreak(data.streak ?? 0);
     if (!data.onboardingDone) setShowOnboarding(true);
     await updateDoc(userRef, profile).catch(() => {});
 
@@ -371,16 +374,73 @@ export function UserApp() {
     } catch (e) { setFavorites(prev); }
   };
 
+  const handleScanButton = async () => {
+    haptic('light');
+    try {
+      const { code_data } = await vkBridge.send('VKWebAppOpenCodeReader');
+      // QR format: "APG_PARTNER_<id>" or plain partner id
+      const partnerId = code_data.startsWith('APG_PARTNER_')
+        ? code_data.replace('APG_PARTNER_', '').trim()
+        : code_data.trim();
+      await handleConfirmScan(partnerId);
+    } catch {
+      // Not in VK or camera unavailable — show manual list
+      setIsScannerOpen(true);
+    }
+  };
+
   const handleConfirmScan = async (placeIdentifier) => {
     if (!user) return;
     const partner = partners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
-    if (!partner) { setIsScannerOpen(false); return; }
+    if (!partner) {
+      setIsScannerOpen(false);
+      showToast('Партнёр не найден', '❌');
+      return;
+    }
+
+    // Проверяем лимит: 1 визит к партнёру в день
+    const todayKey = new Date().toISOString().slice(0, 10); // "2026-06-14"
     try {
+      const userSnap = await getDoc(doc(db, 'users', String(user.id)));
+      const lastScans = userSnap.data()?.lastScans ?? {};
+      const lastScanKey = lastScans[partner.id]; // "2026-06-14" или undefined
+
+      if (lastScanKey === todayKey) {
+        haptic('light');
+        showToast(`Уже сканировали сегодня — возвращайтесь завтра!`, '⏳');
+        setIsScannerOpen(false);
+        return;
+      }
+
       haptic('medium');
-      await updateDoc(doc(db, 'users', String(user.id)), { keys: increment(1) });
-      setUserKeys(prev => prev + 1);
-      showToast(`+1 🗝️ за визит в ${partner.name}`, '🎉');
-      await logActivity({ type: 'scan', icon: '🗝️', text: `Посетил партнёра: ${partner.name}`, partnerName: partner.name });
+
+      // Считаем стрик
+      const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const lastScanDate = userSnap.data()?.lastScanDate ?? null;
+      const newStreak = lastScanDate === yesterdayKey
+        ? (userSnap.data()?.streak ?? 0) + 1
+        : lastScanDate === todayKey
+          ? (userSnap.data()?.streak ?? 1)
+          : 1;
+
+      // Партнёр дня даёт +2 ключа
+      const isFeatured = partner.featured === true;
+      const keysEarned = isFeatured ? 2 : 1;
+
+      await updateDoc(doc(db, 'users', String(user.id)), {
+        keys: increment(keysEarned),
+        [`lastScans.${partner.id}`]: todayKey,
+        lastScanDate: todayKey,
+        streak: newStreak,
+      });
+      setUserKeys(prev => prev + keysEarned);
+      setStreak(newStreak);
+      setKeyAnim(keysEarned);
+      setTimeout(() => setKeyAnim(false), 1400);
+      const streakMsg = newStreak >= 2 ? ` · 🔥 ${newStreak} дней подряд` : '';
+      const featuredMsg = isFeatured ? `+2 🗝️ — Партнёр дня!` : `+1 🗝️ за визит в ${partner.name}`;
+      showToast(`${featuredMsg}${streakMsg}`, isFeatured ? '⭐' : '🎉');
+      await logActivity({ type: 'scan', icon: '🗝️', text: `Посетил партнёра: ${partner.name}${isFeatured ? ' (Партнёр дня)' : ''}`, partnerName: partner.name });
     } catch (e) { console.error(e); }
     finally { setIsScannerOpen(false); }
   };
@@ -496,64 +556,104 @@ export function UserApp() {
 
   // ─── Основное приложение ─────────────────────────────────────────────────────
 
-  const pillIdx = isScannerOpen ? -1 : activePanel === 'profile' ? 2 : 0;
+  // SVG-иконки таббара
+  const TabHomeIcon = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z"
+        fill={active ? T.gold : 'none'} stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+  const TabOffersIcon = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="7" width="20" height="14" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M16 7V5C16 3.9 15.1 3 14 3H10C8.9 3 8 3.9 8 5V7" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M12 12V16M10 14H14" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+  const TabTasksIcon = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="18" height="18" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M8 12L11 15L16 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  const TabProfileIcon = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+
+  // 5 tabs: home(0) offers(1) scan(2) tasks(3) profile(4)
+  const TAB_PANELS = ['home', 'offers', null, 'tasks', 'profile'];
+  const pillIdx = isScannerOpen ? -1 : TAB_PANELS.indexOf(activePanel);
+
+  const TABS = [
+    { id: 'home',    label: 'Главная',  icon: TabHomeIcon },
+    { id: 'offers',  label: 'Акции',    icon: TabOffersIcon },
+    { id: null,      label: 'Скан',     icon: null }, // центральная кнопка
+    { id: 'tasks',   label: 'Задания',  icon: TabTasksIcon },
+    { id: 'profile', label: 'Профиль',  icon: TabProfileIcon },
+  ];
 
   const TabBar = () => (
     <div style={{
       position: 'fixed', bottom: 0,
       left: '50%', transform: 'translateX(-50%)',
-      width: '100%', maxWidth: 480, height: 60,
-      background: 'rgba(8,8,24,0.85)',
-      backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-      borderTop: '1px solid rgba(255,255,255,0.08)',
-      display: 'flex', zIndex: 100, overflow: 'visible',
+      width: '100%', maxWidth: 480, height: 62,
+      background: 'rgba(8,8,24,0.9)',
+      backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+      borderTop: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex', alignItems: 'stretch',
+      zIndex: 100, overflow: 'visible',
     }}>
-      {/* Скользящий pill (только home/profile) */}
-      {pillIdx >= 0 && (
+      {/* Скользящий pill */}
+      {pillIdx >= 0 && pillIdx !== 2 && (
         <div style={{
-          position: 'absolute', top: 8, height: 42,
-          left: `calc(${pillIdx * 33.333}% + 10px)`,
-          width: 'calc(33.333% - 20px)',
+          position: 'absolute', top: 7, height: 44,
+          left: `calc(${pillIdx * 20}% + 6px)`,
+          width: 'calc(20% - 12px)',
           background: 'rgba(201,168,76,0.1)',
           border: '1px solid rgba(201,168,76,0.2)',
-          borderRadius: 13,
-          transition: 'left 0.32s cubic-bezier(0.34, 1.4, 0.64, 1)',
+          borderRadius: 14,
+          transition: 'left 0.35s cubic-bezier(0.34, 1.4, 0.64, 1)',
           pointerEvents: 'none',
         }} />
       )}
 
-      {/* Главная */}
-      {[
-        { id: 'home', icon: '⌂', label: 'Главная' },
-        null, // scan — special
-        { id: 'profile', icon: '○', label: 'Профиль' },
-      ].map((item, idx) => {
-        if (idx === 1) {
-          // Выпуклая кнопка скана
-          return (
-            <button key="scan"
-              onClick={() => { haptic('light'); setIsScannerOpen(true); }}
-              style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
-              <div style={{
-                width: 56, height: 56, marginTop: -18, borderRadius: '50%',
-                background: isScannerOpen ? 'rgba(201,168,76,0.3)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-                boxShadow: isScannerOpen ? 'none' : `0 4px 20px rgba(201,168,76,0.45), 0 0 0 4px rgba(8,8,24,0.9), 0 0 0 5.5px rgba(201,168,76,0.22)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, color: '#0F0F1A',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                transform: isScannerOpen ? 'scale(0.9)' : 'scale(1)',
-              }}>◎</div>
-              <span style={{ fontSize: 9, fontWeight: 700, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4, transition: 'color 0.2s' }}>Скан</span>
-            </button>
-          );
-        }
-        const isActive = item.id === 'profile' ? activePanel === 'profile' : pillIdx === 0;
+      {TABS.map((tab, idx) => {
+        // Центральная кнопка скана
+        if (idx === 2) return (
+          <button key="scan" onClick={handleScanButton}
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
+            <div style={{
+              width: 50, height: 50, marginTop: -14, borderRadius: '50%',
+              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+              boxShadow: isScannerOpen ? 'none' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px rgba(8,8,24,0.9), 0 0 0 5px rgba(201,168,76,0.25)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#0F0F1A',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
+            }}>◎</div>
+            <span style={{ fontSize: 9, fontWeight: 700, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 3 }}>Скан</span>
+          </button>
+        );
+
+        const isActive = activePanel === tab.id && !isScannerOpen;
+        const Icon = tab.icon;
+        const hasNotif = tab.id === 'profile' && unreadNotifications.length > 0;
+
         return (
-          <button key={item.id}
-            onClick={() => { haptic('light'); setActivePanel(item.id); }}
-            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: isActive ? T.gold : T.textSec, fontSize: 9, fontWeight: 700, padding: 0, letterSpacing: 0.5, textTransform: 'uppercase', transition: 'color 0.2s', position: 'relative', zIndex: 1 }}>
-            <span style={{ fontSize: 20, transition: 'transform 0.22s, filter 0.22s', transform: isActive ? 'scale(1.12)' : 'scale(1)', filter: isActive ? `drop-shadow(0 0 5px ${T.gold}99)` : 'none' }}>{item.icon}</span>
-            {item.label}
+          <button key={tab.id}
+            onClick={() => { haptic('light'); setActivePanel(tab.id); }}
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 0, position: 'relative', zIndex: 1, transition: 'opacity 0.2s' }}>
+            <div style={{ position: 'relative' }}>
+              <Icon active={isActive} />
+              {hasNotif && (
+                <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
+              )}
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, transition: 'color 0.2s' }}>
+              {tab.label}
+            </span>
           </button>
         );
       })}
@@ -576,7 +676,7 @@ export function UserApp() {
             <View activePanel={activePanel}>
 
               <HomePanel nav="home"
-                user={user} userKeys={userKeys} favorites={favorites}
+                user={user} userKeys={userKeys} favorites={favorites} streak={streak}
                 partners={partners} events={events} loading={loading} error={error}
                 onOpenPartner={partner => { setActivePartner(partner); setActivePanel('partner'); }}
                 onToggleFavorite={toggleFavorite}
@@ -656,6 +756,14 @@ export function UserApp() {
           />
 
           {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+
+          {/* Анимация +ключей */}
+          {keyAnim && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 3000, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 56, animation: 'keyPop 1.4s ease forwards' }}>🗝️</div>
+              <div style={{ position: 'absolute', fontSize: 32, fontWeight: 900, color: keyAnim === 2 ? '#FFD700' : '#E8C97A', animation: 'keyFloat 1.4s ease forwards', marginTop: -100 }}>+{keyAnim}</div>
+            </div>
+          )}
 
           <Toast toasts={toasts} />
         </AppRoot>

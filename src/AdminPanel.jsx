@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import vkBridge from '@vkontakte/vk-bridge';
+import { QRCodeSVG } from 'qrcode.react';
 import { db } from './firebase';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
@@ -167,6 +168,54 @@ function AccessGuard({ onAllow }) {
   );
 }
 
+function PartnerQRCard({ partner, cardStyle, textColor, subColor, blueColor }) {
+  const svgRef = useRef(null);
+  const qrValue = `APG_PARTNER_${partner.id}`;
+
+  const handlePrint = () => {
+    const svgEl = svgRef.current?.querySelector('svg');
+    const svgHTML = svgEl
+      ? svgEl.outerHTML.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" ')
+      : '';
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>QR — ${partner.name}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #fff; padding: 24px; }
+        .brand { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #999; text-transform: uppercase; margin-bottom: 12px; }
+        .name { font-size: 24px; font-weight: 800; color: #111; margin-top: 14px; text-align: center; }
+        .hint { font-size: 13px; color: #777; margin-top: 10px; text-align: center; max-width: 240px; line-height: 1.5; }
+        .code { font-size: 10px; color: #bbb; margin-top: 10px; font-family: monospace; }
+        .btn { margin-top: 24px; padding: 10px 28px; background: #1976d2; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        @media print { .btn { display: none; } }
+      </style></head>
+      <body>
+        <div class="brand">АПГ · Альянс Партнёров Города</div>
+        ${svgHTML}
+        <div class="name">${partner.name}</div>
+        <div class="hint">Отсканируйте QR-код и получите ключ в программе лояльности АПГ</div>
+        <div class="code">${qrValue}</div>
+        <button class="btn" onclick="window.print()">🖨️ Печать</button>
+      </body></html>`);
+    win.document.close();
+  };
+
+  return (
+    <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '20px 16px' }}>
+      <div ref={svgRef} style={{ background: '#fff', padding: 12, borderRadius: 12 }}>
+        <QRCodeSVG value={qrValue} size={160} bgColor="#ffffff" fgColor="#0F0F1A" level="M" />
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: textColor }}>{partner.emoji} {partner.name}</div>
+        <div style={{ fontSize: 10, color: subColor, marginTop: 4, fontFamily: 'monospace', wordBreak: 'break-all' }}>{qrValue}</div>
+      </div>
+      <button onClick={handlePrint} style={{ width: '100%', padding: '10px 0', borderRadius: 10, border: 'none', background: blueColor, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        🖨️ Распечатать
+      </button>
+    </div>
+  );
+}
+
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
 export const AdminPanel = () => {
@@ -287,6 +336,17 @@ export const AdminPanel = () => {
     fetchData();
   };
 
+  const toggleFeatured = async (partner) => {
+    const newVal = !partner.featured;
+    // Снимаем featured со всех остальных если ставим новый
+    if (newVal) {
+      const batch = partners.filter(p => p.featured && p.id !== partner.id);
+      await Promise.all(batch.map(p => updateDoc(doc(db, 'partners', p.id), { featured: false })));
+    }
+    await updateDoc(doc(db, 'partners', partner.id), { featured: newVal });
+    fetchData();
+  };
+
   // ─── События ────────────────────────────────────────────────────────────────
 
   const resetEventForm = () => {
@@ -358,6 +418,7 @@ export const AdminPanel = () => {
   const TABS = [
     { id: 'stats',         label: '📊 Статистика' },
     { id: 'partners',      label: `🤝 Партнёры (${partners.length})` },
+    { id: 'qrcodes',       label: '📷 QR-коды' },
     { id: 'events',        label: `🎉 События (${events.length})` },
     { id: 'users',         label: `👥 Пользователи (${users.length})` },
     { id: 'notifications', label: `🔔 Рассылка` },
@@ -504,6 +565,12 @@ export const AdminPanel = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <button
+                      title="Партнёр дня (+2 ключа)"
+                      style={{ ...s.btn, padding: '6px 10px', fontSize: 12, background: p.featured ? '#C9A84C' : s.btnGray.background, color: p.featured ? '#0F0F1A' : s.btnGray.color, border: p.featured ? 'none' : s.btnGray.border }}
+                      onClick={() => toggleFeatured(p)}>
+                      ⭐
+                    </button>
                     <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPartner(p)}>✏️</button>
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePartner(p.id)}>🗑️</button>
                   </div>
@@ -512,6 +579,26 @@ export const AdminPanel = () => {
             }
           </div>
         </>
+      )}
+
+      {/* ── QR-КОДЫ ── */}
+      {activeTab === 'qrcodes' && (
+        <div>
+          <div style={{ ...s.card, marginBottom: 16 }}>
+            <h2 style={s.h2}>📷 QR-коды партнёров</h2>
+            <p style={{ color: T.sub, fontSize: 13, margin: '4px 0 0' }}>
+              Распечатайте QR-код и передайте партнёру. После выполнения услуги партнёр показывает код клиенту — тот сканирует и получает ключ.
+            </p>
+          </div>
+
+          {partners.length === 0 && (
+            <div style={{ ...s.card, textAlign: 'center', color: T.sub }}>Нет партнёров. Сначала добавьте партнёра.</div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+            {partners.map(p => <PartnerQRCard key={p.id} partner={p} cardStyle={s.card} textColor={T.text} subColor={T.sub} blueColor={T.blue} />)}
+          </div>
+        </div>
       )}
 
       {/* ── СОБЫТИЯ ── */}
