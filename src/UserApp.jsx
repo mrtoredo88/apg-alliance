@@ -159,6 +159,26 @@ export function UserApp() {
     return m ? m[1] : null;
   })());
 
+  // Анимация переходов между панелями
+  const prevPanelRef = useRef('home');
+  useEffect(() => {
+    if (prevPanelRef.current === activePanel) return;
+    prevPanelRef.current = activePanel;
+    const TAB_IDS = ['home', 'offers', 'tasks', 'profile'];
+    const anim = TAB_IDS.includes(activePanel)
+      ? 'tabFadeIn 0.22s cubic-bezier(0.2, 0, 0, 1) both'
+      : 'pageSlideIn 0.26s cubic-bezier(0.2, 0, 0, 1) both';
+    const timer = setTimeout(() => {
+      const el = document.getElementById(activePanel);
+      if (el) {
+        el.style.animation = 'none';
+        void el.offsetHeight; // reflow
+        el.style.animation = anim;
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [activePanel]);
+
   const loadUserData = useCallback(async (userData) => {
     const userRef = doc(db, 'users', String(userData.id));
     const docSnap = await getDoc(userRef);
