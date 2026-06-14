@@ -10,6 +10,7 @@ import { HomePanel } from './HomePanel.jsx';
 import { PartnerPage } from './PartnerPage.jsx';
 import { Onboarding } from './Onboarding.jsx';
 import { EventsPage } from './EventsPage.jsx';
+import { LeaderboardPage } from './LeaderboardPage.jsx';
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
@@ -81,13 +82,19 @@ export function UserApp() {
       const userRef = doc(db, 'users', String(userData.id));
       const docSnap = await getDoc(userRef);
       if (!isMounted.current) return;
+      const profile = {
+        firstName: userData.first_name ?? '',
+        lastName:  userData.last_name  ?? '',
+        photo:     userData.photo_200  ?? null,
+      };
       if (docSnap.exists()) {
         const data = docSnap.data();
         setUserKeys(data.keys ?? 0);
         setFavorites(data.favorites ?? []);
         if (!data.onboardingDone) setShowOnboarding(true);
+        await updateDoc(userRef, profile);
       } else {
-        await setDoc(userRef, { keys: 0, favorites: [], onboardingDone: false });
+        await setDoc(userRef, { keys: 0, favorites: [], onboardingDone: false, ...profile });
         setShowOnboarding(true);
       }
     } catch (e) {
@@ -177,11 +184,18 @@ export function UserApp() {
                 onScan={() => setIsScannerOpen(true)}
                 onShare={handleShare}
                 onOpenEvents={() => setActivePanel('events')}
+                onOpenLeaderboard={() => setActivePanel('leaderboard')}
                 onRetry={() => { const m = { current: true }; initApp(m); }}
               />
 
               <EventsPage nav="events"
                 events={events}
+                onBack={() => setActivePanel('home')}
+              />
+
+              <LeaderboardPage nav="leaderboard"
+                currentUserId={user?.id}
+                userKeys={userKeys}
                 onBack={() => setActivePanel('home')}
               />
 
