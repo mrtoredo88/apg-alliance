@@ -246,9 +246,13 @@ function PartnerQRCard({ partner }) {
 
 // ─── AccessGuard ─────────────────────────────────────────────────────────────
 
+const ADMIN_PASSWORD = 'APG_Zelenоgrad_2024';
+
 function AccessGuard({ onAllow }) {
-  const [status, setStatus] = useState('checking');
-  const [vkId, setVkId]     = useState(null);
+  const [status, setStatus]   = useState('checking');
+  const [vkId, setVkId]       = useState(null);
+  const [pwd, setPwd]         = useState('');
+  const [pwdError, setPwdError] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -266,18 +270,48 @@ function AccessGuard({ onAllow }) {
     })();
   }, [onAllow]);
 
-  if (status === 'checking') return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: T.bg }}><p style={{ color: T.sub }}>Проверка доступа...</p></div>;
+  const handlePassword = () => {
+    if (pwd === ADMIN_PASSWORD) { onAllow(); }
+    else { setPwdError(true); setTimeout(() => setPwdError(false), 1500); }
+  };
+
+  if (status === 'checking') return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: T.bg }}>
+      <p style={{ color: T.sub }}>Проверка доступа...</p>
+    </div>
+  );
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: T.bg, padding: 24 }}>
       <div style={{ background: T.card, borderRadius: 20, padding: 24, maxWidth: 360, width: '100%', textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>{status === 'no_config' ? '⚙️' : '🔒'}</div>
-        <h2 style={{ ...s.h2, marginBottom: 8 }}>{status === 'no_config' ? 'Настройте доступ' : 'Нет доступа'}</h2>
-        {status === 'no_config'
-          ? <><p style={{ color: T.sub, fontSize: 13, lineHeight: '19px', marginBottom: 12 }}>Добавьте VK ID в массив ADMIN_IDS в AdminPanel.jsx</p>
-              <div style={{ background: '#f0f7ff', borderRadius: 10, padding: '10px 14px', border: `1px solid ${T.blue}44`, fontFamily: 'monospace', fontSize: 14, color: T.blue }}>Ваш VK ID: <b>{vkId}</b></div></>
-          : <p style={{ color: T.sub, fontSize: 13 }}>Аккаунт не имеет прав администратора.{vkId && <><br/><br/>VK ID: <b>{vkId}</b></>}</p>
-        }
+        {status === 'no_config' ? (
+          <>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⚙️</div>
+            <h2 style={{ ...s.h2, marginBottom: 8 }}>Настройте доступ</h2>
+            <p style={{ color: T.sub, fontSize: 13, lineHeight: '19px', marginBottom: 12 }}>Добавьте VK ID в массив ADMIN_IDS в AdminPanel.jsx</p>
+            <div style={{ background: '#f0f7ff', borderRadius: 10, padding: '10px 14px', border: `1px solid ${T.blue}44`, fontFamily: 'monospace', fontSize: 14, color: T.blue }}>Ваш VK ID: <b>{vkId}</b></div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+            <h2 style={{ ...s.h2, marginBottom: 4 }}>Вход в админку</h2>
+            <p style={{ color: T.sub, fontSize: 13, marginBottom: 20, lineHeight: '18px' }}>
+              Открыто вне ВКонтакте — введите пароль администратора
+            </p>
+            <input
+              type="password"
+              placeholder="Пароль..."
+              value={pwd}
+              onChange={e => setPwd(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handlePassword()}
+              style={{ ...s.input, marginBottom: 10, textAlign: 'center', border: pwdError ? `2px solid ${T.red}` : `1px solid ${T.border}`, transition: 'border 0.2s' }}
+            />
+            {pwdError && <p style={{ color: T.red, fontSize: 12, marginBottom: 10 }}>Неверный пароль</p>}
+            <button onClick={handlePassword} style={{ ...s.btn, ...s.btnPri, width: '100%' }}>
+              Войти
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
