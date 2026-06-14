@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import vkBridge from '@vkontakte/vk-bridge';
 import { QRCodeSVG } from 'qrcode.react';
-import { db, storage } from './firebase';
+import { db } from './firebase';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, query, orderBy, serverTimestamp, increment } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const ADMIN_IDS = [988504];
 
@@ -49,19 +48,29 @@ const s = {
   tab:       { flex: '0 0 auto', padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 },
 };
 
-// ─── Утилиты ─────────────────────────────────────────────────────────────────
+// ─── ImgBB upload ─────────────────────────────────────────────────────────────
 
-async function uploadImageToStorage(file, folder) {
-  const ext  = file.name.split('.').pop();
-  const path = `${folder}/${Date.now()}.${ext}`;
-  const ref  = storageRef(storage, path);
-  await uploadBytes(ref, file);
-  return getDownloadURL(ref);
+const IMGBB_KEY_LS = 'apg_imgbb_key';
+
+async function uploadImageToImgBB(file, apiKey) {
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = (e) => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const form = new FormData();
+  form.append('key', apiKey);
+  form.append('image', base64);
+  const res  = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error?.message ?? 'ImgBB upload failed');
+  return data.data.url;
 }
 
 // ─── ImageUploader ────────────────────────────────────────────────────────────
 
-function ImageUploader({ currentUrl, onUrlChange, folder, label = 'Фото', uploading, setUploading }) {
+function ImageUploader({ currentUrl, onUrlChange, apiKey, label = 'Фото', uploading, setUploading }) {
   const fileRef = useRef(null);
   const [preview, setPreview] = useState(currentUrl || '');
 
@@ -70,17 +79,18 @@ function ImageUploader({ currentUrl, onUrlChange, folder, label = 'Фото', up
   const handleFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!apiKey) { alert('Сначала введите ImgBB API Key в настройках (вверху страницы).'); return; }
     const reader = new FileReader();
     reader.onload = (ev) => setPreview(ev.target.result);
     reader.readAsDataURL(file);
     setUploading(true);
     try {
-      const url = await uploadImageToStorage(file, folder);
+      const url = await uploadImageToImgBB(file, apiKey);
       onUrlChange(url);
       setPreview(url);
     } catch (err) {
-      console.error('Upload failed:', err);
-      alert('Ошибка загрузки. Проверьте правила Firebase Storage.');
+      console.error(err);
+      alert('Ошибка загрузки. Проверьте API Key ImgBB.');
     } finally {
       setUploading(false);
     }
@@ -110,19 +120,20 @@ function ImageUploader({ currentUrl, onUrlChange, folder, label = 'Фото', up
 
 // ─── PhotoGalleryUploader — несколько фото ───────────────────────────────────
 
-function PhotoGalleryUploader({ photos = [], onChange, folder, uploading, setUploading }) {
+function PhotoGalleryUploader({ photos = [], onChange, apiKey, uploading, setUploading }) {
   const fileRef = useRef(null);
 
   const handleFile = async (e) => {
     const files = Array.from(e.target.files).slice(0, 5 - photos.length);
     if (!files.length) return;
+    if (!apiKey) { alert('Сначала введите ImgBB API Key в настройках (вверху страницы).'); return; }
     setUploading(true);
     try {
-      const urls = await Promise.all(files.map(f => uploadImageToStorage(f, folder)));
+      const urls = await Promise.all(files.map(f => uploadImageToImgBB(f, apiKey)));
       onChange([...photos, ...urls]);
     } catch (err) {
       console.error(err);
-      alert('Ошибка загрузки фото.');
+      alert('Ошибка загрузки фото. Проверьте API Key ImgBB.');
     } finally {
       setUploading(false);
     }
@@ -286,6 +297,8 @@ export const AdminPanel = () => {
   const [uploadingLogo, setUploadingLogo]       = useState(false);
   const [uploadingPhotos, setUploadingPhotos]   = useState(false);
   const [uploadingEvImg, setUploadingEvImg]     = useState(false);
+  const [imgbbKey, setImgbbKey]       = useState(() => localStorage.getItem(IMGBB_KEY_LS) ?? '');
+  const [imgbbInput, setImgbbInput]   = useState(() => localStorage.getItem(IMGBB_KEY_LS) ?? '');
 
   // ─ Форма партнёра
   const [editingPartner, setEditingPartner] = useState(null);
@@ -510,10 +523,40 @@ export const AdminPanel = () => {
         <p style={{ color: T.sub, fontSize: 13, margin: 0 }}>Зеленоград · Альянс Партнёров Города</p>
       </div>
 
-      {/* Предупреждение о Storage */}
-      <div style={{ background: '#FFF3CD', border: '1px solid #FFCA2C', borderRadius: 12, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#664D03', lineHeight: '18px' }}>
-        <b>⚠️ Firebase Storage:</b> для загрузки фото настройте правила в консоли Firebase → Storage → Rules:<br/>
-        <code style={{ fontFamily: 'monospace', fontSize: 11 }}>allow read, write: if true;</code>
+      {/* Настройка ImgBB */}
+      <div style={{ background: imgbbKey ? '#F0FFF0' : '#FFF3CD', border: `1px solid ${imgbbKey ? '#4BB34B' : '#FFCA2C'}`, borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: imgbbKey ? T.green : '#856404', marginBottom: 6 }}>
+          {imgbbKey ? '✅ ImgBB подключён — загрузка фото доступна' : '📷 Настройте загрузку фото (ImgBB — бесплатно)'}
+        </div>
+        {!imgbbKey && (
+          <div style={{ fontSize: 12, color: '#664D03', lineHeight: '18px', marginBottom: 8 }}>
+            1. Зайди на <b>imgbb.com</b> → зарегистрируйся бесплатно<br/>
+            2. Перейди в <b>API</b> (ссылка вверху) → скопируй API Key<br/>
+            3. Вставь ключ ниже и нажми Сохранить
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            style={{ ...s.input, margin: 0, flex: 1, fontSize: 13 }}
+            placeholder="ImgBB API Key..."
+            value={imgbbInput}
+            onChange={e => setImgbbInput(e.target.value)}
+          />
+          <button style={{ ...s.btn, ...(imgbbKey ? s.btnGray : s.btnPri), flexShrink: 0 }}
+            onClick={() => {
+              const k = imgbbInput.trim();
+              localStorage.setItem(IMGBB_KEY_LS, k);
+              setImgbbKey(k);
+            }}>
+            {imgbbKey ? 'Обновить' : 'Сохранить'}
+          </button>
+          {imgbbKey && (
+            <button style={{ ...s.btn, ...s.btnDanger, flexShrink: 0 }}
+              onClick={() => { localStorage.removeItem(IMGBB_KEY_LS); setImgbbKey(''); setImgbbInput(''); }}>
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Табы */}
@@ -630,12 +673,12 @@ export const AdminPanel = () => {
             <EmojiPicker emojis={PARTNER_EMOJIS} value={pEmoji} onChange={setPEmoji} />
 
             <label style={s.label}>Логотип (аватар партнёра)</label>
-            <ImageUploader currentUrl={pLogo} onUrlChange={setPLogo} folder="logos"
+            <ImageUploader currentUrl={pLogo} onUrlChange={setPLogo} apiKey={imgbbKey}
               label="Логотип" uploading={uploadingLogo} setUploading={setUploadingLogo} />
             {pLogo && <img src={pLogo} alt="" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', marginBottom: 10 }} onError={e => e.target.style.display='none'} />}
 
             <label style={s.label}>Фотогалерея (до 5 фото)</label>
-            <PhotoGalleryUploader photos={pPhotos} onChange={setPPhotos} folder="partner-photos"
+            <PhotoGalleryUploader photos={pPhotos} onChange={setPPhotos} apiKey={imgbbKey}
               uploading={uploadingPhotos} setUploading={setUploadingPhotos} />
 
             <label style={s.label}>Телефон</label>
@@ -720,7 +763,7 @@ export const AdminPanel = () => {
             <h2 style={s.h2}>{editingEvent ? `✏️ ${editingEvent.title}` : '➕ Новое событие'}</h2>
 
             <label style={s.label}>Обложка события</label>
-            <ImageUploader currentUrl={eImageUrl} onUrlChange={setEImageUrl} folder="event-images"
+            <ImageUploader currentUrl={eImageUrl} onUrlChange={setEImageUrl} apiKey={imgbbKey}
               label="Обложка" uploading={uploadingEvImg} setUploading={setUploadingEvImg} />
 
             <label style={s.label}>Название *</label>
