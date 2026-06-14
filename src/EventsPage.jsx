@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Panel, PanelHeader, PanelHeaderBack } from '@vkontakte/vkui';
+import { Panel } from '@vkontakte/vkui';
 
 const T = {
   bg:      '#0F0F1A',
@@ -142,25 +142,19 @@ export function EventsPage({ nav, events = [], onBack }) {
 
   return (
     <Panel id={nav}>
-      <PanelHeader
-        before={<PanelHeaderBack onClick={onBack} />}
-        style={{ background: T.bg }}
-      >
-        <span style={{ color: T.textPri, fontWeight: 700 }}>
-          <span style={{ color: T.gold }}>✦</span> События
-        </span>
-      </PanelHeader>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
+          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>✦ События</div>
+            {events.length > 0 && <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>{events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}</div>}
+          </div>
+        </div>
+      </div>
 
       <div style={{ background: T.bg, minHeight: '100%' }}>
 
         {/* Счётчик */}
-        {events.length > 0 && (
-          <div style={{ padding: '12px 16px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontSize: 11, color: T.textSec, background: T.surface, padding: '4px 12px', borderRadius: 20, border: `1px solid ${T.border}` }}>
-              {events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}
-            </div>
-          </div>
-        )}
 
         {events.length === 0 ? (
           <div style={{ margin: '32px 16px', background: T.surface, borderRadius: 24, padding: '36px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Panel, PanelHeader, PanelHeaderBack } from '@vkontakte/vkui';
+import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
@@ -159,14 +159,15 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
 
   return (
     <Panel id={nav}>
-      <PanelHeader
-        before={<PanelHeaderBack onClick={onBack} />}
-        style={{ background: T.bg }}
-      >
-        <span style={{ color: T.textPri, fontWeight: 700 }}>
-          <span style={{ color: T.gold }}>✦</span> Рейтинг
-        </span>
-      </PanelHeader>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
+          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>✦ Рейтинг</div>
+            {!loading && leaders.length > 0 && <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>{leaders.length} участников</div>}
+          </div>
+        </div>
+      </div>
 
       <div style={{ background: T.bg, minHeight: '100%', paddingBottom: 80 }}>
 

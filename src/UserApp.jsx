@@ -548,8 +548,18 @@ export function UserApp() {
             {[0,1,2,3].map(i => <div key={i} style={{ background: '#1A1A2E', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, border: `1px solid ${T.border}` }}><div style={{ ...SK, width: 56, height: 56, borderRadius: 28 }} /><div style={{ ...SK, width: 80, height: 13 }} /><div style={{ ...SK, width: 56, height: 10 }} /><div style={{ ...SK, height: 34, borderRadius: 12 }} /></div>)}
           </div>
         </div>
-        {/* Tab bar */}
-        <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, height: 60, background: 'rgba(8,8,24,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
+        {/* Tab bar skeleton — 5 вкладок */}
+        <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, height: 62, background: 'rgba(8,8,24,0.9)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 8px' }}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+              {i === 2
+                ? <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.2)' }} />
+                : <div style={{ ...SK, width: 22, height: 22, borderRadius: 6 }} />
+              }
+              <div style={{ ...SK, width: 32, height: 8, borderRadius: 4 }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
