@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel, Spinner, Div } from '@vkontakte/vkui';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
 import { db } from './firebase';
@@ -13,11 +13,12 @@ import { EventsPage } from './EventsPage.jsx';
 import { LeaderboardPage } from './LeaderboardPage.jsx';
 import { ActivityPage } from './ActivityPage.jsx';
 
-const T = { bg: '#0F0F1A', gold: '#C9A84C', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
+const T = { bg: '#0F0F1A', gold: '#C9A84C', goldL: '#E8C97A', textPri: '#F0F0F0', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
 const APP_ID = 54601851;
 const CACHE_KEY = 'apg_v1';
 const CACHE_TTL = 30 * 60 * 1000;
+const EVENTS_COUNT_KEY = 'apg_events_count';
 
 const readCache = () => {
   try {
@@ -34,6 +35,50 @@ const writeCache = (partners, events) => {
   catch {}
 };
 
+// ─── Баннер новых событий ─────────────────────────────────────────────────────
+
+function NewEventsBanner({ count, onView, onDismiss }) {
+  useEffect(() => {
+    if (count <= 0) return;
+    const t = setTimeout(onDismiss, 6000);
+    return () => clearTimeout(t);
+  }, [count, onDismiss]);
+
+  if (count <= 0) return null;
+
+  const label = count === 1 ? 'Новое событие!' : `${count} новых события!`;
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 300, padding: '12px 16px', animation: 'slideDown 0.4s ease' }}>
+      <div style={{
+        background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+        borderRadius: 18, padding: '13px 14px',
+        display: 'flex', alignItems: 'center', gap: 10,
+        boxShadow: '0 8px 28px rgba(0,0,0,0.5)',
+      }}>
+        <span style={{ fontSize: 24, flexShrink: 0 }}>🎉</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 800, color: '#0F0F1A', fontSize: 14, lineHeight: '18px' }}>{label}</div>
+          <div style={{ fontSize: 11, color: 'rgba(15,15,26,0.65)', marginTop: 1 }}>Партнёры АПГ что-то готовят</div>
+        </div>
+        <button onClick={onView} style={{
+          padding: '8px 14px', borderRadius: 10, border: 'none',
+          background: '#0F0F1A', color: T.gold,
+          fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+        }}>Смотреть</button>
+        <button onClick={onDismiss} style={{
+          background: 'rgba(15,15,26,0.15)', border: 'none', borderRadius: '50%',
+          width: 28, height: 28, cursor: 'pointer', fontSize: 13,
+          color: '#0F0F1A', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>✕</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Основной компонент ───────────────────────────────────────────────────────
+
 export function UserApp() {
   const [activePanel, setActivePanel] = useState('home');
   const [activePartner, setActivePartner] = useState(null);
@@ -46,11 +91,12 @@ export function UserApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [newEventsCount, setNewEventsCount] = useState(0);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const initApp = useCallback(async (isMounted) => {
     setError(null);
 
-    // Мгновенно показываем кэшированные данные
     const cached = readCache();
     if (cached) {
       setPartners(cached.partners);
@@ -75,10 +121,17 @@ export function UserApp() {
       ]);
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const freshEvents = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const freshEvents   = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setPartners(freshPartners);
       setEvents(freshEvents);
       writeCache(freshPartners, freshEvents);
+
+      // Детектируем новые события с момента последнего визита
+      const lastCount = parseInt(localStorage.getItem(EVENTS_COUNT_KEY) ?? '-1');
+      if (lastCount >= 0 && freshEvents.length > lastCount) {
+        setNewEventsCount(freshEvents.length - lastCount);
+      }
+      localStorage.setItem(EVENTS_COUNT_KEY, String(freshEvents.length));
 
       const userRef = doc(db, 'users', String(userData.id));
       const docSnap = await getDoc(userRef);
@@ -92,15 +145,15 @@ export function UserApp() {
         const data = docSnap.data();
         setUserKeys(data.keys ?? 0);
         setFavorites(data.favorites ?? []);
+        setNotificationsEnabled(data.notificationsEnabled ?? false);
         if (!data.onboardingDone) setShowOnboarding(true);
         await updateDoc(userRef, profile);
       } else {
-        await setDoc(userRef, { keys: 0, favorites: [], onboardingDone: false, ...profile });
+        await setDoc(userRef, { keys: 0, favorites: [], onboardingDone: false, notificationsEnabled: false, ...profile });
         setShowOnboarding(true);
       }
     } catch (e) {
       console.error(e);
-      // Если кэш есть — тихо работаем с ним, ошибку не показываем
       if (isMounted.current && !cached) setError('Не удалось загрузить данные.');
     } finally {
       if (isMounted.current) setLoading(false);
@@ -157,8 +210,7 @@ export function UserApp() {
       await updateDoc(doc(db, 'users', String(user.id)), { keys: increment(1) });
       setUserKeys(prev => prev + 1);
       await logActivity({
-        type: 'scan',
-        icon: '🗝️',
+        type: 'scan', icon: '🗝️',
         text: `Посетил партнёра: ${partner.name}`,
         partnerName: partner.name,
       });
@@ -176,6 +228,18 @@ export function UserApp() {
   const handleShare = () => {
     const refLink = `https://vk.com/app${APP_ID}${user?.id ? `#ref_${user.id}` : ''}`;
     vkBridge.send('VKWebAppShare', { link: refLink }).catch(() => {});
+  };
+
+  const handleEnableNotifications = async () => {
+    try {
+      await vkBridge.send('VKWebAppAllowNotifications');
+      setNotificationsEnabled(true);
+      if (user && user.id !== 'guest') {
+        await updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true });
+      }
+    } catch {
+      // пользователь отказал или не поддерживается
+    }
   };
 
   const TabBar = () => (
@@ -238,6 +302,8 @@ export function UserApp() {
                   onToggleFavorite={toggleFavorite}
                   onOpenPartner={partner => { setActivePartner(partner); setActivePanel('partner'); }}
                   onOpenActivity={() => setActivePanel('activity')}
+                  onEnableNotifications={handleEnableNotifications}
+                  notificationsEnabled={notificationsEnabled}
                   onLogout={handleLogout}
                 />
               </Panel>
@@ -251,6 +317,12 @@ export function UserApp() {
           </div>
 
           <TabBar />
+
+          <NewEventsBanner
+            count={newEventsCount}
+            onView={() => { setNewEventsCount(0); setActivePanel('events'); }}
+            onDismiss={() => setNewEventsCount(0)}
+          />
 
           <ScannerComponent
             isOpen={isScannerOpen}
