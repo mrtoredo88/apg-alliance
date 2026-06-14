@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge from '@vkontakte/vk-bridge';
+import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress } from './levels.js';
 
 const T = {
@@ -365,15 +366,16 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
       {/* ── Реферальная программа ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Реферальная программа</div>
+        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Пригласить друга</div>
         <div style={{ background: T.surface, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
-          {/* Статистика если есть рефералы */}
+
+          {/* Статистика */}
           {referralCount > 0 && (
             <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 16 }}>
               <div style={{ textAlign: 'center', flex: 1 }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: T.textPri }}>{referralCount}</div>
                 <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>
-                  {referralCount === 1 ? 'друг' : referralCount < 5 ? 'друга' : 'друзей'}
+                  {referralCount === 1 ? 'друг' : referralCount < 5 ? 'друга' : 'друзей'} пришло
                 </div>
               </div>
               <div style={{ width: 1, background: T.border }} />
@@ -383,12 +385,34 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               </div>
             </div>
           )}
-          {/* Кнопка приглашения */}
+
+          {/* QR-код */}
+          {user?.id && (
+            <div style={{ padding: '16px', borderBottom: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 13, color: T.textSec, textAlign: 'center', lineHeight: '18px' }}>
+                Покажи QR другу — он сканирует и вы оба получаете <span style={{ color: T.gold, fontWeight: 700 }}>+2 🗝️</span>
+              </div>
+              <div style={{ background: '#fff', borderRadius: 16, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                <QRCodeSVG
+                  value={`https://vk.com/app54601851#ref_${user.id}`}
+                  size={160}
+                  bgColor="#ffffff"
+                  fgColor="#0F0F1A"
+                  level="M"
+                />
+              </div>
+              <div style={{ fontSize: 11, color: T.textSec, textAlign: 'center' }}>
+                твой личный код · ID {user.id}
+              </div>
+            </div>
+          )}
+
+          {/* Кнопка поделиться */}
           <button onClick={onShare} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(75,179,75,0.12)', border: '1px solid rgba(75,179,75,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>👥</div>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(75,179,75,0.12)', border: '1px solid rgba(75,179,75,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📤</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, color: T.textPri, fontWeight: 600 }}>Пригласить друга</div>
-              <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>+2 ключа за каждого</div>
+              <div style={{ fontSize: 15, color: T.textPri, fontWeight: 600 }}>Поделиться ссылкой</div>
+              <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>Отправить в ВКонтакте или мессенджер</div>
             </div>
             <span style={{ color: T.textSec, fontSize: 16 }}>›</span>
           </button>
