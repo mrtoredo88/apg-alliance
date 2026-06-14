@@ -1,5 +1,5 @@
-import React from 'react';
-import { Panel, PanelHeader, PanelHeaderBack } from '@vkontakte/vkui';
+import React, { useState, useMemo } from 'react';
+import { Panel } from '@vkontakte/vkui';
 
 const T = {
   bg:      '#0F0F1A',
@@ -11,30 +11,44 @@ const T = {
   textSec: 'rgba(240,240,240,0.5)',
 };
 
+const GLASS = {
+  background: 'rgba(255,255,255,0.05)',
+  border: `1px solid rgba(255,255,255,0.08)`,
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+};
+
 function OfferCard({ partner, onOpenPartner, index }) {
   return (
     <div style={{
-      background: T.surface, borderRadius: 20, padding: 16, marginBottom: 12,
-      border: `1px solid ${T.border}`,
+      ...GLASS,
+      borderRadius: 20, padding: 16, marginBottom: 12,
       animation: 'fadeInUp 0.4s ease both',
-      animationDelay: `${index * 0.07}s`,
+      animationDelay: `${index * 0.06}s`,
     }}>
-      {/* Партнёр */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         {partner.logoUrl
-          ? <img src={partner.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${T.border}`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-          : <div style={{ width: 48, height: 48, borderRadius: '50%', background: T.gold + '18', border: `2px solid ${T.gold}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
+          ? <img src={partner.logoUrl} alt="" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: `2px solid rgba(201,168,76,0.25)`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+          : <div style={{ width: 52, height: 52, borderRadius: '50%', background: T.gold + '18', border: `2px solid ${T.gold}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
         }
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.textPri }}>{partner.name}</div>
-          {partner.categoryLabel && <div style={{ fontSize: 11, color: T.gold, marginTop: 2 }}>{partner.categoryLabel}</div>}
+          {partner.categoryLabel && (
+            <div style={{ fontSize: 11, color: T.gold, marginTop: 3, fontWeight: 600 }}>
+              {partner.categoryLabel}
+            </div>
+          )}
         </div>
+        {partner.featured && (
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>
+            ⭐ ПАРТНЁР ДНЯ
+          </div>
+        )}
       </div>
 
-      {/* Акция */}
       <div style={{
-        background: `linear-gradient(135deg, ${T.gold}18, ${T.goldL}08)`,
-        border: `1px solid ${T.gold}35`, borderRadius: 14,
+        background: `linear-gradient(135deg, ${T.gold}14, ${T.goldL}08)`,
+        border: `1px solid ${T.gold}30`, borderRadius: 14,
         padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12,
       }}>
         <span style={{ fontSize: 22, flexShrink: 0, marginTop: 1 }}>🎁</span>
@@ -60,30 +74,105 @@ function OfferCard({ partner, onOpenPartner, index }) {
 }
 
 export function OffersPage({ partners = [], onBack, onOpenPartner }) {
-  const withOffers = partners.filter(p => p.offer?.trim());
+  const [activeCategory, setActiveCategory] = useState('all');
+
+  const withOffers = useMemo(() => partners.filter(p => p.offer?.trim()), [partners]);
+
+  const categories = useMemo(() => {
+    const counts = {};
+    withOffers.forEach(p => {
+      const cat = p.category || 'other';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    const labels = {
+      food:     '🍽️ Еда',
+      beauty:   '💅 Красота',
+      health:   '💊 Здоровье',
+      sport:    '🏋️ Спорт',
+      retail:   '🛍️ Магазины',
+      services: '🔧 Услуги',
+      other:    '📦 Прочее',
+    };
+    return Object.entries(counts).map(([id, count]) => ({
+      id,
+      label: labels[id] ?? id,
+      count,
+    }));
+  }, [withOffers]);
+
+  const filtered = useMemo(() =>
+    activeCategory === 'all'
+      ? withOffers
+      : withOffers.filter(p => (p.category || 'other') === activeCategory),
+    [withOffers, activeCategory]
+  );
 
   return (
     <Panel id="offers">
-      <PanelHeader before={<PanelHeaderBack onClick={onBack} />}>
-        Акции и предложения
-      </PanelHeader>
+      {/* Кастомный хедер */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(15,15,26,0.92)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '0 16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
+          <button onClick={onBack} style={{
+            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0,
+          }}>‹</button>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>
+              ✦ Акции и предложения
+            </div>
+            {withOffers.length > 0 && (
+              <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>
+                {withOffers.length} {withOffers.length === 1 ? 'предложение' : withOffers.length < 5 ? 'предложения' : 'предложений'}
+              </div>
+            )}
+          </div>
+        </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '8px 16px 24px' }}>
+        {/* Фильтр по категориям */}
+        {categories.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, paddingBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => setActiveCategory('all')}
+              style={{
+                flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700,
+                background: activeCategory === 'all' ? T.gold : 'rgba(255,255,255,0.07)',
+                color: activeCategory === 'all' ? '#0F0F1A' : T.textSec,
+                transition: 'background 0.2s, color 0.2s',
+              }}
+            >
+              Все · {withOffers.length}
+            </button>
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                style={{
+                  flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 700,
+                  background: activeCategory === cat.id ? T.gold : 'rgba(255,255,255,0.07)',
+                  color: activeCategory === cat.id ? '#0F0F1A' : T.textSec,
+                  transition: 'background 0.2s, color 0.2s',
+                }}
+              >
+                {cat.label} · {cat.count}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
+      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
         {withOffers.length === 0 ? (
           <div style={{ paddingTop: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
-            <div style={{ animation: 'float 3s ease-in-out infinite' }}>
-              <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
-                <rect x="20" y="30" width="50" height="40" rx="10" fill="rgba(201,168,76,0.07)" stroke="rgba(201,168,76,0.22)" strokeWidth="1.5"/>
-                <rect x="20" y="30" width="50" height="14" rx="10" fill="rgba(201,168,76,0.12)"/>
-                <rect x="20" y="37" width="50" height="7" fill="rgba(201,168,76,0.12)"/>
-                <line x1="45" y1="18" x2="45" y2="70" stroke="rgba(201,168,76,0.4)" strokeWidth="1.5" strokeDasharray="3 2"/>
-                <circle cx="45" cy="18" r="5" fill="rgba(201,168,76,0.6)"/>
-                <circle cx="28" cy="55" r="3" fill="rgba(201,168,76,0.25)"/>
-                <circle cx="45" cy="55" r="3" fill="rgba(201,168,76,0.25)"/>
-                <circle cx="62" cy="55" r="3" fill="rgba(201,168,76,0.25)"/>
-              </svg>
-            </div>
+            <div style={{ fontSize: 64, animation: 'float 3s ease-in-out infinite' }}>🎁</div>
             <div>
               <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Акций пока нет</div>
               <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>
@@ -91,15 +180,21 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
               </div>
             </div>
           </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ paddingTop: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 52 }}>🔍</div>
+            <div style={{ color: T.textSec, fontSize: 14 }}>В этой категории пока нет акций</div>
+            <button onClick={() => setActiveCategory('all')} style={{
+              padding: '10px 24px', borderRadius: 12, border: '1px solid rgba(201,168,76,0.3)',
+              background: 'rgba(201,168,76,0.1)', color: T.gold, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            }}>
+              Показать все
+            </button>
+          </div>
         ) : (
-          <>
-            <div style={{ fontSize: 13, color: T.textSec, marginBottom: 14, marginTop: 4 }}>
-              {withOffers.length} {withOffers.length === 1 ? 'предложение' : withOffers.length < 5 ? 'предложения' : 'предложений'} для участников АПГ
-            </div>
-            {withOffers.map((p, i) => (
-              <OfferCard key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />
-            ))}
-          </>
+          filtered.map((p, i) => (
+            <OfferCard key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />
+          ))
         )}
       </div>
     </Panel>

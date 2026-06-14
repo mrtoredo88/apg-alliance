@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Panel, PanelHeader, PanelHeaderBack } from '@vkontakte/vkui';
+import { Panel } from '@vkontakte/vkui';
 import { TASKS } from './tasks.js';
 
 const T = {
@@ -149,11 +149,32 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, compl
 
   return (
     <Panel id="tasks">
-      <PanelHeader before={<PanelHeaderBack onClick={onBack} />}>
-        Задания
-      </PanelHeader>
+      {/* Кастомный хедер */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(15,15,26,0.92)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '0 16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
+          <button onClick={onBack} style={{
+            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0,
+          }}>‹</button>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>
+              ✦ Задания
+            </div>
+            <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>
+              {done.length} / {TASKS.length} выполнено · {earnedKeys} из {totalKeys} 🗝️
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '8px 16px 24px' }}>
+      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Прогресс */}
         <div style={{ background: T.surface, borderRadius: 20, padding: '16px', marginBottom: 16, border: `1px solid ${T.border}` }}>
