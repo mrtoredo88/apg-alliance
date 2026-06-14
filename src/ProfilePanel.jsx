@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { PanelHeader, Progress, Avatar } from '@vkontakte/vkui';
 
 const T = {
@@ -141,7 +141,20 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteConfirmed = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      await onDeleteProfile?.();
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }, [onDeleteProfile]);
+
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
@@ -322,7 +335,97 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         </button>
       </div>
 
+      {/* ── Удаление профиля ── */}
+      <div style={{ padding: '8px 16px 0' }}>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 16, border: 'none', background: 'none', color: 'rgba(240,240,240,0.25)', fontSize: 13, fontWeight: 500, cursor: 'pointer', letterSpacing: 0.2 }}
+        >
+          Удалить профиль
+        </button>
+      </div>
+
       <div style={{ height: 24 }} />
+
+      {/* ── Модалка подтверждения удаления ── */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 600,
+          background: 'rgba(10,10,20,0.88)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          padding: '0 16px 32px',
+        }}
+          onClick={e => { if (e.target === e.currentTarget && !isDeleting) setShowDeleteConfirm(false); }}
+        >
+          <div style={{
+            width: '100%', maxWidth: 420,
+            background: '#1A1A2E', borderRadius: 28,
+            border: '1px solid rgba(255,255,255,0.07)',
+            padding: '28px 22px 22px',
+            animation: 'fadeInUp 0.25s ease',
+          }}>
+            {/* Иконка */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: 20,
+                background: T.red + '18', border: `1px solid ${T.red}44`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+              }}>🗑️</div>
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri, marginBottom: 8 }}>
+                Удалить профиль?
+              </div>
+              <div style={{ fontSize: 13, color: T.textSec, lineHeight: '19px' }}>
+                Все ваши ключи, достижения и история активности будут безвозвратно удалены. Это действие нельзя отменить.
+              </div>
+            </div>
+
+            {/* Список что удалится */}
+            <div style={{ background: 'rgba(230,70,70,0.07)', border: `1px solid ${T.red}30`, borderRadius: 14, padding: '12px 14px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { emoji: '🗝️', text: `${userKeys} ключей` },
+                { emoji: '⭐', text: `${favorites.length} избранных заведений` },
+                { emoji: '📋', text: 'История активности' },
+              ].map(item => (
+                <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 15 }}>{item.emoji}</span>
+                  <span style={{ fontSize: 13, color: T.textSec }}>{item.text}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                style={{
+                  flex: 1, padding: '14px 0', borderRadius: 14,
+                  border: `1px solid rgba(255,255,255,0.1)`, background: 'rgba(255,255,255,0.06)',
+                  color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleDeleteConfirmed}
+                disabled={isDeleting}
+                style={{
+                  flex: 1, padding: '14px 0', borderRadius: 14,
+                  border: 'none', background: T.red,
+                  color: '#fff', fontSize: 15, fontWeight: 700,
+                  cursor: isDeleting ? 'default' : 'pointer',
+                  opacity: isDeleting ? 0.6 : 1,
+                  transition: 'opacity 0.2s',
+                }}
+              >
+                {isDeleting ? 'Удаляем...' : 'Удалить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

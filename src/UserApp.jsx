@@ -3,7 +3,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
 import { db } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, increment, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection, getDocs, addDoc, serverTimestamp, deleteDoc, query, orderBy, where } from 'firebase/firestore';
 import ScannerComponent from './Scanner.jsx';
 import { ProfilePanel }    from './ProfilePanel.jsx';
 import { HomePanel }       from './HomePanel.jsx';
@@ -65,6 +65,37 @@ function NewEventsBanner({ count, onView, onDismiss }) {
   );
 }
 
+// ─── Модалка уведомлений ──────────────────────────────────────────────────────
+
+function NotificationModal({ notifications, onDismiss }) {
+  const [idx, setIdx] = useState(0);
+  const notif = notifications[idx];
+  const isLast = idx === notifications.length - 1;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(10,10,20,0.88)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
+      <div style={{ width: '100%', maxWidth: 420, background: '#1A1A2E', borderRadius: 28, border: '1px solid rgba(255,255,255,0.07)', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease' }}>
+        {notifications.length > 1 && (
+          <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(240,240,240,0.3)', marginBottom: 16 }}>
+            {idx + 1} из {notifications.length}
+          </div>
+        )}
+        <div style={{ textAlign: 'center', fontSize: 52, marginBottom: 14 }}>{notif.emoji ?? '🔔'}</div>
+        <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 800, color: '#F0F0F0', marginBottom: 8, lineHeight: '24px' }}>{notif.title}</div>
+        {notif.body && (
+          <div style={{ textAlign: 'center', fontSize: 14, color: 'rgba(240,240,240,0.55)', lineHeight: '21px', marginBottom: 22 }}>{notif.body}</div>
+        )}
+        <button
+          onClick={() => isLast ? onDismiss() : setIdx(i => i + 1)}
+          style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}
+        >
+          {isLast ? 'Понятно' : 'Следующее →'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
 export function UserApp() {
@@ -87,6 +118,7 @@ export function UserApp() {
 
   // userData сохраняем для использования в handleConsentAccept
   const [pendingUserData, setPendingUserData] = useState(null);
+  const [unreadNotifications, setUnreadNotifications] = useState([]);
 
   const loadUserData = useCallback(async (userData) => {
     const userRef = doc(db, 'users', String(userData.id));
@@ -120,6 +152,24 @@ export function UserApp() {
     setNotificationsEnabled(data.notificationsEnabled ?? false);
     if (!data.onboardingDone) setShowOnboarding(true);
     await updateDoc(userRef, profile).catch(() => {});
+
+    // Проверяем уведомления
+    try {
+      const lastSeen = data.notificationsLastSeen ?? null;
+      let notifQ;
+      if (lastSeen) {
+        notifQ = query(collection(db, 'notifications'), where('createdAt', '>', lastSeen), orderBy('createdAt', 'desc'));
+      } else {
+        notifQ = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+        await updateDoc(userRef, { notificationsLastSeen: serverTimestamp() }).catch(() => {});
+      }
+      if (lastSeen) {
+        const notifSnap = await getDocs(notifQ);
+        const notifs = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (notifs.length > 0) setUnreadNotifications(notifs);
+      }
+    } catch {}
+
     setScreen('app');
   }, []);
 
@@ -269,6 +319,31 @@ export function UserApp() {
     setScreen('login');
   };
 
+  const handleDeleteProfile = async () => {
+    if (!user || user.id === 'guest') return;
+    try {
+      const activitySnap = await getDocs(collection(db, 'users', String(user.id), 'activity'));
+      await Promise.all(activitySnap.docs.map(d => deleteDoc(d.ref)));
+      await deleteDoc(doc(db, 'users', String(user.id)));
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(EVENTS_CNT_KEY);
+      localStorage.removeItem(LOGGED_OUT_KEY);
+      setUser(null); setUserKeys(0); setFavorites([]);
+      setActivePanel('home');
+      setScreen('login');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDismissNotifications = async () => {
+    setUnreadNotifications([]);
+    if (user && user.id !== 'guest') {
+      try { await updateDoc(doc(db, 'users', String(user.id)), { notificationsLastSeen: serverTimestamp() }); }
+      catch {}
+    }
+  };
+
   const handleShare = () => {
     const refLink = `https://vk.com/app${APP_ID}${user?.id ? `#ref_${user.id}` : ''}`;
     vkBridge.send('VKWebAppShare', { link: refLink }).catch(() => {});
@@ -289,19 +364,39 @@ export function UserApp() {
   if (screen === 'login') return <LoginScreen onLogin={handleLogin} />;
   if (screen === 'consent') return <ConsentScreen onAccept={handleConsentAccept} />;
 
-  // Экран загрузки (первый вход, данные ещё не в кэше)
+  // Экран загрузки (первый вход, данные ещё не в кэше) — скелетон
   if (screen === 'loading' || (loading && partners.length === 0)) {
+    const SK = { background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite', borderRadius: 10 };
     return (
-      <div style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <div style={{ position: 'relative', width: 72, height: 72 }}>
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(201,168,76,0.12)', borderTopColor: T.gold, animation: 'spin 1.2s linear infinite' }} />
-          <div style={{ position: 'absolute', inset: 8, borderRadius: '50%', border: '1.5px solid rgba(201,168,76,0.07)', borderBottomColor: 'rgba(201,168,76,0.35)', animation: 'spin 2s linear infinite reverse' }} />
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: T.gold, animation: 'pulse-glow 2s ease-in-out infinite' }}>✦</div>
+      <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 60 }}>
+        {/* Header */}
+        <div style={{ height: 52, background: T.bg, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10 }}>
+          <div style={{ ...SK, width: 30, height: 30, borderRadius: 8 }} />
+          <div style={{ ...SK, width: 50, height: 16 }} />
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ color: T.textPri, fontSize: 16, fontWeight: 700, marginBottom: 4 }}>АПГ</div>
-          <div style={{ color: T.textSec, fontSize: 13 }}>Загружаем данные...</div>
+        {/* Hero */}
+        <div style={{ margin: '12px 16px', borderRadius: 24, background: '#1A1A2E', padding: '22px 20px', border: `1px solid ${T.border}` }}>
+          <div style={{ ...SK, width: 140, height: 11, marginBottom: 10 }} />
+          <div style={{ ...SK, width: 190, height: 26, marginBottom: 4 }} />
+          <div style={{ ...SK, width: 110, height: 18, marginBottom: 18 }} />
+          <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '12px 14px' }}>
+            <div style={{ ...SK, width: 160, height: 14, marginBottom: 10 }} />
+            <div style={{ ...SK, height: 5 }} />
+          </div>
         </div>
+        {/* Quick actions */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '0 16px 12px' }}>
+          {[0,1,2,3].map(i => <div key={i} style={{ background: '#1A1A2E', borderRadius: 16, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: `1px solid ${T.border}` }}><div style={{ ...SK, width: 38, height: 38, borderRadius: 12 }} /><div style={{ ...SK, width: 32, height: 10 }} /></div>)}
+        </div>
+        {/* Partner cards */}
+        <div style={{ padding: '0 16px' }}>
+          <div style={{ ...SK, width: 140, height: 18, marginBottom: 12 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {[0,1,2,3].map(i => <div key={i} style={{ background: '#1A1A2E', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, border: `1px solid ${T.border}` }}><div style={{ ...SK, width: 56, height: 56, borderRadius: 28 }} /><div style={{ ...SK, width: 80, height: 13 }} /><div style={{ ...SK, width: 56, height: 10 }} /><div style={{ ...SK, height: 34, borderRadius: 12 }} /></div>)}
+          </div>
+        </div>
+        {/* Tab bar */}
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}` }} />
       </div>
     );
   }
@@ -364,6 +459,7 @@ export function UserApp() {
                   onEnableNotifications={handleEnableNotifications}
                   notificationsEnabled={notificationsEnabled}
                   onLogout={handleLogout}
+                  onDeleteProfile={handleDeleteProfile}
                 />
               </Panel>
 
@@ -379,6 +475,10 @@ export function UserApp() {
             onView={() => { setNewEventsCount(0); setActivePanel('events'); }}
             onDismiss={() => setNewEventsCount(0)}
           />
+
+          {unreadNotifications.length > 0 && (
+            <NotificationModal notifications={unreadNotifications} onDismiss={handleDismissNotifications} />
+          )}
 
           <ScannerComponent
             isOpen={isScannerOpen}

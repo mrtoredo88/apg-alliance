@@ -361,6 +361,62 @@ function ApgLogo() {
   );
 }
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function Skel({ w = '100%', h = 16, radius = 8, style: extra = {} }) {
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: radius, flexShrink: 0,
+      background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s ease-in-out infinite',
+      ...extra,
+    }} />
+  );
+}
+
+function SkeletonHome() {
+  return (
+    <div>
+      {/* Hero */}
+      <div style={{ margin: '8px 16px', borderRadius: 24, background: T.surface, padding: '22px 20px', border: `1px solid ${T.border}` }}>
+        <Skel h={11} w={140} radius={6} style={{ marginBottom: 10 }} />
+        <Skel h={26} w={190} radius={8} style={{ marginBottom: 4 }} />
+        <Skel h={18} w={110} radius={8} style={{ marginBottom: 18 }} />
+        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '12px 14px' }}>
+          <Skel h={14} w={160} radius={6} style={{ marginBottom: 10 }} />
+          <Skel h={5} radius={3} />
+        </div>
+      </div>
+
+      {/* QuickActions */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '12px 16px' }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ background: T.surface, borderRadius: 16, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: `1px solid ${T.border}` }}>
+            <Skel w={38} h={38} radius={12} />
+            <Skel w={32} h={10} radius={5} />
+          </div>
+        ))}
+      </div>
+
+      {/* Partners */}
+      <div style={{ padding: '20px 16px 8px' }}>
+        <Skel h={18} w={140} radius={8} style={{ marginBottom: 12 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} style={{ background: T.surface, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, border: `1px solid ${T.border}` }}>
+              <Skel w={56} h={56} radius={28} />
+              <Skel h={13} w={80} radius={6} />
+              <Skel h={10} w={56} radius={5} />
+              <Skel h={34} radius={12} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
 export function HomePanel({
@@ -370,10 +426,14 @@ export function HomePanel({
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredPartners = activeCategory === 'all'
-    ? partners
-    : partners.filter(p => p.category === activeCategory);
+  const filteredPartners = partners
+    .filter(p => activeCategory === 'all' || p.category === activeCategory)
+    .filter(p => !searchQuery.trim() ||
+      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   return (
     <Panel id="home">
@@ -383,34 +443,7 @@ export function HomePanel({
 
       <div style={{ background: T.bg, minHeight: '100%' }}>
 
-        {loading && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 320, flexDirection: 'column', gap: 18 }}>
-            <div style={{ position: 'relative', width: 72, height: 72 }}>
-              <div style={{
-                position: 'absolute', inset: 0, borderRadius: '50%',
-                border: '2px solid rgba(201,168,76,0.12)',
-                borderTopColor: '#C9A84C',
-                animation: 'spin 1.2s linear infinite',
-              }} />
-              <div style={{
-                position: 'absolute', inset: 8, borderRadius: '50%',
-                border: '1.5px solid rgba(201,168,76,0.07)',
-                borderBottomColor: 'rgba(201,168,76,0.35)',
-                animation: 'spin 2s linear infinite reverse',
-              }} />
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, color: '#C9A84C',
-                animation: 'pulse-glow 2s ease-in-out infinite',
-              }}>✦</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: T.textPri, fontSize: 15, fontWeight: 700, marginBottom: 4 }}>АПГ</div>
-              <div style={{ color: T.textSec, fontSize: 13 }}>Загружаем данные...</div>
-            </div>
-          </div>
-        )}
+        {loading && <SkeletonHome />}
 
         {!loading && error && (
           <div style={{ padding: '40px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
@@ -493,8 +526,25 @@ export function HomePanel({
               </HorizontalScroll>
             )}
 
+            {/* Поиск */}
+            <div style={{ padding: '20px 16px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: T.surface, borderRadius: 14, padding: '10px 14px', border: `1px solid ${T.border}` }}>
+                <span style={{ fontSize: 15, opacity: 0.4, flexShrink: 0 }}>🔍</span>
+                <input
+                  type="search"
+                  placeholder="Найти партнёра..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{ background: 'none', border: 'none', outline: 'none', color: T.textPri, fontSize: 14, flex: 1, minWidth: 0 }}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSec, fontSize: 16, padding: 0, flexShrink: 0 }}>✕</button>
+                )}
+              </div>
+            </div>
+
             {/* Фильтр категорий */}
-            <div style={{ padding: '20px 0 8px' }}>
+            <div style={{ padding: '10px 0 8px' }}>
               <HorizontalScroll>
                 <div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>
                   {CATEGORIES.map(cat => (
@@ -540,7 +590,11 @@ export function HomePanel({
                   </div>
                   <div>
                     <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Ничего не найдено</div>
-                    <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>В этой категории пока нет партнёров</div>
+                    <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>
+                      {searchQuery.trim()
+                        ? `По запросу «${searchQuery.trim()}» партнёры не найдены`
+                        : 'В этой категории пока нет партнёров'}
+                    </div>
                   </div>
                 </div>
               ) : (
