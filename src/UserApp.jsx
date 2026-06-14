@@ -12,6 +12,25 @@ import { Onboarding } from './Onboarding.jsx';
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
+const APP_ID = 54601851;
+const CACHE_KEY = 'apg_v1';
+const CACHE_TTL = 30 * 60 * 1000;
+
+const readCache = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (Date.now() - c.ts > CACHE_TTL) return null;
+    return c;
+  } catch { return null; }
+};
+
+const writeCache = (partners, events) => {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ partners, events, ts: Date.now() })); }
+  catch {}
+};
+
 export function UserApp() {
   const [activePanel, setActivePanel] = useState('home');
   const [activePartner, setActivePartner] = useState(null);
@@ -26,7 +45,18 @@ export function UserApp() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const initApp = useCallback(async (isMounted) => {
-    setLoading(true); setError(null);
+    setError(null);
+
+    // Мгновенно показываем кэшированные данные
+    const cached = readCache();
+    if (cached) {
+      setPartners(cached.partners);
+      setEvents(cached.events);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
       vkBridge.send('VKWebAppInit');
       const userData = await Promise.race([
@@ -41,8 +71,11 @@ export function UserApp() {
         getDocs(collection(db, 'events')),
       ]);
       if (!isMounted.current) return;
-      setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const freshEvents = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPartners(freshPartners);
+      setEvents(freshEvents);
+      writeCache(freshPartners, freshEvents);
 
       const userRef = doc(db, 'users', String(userData.id));
       const docSnap = await getDoc(userRef);
@@ -58,7 +91,8 @@ export function UserApp() {
       }
     } catch (e) {
       console.error(e);
-      if (isMounted.current) setError('Не удалось загрузить данные.');
+      // Если кэш есть — тихо работаем с ним, ошибку не показываем
+      if (isMounted.current && !cached) setError('Не удалось загрузить данные.');
     } finally {
       if (isMounted.current) setLoading(false);
     }
@@ -105,6 +139,11 @@ export function UserApp() {
     initApp(isMounted);
   };
 
+  const handleShare = () => {
+    const refLink = `https://vk.com/app${APP_ID}${user?.id ? `#ref_${user.id}` : ''}`;
+    vkBridge.send('VKWebAppShare', { link: refLink }).catch(() => {});
+  };
+
   const TabBar = () => (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}`, display: 'flex', zIndex: 100 }}>
       {[
@@ -135,6 +174,7 @@ export function UserApp() {
                 onOpenPartner={partner => { setActivePartner(partner); setActivePanel('partner'); }}
                 onToggleFavorite={toggleFavorite}
                 onScan={() => setIsScannerOpen(true)}
+                onShare={handleShare}
                 onRetry={() => { const m = { current: true }; initApp(m); }}
               />
 

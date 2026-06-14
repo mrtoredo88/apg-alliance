@@ -309,12 +309,12 @@ function HeroBanner({ userKeys, userName }) {
 
 // ─── Быстрые действия ────────────────────────────────────────────────────────
 
-function QuickActions({ onScan }) {
+function QuickActions({ onScan, onShare }) {
   const actions = [
-    { icon: '📷', label: 'QR-скан',    color: T.blue,  onClick: onScan },
-    { icon: '🎁', label: 'Акции',      color: T.green, onClick: () => {} },
-    { icon: '🏆', label: 'Рейтинг',   color: T.gold,  onClick: () => {} },
-    { icon: '👥', label: 'Позвать',   color: T.red,   onClick: () => {} },
+    { icon: '📷', label: 'QR-скан',  color: T.blue,  onClick: onScan },
+    { icon: '🎁', label: 'Акции',    color: T.green, onClick: () => {} },
+    { icon: '🏆', label: 'Рейтинг', color: T.gold,  onClick: () => {} },
+    { icon: '👥', label: 'Позвать', color: T.red,   onClick: onShare },
   ];
 
   return (
@@ -366,7 +366,7 @@ function ApgLogo() {
 export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [],
   loading = false, error = null,
-  onOpenPartner, onToggleFavorite, onScan, onRetry,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onRetry,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -441,7 +441,7 @@ export function HomePanel({
             <HeroBanner userKeys={userKeys} userName={user?.first_name} />
 
             <div style={{ padding: '12px 0 4px' }}>
-              <QuickActions onScan={onScan} />
+              <QuickActions onScan={onScan} onShare={onShare} />
             </div>
 
             {/* События */}

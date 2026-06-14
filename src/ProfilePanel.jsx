@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PanelHeader, Progress, Avatar } from '@vkontakte/vkui';
 
 const T = {
@@ -52,6 +52,72 @@ function AchievementBadge({ a, unlocked }) {
         {unlocked && <div style={{ position: 'absolute', bottom: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</div>}
       </div>
       <span style={{ fontSize: 10, color: unlocked ? T.textPri : T.textSec, fontWeight: unlocked ? 700 : 400, textAlign: 'center', lineHeight: '13px' }}>{a.title}</span>
+    </div>
+  );
+}
+
+const FAQ_ITEMS = [
+  {
+    q: 'Что такое АПГ?',
+    a: 'Альянс Партнёров Города — программа лояльности, объединяющая лучшие заведения Зеленограда. Участники получают эксклюзивные скидки и предложения от партнёров.',
+  },
+  {
+    q: 'Как собирать ключи?',
+    a: 'Сканируй QR-код при каждом визите к партнёру — за каждое посещение начисляется 1 ключ. Кнопка сканера находится в нижней панели.',
+  },
+  {
+    q: 'Зачем нужны ключи?',
+    a: 'Ключи определяют твой уровень в программе. Уровни: Новичок (0), Участник (5+), Активный (15+), VIP (30+). Чем выше уровень — тем больше привилегий.',
+  },
+  {
+    q: 'Как воспользоваться предложением партнёра?',
+    a: 'Открой карточку партнёра и посмотри раздел «Спецпредложение». Покажи его на кассе или при записи — партнёр применит скидку.',
+  },
+  {
+    q: 'Можно ли сканировать одно место несколько раз?',
+    a: 'Да, каждый визит к партнёру засчитывается и приносит 1 ключ.',
+  },
+  {
+    q: 'Как добавить партнёра в избранное?',
+    a: 'Нажми на сердечко на карточке партнёра. Все избранные заведения появятся в этом разделе профиля.',
+  },
+];
+
+function FaqSection() {
+  const [openIndex, setOpenIndex] = useState(null);
+
+  return (
+    <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Частые вопросы</div>
+      <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+        {FAQ_ITEMS.map((item, i) => {
+          const isOpen = openIndex === i;
+          return (
+            <div key={i} style={{ borderBottom: i < FAQ_ITEMS.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+              <button
+                onClick={() => setOpenIndex(isOpen ? null : i)}
+                style={{
+                  width: '100%', padding: '14px 16px', background: 'none', border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                  cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 14, color: T.textPri, fontWeight: 600, lineHeight: '20px' }}>{item.q}</span>
+                <span style={{
+                  fontSize: 16, color: T.gold, flexShrink: 0,
+                  transform: isOpen ? 'rotate(45deg)' : 'none',
+                  transition: 'transform 0.25s ease',
+                }}>✦</span>
+              </button>
+              {isOpen && (
+                <div style={{ padding: '0 16px 14px' }}>
+                  <p style={{ margin: 0, fontSize: 13, color: T.textSec, lineHeight: '20px' }}>{item.a}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -239,6 +305,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           ))}
         </div>
       </div>
+
+      {/* ── FAQ ── */}
+      <FaqSection />
 
       {/* ── Выход ── */}
       <div style={{ padding: '12px 16px 0' }}>
