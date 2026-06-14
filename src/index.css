@@ -74,6 +74,22 @@ input::placeholder {
   color: rgba(240, 240, 240, 0.55);
 }
 
+/* Onboarding slide transitions */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(48px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0)    scale(1);    }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-48px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0)     scale(1);    }
+}
+/* Сканирующая линия QR */
+@keyframes scanLine {
+  0%   { top: 10%; }
+  50%  { top: 80%; }
+  100% { top: 10%; }
+}
+
 /* Tab switch — мягкий fade + лёгкий scale */
 @keyframes tabFadeIn {
   from { opacity: 0; transform: scale(0.984) translateY(5px); }
