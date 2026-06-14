@@ -499,7 +499,7 @@ export function HomePanel({
                 <div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>
                   {CATEGORIES.map(cat => (
                     <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{
-                      padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                      padding: '7px 14px', borderRadius: 20, cursor: 'pointer',
                       whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700,
                       background: activeCategory === cat.id
                         ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
