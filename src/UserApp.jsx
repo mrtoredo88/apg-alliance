@@ -3,7 +3,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel, Spinner, Div 
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
 import { db } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, increment, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import ScannerComponent from './Scanner.jsx';
 import { ProfilePanel } from './ProfilePanel.jsx';
 import { HomePanel } from './HomePanel.jsx';
@@ -11,6 +11,7 @@ import { PartnerPage } from './PartnerPage.jsx';
 import { Onboarding } from './Onboarding.jsx';
 import { EventsPage } from './EventsPage.jsx';
 import { LeaderboardPage } from './LeaderboardPage.jsx';
+import { ActivityPage } from './ActivityPage.jsx';
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
@@ -120,22 +121,47 @@ export function UserApp() {
     }
   };
 
+  const logActivity = async (entry) => {
+    if (!user || user.id === 'guest') return;
+    try {
+      await addDoc(collection(db, 'users', String(user.id), 'activity'), {
+        ...entry, ts: serverTimestamp(),
+      });
+    } catch {}
+  };
+
   const toggleFavorite = async (partnerId) => {
     if (!user) return;
     const prev = favorites;
-    const next = favorites.includes(partnerId) ? favorites.filter(id => id !== partnerId) : [...favorites, partnerId];
+    const isAdding = !favorites.includes(partnerId);
+    const next = isAdding ? [...favorites, partnerId] : favorites.filter(id => id !== partnerId);
     setFavorites(next);
-    try { await updateDoc(doc(db, 'users', String(user.id)), { favorites: next }); }
-    catch (e) { setFavorites(prev); }
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), { favorites: next });
+      const partner = partners.find(p => p.id === partnerId);
+      await logActivity({
+        type: isAdding ? 'favorite_add' : 'favorite_remove',
+        icon: isAdding ? '⭐' : '💔',
+        text: isAdding
+          ? `Добавил в избранное: ${partner?.name ?? partnerId}`
+          : `Убрал из избранного: ${partner?.name ?? partnerId}`,
+      });
+    } catch (e) { setFavorites(prev); }
   };
 
   const handleConfirmScan = async (placeIdentifier) => {
     if (!user) return;
-    const isValid = partners.some(p => p.id === placeIdentifier || p.name === placeIdentifier);
-    if (!isValid) { setIsScannerOpen(false); return; }
+    const partner = partners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
+    if (!partner) { setIsScannerOpen(false); return; }
     try {
       await updateDoc(doc(db, 'users', String(user.id)), { keys: increment(1) });
       setUserKeys(prev => prev + 1);
+      await logActivity({
+        type: 'scan',
+        icon: '🗝️',
+        text: `Посетил партнёра: ${partner.name}`,
+        partnerName: partner.name,
+      });
     } catch (e) { console.error(e); }
     finally { setIsScannerOpen(false); }
   };
@@ -211,9 +237,15 @@ export function UserApp() {
                   user={user} userKeys={userKeys} favorites={favorites} partners={partners}
                   onToggleFavorite={toggleFavorite}
                   onOpenPartner={partner => { setActivePartner(partner); setActivePanel('partner'); }}
+                  onOpenActivity={() => setActivePanel('activity')}
                   onLogout={handleLogout}
                 />
               </Panel>
+
+              <ActivityPage nav="activity"
+                userId={user?.id}
+                onBack={() => setActivePanel('profile')}
+              />
 
             </View>
           </div>

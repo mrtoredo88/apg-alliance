@@ -141,7 +141,7 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onLogout }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onLogout }) {
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
@@ -294,10 +294,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Настройки</div>
         <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }}>
           {[
-            { icon: '🔔', label: 'Уведомления', action: () => {} },
-            { icon: '⚙️', label: 'Настройки профиля', action: () => {} },
-          ].map((item, i) => (
-            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i === 0 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+            { icon: '📋', label: 'История активности', action: onOpenActivity },
+            { icon: '🔔', label: 'Уведомления',        action: () => {} },
+            { icon: '⚙️', label: 'Настройки профиля',  action: () => {} },
+          ].map((item, i, arr) => (
+            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
               <span style={{ fontSize: 15, color: T.textPri, fontWeight: 500 }}>{item.label}</span>
               <span style={{ marginLeft: 'auto', color: T.textSec, fontSize: 16 }}>›</span>
