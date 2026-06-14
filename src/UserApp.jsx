@@ -19,6 +19,8 @@ import { LoginScreen }     from './LoginScreen.jsx';
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C', goldL: '#E8C97A', textPri: '#F0F0F0', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
+const haptic = (style = 'light') => vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
+
 const APP_ID          = 54601851;
 const CACHE_KEY       = 'apg_v1';
 const CACHE_TTL       = 30 * 60 * 1000;
@@ -39,6 +41,30 @@ const writeCache = (partners, events) => {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ partners, events, ts: Date.now() })); }
   catch {}
 };
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+function Toast({ toasts }) {
+  if (!toasts.length) return null;
+  return (
+    <div style={{ position: 'fixed', bottom: 72, left: 16, right: 16, zIndex: 600, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          background: 'rgba(22,22,38,0.97)',
+          border: '1px solid rgba(201,168,76,0.22)',
+          borderRadius: 16,
+          padding: '12px 16px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.55)',
+          animation: t.out ? 'toastOut 0.22s ease forwards' : 'toastIn 0.28s ease',
+        }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>{t.icon}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#F0F0F0', lineHeight: '18px' }}>{t.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── Баннер новых событий ─────────────────────────────────────────────────────
 
@@ -123,6 +149,7 @@ export function UserApp() {
   const [unreadNotifications, setUnreadNotifications] = useState([]);
   const [referralCount, setReferralCount] = useState(0);
   const [completedTasks, setCompletedTasks] = useState([]);
+  const [toasts, setToasts] = useState([]);
 
   // Реферальный ID из хэша URL (e.g. #ref_988504)
   const pendingRefId = useRef((() => {
@@ -249,6 +276,15 @@ export function UserApp() {
     return () => { isMounted.current = false; };
   }, [initApp]);
 
+  const showToast = useCallback((text, icon = '✓') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, text, icon }]);
+    setTimeout(() => {
+      setToasts(prev => prev.map(t => t.id === id ? { ...t, out: true } : t));
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 220);
+    }, 2400);
+  }, []);
+
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
   const handleLogin = () => {
@@ -313,6 +349,7 @@ export function UserApp() {
 
   const toggleFavorite = async (partnerId) => {
     if (!user) return;
+    haptic('light');
     const prev = favorites;
     const isAdding = !favorites.includes(partnerId);
     const next = isAdding ? [...favorites, partnerId] : favorites.filter(id => id !== partnerId);
@@ -320,6 +357,10 @@ export function UserApp() {
     try {
       await updateDoc(doc(db, 'users', String(user.id)), { favorites: next });
       const partner = partners.find(p => p.id === partnerId);
+      showToast(
+        isAdding ? `${partner?.name ?? 'Партнёр'} — в избранном` : `Убрано из избранного`,
+        isAdding ? '⭐' : '💔'
+      );
       await logActivity({
         type: isAdding ? 'favorite_add' : 'favorite_remove',
         icon: isAdding ? '⭐' : '💔',
@@ -335,8 +376,10 @@ export function UserApp() {
     const partner = partners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
     if (!partner) { setIsScannerOpen(false); return; }
     try {
+      haptic('medium');
       await updateDoc(doc(db, 'users', String(user.id)), { keys: increment(1) });
       setUserKeys(prev => prev + 1);
+      showToast(`+1 🗝️ за визит в ${partner.name}`, '🎉');
       await logActivity({ type: 'scan', icon: '🗝️', text: `Посетил партнёра: ${partner.name}`, partnerName: partner.name });
     } catch (e) { console.error(e); }
     finally { setIsScannerOpen(false); }
@@ -370,6 +413,7 @@ export function UserApp() {
   const handleClaimTask = async (taskId, reward) => {
     if (!user || user.id === 'guest') return;
     try {
+      haptic('medium');
       await updateDoc(doc(db, 'users', String(user.id)), {
         completedTasks: arrayUnion(taskId),
         keys: increment(reward),
@@ -381,6 +425,7 @@ export function UserApp() {
       });
       setCompletedTasks(prev => [...prev, taskId]);
       setUserKeys(prev => prev + reward);
+      showToast(`+${reward} ключей получено!`, '🎁');
     } catch (e) { console.error(e); }
   };
 
@@ -451,20 +496,41 @@ export function UserApp() {
 
   // ─── Основное приложение ─────────────────────────────────────────────────────
 
+  const TAB_ITEMS = [
+    { id: 'home',    icon: '⌂', label: 'Главная' },
+    { id: 'scan',    icon: '◎', label: 'Скан' },
+    { id: 'profile', icon: '○', label: 'Профиль' },
+  ];
+  const pillIdx = isScannerOpen ? 1 : activePanel === 'profile' ? 2 : 0;
+
   const TabBar = () => (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}`, display: 'flex', zIndex: 100 }}>
-      {[
-        { id: 'home',    icon: '⌂', label: 'Главная' },
-        { id: 'scan',    icon: '◎', label: 'Скан' },
-        { id: 'profile', icon: '○', label: 'Профиль' },
-      ].map(item => (
-        <button key={item.id}
-          onClick={() => item.id === 'scan' ? setIsScannerOpen(true) : setActivePanel(item.id)}
-          style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: activePanel === item.id ? T.gold : T.textSec, fontSize: 9, fontWeight: 700, padding: 0, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-          <span style={{ fontSize: 20, filter: activePanel === item.id ? `drop-shadow(0 0 6px ${T.gold}88)` : 'none' }}>{item.icon}</span>
-          {item.label}
-        </button>
-      ))}
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}`, display: 'flex', zIndex: 100, overflow: 'hidden' }}>
+      {/* Скользящий pill */}
+      <div style={{
+        position: 'absolute',
+        top: 8, height: 42,
+        left: `calc(${pillIdx * 33.333}% + 10px)`,
+        width: 'calc(33.333% - 20px)',
+        background: 'rgba(201,168,76,0.1)',
+        border: '1px solid rgba(201,168,76,0.2)',
+        borderRadius: 13,
+        transition: 'left 0.32s cubic-bezier(0.34, 1.4, 0.64, 1)',
+        pointerEvents: 'none',
+      }} />
+      {TAB_ITEMS.map((item, idx) => {
+        const isActive = item.id === 'scan' ? isScannerOpen : item.id === 'profile' ? activePanel === 'profile' : pillIdx === 0 && item.id === 'home';
+        return (
+          <button key={item.id}
+            onClick={() => {
+              haptic('light');
+              item.id === 'scan' ? setIsScannerOpen(true) : setActivePanel(item.id);
+            }}
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: isActive ? T.gold : T.textSec, fontSize: 9, fontWeight: 700, padding: 0, letterSpacing: 0.5, textTransform: 'uppercase', transition: 'color 0.2s', position: 'relative', zIndex: 1 }}>
+            <span style={{ fontSize: 20, transition: 'transform 0.22s, filter 0.22s', transform: isActive ? 'scale(1.12)' : 'scale(1)', filter: isActive ? `drop-shadow(0 0 5px ${T.gold}99)` : 'none' }}>{item.icon}</span>
+            {item.label}
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -556,6 +622,8 @@ export function UserApp() {
           />
 
           {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+
+          <Toast toasts={toasts} />
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>
