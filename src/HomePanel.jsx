@@ -313,34 +313,54 @@ function HeroBanner({ userKeys, userName }) {
       }} />
 
       <div style={{ position: 'relative' }}>
-        <div style={{ fontSize: 11, color: T.gold, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10, opacity: 0.85 }}>
           ✦ Альянс Партнёров Города
         </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: T.white, marginBottom: 16, lineHeight: '28px' }}>
-          Добро пожаловать,{'\n'}{userName ?? 'участник'}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: T.white, lineHeight: 1.15, letterSpacing: -0.5 }}>
+            {userName ?? 'участник'} 👋
+          </div>
         </div>
 
         {/* Ключи */}
         <div style={{
-          background: 'rgba(0,0,0,0.25)',
-          borderRadius: 14, padding: '12px 14px',
-          border: `1px solid rgba(201,168,76,0.25)`,
+          background: 'rgba(0,0,0,0.35)',
+          borderRadius: 16, padding: '14px 16px',
+          border: '1px solid rgba(201,168,76,0.3)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 16 }}>🗝️</span>
-              <span style={{ color: T.white, fontSize: 15, fontWeight: 700 }}>{userKeys} ключей</span>
+          {/* Счётчик */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 32, fontWeight: 900, color: T.goldL, letterSpacing: -1, lineHeight: 1 }}>
+                  {userKeys}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: T.gold, letterSpacing: 0.5 }}>🗝️ ключей</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 3, letterSpacing: 0.3 }}>
+                Ваш баланс в программе лояльности
+              </div>
             </div>
-            <span style={{ color: 'rgba(240,240,240,0.6)', fontSize: 12, fontWeight: 600 }}>из {MAX_KEYS}</span>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 1 }}>из</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.55)', lineHeight: 1 }}>{MAX_KEYS}</div>
+            </div>
           </div>
           {/* Прогресс */}
-          <div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ height: 7, background: 'rgba(255,255,255,0.12)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
             <div style={{
               height: '100%', width: `${progress}%`,
               background: `linear-gradient(90deg, ${T.gold}, ${T.goldL})`,
-              borderRadius: 4, transition: 'width 0.6s ease',
-              boxShadow: `0 0 10px ${T.gold}aa`,
+              borderRadius: 8, transition: 'width 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: `0 0 12px ${T.gold}99`,
             }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>0</span>
+            <span style={{ fontSize: 10, color: T.gold, fontWeight: 700 }}>{progress}%</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{MAX_KEYS}</span>
           </div>
         </div>
       </div>
