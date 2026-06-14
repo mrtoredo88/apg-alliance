@@ -3,7 +3,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
 import { db } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, increment, collection, getDocs, addDoc, serverTimestamp, deleteDoc, query, orderBy, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection, getDocs, addDoc, serverTimestamp, deleteDoc, query, orderBy, where, arrayUnion } from 'firebase/firestore';
 import ScannerComponent from './Scanner.jsx';
 import { ProfilePanel }    from './ProfilePanel.jsx';
 import { HomePanel }       from './HomePanel.jsx';
@@ -12,6 +12,8 @@ import { Onboarding }      from './Onboarding.jsx';
 import { EventsPage }      from './EventsPage.jsx';
 import { LeaderboardPage } from './LeaderboardPage.jsx';
 import { ActivityPage }    from './ActivityPage.jsx';
+import { OffersPage }     from './OffersPage.jsx';
+import { TasksPage }     from './TasksPage.jsx';
 import { ConsentScreen }   from './ConsentScreen.jsx';
 import { LoginScreen }     from './LoginScreen.jsx';
 
@@ -119,6 +121,14 @@ export function UserApp() {
   // userData сохраняем для использования в handleConsentAccept
   const [pendingUserData, setPendingUserData] = useState(null);
   const [unreadNotifications, setUnreadNotifications] = useState([]);
+  const [referralCount, setReferralCount] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState([]);
+
+  // Реферальный ID из хэша URL (e.g. #ref_988504)
+  const pendingRefId = useRef((() => {
+    const m = window.location.hash.match(/ref_(\d+)/);
+    return m ? m[1] : null;
+  })());
 
   const loadUserData = useCallback(async (userData) => {
     const userRef = doc(db, 'users', String(userData.id));
@@ -131,7 +141,9 @@ export function UserApp() {
 
     if (!docSnap.exists()) {
       // Новый пользователь — создаём минимальный документ, показываем согласие
-      await setDoc(userRef, { keys: 0, favorites: [], onboardingDone: false, consentGiven: false, notificationsEnabled: false, ...profile });
+      const refId = pendingRefId.current;
+      const referredBy = refId && refId !== String(userData.id) ? { referredBy: refId } : {};
+      await setDoc(userRef, { keys: 0, favorites: [], onboardingDone: false, consentGiven: false, notificationsEnabled: false, ...profile, ...referredBy });
       setPendingUserData(userData);
       setScreen('consent');
       return;
@@ -150,6 +162,8 @@ export function UserApp() {
     setUserKeys(data.keys ?? 0);
     setFavorites(data.favorites ?? []);
     setNotificationsEnabled(data.notificationsEnabled ?? false);
+    setReferralCount(data.referralCount ?? 0);
+    setCompletedTasks(data.completedTasks ?? []);
     if (!data.onboardingDone) setShowOnboarding(true);
     await updateDoc(userRef, profile).catch(() => {});
 
@@ -257,6 +271,23 @@ export function UserApp() {
         setUserKeys(data.keys ?? 0);
         setFavorites(data.favorites ?? []);
         if (!data.onboardingDone) setShowOnboarding(true);
+
+        // Кредитуем рефера при первом согласии
+        if (data.referredBy && !data.referralCredited) {
+          try {
+            const referrerId = data.referredBy;
+            await updateDoc(doc(db, 'users', referrerId), {
+              keys: increment(2),
+              referralCount: increment(1),
+            });
+            await addDoc(collection(db, 'users', referrerId, 'activity'), {
+              type: 'referral', icon: '👥',
+              text: 'Новый участник по вашей реферальной ссылке +2 🗝️',
+              ts: serverTimestamp(),
+            });
+            await updateDoc(userRef, { referralCredited: true });
+          } catch {}
+        }
       }
     } catch (e) { console.error(e); }
     setPendingUserData(null);
@@ -334,6 +365,23 @@ export function UserApp() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleClaimTask = async (taskId, reward) => {
+    if (!user || user.id === 'guest') return;
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), {
+        completedTasks: arrayUnion(taskId),
+        keys: increment(reward),
+      });
+      await addDoc(collection(db, 'users', String(user.id), 'activity'), {
+        type: 'task_complete', icon: '📋',
+        text: `Выполнено задание — получено +${reward} 🗝️`,
+        ts: serverTimestamp(),
+      });
+      setCompletedTasks(prev => [...prev, taskId]);
+      setUserKeys(prev => prev + reward);
+    } catch (e) { console.error(e); }
   };
 
   const handleDismissNotifications = async () => {
@@ -435,7 +483,11 @@ export function UserApp() {
                 onScan={() => setIsScannerOpen(true)}
                 onShare={handleShare}
                 onOpenEvents={() => setActivePanel('events')}
+                onOpenOffers={() => setActivePanel('offers')}
+                onOpenTasks={() => setActivePanel('tasks')}
                 onOpenLeaderboard={() => setActivePanel('leaderboard')}
+                completedTasks={completedTasks}
+                referralCount={referralCount}
                 onRetry={() => { const m = { current: true }; initApp(m); }}
               />
 
@@ -460,10 +512,26 @@ export function UserApp() {
                   notificationsEnabled={notificationsEnabled}
                   onLogout={handleLogout}
                   onDeleteProfile={handleDeleteProfile}
+                  referralCount={referralCount}
+                  onShare={handleShare}
                 />
               </Panel>
 
               <ActivityPage nav="activity" userId={user?.id} onBack={() => setActivePanel('profile')} />
+
+              <OffersPage nav="offers" partners={partners}
+                onBack={() => setActivePanel('home')}
+                onOpenPartner={partner => { setActivePartner(partner); setActivePanel('partner'); }}
+              />
+
+              <TasksPage nav="tasks"
+                userKeys={userKeys}
+                favCount={favorites.length}
+                referralCount={referralCount}
+                completedTasks={completedTasks}
+                onClaim={handleClaimTask}
+                onBack={() => setActivePanel('home')}
+              />
 
             </View>
           </div>

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { TASKS } from './tasks.js';
 import { Panel, PanelHeader, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 
 // ─── Дизайн-токены ────────────────────────────────────────────────────────────
@@ -192,6 +193,14 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
           background: T.gold, boxShadow: `0 0 6px ${T.gold}`,
         }} />
       )}
+      {/* Бейдж акции */}
+      {partner.offer && (
+        <div style={{
+          position: 'absolute', top: 8, right: 8,
+          background: T.green + '22', border: `1px solid ${T.green}55`,
+          borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: T.green,
+        }}>🎁 акция</div>
+      )}
 
       <div style={{ position: 'relative', display: 'inline-block', margin: '0 auto' }}>
         {partner.logoUrl
@@ -309,10 +318,10 @@ function HeroBanner({ userKeys, userName }) {
 
 // ─── Быстрые действия ────────────────────────────────────────────────────────
 
-function QuickActions({ onScan, onShare, onOpenLeaderboard }) {
+function QuickActions({ onScan, onShare, onOpenLeaderboard, onOpenOffers }) {
   const actions = [
     { icon: '📷', label: 'QR-скан',  color: T.blue,  onClick: onScan },
-    { icon: '🎁', label: 'Акции',    color: T.green, onClick: () => {} },
+    { icon: '🎁', label: 'Акции',    color: T.green, onClick: onOpenOffers },
     { icon: '🏆', label: 'Рейтинг', color: T.gold,  onClick: onOpenLeaderboard },
     { icon: '👥', label: 'Позвать', color: T.red,   onClick: onShare },
   ];
@@ -422,11 +431,24 @@ function SkeletonHome() {
 export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [],
   loading = false, error = null,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenLeaderboard, onRetry,
+  completedTasks = [], referralCount = 0,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const taskPreview = useMemo(() => {
+    const statuses = TASKS.map(t => ({
+      ...t,
+      done:  completedTasks.includes(t.id),
+      ready: t.check(userKeys, favorites.length, referralCount) && !completedTasks.includes(t.id),
+      prog:  t.progress ? t.progress(userKeys, favorites.length, referralCount) : 0,
+    }));
+    const claimable  = statuses.filter(s => s.ready);
+    const inProgress = statuses.filter(s => !s.done && !s.ready);
+    return [...claimable, ...inProgress].slice(0, 2);
+  }, [userKeys, favorites.length, referralCount, completedTasks]);
 
   const filteredPartners = partners
     .filter(p => activeCategory === 'all' || p.category === activeCategory)
@@ -474,8 +496,42 @@ export function HomePanel({
             <HeroBanner userKeys={userKeys} userName={user?.first_name} />
 
             <div style={{ padding: '12px 0 4px' }}>
-              <QuickActions onScan={onScan} onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} />
+              <QuickActions onScan={onScan} onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenOffers={onOpenOffers} />
             </div>
+
+            {/* Задания — превью */}
+            {taskPreview.length > 0 && (
+              <div style={{ padding: '20px 16px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>
+                    <span style={{ color: T.gold }}>✦</span> Задания
+                  </div>
+                  <button onClick={onOpenTasks} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: T.gold, fontWeight: 700, padding: 0 }}>
+                    Все →
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {taskPreview.map(t => (
+                    <button key={t.id} onClick={onOpenTasks} style={{ background: t.ready ? 'rgba(201,168,76,0.08)' : T.surface, border: `1px solid ${t.ready ? 'rgba(201,168,76,0.35)' : T.border}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                      <span style={{ fontSize: 22, flexShrink: 0 }}>{t.emoji}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri }}>{t.title}</div>
+                        {t.total && (
+                          <div style={{ marginTop: 5 }}>
+                            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', background: t.ready ? `linear-gradient(90deg, ${T.gold}, ${T.goldL})` : 'rgba(255,255,255,0.2)', borderRadius: 2, width: `${Math.round((t.prog / t.total) * 100)}%`, transition: 'width 0.5s' }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: t.ready ? T.gold : T.textSec, background: t.ready ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>
+                        {t.ready ? '🎁 Забрать' : `+${t.reward} 🗝️`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* События */}
             <div style={{ padding: '20px 16px 8px' }}>

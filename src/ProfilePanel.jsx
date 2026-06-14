@@ -141,7 +141,7 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, onShare }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -300,6 +300,38 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             </div>
           : <div>{favoritePartners.map(p => <FavoriteCard key={p.id} partner={p} onOpen={onOpenPartner} onRemove={onToggleFavorite} />)}</div>
         }
+      </div>
+
+      {/* ── Реферальная программа ── */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Реферальная программа</div>
+        <div style={{ background: T.surface, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+          {/* Статистика если есть рефералы */}
+          {referralCount > 0 && (
+            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 16 }}>
+              <div style={{ textAlign: 'center', flex: 1 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.textPri }}>{referralCount}</div>
+                <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>
+                  {referralCount === 1 ? 'друг' : referralCount < 5 ? 'друга' : 'друзей'}
+                </div>
+              </div>
+              <div style={{ width: 1, background: T.border }} />
+              <div style={{ textAlign: 'center', flex: 1 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.gold }}>{referralCount * 2} 🗝️</div>
+                <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>заработано</div>
+              </div>
+            </div>
+          )}
+          {/* Кнопка приглашения */}
+          <button onClick={onShare} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(75,179,75,0.12)', border: '1px solid rgba(75,179,75,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>👥</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, color: T.textPri, fontWeight: 600 }}>Пригласить друга</div>
+              <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>+2 ключа за каждого</div>
+            </div>
+            <span style={{ color: T.textSec, fontSize: 16 }}>›</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Настройки ── */}
