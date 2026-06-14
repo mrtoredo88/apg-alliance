@@ -27,12 +27,18 @@ const GLASS = {
 };
 
 const CATEGORIES = [
-  { id: 'all',    label: 'Все',         emoji: '✦' },
-  { id: 'food',   label: 'Еда',         emoji: '🍽' },
-  { id: 'beauty', label: 'Красота',     emoji: '💄' },
-  { id: 'sport',  label: 'Спорт',       emoji: '💪' },
-  { id: 'edu',    label: 'Обучение',    emoji: '📚' },
-  { id: 'fun',    label: 'Развлечения', emoji: '🎉' },
+  { id: 'all',     label: 'Все',          emoji: '✦' },
+  { id: 'food',    label: 'Еда',          emoji: '🍽' },
+  { id: 'beauty',  label: 'Красота',      emoji: '💄' },
+  { id: 'health',  label: 'Здоровье',     emoji: '💊' },
+  { id: 'sport',   label: 'Спорт',        emoji: '💪' },
+  { id: 'edu',     label: 'Обучение',     emoji: '📚' },
+  { id: 'fun',     label: 'Развлечения',  emoji: '🎉' },
+  { id: 'shop',    label: 'Магазины',     emoji: '🛍️' },
+  { id: 'auto',    label: 'Авто',         emoji: '🚗' },
+  { id: 'home',    label: 'Дом',          emoji: '🏠' },
+  { id: 'kids',    label: 'Дети',         emoji: '👶' },
+  { id: 'service', label: 'Сервис',       emoji: '🔧' },
 ];
 
 // ─── Модальное окно события ───────────────────────────────────────────────────
@@ -316,24 +322,24 @@ function HeroBanner({ userKeys, userName }) {
 
         {/* Ключи */}
         <div style={{
-          background: 'rgba(255,255,255,0.06)',
+          background: 'rgba(0,0,0,0.25)',
           borderRadius: 14, padding: '12px 14px',
-          border: `1px solid rgba(201,168,76,0.2)`,
+          border: `1px solid rgba(201,168,76,0.25)`,
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 16 }}>🗝️</span>
               <span style={{ color: T.white, fontSize: 15, fontWeight: 700 }}>{userKeys} ключей</span>
             </div>
-            <span style={{ color: T.textSec, fontSize: 12 }}>из {MAX_KEYS}</span>
+            <span style={{ color: 'rgba(240,240,240,0.6)', fontSize: 12, fontWeight: 600 }}>из {MAX_KEYS}</span>
           </div>
           {/* Прогресс */}
-          <div style={{ height: 5, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{
               height: '100%', width: `${progress}%`,
               background: `linear-gradient(90deg, ${T.gold}, ${T.goldL})`,
-              borderRadius: 3, transition: 'width 0.4s ease',
-              boxShadow: `0 0 8px ${T.gold}88`,
+              borderRadius: 4, transition: 'width 0.6s ease',
+              boxShadow: `0 0 10px ${T.gold}aa`,
             }} />
           </div>
         </div>
@@ -633,12 +639,15 @@ export function HomePanel({
                     <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{
                       padding: '7px 14px', borderRadius: 20, cursor: 'pointer',
                       whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700,
-                      ...(activeCategory === cat.id ? {} : GLASS),
                       background: activeCategory === cat.id
                         ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
-                        : undefined,
-                      color: activeCategory === cat.id ? '#0F0F1A' : T.textSec,
-                      border: activeCategory === cat.id ? 'none' : undefined,
+                        : 'rgba(255,255,255,0.08)',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                      color: activeCategory === cat.id ? '#0F0F1A' : 'rgba(240,240,240,0.82)',
+                      border: activeCategory === cat.id
+                        ? 'none'
+                        : '1px solid rgba(255,255,255,0.16)',
                     }}>
                       {cat.emoji} {cat.label}
                     </button>
