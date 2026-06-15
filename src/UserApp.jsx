@@ -25,7 +25,7 @@ const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ def
 const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ default: m.RewardsPage })));
 const MapPage         = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
 
-const T = { bg: '#0F0F1A', gold: '#C9A84C', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
+const T = { bg: '#0F0F1A', gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
 
 function LazyFallback() {
   return (
@@ -269,25 +269,104 @@ export function UserApp() {
 
   // ─── TabBar ─────────────────────────────────────────────────────────────────
 
+  const TabHomeIcon    = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z"
+        fill={active ? T.gold : 'none'} stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+  const TabOffersIcon  = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="7" width="20" height="14" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M16 7V5C16 3.9 15.1 3 14 3H10C8.9 3 8 3.9 8 5V7" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M12 12V16M10 14H14" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+  const TabTasksIcon   = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="18" height="18" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M8 12L11 15L16 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  const TabProfileIcon = ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+
+  const TAB_PANELS = ['home', 'offers', null, 'tasks', 'profile'];
+  const pillIdx    = isScannerOpen ? -1 : TAB_PANELS.indexOf(activePanel);
+
+  const TABS = [
+    { id: 'home',    label: 'Главная', icon: TabHomeIcon },
+    { id: 'offers',  label: 'Акции',   icon: TabOffersIcon },
+    { id: null,      label: 'Скан',    icon: null },
+    { id: 'tasks',   label: 'Задания', icon: TabTasksIcon },
+    { id: 'profile', label: 'Профиль', icon: TabProfileIcon },
+  ];
+
   const TabBar = () => (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#0F0F1A', borderTop: `1px solid ${T.border}`, display: 'flex', zIndex: 100 }}>
-      {[
-        { id: 'home',    icon: '⌂', label: 'Главная' },
-        { id: 'scan',    icon: '◎', label: 'Скан' },
-        { id: 'profile', icon: '○', label: 'Профиль' },
-      ].map(item => (
-        <button key={item.id}
-          onClick={() => item.id === 'scan' ? setIsScannerOpen(true) : goPanel(item.id)}
-          style={{
-            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 3, color: activePanel === item.id ? T.gold : T.textSec,
-            fontSize: 9, fontWeight: 700, padding: 0, letterSpacing: 0.5, textTransform: 'uppercase',
-          }}>
-          <span style={{ fontSize: 20, filter: activePanel === item.id ? `drop-shadow(0 0 6px ${T.gold}88)` : 'none' }}>{item.icon}</span>
-          {item.label}
-        </button>
-      ))}
+    <div style={{
+      position: 'fixed', bottom: 0,
+      left: '50%', transform: 'translateX(-50%)',
+      width: '100%', maxWidth: 480, height: 62,
+      background: 'rgba(8,8,24,0.9)',
+      backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+      borderTop: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex', alignItems: 'stretch',
+      zIndex: 100, overflow: 'visible',
+    }}>
+      {/* Скользящий pill */}
+      {pillIdx >= 0 && pillIdx !== 2 && (
+        <div style={{
+          position: 'absolute', top: 7, height: 44,
+          left: `calc(${pillIdx * 20}% + 6px)`,
+          width: 'calc(20% - 12px)',
+          background: 'rgba(201,168,76,0.1)',
+          border: '1px solid rgba(201,168,76,0.2)',
+          borderRadius: 14,
+          transition: 'left 0.35s cubic-bezier(0.34, 1.4, 0.64, 1)',
+          pointerEvents: 'none',
+        }} />
+      )}
+
+      {TABS.map((tab, i) => {
+        if (i === 2) return (
+          <button key="scan" onClick={() => setIsScannerOpen(true)}
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
+            <div style={{
+              width: 50, height: 50, marginTop: -14, borderRadius: '50%',
+              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+              boxShadow: isScannerOpen ? 'none' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px rgba(8,8,24,0.9), 0 0 0 5px rgba(201,168,76,0.25)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#0F0F1A',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
+            }}>◎</div>
+            <span style={{ fontSize: 9, fontWeight: 700, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 3 }}>Скан</span>
+          </button>
+        );
+
+        const isActive = activePanel === tab.id && !isScannerOpen;
+        const Icon     = tab.icon;
+        const hasNotif = tab.id === 'profile' && unreadCount > 0;
+
+        return (
+          <button key={tab.id}
+            onClick={() => goPanel(tab.id)}
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 0, position: 'relative', zIndex: 1 }}>
+            <div style={{ position: 'relative' }}>
+              <Icon active={isActive} />
+              {hasNotif && (
+                <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
+              )}
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, transition: 'color 0.2s' }}>
+              {tab.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -297,7 +376,14 @@ export function UserApp() {
     <ConfigProvider appearance="dark">
       <AdaptivityProvider>
         <AppRoot>
-          <div style={{ paddingBottom: 60, minHeight: '100vh', background: T.bg }}>
+          {/* Depth orbs — liquid glass background */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: '#08081A', overflow: 'hidden', pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', top: '-25%', left: '-20%', width: 450, height: 450, borderRadius: '50%', background: 'radial-gradient(circle, rgba(90,70,200,0.14) 0%, transparent 70%)' }} />
+            <div style={{ position: 'absolute', top: '30%', right: '-20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
+            <div style={{ position: 'absolute', bottom: '-10%', left: '10%', width: 420, height: 350, borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,50,180,0.11) 0%, transparent 70%)' }} />
+          </div>
+
+          <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 62, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
