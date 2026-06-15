@@ -26,12 +26,19 @@ const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ def
 const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ default: m.RewardsPage })));
 const MapPage         = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
 
-const T = { bg: '#0F0F1A', gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.35)', border: 'rgba(255,255,255,0.07)' };
+function formatCacheAge(ts) {
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1)  return 'только что';
+  if (mins < 60) return `${mins} мин назад`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24)  return `${hrs} ч назад`;
+  return `${Math.round(hrs / 24)} д назад`;
+}
 
 function LazyFallback() {
   return (
-    <div style={{ background: T.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontSize: 13, color: T.textSec }}>Загрузка...</div>
+    <div style={{ background: 'var(--c-bg, #0F0F1A)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ fontSize: 13, color: 'var(--c-text-sec, rgba(240,240,240,0.35))' }}>Загрузка...</div>
     </div>
   );
 }
@@ -72,6 +79,11 @@ export function UserApp() {
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
   const [recentReviews, setRecentReviews]       = useState([]);
   const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
+  const [appearance, setAppearance]             = useState('dark');
+  const [cacheTs, setCacheTs]                   = useState(() => {
+    const v = localStorage.getItem('apg_cache_ts');
+    return v ? Number(v) : null;
+  });
 
   // Реферальный параметр из URL (разовое чтение при монтировании)
   const pendingRefId = useMemo(() => {
@@ -93,17 +105,33 @@ export function UserApp() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // VK статусбар — обновляем CSS-переменную --safe-top
+  // VK статусбар + тема — обновляем CSS-переменные
   useEffect(() => {
     const handler = ({ detail }) => {
       if (detail?.type === 'VKWebAppUpdateConfig') {
         const top = detail.data?.insets?.top ?? 0;
         document.documentElement.style.setProperty('--safe-top', `${top}px`);
+
+        const scheme = detail.data?.scheme ?? '';
+        const isLight = scheme === 'bright_light' || scheme === 'vkcom_light';
+        const newAppearance = isLight ? 'light' : 'dark';
+        setAppearance(newAppearance);
+        document.documentElement.setAttribute('data-theme', newAppearance);
       }
     };
     vkBridge.subscribe(handler);
     return () => vkBridge.unsubscribe(handler);
   }, []);
+
+  const T = useMemo(() => ({
+    bg:           appearance === 'light' ? '#F0F2F5'               : '#0F0F1A',
+    gold:         '#C9A84C',
+    goldL:        '#E8C97A',
+    textSec:      appearance === 'light' ? 'rgba(28,27,30,0.45)'   : 'rgba(240,240,240,0.35)',
+    border:       appearance === 'light' ? 'rgba(0,0,0,0.09)'      : 'rgba(255,255,255,0.07)',
+    tabbarBg:     appearance === 'light' ? 'rgba(232,234,240,0.85)' : 'rgba(12,12,30,0.55)',
+    tabbarBorder: appearance === 'light' ? 'rgba(0,0,0,0.1)'       : 'rgba(255,255,255,0.14)',
+  }), [appearance]);
 
   // Авторотация партнёра дня: admin-set имеет приоритет, иначе — по дню
   const enrichedPartners = useMemo(() => {
@@ -139,6 +167,10 @@ export function UserApp() {
     try {
       const cachedN = localStorage.getItem('apg_news_cache');
       if (cachedN) setNews(JSON.parse(cachedN));
+    } catch {}
+    try {
+      const cachedNt = localStorage.getItem('apg_notif_cache');
+      if (cachedNt) setNotifications(JSON.parse(cachedNt));
     } catch {}
 
     try {
@@ -192,6 +224,11 @@ export function UserApp() {
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
+      try { localStorage.setItem('apg_notif_cache', JSON.stringify(notifList)); } catch {}
+
+      const nowTs = Date.now();
+      try { localStorage.setItem('apg_cache_ts', String(nowTs)); } catch {}
+      if (isMounted.current) setCacheTs(nowTs);
 
       const lastSeen = localStorage.getItem('apg_notif_seen');
       const lastSeenDate = lastSeen ? new Date(Number(lastSeen)) : null;
@@ -583,9 +620,9 @@ export function UserApp() {
       position: 'fixed', bottom: 16,
       left: '50%', transform: 'translateX(-50%)',
       width: 'calc(100% - 32px)', maxWidth: 448, height: 62,
-      background: 'rgba(12,12,30,0.55)',
+      background: T.tabbarBg,
       backdropFilter: 'blur(28px) saturate(2)', WebkitBackdropFilter: 'blur(28px) saturate(2)',
-      border: '1px solid rgba(255,255,255,0.14)',
+      border: `1px solid ${T.tabbarBorder}`,
       borderRadius: 36,
       boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1)',
       display: 'flex', alignItems: 'stretch',
@@ -647,7 +684,7 @@ export function UserApp() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <ConfigProvider appearance="dark">
+    <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
         <AppRoot>
           <div
@@ -677,7 +714,7 @@ export function UserApp() {
             {/* Offline-баннер */}
             {!isOnline && (
               <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: 'rgba(230,70,70,0.95)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', backdropFilter: 'blur(12px)' }}>
-                📵 Нет интернета — данные могут быть устаревшими
+                📵 Нет интернета{cacheTs ? ` — данные от ${formatCacheAge(cacheTs)}` : ' — данные могут быть устаревшими'}
               </div>
             )}
 

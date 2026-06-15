@@ -1,5 +1,17 @@
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
+
+  /* Theme colors — dark by default */
+  --c-bg:            #08081A;
+  --c-text:          #F0F0F0;
+  --c-text-sec:      rgba(240,240,240,0.45);
+  --c-border:        rgba(255,255,255,0.08);
+  --c-surface:       rgba(255,255,255,0.05);
+  --c-tabbar-bg:     rgba(12,12,30,0.55);
+  --c-tabbar-border: rgba(255,255,255,0.14);
+  --c-orb-top:       rgba(80,60,200,0.5);
+  --c-orb-bot:       rgba(30,50,210,0.45);
+
   --vkui--color_background_app:     transparent;
   --vkui--color_background_content: transparent;
   --vkui--color_text_primary:       #f0f0f0;
@@ -10,20 +22,36 @@
   --vkui--size_border_radius_button--m:      12px;
 }
 
+[data-theme="light"] {
+  --c-bg:            #F0F2F5;
+  --c-text:          #1C1B1E;
+  --c-text-sec:      rgba(28,27,30,0.5);
+  --c-border:        rgba(0,0,0,0.09);
+  --c-surface:       rgba(255,255,255,0.65);
+  --c-tabbar-bg:     rgba(232,234,240,0.85);
+  --c-tabbar-border: rgba(0,0,0,0.1);
+  --c-orb-top:       rgba(120,100,230,0.12);
+  --c-orb-bot:       rgba(100,130,230,0.08);
+
+  --vkui--color_text_primary:       #1C1B1E;
+  --vkui--color_background_content: rgba(255,255,255,0.6);
+  --vkui--color_background_app:     transparent;
+}
+
 html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: #08081A;
+  background: var(--c-bg);
 }
 
 #root {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 50% 0%,   rgba(80,60,200,0.5)  0%, transparent 55%),
-    radial-gradient(ellipse at 50% 100%, rgba(30,50,210,0.45) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 0%,   var(--c-orb-top) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, var(--c-orb-bot) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%),
-    #08081A;
+    var(--c-bg);
   background-attachment: scroll;
 }
 
