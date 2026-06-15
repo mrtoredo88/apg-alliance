@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from '@vkontakte/vk-bridge';
@@ -13,6 +13,7 @@ import { HomePanel }         from './HomePanel.jsx';
 import { PartnerPage }       from './PartnerPage.jsx';
 import { Onboarding }        from './Onboarding.jsx';
 import { NotificationsPage } from './NotificationsPage.jsx';
+import { SplashScreen }      from './SplashScreen.jsx';
 
 // Lazy-loaded pages (рендерят <Panel> внутри себя)
 const EventsPage      = lazy(() => import('./EventsPage.jsx').then(m => ({ default: m.EventsPage })));
@@ -35,6 +36,9 @@ function LazyFallback() {
 }
 
 export function UserApp() {
+  const appStartTime                            = useRef(Date.now());
+  const [splashDone, setSplashDone]             = useState(false);
+
   const [activePanel, setActivePanel]           = useState('home');
   const [activePartner, setActivePartner]       = useState(null);
 
@@ -438,6 +442,14 @@ export function UserApp() {
           />
 
           {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+
+          {!splashDone && (
+            <SplashScreen
+              isReady={!loading}
+              onDone={() => setSplashDone(true)}
+              startTime={appStartTime.current}
+            />
+          )}
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>
