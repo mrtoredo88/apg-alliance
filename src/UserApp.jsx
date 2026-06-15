@@ -296,8 +296,9 @@ export function UserApp() {
           <div style={{ paddingBottom: 60, minHeight: '100vh', background: T.bg }}>
             <View activePanel={activePanel}>
 
-              {/* HomePanel рендерит <Panel id="home"> внутри */}
+              {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
               <HomePanel
+                nav="home"
                 user={user} userKeys={userKeys} favorites={favorites}
                 partners={partners} events={events} news={news}
                 loading={loading} error={error}
@@ -316,8 +317,8 @@ export function UserApp() {
                 onOpenNotifications={openNotifications}
               />
 
-              {/* PartnerPage рендерит <Panel id="partner"> внутри */}
               <PartnerPage
+                nav="partner"
                 partner={activePartner}
                 isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
                 onBack={() => goPanel('home')}
@@ -346,63 +347,78 @@ export function UserApp() {
                 />
               </Panel>
 
-              {/* Страницы, рендерящие Panel через nav-проп */}
-              <Suspense fallback={<LazyFallback />}>
-                <EventsPage nav="events" events={events} onBack={() => goPanel('home')} />
-              </Suspense>
+              {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
+              <Panel id="events">
+                <Suspense fallback={<LazyFallback />}>
+                  <EventsPage nav="events" events={events} onBack={() => goPanel('home')} />
+                </Suspense>
+              </Panel>
 
-              <Suspense fallback={<LazyFallback />}>
-                <TasksPage
-                  userKeys={userKeys} favCount={favorites.length}
-                  streak={streak} referralCount={referralCount}
-                  completedTasks={completedTasks}
-                  onBack={() => goPanel('home')}
-                  onClaim={handleClaim}
-                />
-              </Suspense>
+              <Panel id="tasks">
+                <Suspense fallback={<LazyFallback />}>
+                  <TasksPage
+                    userKeys={userKeys} favCount={favorites.length}
+                    streak={streak} referralCount={referralCount}
+                    completedTasks={completedTasks}
+                    onBack={() => goPanel('home')}
+                    onClaim={handleClaim}
+                  />
+                </Suspense>
+              </Panel>
 
-              <Suspense fallback={<LazyFallback />}>
-                <LeaderboardPage
-                  nav="leaderboard"
-                  userKeys={userKeys}
-                  currentUserId={user?.id ? String(user.id) : null}
-                  onBack={() => goPanel('home')}
-                />
-              </Suspense>
+              <Panel id="leaderboard">
+                <Suspense fallback={<LazyFallback />}>
+                  <LeaderboardPage
+                    nav="leaderboard"
+                    userKeys={userKeys}
+                    currentUserId={user?.id ? String(user.id) : null}
+                    onBack={() => goPanel('home')}
+                  />
+                </Suspense>
+              </Panel>
 
-              {/* Страницы с хардкодным Panel id внутри */}
-              <Suspense fallback={<LazyFallback />}>
-                <OffersPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
-              </Suspense>
+              <Panel id="offers">
+                <Suspense fallback={<LazyFallback />}>
+                  <OffersPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                </Suspense>
+              </Panel>
 
-              <Suspense fallback={<LazyFallback />}>
-                <ActivityPage nav="activity" userId={user?.id ? String(user.id) : null} onBack={() => goPanel('profile')} />
-              </Suspense>
+              <Panel id="activity">
+                <Suspense fallback={<LazyFallback />}>
+                  <ActivityPage nav="activity" userId={user?.id ? String(user.id) : null} onBack={() => goPanel('profile')} />
+                </Suspense>
+              </Panel>
 
-              <Suspense fallback={<LazyFallback />}>
-                <ReferralPage
-                  user={user} referralCount={referralCount}
-                  completedTasks={completedTasks}
-                  onBack={() => goPanel('profile')}
-                  onShare={handleShare}
-                />
-              </Suspense>
+              <Panel id="referral">
+                <Suspense fallback={<LazyFallback />}>
+                  <ReferralPage
+                    user={user} referralCount={referralCount}
+                    completedTasks={completedTasks}
+                    onBack={() => goPanel('profile')}
+                    onShare={handleShare}
+                  />
+                </Suspense>
+              </Panel>
 
-              <Suspense fallback={<LazyFallback />}>
-                <RewardsPage
-                  nav="rewards"
-                  user={user} userKeys={userKeys}
-                  onBack={() => goPanel('home')}
-                  onClaim={handleClaim}
-                />
-              </Suspense>
+              <Panel id="rewards">
+                <Suspense fallback={<LazyFallback />}>
+                  <RewardsPage
+                    nav="rewards"
+                    user={user} userKeys={userKeys}
+                    onBack={() => goPanel('home')}
+                    onClaim={handleClaim}
+                  />
+                </Suspense>
+              </Panel>
 
-              <Suspense fallback={<LazyFallback />}>
-                <MapPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
-              </Suspense>
+              <Panel id="map">
+                <Suspense fallback={<LazyFallback />}>
+                  <MapPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                </Suspense>
+              </Panel>
 
-              {/* NotificationsPage рендерит <Panel id="notifications"> внутри */}
               <NotificationsPage
+                nav="notifications"
                 notificationsEnabled={notifEnabled}
                 onEnableNotifications={handleEnableNotifications}
                 lastSeenTs={lastSeenTs}
