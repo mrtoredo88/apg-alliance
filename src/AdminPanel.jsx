@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db } from './firebase';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch, increment } from 'firebase/firestore';
 
 const CATEGORIES = [
   { id: 'food',   label: 'Еда',         emoji: '🍽️' },
@@ -62,6 +62,17 @@ export const AdminPanel = () => {
   const [qrPartner, setQrPartner]           = useState(null);
   const [analytics, setAnalytics]           = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [partnerSearch, setPartnerSearch]   = useState('');
+
+  // Призы
+  const [prizes, setPrizes]               = useState([]);
+  const [editingPrize, setEditingPrize]   = useState(null);
+  const [prName, setPrName]               = useState('');
+  const [prDesc, setPrDesc]               = useState('');
+  const [prCost, setPrCost]               = useState('');
+  const [prEmoji, setPrEmoji]             = useState('🎁');
+  const [prStock, setPrStock]             = useState('');
+  const [prActive, setPrActive]           = useState(true);
 
   // Форма партнёра
   const [pName, setPName] = useState('');
@@ -74,6 +85,7 @@ export const AdminPanel = () => {
   const [pHours, setPHours] = useState('');
   const [pSocial, setPSocial] = useState('');
   const [pOffer, setPOffer] = useState('');
+  const [pStampTarget, setPStampTarget] = useState('');
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -96,6 +108,7 @@ export const AdminPanel = () => {
   const [eDesc, setEDesc] = useState('');
   const [eSocial, setESocial] = useState('');
   const [eAddress, setEAddress] = useState('');
+  const [eDeadline, setEDeadline] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -110,16 +123,18 @@ export const AdminPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pSnap, eSnap, nSnap, ntSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, ntSnap, prSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(() => ({ docs: [] })),
       ]);
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNotifs(ntSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPrizes(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -129,6 +144,7 @@ export const AdminPanel = () => {
   const resetPartnerForm = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
     setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
+    setPStampTarget('');
     setEditingPartner(null);
   };
 
@@ -137,7 +153,7 @@ export const AdminPanel = () => {
     setPName(p.name ?? ''); setPDesc(p.description ?? ''); setPCategory(p.category ?? 'other');
     setPEmoji(p.emoji ?? '🏪'); setPLogo(p.logoUrl ?? ''); setPPhone(p.phone ?? '');
     setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? '');
-    setPOffer(p.offer ?? '');
+    setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
     window.scrollTo(0, 0);
   };
 
@@ -149,6 +165,7 @@ export const AdminPanel = () => {
       categoryLabel: CATEGORIES.find(c => c.id === pCategory)?.label ?? '',
       phone: pPhone.trim(), address: pAddress.trim(),
       hours: pHours.trim(), socialUrl: pSocial.trim(), offer: pOffer.trim(),
+      stampTarget: Number(pStampTarget) || 0,
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
@@ -233,7 +250,7 @@ export const AdminPanel = () => {
 
   const resetEventForm = () => {
     setETitle(''); setEDate(''); setEPartner(''); setEEmoji('🎉');
-    setEDesc(''); setESocial(''); setEAddress('');
+    setEDesc(''); setESocial(''); setEAddress(''); setEDeadline('');
     setEditingEvent(null);
   };
 
@@ -242,6 +259,7 @@ export const AdminPanel = () => {
     setETitle(e.title ?? ''); setEDate(e.date ?? ''); setEPartner(e.partner ?? '');
     setEEmoji(e.emoji ?? '🎉'); setEDesc(e.description ?? '');
     setESocial(e.socialUrl ?? ''); setEAddress(e.address ?? '');
+    setEDeadline(e.deadline ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -251,6 +269,7 @@ export const AdminPanel = () => {
       title: eTitle.trim(), date: eDate.trim(), partner: ePartner.trim(),
       emoji: eEmoji, description: eDesc.trim(),
       socialUrl: eSocial.trim(), address: eAddress.trim(),
+      deadline: eDeadline.trim(),
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
@@ -277,6 +296,87 @@ export const AdminPanel = () => {
     await batch.commit();
     fetchData();
   }, [partners]);
+
+  // ─── Призы ──────────────────────────────────────────────────────────────────
+
+  const PRIZE_EMOJIS = ['🎁','☕','🍕','💆','💄','🎓','🏋️','🎟️','🛍️','🎉','🌿','🍰','🎸','📚','🎨','🤝','🏆','🌟','🎭','💅'];
+
+  const resetPrizeForm = () => {
+    setPrName(''); setPrDesc(''); setPrCost(''); setPrEmoji('🎁');
+    setPrStock(''); setPrActive(true); setEditingPrize(null);
+  };
+
+  const startEditPrize = (p) => {
+    setEditingPrize(p);
+    setPrName(p.name ?? ''); setPrDesc(p.description ?? '');
+    setPrCost(String(p.cost ?? '')); setPrEmoji(p.emoji ?? '🎁');
+    setPrStock(p.stock !== null && p.stock !== undefined ? String(p.stock) : '');
+    setPrActive(p.active !== false);
+    window.scrollTo(0, 0);
+  };
+
+  const savePrize = async () => {
+    if (!prName.trim() || !prCost) return;
+    const data = {
+      name: prName.trim(), description: prDesc.trim(),
+      cost: Number(prCost), emoji: prEmoji,
+      stock: prStock !== '' ? Number(prStock) : null,
+      active: prActive,
+    };
+    if (editingPrize) {
+      await updateDoc(doc(db, 'prizes', editingPrize.id), data);
+    } else {
+      await addDoc(collection(db, 'prizes'), data);
+    }
+    resetPrizeForm();
+    fetchData();
+  };
+
+  const deletePrize = async (id) => {
+    if (!window.confirm('Удалить приз?')) return;
+    await deleteDoc(doc(db, 'prizes', id));
+    fetchData();
+  };
+
+  // ─── Начисление ключей ──────────────────────────────────────────────────────
+
+  const [awardUserId, setAwardUserId] = useState('');
+  const [awardAmount, setAwardAmount] = useState('');
+  const [awardMsg, setAwardMsg]       = useState('');
+
+  const awardKeys = async () => {
+    if (!awardUserId.trim() || !Number(awardAmount)) return;
+    setAwardMsg('Начисляем...');
+    try {
+      await updateDoc(doc(db, 'users', awardUserId.trim()), { keys: increment(Number(awardAmount)) });
+      setAwardMsg(`✅ +${awardAmount} ключей начислено`);
+      setAwardUserId(''); setAwardAmount('');
+    } catch { setAwardMsg('❌ Ошибка — проверьте ID'); }
+    setTimeout(() => setAwardMsg(''), 3000);
+  };
+
+  const exportCSV = () => {
+    if (!analytics?.users?.length) return;
+    const header = ['ID', 'Имя', 'Ключи', 'Стрик', 'Партнёров посещено', 'Задач выполнено', 'Рефералов'];
+    const rows = analytics.users.map(u => [
+      u.id,
+      u.name ?? '',
+      u.keys ?? 0,
+      u.streak ?? 0,
+      Object.keys(u.scannedPartners ?? {}).length,
+      Array.isArray(u.completedTasks) ? u.completedTasks.length : (u.tasksCompleted ?? 0),
+      u.referrals ?? 0,
+    ]);
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `apg_users_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  };
 
   // ─── Аналитика ──────────────────────────────────────────────────────────────
 
@@ -305,7 +405,7 @@ export const AdminPanel = () => {
         .map(p => ({ ...p, visits: visitCounts[p.id] ?? 0 }))
         .sort((a, b) => b.visits - a.visits);
 
-      setAnalytics({ totalUsers, totalKeys, avgKeys, activeUsers, partnerStats });
+      setAnalytics({ totalUsers, totalKeys, avgKeys, activeUsers, partnerStats, users });
     } catch (e) { console.error(e); }
     setAnalyticsLoading(false);
   }, [partners, analyticsLoading]);
@@ -323,6 +423,7 @@ export const AdminPanel = () => {
           { id: 'events',   label: `🎉 События (${events.length})` },
           { id: 'news',     label: `📢 Новости (${news.length})` },
           { id: 'notifs',   label: `🔔 Уведомления` },
+          { id: 'prizes',   label: `🎁 Призы (${prizes.length})` },
           { id: 'analytics',label: '📊 Аналитика' },
         ].map(t => (
           <button key={t.id}
@@ -348,6 +449,9 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
             <input style={s.input} placeholder="Скидка 10% на первый визит" value={pOffer} onChange={e => setPOffer(e.target.value)} />
+
+            <label style={s.label}>Штамп-карта: посещений до награды (0 = выключено) 🎟️</label>
+            <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={pStampTarget} onChange={e => setPStampTarget(e.target.value)} />
 
             <label style={s.label}>Категория</label>
             <select style={s.select} value={pCategory} onChange={e => setPCategory(e.target.value)}>
@@ -382,10 +486,30 @@ export const AdminPanel = () => {
           </div>
 
           <div style={s.card}>
-            <h2 style={s.h2}>Все партнёры</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ ...s.h2, margin: 0 }}>Все партнёры</h2>
+              <span style={{ fontSize: 12, color: '#99A2AD' }}>
+                {partnerSearch
+                  ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} из ${partners.length}`
+                  : partners.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f2f3f5', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
+              <span style={{ fontSize: 14, color: '#99A2AD', flexShrink: 0 }}>🔍</span>
+              <input
+                type="search"
+                placeholder="Поиск по названию..."
+                value={partnerSearch}
+                onChange={e => setPartnerSearch(e.target.value)}
+                style={{ background: 'none', border: 'none', outline: 'none', fontSize: 14, flex: 1, color: '#000' }}
+              />
+              {partnerSearch && (
+                <button onClick={() => setPartnerSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#99A2AD', fontSize: 16, padding: 0, flexShrink: 0 }}>✕</button>
+              )}
+            </div>
             {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
               : partners.length === 0 ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет партнёров</p>
-              : partners.map(p => (
+              : partners.filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).map(p => (
                 <div key={p.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     {p.logoUrl
@@ -440,6 +564,9 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Адрес проведения</label>
             <input style={s.input} placeholder="Зеленоград, корпус 1234" value={eAddress} onChange={e => setEAddress(e.target.value)} />
+
+            <label style={s.label}>Дедлайн / конец акции (необязательно) ⏱️</label>
+            <input style={s.input} type="date" value={eDeadline} onChange={e => setEDeadline(e.target.value)} />
 
             <label style={s.label}>Эмодзи события</label>
             <EmojiPicker emojis={EVENT_EMOJIS} value={eEmoji} onChange={setEEmoji} />
@@ -597,6 +724,78 @@ export const AdminPanel = () => {
         </>
       )}
 
+      {/* ── ПРИЗЫ ── */}
+      {activeTab === 'prizes' && (
+        <div>
+          <div style={s.card}>
+            <h2 style={s.h2}>{editingPrize ? `✏️ ${editingPrize.name}` : '➕ Новый приз'}</h2>
+
+            <label style={s.label}>Название *</label>
+            <input style={s.input} placeholder="Кофе в подарок" value={prName} onChange={e => setPrName(e.target.value)} />
+
+            <label style={s.label}>Описание</label>
+            <textarea style={s.textarea} placeholder="Один напиток на выбор в любом заведении-партнёре" value={prDesc} onChange={e => setPrDesc(e.target.value)} />
+
+            <label style={s.label}>Стоимость в ключах *</label>
+            <input style={s.input} type="number" min="1" placeholder="10" value={prCost} onChange={e => setPrCost(e.target.value)} />
+
+            <label style={s.label}>Количество в наличии (пусто = неограничено)</label>
+            <input style={s.input} type="number" min="0" placeholder="50" value={prStock} onChange={e => setPrStock(e.target.value)} />
+
+            <label style={s.label}>Иконка</label>
+            <EmojiPicker emojis={PRIZE_EMOJIS} value={prEmoji} onChange={setPrEmoji} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <label style={{ fontSize: 14, color: '#000', fontWeight: 600, flex: 1 }}>Активен (показывать в магазине)</label>
+              <button
+                onClick={() => setPrActive(v => !v)}
+                style={{ width: 48, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', background: prActive ? '#3F8AE0' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
+              >
+                <div style={{ position: 'absolute', top: 3, left: prActive ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePrize}>
+                {editingPrize ? '💾 Сохранить' : '➕ Добавить'}
+              </button>
+              {editingPrize && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetPrizeForm}>Отмена</button>}
+            </div>
+          </div>
+
+          <div style={s.card}>
+            <h2 style={s.h2}>Все призы</h2>
+            {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
+              : prizes.length === 0
+                ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет призов — добавьте первый</p>
+                : prizes.map(p => (
+                  <div key={p.id} style={s.row}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: p.active ? '#FFF3CD' : '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, filter: p.active ? 'none' : 'grayscale(1) opacity(0.5)' }}>
+                        {p.emoji ?? '🎁'}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: p.active ? '#000' : '#99A2AD', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.name}
+                          {!p.active && <span style={{ fontSize: 11, color: '#99A2AD', fontWeight: 400, marginLeft: 6 }}>скрыт</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                          🗝️ {p.cost} ключей
+                          {p.stock !== null && p.stock !== undefined && ` · ${p.stock} шт.`}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                      <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPrize(p)}>✏️</button>
+                      <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePrize(p.id)}>🗑️</button>
+                    </div>
+                  </div>
+                ))
+            }
+          </div>
+        </div>
+      )}
+
       {/* ── АНАЛИТИКА ── */}
       {activeTab === 'analytics' && (
         <div>
@@ -623,6 +822,49 @@ export const AdminPanel = () => {
                     <div style={{ fontSize: 11, color: '#99A2AD', lineHeight: '14px', marginTop: 2 }}>{stat.label}</div>
                   </div>
                 ))}
+              </div>
+
+              {/* Начисление ключей */}
+              <div style={s.card}>
+                <h2 style={s.h2}>🔑 Начислить ключи</h2>
+                <label style={s.label}>ID пользователя</label>
+                <input
+                  style={s.input}
+                  placeholder="Вставьте UID из Firebase"
+                  value={awardUserId}
+                  onChange={e => setAwardUserId(e.target.value)}
+                />
+                <label style={s.label}>Количество ключей</label>
+                <input
+                  style={s.input}
+                  type="number"
+                  placeholder="Например: 5"
+                  value={awardAmount}
+                  onChange={e => setAwardAmount(e.target.value)}
+                />
+                <button
+                  style={{ ...s.btn, ...s.btnPri, width: '100%' }}
+                  onClick={awardKeys}
+                  disabled={!awardUserId.trim() || !Number(awardAmount)}
+                >
+                  Начислить
+                </button>
+                {awardMsg && (
+                  <p style={{ marginTop: 8, textAlign: 'center', fontSize: 14, color: awardMsg.startsWith('✅') ? '#4CAF50' : '#E64646' }}>
+                    {awardMsg}
+                  </p>
+                )}
+              </div>
+
+              {/* Экспорт */}
+              <div style={s.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h2 style={{ ...s.h2, margin: '0 0 2px' }}>📥 Экспорт пользователей</h2>
+                    <p style={{ margin: 0, fontSize: 13, color: '#99A2AD' }}>{analytics.users.length} записей</p>
+                  </div>
+                  <button style={{ ...s.btn, ...s.btnPri }} onClick={exportCSV}>Скачать CSV</button>
+                </div>
               </div>
 
               {/* Рейтинг партнёров */}

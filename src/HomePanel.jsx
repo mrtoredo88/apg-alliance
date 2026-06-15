@@ -882,7 +882,7 @@ function openVKApp() {
 }
 
 export function HomePanel({
-  user, userKeys = 0, favorites = [], partners = [], events = [], news = [],
+  user, userKeys = 0, favorites = [], partners = [], events = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
@@ -1253,6 +1253,31 @@ export function HomePanel({
                 </div>
               )}
             </div>
+
+            {/* ── Свежие отзывы ── */}
+            {recentReviews.length > 0 && (
+              <div style={{ margin: '4px 16px' }}>
+                <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Свежие отзывы</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {recentReviews.slice(0, 5).map(r => (
+                    <div key={r.id} style={{ ...GLASS, borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      {r.userPhoto
+                        ? <img src={r.userPhoto} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
+                      }
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: T.textPri }}>{r.userName ?? 'Участник АПГ'}</span>
+                          <span style={{ fontSize: 11, color: '#FFD700', letterSpacing: 0.5 }}>{'★'.repeat(r.stars ?? 0)}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: T.gold, marginBottom: r.text ? 4 : 0 }}>📍 {r.partnerName}</div>
+                        {r.text && <div style={{ fontSize: 12, color: T.textSec, lineHeight: '17px' }}>{r.text}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Футер */}
             <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>

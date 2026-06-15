@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge from './vk.js';
-import { db } from './firebase';
+import { db, auth } from './firebase';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
@@ -53,6 +54,7 @@ export function UserApp() {
   const [streak, setStreak]                     = useState(0);
   const [lastScanDate, setLastScanDate]         = useState(null);
   const [referralCount, setReferralCount]       = useState(0);
+  const [visitCounts, setVisitCounts]           = useState({});
 
   const [unreadCount, setUnreadCount]           = useState(0);
   const [notifEnabled, setNotifEnabled]         = useState(
@@ -67,20 +69,62 @@ export function UserApp() {
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [showOnboarding, setShowOnboarding]     = useState(false);
+  const [isOnline, setIsOnline]                 = useState(navigator.onLine);
+  const [recentReviews, setRecentReviews]       = useState([]);
+  const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
+
+  // Реферальный параметр из URL (разовое чтение при монтировании)
+  const pendingRefId = useMemo(() => {
+    const fromHash   = window.location.hash.match(/^#ref_(\w+)/)?.[1];
+    const fromSearch = new URLSearchParams(window.location.search).get('ref');
+    return fromHash ?? fromSearch ?? null;
+  }, []);
 
   const haptic = useCallback((style = 'light') => {
     vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
   }, []);
+
+  // Offline/online detection
+  useEffect(() => {
+    const on  = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online',  on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  // Авторотация партнёра дня: admin-set имеет приоритет, иначе — по дню
+  const enrichedPartners = useMemo(() => {
+    if (!partners.length) return partners;
+    const hasAdminFeatured = partners.some(p => p.featured);
+    if (hasAdminFeatured) return partners;
+    const dayIdx = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    const featuredId = partners[dayIdx % partners.length].id;
+    return partners.map(p => ({ ...p, featured: p.id === featuredId }));
+  }, [partners]);
 
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
   const loadData = useCallback(async (isMounted) => {
     setLoading(true); setError(null);
 
-    // Показываем закэшированных партнёров сразу (без мерцания)
+    // Анонимный вход в Firebase (нужен для Firestore Security Rules)
+    if (!auth.currentUser) {
+      await signInAnonymously(auth).catch(() => {});
+    }
+
+    // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
     try {
       const cached = localStorage.getItem('apg_partners_cache');
       if (cached) setPartners(JSON.parse(cached));
+    } catch {}
+    try {
+      const cachedE = localStorage.getItem('apg_events_cache');
+      if (cachedE) setEvents(JSON.parse(cachedE));
+    } catch {}
+    try {
+      const cachedN = localStorage.getItem('apg_news_cache');
+      if (cachedN) setNews(JSON.parse(cachedN));
     } catch {}
 
     try {
@@ -100,19 +144,38 @@ export function UserApp() {
       if (!isMounted.current) return;
       setUser(userData);
 
-      const [pSnap, eSnap, nSnap, notifSnap] = await Promise.all([
+      const isGuest = String(userData.id).startsWith('guest_');
+      // auth_map нужно создать ДО getDoc(userRef) — isOwner() проверяет его наличие
+      if (!isGuest && auth.currentUser) {
+        await setDoc(
+          doc(db, 'auth_map', auth.currentUser.uid),
+          { vkId: String(userData.id) },
+          { merge: true },
+        ).catch(() => {});
+      }
+
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
       ]);
 
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
-      setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const freshEvents = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setEvents(freshEvents);
+      try { localStorage.setItem('apg_events_cache', JSON.stringify(freshEvents)); } catch {}
+
+      const freshNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setNews(freshNews);
+      try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
+
+      setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
 
@@ -127,6 +190,7 @@ export function UserApp() {
       }).length;
       setUnreadCount(unread);
 
+      if (!isGuest) {
       const userRef = doc(db, 'users', String(userData.id));
       const docSnap = await getDoc(userRef);
       if (!isMounted.current) return;
@@ -150,6 +214,7 @@ export function UserApp() {
         setLastScanDate(data.lastScanDate ?? null);
         setReferralCount(data.referralCount ?? 0);
         setScanDates(data.scanDates ?? []);
+        setVisitCounts(data.visitCounts ?? {});
         if (!data.onboardingDone) setShowOnboarding(true);
 
         // Ежедневный бонус: +1 ключ за первый вход каждый день
@@ -161,21 +226,45 @@ export function UserApp() {
           updateDoc(userRef, profilePatch).catch(() => {});
         }
       } else {
+        // Новый пользователь
+        const isRealUser = !String(userData.id).startsWith('guest_');
+        const refId = isRealUser ? pendingRefId : null;
+
         await setDoc(userRef, {
-          keys: 0, favorites: [], scannedPartners: {},
+          keys: refId ? 2 : 0,          // +2 за переход по реферальной ссылке
+          favorites: [], scannedPartners: {},
           completedTasks: [], streak: 0, onboardingDone: false,
           scanDates: [], lastBonusDate: todayKey,
+          referredBy: refId ?? null,
           ...profilePatch,
         });
+
+        if (refId && refId !== String(userData.id)) {
+          // Начисляем рефереру +2 ключа и +1 к счётчику
+          updateDoc(doc(db, 'users', refId), {
+            keys: increment(2),
+            referralCount: increment(1),
+          }).catch(() => {});
+          if (isMounted.current) {
+            setTimeout(() => {
+              setToast({ msg: '🎁 +2 ключа — ты пришёл по реферальной ссылке!', type: 'success' });
+              setTimeout(() => setToast(null), 4000);
+            }, 1800);
+          }
+        }
+
+        if (refId) setUserKeys(2);
         setShowOnboarding(true);
       }
+
+      } // end if (!isGuest)
     } catch (e) {
       console.error(e);
       if (isMounted.current) setError('Не удалось загрузить данные.');
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, []);
+  }, [pendingRefId]);
 
   useEffect(() => {
     const isMounted = { current: true };
@@ -258,7 +347,11 @@ export function UserApp() {
     const newScanDates = scanDates.includes(todayKey)
       ? scanDates
       : [...scanDates.slice(-89), todayKey]; // храним последние 90 дат
-    const updateData = { lastScanDate: todayKey, streak: newStreak, scanDates: newScanDates };
+    const newVisitCount = (visitCounts[partner.id] ?? 0) + 1;
+    const updateData = {
+      lastScanDate: todayKey, streak: newStreak, scanDates: newScanDates,
+      [`visitCounts.${partner.id}`]: increment(1),
+    };
 
     if (!alreadyHasKey) {
       updateData.keys = increment(keyBonus);
@@ -270,7 +363,15 @@ export function UserApp() {
       setLastScanDate(todayKey);
       setStreak(newStreak);
       setScanDates(newScanDates);
+      setVisitCounts(prev => ({ ...prev, [partner.id]: newVisitCount }));
       haptic('medium');
+      if (!alreadyHasKey) {
+        setKeyBurst({ amount: keyBonus, id: Date.now() });
+      }
+      // Штамп-карта завершена
+      if (partner.stampTarget > 0 && newVisitCount === partner.stampTarget) {
+        setTimeout(() => showToast(`🎟️ Штамп-карта заполнена! Покажи это сотруднику ${partner.name}`, 'success'), 800);
+      }
       if (!alreadyHasKey) {
         setUserKeys(prev => prev + keyBonus);
         setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
@@ -327,6 +428,26 @@ export function UserApp() {
     } catch (e) { console.error(e); }
   }, [user, completedTasks]);
 
+  const handlePrizeClaim = useCallback(async (prize) => {
+    if (!user || !prize) return false;
+    if (userKeys < prize.cost) return false;
+    try {
+      const batch = [];
+      batch.push(updateDoc(doc(db, 'users', String(user.id)), { keys: increment(-prize.cost) }));
+      batch.push(addDoc(collection(db, 'users', String(user.id), 'claims'), {
+        prizeId: prize.id, prizeName: prize.name,
+        prizeEmoji: prize.emoji ?? '🎁', cost: prize.cost,
+        claimedAt: serverTimestamp(),
+      }));
+      if (prize.stock !== null && prize.stock !== undefined) {
+        batch.push(updateDoc(doc(db, 'prizes', prize.id), { stock: increment(-1) }));
+      }
+      await Promise.all(batch);
+      setUserKeys(prev => prev - prize.cost);
+      return true;
+    } catch (e) { console.error(e); return false; }
+  }, [user, userKeys]);
+
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
   const handleLogout = useCallback(() => {
@@ -351,6 +472,31 @@ export function UserApp() {
       text: 'Присоединяйся к АПГ — Альянсу Партнёров Зеленограда! 🔑',
     }).catch(() => {});
   }, []);
+
+  // ─── Свайп-навигация между основными табами ─────────────────────────────────
+
+  const SWIPE_TABS = ['home', 'offers', 'tasks', 'profile'];
+  const swipeTouchX  = useRef(null);
+  const swipeTouchY  = useRef(null);
+
+  const handleSwipeStart = useCallback((e) => {
+    swipeTouchX.current = e.touches[0].clientX;
+    swipeTouchY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleSwipeEnd = useCallback((e) => {
+    if (swipeTouchX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeTouchX.current;
+    const dy = e.changedTouches[0].clientY - swipeTouchY.current;
+    swipeTouchX.current = null;
+    swipeTouchY.current = null;
+    // Только горизонтальные свайпы > 90px при вертикальном сдвиге < 60px
+    if (Math.abs(dx) < 90 || Math.abs(dy) > 60) return;
+    const idx = SWIPE_TABS.indexOf(activePanel);
+    if (idx === -1) return;          // не на основном табе
+    if (dx < 0 && idx < SWIPE_TABS.length - 1) { haptic('light'); goPanel(SWIPE_TABS[idx + 1]); }
+    if (dx > 0 && idx > 0)                      { haptic('light'); goPanel(SWIPE_TABS[idx - 1]); }
+  }, [activePanel, haptic]);
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
@@ -488,14 +634,45 @@ export function UserApp() {
     <ConfigProvider appearance="dark">
       <AdaptivityProvider>
         <AppRoot>
-          <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+          <div
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1 }}
+            onTouchStart={handleSwipeStart}
+            onTouchEnd={handleSwipeEnd}
+          >
+
+            {/* Анимация получения ключа */}
+            {keyBurst && (
+              <div
+                key={keyBurst.id}
+                onAnimationEnd={() => setKeyBurst(null)}
+                style={{
+                  position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+                  zIndex: 9998, pointerEvents: 'none',
+                  fontSize: 28, fontWeight: 900, color: '#C9A84C',
+                  textShadow: '0 0 20px rgba(201,168,76,0.8)',
+                  animation: 'keyFlyUp 1.1s cubic-bezier(0.2,0.8,0.4,1) forwards',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                +{keyBurst.amount} 🗝️
+              </div>
+            )}
+
+            {/* Offline-баннер */}
+            {!isOnline && (
+              <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: 'rgba(230,70,70,0.95)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', backdropFilter: 'blur(12px)' }}>
+                📵 Нет интернета — данные могут быть устаревшими
+              </div>
+            )}
+
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
               <HomePanel
                 nav="home"
                 user={user} userKeys={userKeys} favorites={favorites}
-                partners={partners} events={events} news={news}
+                partners={enrichedPartners} events={events} news={news}
+                recentReviews={recentReviews}
                 loading={loading} error={error}
                 streak={streak} lastScanDate={lastScanDate}
                 completedTasks={completedTasks} referralCount={referralCount}
@@ -520,9 +697,10 @@ export function UserApp() {
                 onBack={() => goPanel('home')}
                 onToggleFavorite={toggleFavorite}
                 onOpenPartner={openPartner}
-                partners={partners}
+                partners={enrichedPartners}
                 user={user}
                 scannedPartnerIds={scannedPartnerIds}
+                visitCounts={visitCounts}
                 onPartnerUpdate={handlePartnerUpdate}
               />
 
@@ -530,7 +708,7 @@ export function UserApp() {
               <Panel id="profile">
                 <ProfilePanel
                   user={user} userKeys={userKeys} favorites={favorites}
-                  partners={partners} referralCount={referralCount}
+                  partners={enrichedPartners} referralCount={referralCount}
                   streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
                   completedTasks={completedTasks} scanDates={scanDates}
                   notificationsEnabled={notifEnabled}
@@ -578,7 +756,7 @@ export function UserApp() {
 
               <Panel id="offers">
                 <Suspense fallback={<LazyFallback />}>
-                  <OffersPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                  <OffersPage partners={enrichedPartners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
                 </Suspense>
               </Panel>
 
@@ -605,7 +783,7 @@ export function UserApp() {
                     nav="rewards"
                     user={user} userKeys={userKeys}
                     onBack={() => goPanel('home')}
-                    onClaim={handleClaim}
+                    onClaim={handlePrizeClaim}
                   />
                 </Suspense>
               </Panel>

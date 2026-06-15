@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Panel } from '@vkontakte/vkui';
 
 import { T, GLASS, GLASS_STRONG } from './design.js';
@@ -10,6 +10,43 @@ const GRADIENTS = [
   'linear-gradient(135deg, #2a1a3a, #5a2d7a)',
   'linear-gradient(135deg, #1a3a3a, #2d7a6a)',
 ];
+
+function useCountdown(deadline) {
+  const getRemaining = () => {
+    if (!deadline) return null;
+    const ms = new Date(deadline + 'T23:59:59').getTime() - Date.now();
+    if (ms <= 0) return null;
+    const d = Math.floor(ms / 86400000);
+    const h = Math.floor((ms % 86400000) / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return { d, h, m, ms };
+  };
+  const [remaining, setRemaining] = useState(getRemaining);
+  useEffect(() => {
+    if (!deadline) return;
+    const t = setInterval(() => setRemaining(getRemaining()), 60000);
+    return () => clearInterval(t);
+  }, [deadline]);
+  return remaining;
+}
+
+function CountdownChip({ deadline }) {
+  const rem = useCountdown(deadline);
+  if (!rem) return null;
+  const label = rem.d > 0 ? `${rem.d}д ${rem.h}ч` : rem.h > 0 ? `${rem.h}ч ${rem.m}м` : `${rem.m}м`;
+  const urgent = rem.ms < 86400000 * 3;
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: urgent ? 'rgba(230,70,70,0.18)' : 'rgba(255,140,0,0.15)',
+      border: `1px solid ${urgent ? 'rgba(230,70,70,0.45)' : 'rgba(255,140,0,0.4)'}`,
+      borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700,
+      color: urgent ? '#E64646' : '#FF8C00',
+    }}>
+      ⏱ {label}
+    </div>
+  );
+}
 
 function EventModal({ event, onClose }) {
   if (!event) return null;
@@ -51,6 +88,11 @@ function EventModal({ event, onClose }) {
             </div>
           )}
         </div>
+        {event.deadline && (
+          <div style={{ marginBottom: 16 }}>
+            <CountdownChip deadline={event.deadline} />
+          </div>
+        )}
         {event.description && (
           <div style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 14, padding: 14, marginBottom: 20, border: '1px solid rgba(255,255,255,0.12)' }}>
             <p style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', margin: 0 }}>{event.description}</p>
@@ -116,6 +158,11 @@ function EventListCard({ event, index, onClick }) {
           {event.address && (
             <div style={{ fontSize: 12, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               📍 {event.address}
+            </div>
+          )}
+          {event.deadline && (
+            <div style={{ marginTop: 4 }}>
+              <CountdownChip deadline={event.deadline} />
             </div>
           )}
         </div>

@@ -135,7 +135,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, onPartnerUpdate }) {
+export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -185,6 +185,10 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
         createdAt: serverTimestamp(),
       };
       await setDoc(reviewRef, reviewData);
+      // Также пишем в глобальную коллекцию для фида отзывов на главной
+      setDoc(doc(db, 'reviews', `${partner.id}_${userId}`), {
+        ...reviewData, partnerId: partner.id, partnerName: partner.name,
+      }).catch(() => {});
 
       // Обновляем список отзывов
       const snap = await getDocs(query(
@@ -318,6 +322,44 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             </div>
           </div>
         )}
+
+        {/* Штамп-карта */}
+        {partner.stampTarget > 0 && (() => {
+          const stamps    = visitCounts[partner.id] ?? 0;
+          const target    = partner.stampTarget;
+          const filled    = Math.min(stamps, target);
+          const completed = stamps >= target;
+          return (
+            <div style={{ margin:'12px 16px', borderRadius:24, padding:'16px', background: completed ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.05)', border:`1px solid ${completed ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.1)'}`, backdropFilter:'blur(20px)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div style={{ fontSize:11, color: completed ? T.gold : T.textSec, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
+                  🎟️ Штамп-карта
+                </div>
+                <div style={{ fontSize:12, color: completed ? T.gold : T.textSec, fontWeight:700 }}>
+                  {filled} / {target}
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+                {Array.from({ length: target }, (_, i) => (
+                  <div key={i} style={{
+                    width:34, height:34, borderRadius:10, border:`2px solid ${i < filled ? T.gold : 'rgba(255,255,255,0.15)'}`,
+                    background: i < filled ? `linear-gradient(135deg,${T.gold},${T.goldL})` : 'rgba(255,255,255,0.04)',
+                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0,
+                    transition:'all 0.3s',
+                    boxShadow: i < filled ? `0 0 8px rgba(201,168,76,0.45)` : 'none',
+                  }}>
+                    {i < filled ? '✦' : ''}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:12, color: completed ? T.gold : T.textSec, lineHeight:'17px', fontWeight: completed ? 700 : 400 }}>
+                {completed
+                  ? '🏆 Карта заполнена! Покажи администратору для получения награды'
+                  : `Посети ещё ${target - filled} раз${target - filled === 1 ? '' : 'а'} — и получи особый бонус`}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Фото */}
         {photos.length > 0 && (

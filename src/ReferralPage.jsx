@@ -3,6 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { T, GLASS } from './design.js';
+import vkBridge from './vk.js';
 
 const APP_ID = 54601851;
 
@@ -25,12 +26,19 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(refLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await vkBridge.send('VKWebAppCopyText', { text: refLink });
     } catch {
-      // fallback: select input text
+      try { await navigator.clipboard.writeText(refLink); } catch {}
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleShare = () => {
+    vkBridge.send('VKWebAppShare', {
+      link: refLink,
+      text: '🗝️ Присоединяйся к АПГ — Альянсу Партнёров Зеленограда! Оба получим по +2 ключа!',
+    }).catch(() => {});
   };
 
   const earnedKeys = referralCount * 2;
@@ -109,7 +117,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
           {/* Кнопки */}
           <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
-              onClick={onShare}
+              onClick={handleShare}
               style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.blue}, #2D6FBC)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               📤 Поделиться в ВКонтакте
