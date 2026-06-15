@@ -655,23 +655,42 @@ export const AdminPanel = () => {
             <label style={s.label}>Дедлайн / конец акции (необязательно) ⏱️</label>
             <input style={s.input} type="date" value={eDeadline} onChange={e => setEDeadline(e.target.value)} />
 
-            <label style={s.label}>🔒 Закрытое мероприятие (требует ключи)</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <input type="checkbox" id="eIsPrivate" checked={eIsPrivate} onChange={e => setEIsPrivate(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-              <label htmlFor="eIsPrivate" style={{ ...s.label, marginBottom: 0, cursor: 'pointer' }}>Закрытый доступ по ключам</label>
+            <div
+              onClick={() => setEIsPrivate(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', borderRadius: 12, marginBottom: 12, cursor: 'pointer',
+                background: eIsPrivate ? '#FFF3CD' : '#f2f3f5',
+                border: `2px solid ${eIsPrivate ? '#FFC107' : '#e0e0e0'}`,
+                transition: 'all 0.2s',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: eIsPrivate ? '#856404' : '#000' }}>🔒 Закрытое мероприятие</div>
+                <div style={{ fontSize: 12, color: eIsPrivate ? '#856404' : '#99A2AD', marginTop: 2 }}>Доступ по ключам АПГ</div>
+              </div>
+              <div style={{
+                width: 44, height: 26, borderRadius: 13, position: 'relative',
+                background: eIsPrivate ? '#FFC107' : '#C8C8C8', transition: 'background 0.2s', flexShrink: 0,
+              }}>
+                <div style={{
+                  position: 'absolute', top: 3, left: eIsPrivate ? 21 : 3, width: 20, height: 20,
+                  borderRadius: 10, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </div>
             </div>
 
             {eIsPrivate && (
-              <>
-                <label style={s.label}>Минимум ключей для регистрации</label>
-                <input style={s.input} type="number" min="0" placeholder="10" value={eMinKeys} onChange={e => setEMinKeys(e.target.value)} />
+              <div style={{ background: '#FFFBEB', border: '1px solid #FFC107', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
+                <label style={{ ...s.label, color: '#856404' }}>🗝️ Минимум ключей для входа</label>
+                <input style={{ ...s.input, marginBottom: 10 }} type="number" min="0" placeholder="10" value={eMinKeys} onChange={e => setEMinKeys(e.target.value)} />
 
-                <label style={s.label}>Лимит участников (0 = без ограничения)</label>
-                <input style={s.input} type="number" min="0" placeholder="50" value={eMaxParticipants} onChange={e => setEMaxParticipants(e.target.value)} />
+                <label style={{ ...s.label, color: '#856404' }}>👥 Лимит участников (0 = без ограничения)</label>
+                <input style={{ ...s.input, marginBottom: 10 }} type="number" min="0" placeholder="50" value={eMaxParticipants} onChange={e => setEMaxParticipants(e.target.value)} />
 
-                <label style={s.label}>Дата и время мероприятия (для таймера)</label>
-                <input style={s.input} type="datetime-local" value={eEventDate} onChange={e => setEEventDate(e.target.value)} />
-              </>
+                <label style={{ ...s.label, color: '#856404' }}>📅 Дата и время мероприятия (для таймера)</label>
+                <input style={{ ...s.input, marginBottom: 0 }} type="datetime-local" value={eEventDate} onChange={e => setEEventDate(e.target.value)} />
+              </div>
             )}
 
             <label style={s.label}>Эмодзи события</label>
