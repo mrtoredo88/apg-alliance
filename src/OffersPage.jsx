@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
@@ -58,8 +58,56 @@ function OfferCard({ partner, onOpenPartner, index }) {
   );
 }
 
+function PartnerSearchCard({ partner, onOpenPartner, index, query }) {
+  const name = partner.name ?? '';
+  // подсвечиваем совпадение в имени
+  const idx = name.toLowerCase().indexOf(query.toLowerCase());
+  const highlighted = idx >= 0
+    ? <>{name.slice(0, idx)}<mark style={{ background: T.gold + '40', color: T.gold, borderRadius: 3, padding: '0 1px' }}>{name.slice(idx, idx + query.length)}</mark>{name.slice(idx + query.length)}</>
+    : name;
+
+  return (
+    <div style={{
+      ...GLASS,
+      borderRadius: 20, padding: '14px 16px', marginBottom: 10,
+      display: 'flex', alignItems: 'center', gap: 12,
+      animation: 'fadeInUp 0.3s ease both',
+      animationDelay: `${index * 0.04}s`,
+    }}>
+      {partner.logoUrl
+        ? <img src={partner.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid rgba(201,168,76,0.2)`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+        : <div style={{ width: 48, height: 48, borderRadius: '50%', background: T.gold + '15', border: `1.5px solid ${T.gold}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
+      }
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, lineHeight: '18px' }}>{highlighted}</div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+          {partner.categoryLabel && <span style={{ fontSize: 10, color: T.gold, fontWeight: 600 }}>{partner.categoryLabel}</span>}
+          {partner.offer && <span style={{ fontSize: 10, color: T.green, fontWeight: 600 }}>· есть акция</span>}
+        </div>
+      </div>
+      <button onClick={() => onOpenPartner(partner)} style={{
+        padding: '8px 14px', borderRadius: 12, border: 'none', cursor: 'pointer', flexShrink: 0,
+        background: partner.offer
+          ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
+          : 'rgba(255,255,255,0.08)',
+        color: partner.offer ? '#0F0F1A' : T.textPri,
+        fontSize: 12, fontWeight: 700,
+      }}>
+        Открыть
+      </button>
+    </div>
+  );
+}
+
+const CATEGORY_LABELS = {
+  food: '🍽️ Еда', beauty: '💅 Красота', health: '💊 Здоровье',
+  sport: '🏋️ Спорт', retail: '🛍️ Магазины', services: '🔧 Услуги', other: '📦 Прочее',
+};
+
 export function OffersPage({ partners = [], onBack, onOpenPartner }) {
   const [activeCategory, setActiveCategory] = useState('all');
+  const [search, setSearch]                 = useState('');
+  const inputRef                            = useRef(null);
 
   const withOffers = useMemo(() => partners.filter(p => p.offer?.trim()), [partners]);
 
@@ -69,21 +117,23 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
       const cat = p.category || 'other';
       counts[cat] = (counts[cat] || 0) + 1;
     });
-    const labels = {
-      food:     '🍽️ Еда',
-      beauty:   '💅 Красота',
-      health:   '💊 Здоровье',
-      sport:    '🏋️ Спорт',
-      retail:   '🛍️ Магазины',
-      services: '🔧 Услуги',
-      other:    '📦 Прочее',
-    };
     return Object.entries(counts).map(([id, count]) => ({
-      id,
-      label: labels[id] ?? id,
-      count,
+      id, label: CATEGORY_LABELS[id] ?? id, count,
     }));
   }, [withOffers]);
+
+  const isSearching = search.trim().length > 0;
+
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [];
+    const q = search.trim().toLowerCase();
+    return partners.filter(p =>
+      p.name?.toLowerCase().includes(q) ||
+      p.offer?.toLowerCase().includes(q) ||
+      p.categoryLabel?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q)
+    );
+  }, [partners, search, isSearching]);
 
   const filtered = useMemo(() =>
     activeCategory === 'all'
@@ -108,20 +158,49 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
             borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0,
           }}>‹</button>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>
-              ✦ Акции и предложения
+              ✦ Акции и партнёры
             </div>
-            {withOffers.length > 0 && (
+            {!isSearching && withOffers.length > 0 && (
               <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>
-                {withOffers.length} {withOffers.length === 1 ? 'предложение' : withOffers.length < 5 ? 'предложения' : 'предложений'}
+                {withOffers.length} {withOffers.length === 1 ? 'предложение' : withOffers.length < 5 ? 'предложения' : 'предложений'} · {partners.length} партнёров
               </div>
             )}
           </div>
         </div>
 
-        {/* Фильтр по категориям */}
-        {categories.length > 1 && (
+        {/* Поисковая строка */}
+        <div style={{ paddingBottom: 10, position: 'relative' }}>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 15, opacity: 0.5, pointerEvents: 'none' }}>🔍</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Найти партнёра по имени или категории..."
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '10px 36px 10px 38px',
+                background: 'rgba(255,255,255,0.07)',
+                border: `1px solid ${isSearching ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 14,
+                color: T.textPri, fontSize: 14, outline: 'none',
+                transition: 'border-color 0.2s',
+              }}
+            />
+            {isSearching && (
+              <button
+                onClick={() => { setSearch(''); inputRef.current?.focus(); }}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.textSec, fontSize: 12, padding: 0 }}
+              >✕</button>
+            )}
+          </div>
+        </div>
+
+        {/* Фильтр по категориям — скрыт при поиске */}
+        {!isSearching && categories.length > 1 && (
           <div style={{ display: 'flex', gap: 8, paddingBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
             <button
               onClick={() => setActiveCategory('all')}
@@ -155,31 +234,69 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
       </div>
 
       <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
-        {withOffers.length === 0 ? (
-          <div style={{ paddingTop: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 64, animation: 'float 3s ease-in-out infinite' }}>🎁</div>
-            <div>
-              <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Акций пока нет</div>
-              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>
-                Партнёры АПГ скоро добавят специальные предложения
+
+        {/* ── Режим поиска ── */}
+        {isSearching ? (
+          searchResults.length === 0 ? (
+            <div style={{ paddingTop: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+              <div style={{ fontSize: 52 }}>🔍</div>
+              <div>
+                <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Ничего не найдено</div>
+                <div style={{ color: T.textSec, fontSize: 13 }}>Попробуй другой запрос</div>
+              </div>
+              <button onClick={() => setSearch('')} style={{
+                padding: '10px 24px', borderRadius: 12,
+                border: '1px solid rgba(201,168,76,0.3)',
+                background: 'rgba(201,168,76,0.1)', color: T.gold,
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>
+                Сбросить поиск
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: T.textSec, marginBottom: 12, fontWeight: 600 }}>
+                Найдено: <span style={{ color: T.gold }}>{searchResults.length}</span> из {partners.length} партнёров
+              </div>
+              {searchResults.map((p, i) => (
+                <PartnerSearchCard
+                  key={p.id}
+                  partner={p}
+                  index={i}
+                  query={search.trim()}
+                  onOpenPartner={onOpenPartner}
+                />
+              ))}
+            </>
+          )
+        ) : (
+          /* ── Обычный режим — акции ── */
+          withOffers.length === 0 ? (
+            <div style={{ paddingTop: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 64, animation: 'float 3s ease-in-out infinite' }}>🎁</div>
+              <div>
+                <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Акций пока нет</div>
+                <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>
+                  Партнёры АПГ скоро добавят специальные предложения
+                </div>
               </div>
             </div>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ paddingTop: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
-            <div style={{ fontSize: 52 }}>🔍</div>
-            <div style={{ color: T.textSec, fontSize: 14 }}>В этой категории пока нет акций</div>
-            <button onClick={() => setActiveCategory('all')} style={{
-              padding: '10px 24px', borderRadius: 12, border: '1px solid rgba(201,168,76,0.3)',
-              background: 'rgba(201,168,76,0.1)', color: T.gold, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            }}>
-              Показать все
-            </button>
-          </div>
-        ) : (
-          filtered.map((p, i) => (
-            <OfferCard key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />
-          ))
+          ) : filtered.length === 0 ? (
+            <div style={{ paddingTop: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+              <div style={{ fontSize: 52 }}>🔍</div>
+              <div style={{ color: T.textSec, fontSize: 14 }}>В этой категории пока нет акций</div>
+              <button onClick={() => setActiveCategory('all')} style={{
+                padding: '10px 24px', borderRadius: 12, border: '1px solid rgba(201,168,76,0.3)',
+                background: 'rgba(201,168,76,0.1)', color: T.gold, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>
+                Показать все
+              </button>
+            </div>
+          ) : (
+            filtered.map((p, i) => (
+              <OfferCard key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />
+            ))
+          )
         )}
       </div>
     </Panel>

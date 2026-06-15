@@ -937,12 +937,16 @@ export function HomePanel({
     return [...claimable, ...inProgress].slice(0, 2);
   }, [userKeys, favorites.length, referralCount, streak, completedTasks]);
 
+  const isSearching = searchQuery.trim().length > 0;
   const filteredPartners = partners
-    .filter(p => activeCategory === 'all' || p.category === activeCategory)
-    .filter(p => !searchQuery.trim() ||
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    .filter(p => isSearching || activeCategory === 'all' || p.category === activeCategory)
+    .filter(p => !isSearching || (() => {
+      const q = searchQuery.trim().toLowerCase();
+      return p.name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.categoryLabel?.toLowerCase().includes(q) ||
+        p.offer?.toLowerCase().includes(q);
+    })());
 
   return (
     <Panel id="home">
@@ -1187,11 +1191,13 @@ export function HomePanel({
                   <span style={{ color: T.gold }}>✦</span> Партнёры АПГ
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <button onClick={onOpenMap} style={{ padding: '4px 10px', borderRadius: 16, border: `1px solid rgba(74,144,217,0.35)`, background: 'rgba(74,144,217,0.1)', color: '#4A90D9', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                    🗺️ Карта
-                  </button>
-                  <div style={{ fontSize: 11, color: T.textSec, background: T.surface, padding: '4px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>
-                    {filteredPartners.length}
+                  {!isSearching && (
+                    <button onClick={onOpenMap} style={{ padding: '4px 10px', borderRadius: 16, border: `1px solid rgba(74,144,217,0.35)`, background: 'rgba(74,144,217,0.1)', color: '#4A90D9', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                      🗺️ Карта
+                    </button>
+                  )}
+                  <div style={{ fontSize: 11, color: isSearching ? T.gold : T.textSec, background: isSearching ? 'rgba(201,168,76,0.12)' : T.surface, padding: '4px 10px', borderRadius: 20, border: `1px solid ${isSearching ? 'rgba(201,168,76,0.3)' : T.border}`, transition: 'all 0.2s', fontWeight: isSearching ? 700 : 400 }}>
+                    {isSearching ? `${filteredPartners.length} из ${partners.length}` : filteredPartners.length}
                   </div>
                 </div>
               </div>
