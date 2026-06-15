@@ -334,13 +334,6 @@ export function UserApp() {
     return () => { isMounted.current = false; };
   }, [loadData]);
 
-  // Открываем партнёра из deep link, как только партнёры загружены
-  useEffect(() => {
-    if (!pendingPartnerId || !partners.length || deepLinkOpened.current) return;
-    const p = partners.find(p => p.id === pendingPartnerId);
-    if (p) { deepLinkOpened.current = true; openPartner(p); }
-  }, [pendingPartnerId, partners, openPartner]);
-
   const handleRefresh = useCallback(async () => {
     const isMounted = { current: true };
     await loadData(isMounted);
@@ -482,6 +475,13 @@ export function UserApp() {
     setActivePartner(partner);
     setActivePanel('partner');
   }, []);
+
+  // Открываем партнёра из deep link — после того как openPartner объявлен
+  useEffect(() => {
+    if (!pendingPartnerId || !partners.length || deepLinkOpened.current) return;
+    const p = partners.find(p => p.id === pendingPartnerId);
+    if (p) { deepLinkOpened.current = true; openPartner(p); }
+  }, [pendingPartnerId, partners, openPartner]);
 
   // ─── Задания ────────────────────────────────────────────────────────────────
 
