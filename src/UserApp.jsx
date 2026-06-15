@@ -308,13 +308,14 @@ export function UserApp() {
 
   const TabBar = () => (
     <div style={{
-      position: 'fixed', bottom: 0,
+      position: 'fixed', bottom: 16,
       left: '50%', transform: 'translateX(-50%)',
-      width: '100%', maxWidth: 480, height: 62,
-      background: 'rgba(8,8,24,0.55)',
-      backdropFilter: 'blur(24px) saturate(1.8)', WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-      borderTop: '1px solid rgba(255,255,255,0.12)',
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+      width: 'calc(100% - 32px)', maxWidth: 448, height: 62,
+      background: 'rgba(12,12,30,0.55)',
+      backdropFilter: 'blur(28px) saturate(2)', WebkitBackdropFilter: 'blur(28px) saturate(2)',
+      border: '1px solid rgba(255,255,255,0.14)',
+      borderRadius: 36,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1)',
       display: 'flex', alignItems: 'stretch',
       zIndex: 100, overflow: 'visible',
     }}>
@@ -377,7 +378,7 @@ export function UserApp() {
     <ConfigProvider appearance="dark">
       <AdaptivityProvider>
         <AppRoot>
-          <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 62, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+          <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
