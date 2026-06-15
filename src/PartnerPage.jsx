@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Panel, HorizontalScroll } from '@vkontakte/vkui';
-import vkBridge from './vk.js';
+import vkBridge, { isVK } from './vk.js';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -218,20 +218,28 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const avgRating = partner.avgRating ?? 0;
   const reviewCount = partner.reviewCount ?? reviews.length;
 
-  const openLink = (url, self = false) => {
+  const openLink = (url) => {
     if (!url) return;
-    const target = self ? '_self' : '_blank';
-    const w = window.open(url, target, self ? '' : 'noopener,noreferrer');
-    if (!w) vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
+    if (isVK()) {
+      // В VK WebView window.open() может вернуть объект даже при блокировке —
+      // всегда используем Bridge напрямую
+      if (url.startsWith('tel:')) {
+        window.location.href = url; // звонок через нативный обработчик WebView
+      } else {
+        vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
+      }
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
   const openVkGroup = () => {
     if (!partner.vkGroupUrl) return;
     const url = partner.vkGroupUrl.startsWith('http') ? partner.vkGroupUrl : `https://vk.com/${partner.vkGroupUrl}`;
     openLink(url);
   };
-  const handlePhone  = () => {
+  const handlePhone = () => {
     if (!partner.phone) return;
-    openLink(`tel:${partner.phone.replace(/\s/g,'')}`, true);
+    openLink(`tel:${partner.phone.replace(/\s/g, '')}`);
   };
   const handleMap = () => {
     if (!partner.address) return;
@@ -249,28 +257,32 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   return (
     <Panel id="partner">
-      {/* Хедер */}
-      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(8,8,20,0.72)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
-          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
-            {avgRating > 0 && (
-              <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
-                <span style={{ fontSize:11, color:'#FFD700', letterSpacing:1 }}>{'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5-Math.round(avgRating))}</span>
-                <span style={{ fontSize:11, color:T.gold, fontWeight:700 }}>{avgRating.toFixed(1)}</span>
-                <span style={{ fontSize:10, color:T.textSec }}>({reviewCount})</span>
-              </div>
-            )}
-          </div>
-          <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
-          <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
-            {isFavorite ? '♥' : '♡'}
-          </button>
-        </div>
-      </div>
+      {/* Явный scroll-контейнер: sticky работает только внутри своего overflow-контейнера.
+          VK UI Panel может иметь overflow:hidden во время анимации — создаём свой. */}
+      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', background: T.bg }}>
 
-      <div style={{ background:T.bg, minHeight:'100%' }}>
+        {/* Хедер */}
+        <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(8,8,20,0.72)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
+            <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
+              {avgRating > 0 && (
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
+                  <span style={{ fontSize:11, color:'#FFD700', letterSpacing:1 }}>{'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5-Math.round(avgRating))}</span>
+                  <span style={{ fontSize:11, color:T.gold, fontWeight:700 }}>{avgRating.toFixed(1)}</span>
+                  <span style={{ fontSize:10, color:T.textSec }}>({reviewCount})</span>
+                </div>
+              )}
+            </div>
+            <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
+            <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
+              {isFavorite ? '♥' : '♡'}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ minHeight: 'calc(100% - 52px)' }}>
 
         {/* Шапка партнёра */}
         <div style={{ margin:'8px 16px', borderRadius:24, background:'linear-gradient(135deg,#0F0F2E,#1A1A4E)', position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>
@@ -483,6 +495,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       {lightboxIdx !== null && (
         <PhotoLightbox photos={photos} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
+      </div>  {/* конец scroll-контейнера */}
     </Panel>
   );
 }
