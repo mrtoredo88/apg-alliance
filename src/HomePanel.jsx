@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
@@ -405,10 +406,10 @@ function NewsModal({ item, onClose }) {
 
   const pct = Math.max(0, 1 - dragY / 280);
 
-  return (
+  const modal = (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
+        position: 'fixed', inset: 0, zIndex: 9999,
         background: `rgba(0,0,0,${(0.72 * pct).toFixed(2)})`,
         display: 'flex', alignItems: 'flex-end',
         backdropFilter: `blur(${(6 * pct).toFixed(1)}px)`,
@@ -454,8 +455,8 @@ function NewsModal({ item, onClose }) {
                 rel="noopener noreferrer"
                 style={{
                   display: 'block',
-                  marginTop: 20,
-                  padding: '14px 18px',
+                  marginTop: 24,
+                  padding: '16px 18px',
                   background: 'rgba(255,255,255,0.07)',
                   border: '1px solid rgba(255,255,255,0.13)',
                   borderRadius: 14,
@@ -474,6 +475,7 @@ function NewsModal({ item, onClose }) {
       </div>
     </div>
   );
+  return createPortal(modal, document.body);
 }
 
 function NewsWidget({ news }) {
