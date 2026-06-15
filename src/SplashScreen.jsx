@@ -5,42 +5,42 @@ const CSS = `
   from { stroke-dashoffset: 200; opacity: 0; }
   to   { stroke-dashoffset: 0;   opacity: 1; }
 }
-@keyframes apg-glow-pulse {
-  0%, 100% { opacity: 0.5; transform: scale(1);    }
-  50%       { opacity: 1;   transform: scale(1.12); }
-}
-@keyframes apg-shimmer-text {
-  0%   { background-position: -200% center; }
-  100% { background-position:  200% center; }
-}
-@keyframes apg-shimmer-sweep {
-  0%   { left: -60%; opacity: 0; }
-  20%  { opacity: 1; }
-  80%  { opacity: 1; }
-  100% { left: 130%; opacity: 0; }
+@keyframes apg-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 @keyframes apg-fadein {
   from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0);    }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes apg-dot {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
-  40%           { transform: scale(1);   opacity: 1;   }
+@keyframes apg-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
 }
 @keyframes apg-orb1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50%      { transform: translate(30px, -20px) scale(1.1); }
+  50%      { transform: translate(24px, -16px) scale(1.08); }
 }
 @keyframes apg-orb2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50%      { transform: translate(-20px, 30px) scale(0.95); }
+  50%      { transform: translate(-18px, 22px) scale(0.93); }
+}
+@keyframes apg-ring-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(1.1); }
+}
+@keyframes apg-logo-in {
+  from { opacity: 0; transform: scale(0.82); }
+  to   { opacity: 1; transform: scale(1); }
 }
 `;
 
+const SHIMMER_GRAD = 'linear-gradient(90deg, #8A6520 0%, #C9A84C 20%, #F0E0A0 38%, #FFFBEF 50%, #F0E0A0 62%, #C9A84C 80%, #8A6520 100%)';
+
 export function SplashScreen({ isReady, onDone, startTime }) {
-  const [phase, setPhase]       = useState('enter');   // enter | hold | exit
-  const mountTime               = useRef(startTime ?? Date.now());
-  const MIN_SHOW_MS             = 2200;
+  const [phase, setPhase] = useState('enter');
+  const mountTime         = useRef(startTime ?? Date.now());
+  const MIN_SHOW_MS       = 2400;
 
   useEffect(() => {
     if (!isReady) return;
@@ -52,17 +52,28 @@ export function SplashScreen({ isReady, onDone, startTime }) {
 
   const exiting = phase === 'exit';
 
+  // Общий стиль переливающегося текста — одинаковый для всех
+  const shimmerText = (extra = {}) => ({
+    background: SHIMMER_GRAD,
+    backgroundSize: '200% 100%',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    animation: 'apg-shimmer 2.6s linear 1.0s infinite',
+    ...extra,
+  });
+
   return (
     <>
       <style>{CSS}</style>
       <div style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: '#0A0A18',
+        background: '#080818',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         pointerEvents: exiting ? 'none' : 'all',
-        opacity:   exiting ? 0 : 1,
-        transform: exiting ? 'scale(1.06)' : 'scale(1)',
+        opacity:    exiting ? 0 : 1,
+        transform:  exiting ? 'scale(1.05)' : 'scale(1)',
         transition: exiting
           ? 'opacity 0.55s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1)'
           : 'none',
@@ -73,147 +84,173 @@ export function SplashScreen({ isReady, onDone, startTime }) {
         {/* Фоновые орбы */}
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
           <div style={{
-            position: 'absolute', top: '15%', left: '20%',
-            width: 340, height: 340, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(90,60,220,0.18) 0%, transparent 70%)',
-            animation: 'apg-orb1 7s ease-in-out infinite',
+            position: 'absolute', top: '8%', left: '10%',
+            width: 380, height: 380, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(80,55,210,0.2) 0%, transparent 70%)',
+            animation: 'apg-orb1 8s ease-in-out infinite',
           }} />
           <div style={{
-            position: 'absolute', bottom: '20%', right: '15%',
-            width: 280, height: 280, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%)',
-            animation: 'apg-orb2 8s ease-in-out infinite',
+            position: 'absolute', bottom: '10%', right: '8%',
+            width: 300, height: 300, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(201,168,76,0.13) 0%, transparent 70%)',
+            animation: 'apg-orb2 9s ease-in-out infinite',
+          }} />
+          {/* Точечная сетка */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: 'radial-gradient(rgba(201,168,76,0.045) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
           }} />
         </div>
 
         {/* Логотип */}
-        <div style={{ position: 'relative', marginBottom: 36 }}>
-
-          {/* Внешнее свечение — пульсирует */}
+        <div style={{
+          position: 'relative', marginBottom: 40,
+          opacity: 0,
+          animation: 'apg-logo-in 0.7s cubic-bezier(0.2,0,0,1) 0.15s forwards',
+        }}>
+          {/* Пульсирующее кольцо */}
           <div style={{
-            position: 'absolute', inset: -28,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(201,168,76,0.22) 0%, transparent 70%)',
-            animation: 'apg-glow-pulse 2.4s ease-in-out infinite',
+            position: 'absolute', inset: -32, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(201,168,76,0.18) 0%, transparent 68%)',
+            animation: 'apg-ring-pulse 2.6s ease-in-out 1.0s infinite',
+          }} />
+          {/* Второе кольцо */}
+          <div style={{
+            position: 'absolute', inset: -16, borderRadius: 44,
+            border: '1px solid rgba(201,168,76,0.12)',
+            animation: 'apg-ring-pulse 2.6s ease-in-out 1.3s infinite',
           }} />
 
-          {/* Glass-подложка */}
+          {/* Карточка логотипа */}
           <div style={{
-            width: 108, height: 108, borderRadius: 32,
-            background: 'rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.25)',
+            width: 112, height: 112, borderRadius: 34,
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)',
+            backdropFilter: 'blur(32px)',
+            WebkitBackdropFilter: 'blur(32px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.22)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             position: 'relative', overflow: 'hidden',
           }}>
-            {/* Световая полоса внутри карточки */}
+            {/* Внутренний шиммер — синхронизирован с текстом */}
             <div style={{
-              position: 'absolute',
-              top: 0, bottom: 0, width: '45%',
-              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)',
-              animation: 'apg-shimmer-sweep 2.8s ease-in-out infinite',
-              animationDelay: '0.4s',
-              pointerEvents: 'none',
+              position: 'absolute', inset: 0,
+              background: `linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%)`,
+              backgroundSize: '200% 100%',
+              animation: 'apg-shimmer 2.6s linear 1.0s infinite',
             }} />
 
-            {/* SVG алмаз */}
-            <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+            <svg width="58" height="58" viewBox="0 0 60 60" fill="none">
               <defs>
-                <linearGradient id="diamond-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%"   stopColor="#E8C97A" />
                   <stop offset="50%"  stopColor="#C9A84C" />
-                  <stop offset="100%" stopColor="#A07830" />
+                  <stop offset="100%" stopColor="#9A7030" />
                 </linearGradient>
-                <filter id="diamond-glow">
-                  <feGaussianBlur stdDeviation="1.5" result="blur"/>
-                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                <filter id="df">
+                  <feGaussianBlur stdDeviation="1.2" result="b"/>
+                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
                 </filter>
               </defs>
-              {/* Ромб — анимированная обводка */}
               <polygon
-                points="30,6 52,30 30,54 8,30"
-                fill="rgba(201,168,76,0.1)"
-                stroke="url(#diamond-grad)"
-                strokeWidth="1.8"
-                strokeDasharray="200"
-                strokeDashoffset="200"
-                filter="url(#diamond-glow)"
-                style={{ animation: 'apg-draw 1.2s cubic-bezier(0.4,0,0.2,1) 0.1s forwards' }}
+                points="30,5 53,30 30,55 7,30"
+                fill="rgba(201,168,76,0.08)"
+                stroke="url(#dg)" strokeWidth="1.6"
+                strokeDasharray="200" strokeDashoffset="200"
+                filter="url(#df)"
+                style={{ animation: 'apg-draw 1.1s cubic-bezier(0.4,0,0.2,1) 0.2s forwards' }}
               />
-              {/* Горизонтальная линия */}
-              <line x1="8" y1="30" x2="52" y2="30"
-                stroke="rgba(201,168,76,0.3)" strokeWidth="0.9"
-                strokeDasharray="44" strokeDashoffset="44"
-                style={{ animation: 'apg-draw 0.6s ease 0.9s forwards' }}
+              <line x1="7" y1="30" x2="53" y2="30"
+                stroke="rgba(201,168,76,0.28)" strokeWidth="0.8"
+                strokeDasharray="46" strokeDashoffset="46"
+                style={{ animation: 'apg-draw 0.5s ease 1.0s forwards' }}
               />
-              {/* Вертикальная линия */}
-              <line x1="30" y1="6" x2="30" y2="54"
-                stroke="rgba(201,168,76,0.3)" strokeWidth="0.9"
-                strokeDasharray="48" strokeDashoffset="48"
-                style={{ animation: 'apg-draw 0.6s ease 0.9s forwards' }}
+              <line x1="30" y1="5" x2="30" y2="55"
+                stroke="rgba(201,168,76,0.28)" strokeWidth="0.8"
+                strokeDasharray="50" strokeDashoffset="50"
+                style={{ animation: 'apg-draw 0.5s ease 1.0s forwards' }}
               />
-              {/* Центральная точка */}
-              <circle cx="30" cy="30" r="4.5" fill="#C9A84C"
-                style={{ opacity: 0, animation: 'apg-fadein 0.4s ease 1.3s forwards' }}
+              <circle cx="30" cy="30" r="4" fill="#C9A84C"
+                style={{ opacity: 0, animation: 'apg-fadein 0.35s ease 1.3s forwards' }}
               />
-              <circle cx="30" cy="30" r="2" fill="#0A0A18"
-                style={{ opacity: 0, animation: 'apg-fadein 0.4s ease 1.3s forwards' }}
+              <circle cx="30" cy="30" r="1.6" fill="#080818"
+                style={{ opacity: 0, animation: 'apg-fadein 0.35s ease 1.3s forwards' }}
               />
             </svg>
           </div>
         </div>
 
-        {/* Надпись АПГ с переливом */}
+        {/* Текстовый блок — все элементы переливаются одинаково */}
         <div style={{
-          opacity: 0,
-          animation: 'apg-fadein 0.5s ease 0.8s forwards',
           textAlign: 'center',
+          opacity: 0,
+          animation: 'apg-fadein 0.5s ease 0.7s forwards',
         }}>
+          {/* АПГ */}
           <div style={{
-            fontSize: 44, fontWeight: 900, letterSpacing: 10,
+            fontSize: 52, fontWeight: 900, letterSpacing: 14,
             lineHeight: 1,
-            background: 'linear-gradient(90deg, #A07830 0%, #C9A84C 25%, #F0E0A0 45%, #FFF8DC 50%, #F0E0A0 55%, #C9A84C 75%, #A07830 100%)',
-            backgroundSize: '250% 100%',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            animation: 'apg-shimmer-text 2.4s ease-in-out 1.2s infinite',
+            paddingLeft: 14,
+            ...shimmerText(),
           }}>АПГ</div>
 
+          {/* Разделитель */}
           <div style={{
-            fontSize: 12, fontWeight: 700, letterSpacing: 3.5,
-            color: 'rgba(201,168,76,0.7)',
+            margin: '16px auto',
+            width: 64, height: 1,
+            background: SHIMMER_GRAD,
+            backgroundSize: '200% 100%',
+            animation: 'apg-shimmer 2.6s linear 1.0s infinite',
+            opacity: 0,
+            animationFillMode: 'both',
+            animationDelay: '1.0s',
+          }} />
+
+          {/* ЗЕЛЕНОГРАД */}
+          <div style={{
+            fontSize: 11, fontWeight: 800,
+            letterSpacing: 5, paddingLeft: 5,
+            textTransform: 'uppercase',
+            opacity: 0,
+            animation: 'apg-fadein 0.4s ease 0.9s forwards',
+          }}>
+            <span style={{ ...shimmerText() }}>Зеленоград</span>
+          </div>
+
+          {/* Альянс Партнёров Города */}
+          <div style={{
+            fontSize: 12, letterSpacing: 1.5,
             textTransform: 'uppercase',
             marginTop: 8,
             opacity: 0,
-            animation: 'apg-fadein 0.5s ease 1.1s forwards',
-          }}>Зеленоград</div>
-
-          <div style={{
-            fontSize: 11, letterSpacing: 1.5,
-            color: 'rgba(255,255,255,0.28)',
-            textTransform: 'uppercase',
-            marginTop: 6,
-            opacity: 0,
-            animation: 'apg-fadein 0.5s ease 1.3s forwards',
-          }}>Альянс Партнёров Города</div>
+            animation: 'apg-fadein 0.4s ease 1.1s forwards',
+          }}>
+            <span style={{
+              ...shimmerText({ WebkitTextFillColor: undefined, backgroundClip: undefined }),
+              background: undefined,
+              color: 'rgba(201,168,76,0.45)',
+              WebkitTextFillColor: 'rgba(201,168,76,0.45)',
+            }}>Альянс Партнёров Города</span>
+          </div>
         </div>
 
-        {/* Точки загрузки */}
+        {/* Прогресс-бар */}
         <div style={{
-          display: 'flex', gap: 8, marginTop: 52,
+          position: 'absolute', bottom: 52,
+          width: 140, height: 2,
+          background: 'rgba(255,255,255,0.05)',
+          borderRadius: 1, overflow: 'hidden',
           opacity: 0,
-          animation: 'apg-fadein 0.4s ease 1.5s forwards',
+          animation: 'apg-fadein 0.4s ease 1.4s forwards',
         }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{
-              width: 7, height: 7, borderRadius: '50%',
-              background: '#C9A84C',
-              animation: `apg-dot 1.4s ease-in-out ${i * 0.22}s infinite`,
-            }} />
-          ))}
+          <div style={{
+            height: '100%', borderRadius: 1,
+            background: SHIMMER_GRAD,
+            backgroundSize: '200% 100%',
+            animation: `apg-progress ${MIN_SHOW_MS}ms cubic-bezier(0.4,0,0.2,1) 0.3s forwards,
+                        apg-shimmer 2.6s linear 1.0s infinite`,
+          }} />
         </div>
 
       </div>
