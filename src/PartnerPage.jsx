@@ -1,38 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Panel, HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge from './vk.js';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-const T = {
-  bg:'#0F0F1A', surface:'#1A1A2E', border:'rgba(255,255,255,0.07)',
-  gold:'#C9A84C', goldL:'#E8C97A', blue:'#4A90D9', green:'#4BB34B', red:'#E64646',
-  textPri:'#F0F0F0', textSec:'rgba(240,240,240,0.5)',
-};
-
-const GLASS = {
-  background: 'rgba(255,255,255,0.07)',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
-
-const GLASS_STRONG = {
-  background: 'rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(48px) saturate(2)',
-  WebkitBackdropFilter: 'blur(48px) saturate(2)',
-  border: '1px solid rgba(255,255,255,0.16)',
-  boxShadow: '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
-};
-
-const GLASS_GOLD = {
-  background: 'linear-gradient(135deg, rgba(201,168,76,0.16), rgba(201,168,76,0.06))',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(201,168,76,0.28)',
-  boxShadow: '0 8px 28px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
+import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
 
@@ -40,8 +13,8 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   const [idx, setIdx] = useState(startIndex);
   const prev = () => setIdx(i => (i - 1 + photos.length) % photos.length);
   const next = () => setIdx(i => (i + 1) % photos.length);
-  return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:900, background:'rgba(0,0,0,0.93)', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)' }}>
+  return createPortal(
+    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.93)', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)' }}>
       <button onClick={onClose} style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'50%', width:38, height:38, color:'#fff', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10 }}>✕</button>
       {photos.length > 1 && <div style={{ position:'absolute', top:22, left:'50%', transform:'translateX(-50%)', fontSize:12, color:'rgba(255,255,255,0.6)', fontWeight:600, zIndex:10 }}>{idx+1}/{photos.length}</div>}
       <img src={photos[idx]} alt="" onClick={e => e.stopPropagation()} style={{ maxWidth:'94vw', maxHeight:'82vh', objectFit:'contain', borderRadius:16 }} />
@@ -49,7 +22,8 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
         <button onClick={e => { e.stopPropagation(); prev(); }} style={{ position:'absolute', left:12, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'50%', width:42, height:42, color:'#fff', fontSize:22, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>‹</button>
         <button onClick={e => { e.stopPropagation(); next(); }} style={{ position:'absolute', right:12, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'50%', width:42, height:42, color:'#fff', fontSize:22, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
       </>}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

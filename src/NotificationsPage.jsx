@@ -3,25 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
-const T = {
-  bg:      '#0F0F1A',
-  surface: '#1A1A2E',
-  border:  'rgba(255,255,255,0.07)',
-  gold:    '#C9A84C',
-  goldL:   '#E8C97A',
-  blue:    '#4A90D9',
-  green:   '#4BB34B',
-  textPri: '#F0F0F0',
-  textSec: 'rgba(240,240,240,0.5)',
-};
-
-const GLASS = {
-  background: 'rgba(255,255,255,0.07)',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
+import { T, GLASS } from './design.js';
 
 function timeAgo(ts) {
   if (!ts) return '';
@@ -37,12 +19,17 @@ function timeAgo(ts) {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
-export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifications, lastSeenTs }) {
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications }) {
+  const [notifications, setNotifications] = useState(propNotifications ?? []);
+  const [loading, setLoading] = useState(!propNotifications);
   const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
+    if (propNotifications) {
+      setNotifications(propNotifications);
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const snap = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')));
@@ -50,7 +37,7 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
       } catch {}
       setLoading(false);
     })();
-  }, []);
+  }, [propNotifications]);
 
   const handleEnable = async () => {
     setEnabling(true);

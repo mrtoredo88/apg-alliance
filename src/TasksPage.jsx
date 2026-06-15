@@ -1,25 +1,7 @@
 import React, { useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { TASKS } from './tasks.js';
-
-const T = {
-  bg:      '#0F0F1A',
-  surface: '#1A1A2E',
-  border:  'rgba(255,255,255,0.07)',
-  gold:    '#C9A84C',
-  goldL:   '#E8C97A',
-  green:   '#4BB34B',
-  textPri: '#F0F0F0',
-  textSec: 'rgba(240,240,240,0.5)',
-};
-
-const GLASS = {
-  background: 'rgba(255,255,255,0.07)',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
+import { T, GLASS } from './design.js';
 
 function TaskCard({ task, status, onClaim, claiming }) {
   const pct = task.total
@@ -134,7 +116,7 @@ function TaskCard({ task, status, onClaim, claiming }) {
   );
 }
 
-export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, streak = 0, completedTasks = [], onClaim, onBack }) {
+export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], onClaim, onBack }) {
   const [claiming, setClaiming] = useState(null);
 
   const handleClaim = async (taskId, reward) => {
@@ -146,8 +128,8 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
   const statuses = TASKS.map(t => ({
     ...t,
     done:  completedTasks.includes(t.id),
-    ready: t.check(userKeys, favCount, referralCount, streak) && !completedTasks.includes(t.id),
-    prog:  t.progress ? t.progress(userKeys, favCount, referralCount, streak) : 0,
+    ready: t.check(userKeys, favCount, referralCount, streak, scannedCount) && !completedTasks.includes(t.id),
+    prog:  t.progress ? t.progress(userKeys, favCount, referralCount, streak, scannedCount) : 0,
   }));
 
   const claimable   = statuses.filter(s => s.ready);

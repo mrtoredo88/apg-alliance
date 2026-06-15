@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
-import vkBridge from '@vkontakte/vk-bridge';
+import vkBridge from './vk.js';
 import { db } from './firebase';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
@@ -62,6 +62,7 @@ export function UserApp() {
   const [partners, setPartners]                 = useState([]);
   const [events, setEvents]                     = useState([]);
   const [news, setNews]                         = useState([]);
+  const [notifications, setNotifications]       = useState([]);
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [showOnboarding, setShowOnboarding]     = useState(false);
@@ -98,12 +99,14 @@ export function UserApp() {
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setNotifications(notifList);
 
       const lastSeen = localStorage.getItem('apg_notif_seen');
       const lastSeenDate = lastSeen ? new Date(Number(lastSeen)) : null;
-      const unread = notifSnap.docs.filter(d => {
+      const unread = notifList.filter(d => {
         if (!lastSeenDate) return true;
-        const ts = d.data().createdAt;
+        const ts = d.createdAt;
         if (!ts) return false;
         const date = ts.toDate ? ts.toDate() : new Date(ts);
         return date > lastSeenDate;
@@ -191,30 +194,39 @@ export function UserApp() {
       return;
     }
 
-    // Уже отсканирован ранее — ключ не начисляем
-    if (scannedPartnerIds[partner.id]) {
+    const alreadyHasKey   = !!scannedPartnerIds[partner.id];
+    const todayKey        = new Date().toISOString().slice(0, 10);
+    const alreadyToday    = lastScanDate === todayKey;
+
+    // Ключ за этого партнёра уже получен И сегодня уже отмечались — ничего не делаем
+    if (alreadyHasKey && alreadyToday) {
       setIsScannerOpen(false);
       isScanningRef.current = false;
-      showToast(`Вы уже получили ключ за «${partner.name}»`);
+      showToast('Уже отмечено сегодня 👋');
       return;
     }
 
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const alreadyScannedToday = lastScanDate === todayKey;
-    const newStreak = alreadyScannedToday ? streak : streak + 1;
+    const newStreak  = alreadyToday ? streak : streak + 1;
+    const updateData = { lastScanDate: todayKey, streak: newStreak };
+
+    if (!alreadyHasKey) {
+      updateData.keys = increment(1);
+      updateData[`scannedPartners.${partner.id}`] = true;
+    }
 
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), {
-        keys: increment(1),
-        [`scannedPartners.${partner.id}`]: true,
-        lastScanDate: todayKey,
-        streak: newStreak,
-      });
-      setUserKeys(prev => prev + 1);
-      setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
+      await updateDoc(doc(db, 'users', String(user.id)), updateData);
       setLastScanDate(todayKey);
       setStreak(newStreak);
-      showToast(`+1 ключ — ${partner.name}! 🔑`, 'success');
+      if (!alreadyHasKey) {
+        setUserKeys(prev => prev + 1);
+        setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
+        showToast(`+1 ключ — ${partner.name}! 🔑`, 'success');
+      } else {
+        const days = newStreak;
+        const label = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
+        showToast(`Серия продолжается — ${days} ${label}! 🔥`, 'success');
+      }
     } catch (e) {
       console.error(e);
       showToast('Ошибка при сохранении. Попробуйте ещё раз.');
@@ -423,6 +435,7 @@ export function UserApp() {
                 loading={loading} error={error}
                 streak={streak} lastScanDate={lastScanDate}
                 completedTasks={completedTasks} referralCount={referralCount}
+                scannedCount={Object.keys(scannedPartnerIds).length}
                 unreadCount={unreadCount}
                 onOpenPartner={openPartner}
                 onToggleFavorite={toggleFavorite}
@@ -478,6 +491,7 @@ export function UserApp() {
                   <TasksPage
                     userKeys={userKeys} favCount={favorites.length}
                     streak={streak} referralCount={referralCount}
+                    scannedCount={Object.keys(scannedPartnerIds).length}
                     completedTasks={completedTasks}
                     onBack={() => goPanel('home')}
                     onClaim={handleClaim}
@@ -538,6 +552,7 @@ export function UserApp() {
 
               <NotificationsPage
                 nav="notifications"
+                notifications={notifications}
                 notificationsEnabled={notifEnabled}
                 onEnableNotifications={handleEnableNotifications}
                 lastSeenTs={lastSeenTs}

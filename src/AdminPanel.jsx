@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import vkBridge from '@vkontakte/vk-bridge';
+import { QRCodeSVG } from 'qrcode.react';
+import vkBridge from './vk.js';
 import { db } from './firebase';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 
@@ -58,6 +59,7 @@ export const AdminPanel = () => {
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
+  const [qrPartner, setQrPartner]           = useState(null);
 
   // Форма партнёра
   const [pName, setPName] = useState('');
@@ -352,6 +354,7 @@ export const AdminPanel = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <button style={{ ...s.btn, background: '#E8F3FF', color: '#3F8AE0', padding: '6px 10px', fontSize: 11, fontWeight: 700 }} onClick={() => setQrPartner(p)}>QR</button>
                     <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPartner(p)}>✏️</button>
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePartner(p.id)}>🗑️</button>
                   </div>
@@ -543,6 +546,30 @@ export const AdminPanel = () => {
       )}
 
       <div style={{ height: 32 }} />
+
+      {/* QR-модал для партнёра */}
+      {qrPartner && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setQrPartner(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 320, width: '100%', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: '#000' }}>{qrPartner.name}</div>
+            <div style={{ fontSize: 12, color: '#99A2AD', marginBottom: 20 }}>ID: {qrPartner.id}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+              <QRCodeSVG value={qrPartner.id} size={220} bgColor="#ffffff" fgColor="#0F0F1A" level="M" />
+            </div>
+            <div style={{ fontSize: 12, color: '#99A2AD', marginBottom: 20, lineHeight: '17px' }}>
+              Распечатайте этот QR-код и разместите у партнёра.<br/>
+              Клиент сканирует его через приложение АПГ и получает ключ.
+            </div>
+            <button onClick={() => setQrPartner(null)} style={{ ...s.btn, ...s.btnGray, width: '100%' }}>Закрыть</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

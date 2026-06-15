@@ -1,3 +1,6 @@
+// check(keys, favCount, referralCount, streak, scannedCount)
+// sc = scannedCount — количество уникальных посещённых партнёров
+
 export const TASKS = [
   {
     id: 'first_open',
@@ -18,7 +21,7 @@ export const TASKS = [
     emoji: '🗝️', title: 'Первые шаги',
     desc: 'Посети 3 партнёра АПГ',
     reward: 2,
-    check: (k) => k >= 3, total: 3, progress: (k) => Math.min(k, 3),
+    check: (k, f, r, s, sc) => sc >= 3, total: 3, progress: (k, f, r, s, sc) => Math.min(sc, 3),
   },
   {
     id: 'fav_3',
@@ -32,7 +35,7 @@ export const TASKS = [
     emoji: '🔥', title: 'Завсегдатай',
     desc: 'Посети 10 партнёров',
     reward: 5,
-    check: (k) => k >= 10, total: 10, progress: (k) => Math.min(k, 10),
+    check: (k, f, r, s, sc) => sc >= 10, total: 10, progress: (k, f, r, s, sc) => Math.min(sc, 10),
   },
   {
     id: 'keys_15',
@@ -60,7 +63,7 @@ export const TASKS = [
     emoji: '💎', title: 'Преданный участник',
     desc: 'Посети 25 партнёров',
     reward: 10,
-    check: (k) => k >= 25, total: 25, progress: (k) => Math.min(k, 25),
+    check: (k, f, r, s, sc) => sc >= 25, total: 25, progress: (k, f, r, s, sc) => Math.min(sc, 25),
   },
   {
     id: 'fav_10',
@@ -93,7 +96,7 @@ export const TASKS = [
   {
     id: 'visit_100',
     emoji: '👑', title: 'Легенда Зеленограда',
-    desc: 'Посети партнёров 100 раз — настоящая легенда!',
+    desc: 'Набери 100 ключей — настоящая легенда!',
     reward: 30,
     check: (k) => k >= 100, total: 100, progress: (k) => Math.min(k, 100),
   },

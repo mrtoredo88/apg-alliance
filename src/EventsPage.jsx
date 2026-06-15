@@ -1,33 +1,7 @@
 import React, { useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
 
-const T = {
-  bg:      '#0F0F1A',
-  surface: '#1A1A2E',
-  border:  'rgba(255,255,255,0.07)',
-  gold:    '#C9A84C',
-  goldL:   '#E8C97A',
-  blue:    '#4A90D9',
-  green:   '#4BB34B',
-  textPri: '#F0F0F0',
-  textSec: 'rgba(240,240,240,0.5)',
-};
-
-const GLASS = {
-  background: 'rgba(255,255,255,0.07)',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
-
-const GLASS_STRONG = {
-  background: 'rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(48px) saturate(2)',
-  WebkitBackdropFilter: 'blur(48px) saturate(2)',
-  border: '1px solid rgba(255,255,255,0.16)',
-  boxShadow: '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
-};
+import { T, GLASS, GLASS_STRONG } from './design.js';
 
 const GRADIENTS = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',

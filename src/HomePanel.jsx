@@ -3,47 +3,7 @@ import { createPortal } from 'react-dom';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
-
-// ─── Дизайн-токены ────────────────────────────────────────────────────────────
-const T = {
-  bg:       '#0F0F1A',   // Глубокий тёмно-синий фон
-  surface:  '#1A1A2E',   // Карточки
-  surface2: '#16213E',   // Вторичные карточки
-  border:   'rgba(255,255,255,0.07)',
-  gold:     '#C9A84C',   // Золотой акцент
-  goldL:    '#E8C97A',   // Светлый золотой
-  blue:     '#4A90D9',   // Синий акцент
-  green:    '#4BB34B',
-  red:      '#E64646',
-  textPri:  '#F0F0F0',
-  textSec:  'rgba(240,240,240,0.5)',
-  white:    '#FFFFFF',
-};
-
-// Liquid Glass токены
-const GLASS = {
-  background: 'rgba(255,255,255,0.07)',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
-
-const GLASS_STRONG = {
-  background: 'rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(48px) saturate(2)',
-  WebkitBackdropFilter: 'blur(48px) saturate(2)',
-  border: '1px solid rgba(255,255,255,0.16)',
-  boxShadow: '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
-};
-
-const GLASS_GOLD = {
-  background: 'linear-gradient(135deg, rgba(201,168,76,0.16), rgba(201,168,76,0.06))',
-  backdropFilter: 'blur(28px) saturate(1.8)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
-  border: '1px solid rgba(201,168,76,0.28)',
-  boxShadow: '0 8px 28px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.08)',
-};
+import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 
 const CATEGORIES = [
   { id: 'all',     label: 'Все',          emoji: '✦' },
@@ -910,7 +870,7 @@ function openVKApp() {
 export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [], news = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
-  completedTasks = [], referralCount = 0, unreadCount = 0, isWebMode = false,
+  completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -969,8 +929,8 @@ export function HomePanel({
     const statuses = TASKS.map(t => ({
       ...t,
       done:  completedTasks.includes(t.id),
-      ready: t.check(userKeys, favorites.length, referralCount, streak) && !completedTasks.includes(t.id),
-      prog:  t.progress ? t.progress(userKeys, favorites.length, referralCount, streak) : 0,
+      ready: t.check(userKeys, favorites.length, referralCount, streak, scannedCount) && !completedTasks.includes(t.id),
+      prog:  t.progress ? t.progress(userKeys, favorites.length, referralCount, streak, scannedCount) : 0,
     }));
     const claimable  = statuses.filter(s => s.ready);
     const inProgress = statuses.filter(s => !s.done && !s.ready);
