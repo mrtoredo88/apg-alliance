@@ -345,7 +345,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
       {/* Кастомный хедер */}
       <div style={{
-        position: 'sticky', top: 'var(--safe-top, 0px)', zIndex: 50,
+        position: 'sticky', top: 0, zIndex: 50,
         background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
@@ -361,7 +361,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         const pct    = getLevelProgress(userKeys);
         return (
           <div style={{
-            margin: '8px 16px',
+            margin: '14px 16px',
             borderRadius: 28,
             background: 'linear-gradient(145deg, rgba(18,12,50,0.97), rgba(22,18,62,0.95))',
             backdropFilter: 'blur(40px) saturate(2)',
