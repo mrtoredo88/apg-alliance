@@ -13,16 +13,17 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  background: #08081A;
+}
+
+#root {
+  min-height: 100vh;
   background:
     radial-gradient(ellipse at 20% 0%,   rgba(80,60,200,0.45) 0%, transparent 50%),
     radial-gradient(ellipse at 85% 40%,  rgba(201,168,76,0.2) 0%, transparent 45%),
     radial-gradient(ellipse at 10% 100%, rgba(30,50,210,0.5)  0%, transparent 45%),
     #08081A;
-  background-attachment: fixed;
-}
-
-#root {
-  min-height: 100vh;
+  background-attachment: scroll;
 }
 
 /* VK UI — весь стек прозрачный, чтобы depth orbs просвечивали */
