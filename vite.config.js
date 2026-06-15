@@ -27,5 +27,20 @@ export default defineConfig({
   plugins: [react(), versionPlugin()],
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/react') || id.includes('/node_modules/react-dom') || id.includes('/node_modules/react-router-dom') || id.includes('/node_modules/scheduler')) {
+            return 'vendor-react';
+          }
+          if (id.includes('/node_modules/@vkontakte')) {
+            return 'vendor-vkui';
+          }
+          if (id.includes('/node_modules/firebase') || id.includes('/node_modules/@firebase')) {
+            return 'vendor-firebase';
+          }
+        },
+      },
+    },
   },
 })
