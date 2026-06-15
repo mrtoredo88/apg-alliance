@@ -65,10 +65,10 @@ const CATEGORIES = [
 function EventModal({ event, onClose }) {
   if (!event) return null;
 
-  return (
+  const modal = (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.75)', zIndex: 1000,
+      background: 'rgba(0,0,0,0.75)', zIndex: 9999,
       display: 'flex', alignItems: 'flex-end',
       backdropFilter: 'blur(4px)',
     }} onClick={onClose}>
@@ -166,6 +166,7 @@ function EventModal({ event, onClose }) {
       </div>
     </div>
   );
+  return createPortal(modal, document.body);
 }
 
 // ─── Карточка события ─────────────────────────────────────────────────────────

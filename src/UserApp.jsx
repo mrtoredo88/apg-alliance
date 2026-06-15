@@ -37,7 +37,9 @@ function LazyFallback() {
 
 export function UserApp() {
   const appStartTime                            = useRef(Date.now());
+  const isScanningRef                           = useRef(false);
   const [splashDone, setSplashDone]             = useState(false);
+  const [toast, setToast]                       = useState(null);
 
   const [activePanel, setActivePanel]           = useState('home');
   const [activePartner, setActivePartner]       = useState(null);
@@ -73,7 +75,14 @@ export function UserApp() {
       const userData = await Promise.race([
         vkBridge.send('VKWebAppGetUserInfo'),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
-      ]).catch(() => ({ id: 'guest', first_name: 'Участник', last_name: 'АПГ', photo_200: null }));
+      ]).catch(() => {
+        let guestId = localStorage.getItem('apg_guest_id');
+        if (!guestId) {
+          guestId = 'guest_' + Math.random().toString(36).slice(2, 9);
+          localStorage.setItem('apg_guest_id', guestId);
+        }
+        return { id: guestId, first_name: 'Участник', last_name: 'АПГ', photo_200: null };
+      });
 
       if (!isMounted.current) return;
       setUser(userData);
@@ -166,10 +175,29 @@ export function UserApp() {
 
   // ─── Скан ───────────────────────────────────────────────────────────────────
 
+  const showToast = useCallback((msg, type = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
   const handleConfirmScan = useCallback(async (placeIdentifier) => {
-    if (!user) return;
+    if (!user || isScanningRef.current) return;
+    isScanningRef.current = true;
+
     const partner = partners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
-    if (!partner) { setIsScannerOpen(false); return; }
+    if (!partner) {
+      setIsScannerOpen(false);
+      isScanningRef.current = false;
+      return;
+    }
+
+    // Уже отсканирован ранее — ключ не начисляем
+    if (scannedPartnerIds[partner.id]) {
+      setIsScannerOpen(false);
+      isScanningRef.current = false;
+      showToast(`Вы уже получили ключ за «${partner.name}»`);
+      return;
+    }
 
     const todayKey = new Date().toISOString().slice(0, 10);
     const alreadyScannedToday = lastScanDate === todayKey;
@@ -186,9 +214,15 @@ export function UserApp() {
       setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
       setLastScanDate(todayKey);
       setStreak(newStreak);
-    } catch (e) { console.error(e); }
-    finally { setIsScannerOpen(false); }
-  }, [user, partners, lastScanDate, streak]);
+      showToast(`+1 ключ — ${partner.name}! 🔑`, 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+    } finally {
+      setIsScannerOpen(false);
+      isScanningRef.current = false;
+    }
+  }, [user, partners, lastScanDate, streak, scannedPartnerIds, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -228,7 +262,7 @@ export function UserApp() {
   }, [loadData]);
 
   const handleDeleteProfile = useCallback(async () => {
-    if (!user || user.id === 'guest') return;
+    if (!user || String(user.id).startsWith('guest_')) return;
     try {
       await deleteDoc(doc(db, 'users', String(user.id)));
       handleLogout();
@@ -530,6 +564,24 @@ export function UserApp() {
               onDone={() => setSplashDone(true)}
               startTime={appStartTime.current}
             />
+          )}
+
+          {/* Toast-уведомления */}
+          {toast && (
+            <div style={{
+              position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 10000, pointerEvents: 'none',
+              background: toast.type === 'success' ? 'rgba(75,179,75,0.15)' : 'rgba(20,20,50,0.85)',
+              border: `1px solid ${toast.type === 'success' ? 'rgba(75,179,75,0.35)' : 'rgba(255,255,255,0.12)'}`,
+              backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+              borderRadius: 14, padding: '12px 20px',
+              color: '#F0F0F0', fontSize: 14, fontWeight: 600,
+              whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 48px)',
+              animation: 'toastIn 0.25s ease',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            }}>
+              {toast.msg}
+            </div>
           )}
         </AppRoot>
       </AdaptivityProvider>

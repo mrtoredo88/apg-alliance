@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserApp } from './UserApp.jsx';
+import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 async function checkForUpdate() {
   try {
@@ -36,16 +37,18 @@ function AdminFallback() {
 export function App() {
   useEffect(() => { checkForUpdate(); }, []);
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/" element={<UserApp />} />
-        <Route path="/admin" element={
-          <Suspense fallback={<AdminFallback />}>
-            <AdminPanel />
-          </Suspense>
-        } />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<UserApp />} />
+          <Route path="/admin" element={
+            <Suspense fallback={<AdminFallback />}>
+              <AdminPanel />
+            </Suspense>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }
