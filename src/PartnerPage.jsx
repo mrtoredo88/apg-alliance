@@ -244,13 +244,25 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const avgRating = partner.avgRating ?? 0;
   const reviewCount = partner.reviewCount ?? reviews.length;
 
+  const openLink = (url, self = false) => {
+    if (!url) return;
+    const target = self ? '_self' : '_blank';
+    const w = window.open(url, target, self ? '' : 'noopener,noreferrer');
+    if (!w) vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
+  };
   const openVkGroup = () => {
     if (!partner.vkGroupUrl) return;
     const url = partner.vkGroupUrl.startsWith('http') ? partner.vkGroupUrl : `https://vk.com/${partner.vkGroupUrl}`;
-    vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => window.open(url, '_blank'));
+    openLink(url);
   };
-  const handlePhone  = () => partner.phone   && window.open(`tel:${partner.phone.replace(/\s/g,'')}`, '_self');
-  const handleMap    = () => partner.address  && vkBridge.send('VKWebAppOpenLink', { link:`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address+', Зеленоград')}` }).catch(() => {});
+  const handlePhone  = () => {
+    if (!partner.phone) return;
+    openLink(`tel:${partner.phone.replace(/\s/g,'')}`, true);
+  };
+  const handleMap = () => {
+    if (!partner.address) return;
+    openLink(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
+  };
   const handleShare  = () => vkBridge.send('VKWebAppShare', { link:`https://vk.com/app54601851`, text:`${partner.name} — партнёр АПГ! ${partner.offer ? partner.offer+' · ' : ''}Зеленоград` }).catch(() => {});
 
   const infoRows = [
@@ -472,7 +484,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           {partner.phone   && <button onClick={handlePhone}  style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.green},#3a9a3a)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📞 Позвонить</button>}
           {partner.address && <button onClick={handleMap}    style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
           {partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && (
-            <button onClick={() => vkBridge.send('VKWebAppOpenLink', { link:partner.socialUrl }).catch(()=>{})} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
+            <button onClick={() => openLink(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
           )}
           <button onClick={() => onToggleFavorite(partner.id)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:isFavorite?`1px solid ${T.red}44`:'none', background:isFavorite?T.red+'15':`linear-gradient(135deg,${T.gold},${T.goldL})`, color:isFavorite?T.red:'#0F0F1A', fontSize:15, fontWeight:700, cursor:'pointer' }}>
             {isFavorite ? '♥ Убрать из избранного' : '♡ Добавить в избранное'}

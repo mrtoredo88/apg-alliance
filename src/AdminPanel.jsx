@@ -72,10 +72,12 @@ export const AdminPanel = () => {
   const [pOffer, setPOffer] = useState('');
 
   // Форма новости
-  const [nTitle, setNTitle] = useState('');
-  const [nText, setNText]   = useState('');
-  const [nEmoji, setNEmoji] = useState('📢');
-  const [nImage, setNImage] = useState('');
+  const [nTitle, setNTitle]         = useState('');
+  const [nText, setNText]           = useState('');
+  const [nEmoji, setNEmoji]         = useState('📢');
+  const [nImage, setNImage]         = useState('');
+  const [nLinkUrl, setNLinkUrl]     = useState('');
+  const [nLinkLabel, setNLinkLabel] = useState('');
 
   // Форма уведомления
   const [ntTitle, setNtTitle] = useState('');
@@ -163,6 +165,7 @@ export const AdminPanel = () => {
 
   const resetNewsForm = () => {
     setNTitle(''); setNText(''); setNEmoji('📢'); setNImage('');
+    setNLinkUrl(''); setNLinkLabel('');
     setEditingNews(null);
   };
 
@@ -170,6 +173,7 @@ export const AdminPanel = () => {
     setEditingNews(item);
     setNTitle(item.title ?? ''); setNText(item.text ?? '');
     setNEmoji(item.emoji ?? '📢'); setNImage(item.imageUrl ?? '');
+    setNLinkUrl(item.linkUrl ?? ''); setNLinkLabel(item.linkLabel ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -180,6 +184,8 @@ export const AdminPanel = () => {
       text: nText.trim(),
       emoji: nEmoji,
       imageUrl: nImage.trim(),
+      linkUrl: nLinkUrl.trim(),
+      linkLabel: nLinkLabel.trim(),
       ...(editingNews ? {} : { createdAt: serverTimestamp() }),
     };
     if (editingNews) {
@@ -434,6 +440,12 @@ export const AdminPanel = () => {
             {nImage && (
               <img src={nImage} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, marginBottom: 10 }} onError={e => e.target.style.display = 'none'} />
             )}
+
+            <label style={s.label}>Название ссылки (необязательно)</label>
+            <input style={s.input} placeholder="Подробнее на сайте" value={nLinkLabel} onChange={e => setNLinkLabel(e.target.value)} />
+
+            <label style={s.label}>URL ссылки</label>
+            <input style={s.input} placeholder="https://..." value={nLinkUrl} onChange={e => setNLinkUrl(e.target.value)} />
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>

@@ -447,6 +447,28 @@ function NewsModal({ item, onClose }) {
             <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
             {dateStr && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>{dateStr}</div>}
             <div style={{ fontSize: 15, color: 'rgba(240,240,240,0.8)', lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
+            {item.linkUrl && item.linkLabel && (
+              <a
+                href={item.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block',
+                  marginTop: 20,
+                  padding: '14px 18px',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.13)',
+                  borderRadius: 14,
+                  color: '#fff',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  textAlign: 'center',
+                }}
+              >
+                {item.linkLabel} →
+              </a>
+            )}
           </div>
         </div>
       </div>
