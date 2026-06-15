@@ -93,6 +93,18 @@ export function UserApp() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+  // VK статусбар — обновляем CSS-переменную --safe-top
+  useEffect(() => {
+    const handler = ({ detail }) => {
+      if (detail?.type === 'VKWebAppUpdateConfig') {
+        const top = detail.data?.insets?.top ?? 0;
+        document.documentElement.style.setProperty('--safe-top', `${top}px`);
+      }
+    };
+    vkBridge.subscribe(handler);
+    return () => vkBridge.unsubscribe(handler);
+  }, []);
+
   // Авторотация партнёра дня: admin-set имеет приоритет, иначе — по дню
   const enrichedPartners = useMemo(() => {
     if (!partners.length) return partners;

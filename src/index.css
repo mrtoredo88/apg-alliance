@@ -1,4 +1,5 @@
 :root {
+  --safe-top: env(safe-area-inset-top, 0px);
   --vkui--color_background_app:     transparent;
   --vkui--color_background_content: transparent;
   --vkui--color_text_primary:       #f0f0f0;
