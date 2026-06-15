@@ -144,6 +144,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const [formText, setFormText]           = useState('');
   const [submitting, setSubmitting]       = useState(false);
   const [submitDone, setSubmitDone]       = useState(false);
+  const [phoneCopied, setPhoneCopied]     = useState(false);
 
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
@@ -223,7 +224,17 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     const url = partner.vkGroupUrl.startsWith('http') ? partner.vkGroupUrl : `https://vk.com/${partner.vkGroupUrl}`;
     openUrl(url);
   };
-  const handlePhone = () => partner.phone && openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
+  const handlePhone = () => {
+    if (!partner.phone) return;
+    // Копируем номер в буфер — VK WebView блокирует tel: схему
+    vkBridge.send('VKWebAppCopyText', { text: partner.phone }).catch(() => {
+      navigator.clipboard?.writeText(partner.phone).catch(() => {});
+    });
+    setPhoneCopied(true);
+    setTimeout(() => setPhoneCopied(false), 3000);
+    // Попытка открыть диалер (может сработать в браузере)
+    openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
+  };
   const handleMap   = () => partner.address && openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
   const handleShare  = () => vkBridge.send('VKWebAppShare', { link:`https://vk.com/app54601851`, text:`${partner.name} — партнёр АПГ! ${partner.offer ? partner.offer+' · ' : ''}Зеленоград` }).catch(() => {});
 
@@ -445,7 +456,22 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               🔵 Сообщество ВКонтакте
             </button>
           )}
-          {partner.phone   && <button onClick={handlePhone}  style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.green},#3a9a3a)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📞 Позвонить</button>}
+          {partner.phone && (
+            <div>
+              <button onClick={handlePhone} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background: phoneCopied ? `linear-gradient(135deg,#2d7a2d,#1e5e1e)` : `linear-gradient(135deg,${T.green},#3a9a3a)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', transition:'background 0.3s' }}>
+                {phoneCopied ? '✓ Номер скопирован' : '📞 Позвонить'}
+              </button>
+              {phoneCopied && (
+                <div style={{ marginTop:8, padding:'10px 14px', background:'rgba(75,179,75,0.12)', border:'1px solid rgba(75,179,75,0.3)', borderRadius:12, display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:20 }}>📋</span>
+                  <div>
+                    <div style={{ fontSize:11, color:T.green, fontWeight:700, marginBottom:2 }}>Номер в буфере обмена</div>
+                    <div style={{ fontSize:16, color:T.textPri, fontWeight:700, letterSpacing:1 }}>{partner.phone}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {partner.address && <button onClick={handleMap}    style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
           {partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && (
             <button onClick={() => openUrl(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
