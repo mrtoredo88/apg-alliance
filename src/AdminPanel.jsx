@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
-import { db } from './firebase';
+import { db, auth } from './firebase';
+import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch, increment } from 'firebase/firestore';
 
 const CATEGORIES = [
@@ -36,6 +37,25 @@ const s = {
   tabs:    { display: 'flex', gap: 8, marginBottom: 16 },
   tab:     { flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, textAlign: 'center' },
 };
+
+function MiniBarChart({ data, labelKey, valueKey, color = '#3F8AE0', shortDate = false }) {
+  const max = Math.max(...data.map(d => d[valueKey]), 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 90, paddingTop: 8 }}>
+      {data.map((d, i) => {
+        const h = Math.max(Math.round((d[valueKey] / max) * 60), d[valueKey] > 0 ? 4 : 1);
+        const label = shortDate ? d[labelKey].slice(5).replace('-', '/') : d[labelKey];
+        return (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            {d[valueKey] > 0 && <div style={{ fontSize: 9, fontWeight: 700, color }}>{d[valueKey]}</div>}
+            <div style={{ width: '100%', background: color, borderRadius: '3px 3px 0 0', height: h, opacity: d[valueKey] > 0 ? 1 : 0.15, transition: 'height 0.4s ease' }} />
+            <div style={{ fontSize: 8, color: '#99A2AD', textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%' }}>{label}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function EmojiPicker({ emojis, value, onChange }) {
   return (
@@ -115,6 +135,9 @@ export const AdminPanel = () => {
       try {
         await Promise.race([vkBridge.send('VKWebAppInit'), new Promise((_, r) => setTimeout(() => r(new Error()), 1000))]);
       } catch (e) {}
+      if (!auth.currentUser) {
+        await signInAnonymously(auth).catch(() => {});
+      }
       fetchData();
     };
     init();
@@ -387,25 +410,76 @@ export const AdminPanel = () => {
       const snap = await getDocs(collection(db, 'users'));
       const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const totalUsers = users.length;
-      const totalKeys  = users.reduce((s, u) => s + (u.keys ?? 0), 0);
-      const avgKeys    = totalUsers > 0 ? (totalKeys / totalUsers).toFixed(1) : 0;
+      const totalUsers  = users.length;
+      const totalKeys   = users.reduce((s, u) => s + (u.keys ?? 0), 0);
+      const avgKeys     = totalUsers > 0 ? (totalKeys / totalUsers).toFixed(1) : 0;
       const activeUsers = users.filter(u => (u.keys ?? 0) > 0).length;
+      const totalScans  = users.reduce((s, u) => s + Object.keys(u.scannedPartners ?? {}).length, 0);
 
-      // Считаем уникальных посетителей по каждому партнёру
+      // Рейтинг партнёров по уникальным посетителям
       const visitCounts = {};
       users.forEach(u => {
         Object.keys(u.scannedPartners ?? {}).forEach(pid => {
           visitCounts[pid] = (visitCounts[pid] ?? 0) + 1;
         });
       });
-
-      // Объединяем с данными партнёров
       const partnerStats = partners
         .map(p => ({ ...p, visits: visitCounts[p.id] ?? 0 }))
         .sort((a, b) => b.visits - a.visits);
 
-      setAnalytics({ totalUsers, totalKeys, avgKeys, activeUsers, partnerStats, users });
+      // DAU: активные пользователи за последние 14 дней (по scanDates)
+      const today = new Date();
+      const last14 = Array.from({ length: 14 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - (13 - i));
+        return d.toISOString().slice(0, 10);
+      });
+      const dauMap = {};
+      last14.forEach(date => { dauMap[date] = 0; });
+      users.forEach(u => {
+        (u.scanDates ?? []).forEach(date => {
+          if (dauMap[date] !== undefined) dauMap[date]++;
+        });
+      });
+      const dauData = last14.map(date => ({ date, count: dauMap[date] }));
+
+      // Топ-10 по ключам
+      const topUsers = [...users]
+        .sort((a, b) => (b.keys ?? 0) - (a.keys ?? 0))
+        .slice(0, 10)
+        .map(u => ({
+          id: u.id,
+          name: [u.firstName, u.lastName].filter(Boolean).join(' ') || `#${u.id.slice(0, 6)}`,
+          keys: u.keys ?? 0,
+          scans: Object.keys(u.scannedPartners ?? {}).length,
+        }));
+
+      // Распределение ключей
+      const keyBuckets = [
+        { label: '0',    min: 0,  max: 0,        count: 0 },
+        { label: '1-5',  min: 1,  max: 5,        count: 0 },
+        { label: '6-15', min: 6,  max: 15,       count: 0 },
+        { label: '16-30',min: 16, max: 30,       count: 0 },
+        { label: '31-50',min: 31, max: 50,       count: 0 },
+        { label: '51+',  min: 51, max: Infinity, count: 0 },
+      ];
+      users.forEach(u => {
+        const k = u.keys ?? 0;
+        const b = keyBuckets.find(b => k >= b.min && k <= b.max);
+        if (b) b.count++;
+      });
+
+      // Реферальная воронка
+      const referredCount   = users.filter(u => u.referredBy).length;
+      const totalReferrals  = users.reduce((s, u) => s + (u.referralCount ?? 0), 0);
+      const referralKeysOut = referredCount * 2 + totalReferrals * 2;
+
+      setAnalytics({
+        totalUsers, totalKeys, avgKeys, activeUsers, totalScans,
+        partnerStats, users,
+        dauData, topUsers, keyBuckets,
+        referredCount, totalReferrals, referralKeysOut,
+      });
     } catch (e) { console.error(e); }
     setAnalyticsLoading(false);
   }, [partners, analyticsLoading]);
@@ -812,14 +886,69 @@ export const AdminPanel = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
                   { label: 'Всего пользователей', value: analytics.totalUsers, icon: '👥' },
-                  { label: 'Активных (с ключами)', value: analytics.activeUsers, icon: '🔑' },
+                  { label: 'Активных (с ключами)', value: analytics.activeUsers, icon: '✅' },
                   { label: 'Ключей в обороте', value: analytics.totalKeys, icon: '🗝️' },
-                  { label: 'Ключей на юзера', value: analytics.avgKeys, icon: '📈' },
+                  { label: 'Ср. ключей на юзера', value: analytics.avgKeys, icon: '📈' },
+                  { label: 'Уникальных сканов', value: analytics.totalScans, icon: '📲' },
+                  { label: 'Рефералов всего', value: analytics.totalReferrals, icon: '👥' },
                 ].map(stat => (
                   <div key={stat.label} style={{ ...s.card, marginBottom: 0, textAlign: 'center' }}>
-                    <div style={{ fontSize: 28, marginBottom: 4 }}>{stat.icon}</div>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: '#3F8AE0' }}>{stat.value}</div>
+                    <div style={{ fontSize: 24, marginBottom: 4 }}>{stat.icon}</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#3F8AE0' }}>{stat.value}</div>
                     <div style={{ fontSize: 11, color: '#99A2AD', lineHeight: '14px', marginTop: 2 }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* DAU — активность за 14 дней */}
+              <div style={s.card}>
+                <h2 style={s.h2}>📅 Активные пользователи (14 дней)</h2>
+                <MiniBarChart data={analytics.dauData} labelKey="date" valueKey="count" color="#3F8AE0" shortDate />
+                <div style={{ fontSize: 11, color: '#99A2AD', marginTop: 6 }}>
+                  Кол-во юзеров, сделавших скан в этот день
+                </div>
+              </div>
+
+              {/* Распределение ключей */}
+              <div style={s.card}>
+                <h2 style={s.h2}>🗝️ Распределение ключей</h2>
+                <MiniBarChart data={analytics.keyBuckets} labelKey="label" valueKey="count" color="#F4A261" />
+                <div style={{ fontSize: 11, color: '#99A2AD', marginTop: 6 }}>
+                  Сколько пользователей имеют данное количество ключей
+                </div>
+              </div>
+
+              {/* Реферальная статистика */}
+              <div style={s.card}>
+                <h2 style={s.h2}>🔗 Реферальная программа</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  {[
+                    { label: 'Пришли по реферальной', value: analytics.referredCount },
+                    { label: 'Активных рефереров', value: analytics.totalReferrals > 0 ? analytics.users.filter(u => (u.referralCount ?? 0) > 0).length : 0 },
+                    { label: 'Ключей роздано', value: analytics.referralKeysOut },
+                  ].map(s2 => (
+                    <div key={s2.label} style={{ background: '#f2f3f5', borderRadius: 12, padding: '12px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: '#3F8AE0' }}>{s2.value}</div>
+                      <div style={{ fontSize: 10, color: '#99A2AD', lineHeight: '13px', marginTop: 3 }}>{s2.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Топ-10 пользователей */}
+              <div style={s.card}>
+                <h2 style={s.h2}>🏆 Топ-10 пользователей</h2>
+                {analytics.topUsers.map((u, i) => (
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 9 ? '1px solid #f2f3f5' : 'none' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: i < 3 ? '#3F8AE0' : '#99A2AD', width: 22, flexShrink: 0 }}>#{i + 1}</span>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: i === 0 ? '#FFF3CD' : i === 1 ? '#F5F5F5' : i === 2 ? '#FBE9D0' : '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#000', flexShrink: 0 }}>
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : u.name[0]?.toUpperCase() ?? '?'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
+                      <div style={{ fontSize: 11, color: '#99A2AD' }}>ID: {u.id} · {u.scans} партнёров</div>
+                    </div>
+                    <div style={{ flexShrink: 0, fontSize: 13, fontWeight: 800, color: '#3F8AE0' }}>🗝️ {u.keys}</div>
                   </div>
                 ))}
               </div>
