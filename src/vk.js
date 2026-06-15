@@ -66,4 +66,17 @@ const vkBridge = {
   unsubscribe: _vkBridge.unsubscribe?.bind(_vkBridge),
 };
 
+// Открывает URL надёжно: обходит isVK() и вызывает реальный _vkBridge напрямую.
+// В браузере _vkBridge.send упадёт → перехватываем и делаем window.open.
+export const openUrl = (url) => {
+  if (!url) return;
+  if (url.startsWith('tel:')) {
+    window.location.href = url;
+    return;
+  }
+  _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  });
+};
+
 export default vkBridge;

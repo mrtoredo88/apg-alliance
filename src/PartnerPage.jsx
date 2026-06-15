@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Panel, HorizontalScroll } from '@vkontakte/vkui';
-import vkBridge, { isVK } from './vk.js';
+import vkBridge, { openUrl } from './vk.js';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -218,33 +218,13 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const avgRating = partner.avgRating ?? 0;
   const reviewCount = partner.reviewCount ?? reviews.length;
 
-  const openLink = (url) => {
-    if (!url) return;
-    if (isVK()) {
-      // В VK WebView window.open() может вернуть объект даже при блокировке —
-      // всегда используем Bridge напрямую
-      if (url.startsWith('tel:')) {
-        window.location.href = url; // звонок через нативный обработчик WebView
-      } else {
-        vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
-      }
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  };
   const openVkGroup = () => {
     if (!partner.vkGroupUrl) return;
     const url = partner.vkGroupUrl.startsWith('http') ? partner.vkGroupUrl : `https://vk.com/${partner.vkGroupUrl}`;
-    openLink(url);
+    openUrl(url);
   };
-  const handlePhone = () => {
-    if (!partner.phone) return;
-    openLink(`tel:${partner.phone.replace(/\s/g, '')}`);
-  };
-  const handleMap = () => {
-    if (!partner.address) return;
-    openLink(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
-  };
+  const handlePhone = () => partner.phone && openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
+  const handleMap   = () => partner.address && openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
   const handleShare  = () => vkBridge.send('VKWebAppShare', { link:`https://vk.com/app54601851`, text:`${partner.name} — партнёр АПГ! ${partner.offer ? partner.offer+' · ' : ''}Зеленоград` }).catch(() => {});
 
   const infoRows = [
@@ -257,32 +237,30 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   return (
     <Panel id="partner">
-      {/* Явный scroll-контейнер: sticky работает только внутри своего overflow-контейнера.
-          VK UI Panel может иметь overflow:hidden во время анимации — создаём свой. */}
-      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', background: T.bg }}>
-
-        {/* Хедер */}
-        <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(8,8,20,0.72)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
-            <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
-              {avgRating > 0 && (
-                <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
-                  <span style={{ fontSize:11, color:'#FFD700', letterSpacing:1 }}>{'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5-Math.round(avgRating))}</span>
-                  <span style={{ fontSize:11, color:T.gold, fontWeight:700 }}>{avgRating.toFixed(1)}</span>
-                  <span style={{ fontSize:10, color:T.textSec }}>({reviewCount})</span>
-                </div>
-              )}
-            </div>
-            <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
-            <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
-              {isFavorite ? '♥' : '♡'}
-            </button>
+      {/* position:fixed — работает независимо от overflow контейнера Panel и VK UI анимаций */}
+      <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:50, background:'rgba(8,8,20,0.82)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
+          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
+            {avgRating > 0 && (
+              <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
+                <span style={{ fontSize:11, color:'#FFD700', letterSpacing:1 }}>{'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5-Math.round(avgRating))}</span>
+                <span style={{ fontSize:11, color:T.gold, fontWeight:700 }}>{avgRating.toFixed(1)}</span>
+                <span style={{ fontSize:10, color:T.textSec }}>({reviewCount})</span>
+              </div>
+            )}
           </div>
+          <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
+          <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
+            {isFavorite ? '♥' : '♡'}
+          </button>
         </div>
+      </div>
 
-        <div style={{ minHeight: 'calc(100% - 52px)' }}>
+      <div style={{ background: T.bg }}>
+        {/* Отступ для фиксированного хедера */}
+        <div style={{ height:52 }} />
 
         {/* Шапка партнёра */}
         <div style={{ margin:'8px 16px', borderRadius:24, background:'linear-gradient(135deg,#0F0F2E,#1A1A4E)', position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>
@@ -470,7 +448,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           {partner.phone   && <button onClick={handlePhone}  style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.green},#3a9a3a)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📞 Позвонить</button>}
           {partner.address && <button onClick={handleMap}    style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
           {partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && (
-            <button onClick={() => openLink(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
+            <button onClick={() => openUrl(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
           )}
           <button onClick={() => onToggleFavorite(partner.id)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:isFavorite?`1px solid ${T.red}44`:'none', background:isFavorite?T.red+'15':`linear-gradient(135deg,${T.gold},${T.goldL})`, color:isFavorite?T.red:'#0F0F1A', fontSize:15, fontWeight:700, cursor:'pointer' }}>
             {isFavorite ? '♥ Убрать из избранного' : '♡ Добавить в избранное'}
@@ -495,7 +473,6 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       {lightboxIdx !== null && (
         <PhotoLightbox photos={photos} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
-      </div>  {/* конец scroll-контейнера */}
     </Panel>
   );
 }
