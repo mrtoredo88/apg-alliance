@@ -64,7 +64,7 @@ function PartnerLogo({ partner, size = 88 }) {
   return (
     <div style={{ width:size, height:size, borderRadius:'50%', padding:3, background:`linear-gradient(135deg,${T.gold},${T.goldL})` }}>
       <div style={{ width:'100%', height:'100%', borderRadius:'50%', overflow:'hidden' }}>
-        <img src={partner.logoUrl} alt="" onError={() => setFailed(true)} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+        <img src={partner.logoUrl} alt="" loading="lazy" onError={() => setFailed(true)} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
       </div>
     </div>
   );

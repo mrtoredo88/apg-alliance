@@ -198,7 +198,7 @@ function PartnerLogo({ partner, size = 56 }) {
   }
   return (
     <img
-      src={partner.logoUrl} alt={name}
+      src={partner.logoUrl} alt={name} loading="lazy"
       onError={() => setFailed(true)}
       style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.12)', display: 'block', flexShrink: 0 }}
     />

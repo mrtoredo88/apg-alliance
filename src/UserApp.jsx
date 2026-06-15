@@ -9,8 +9,9 @@ import {
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
 } from 'firebase/firestore';
 import ScannerComponent      from './Scanner.jsx';
-import { ProfilePanel }      from './ProfilePanel.jsx';
 import { HomePanel }         from './HomePanel.jsx';
+
+const ProfilePanel = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 import { PartnerPage }       from './PartnerPage.jsx';
 import { Onboarding }        from './Onboarding.jsx';
 import { NotificationsPage } from './NotificationsPage.jsx';
@@ -87,10 +88,18 @@ export function UserApp() {
 
   // Реферальный параметр из URL (разовое чтение при монтировании)
   const pendingRefId = useMemo(() => {
-    const fromHash   = window.location.hash.match(/^#ref_(\w+)/)?.[1];
+    const fromHash   = window.location.hash.match(/[#&]ref[=_](\w+)/)?.[1];
     const fromSearch = new URLSearchParams(window.location.search).get('ref');
     return fromHash ?? fromSearch ?? null;
   }, []);
+
+  // Deep link на конкретного партнёра: #partner_ID или ?partner=ID
+  const pendingPartnerId = useMemo(() => {
+    const fromHash   = window.location.hash.match(/[#&]partner[=_](\w+)/)?.[1];
+    const fromSearch = new URLSearchParams(window.location.search).get('partner');
+    return fromHash ?? fromSearch ?? null;
+  }, []);
+  const deepLinkOpened = useRef(false);
 
   const haptic = useCallback((style = 'light') => {
     vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
@@ -325,6 +334,13 @@ export function UserApp() {
     return () => { isMounted.current = false; };
   }, [loadData]);
 
+  // Открываем партнёра из deep link, как только партнёры загружены
+  useEffect(() => {
+    if (!pendingPartnerId || !partners.length || deepLinkOpened.current) return;
+    const p = partners.find(p => p.id === pendingPartnerId);
+    if (p) { deepLinkOpened.current = true; openPartner(p); }
+  }, [pendingPartnerId, partners, openPartner]);
+
   const handleRefresh = useCallback(async () => {
     const isMounted = { current: true };
     await loadData(isMounted);
@@ -429,7 +445,8 @@ export function UserApp() {
         setUserKeys(prev => prev + keyBonus);
         setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
         const bonusText = keyBonus > 1 ? ` x${keyBonus} (партнёр дня!)` : '';
-        showToast(`+${keyBonus} ключ${bonusText} — ${partner.name}! 🔑`, 'success');
+        setToast({ msg: `+${keyBonus} ключ${bonusText} — ${partner.name}! 🔑`, type: 'success', sharePartner: partner });
+        setTimeout(() => setToast(null), 4500);
         addDoc(collection(db, 'users', String(user.id), 'activity'), {
           type: 'scan', icon: keyBonus > 1 ? '⭐' : '🔑',
           text: `Посещён: ${partner.name}${keyBonus > 1 ? ' (партнёр дня × 2)' : ''}`,
@@ -759,21 +776,23 @@ export function UserApp() {
 
               {/* ProfilePanel не рендерит Panel — оборачиваем */}
               <Panel id="profile">
-                <ProfilePanel
-                  user={user} userKeys={userKeys} favorites={favorites}
-                  partners={enrichedPartners} referralCount={referralCount}
-                  streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
-                  completedTasks={completedTasks} scanDates={scanDates}
-                  notificationsEnabled={notifEnabled}
-                  onToggleFavorite={toggleFavorite}
-                  onOpenPartner={openPartner}
-                  onOpenActivity={() => goPanel('activity')}
-                  onEnableNotifications={handleEnableNotifications}
-                  onOpenReferral={() => goPanel('referral')}
-                  onShare={handleShare}
-                  onLogout={handleLogout}
-                  onDeleteProfile={handleDeleteProfile}
-                />
+                <Suspense fallback={<LazyFallback />}>
+                  <ProfilePanel
+                    user={user} userKeys={userKeys} favorites={favorites}
+                    partners={enrichedPartners} referralCount={referralCount}
+                    streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
+                    completedTasks={completedTasks} scanDates={scanDates}
+                    notificationsEnabled={notifEnabled}
+                    onToggleFavorite={toggleFavorite}
+                    onOpenPartner={openPartner}
+                    onOpenActivity={() => goPanel('activity')}
+                    onEnableNotifications={handleEnableNotifications}
+                    onOpenReferral={() => goPanel('referral')}
+                    onShare={handleShare}
+                    onLogout={handleLogout}
+                    onDeleteProfile={handleDeleteProfile}
+                  />
+                </Suspense>
               </Panel>
 
               {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
@@ -882,17 +901,36 @@ export function UserApp() {
           {toast && (
             <div style={{
               position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 10000, pointerEvents: 'none',
+              zIndex: 10000, pointerEvents: toast.sharePartner ? 'auto' : 'none',
               background: toast.type === 'success' ? 'rgba(75,179,75,0.15)' : 'rgba(20,20,50,0.85)',
               border: `1px solid ${toast.type === 'success' ? 'rgba(75,179,75,0.35)' : 'rgba(255,255,255,0.12)'}`,
               backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-              borderRadius: 14, padding: '12px 20px',
+              borderRadius: 14, padding: '10px 16px',
               color: '#F0F0F0', fontSize: 14, fontWeight: 600,
-              whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 48px)',
+              maxWidth: 'calc(100vw - 48px)',
               animation: 'toastIn 0.25s ease',
               boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column', gap: 8,
             }}>
-              {toast.msg}
+              <span style={{ whiteSpace: 'nowrap' }}>{toast.msg}</span>
+              {toast.sharePartner && (
+                <button
+                  onClick={() => {
+                    vkBridge.send('VKWebAppShare', {
+                      link: 'https://vk.com/app54601851',
+                      text: `Только что посетил ${toast.sharePartner.name} — +${toast.sharePartner.featured ? 2 : 1} ключ! 🗝️ Присоединяйся к АПГ — Альянсу Партнёров Зеленограда`,
+                    }).catch(() => {});
+                    setToast(null);
+                  }}
+                  style={{
+                    background: 'rgba(74,144,217,0.15)', border: '1px solid rgba(74,144,217,0.35)',
+                    borderRadius: 10, padding: '5px 12px', color: '#6AABEC',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-start',
+                  }}
+                >
+                  📤 Рассказать друзьям
+                </button>
+              )}
             </div>
           )}
         </AppRoot>

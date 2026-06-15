@@ -7,6 +7,8 @@
   --c-text-sec:      rgba(240,240,240,0.45);
   --c-border:        rgba(255,255,255,0.08);
   --c-surface:       rgba(255,255,255,0.05);
+  --c-card:          #1A1A2E;
+  --c-card2:         #16213E;
   --c-tabbar-bg:     rgba(12,12,30,0.55);
   --c-tabbar-border: rgba(255,255,255,0.14);
   --c-orb-top:       rgba(80,60,200,0.5);
@@ -28,6 +30,8 @@
   --c-text-sec:      rgba(28,27,30,0.5);
   --c-border:        rgba(0,0,0,0.09);
   --c-surface:       rgba(255,255,255,0.65);
+  --c-card:          rgba(255,255,255,0.75);
+  --c-card2:         rgba(255,255,255,0.55);
   --c-tabbar-bg:     rgba(232,234,240,0.85);
   --c-tabbar-border: rgba(0,0,0,0.1);
   --c-orb-top:       rgba(120,100,230,0.12);

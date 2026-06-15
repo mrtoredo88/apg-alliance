@@ -13,7 +13,7 @@ function OfferCard({ partner, onOpenPartner, index }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         {partner.logoUrl
-          ? <img src={partner.logoUrl} alt="" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: `2px solid rgba(201,168,76,0.25)`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+          ? <img src={partner.logoUrl} alt="" loading="lazy" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: `2px solid rgba(201,168,76,0.25)`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
           : <div style={{ width: 52, height: 52, borderRadius: '50%', background: T.gold + '18', border: `2px solid ${T.gold}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
         }
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -75,7 +75,7 @@ function PartnerSearchCard({ partner, onOpenPartner, index, query }) {
       animationDelay: `${index * 0.04}s`,
     }}>
       {partner.logoUrl
-        ? <img src={partner.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid rgba(201,168,76,0.2)`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+        ? <img src={partner.logoUrl} alt="" loading="lazy" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid rgba(201,168,76,0.2)`, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
         : <div style={{ width: 48, height: 48, borderRadius: '50%', background: T.gold + '15', border: `1.5px solid ${T.gold}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
       }
       <div style={{ flex: 1, minWidth: 0 }}>
