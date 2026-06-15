@@ -5,7 +5,7 @@ import vkBridge from './vk.js';
 import { db } from './firebase';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
-  collection, getDocs, query, orderBy,
+  collection, getDocs, query, orderBy, addDoc, serverTimestamp,
 } from 'firebase/firestore';
 import ScannerComponent      from './Scanner.jsx';
 import { ProfilePanel }      from './ProfilePanel.jsx';
@@ -117,6 +117,12 @@ export function UserApp() {
       const docSnap = await getDoc(userRef);
       if (!isMounted.current) return;
 
+      const profilePatch = {
+        firstName: userData.first_name ?? null,
+        lastName:  userData.last_name  ?? null,
+        photo:     userData.photo_200  ?? null,
+      };
+
       if (docSnap.exists()) {
         const data = docSnap.data();
         setUserKeys(data.keys ?? 0);
@@ -127,10 +133,12 @@ export function UserApp() {
         setLastScanDate(data.lastScanDate ?? null);
         setReferralCount(data.referralCount ?? 0);
         if (!data.onboardingDone) setShowOnboarding(true);
+        updateDoc(userRef, profilePatch).catch(() => {});
       } else {
         await setDoc(userRef, {
           keys: 0, favorites: [], scannedPartners: {},
           completedTasks: [], streak: 0, onboardingDone: false,
+          ...profilePatch,
         });
         setShowOnboarding(true);
       }
@@ -168,13 +176,24 @@ export function UserApp() {
   const toggleFavorite = useCallback(async (partnerId) => {
     if (!user) return;
     const prev = favorites;
-    const next = favorites.includes(partnerId)
-      ? favorites.filter(id => id !== partnerId)
-      : [...favorites, partnerId];
+    const isAdding = !favorites.includes(partnerId);
+    const next = isAdding
+      ? [...favorites, partnerId]
+      : favorites.filter(id => id !== partnerId);
     setFavorites(next);
-    try { await updateDoc(doc(db, 'users', String(user.id)), { favorites: next }); }
-    catch { setFavorites(prev); }
-  }, [user, favorites]);
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), { favorites: next });
+      const partner = partners.find(p => p.id === partnerId);
+      addDoc(collection(db, 'users', String(user.id), 'activity'), {
+        type: isAdding ? 'favorite_add' : 'favorite_remove',
+        icon: isAdding ? '⭐' : '✕',
+        text: isAdding
+          ? `Добавлено в избранное: ${partner?.name ?? partnerId}`
+          : `Убрано из избранного: ${partner?.name ?? partnerId}`,
+        ts: serverTimestamp(),
+      }).catch(() => {});
+    } catch { setFavorites(prev); }
+  }, [user, favorites, partners]);
 
   // ─── Скан ───────────────────────────────────────────────────────────────────
 
@@ -222,10 +241,20 @@ export function UserApp() {
         setUserKeys(prev => prev + 1);
         setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
         showToast(`+1 ключ — ${partner.name}! 🔑`, 'success');
+        addDoc(collection(db, 'users', String(user.id), 'activity'), {
+          type: 'scan', icon: '🔑',
+          text: `Посещён: ${partner.name}`,
+          ts: serverTimestamp(),
+        }).catch(() => {});
       } else {
         const days = newStreak;
         const label = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
         showToast(`Серия продолжается — ${days} ${label}! 🔥`, 'success');
+        addDoc(collection(db, 'users', String(user.id), 'activity'), {
+          type: 'scan', icon: '🔥',
+          text: `Стрик продолжается (${partner.name}) — ${days} ${label}`,
+          ts: serverTimestamp(),
+        }).catch(() => {});
       }
     } catch (e) {
       console.error(e);
@@ -467,6 +496,8 @@ export function UserApp() {
                 <ProfilePanel
                   user={user} userKeys={userKeys} favorites={favorites}
                   partners={partners} referralCount={referralCount}
+                  streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
+                  completedTasks={completedTasks}
                   notificationsEnabled={notifEnabled}
                   onToggleFavorite={toggleFavorite}
                   onOpenPartner={openPartner}

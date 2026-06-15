@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
+import confetti from 'canvas-confetti';
 import { TASKS } from './tasks.js';
 import { T, GLASS } from './design.js';
 
@@ -121,7 +122,16 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
 
   const handleClaim = async (taskId, reward) => {
     setClaiming(taskId);
-    try { await onClaim(taskId, reward); }
+    try {
+      await onClaim(taskId, reward);
+      confetti({
+        particleCount: 120,
+        spread: 70,
+        origin: { y: 0.55 },
+        colors: ['#C9A84C', '#E8C97A', '#ffffff', '#4BB34B'],
+        disableForReducedMotion: true,
+      });
+    }
     finally { setClaiming(null); }
   };
 

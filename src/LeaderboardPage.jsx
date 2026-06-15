@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { getLevel } from './levels.js';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
 
@@ -71,10 +73,62 @@ function PodiumCard({ user, rank }) {
   );
 }
 
-function UserRow({ user, rank, isCurrentUser, index }) {
+function UserProfileModal({ user, rank, onClose }) {
+  const level = getLevel(user.keys ?? 0);
+  const medals = ['🥇', '🥈', '🥉'];
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, borderRadius: 28, background: 'linear-gradient(145deg, rgba(18,12,50,0.98), rgba(22,18,62,0.97))', border: '1px solid rgba(201,168,76,0.28)', boxShadow: '0 24px 80px rgba(0,0,0,0.65)', padding: '28px 24px', position: 'relative', overflow: 'hidden', animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.4,0.64,1)' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
+
+        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textSec, fontSize: 16, cursor: 'pointer' }}>✕</button>
+
+        {/* Аватар + имя */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 24, position: 'relative' }}>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', padding: 3, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})` }}>
+            <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
+              {user.photo
+                ? <img src={user.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: T.gold, fontWeight: 700 }}>{(user.firstName ?? '?')[0]}</div>
+              }
+            </div>
+          </div>
+          {rank < 3 && <div style={{ position: 'absolute', top: 54, left: '50%', transform: 'translateX(20px)', fontSize: 22 }}>{medals[rank]}</div>}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: T.textPri }}>{user.firstName ?? ''} {user.lastName ?? ''}</div>
+            <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 4 }}>{level.emoji} {level.title}</div>
+          </div>
+        </div>
+
+        {/* Статистика */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+          {[
+            { emoji: '🏆', value: `#${rank + 1}`,       label: 'место' },
+            { emoji: '🗝️', value: user.keys ?? 0,       label: 'ключей' },
+            { emoji: '🔥', value: user.streak ?? 0,     label: 'стрик' },
+          ].map(s => (
+            <div key={s.label} style={{ ...GLASS, borderRadius: 16, padding: '12px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20 }}>{s.emoji}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: T.gold, lineHeight: 1.2 }}>{s.value}</div>
+              <div style={{ fontSize: 10, color: T.textSec, marginTop: 2 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ textAlign: 'center', fontSize: 12, color: T.textSec, opacity: 0.6 }}>
+          Участник АПГ — Альянс Партнёров Зеленограда
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function UserRow({ user, rank, isCurrentUser, index, onSelect }) {
   const isMedal = rank <= 2;
   return (
-    <div style={{
+    <div onClick={() => onSelect(user, rank)} style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '12px 16px',
       background: isCurrentUser ? `rgba(201,168,76,0.08)` : 'transparent',
@@ -84,6 +138,7 @@ function UserRow({ user, rank, isCurrentUser, index }) {
       margin: isCurrentUser ? '0 8px' : 0,
       animation: 'fadeInUp 0.35s ease both',
       animationDelay: `${index * 0.04}s`,
+      cursor: 'pointer',
     }}>
       {/* Ранг */}
       <div style={{ width: 28, textAlign: 'center', flexShrink: 0 }}>
@@ -120,6 +175,10 @@ function UserRow({ user, rank, isCurrentUser, index }) {
 export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedRank, setSelectedRank] = useState(0);
+
+  const handleSelect = (user, rank) => { setSelectedUser(user); setSelectedRank(rank); };
 
   useEffect(() => {
     const fetch = async () => {
@@ -190,9 +249,9 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
                   ✦ Лидеры АПГ ✦
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-                  {top3[1] && <PodiumCard user={top3[1]} rank={1} />}
-                  {top3[0] && <PodiumCard user={top3[0]} rank={0} />}
-                  {top3[2] && <PodiumCard user={top3[2]} rank={2} />}
+                  {top3[1] && <div onClick={() => handleSelect(top3[1], 1)} style={{ flex: 1, cursor: 'pointer' }}><PodiumCard user={top3[1]} rank={1} /></div>}
+                  {top3[0] && <div onClick={() => handleSelect(top3[0], 0)} style={{ flex: 1, cursor: 'pointer' }}><PodiumCard user={top3[0]} rank={0} /></div>}
+                  {top3[2] && <div onClick={() => handleSelect(top3[2], 2)} style={{ flex: 1, cursor: 'pointer' }}><PodiumCard user={top3[2]} rank={2} /></div>}
                 </div>
               </div>
             )}
@@ -207,6 +266,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
                     rank={i + 3}
                     isCurrentUser={user.id === String(currentUserId)}
                     index={i}
+                    onSelect={handleSelect}
                   />
                 ))}
               </div>
@@ -222,6 +282,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
                     rank={currentUserIndex}
                     isCurrentUser
                     index={0}
+                    onSelect={handleSelect}
                   />
                 </div>
               </div>
@@ -235,6 +296,14 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
           </>
         )}
       </div>
+
+      {selectedUser && (
+        <UserProfileModal
+          user={selectedUser}
+          rank={selectedRank}
+          onClose={() => setSelectedUser(null)}
+        />
+      )}
     </Panel>
   );
 }

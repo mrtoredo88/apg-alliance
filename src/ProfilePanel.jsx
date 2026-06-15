@@ -115,13 +115,67 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, onShare, onOpenReferral }) {
+function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlockedAchievements, level, onClose, onShareVK }) {
+  const name = user ? `${user.first_name} ${user.last_name}`.trim() : 'Участник АПГ';
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 32px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, padding: '0 16px', animation: 'slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1)' }}>
+        {/* Превью карточки */}
+        <div style={{ borderRadius: 28, padding: '24px 20px', marginBottom: 12, background: 'linear-gradient(145deg, #120c32, #16123e)', border: '1px solid rgba(201,168,76,0.35)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
+
+          <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16, opacity: 0.8 }}>✦ АПГ — Альянс Партнёров Зеленограда</div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+            {user?.photo_200
+              ? <img src={user.photo_200} alt="" style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.gold}88`, objectFit: 'cover', flexShrink: 0 }} />
+              : <div style={{ width: 56, height: 56, borderRadius: '50%', background: T.gold + '20', border: `2px solid ${T.gold}60`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>👤</div>
+            }
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{name}</div>
+              <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.title}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            {[
+              { emoji: '🗝️', value: userKeys,         label: 'ключей' },
+              { emoji: '🔥', value: streak,            label: 'дней стрик' },
+              { emoji: '🏪', value: scannedCount,      label: 'партнёров' },
+              { emoji: '🏆', value: unlockedAchievements, label: 'наград' },
+            ].map(s => (
+              <div key={s.label} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 18 }}>{s.emoji}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: T.gold, lineHeight: 1.2 }}>{s.value}</div>
+                <div style={{ fontSize: 9, color: T.textSec, lineHeight: '12px', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Кнопки */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onShareVK} style={{ flex: 1, padding: '14px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            📤 Поделиться в VK
+          </button>
+          <button onClick={onClose} style={{ padding: '14px 20px', borderRadius: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: T.textPri, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], onShare, onOpenReferral }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIosHint, setShowIosHint] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -497,7 +551,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
           {/* Кнопки */}
           <div style={{ padding: '0 14px 14px', display: 'flex', gap: 8 }}>
-            <button onClick={onShare} style={{ flex: 1, padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setShowShareModal(true)} style={{ flex: 1, padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               📤 Поделиться
             </button>
             <button onClick={onOpenReferral} style={{ flex: 1, padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: T.textPri, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
@@ -742,6 +796,29 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             </div>
           </div>
         </div>
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          user={user}
+          userKeys={userKeys}
+          streak={streak}
+          scannedCount={scannedCount}
+          completedTasks={completedTasks}
+          unlockedAchievements={achievements.filter(a => a.unlocked).length}
+          level={level}
+          onClose={() => setShowShareModal(false)}
+          onShareVK={() => {
+            const name = user ? user.first_name : 'Я';
+            const levelLabel = level.title;
+            const msg = `${name} — участник АПГ!\n\n🗝️ ${userKeys} ключей · ${levelLabel}\n🔥 Стрик: ${streak} дней\n🏪 Партнёров посещено: ${scannedCount}\n\nПрисоединяйся к Альянсу Партнёров Зеленограда 👇`;
+            vkBridge.send('VKWebAppShowWallPostBox', {
+              message: msg,
+              attachments: 'https://vk.com/app54601851',
+            }).catch(() => {});
+            setShowShareModal(false);
+          }}
+        />
       )}
     </div>
   );
