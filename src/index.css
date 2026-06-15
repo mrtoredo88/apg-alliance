@@ -19,9 +19,9 @@ html, body {
 #root {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 20% 0%,   rgba(80,60,200,0.45) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 40%,  rgba(201,168,76,0.2) 0%, transparent 45%),
-    radial-gradient(ellipse at 10% 100%, rgba(30,50,210,0.5)  0%, transparent 45%),
+    radial-gradient(ellipse at 50% 0%,   rgba(80,60,200,0.5)  0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(30,50,210,0.45) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%),
     #08081A;
   background-attachment: scroll;
 }
