@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
@@ -19,12 +19,29 @@ const T = {
   white:    '#FFFFFF',
 };
 
+// Liquid Glass токены
 const GLASS = {
-  background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
+const GLASS_STRONG = {
+  background: 'rgba(255,255,255,0.08)',
+  backdropFilter: 'blur(48px) saturate(2)',
+  WebkitBackdropFilter: 'blur(48px) saturate(2)',
+  border: '1px solid rgba(255,255,255,0.16)',
+  boxShadow: '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
+};
+
+const GLASS_GOLD = {
+  background: 'linear-gradient(135deg, rgba(201,168,76,0.16), rgba(201,168,76,0.06))',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(201,168,76,0.28)',
+  boxShadow: '0 8px 28px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.08)',
 };
 
 const CATEGORIES = [
@@ -273,11 +290,18 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         <div style={{ fontSize: 12, fontWeight: 700, color: T.textPri, lineHeight: '16px', marginBottom: 3 }}>
           {partner.name ?? 'Партнёр'}
         </div>
-        {partner.categoryLabel && (
+        {partner.avgRating > 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+            <span style={{ fontSize: 11, color: '#FFD700', letterSpacing: 0.5 }}>
+              {'★'.repeat(Math.round(partner.avgRating))}{'☆'.repeat(5 - Math.round(partner.avgRating))}
+            </span>
+            <span style={{ fontSize: 10, color: T.textSec }}>{partner.avgRating.toFixed(1)}</span>
+          </div>
+        ) : partner.categoryLabel ? (
           <div style={{ fontSize: 10, color: T.gold }}>
             {CATEGORIES.find(c => c.id === partner.category)?.emoji} {partner.categoryLabel}
           </div>
-        )}
+        ) : null}
       </div>
 
       <button onClick={() => onOpen(partner)} style={{
@@ -300,12 +324,10 @@ function FeaturedPartnerCard({ partner, onOpen }) {
         width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: 0, background: 'none',
       }}>
         <div style={{
-          borderRadius: 20,
-          background: 'linear-gradient(135deg, rgba(255,200,0,0.12) 0%, rgba(255,150,0,0.08) 100%)',
-          border: '1px solid rgba(255,200,0,0.3)',
+          borderRadius: 24,
+          ...GLASS_GOLD,
           padding: '14px 16px',
           display: 'flex', alignItems: 'center', gap: 14,
-          boxShadow: '0 0 24px rgba(255,180,0,0.08)',
         }}>
           {/* Метка */}
           <div style={{ flexShrink: 0 }}>
@@ -332,6 +354,246 @@ function FeaturedPartnerCard({ partner, onOpen }) {
   );
 }
 
+// ─── Новостной виджет ────────────────────────────────────────────────────────
+
+function NewsModal({ item, onClose }) {
+  const [dragY, setDragY]           = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchY    = useRef(null);
+  const sheetRef  = useRef(null);
+  const scrollRef = useRef(null);
+
+  const THRESHOLD = 110;
+
+  // Non-passive touchmove: intercept downward drag only when inner scroll is at top
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      if (touchY.current === null) return;
+      const dy = e.touches[0].clientY - touchY.current;
+      if (dy <= 0) return;
+      if (scrollRef.current && scrollRef.current.scrollTop > 0) return;
+      e.preventDefault();
+      setDragY(Math.min(dy, 420));
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, []);
+
+  const onTouchStart = (e) => {
+    touchY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const onTouchEnd = (e) => {
+    if (touchY.current === null) return;
+    const dy = e.changedTouches[0].clientY - touchY.current;
+    touchY.current = null;
+    setIsDragging(false);
+    if (dy >= THRESHOLD) {
+      setDragY(700);
+      setTimeout(onClose, 300);
+    } else {
+      setDragY(0);
+    }
+  };
+
+  const dateStr = item.createdAt?.toDate
+    ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+
+  const pct = Math.max(0, 1 - dragY / 280);
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: `rgba(0,0,0,${(0.72 * pct).toFixed(2)})`,
+        display: 'flex', alignItems: 'flex-end',
+        backdropFilter: `blur(${(6 * pct).toFixed(1)}px)`,
+        WebkitBackdropFilter: `blur(${(6 * pct).toFixed(1)}px)`,
+      }}
+      onClick={onClose}
+    >
+      <div
+        ref={sheetRef}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'rgba(10,10,26,0.97)',
+          backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
+          borderRadius: '24px 24px 0 0',
+          width: '100%', maxHeight: '88vh',
+          border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
+          transform: `translateY(${dragY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.2,0,0,1)',
+          willChange: 'transform',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Ручка — всегда активна для свайпа */}
+        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, margin: '14px auto 6px', flexShrink: 0 }} />
+
+        {/* Скроллируемый контент */}
+        <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
+          {item.imageUrl && (
+            <img src={item.imageUrl} alt="" onError={e => { e.target.style.display = 'none'; }}
+              style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', marginTop: 8 }} />
+          )}
+          <div style={{ padding: '20px 20px 48px' }}>
+            {!item.imageUrl && item.emoji && <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{item.emoji}</div>}
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
+            {dateStr && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>{dateStr}</div>}
+            <div style={{ fontSize: 15, color: 'rgba(240,240,240,0.8)', lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NewsWidget({ news }) {
+  const [idx, setIdx]         = useState(0);
+  const [modal, setModal]     = useState(null);
+  const [offset, setOffset]   = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const widgetBodyRef = useRef(null);
+  const touchY   = useRef(null);
+  const idxRef   = useRef(0);
+
+  const ITEM_H    = 270;
+  const THRESHOLD = 55;
+
+  const goTo = useCallback((newIdx) => {
+    const clamped = Math.max(0, Math.min(news.length - 1, newIdx));
+    idxRef.current = clamped;
+    setIdx(clamped);
+    setOffset(0);
+    setIsDragging(false);
+  }, [news.length]);
+
+  useEffect(() => { idxRef.current = idx; }, [idx]);
+
+  // Non-passive touchmove: prevents page scroll while swiping inside the widget
+  useEffect(() => {
+    const el = widgetBodyRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      if (touchY.current === null) return;
+      e.preventDefault();
+      const dy = e.touches[0].clientY - touchY.current;
+      const cur = idxRef.current;
+      const atEdge = (cur === 0 && dy > 0) || (cur === news.length - 1 && dy < 0);
+      setOffset(atEdge ? dy * 0.2 : dy);
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, [news.length]);
+
+  if (!news.length) return null;
+
+  const onTouchStart = (e) => {
+    touchY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const onTouchEnd = (e) => {
+    if (touchY.current === null) return;
+    const dy = e.changedTouches[0].clientY - touchY.current;
+    touchY.current = null;
+    if (dy < -THRESHOLD && idxRef.current < news.length - 1) goTo(idxRef.current + 1);
+    else if (dy > THRESHOLD && idxRef.current > 0) goTo(idxRef.current - 1);
+    else { setOffset(0); setIsDragging(false); }
+  };
+
+  return (
+    <>
+      <div style={{ margin: '8px 16px 0', ...GLASS_STRONG, borderRadius: 24, overflow: 'hidden', position: 'relative', animation: 'fadeInUp 0.4s ease both' }}>
+
+        {/* Шапка виджета */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, letterSpacing: 2.5, textTransform: 'uppercase' }}>✦ Новости АПГ</span>
+          {news.length > 1 && <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>{idx + 1} / {news.length}</span>}
+        </div>
+
+        {/* Вертикальный слайдер */}
+        <div
+          ref={widgetBodyRef}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          style={{ height: ITEM_H, overflow: 'hidden', position: 'relative' }}
+        >
+          <div style={{
+            transform: `translateY(${-idx * ITEM_H + offset}px)`,
+            transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.2,0,0,1)',
+          }}>
+            {news.map((n) => {
+              const ds = n.createdAt?.toDate
+                ? n.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+                : '';
+              return (
+                <div key={n.id} style={{ height: ITEM_H, display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
+                  {n.imageUrl ? (
+                    <div style={{ margin: '0 -16px 12px', position: 'relative', flexShrink: 0 }}>
+                      <img src={n.imageUrl} alt="" onError={e => { e.target.style.display = 'none'; }}
+                        style={{ width: '100%', height: 132, objectFit: 'cover', display: 'block' }} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(8,8,26,0.55) 0%, transparent 55%)', pointerEvents: 'none' }} />
+                    </div>
+                  ) : (
+                    n.emoji && <div style={{ fontSize: 42, lineHeight: 1, marginBottom: 10, flexShrink: 0 }}>{n.emoji}</div>
+                  )}
+                  <div style={{ fontSize: 17, fontWeight: 900, color: T.textPri, lineHeight: 1.35, marginBottom: 8, letterSpacing: -0.3, flexShrink: 0 }}>
+                    {n.imageUrl && n.emoji && <span style={{ marginRight: 6 }}>{n.emoji}</span>}
+                    {n.title}
+                  </div>
+                  <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px', flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: n.imageUrl ? 3 : 4, WebkitBoxOrient: 'vertical' }}>
+                    {n.text}
+                  </div>
+                  {ds && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 8, flexShrink: 0 }}>{ds}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Подвал: вертикальные точки + кнопка */}
+        <div style={{ padding: '10px 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {news.length > 1 && news.map((_, i) => (
+              <div key={i} onClick={() => goTo(i)} style={{
+                width: 6,
+                height: i === idx ? 20 : 6,
+                borderRadius: 3,
+                cursor: 'pointer',
+                background: i === idx ? T.gold : 'rgba(255,255,255,0.22)',
+                transition: 'all 0.25s ease',
+              }} />
+            ))}
+          </div>
+          <button onClick={() => setModal(news[idx])} style={{
+            background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+            color: '#0F0F1A', border: 'none', borderRadius: 14,
+            padding: '9px 18px', fontSize: 13, fontWeight: 800,
+            cursor: 'pointer', flexShrink: 0, letterSpacing: 0.3,
+            boxShadow: `0 4px 14px rgba(201,168,76,0.35)`,
+            marginLeft: news.length > 1 ? 0 : 'auto',
+          }}>
+            Подробнее
+          </button>
+        </div>
+      </div>
+
+      {modal && <NewsModal item={modal} onClose={() => setModal(null)} />}
+    </>
+  );
+}
+
+function NewsFeed({ news }) {
+  return <NewsWidget news={news} />;
+}
+
 // ─── Баннер ───────────────────────────────────────────────────────────────────
 
 function HeroBanner({ userKeys, userName, streak }) {
@@ -343,15 +605,15 @@ function HeroBanner({ userKeys, userName, streak }) {
   return (
     <div style={{
       margin: '8px 16px',
-      borderRadius: 24,
-      background: 'linear-gradient(135deg, #0F0F2E 0%, #1A1A4E 50%, #0F0F2E 100%)',
+      borderRadius: 28,
+      ...GLASS_STRONG,
       padding: '22px 20px 20px',
       position: 'relative', overflow: 'hidden',
-      border: `1px solid rgba(201,168,76,0.3)`,
       animation: 'fadeInUp 0.5s ease both',
     }}>
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.07) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-      <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}22, transparent 70%)` }} />
+      {/* Лёгкий золотой gradient overlay */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(201,168,76,0.06) 0%, transparent 60%)', pointerEvents: 'none', borderRadius: 28 }} />
+      <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}28, transparent 70%)`, pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative' }}>
         <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10, opacity: 0.85 }}>
@@ -364,7 +626,7 @@ function HeroBanner({ userKeys, userName, streak }) {
               {userName ?? 'участник'} 👋
             </div>
           </div>
-          {streak >= 2 && (
+          {streak >= 7 && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.35)', borderRadius: 12, padding: '6px 10px', gap: 1 }}>
               <span style={{ fontSize: 18 }}>🔥</span>
               <span style={{ fontSize: 11, fontWeight: 800, color: '#FF8C42' }}>{streak}</span>
@@ -374,7 +636,7 @@ function HeroBanner({ userKeys, userName, streak }) {
         </div>
 
         {/* Уровень + ключи */}
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '14px 16px', border: `1px solid ${level.color}66`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 12px rgba(0,0,0,0.3)` }}>
+        <div style={{ background: 'rgba(0,0,0,0.18)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 18, padding: '14px 16px', border: `1px solid ${level.color}44`, boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.2)` }}>
 
           {/* Верхняя строка: уровень и счётчик */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -420,14 +682,85 @@ function HeroBanner({ userKeys, userName, streak }) {
   );
 }
 
+// ─── Стрик ───────────────────────────────────────────────────────────────────
+
+const STREAK_MILESTONES = [3, 7, 30];
+
+function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
+  if (streak < 1) return null;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const scannedToday = lastScanDate === todayKey;
+
+  const nextMilestone = STREAK_MILESTONES.find(m => streak < m) ?? null;
+  const daysLeft = nextMilestone ? nextMilestone - streak : 0;
+
+  // Показываем 7 точек: последние дни серии + сегодня
+  const totalDots = 7;
+  const dots = Array.from({ length: totalDots }, (_, i) => {
+    const daysAgo = totalDots - 1 - i; // 6..0
+    if (daysAgo === 0) return scannedToday ? 'done' : 'today';
+    return streak > daysAgo ? 'done' : 'empty';
+  });
+
+  const flameSize = streak >= 30 ? 28 : streak >= 7 ? 24 : 20;
+
+  return (
+    <div style={{ margin: '10px 16px 0', borderRadius: 24, padding: '14px 16px', background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', border: '1px solid rgba(255,100,0,0.22)', boxShadow: '0 8px 28px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 14, animation: 'fadeInUp 0.4s ease both' }}>
+      {/* Иконка пламени */}
+      <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: flameSize, flexShrink: 0 }}>
+        🔥
+      </div>
+
+      {/* Контент */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#FF8C42', lineHeight: 1 }}>{streak}</span>
+          <span style={{ fontSize: 12, color: 'rgba(255,140,66,0.8)', fontWeight: 600 }}>{streak === 1 ? 'день подряд' : streak < 5 ? 'дня подряд' : 'дней подряд'}</span>
+        </div>
+
+        {/* Точки-дни */}
+        <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+          {dots.map((state, i) => (
+            <div key={i} style={{
+              width: state === 'done' ? 18 : 16,
+              height: state === 'done' ? 18 : 16,
+              borderRadius: '50%',
+              background: state === 'done' ? 'linear-gradient(135deg, #FF8C42, #FF4500)' : state === 'today' ? 'rgba(255,140,66,0.2)' : 'rgba(255,255,255,0.1)',
+              border: state === 'today' ? '2px dashed rgba(255,140,66,0.6)' : state === 'done' ? '2px solid rgba(255,140,66,0.6)' : '1px solid rgba(255,255,255,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 9, transition: 'all 0.3s',
+              boxShadow: state === 'done' ? '0 0 6px rgba(255,140,66,0.4)' : 'none',
+            }}>
+              {state === 'done' ? '✓' : ''}
+            </div>
+          ))}
+        </div>
+
+        {/* Подсказка */}
+        {scannedToday
+          ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{nextMilestone ? `До задания «${nextMilestone} дней»: ещё ${daysLeft}` : '🏆 Рекорд! Так держать!'}</div>
+          : <div style={{ fontSize: 11, color: '#FF8C42', fontWeight: 600 }}>Посети партнёра сегодня, чтобы не потерять серию</div>
+        }
+      </div>
+
+      {/* Кнопка к заданиям */}
+      {nextMilestone && (
+        <button onClick={onOpenTasks} style={{ background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.3)', borderRadius: 10, padding: '6px 10px', color: '#FF8C42', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0, textAlign: 'center', lineHeight: '14px' }}>
+          🎁<br/>{daysLeft}д
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Быстрые действия ────────────────────────────────────────────────────────
 
-function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks }) {
+function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, onOpenRewards }) {
   const actions = [
-    { icon: '🗓️', label: 'События', color: T.blue,  onClick: onOpenEvents },
+    { icon: '🗓️', label: 'События', color: T.blue,    onClick: onOpenEvents },
     { icon: '✦',  label: 'Задания', color: '#9B7EDF', onClick: onOpenTasks },
-    { icon: '🏆', label: 'Рейтинг', color: T.gold,  onClick: onOpenLeaderboard },
-    { icon: '👥', label: 'Позвать', color: T.red,   onClick: onShare },
+    { icon: '🏆', label: 'Рейтинг', color: T.gold,    onClick: onOpenLeaderboard },
+    { icon: '🎁', label: 'Призы',   color: T.green,   onClick: onOpenRewards },
   ];
 
   return (
@@ -435,14 +768,15 @@ function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks })
       {actions.map((a) => (
         <button key={a.label} onClick={a.onClick} style={{
           ...GLASS,
-          borderRadius: 16, padding: '12px 4px',
+          borderRadius: 20, padding: '13px 4px',
           cursor: 'pointer', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 6,
+          alignItems: 'center', gap: 7,
         }}>
           <div style={{
-            width: 38, height: 38, borderRadius: 12,
-            background: a.color + '18',
-            border: `1px solid ${a.color}33`,
+            width: 40, height: 40, borderRadius: 14,
+            background: `linear-gradient(145deg, ${a.color}28, ${a.color}10)`,
+            border: `1px solid ${a.color}35`,
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px ${a.color}18`,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
           }}>
             {a.icon}
@@ -535,15 +869,74 @@ function SkeletonHome() {
 
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
+const VK_APP_URL = 'https://vk.com/app54601851';
+
+function openVKApp() {
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    window.location.href =
+      'intent://vk.com/app54601851#Intent;scheme=https;package=com.vkontakte.android;' +
+      'S.browser_fallback_url=' + encodeURIComponent(VK_APP_URL) + ';end';
+    return;
+  }
+  window.location.href = VK_APP_URL;
+}
+
 export function HomePanel({
-  user, userKeys = 0, favorites = [], partners = [], events = [],
-  loading = false, error = null, streak = 0,
-  completedTasks = [], referralCount = 0,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry,
+  user, userKeys = 0, favorites = [], partners = [], events = [], news = [],
+  loading = false, error = null, streak = 0, lastScanDate = null,
+  completedTasks = [], referralCount = 0, unreadCount = 0, isWebMode = false,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // ─── Pull-to-refresh ────────────────────────────────────────────────────────
+  const [pullY, setPullY] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const containerRef       = useRef(null);
+  const touchStartY        = useRef(0);
+  const touchStartScroll   = useRef(0);
+  const pullYRef           = useRef(0);
+  const isRefreshingRef    = useRef(false);
+
+  const PULL_TRIGGER = 28; // dampened px to trigger refresh
+  const PULL_DAMPEN  = 0.45;
+  const PULL_MAX     = 56;
+
+  const updatePull = (val) => { pullYRef.current = val; setPullY(val); };
+
+  const handleTouchStart = useCallback((e) => {
+    if (isRefreshingRef.current) return;
+    touchStartScroll.current = window.scrollY;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (isRefreshingRef.current) return;
+    // Проверяем текущую позицию скролла — если не в самом верху, PTR не активируем
+    if (window.scrollY > 4) { updatePull(0); return; }
+    if (touchStartScroll.current > 4) { updatePull(0); return; }
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (dy <= 0) { updatePull(0); return; }
+    updatePull(Math.min(dy * PULL_DAMPEN, PULL_MAX));
+  }, []);
+
+  const handleTouchEnd = useCallback(async () => {
+    const py = pullYRef.current;
+    if (py >= PULL_TRIGGER) {
+      isRefreshingRef.current = true;
+      setIsRefreshing(true);
+      updatePull(0);
+      try { await onRefresh?.(); } finally {
+        isRefreshingRef.current = false;
+        setIsRefreshing(false);
+      }
+    } else {
+      updatePull(0);
+    }
+  }, [onRefresh]);
 
   const featuredPartner = partners.find(p => p.featured === true) ?? null;
 
@@ -551,13 +944,13 @@ export function HomePanel({
     const statuses = TASKS.map(t => ({
       ...t,
       done:  completedTasks.includes(t.id),
-      ready: t.check(userKeys, favorites.length, referralCount) && !completedTasks.includes(t.id),
-      prog:  t.progress ? t.progress(userKeys, favorites.length, referralCount) : 0,
+      ready: t.check(userKeys, favorites.length, referralCount, streak) && !completedTasks.includes(t.id),
+      prog:  t.progress ? t.progress(userKeys, favorites.length, referralCount, streak) : 0,
     }));
     const claimable  = statuses.filter(s => s.ready);
     const inProgress = statuses.filter(s => !s.done && !s.ready);
     return [...claimable, ...inProgress].slice(0, 2);
-  }, [userKeys, favorites.length, referralCount, completedTasks]);
+  }, [userKeys, favorites.length, referralCount, streak, completedTasks]);
 
   const filteredPartners = partners
     .filter(p => activeCategory === 'all' || p.category === activeCategory)
@@ -568,11 +961,48 @@ export function HomePanel({
 
   return (
     <Panel id="home">
-      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(15,15,26,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', alignItems:'center', height:52 }}>
+      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(8,8,20,0.72)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52 }}>
         <ApgLogo />
+        <button onClick={onOpenNotifications} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, position: 'relative', color: T.textSec, fontSize: 22, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          🔔
+          {unreadCount > 0 && (
+            <div style={{ position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8, background: '#E64646', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#fff', padding: '0 3px', border: '2px solid rgba(15,15,26,0.92)' }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </div>
+          )}
+        </button>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%' }}>
+      {/* Pull-to-refresh indicator */}
+      <div style={{
+        height: isRefreshing ? 52 : Math.round(pullY),
+        overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        transition: (isRefreshing || pullY === 0) ? 'height 0.3s ease' : 'none',
+        background: T.bg, pointerEvents: 'none',
+      }}>
+        {(pullY > 12 || isRefreshing) && (
+          <>
+            <span style={{
+              fontSize: 18, display: 'inline-block', color: T.gold, lineHeight: 1,
+              animation: isRefreshing ? 'spin 0.7s linear infinite' : 'none',
+              transform: isRefreshing ? 'none' : `rotate(${Math.min((pullY / PULL_TRIGGER) * 180, 180)}deg)`,
+              transition: isRefreshing ? 'none' : 'transform 0.15s',
+            }}>↻</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.gold }}>
+              {isRefreshing ? 'Обновление...' : pullY >= PULL_TRIGGER ? 'Отпустите' : 'Потяните вниз'}
+            </span>
+          </>
+        )}
+      </div>
+
+      <div
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ background: T.bg, minHeight: '100%' }}
+      >
 
         {loading && <SkeletonHome />}
 
@@ -602,10 +1032,30 @@ export function HomePanel({
 
         {!loading && !error && (
           <>
-            <HeroBanner userKeys={userKeys} userName={user?.first_name} streak={streak} />
+            {/* Демо-баннер для веб-версии */}
+            {isWebMode && (
+              <div style={{ margin: '10px 16px 0', borderRadius: 20, background: 'linear-gradient(135deg, rgba(39,135,245,0.14), rgba(39,135,245,0.06))', border: '1px solid rgba(39,135,245,0.28)', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, animation: 'fadeInUp 0.4s ease both' }}>
+                <div style={{ fontSize: 20, flexShrink: 0 }}>📱</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#5BA4F5', marginBottom: 2 }}>Демо-версия</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: '15px' }}>Полный функционал — в приложении ВКонтакте</div>
+                </div>
+                <button
+                  onClick={openVKApp}
+                  style={{ background: 'rgba(39,135,245,0.2)', border: '1px solid rgba(39,135,245,0.4)', borderRadius: 12, padding: '7px 12px', color: '#5BA4F5', fontSize: 11, fontWeight: 800, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+                >
+                  Открыть ВК →
+                </button>
+              </div>
+            )}
+
+            {/* Новостная лента */}
+            <NewsFeed news={news} />
+
+            <StreakWidget streak={streak} lastScanDate={lastScanDate} onOpenTasks={onOpenTasks} />
 
             <div style={{ padding: '12px 0 4px' }}>
-              <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} />
+              <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} onOpenRewards={onOpenRewards} />
             </div>
 
             {/* Партнёр дня */}
@@ -751,8 +1201,13 @@ export function HomePanel({
                 <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>
                   <span style={{ color: T.gold }}>✦</span> Партнёры АПГ
                 </div>
-                <div style={{ fontSize: 11, color: T.textSec, background: T.surface, padding: '4px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>
-                  {filteredPartners.length} партнёров
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button onClick={onOpenMap} style={{ padding: '4px 10px', borderRadius: 16, border: `1px solid rgba(74,144,217,0.35)`, background: 'rgba(74,144,217,0.1)', color: '#4A90D9', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    🗺️ Карта
+                  </button>
+                  <div style={{ fontSize: 11, color: T.textSec, background: T.surface, padding: '4px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>
+                    {filteredPartners.length}
+                  </div>
                 </div>
               </div>
 

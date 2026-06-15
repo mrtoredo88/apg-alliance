@@ -13,6 +13,22 @@ const T = {
   textSec: 'rgba(240,240,240,0.5)',
 };
 
+const GLASS = {
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
+const GLASS_STRONG = {
+  background: 'rgba(255,255,255,0.08)',
+  backdropFilter: 'blur(48px) saturate(2)',
+  WebkitBackdropFilter: 'blur(48px) saturate(2)',
+  border: '1px solid rgba(255,255,255,0.16)',
+  boxShadow: '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
+};
+
 const GRADIENTS = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
   'linear-gradient(135deg, #1a3a1a, #2d6a3a)',
@@ -26,15 +42,14 @@ function EventModal({ event, onClose }) {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.75)', zIndex: 1000,
+      background: 'rgba(0,0,0,0.6)', zIndex: 1000,
       display: 'flex', alignItems: 'flex-end',
-      backdropFilter: 'blur(4px)',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
     }} onClick={onClose}>
       <div style={{
-        background: T.surface, borderRadius: '24px 24px 0 0',
+        ...GLASS_STRONG, borderRadius: '28px 28px 0 0',
         width: '100%', padding: '24px 20px 48px',
         maxHeight: '85vh', overflowY: 'auto',
-        border: `1px solid ${T.border}`, borderBottom: 'none',
       }} onClick={e => e.stopPropagation()}>
         <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 20px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -63,7 +78,7 @@ function EventModal({ event, onClose }) {
           )}
         </div>
         {event.description && (
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 14, marginBottom: 20, border: `1px solid ${T.border}` }}>
+          <div style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 14, padding: 14, marginBottom: 20, border: '1px solid rgba(255,255,255,0.12)' }}>
             <p style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', margin: 0 }}>{event.description}</p>
           </div>
         )}
@@ -78,7 +93,7 @@ function EventModal({ event, onClose }) {
               📲 Перейти к событию
             </button>
           )}
-          <button onClick={onClose} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: `1px solid ${T.border}`, background: 'rgba(255,255,255,0.05)', color: T.textSec, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: T.textSec, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
             Закрыть
           </button>
         </div>
@@ -93,8 +108,9 @@ function EventListCard({ event, index, onClick }) {
     <div
       onClick={() => onClick(event)}
       style={{
-        background: grad, borderRadius: 20, overflow: 'hidden',
-        border: `1px solid ${T.border}`, cursor: 'pointer',
+        background: grad, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderRadius: 24, overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.13)', cursor: 'pointer',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
         display: 'flex', alignItems: 'stretch',
         animation: 'fadeInUp 0.4s ease both',
         animationDelay: `${index * 0.06}s`,
@@ -142,7 +158,7 @@ export function EventsPage({ nav, events = [], onBack }) {
 
   return (
     <Panel id={nav}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div>
@@ -157,7 +173,7 @@ export function EventsPage({ nav, events = [], onBack }) {
         {/* Счётчик */}
 
         {events.length === 0 ? (
-          <div style={{ margin: '32px 16px', background: T.surface, borderRadius: 24, padding: '36px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
               <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                 <rect x="10" y="22" width="70" height="60" rx="12" fill="rgba(201,168,76,0.07)" stroke="rgba(201,168,76,0.22)" strokeWidth="1.5"/>

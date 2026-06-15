@@ -16,6 +16,14 @@ const T = {
   textSec: 'rgba(240,240,240,0.5)',
 };
 
+const GLASS = {
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
 const TYPE_COLORS = {
   scan:           '#C9A84C',
   favorite_add:   '#4BB34B',
@@ -126,7 +134,7 @@ export function ActivityPage({ nav, userId, onBack }) {
 
   return (
     <Panel id={nav}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div>
@@ -147,7 +155,7 @@ export function ActivityPage({ nav, userId, onBack }) {
             <span style={{ color: T.textSec, fontSize: 14 }}>Загружаем историю...</span>
           </div>
         ) : items.length === 0 ? (
-          <div style={{ margin: '32px 16px', background: T.surface, borderRadius: 24, padding: '36px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
               <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                 <circle cx="45" cy="45" r="38" fill="rgba(201,168,76,0.05)" stroke="rgba(201,168,76,0.2)" strokeWidth="1.5"/>
@@ -172,7 +180,7 @@ export function ActivityPage({ nav, userId, onBack }) {
                 { label: 'Визитов', value: items.filter(i => i.type === 'scan').length, color: T.gold },
                 { label: 'В избранное', value: items.filter(i => i.type === 'favorite_add').length, color: T.green },
               ].map(s => (
-                <div key={s.label} style={{ background: T.surface, borderRadius: 14, padding: '10px 14px', border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</span>
                   <span style={{ fontSize: 11, color: T.textSec }}>{s.label}</span>
                 </div>
@@ -185,7 +193,7 @@ export function ActivityPage({ nav, userId, onBack }) {
                 <div style={{ padding: '0 16px 8px', fontSize: 11, fontWeight: 700, color: T.textSec, letterSpacing: 1, textTransform: 'uppercase' }}>
                   {group.label}
                 </div>
-                <div style={{ background: T.surface, borderRadius: 20, margin: '0 16px', border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+                <div style={{ ...GLASS, borderRadius: 24, margin: '0 16px', overflow: 'hidden' }}>
                   {group.items.map((item, i) => (
                     <ActivityItem key={item.id} item={item} index={i} />
                   ))}

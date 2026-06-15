@@ -6,7 +6,7 @@ import {
   Input, FormItem, Textarea
 } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
-import vkBridge from '@vkontakte/vk-bridge';
+import vkBridge from './vk.js';
 import { 
   Icon28QrCodeOutline, Icon28HomeOutline, Icon28UserCircleOutline, Icon28KeyOutline, 
   Icon28UserAddOutline, Icon28DoorArrowRightOutline, Icon28StorefrontOutline 

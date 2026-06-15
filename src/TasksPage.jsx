@@ -13,6 +13,14 @@ const T = {
   textSec: 'rgba(240,240,240,0.5)',
 };
 
+const GLASS = {
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
 function TaskCard({ task, status, onClaim, claiming }) {
   const pct = task.total
     ? Math.round((status.prog / task.total) * 100)
@@ -28,12 +36,14 @@ function TaskCard({ task, status, onClaim, claiming }) {
     ? 'rgba(75,179,75,0.05)'
     : status.ready
     ? 'rgba(201,168,76,0.07)'
-    : T.surface;
+    : 'rgba(255,255,255,0.07)';
 
   return (
     <div style={{
-      background: bg, borderRadius: 20, padding: 16, marginBottom: 10,
+      background: bg, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+      borderRadius: 24, padding: 16, marginBottom: 10,
       border: `1px solid ${borderColor}`,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
       animation: 'fadeInUp 0.35s ease both',
       opacity: status.done ? 0.65 : 1,
       position: 'relative', overflow: 'hidden',
@@ -124,7 +134,7 @@ function TaskCard({ task, status, onClaim, claiming }) {
   );
 }
 
-export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, completedTasks = [], onClaim, onBack }) {
+export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, streak = 0, completedTasks = [], onClaim, onBack }) {
   const [claiming, setClaiming] = useState(null);
 
   const handleClaim = async (taskId, reward) => {
@@ -136,8 +146,8 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, compl
   const statuses = TASKS.map(t => ({
     ...t,
     done:  completedTasks.includes(t.id),
-    ready: t.check(userKeys, favCount, referralCount) && !completedTasks.includes(t.id),
-    prog:  t.progress ? t.progress(userKeys, favCount, referralCount) : 0,
+    ready: t.check(userKeys, favCount, referralCount, streak) && !completedTasks.includes(t.id),
+    prog:  t.progress ? t.progress(userKeys, favCount, referralCount, streak) : 0,
   }));
 
   const claimable   = statuses.filter(s => s.ready);
@@ -152,9 +162,9 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, compl
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(15,15,26,0.92)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
         padding: '0 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
@@ -177,7 +187,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, compl
       <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Прогресс */}
-        <div style={{ background: T.surface, borderRadius: 20, padding: '16px', marginBottom: 16, border: `1px solid ${T.border}` }}>
+        <div style={{ ...GLASS, borderRadius: 24, padding: '16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textSec }}>Выполнено заданий</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.gold }}>{done.length} / {TASKS.length}</div>

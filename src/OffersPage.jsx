@@ -12,17 +12,26 @@ const T = {
 };
 
 const GLASS = {
-  background: 'rgba(255,255,255,0.05)',
-  border: `1px solid rgba(255,255,255,0.08)`,
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
+const GLASS_GOLD = {
+  background: 'linear-gradient(135deg, rgba(201,168,76,0.16), rgba(201,168,76,0.06))',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(201,168,76,0.28)',
+  boxShadow: '0 8px 28px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.08)',
 };
 
 function OfferCard({ partner, onOpenPartner, index }) {
   return (
     <div style={{
       ...GLASS,
-      borderRadius: 20, padding: 16, marginBottom: 12,
+      borderRadius: 24, padding: 16, marginBottom: 12,
       animation: 'fadeInUp 0.4s ease both',
       animationDelay: `${index * 0.06}s`,
     }}>
@@ -47,8 +56,8 @@ function OfferCard({ partner, onOpenPartner, index }) {
       </div>
 
       <div style={{
-        background: `linear-gradient(135deg, ${T.gold}14, ${T.goldL}08)`,
-        border: `1px solid ${T.gold}30`, borderRadius: 14,
+        ...GLASS_GOLD,
+        borderRadius: 16,
         padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12,
       }}>
         <span style={{ fontSize: 22, flexShrink: 0, marginTop: 1 }}>🎁</span>
@@ -112,9 +121,9 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(15,15,26,0.92)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
         padding: '0 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>

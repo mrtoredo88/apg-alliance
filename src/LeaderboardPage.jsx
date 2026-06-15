@@ -16,6 +16,22 @@ const T = {
   textSec: 'rgba(240,240,240,0.5)',
 };
 
+const GLASS = {
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
+const GLASS_GOLD = {
+  background: 'linear-gradient(135deg, rgba(201,168,76,0.16), rgba(201,168,76,0.06))',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(201,168,76,0.28)',
+  boxShadow: '0 8px 28px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
 const MEDALS = ['🥇', '🥈', '🥉'];
 const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
@@ -159,7 +175,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
 
   return (
     <Panel id={nav}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div>
@@ -180,7 +196,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
             <span style={{ color: T.textSec, fontSize: 14 }}>Загружаем рейтинг...</span>
           </div>
         ) : leaders.length === 0 ? (
-          <div style={{ margin: '32px 16px', background: T.surface, borderRadius: 24, padding: '36px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <div style={{ fontSize: 56 }}>🏆</div>
             <div>
               <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Рейтинг пока пуст</div>
@@ -193,8 +209,8 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
             {top3.length >= 2 && (
               <div style={{
                 margin: '16px 16px 24px',
-                background: 'linear-gradient(180deg, rgba(201,168,76,0.06) 0%, transparent 100%)',
-                borderRadius: 24, border: `1px solid rgba(201,168,76,0.12)`,
+                ...GLASS_GOLD,
+                borderRadius: 24,
                 padding: '20px 12px 0',
               }}>
                 <div style={{ fontSize: 11, color: T.gold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 16 }}>
@@ -210,7 +226,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
 
             {/* Остальные */}
             {rest.length > 0 && (
-              <div style={{ background: T.surface, borderRadius: 20, margin: '0 16px', border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+              <div style={{ ...GLASS, borderRadius: 24, margin: '0 16px', overflow: 'hidden' }}>
                 {rest.slice(0, 47).map((user, i) => (
                   <UserRow
                     key={user.id}
@@ -227,7 +243,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
             {showCurrentUserSeparately && currentUserIndex !== -1 && (
               <div style={{ margin: '16px 16px 0' }}>
                 <div style={{ fontSize: 12, color: T.textSec, marginBottom: 8, textAlign: 'center' }}>Ваша позиция</div>
-                <div style={{ background: T.surface, borderRadius: 16, border: `1px solid rgba(201,168,76,0.25)`, overflow: 'hidden' }}>
+                <div style={{ ...GLASS, borderRadius: 20, border: '1px solid rgba(201,168,76,0.25)', overflow: 'hidden' }}>
                   <UserRow
                     user={leaders[currentUserIndex]}
                     rank={currentUserIndex}

@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Avatar } from '@vkontakte/vkui';
-import vkBridge from '@vkontakte/vk-bridge';
+import vkBridge from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
-import { LEVELS, getLevel, getNextLevel, getLevelProgress } from './levels.js';
+import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
 const T = {
   bg:       '#0F0F1A',
@@ -18,13 +18,40 @@ const T = {
   textSec:  'rgba(240,240,240,0.5)',
 };
 
+const GLASS = {
+  background: 'rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
+const GLASS_STRONG = {
+  background: 'rgba(255,255,255,0.08)',
+  backdropFilter: 'blur(48px) saturate(2)',
+  WebkitBackdropFilter: 'blur(48px) saturate(2)',
+  border: '1px solid rgba(255,255,255,0.16)',
+  boxShadow: '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
+};
+
+const GLASS_GOLD = {
+  background: 'linear-gradient(135deg, rgba(201,168,76,0.16), rgba(201,168,76,0.06))',
+  backdropFilter: 'blur(28px) saturate(1.8)',
+  WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+  border: '1px solid rgba(201,168,76,0.28)',
+  boxShadow: '0 8px 28px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.08)',
+};
+
 const ACHIEVEMENTS = [
-  { id: 'first_scan',     title: 'Первый шаг',   emoji: '🎯', color: T.blue,  cond: (k)    => k >= 1 },
-  { id: 'five_keys',      title: 'Коллекционер', emoji: '🗝️', color: T.gold,  cond: (k)    => k >= 5 },
-  { id: 'ten_keys',       title: 'Исследователь',emoji: '🔍', color: T.green, cond: (k)    => k >= 10 },
-  { id: 'first_fav',      title: 'Знаток',        emoji: '⭐', color: T.red,   cond: (k, f) => f.length >= 1 },
-  { id: 'five_favs',      title: 'Свой человек',  emoji: '❤️', color: T.red,   cond: (k, f) => f.length >= 5 },
-  { id: 'vip',            title: 'VIP',           emoji: '👑', color: T.gold,  cond: (k)    => k >= 30 },
+  { id: 'first_scan',   title: 'Первый шаг',    emoji: '🎯', color: '#4A90D9', cond: (k)       => k >= 1 },
+  { id: 'five_keys',    title: 'Коллекционер',  emoji: '🗝️', color: '#C9A84C', cond: (k)       => k >= 5 },
+  { id: 'ten_keys',     title: 'Исследователь', emoji: '🔍', color: '#4BB34B', cond: (k)       => k >= 10 },
+  { id: 'first_fav',    title: 'Знаток',         emoji: '⭐', color: '#FF8C00', cond: (k, f)    => f.length >= 1 },
+  { id: 'five_favs',    title: 'Свой человек',   emoji: '❤️', color: '#E64646', cond: (k, f)    => f.length >= 5 },
+  { id: 'referral_bdg', title: 'Магнит',         emoji: '🤝', color: '#4A90D9', cond: (k, f, r) => r >= 1 },
+  { id: 'vip',          title: 'VIP',            emoji: '👑', color: '#C9A84C', cond: (k)       => k >= 30 },
+  { id: 'fifty_keys',   title: 'Ветеран',        emoji: '🏅', color: '#9B59B6', cond: (k)       => k >= 50 },
+  { id: 'legend',       title: 'Легенда',        emoji: '🏆', color: '#FFD700', cond: (k)       => k >= 100 },
 ];
 
 function AchievementBadge({ a, unlocked }) {
@@ -72,7 +99,7 @@ function FaqSection() {
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Частые вопросы</div>
-      <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+      <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
         {FAQ_ITEMS.map((item, i) => {
           const isOpen = openIndex === i;
           return (
@@ -107,7 +134,7 @@ function FaqSection() {
 
 function FavoriteCard({ partner, onOpen, onRemove }) {
   return (
-    <div style={{ background: T.surface, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: `1px solid ${T.border}` }}>
+    <div style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
       {partner.logoUrl
         ? <Avatar size={44} src={partner.logoUrl} />
         : <div style={{ width: 44, height: 44, borderRadius: '50%', background: T.gold + '18', border: `2px solid ${T.gold}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
@@ -124,9 +151,31 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, onShare }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, onShare, onOpenReferral }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [achievementToast, setAchievementToast] = useState(null);
+  const [toastExiting, setToastExiting] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showIosHint, setShowIosHint] = useState(false);
+
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const showInstallBtn = !isStandalone && (installPrompt || isIos);
+
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (isIos) { setShowIosHint(h => !h); return; }
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
+  };
 
   const handleDeleteConfirmed = useCallback(async () => {
     setIsDeleting(true);
@@ -138,15 +187,34 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }
   }, [onDeleteProfile]);
 
+  const dismissToast = useCallback(() => {
+    setToastExiting(true);
+    setTimeout(() => { setAchievementToast(null); setToastExiting(false); }, 300);
+  }, []);
+
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
   const progress = getLevelProgress(userKeys);
 
   const achievements = useMemo(() =>
-    ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.cond(userKeys, favorites) })),
-    [userKeys, favorites]
+    ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.cond(userKeys, favorites, referralCount) })),
+    [userKeys, favorites, referralCount]
   );
+
+  useEffect(() => {
+    const SEEN_KEY = 'apg_seen_achievements';
+    const seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'));
+    const newOnes = achievements.filter(a => a.unlocked && !seen.has(a.id));
+    if (newOnes.length === 0) return;
+    const toShow = newOnes[newOnes.length - 1];
+    newOnes.forEach(a => seen.add(a.id));
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+    setAchievementToast(toShow);
+    setToastExiting(false);
+    const timer = setTimeout(() => dismissToast(), 4000);
+    return () => clearTimeout(timer);
+  }, [achievements, dismissToast]);
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const favoritePartners = useMemo(() => partners.filter(p => favorites.includes(p.id)), [partners, favorites]);
 
@@ -174,67 +242,123 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
   return (
     <div style={{ background: T.bg, minHeight: '100%' }}>
+
+      {/* ── Toast достижения ── */}
+      {achievementToast && (
+        <div style={{
+          position: 'fixed', top: 60, left: 16, right: 16, zIndex: 700,
+          background: 'rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(48px) saturate(2)',
+          WebkitBackdropFilter: 'blur(48px) saturate(2)',
+          border: `1px solid ${achievementToast.color}60`,
+          borderRadius: 20, padding: '14px 16px',
+          display: 'flex', alignItems: 'center', gap: 14,
+          boxShadow: `0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px ${achievementToast.color}25`,
+          animation: toastExiting ? 'achievementOut 0.3s ease both' : 'achievementPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both',
+        }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 16, flexShrink: 0,
+            background: achievementToast.color + '20',
+            border: `2px solid ${achievementToast.color}70`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+          }}>
+            {achievementToast.emoji}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>✦ Новое достижение!</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>{achievementToast.title}</div>
+          </div>
+          <button onClick={dismissToast} style={{ background: 'none', border: 'none', color: T.textSec, fontSize: 20, cursor: 'pointer', padding: 4, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
+
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(15,15,26,0.92)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
         padding: '0 16px',
         display: 'flex', alignItems: 'center', height: 52,
       }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>✦ Профиль</div>
       </div>
 
-      {/* ── Шапка профиля ── */}
-      <div style={{ margin: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #0F0F2E, #1A1A4E)', padding: '24px 20px 20px', position: 'relative', overflow: 'hidden', border: `1px solid rgba(201,168,76,0.25)` }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.06) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-        <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.12), transparent 70%)' }} />
+      {/* ── Единая карточка профиля ── */}
+      {(() => {
+        const toNext = getKeysToNext(userKeys);
+        const pct    = getLevelProgress(userKeys);
+        return (
+          <div style={{
+            margin: '8px 16px',
+            borderRadius: 28,
+            background: 'linear-gradient(145deg, rgba(18,12,50,0.97), rgba(22,18,62,0.95))',
+            backdropFilter: 'blur(40px) saturate(2)',
+            WebkitBackdropFilter: 'blur(40px) saturate(2)',
+            border: `1px solid rgba(201,168,76,0.28)`,
+            boxShadow: `0 16px 48px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(201,168,76,0.06)`,
+            padding: '20px 20px 18px',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            {/* Фоновые элементы */}
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.05) 1px, transparent 1px)', backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}20, transparent 70%)`, pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: -30, left: -30, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(90,60,220,0.1), transparent 70%)', pointerEvents: 'none' }} />
 
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          {/* Аватар */}
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: 84, height: 84, borderRadius: '50%', padding: 3, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})` }}>
-              <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
-                {safeUser.photo_200
-                  ? <img src={safeUser.photo_200} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>👤</div>
-                }
+            <div style={{ position: 'relative' }}>
+              {/* Строка: аватар + имя/город/уровень + ключи */}
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 18 }}>
+                {/* Аватар */}
+                <div style={{ width: 72, height: 72, borderRadius: '50%', padding: 2.5, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, flexShrink: 0 }}>
+                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
+                    {safeUser.photo_200
+                      ? <img src={safeUser.photo_200} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#C9A84C', background: 'rgba(201,168,76,0.12)' }}>
+                          {(safeUser.first_name || '?')[0].toUpperCase()}
+                        </div>
+                    }
+                  </div>
+                </div>
+
+                {/* Имя + город + уровень */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri, lineHeight: 1.2, marginBottom: 2 }}>
+                    {safeUser.first_name} {safeUser.last_name}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textSec, marginBottom: 8 }}>Участник АПГ · Зеленоград</div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: level.color + '22', border: `1px solid ${level.color}55`, borderRadius: 16, padding: '4px 10px' }}>
+                    <span style={{ fontSize: 13 }}>{level.emoji}</span>
+                    <span style={{ fontSize: 11, color: level.color, fontWeight: 700 }}>{level.label}</span>
+                  </div>
+                </div>
+
+                {/* Счётчик ключей */}
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: -1 }}>{userKeys}</div>
+                  <div style={{ fontSize: 10, color: T.goldL, fontWeight: 700, marginTop: 3 }}>🗝️ ключей</div>
+                </div>
+              </div>
+
+              {/* Прогресс */}
+              <div style={{ height: 7, background: 'rgba(255,255,255,0.1)', borderRadius: 7, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg, ${level.color}, ${T.goldL})`, borderRadius: 7, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)', boxShadow: `0 0 12px ${level.color}` }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontWeight: 600 }}>
+                {nextLevel
+                  ? `До «${nextLevel.label}» ${nextLevel.emoji}: ещё ${toNext} ключей`
+                  : '👑 Максимальный уровень — вы Амбассадор АПГ!'}
               </div>
             </div>
           </div>
-
-          {/* Имя */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: T.textPri }}>{safeUser.first_name} {safeUser.last_name}</div>
-            <div style={{ fontSize: 12, color: T.textSec, marginTop: 3 }}>Участник АПГ</div>
-          </div>
-
-          {/* Бейдж уровня */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: level.color + '20', border: `1px solid ${level.color}50`, borderRadius: 20, padding: '5px 14px' }}>
-            <span style={{ fontSize: 14 }}>{level.emoji}</span>
-            <span style={{ fontSize: 12, color: level.color, fontWeight: 700 }}>{level.label}</span>
-          </div>
-
-          {/* Прогресс */}
-          <div style={{ width: '100%', marginTop: 4 }}>
-            <div style={{ height: 5, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg, ${T.gold}, ${T.goldL})`, borderRadius: 3, boxShadow: `0 0 8px ${T.gold}88` }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-              <span style={{ fontSize: 11, color: T.textSec }}>🗝️ {userKeys} ключей</span>
-              <span style={{ fontSize: 11, color: T.textSec }}>{nextLevel ? `До «${nextLevel.label}»: ${nextLevel.min - userKeys}` : '🏆 Макс. уровень'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* ── Статистика ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Статистика</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           {stats.map(s => (
-            <div key={s.label} style={{ background: T.surface, borderRadius: 16, padding: '14px 8px', textAlign: 'center', border: `1px solid ${T.border}` }}>
+            <div key={s.label} style={{ ...GLASS, borderRadius: 20, padding: '14px 8px', textAlign: 'center' }}>
               <div style={{ fontSize: 22, marginBottom: 6 }}>{s.emoji}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri }}>{s.value}</div>
               <div style={{ fontSize: 10, color: T.textSec, marginTop: 3 }}>{s.label}</div>
@@ -246,7 +370,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {/* ── Путь участника ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Путь участника</div>
-        <div style={{ background: T.surface, borderRadius: 20, padding: '16px 16px', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div style={{ ...GLASS, borderRadius: 24, padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
           {LEVELS.map((lvl, i) => {
             const isReached  = userKeys >= lvl.min;
             const isCurrent  = level.id === lvl.id;
@@ -300,11 +424,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Достижения</div>
-          <div style={{ fontSize: 11, color: T.textSec, background: T.surface, padding: '3px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>{unlockedCount}/{achievements.length}</div>
+          <div style={{ fontSize: 11, color: T.textSec, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.13)' }}>{unlockedCount}/{achievements.length}</div>
         </div>
 
         {unlockedCount === 0
-          ? <div style={{ background: T.surface, borderRadius: 24, padding: '28px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          ? <div style={{ ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
               <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
                 <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                   <path d="M28 17 H62 V46 C62 62 45 72 45 72 C45 72 28 62 28 46 Z" fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.26)" strokeWidth="1.5"/>
@@ -325,7 +449,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Сканируй QR-коды партнёров — так появятся первые достижения</div>
               </div>
             </div>
-          : <div style={{ background: T.surface, borderRadius: 20, padding: 16, border: `1px solid ${T.border}` }}>
+          : <div style={{ ...GLASS, borderRadius: 24, padding: 16 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 {achievements.map(a => <AchievementBadge key={a.id} a={a} unlocked={a.unlocked} />)}
               </div>
@@ -337,11 +461,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Избранное</div>
-          {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: T.textSec, background: T.surface, padding: '3px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>{favoritePartners.length}</div>}
+          {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: T.textSec, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.13)' }}>{favoritePartners.length}</div>}
         </div>
 
         {favoritePartners.length === 0
-          ? <div style={{ background: T.surface, borderRadius: 24, padding: '28px 20px', textAlign: 'center', border: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          ? <div style={{ ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
               <div style={{ animation: 'float 4s ease-in-out infinite' }}>
                 <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                   <path d="M45 72 C45 72 14 51 14 31 C14 21 22 14 32 14 C37 14 42 17 45 23 C48 17 53 14 58 14 C68 14 76 21 76 31 C76 51 45 72 45 72 Z" fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.26)" strokeWidth="1.5"/>
@@ -367,7 +491,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {/* ── Реферальная программа ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Пригласить друга</div>
-        <div style={{ background: T.surface, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
 
           {/* Статистика */}
           {referralCount > 0 && (
@@ -407,22 +531,22 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             </div>
           )}
 
-          {/* Кнопка поделиться */}
-          <button onClick={onShare} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(75,179,75,0.12)', border: '1px solid rgba(75,179,75,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📤</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, color: T.textPri, fontWeight: 600 }}>Поделиться ссылкой</div>
-              <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>Отправить в ВКонтакте или мессенджер</div>
-            </div>
-            <span style={{ color: T.textSec, fontSize: 16 }}>›</span>
-          </button>
+          {/* Кнопки */}
+          <div style={{ padding: '0 14px 14px', display: 'flex', gap: 8 }}>
+            <button onClick={onShare} style={{ flex: 1, padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              📤 Поделиться
+            </button>
+            <button onClick={onOpenReferral} style={{ flex: 1, padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: T.textPri, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              Подробнее ›
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── Настройки ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Настройки</div>
-        <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
           {[
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
@@ -448,7 +572,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {/* ── Поддержка ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Поддержка</div>
-        <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
           {[
             {
               icon: '💬',
@@ -490,7 +614,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {/* ── О приложении ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ О приложении</div>
-        <div style={{ background: T.surface, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
           {/* Лого + название */}
           <div style={{ padding: '18px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: 14, background: `linear-gradient(135deg, ${T.gold}30, ${T.goldL}18)`, border: `1px solid ${T.gold}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>🗝️</div>
@@ -513,6 +637,49 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           ))}
         </div>
       </div>
+
+      {/* ── Администрирование (только для админа) ── */}
+      {user?.id === 988504 && (
+        <div style={{ padding: '16px 16px 0' }}>
+          <button
+            onClick={() => { window.location.hash = '/admin'; }}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.gold}44`, background: T.gold + '15', color: T.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+          >
+            ⚙️ Панель администратора
+          </button>
+        </div>
+      )}
+
+      {/* ── Установить как приложение ── */}
+      {showInstallBtn && (
+        <div style={{ padding: '16px 16px 0' }}>
+          <button
+            onClick={handleInstall}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.green}44`, background: T.green + '15', color: T.green, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+          >
+            📲 Добавить на экран телефона
+          </button>
+          {showIosHint && (
+            <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px' }}>
+                <div style={{ marginBottom: 8 }}>Чтобы установить приложение на iPhone / iPad:</div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>1️⃣</span>
+                  <span>Нажмите кнопку <strong style={{ color: T.textPri }}>Поделиться</strong> <span style={{ fontSize: 16 }}>⬆️</span> внизу Safari</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>2️⃣</span>
+                  <span>Выберите <strong style={{ color: T.textPri }}>«На экран "Домой"»</strong></span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>3️⃣</span>
+                  <span>Нажмите <strong style={{ color: T.textPri }}>«Добавить»</strong></span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Выход ── */}
       <div style={{ padding: '16px 16px 0' }}>
@@ -537,7 +704,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {showDeleteConfirm && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 600,
-          background: 'rgba(10,10,20,0.88)',
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
           padding: '0 16px 32px',
         }}
@@ -545,8 +713,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         >
           <div style={{
             width: '100%', maxWidth: 420,
-            background: '#1A1A2E', borderRadius: 28,
-            border: '1px solid rgba(255,255,255,0.07)',
+            ...GLASS_STRONG, borderRadius: '28px 28px 0 0',
             padding: '28px 22px 22px',
             animation: 'fadeInUp 0.25s ease',
           }}>
@@ -588,7 +755,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 disabled={isDeleting}
                 style={{
                   flex: 1, padding: '14px 0', borderRadius: 14,
-                  border: `1px solid rgba(255,255,255,0.1)`, background: 'rgba(255,255,255,0.06)',
+                  background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)',
                   color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer',
                 }}
               >
