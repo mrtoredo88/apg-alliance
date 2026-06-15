@@ -110,7 +110,9 @@ export function UserApp() {
 
     // Анонимный вход в Firebase (нужен для Firestore Security Rules)
     if (!auth.currentUser) {
-      await signInAnonymously(auth).catch(() => {});
+      await signInAnonymously(auth).catch((e) => {
+        console.warn('[APG] signInAnonymously failed:', e.code, e.message);
+      });
     }
 
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
@@ -190,7 +192,7 @@ export function UserApp() {
       }).length;
       setUnreadCount(unread);
 
-      if (!isGuest) {
+      if (!isGuest) { try {
       const userRef = doc(db, 'users', String(userData.id));
       const docSnap = await getDoc(userRef);
       if (!isMounted.current) return;
@@ -257,9 +259,11 @@ export function UserApp() {
         setShowOnboarding(true);
       }
 
-      } // end if (!isGuest)
+      } catch (e) {
+        console.warn('[APG] User data load failed:', e.code, e.message);
+      }} // end if (!isGuest)
     } catch (e) {
-      console.error(e);
+      console.error('[APG] loadData fatal error:', e.code, e.message);
       if (isMounted.current) setError('Не удалось загрузить данные.');
     } finally {
       if (isMounted.current) setLoading(false);
