@@ -311,9 +311,10 @@ export function UserApp() {
       position: 'fixed', bottom: 0,
       left: '50%', transform: 'translateX(-50%)',
       width: '100%', maxWidth: 480, height: 62,
-      background: 'rgba(8,8,24,0.9)',
-      backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-      borderTop: '1px solid rgba(255,255,255,0.07)',
+      background: 'rgba(8,8,24,0.55)',
+      backdropFilter: 'blur(24px) saturate(1.8)', WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+      borderTop: '1px solid rgba(255,255,255,0.12)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
       display: 'flex', alignItems: 'stretch',
       zIndex: 100, overflow: 'visible',
     }}>
@@ -376,13 +377,6 @@ export function UserApp() {
     <ConfigProvider appearance="dark">
       <AdaptivityProvider>
         <AppRoot>
-          {/* Depth orbs — liquid glass background */}
-          <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: '#08081A', overflow: 'hidden', pointerEvents: 'none' }}>
-            <div style={{ position: 'absolute', top: '-25%', left: '-20%', width: 450, height: 450, borderRadius: '50%', background: 'radial-gradient(circle, rgba(90,70,200,0.14) 0%, transparent 70%)' }} />
-            <div style={{ position: 'absolute', top: '30%', right: '-20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
-            <div style={{ position: 'absolute', bottom: '-10%', left: '10%', width: 420, height: 350, borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,50,180,0.11) 0%, transparent 70%)' }} />
-          </div>
-
           <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 62, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
             <View activePanel={activePanel}>
 

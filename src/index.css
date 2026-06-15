@@ -9,19 +9,38 @@
   --vkui--size_border_radius_button--m:      12px;
 }
 
-html, body, #root {
-  background: #08081A;
+html, body {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 20% 0%,   rgba(80,60,200,0.45) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 40%,  rgba(201,168,76,0.2) 0%, transparent 45%),
+    radial-gradient(ellipse at 10% 100%, rgba(30,50,210,0.5)  0%, transparent 45%),
+    #08081A;
+  background-attachment: fixed;
 }
 
-/* VK UI панели — прозрачный фон чтобы видеть depth orbs */
+#root {
+  min-height: 100vh;
+}
+
+/* VK UI — весь стек прозрачный, чтобы depth orbs просвечивали */
 .vkuiPanel,
 .vkuiPanel__in,
 .vkuiAppRoot,
+.vkuiAppRoot__wrapper,
 .vkuiSplitLayout,
-.vkuiSplitCol {
+.vkuiSplitLayout__inner,
+.vkuiSplitCol,
+.vkuiSplitCol__fixed,
+.vkuiSplitCol__animate,
+.vkuiView,
+.vkuiView__panels,
+.vkuiView__panel,
+.vkuiView__panel-in {
   background: transparent !important;
+  background-color: transparent !important;
 }
 
 /* Эффект легкой тени для карточек, чтобы они выглядели «парящими» */
