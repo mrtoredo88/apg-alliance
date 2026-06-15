@@ -73,25 +73,22 @@ const vkBridge = {
 export const openUrl = (url) => {
   if (!url) return;
 
-  if (url.startsWith('tel:')) {
-    // tel: работает через location.href в большинстве WebView
-    window.location.href = url;
-    return;
-  }
-
   // 1. Синхронный anchor click — работает в VK-браузере и обычных браузерах
   //    (выполняется в том же стеке вызовов, что и клик пользователя)
   const a = document.createElement('a');
   a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
+  if (!url.startsWith('tel:')) {
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+  }
   document.body.appendChild(a);
   a.click();
   setTimeout(() => a.remove(), 100);
 
-  // 2. VK Bridge — для нативного VK Mini App (Android/iOS)
-  //    Если anchor уже открыл URL, bridge может открыть второй раз — приемлемо
-  _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
+  // 2. VK Bridge — для нативного VK Mini App (Android/iOS), только для http/https
+  if (!url.startsWith('tel:')) {
+    _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
+  }
 };
 
 export default vkBridge;
