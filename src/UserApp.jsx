@@ -8,14 +8,14 @@ import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
 } from 'firebase/firestore';
-import ScannerComponent      from './Scanner.jsx';
 import { HomePanel }         from './HomePanel.jsx';
-
-const ProfilePanel = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
-import { PartnerPage }       from './PartnerPage.jsx';
-import { Onboarding }        from './Onboarding.jsx';
-import { NotificationsPage } from './NotificationsPage.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
+
+const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
+const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
+const PartnerPage       = lazy(() => import('./PartnerPage.jsx').then(m => ({ default: m.PartnerPage })));
+const Onboarding        = lazy(() => import('./Onboarding.jsx').then(m => ({ default: m.Onboarding })));
+const NotificationsPage = lazy(() => import('./NotificationsPage.jsx').then(m => ({ default: m.NotificationsPage })));
 
 // Lazy-loaded pages (рендерят <Panel> внутри себя)
 const EventsPage      = lazy(() => import('./EventsPage.jsx').then(m => ({ default: m.EventsPage })));
@@ -806,19 +806,21 @@ export function UserApp() {
                 onOpenNotifications={openNotifications}
               />
 
-              <PartnerPage
-                nav="partner"
-                partner={activePartner}
-                isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
-                onBack={() => goPanel('home')}
-                onToggleFavorite={toggleFavorite}
-                onOpenPartner={openPartner}
-                partners={enrichedPartners}
-                user={user}
-                scannedPartnerIds={scannedPartnerIds}
-                visitCounts={visitCounts}
-                onPartnerUpdate={handlePartnerUpdate}
-              />
+              <Suspense fallback={<Panel id="partner"><LazyFallback /></Panel>}>
+                <PartnerPage
+                  nav="partner"
+                  partner={activePartner}
+                  isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
+                  onBack={() => goPanel('home')}
+                  onToggleFavorite={toggleFavorite}
+                  onOpenPartner={openPartner}
+                  partners={enrichedPartners}
+                  user={user}
+                  scannedPartnerIds={scannedPartnerIds}
+                  visitCounts={visitCounts}
+                  onPartnerUpdate={handlePartnerUpdate}
+                />
+              </Suspense>
 
               {/* ProfilePanel не рендерит Panel — оборачиваем */}
               <Panel id="profile">
@@ -914,28 +916,36 @@ export function UserApp() {
                 </Suspense>
               </Panel>
 
-              <NotificationsPage
-                nav="notifications"
-                notifications={notifications}
-                notificationsEnabled={notifEnabled}
-                onEnableNotifications={handleEnableNotifications}
-                lastSeenTs={lastSeenTs}
-                onBack={() => goPanel('home')}
-              />
+              <Suspense fallback={<Panel id="notifications"><LazyFallback /></Panel>}>
+                <NotificationsPage
+                  nav="notifications"
+                  notifications={notifications}
+                  notificationsEnabled={notifEnabled}
+                  onEnableNotifications={handleEnableNotifications}
+                  lastSeenTs={lastSeenTs}
+                  onBack={() => goPanel('home')}
+                />
+              </Suspense>
 
             </View>
           </div>
 
           <TabBar />
 
-          <ScannerComponent
-            isOpen={isScannerOpen}
-            onClose={() => setIsScannerOpen(false)}
-            mapPlaces={partners}
-            onConfirm={handleConfirmScan}
-          />
+          <Suspense fallback={null}>
+            <ScannerComponent
+              isOpen={isScannerOpen}
+              onClose={() => setIsScannerOpen(false)}
+              mapPlaces={partners}
+              onConfirm={handleConfirmScan}
+            />
+          </Suspense>
 
-          {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+          {showOnboarding && (
+            <Suspense fallback={null}>
+              <Onboarding onComplete={handleOnboardingComplete} />
+            </Suspense>
+          )}
 
           {!splashDone && (
             <SplashScreen
