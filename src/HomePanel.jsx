@@ -866,6 +866,123 @@ function SkeletonHome() {
   );
 }
 
+// ─── Закрытые мероприятия ─────────────────────────────────────────────────────
+
+function calcTimeLeft(dateStr) {
+  if (!dateStr) return null;
+  const diff = new Date(dateStr).getTime() - Date.now();
+  if (diff <= 0) return null;
+  return {
+    days:    Math.floor(diff / 86400000),
+    hours:   Math.floor((diff % 86400000) / 3600000),
+    minutes: Math.floor((diff % 3600000) / 60000),
+    seconds: Math.floor((diff % 60000) / 1000),
+  };
+}
+
+function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
+  const [timeLeft, setTimeLeft] = useState(() => calcTimeLeft(event.eventDate));
+
+  useEffect(() => {
+    if (!event.eventDate) return;
+    const id = setInterval(() => setTimeLeft(calcTimeLeft(event.eventDate)), 1000);
+    return () => clearInterval(id);
+  }, [event.eventDate]);
+
+  const minKeys = event.minKeys ?? 0;
+  const hasEnough = minKeys === 0 || userKeys >= minKeys;
+  const isFull = event.maxParticipants > 0 && (event.registeredCount ?? 0) >= event.maxParticipants;
+  const isPast = timeLeft === null && !!event.eventDate;
+  const need = minKeys - userKeys;
+
+  return (
+    <div style={{ margin: '16px 16px 0', ...GLASS_GOLD, borderRadius: 24, padding: '18px 18px 16px' }}>
+      {/* Заголовок */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 26, flexShrink: 0 }}>{event.emoji ?? '🎉'}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.gold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>✦ Следующее мероприятие АПГ</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: '19px' }}>{event.title}</div>
+          </div>
+        </div>
+        {isRegistered && (
+          <div style={{ fontSize: 10, fontWeight: 700, color: T.green, background: T.green + '18', border: `1px solid ${T.green}40`, borderRadius: 10, padding: '4px 9px', flexShrink: 0 }}>✓ Записан</div>
+        )}
+      </div>
+
+      {/* Таймер обратного отсчёта */}
+      {!isPast && event.eventDate && timeLeft && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
+          {[
+            { v: timeLeft.days,    l: 'дн'  },
+            { v: timeLeft.hours,   l: 'ч'   },
+            { v: timeLeft.minutes, l: 'мин' },
+            { v: timeLeft.seconds, l: 'сек' },
+          ].map(({ v, l }) => (
+            <div key={l} style={{ flex: 1, ...GLASS, borderRadius: 14, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: T.textPri, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(v).padStart(2, '0')}</div>
+              <div style={{ fontSize: 9, color: T.textSec, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isPast && (
+        <div style={{ fontSize: 12, color: T.textSec, textAlign: 'center', marginBottom: 12 }}>Мероприятие состоялось</div>
+      )}
+
+      {/* Прогресс ключей */}
+      {minKeys > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            <span style={{ fontSize: 11, color: T.textSec }}>Прогресс к порогу</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: hasEnough ? T.green : T.gold }}>
+              {Math.min(userKeys, minKeys)} / {minKeys} 🗝️
+            </span>
+          </div>
+          <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 3,
+              width: `${Math.min((userKeys / minKeys) * 100, 100)}%`,
+              background: hasEnough
+                ? `linear-gradient(90deg, ${T.green}, #6ECC6E)`
+                : `linear-gradient(90deg, ${T.gold}, ${T.goldL})`,
+              transition: 'width 0.5s ease',
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Кнопка */}
+      {isRegistered ? (
+        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: `1px solid ${T.green}40`, background: T.green + '12', color: T.green, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          ✓ Я записан — отменить?
+        </button>
+      ) : isFull ? (
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: T.textSec, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
+          Мест нет
+        </div>
+      ) : isPast ? null : hasEnough ? (
+        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+          Я иду! 🎉
+        </button>
+      ) : (
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: T.textSec, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+          Нужно ещё {need} {need === 1 ? 'ключ' : need < 5 ? 'ключа' : 'ключей'} 🗝️
+        </div>
+      )}
+
+      {/* Дата и место */}
+      {(event.date || event.address) && (
+        <div style={{ marginTop: 10, fontSize: 11, color: T.textSec, textAlign: 'center' }}>
+          {event.date && `📅 ${event.date}`}{event.address && ` · ${event.address}`}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Основной компонент ───────────────────────────────────────────────────────
 
 const VK_APP_URL = 'https://vk.com/app54601851';
@@ -885,6 +1002,7 @@ export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
+  registeredEventIds = [], onEventRegister,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -938,6 +1056,17 @@ export function HomePanel({
   }, [onRefresh]);
 
   const featuredPartner = partners.find(p => p.featured === true) ?? null;
+
+  const nextPrivateEvent = useMemo(() => {
+    const privates = events.filter(e => e.isPrivate);
+    if (!privates.length) return null;
+    const nowMs = Date.now();
+    const upcoming = privates
+      .filter(e => e.eventDate && new Date(e.eventDate).getTime() > nowMs)
+      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+    if (upcoming.length) return upcoming[0];
+    return privates.sort((a, b) => new Date(b.eventDate || 0) - new Date(a.eventDate || 0))[0] ?? null;
+  }, [events]);
 
   const taskPreview = useMemo(() => {
     const statuses = TASKS.map(t => ({
@@ -1060,6 +1189,16 @@ export function HomePanel({
             <div style={{ padding: '12px 0 4px' }}>
               <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} onOpenRewards={onOpenRewards} />
             </div>
+
+            {/* Закрытое мероприятие АПГ */}
+            {nextPrivateEvent && (
+              <PrivateEventCard
+                event={nextPrivateEvent}
+                userKeys={userKeys}
+                isRegistered={registeredEventIds.includes(nextPrivateEvent.id)}
+                onRegister={onEventRegister}
+              />
+            )}
 
             {/* Партнёр дня */}
             {featuredPartner && (

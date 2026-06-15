@@ -129,6 +129,10 @@ export const AdminPanel = () => {
   const [eSocial, setESocial] = useState('');
   const [eAddress, setEAddress] = useState('');
   const [eDeadline, setEDeadline] = useState('');
+  const [eIsPrivate, setEIsPrivate] = useState(false);
+  const [eMinKeys, setEMinKeys] = useState('');
+  const [eMaxParticipants, setEMaxParticipants] = useState('');
+  const [eEventDate, setEEventDate] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -274,6 +278,7 @@ export const AdminPanel = () => {
   const resetEventForm = () => {
     setETitle(''); setEDate(''); setEPartner(''); setEEmoji('🎉');
     setEDesc(''); setESocial(''); setEAddress(''); setEDeadline('');
+    setEIsPrivate(false); setEMinKeys(''); setEMaxParticipants(''); setEEventDate('');
     setEditingEvent(null);
   };
 
@@ -283,6 +288,10 @@ export const AdminPanel = () => {
     setEEmoji(e.emoji ?? '🎉'); setEDesc(e.description ?? '');
     setESocial(e.socialUrl ?? ''); setEAddress(e.address ?? '');
     setEDeadline(e.deadline ?? '');
+    setEIsPrivate(e.isPrivate ?? false);
+    setEMinKeys(e.minKeys != null ? String(e.minKeys) : '');
+    setEMaxParticipants(e.maxParticipants != null ? String(e.maxParticipants) : '');
+    setEEventDate(e.eventDate ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -293,6 +302,10 @@ export const AdminPanel = () => {
       emoji: eEmoji, description: eDesc.trim(),
       socialUrl: eSocial.trim(), address: eAddress.trim(),
       deadline: eDeadline.trim(),
+      isPrivate: eIsPrivate,
+      minKeys: eMinKeys !== '' ? Number(eMinKeys) : 0,
+      maxParticipants: eMaxParticipants !== '' ? Number(eMaxParticipants) : 0,
+      eventDate: eEventDate.trim(),
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
@@ -642,6 +655,25 @@ export const AdminPanel = () => {
             <label style={s.label}>Дедлайн / конец акции (необязательно) ⏱️</label>
             <input style={s.input} type="date" value={eDeadline} onChange={e => setEDeadline(e.target.value)} />
 
+            <label style={s.label}>🔒 Закрытое мероприятие (требует ключи)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <input type="checkbox" id="eIsPrivate" checked={eIsPrivate} onChange={e => setEIsPrivate(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+              <label htmlFor="eIsPrivate" style={{ ...s.label, marginBottom: 0, cursor: 'pointer' }}>Закрытый доступ по ключам</label>
+            </div>
+
+            {eIsPrivate && (
+              <>
+                <label style={s.label}>Минимум ключей для регистрации</label>
+                <input style={s.input} type="number" min="0" placeholder="10" value={eMinKeys} onChange={e => setEMinKeys(e.target.value)} />
+
+                <label style={s.label}>Лимит участников (0 = без ограничения)</label>
+                <input style={s.input} type="number" min="0" placeholder="50" value={eMaxParticipants} onChange={e => setEMaxParticipants(e.target.value)} />
+
+                <label style={s.label}>Дата и время мероприятия (для таймера)</label>
+                <input style={s.input} type="datetime-local" value={eEventDate} onChange={e => setEEventDate(e.target.value)} />
+              </>
+            )}
+
             <label style={s.label}>Эмодзи события</label>
             <EmojiPicker emojis={EVENT_EMOJIS} value={eEmoji} onChange={setEEmoji} />
 
@@ -662,8 +694,8 @@ export const AdminPanel = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{e.emoji ?? '🎉'}</div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
-                      <div style={{ fontSize: 12, color: '#99A2AD' }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.isPrivate ? '🔒 ' : ''}{e.title}</div>
+                      <div style={{ fontSize: 12, color: '#99A2AD' }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>

@@ -80,6 +80,7 @@ export function UserApp() {
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
   const [recentReviews, setRecentReviews]       = useState([]);
   const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
+  const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [appearance, setAppearance]             = useState('dark');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
@@ -275,6 +276,7 @@ export function UserApp() {
         setReferralCount(data.referralCount ?? 0);
         setScanDates(data.scanDates ?? []);
         setVisitCounts(data.visitCounts ?? {});
+        setRegisteredEventIds(data.registeredEvents ?? []);
         if (!data.onboardingDone) setShowOnboarding(true);
 
         // Ежедневный бонус: +1 ключ за первый вход каждый день
@@ -518,6 +520,48 @@ export function UserApp() {
     } catch (e) { console.error(e); return false; }
   }, [user, userKeys]);
 
+  // ─── Мероприятия ────────────────────────────────────────────────────────────
+
+  const handleEventRegister = useCallback(async (event) => {
+    if (!user || String(user.id).startsWith('guest_')) return;
+    const userId = String(user.id);
+    const eventId = event.id;
+    const isRegistered = registeredEventIds.includes(eventId);
+
+    if (isRegistered) {
+      const next = registeredEventIds.filter(id => id !== eventId);
+      setRegisteredEventIds(next);
+      try {
+        await Promise.all([
+          deleteDoc(doc(db, 'events', eventId, 'registrations', userId)),
+          updateDoc(doc(db, 'users', userId), { registeredEvents: next }),
+        ]);
+      } catch (e) {
+        console.error(e);
+        setRegisteredEventIds(prev => [...prev, eventId]);
+      }
+    } else {
+      if (userKeys < (event.minKeys ?? 0)) return;
+      const next = [...registeredEventIds, eventId];
+      setRegisteredEventIds(next);
+      try {
+        await Promise.all([
+          setDoc(doc(db, 'events', eventId, 'registrations', userId), {
+            userId,
+            userName: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim(),
+            userPhoto: user.photo_200 ?? null,
+            registeredAt: serverTimestamp(),
+          }),
+          updateDoc(doc(db, 'users', userId), { registeredEvents: next }),
+        ]);
+        showToast(`✓ Вы записаны: ${event.title}!`, 'success');
+      } catch (e) {
+        console.error(e);
+        setRegisteredEventIds(prev => prev.filter(id => id !== eventId));
+      }
+    }
+  }, [user, userKeys, registeredEventIds, showToast]);
+
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
   const handleLogout = useCallback(() => {
@@ -748,6 +792,8 @@ export function UserApp() {
                 completedTasks={completedTasks} referralCount={referralCount}
                 scannedCount={Object.keys(scannedPartnerIds).length}
                 unreadCount={unreadCount}
+                registeredEventIds={registeredEventIds}
+                onEventRegister={handleEventRegister}
                 onOpenPartner={openPartner}
                 onToggleFavorite={toggleFavorite}
                 onScan={() => setIsScannerOpen(true)}
@@ -779,7 +825,9 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <ProfilePanel
                     user={user} userKeys={userKeys} favorites={favorites}
-                    partners={enrichedPartners} referralCount={referralCount}
+                    partners={enrichedPartners} events={events}
+                    registeredEventIds={registeredEventIds}
+                    referralCount={referralCount}
                     streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
                     completedTasks={completedTasks} scanDates={scanDates}
                     notificationsEnabled={notifEnabled}
