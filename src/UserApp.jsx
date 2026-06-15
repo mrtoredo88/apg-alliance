@@ -226,10 +226,11 @@ export function UserApp() {
     }
 
     const newStreak  = alreadyToday ? streak : streak + 1;
+    const keyBonus   = (!alreadyHasKey && partner.featured) ? 2 : 1;
     const updateData = { lastScanDate: todayKey, streak: newStreak };
 
     if (!alreadyHasKey) {
-      updateData.keys = increment(1);
+      updateData.keys = increment(keyBonus);
       updateData[`scannedPartners.${partner.id}`] = true;
     }
 
@@ -238,12 +239,13 @@ export function UserApp() {
       setLastScanDate(todayKey);
       setStreak(newStreak);
       if (!alreadyHasKey) {
-        setUserKeys(prev => prev + 1);
+        setUserKeys(prev => prev + keyBonus);
         setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
-        showToast(`+1 ключ — ${partner.name}! 🔑`, 'success');
+        const bonusText = keyBonus > 1 ? ` x${keyBonus} (партнёр дня!)` : '';
+        showToast(`+${keyBonus} ключ${bonusText} — ${partner.name}! 🔑`, 'success');
         addDoc(collection(db, 'users', String(user.id), 'activity'), {
-          type: 'scan', icon: '🔑',
-          text: `Посещён: ${partner.name}`,
+          type: 'scan', icon: keyBonus > 1 ? '⭐' : '🔑',
+          text: `Посещён: ${partner.name}${keyBonus > 1 ? ' (партнёр дня × 2)' : ''}`,
           ts: serverTimestamp(),
         }).catch(() => {});
       } else {

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db } from './firebase';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch } from 'firebase/firestore';
 
 const CATEGORIES = [
   { id: 'food',   label: 'Еда',         emoji: '🍽️' },
@@ -60,6 +60,8 @@ export const AdminPanel = () => {
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
   const [qrPartner, setQrPartner]           = useState(null);
+  const [analytics, setAnalytics]           = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Форма партнёра
   const [pName, setPName] = useState('');
@@ -265,6 +267,49 @@ export const AdminPanel = () => {
     fetchData();
   };
 
+  // ─── Партнёр дня ────────────────────────────────────────────────────────────
+
+  const setFeaturedPartner = useCallback(async (partnerId) => {
+    const batch = writeBatch(db);
+    partners.forEach(p => {
+      batch.update(doc(db, 'partners', p.id), { featured: partnerId !== null && p.id === partnerId });
+    });
+    await batch.commit();
+    fetchData();
+  }, [partners]);
+
+  // ─── Аналитика ──────────────────────────────────────────────────────────────
+
+  const loadAnalytics = useCallback(async () => {
+    if (analyticsLoading) return;
+    setAnalyticsLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const totalUsers = users.length;
+      const totalKeys  = users.reduce((s, u) => s + (u.keys ?? 0), 0);
+      const avgKeys    = totalUsers > 0 ? (totalKeys / totalUsers).toFixed(1) : 0;
+      const activeUsers = users.filter(u => (u.keys ?? 0) > 0).length;
+
+      // Считаем уникальных посетителей по каждому партнёру
+      const visitCounts = {};
+      users.forEach(u => {
+        Object.keys(u.scannedPartners ?? {}).forEach(pid => {
+          visitCounts[pid] = (visitCounts[pid] ?? 0) + 1;
+        });
+      });
+
+      // Объединяем с данными партнёров
+      const partnerStats = partners
+        .map(p => ({ ...p, visits: visitCounts[p.id] ?? 0 }))
+        .sort((a, b) => b.visits - a.visits);
+
+      setAnalytics({ totalUsers, totalKeys, avgKeys, activeUsers, partnerStats });
+    } catch (e) { console.error(e); }
+    setAnalyticsLoading(false);
+  }, [partners, analyticsLoading]);
+
   return (
     <div style={s.page}>
       <div style={{ marginBottom: 16 }}>
@@ -272,19 +317,21 @@ export const AdminPanel = () => {
         <p style={{ color: '#99A2AD', fontSize: 13, margin: 0 }}>АПГ — Альянс Партнёров Города</p>
       </div>
 
-      <div style={s.tabs}>
-        <button style={{ ...s.tab, background: activeTab === 'partners' ? '#3F8AE0' : '#fff', color: activeTab === 'partners' ? '#fff' : '#000' }} onClick={() => setActiveTab('partners')}>
-          🤝 Партнёры ({partners.length})
-        </button>
-        <button style={{ ...s.tab, background: activeTab === 'events' ? '#3F8AE0' : '#fff', color: activeTab === 'events' ? '#fff' : '#000' }} onClick={() => setActiveTab('events')}>
-          🎉 События ({events.length})
-        </button>
-        <button style={{ ...s.tab, background: activeTab === 'news' ? '#3F8AE0' : '#fff', color: activeTab === 'news' ? '#fff' : '#000' }} onClick={() => setActiveTab('news')}>
-          📢 Новости ({news.length})
-        </button>
-        <button style={{ ...s.tab, background: activeTab === 'notifs' ? '#3F8AE0' : '#fff', color: activeTab === 'notifs' ? '#fff' : '#000' }} onClick={() => setActiveTab('notifs')}>
-          🔔 Уведомления ({notifs.length})
-        </button>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        {[
+          { id: 'partners', label: `🤝 Партнёры (${partners.length})` },
+          { id: 'events',   label: `🎉 События (${events.length})` },
+          { id: 'news',     label: `📢 Новости (${news.length})` },
+          { id: 'notifs',   label: `🔔 Уведомления` },
+          { id: 'analytics',label: '📊 Аналитика' },
+        ].map(t => (
+          <button key={t.id}
+            style={{ ...s.tab, flex: 'none', padding: '10px 14px', background: activeTab === t.id ? '#3F8AE0' : '#fff', color: activeTab === t.id ? '#fff' : '#000' }}
+            onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* ── ПАРТНЁРЫ ── */}
@@ -354,6 +401,11 @@ export const AdminPanel = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <button
+                      title={p.featured ? 'Партнёр дня (снять)' : 'Сделать партнёром дня'}
+                      style={{ ...s.btn, padding: '6px 10px', fontSize: 14, background: p.featured ? '#FFF3CD' : '#f2f3f5', border: p.featured ? '1.5px solid #FFD700' : 'none' }}
+                      onClick={() => setFeaturedPartner(p.featured ? null : p.id)}
+                    >⭐</button>
                     <button style={{ ...s.btn, background: '#E8F3FF', color: '#3F8AE0', padding: '6px 10px', fontSize: 11, fontWeight: 700 }} onClick={() => setQrPartner(p)}>QR</button>
                     <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPartner(p)}>✏️</button>
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePartner(p.id)}>🗑️</button>
@@ -543,6 +595,71 @@ export const AdminPanel = () => {
             }
           </div>
         </>
+      )}
+
+      {/* ── АНАЛИТИКА ── */}
+      {activeTab === 'analytics' && (
+        <div>
+          {analyticsLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#99A2AD' }}>Загружаем данные...</div>
+          ) : !analytics ? (
+            <div style={s.card}>
+              <p style={{ color: '#99A2AD', textAlign: 'center', marginBottom: 16 }}>Нажмите кнопку, чтобы загрузить статистику</p>
+              <button style={{ ...s.btn, ...s.btnPri, width: '100%' }} onClick={loadAnalytics}>📊 Загрузить аналитику</button>
+            </div>
+          ) : (
+            <>
+              {/* Сводка */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: 'Всего пользователей', value: analytics.totalUsers, icon: '👥' },
+                  { label: 'Активных (с ключами)', value: analytics.activeUsers, icon: '🔑' },
+                  { label: 'Ключей в обороте', value: analytics.totalKeys, icon: '🗝️' },
+                  { label: 'Ключей на юзера', value: analytics.avgKeys, icon: '📈' },
+                ].map(stat => (
+                  <div key={stat.label} style={{ ...s.card, marginBottom: 0, textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, marginBottom: 4 }}>{stat.icon}</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: '#3F8AE0' }}>{stat.value}</div>
+                    <div style={{ fontSize: 11, color: '#99A2AD', lineHeight: '14px', marginTop: 2 }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Рейтинг партнёров */}
+              <div style={s.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>🏆 Рейтинг партнёров</h2>
+                  <button style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }} onClick={loadAnalytics}>↻ Обновить</button>
+                </div>
+                {analytics.partnerStats.length === 0 ? (
+                  <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет данных</p>
+                ) : (() => {
+                  const max = analytics.partnerStats[0]?.visits || 1;
+                  return analytics.partnerStats.map((p, i) => (
+                    <div key={p.id} style={{ marginBottom: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: i < 3 ? '#3F8AE0' : '#99A2AD', width: 22, flexShrink: 0 }}>#{i + 1}</span>
+                        {p.logoUrl
+                          ? <img src={p.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+                          : <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{p.emoji ?? '🏪'}</div>
+                        }
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#3F8AE0', flexShrink: 0, marginLeft: 8 }}>{p.visits} чел.</span>
+                          </div>
+                          <div style={{ height: 6, background: '#f2f3f5', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', borderRadius: 3, width: `${Math.round((p.visits / max) * 100)}%`, background: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#3F8AE0', transition: 'width 0.6s ease' }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       <div style={{ height: 32 }} />
