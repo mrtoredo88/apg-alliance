@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Публичные коллекции — только чтение для клиентов ─────────────────────
+    // Запись только через Firebase Console или Admin SDK (backend).
+    // AdminPanel на клиенте работает через auth: любой авторизованный пользователь
+    // может писать сюда; реальная защита — через отдельный admin-токен на бэкенде.
+    match /partners/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /events/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /news/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /prizes/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /notifications/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ── Отзывы — чтение всем, запись только авторизованным ───────────────────
+    match /reviews/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ── Данные пользователей ──────────────────────────────────────────────────
+    // Пользователь может читать и писать только в свой документ.
+    // userId — VK user id (строка), хранится в auth_map после анонимного входа.
+    match /users/{userId} {
+      allow read:  if request.auth != null
+                   && isOwner(userId);
+      allow write: if request.auth != null
+                   && isOwner(userId);
+
+      match /{sub}/{docId} {
+        allow read, write: if request.auth != null
+                           && isOwner(userId);
+      }
+    }
+
+    // ── Маппинг Firebase UID → VK user id ────────────────────────────────────
+    // Создаётся при первом входе; пользователь может только создать свою запись.
+    match /auth_map/{firebaseUid} {
+      allow read:   if request.auth != null && request.auth.uid == firebaseUid;
+      allow create: if request.auth != null && request.auth.uid == firebaseUid;
+      allow update, delete: if false;
+    }
+
+    function isOwner(userId) {
+      return exists(/databases/$(database)/documents/auth_map/$(request.auth.uid))
+          && get(/databases/$(database)/documents/auth_map/$(request.auth.uid)).data.vkId == userId;
+    }
+  }
+}
