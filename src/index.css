@@ -1,14 +1,27 @@
 :root {
-  /* Премиальная палитра: Глубокий синий и мягкое золото */
-  --vkui--color_background_app: #f9f9f9;
-  --vkui--color_background_content: #ffffff;
-  --vkui--color_text_primary: #1a1a1a;
-  --vkui--color_text_accent: #c5a059; /* Золотой оттенок */
-  --vkui--color_background_accent: #1e2a44; /* Глубокий деловой синий */
-  
-  /* Скругления для "дружелюбного" вида */
+  --vkui--color_background_app:     transparent;
+  --vkui--color_background_content: transparent;
+  --vkui--color_text_primary:       #f0f0f0;
+  --vkui--color_text_accent:        #C9A84C;
+  --vkui--color_background_accent:  #1e2a44;
+
   --vkui--size_border_radius_paper--regular: 16px;
-  --vkui--size_border_radius_button--m: 12px;
+  --vkui--size_border_radius_button--m:      12px;
+}
+
+html, body, #root {
+  background: #08081A;
+  margin: 0;
+  padding: 0;
+}
+
+/* VK UI панели — прозрачный фон чтобы видеть depth orbs */
+.vkuiPanel,
+.vkuiPanel__in,
+.vkuiAppRoot,
+.vkuiSplitLayout,
+.vkuiSplitCol {
+  background: transparent !important;
 }
 
 /* Эффект легкой тени для карточек, чтобы они выглядели «парящими» */
