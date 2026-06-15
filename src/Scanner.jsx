@@ -1,94 +1,198 @@
-import React, { useEffect, useRef } from 'react';
-import vkBridge from '@vkontakte/vk-bridge';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import QrScanner from 'qr-scanner';
+import qrWorkerSrc from 'qr-scanner/qr-scanner-worker.min.js?url';
 
-export default function Scanner({ isOpen, onClose, mapPlaces, onConfirm }) {
-  const triggered = useRef(false);
+QrScanner.WORKER_PATH = qrWorkerSrc;
+
+const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
+
+export default function Scanner({ isOpen, onClose, onConfirm }) {
+  const videoRef    = useRef(null);
+  const scannerRef  = useRef(null);
+  const doneRef     = useRef(false);
+  const [err, setErr]       = useState(null);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [torchOn, setTorchOn]   = useState(false);
+
+  const stopScanner = useCallback(() => {
+    if (scannerRef.current) {
+      scannerRef.current.stop();
+      scannerRef.current.destroy();
+      scannerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    if (!isOpen) { triggered.current = false; return; }
-    if (triggered.current) return;
-    triggered.current = true;
+    if (!isOpen) {
+      doneRef.current = false;
+      setErr(null);
+      setTorchOn(false);
+      return;
+    }
 
-    vkBridge.send('VKWebAppOpenCodeReader')
-      .then(({ code_data }) => {
-        if (code_data) onConfirm?.(code_data);
-        else onClose?.();
-      })
-      .catch(() => onClose?.());
-  }, [isOpen, onClose, onConfirm]);
+    // Wait for video element to mount
+    const timer = setTimeout(() => {
+      if (!videoRef.current) return;
+
+      const scanner = new QrScanner(
+        videoRef.current,
+        (result) => {
+          if (doneRef.current) return;
+          doneRef.current = true;
+          stopScanner();
+          onConfirm?.(result.data);
+        },
+        {
+          returnDetailedScanResult: true,
+          highlightScanRegion: false,
+          highlightCodeOutline: false,
+          preferredCamera: 'environment',
+        },
+      );
+
+      scannerRef.current = scanner;
+
+      scanner.start()
+        .then(() => {
+          scanner.hasFlash().then(has => setHasTorch(has));
+        })
+        .catch(() => {
+          setErr('Нет доступа к камере. Разрешите его в настройках браузера.');
+        });
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      stopScanner();
+    };
+  }, [isOpen, stopScanner, onConfirm]);
+
+  const handleClose = useCallback(() => {
+    stopScanner();
+    onClose?.();
+  }, [stopScanner, onClose]);
+
+  const toggleTorch = useCallback(() => {
+    if (!scannerRef.current) return;
+    const next = !torchOn;
+    setTorchOn(next);
+    scannerRef.current.toggleFlash();
+  }, [torchOn]);
 
   if (!isOpen) return null;
 
-  // В dev-режиме VKWebAppOpenCodeReader не работает — показываем список партнёров
-  const isDev = import.meta.env.MODE === 'development';
-  if (!isDev) {
-    return (
-      <div style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(9,9,13,0.7)',
-        zIndex: 2000,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: 12,
-      }}>
-        <div style={{
-          width: 48, height: 48,
-          border: '3px solid rgba(201,168,76,0.3)',
-          borderTopColor: '#C9A84C',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }} />
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Открываем сканер…</div>
-      </div>
-    );
-  }
-
-  // Dev fallback — список партнёров для тестирования
-  const safePlaces = Array.isArray(mapPlaces) ? mapPlaces : [];
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(9,9,13,0.97)',
+      background: '#000',
       zIndex: 2000,
       display: 'flex', flexDirection: 'column',
-      padding: '24px 20px',
-      overflowY: 'auto',
     }}>
+      {/* Camera feed */}
+      <video
+        ref={videoRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        muted playsInline
+      />
+
+      {/* Dark vignette overlay */}
       <div style={{
-        color: 'rgba(201,168,76,0.8)', fontSize: 11,
-        fontWeight: 700, letterSpacing: 2,
-        textTransform: 'uppercase', marginBottom: 16,
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse 260px 260px at 50% 44%, transparent 100%, rgba(0,0,0,0.72) 100%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Top bar */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '52px 20px 0',
       }}>
-        DEV — выбрать партнёра
+        <button onClick={handleClose} style={{
+          background: 'rgba(0,0,0,0.45)',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '50%', width: 40, height: 40,
+          color: '#fff', fontSize: 18, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(8px)',
+        }}>✕</button>
+
+        <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>Сканер QR</div>
+
+        {hasTorch ? (
+          <button onClick={toggleTorch} style={{
+            background: torchOn ? 'rgba(201,168,76,0.25)' : 'rgba(0,0,0,0.45)',
+            border: `1px solid ${torchOn ? 'rgba(201,168,76,0.5)' : 'rgba(255,255,255,0.15)'}`,
+            borderRadius: '50%', width: 40, height: 40,
+            color: torchOn ? T.gold : '#fff', fontSize: 18, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(8px)',
+          }}>🔦</button>
+        ) : <div style={{ width: 40 }} />}
       </div>
-      {safePlaces.map(place => (
-        <button
-          key={place.id}
-          onClick={() => onConfirm?.(place.id)}
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#F0F0F0', padding: '14px 16px',
-            borderRadius: 12, marginBottom: 8,
-            cursor: 'pointer', fontSize: 14, fontWeight: 600,
-            textAlign: 'left',
-          }}
-        >
-          {place.icon} {place.name}
-        </button>
-      ))}
-      <button
-        onClick={onClose}
-        style={{
-          background: 'none',
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: 'rgba(240,240,240,0.4)',
-          marginTop: 12, padding: '14px',
-          borderRadius: 12, cursor: 'pointer', fontSize: 14,
-        }}
-      >
-        Отмена
-      </button>
+
+      {/* Scanning frame */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 24,
+      }}>
+        {err ? (
+          <div style={{
+            background: 'rgba(230,70,70,0.15)',
+            border: '1px solid rgba(230,70,70,0.35)',
+            borderRadius: 16, padding: '16px 20px',
+            color: '#fff', fontSize: 14, textAlign: 'center',
+            maxWidth: 280, lineHeight: '20px',
+            backdropFilter: 'blur(12px)',
+          }}>
+            {err}
+          </div>
+        ) : (
+          <>
+            {/* Corner frame */}
+            <div style={{ position: 'relative', width: 240, height: 240 }}>
+              {[
+                { top: 0, left: 0, borderTop: true, borderLeft: true },
+                { top: 0, right: 0, borderTop: true, borderRight: true },
+                { bottom: 0, left: 0, borderBottom: true, borderLeft: true },
+                { bottom: 0, right: 0, borderBottom: true, borderRight: true },
+              ].map((corner, i) => (
+                <div key={i} style={{
+                  position: 'absolute',
+                  width: 28, height: 28,
+                  ...corner,
+                  borderTopWidth:    corner.borderTop    ? 3 : 0,
+                  borderLeftWidth:   corner.borderLeft   ? 3 : 0,
+                  borderBottomWidth: corner.borderBottom ? 3 : 0,
+                  borderRightWidth:  corner.borderRight  ? 3 : 0,
+                  borderStyle: 'solid',
+                  borderColor: T.gold,
+                  borderRadius: corner.borderTop && corner.borderLeft ? '4px 0 0 0'
+                    : corner.borderTop && corner.borderRight ? '0 4px 0 0'
+                    : corner.borderBottom && corner.borderLeft ? '0 0 0 4px'
+                    : '0 0 4px 0',
+                }} />
+              ))}
+              {/* Scan line animation */}
+              <div style={{
+                position: 'absolute', left: 4, right: 4, height: 2,
+                background: `linear-gradient(90deg, transparent, ${T.gold}, transparent)`,
+                animation: 'scanLine 2s ease-in-out infinite',
+                boxShadow: `0 0 8px ${T.gold}`,
+              }} />
+            </div>
+
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', lineHeight: '20px' }}>
+              Наведите камеру на QR-код партнёра
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Bottom padding */}
+      <div style={{ height: 60 }} />
     </div>
   );
 }
