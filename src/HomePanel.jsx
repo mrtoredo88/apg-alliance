@@ -208,6 +208,12 @@ function PartnerLogo({ partner, size = 56 }) {
 // ─── Карточка партнёра ────────────────────────────────────────────────────────
 
 function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 }) {
+  const isNew = (() => {
+    if (!partner.createdAt) return false;
+    const ts = partner.createdAt.toDate ? partner.createdAt.toDate() : new Date(partner.createdAt.seconds * 1000);
+    return Date.now() - ts.getTime() < 14 * 24 * 60 * 60 * 1000;
+  })();
+
   return (
     <div style={{
       ...GLASS,
@@ -224,6 +230,14 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
           width: 8, height: 8, borderRadius: '50%',
           background: T.gold, boxShadow: `0 0 6px ${T.gold}`,
         }} />
+      )}
+      {/* NEW бейдж */}
+      {isNew && !partner.offer && (
+        <div style={{
+          position: 'absolute', top: 8, right: 8,
+          background: 'rgba(74,144,217,0.2)', border: '1px solid rgba(74,144,217,0.5)',
+          borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, color: '#4A90D9',
+        }}>✦ NEW</div>
       )}
       {/* Бейдж акции */}
       {partner.offer && (

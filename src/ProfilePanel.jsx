@@ -168,7 +168,60 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], onShare, onOpenReferral }) {
+function StreakCalendar({ scanDates = [], streak = 0 }) {
+  const days = 30;
+  const today = new Date();
+  const dateSet = new Set(scanDates);
+
+  const cells = Array.from({ length: days }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (days - 1 - i));
+    const key = d.toISOString().slice(0, 10);
+    const isToday = i === days - 1;
+    return { key, active: dateSet.has(key), isToday, dayNum: d.getDate() };
+  });
+
+  return (
+    <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>🔥 Активность — 30 дней</div>
+        {streak > 0 && <div style={{ fontSize: 11, color: '#FF8C42', fontWeight: 700, background: 'rgba(255,100,0,0.1)', border: '1px solid rgba(255,100,0,0.25)', padding: '3px 10px', borderRadius: 20 }}>{streak} дн. подряд</div>}
+      </div>
+      <div style={{ ...GLASS, borderRadius: 20, padding: '14px 12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 4 }}>
+          {cells.map(c => (
+            <div key={c.key} title={c.key} style={{
+              aspectRatio: '1', borderRadius: 6,
+              background: c.active
+                ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
+                : c.isToday
+                  ? 'rgba(201,168,76,0.15)'
+                  : 'rgba(255,255,255,0.05)',
+              border: c.isToday ? `1px solid ${T.gold}60` : '1px solid transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, color: c.active ? '#0F0F1A' : T.textSec,
+              fontWeight: c.active ? 800 : 400,
+            }}>
+              {c.active ? '✓' : c.dayNum}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginTop: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})` }} />
+            <span style={{ fontSize: 10, color: T.textSec }}>Посещение</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.gold}60` }} />
+            <span style={{ fontSize: 10, color: T.textSec }}>Сегодня</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -437,6 +490,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           })}
         </div>
       </div>
+
+      {/* ── Streak Calendar ── */}
+      <StreakCalendar scanDates={scanDates} streak={streak} />
 
       {/* ── Достижения ── */}
       <div style={{ padding: '16px 16px 0' }}>

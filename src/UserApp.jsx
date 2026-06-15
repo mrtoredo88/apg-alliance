@@ -40,6 +40,7 @@ export function UserApp() {
   const isScanningRef                           = useRef(false);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
+  const [scanDates, setScanDates]               = useState([]);
 
   const [activePanel, setActivePanel]           = useState('home');
   const [activePartner, setActivePartner]       = useState(null);
@@ -67,10 +68,21 @@ export function UserApp() {
   const [error, setError]                       = useState(null);
   const [showOnboarding, setShowOnboarding]     = useState(false);
 
+  const haptic = useCallback((style = 'light') => {
+    vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
+  }, []);
+
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
   const loadData = useCallback(async (isMounted) => {
     setLoading(true); setError(null);
+
+    // Показываем закэшированных партнёров сразу (без мерцания)
+    try {
+      const cached = localStorage.getItem('apg_partners_cache');
+      if (cached) setPartners(JSON.parse(cached));
+    } catch {}
+
     try {
       vkBridge.send('VKWebAppInit');
       const userData = await Promise.race([
@@ -96,7 +108,9 @@ export function UserApp() {
       ]);
 
       if (!isMounted.current) return;
-      setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPartners(freshPartners);
+      try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -123,21 +137,34 @@ export function UserApp() {
         photo:     userData.photo_200  ?? null,
       };
 
+      const todayKey = new Date().toISOString().slice(0, 10);
+
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setUserKeys(data.keys ?? 0);
+        const keys = data.keys ?? 0;
+        setUserKeys(keys);
         setFavorites(data.favorites ?? []);
         setScannedPartnerIds(data.scannedPartners ?? {});
         setCompletedTasks(data.completedTasks ?? []);
         setStreak(data.streak ?? 0);
         setLastScanDate(data.lastScanDate ?? null);
         setReferralCount(data.referralCount ?? 0);
+        setScanDates(data.scanDates ?? []);
         if (!data.onboardingDone) setShowOnboarding(true);
-        updateDoc(userRef, profilePatch).catch(() => {});
+
+        // Ежедневный бонус: +1 ключ за первый вход каждый день
+        if (data.lastBonusDate !== todayKey) {
+          updateDoc(userRef, { keys: increment(1), lastBonusDate: todayKey, ...profilePatch }).catch(() => {});
+          setUserKeys(keys + 1);
+          if (isMounted.current) setTimeout(() => { setToast({ msg: '🎁 Ежедневный бонус — +1 ключ!', type: 'success' }); setTimeout(() => setToast(null), 3000); }, 1500);
+        } else {
+          updateDoc(userRef, profilePatch).catch(() => {});
+        }
       } else {
         await setDoc(userRef, {
           keys: 0, favorites: [], scannedPartners: {},
           completedTasks: [], streak: 0, onboardingDone: false,
+          scanDates: [], lastBonusDate: todayKey,
           ...profilePatch,
         });
         setShowOnboarding(true);
@@ -175,6 +202,7 @@ export function UserApp() {
 
   const toggleFavorite = useCallback(async (partnerId) => {
     if (!user) return;
+    haptic('light');
     const prev = favorites;
     const isAdding = !favorites.includes(partnerId);
     const next = isAdding
@@ -193,7 +221,7 @@ export function UserApp() {
         ts: serverTimestamp(),
       }).catch(() => {});
     } catch { setFavorites(prev); }
-  }, [user, favorites, partners]);
+  }, [user, favorites, partners, haptic]);
 
   // ─── Скан ───────────────────────────────────────────────────────────────────
 
@@ -227,7 +255,10 @@ export function UserApp() {
 
     const newStreak  = alreadyToday ? streak : streak + 1;
     const keyBonus   = (!alreadyHasKey && partner.featured) ? 2 : 1;
-    const updateData = { lastScanDate: todayKey, streak: newStreak };
+    const newScanDates = scanDates.includes(todayKey)
+      ? scanDates
+      : [...scanDates.slice(-89), todayKey]; // храним последние 90 дат
+    const updateData = { lastScanDate: todayKey, streak: newStreak, scanDates: newScanDates };
 
     if (!alreadyHasKey) {
       updateData.keys = increment(keyBonus);
@@ -238,6 +269,8 @@ export function UserApp() {
       await updateDoc(doc(db, 'users', String(user.id)), updateData);
       setLastScanDate(todayKey);
       setStreak(newStreak);
+      setScanDates(newScanDates);
+      haptic('medium');
       if (!alreadyHasKey) {
         setUserKeys(prev => prev + keyBonus);
         setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
@@ -265,7 +298,7 @@ export function UserApp() {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, partners, lastScanDate, streak, scannedPartnerIds, showToast]);
+  }, [user, partners, lastScanDate, streak, scannedPartnerIds, scanDates, haptic, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -412,7 +445,7 @@ export function UserApp() {
 
       {TABS.map((tab, i) => {
         if (i === 2) return (
-          <button key="scan" onClick={() => setIsScannerOpen(true)}
+          <button key="scan" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
             style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
             <div style={{
               width: 50, height: 50, marginTop: -14, borderRadius: '50%',
@@ -432,7 +465,7 @@ export function UserApp() {
 
         return (
           <button key={tab.id}
-            onClick={() => goPanel(tab.id)}
+            onClick={() => { haptic('light'); goPanel(tab.id); }}
             style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 0, position: 'relative', zIndex: 1 }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
@@ -499,7 +532,7 @@ export function UserApp() {
                   user={user} userKeys={userKeys} favorites={favorites}
                   partners={partners} referralCount={referralCount}
                   streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
-                  completedTasks={completedTasks}
+                  completedTasks={completedTasks} scanDates={scanDates}
                   notificationsEnabled={notifEnabled}
                   onToggleFavorite={toggleFavorite}
                   onOpenPartner={openPartner}

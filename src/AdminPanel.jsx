@@ -153,7 +153,7 @@ export const AdminPanel = () => {
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
     } else {
-      await addDoc(collection(db, 'partners'), data);
+      await addDoc(collection(db, 'partners'), { ...data, createdAt: serverTimestamp() });
     }
     resetPartnerForm();
     fetchData();
