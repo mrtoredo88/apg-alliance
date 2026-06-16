@@ -21,7 +21,7 @@ const ACHIEVEMENTS = [
 function AchievementBadge({ a, unlocked }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 76, gap: 6, opacity: unlocked ? 1 : 0.3, filter: unlocked ? 'none' : 'grayscale(1)' }}>
-      <div style={{ width: 52, height: 52, borderRadius: 16, background: unlocked ? a.color + '20' : 'rgba(255,255,255,0.05)', border: `2px solid ${unlocked ? a.color + '60' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, position: 'relative' }}>
+      <div style={{ width: 52, height: 52, borderRadius: 16, background: unlocked ? a.color + '20' : T.chipBg, border: `2px solid ${unlocked ? a.color + '60' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, position: 'relative' }}>
         {a.emoji}
         {unlocked && <div style={{ position: 'absolute', bottom: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</div>}
       </div>
@@ -216,7 +216,7 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
               { emoji: '🏪', value: scannedCount,      label: 'партнёров' },
               { emoji: '🏆', value: unlockedAchievements, label: 'наград' },
             ].map(s => (
-              <div key={s.label} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div key={s.label} style={{ background: T.chipBg, borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: `1px solid ${T.border}` }}>
                 <div style={{ fontSize: 18 }}>{s.emoji}</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: T.gold, lineHeight: 1.2 }}>{s.value}</div>
                 <div style={{ fontSize: 9, color: T.textSec, lineHeight: '12px', marginTop: 2 }}>{s.label}</div>
@@ -230,7 +230,7 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
           <button onClick={onShareVK} style={{ flex: 1, padding: '14px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             📤 Поделиться в VK
           </button>
-          <button onClick={onClose} style={{ padding: '14px 20px', borderRadius: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: T.textPri, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ padding: '14px 20px', borderRadius: 16, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textPri, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Закрыть
           </button>
         </div>
@@ -978,7 +978,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 disabled={isDeleting}
                 style={{
                   flex: 1, padding: '14px 0', borderRadius: 14,
-                  background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)',
+                  background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`,
                   color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer',
                 }}
               >
@@ -1015,7 +1015,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           onClose={() => setShowShareModal(false)}
           onShareVK={() => {
             const name = user ? user.first_name : 'Я';
-            const levelLabel = level.title;
+            const levelLabel = level.label;
             const msg = `${name} — участник АПГ!\n\n🗝️ ${userKeys} ключей · ${levelLabel}\n🔥 Стрик: ${streak} дней\n🏪 Партнёров посещено: ${scannedCount}\n\nПрисоединяйся к Альянсу Партнёров Зеленограда 👇`;
             vkBridge.send('VKWebAppShowWallPostBox', {
               message: msg,
