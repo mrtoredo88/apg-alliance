@@ -7,6 +7,7 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
+  where, getCountFromServer,
 } from 'firebase/firestore';
 import { HomePanel }         from './HomePanel.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
@@ -81,6 +82,7 @@ export function UserApp() {
   const [recentReviews, setRecentReviews]       = useState([]);
   const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
+  const [userRank, setUserRank]                   = useState(null);
   const [appearance, setAppearance]             = useState('dark');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
@@ -147,11 +149,14 @@ export function UserApp() {
   const enrichedPartners = useMemo(() => {
     if (!partners.length) return partners;
     const hasAdminFeatured = partners.some(p => p.featured);
-    if (hasAdminFeatured) return partners;
     const dayIdx = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-    const featuredId = partners[dayIdx % partners.length].id;
-    return partners.map(p => ({ ...p, featured: p.id === featuredId }));
-  }, [partners]);
+    const featuredId = hasAdminFeatured ? null : partners[dayIdx % partners.length].id;
+    return partners.map(p => ({
+      ...p,
+      featured: hasAdminFeatured ? !!p.featured : p.id === featuredId,
+      visitCount: visitCounts[p.id] ?? 0,
+    }));
+  }, [partners, visitCounts]);
 
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
@@ -278,6 +283,11 @@ export function UserApp() {
         setVisitCounts(data.visitCounts ?? {});
         setRegisteredEventIds(data.registeredEvents ?? []);
         if (!data.onboardingDone) setShowOnboarding(true);
+
+        // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
+        getCountFromServer(query(collection(db, 'users'), where('keys', '>', keys)))
+          .then(snap => { if (isMounted.current) setUserRank(snap.data().count + 1); })
+          .catch(() => {});
 
         // Ежедневный бонус: +1 ключ за первый вход каждый день
         if (data.lastBonusDate !== todayKey) {
@@ -531,19 +541,23 @@ export function UserApp() {
     if (isRegistered) {
       const next = registeredEventIds.filter(id => id !== eventId);
       setRegisteredEventIds(next);
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount ?? 1) - 1) } : e));
       try {
         await Promise.all([
           deleteDoc(doc(db, 'events', eventId, 'registrations', userId)),
           updateDoc(doc(db, 'users', userId), { registeredEvents: next }),
+          updateDoc(doc(db, 'events', eventId), { registeredCount: increment(-1) }),
         ]);
       } catch (e) {
         console.error(e);
         setRegisteredEventIds(prev => [...prev, eventId]);
+        setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       }
     } else {
       if (userKeys < (event.minKeys ?? 0)) return;
       const next = [...registeredEventIds, eventId];
       setRegisteredEventIds(next);
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       try {
         await Promise.all([
           setDoc(doc(db, 'events', eventId, 'registrations', userId), {
@@ -553,14 +567,16 @@ export function UserApp() {
             registeredAt: serverTimestamp(),
           }),
           updateDoc(doc(db, 'users', userId), { registeredEvents: next }),
+          updateDoc(doc(db, 'events', eventId), { registeredCount: increment(1) }),
         ]);
         showToast(`✓ Вы записаны: ${event.title}!`, 'success');
       } catch (e) {
         console.error(e);
         setRegisteredEventIds(prev => prev.filter(id => id !== eventId));
+        setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount ?? 1) - 1) } : e));
       }
     }
-  }, [user, userKeys, registeredEventIds, showToast]);
+  }, [user, userKeys, registeredEventIds, setEvents, showToast]);
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
@@ -793,6 +809,7 @@ export function UserApp() {
                 scannedCount={Object.keys(scannedPartnerIds).length}
                 unreadCount={unreadCount}
                 registeredEventIds={registeredEventIds}
+                userRank={userRank}
                 onEventRegister={handleEventRegister}
                 onOpenPartner={openPartner}
                 onToggleFavorite={toggleFavorite}

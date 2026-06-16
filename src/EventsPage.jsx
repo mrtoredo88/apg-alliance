@@ -174,53 +174,69 @@ function EventListCard({ event, index, onClick }) {
   );
 }
 
+function isEventPast(event) {
+  const dateStr = event.eventDate || event.deadline;
+  if (!dateStr) return false;
+  const d = new Date(dateStr.length <= 10 ? dateStr + 'T23:59:59' : dateStr);
+  return !isNaN(d) && d.getTime() < Date.now();
+}
+
+function EmptyState({ tab }) {
+  return (
+    <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <div style={{ fontSize: 48 }}>{tab === 'upcoming' ? '🗓️' : '📦'}</div>
+      <div>
+        <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
+          {tab === 'upcoming' ? 'Скоро будут события' : 'Прошедших событий нет'}
+        </div>
+        <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>
+          {tab === 'upcoming' ? 'Партнёры АПГ готовят кое-что интересное' : 'Здесь появятся прошедшие мероприятия'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EventsPage({ nav, events = [], onBack }) {
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [tab, setTab] = useState('upcoming');
+
+  const upcoming = events.filter(e => !isEventPast(e));
+  const past     = events.filter(e => isEventPast(e)).reverse();
+  const list     = tab === 'upcoming' ? upcoming : past;
 
   return (
     <Panel id={nav}>
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>✦ События</div>
-            {events.length > 0 && <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>{events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}</div>}
           </div>
+        </div>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 8, paddingBottom: 12 }}>
+          {[['upcoming', `Предстоящие${upcoming.length ? ` · ${upcoming.length}` : ''}`], ['past', `Прошедшие${past.length ? ` · ${past.length}` : ''}`]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{
+              padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: tab === id ? T.gold : 'rgba(255,255,255,0.07)',
+              color: tab === id ? '#0F0F1A' : T.textSec,
+              transition: 'all 0.18s',
+            }}>{label}</button>
+          ))}
         </div>
       </div>
 
       <div style={{ background: T.bg, minHeight: '100%' }}>
-
-        {/* Счётчик */}
-
-        {events.length === 0 ? (
-          <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
-              <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
-                <rect x="10" y="22" width="70" height="60" rx="12" fill="rgba(201,168,76,0.07)" stroke="rgba(201,168,76,0.22)" strokeWidth="1.5"/>
-                <rect x="10" y="22" width="70" height="23" rx="12" fill="rgba(201,168,76,0.11)"/>
-                <rect x="10" y="35" width="70" height="10" fill="rgba(201,168,76,0.11)"/>
-                <rect x="25" y="12" width="7" height="19" rx="3.5" fill="rgba(201,168,76,0.65)"/>
-                <rect x="58" y="12" width="7" height="19" rx="3.5" fill="rgba(201,168,76,0.65)"/>
-                <circle cx="30" cy="56" r="3.5" fill="rgba(201,168,76,0.28)"/>
-                <circle cx="45" cy="56" r="3.5" fill="rgba(201,168,76,0.28)"/>
-                <circle cx="60" cy="56" r="3.5" fill="rgba(201,168,76,0.28)"/>
-                <circle cx="45" cy="70" r="5" fill="rgba(201,168,76,0.82)"/>
-              </svg>
-            </div>
-            <div>
-              <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Скоро будут события</div>
-              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Партнёры АПГ готовят кое-что интересное</div>
-            </div>
-          </div>
+        {list.length === 0 ? (
+          <EmptyState tab={tab} />
         ) : (
           <div style={{ padding: '8px 16px 80px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {events.map((event, i) => (
+            {list.map((event, i) => (
               <EventListCard key={event.id} event={event} index={i} onClick={setSelectedEvent} />
             ))}
           </div>
         )}
-
       </div>
 
       <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />

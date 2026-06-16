@@ -260,6 +260,14 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         }}>
           {isFavorite ? '♥' : '♡'}
         </button>
+        {partner.visitCount > 0 && (
+          <div style={{
+            position: 'absolute', bottom: -4, left: -4,
+            background: 'rgba(15,15,26,0.9)', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 8, padding: '1px 5px',
+            fontSize: 9, fontWeight: 700, color: T.textSec, lineHeight: '14px',
+          }}>×{partner.visitCount}</div>
+        )}
       </div>
 
       <div>
@@ -754,12 +762,12 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
 
 // ─── Быстрые действия ────────────────────────────────────────────────────────
 
-function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, onOpenRewards }) {
+function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, onOpenRewards, userRank }) {
   const actions = [
-    { icon: '🗓️', label: 'События', color: T.blue,    onClick: onOpenEvents },
-    { icon: '✦',  label: 'Задания', color: '#9B7EDF', onClick: onOpenTasks },
-    { icon: '🏆', label: 'Рейтинг', color: T.gold,    onClick: onOpenLeaderboard },
-    { icon: '🎁', label: 'Призы',   color: T.green,   onClick: onOpenRewards },
+    { icon: '🗓️', label: 'События',               color: T.blue,    onClick: onOpenEvents },
+    { icon: '✦',  label: 'Задания',               color: '#9B7EDF', onClick: onOpenTasks },
+    { icon: '🏆', label: 'Рейтинг', rank: userRank, color: T.gold,    onClick: onOpenLeaderboard },
+    { icon: '🎁', label: 'Призы',                 color: T.green,   onClick: onOpenRewards },
   ];
 
   return (
@@ -769,7 +777,7 @@ function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, o
           ...GLASS,
           borderRadius: 20, padding: '13px 4px',
           cursor: 'pointer', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 7,
+          alignItems: 'center', gap: 7, position: 'relative',
         }}>
           <div style={{
             width: 40, height: 40, borderRadius: 14,
@@ -781,6 +789,13 @@ function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, o
             {a.icon}
           </div>
           <span style={{ color: T.textSec, fontSize: 10, fontWeight: 600 }}>{a.label}</span>
+          {a.rank != null && (
+            <div style={{
+              position: 'absolute', top: 6, right: 6,
+              background: T.gold, borderRadius: 8, padding: '1px 5px',
+              fontSize: 9, fontWeight: 800, color: '#0F0F1A', lineHeight: '14px',
+            }}>#{a.rank}</div>
+          )}
         </button>
       ))}
     </div>
@@ -973,12 +988,25 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
         </div>
       )}
 
-      {/* Дата и место */}
-      {(event.date || event.address) && (
-        <div style={{ marginTop: 10, fontSize: 11, color: T.textSec, textAlign: 'center' }}>
+      {/* Дата, место и поделиться */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+        <div style={{ fontSize: 11, color: T.textSec }}>
           {event.date && `📅 ${event.date}`}{event.address && ` · ${event.address}`}
         </div>
-      )}
+        <button
+          onClick={() => {
+            const text = `🔒 Закрытое мероприятие АПГ: «${event.title}»${event.date ? ` — ${event.date}` : ''}. Нужно ${minKeys} ключей АПГ для входа!`;
+            if (navigator.share) {
+              navigator.share({ text });
+            } else {
+              navigator.clipboard?.writeText(text).then(() => {});
+            }
+          }}
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
+        >
+          ↗ Поделиться
+        </button>
+      </div>
     </div>
   );
 }
@@ -1002,7 +1030,7 @@ export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
-  registeredEventIds = [], onEventRegister,
+  registeredEventIds = [], onEventRegister, userRank = null,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1187,7 +1215,7 @@ export function HomePanel({
             <StreakWidget streak={streak} lastScanDate={lastScanDate} onOpenTasks={onOpenTasks} />
 
             <div style={{ padding: '12px 0 4px' }}>
-              <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} onOpenRewards={onOpenRewards} />
+              <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} onOpenRewards={onOpenRewards} userRank={userRank} />
             </div>
 
             {/* Закрытое мероприятие АПГ */}
