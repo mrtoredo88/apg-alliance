@@ -82,7 +82,7 @@ export const TASKS = [
   {
     id: 'visit_50',
     emoji: '🏆', title: 'Постоянный гость',
-    desc: 'Посети партнёров 50 раз',
+    desc: 'Набери 50 ключей',
     reward: 15,
     check: (k) => k >= 50, total: 50, progress: (k) => Math.min(k, 50),
   },

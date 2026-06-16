@@ -101,7 +101,8 @@ function PartnerSearchCard({ partner, onOpenPartner, index, query }) {
 
 const CATEGORY_LABELS = {
   food: '🍽️ Еда', beauty: '💅 Красота', health: '💊 Здоровье',
-  sport: '🏋️ Спорт', retail: '🛍️ Магазины', services: '🔧 Услуги', other: '📦 Прочее',
+  sport: '🏋️ Спорт', retail: '🛍️ Магазины', services: '🔧 Услуги',
+  edu: '📚 Обучение', fun: '🎉 Развлечения', other: '📦 Прочее',
 };
 
 export function OffersPage({ partners = [], onBack, onOpenPartner }) {
