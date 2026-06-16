@@ -318,7 +318,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                 color: saved ? T.green : '#0F0F1A',
                 fontSize: 15, fontWeight: 800, cursor: saving ? 'default' : 'pointer',
                 opacity: saving ? 0.7 : 1, transition: 'all 0.25s',
-                border: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
+                outline: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
               }}
             >
               {saving ? 'Сохраняем...' : saved ? '✓ Сохранено!' : 'Сохранить изменения'}
