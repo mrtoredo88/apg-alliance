@@ -88,7 +88,7 @@ export function UserApp() {
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
-  const [appearance, setAppearance]             = useState('light');
+  const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'light');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;
@@ -140,7 +140,11 @@ export function UserApp() {
   }, []);
 
   const handleToggleTheme = useCallback(() => {
-    setAppearance(prev => prev === 'light' ? 'dark' : 'light');
+    setAppearance(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('apg_theme', next);
+      return next;
+    });
   }, []);
 
   const T = useMemo(() => ({

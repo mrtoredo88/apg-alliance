@@ -14,31 +14,89 @@ const CATEGORIES = [
   { id: 'other',  label: 'Другое',      emoji: '🏪' },
 ];
 
-const EVENT_EMOJIS = ['🎉','🎓','🍕','💆','🏋️','🎨','🎤','🤝','🎁','🌟','🎭','☕'];
-const NEWS_EMOJIS  = ['📢','🔥','🌟','🎁','📅','💡','🤝','🏆','🎉','📸','🗞️','✨'];
+const EVENT_EMOJIS   = ['🎉','🎓','🍕','💆','🏋️','🎨','🎤','🤝','🎁','🌟','🎭','☕'];
+const NEWS_EMOJIS    = ['📢','🔥','🌟','🎁','📅','💡','🤝','🏆','🎉','📸','🗞️','✨'];
 const PARTNER_EMOJIS = ['🏪','💆','💄','🍽️','☕','🎓','🏋️','💅','🎉','🛍️','🎭','🌿'];
 
-const s = {
-  page:    { padding: 16, fontFamily: '-apple-system, sans-serif', background: '#f2f3f5', minHeight: '100vh' },
-  card:    { background: '#fff', borderRadius: 16, padding: 16, marginBottom: 16 },
-  h1:      { fontSize: 22, fontWeight: 700, margin: '0 0 4px', color: '#000' },
-  h2:      { fontSize: 17, fontWeight: 600, margin: '0 0 12px', color: '#000' },
-  label:   { fontSize: 13, color: '#99A2AD', marginBottom: 4, display: 'block' },
-  input:   { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 15, boxSizing: 'border-box', outline: 'none', marginBottom: 10 },
-  textarea:{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 15, boxSizing: 'border-box', outline: 'none', marginBottom: 10, minHeight: 80, resize: 'vertical' },
-  btn:     { padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 },
-  btnPri:  { background: '#3F8AE0', color: '#fff' },
-  btnDanger:{ background: '#E64646', color: '#fff' },
-  btnGray: { background: '#f2f3f5', color: '#000' },
-  row:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f2f3f5' },
-  emojiGrid:{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  emojiBtn: { width: 40, height: 40, borderRadius: 10, border: '2px solid transparent', cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f2f3f5' },
-  select:  { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: 15, boxSizing: 'border-box', outline: 'none', marginBottom: 10, background: '#fff' },
-  tabs:    { display: 'flex', gap: 8, marginBottom: 16 },
-  tab:     { flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, textAlign: 'center' },
+// Admin panel always uses dark theme
+const A = {
+  gold:    '#C9A84C',
+  goldL:   '#E8C76D',
+  goldDim: 'rgba(201,168,76,0.12)',
+  goldBrd: 'rgba(201,168,76,0.3)',
+  blue:    '#4A90D9',
+  blueDim: 'rgba(74,144,217,0.12)',
+  green:   '#4BB34B',
+  red:     '#E64646',
+  redDim:  'rgba(230,70,70,0.12)',
+  redBrd:  'rgba(230,70,70,0.3)',
+  text:    '#F0F0F0',
+  textSec: 'rgba(240,240,240,0.45)',
+  border:  'rgba(255,255,255,0.08)',
+  rowBrd:  'rgba(255,255,255,0.07)',
+  chip:    'rgba(255,255,255,0.07)',
+  inputBg: 'rgba(255,255,255,0.06)',
+  inputBrd:'rgba(255,255,255,0.1)',
 };
 
-function MiniBarChart({ data, labelKey, valueKey, color = '#3F8AE0', shortDate = false }) {
+const s = {
+  page:     {
+    padding: '16px 14px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+    background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)',
+    minHeight: '100vh',
+  },
+  card:     {
+    background: 'rgba(255,255,255,0.04)',
+    backdropFilter: 'blur(28px) saturate(1.6)',
+    WebkitBackdropFilter: 'blur(28px) saturate(1.6)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+  },
+  h1:       { fontSize: 22, fontWeight: 800, margin: '0 0 4px', color: '#F0F0F0' },
+  h2:       { fontSize: 16, fontWeight: 700, margin: '0 0 14px', color: '#F0F0F0' },
+  label:    {
+    fontSize: 11, color: 'rgba(240,240,240,0.45)', marginBottom: 6,
+    display: 'block', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase',
+  },
+  input:    {
+    width: '100%', padding: '11px 13px', borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+    color: '#F0F0F0', fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
+  },
+  textarea: {
+    width: '100%', padding: '11px 13px', borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+    color: '#F0F0F0', fontSize: 14, boxSizing: 'border-box', outline: 'none',
+    marginBottom: 12, minHeight: 80, resize: 'vertical',
+  },
+  btn:      { padding: '10px 16px', borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 },
+  btnPri:   { background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', color: '#0F0F1A', fontWeight: 700 },
+  btnDanger:{ background: 'rgba(230,70,70,0.12)', color: '#E64646', border: '1px solid rgba(230,70,70,0.3)' },
+  btnGray:  { background: 'rgba(255,255,255,0.07)', color: '#F0F0F0', border: '1px solid rgba(255,255,255,0.1)' },
+  row:      {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '11px 0', borderBottom: '1px solid rgba(255,255,255,0.07)',
+  },
+  emojiGrid:{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  emojiBtn: {
+    width: 42, height: 42, borderRadius: 12, border: '2px solid transparent',
+    cursor: 'pointer', fontSize: 22, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', background: 'rgba(255,255,255,0.06)',
+  },
+  select:   {
+    width: '100%', padding: '11px 13px', borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+    color: '#F0F0F0', fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
+  },
+  tabs:     { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  tab:      { padding: '9px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, textAlign: 'center' },
+};
+
+function MiniBarChart({ data, labelKey, valueKey, color = A.gold, shortDate = false }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 90, paddingTop: 8 }}>
@@ -49,7 +107,7 @@ function MiniBarChart({ data, labelKey, valueKey, color = '#3F8AE0', shortDate =
           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             {d[valueKey] > 0 && <div style={{ fontSize: 9, fontWeight: 700, color }}>{d[valueKey]}</div>}
             <div style={{ width: '100%', background: color, borderRadius: '3px 3px 0 0', height: h, opacity: d[valueKey] > 0 ? 1 : 0.15, transition: 'height 0.4s ease' }} />
-            <div style={{ fontSize: 8, color: '#99A2AD', textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%' }}>{label}</div>
+            <div style={{ fontSize: 8, color: A.textSec, textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%' }}>{label}</div>
           </div>
         );
       })}
@@ -61,7 +119,11 @@ function EmojiPicker({ emojis, value, onChange }) {
   return (
     <div style={s.emojiGrid}>
       {emojis.map(emoji => (
-        <button key={emoji} onClick={() => onChange(emoji)} style={{ ...s.emojiBtn, border: value === emoji ? '2px solid #3F8AE0' : '2px solid transparent', background: value === emoji ? '#E8F3FF' : '#f2f3f5' }}>
+        <button key={emoji} onClick={() => onChange(emoji)} style={{
+          ...s.emojiBtn,
+          border: value === emoji ? `2px solid ${A.gold}` : '2px solid transparent',
+          background: value === emoji ? A.goldDim : 'rgba(255,255,255,0.06)',
+        }}>
           {emoji}
         </button>
       ))}
@@ -474,7 +536,6 @@ export const AdminPanel = () => {
       const activeUsers = users.filter(u => (u.keys ?? 0) > 0).length;
       const totalScans  = users.reduce((s, u) => s + Object.keys(u.scannedPartners ?? {}).length, 0);
 
-      // Рейтинг партнёров по уникальным посетителям
       const visitCounts = {};
       users.forEach(u => {
         Object.keys(u.scannedPartners ?? {}).forEach(pid => {
@@ -485,7 +546,6 @@ export const AdminPanel = () => {
         .map(p => ({ ...p, visits: visitCounts[p.id] ?? 0 }))
         .sort((a, b) => b.visits - a.visits);
 
-      // DAU: активные пользователи за последние 14 дней (по scanDates)
       const today = new Date();
       const last14 = Array.from({ length: 14 }, (_, i) => {
         const d = new Date(today);
@@ -501,7 +561,6 @@ export const AdminPanel = () => {
       });
       const dauData = last14.map(date => ({ date, count: dauMap[date] }));
 
-      // Топ-10 по ключам
       const topUsers = [...users]
         .sort((a, b) => (b.keys ?? 0) - (a.keys ?? 0))
         .slice(0, 10)
@@ -512,7 +571,6 @@ export const AdminPanel = () => {
           scans: Object.keys(u.scannedPartners ?? {}).length,
         }));
 
-      // Распределение ключей
       const keyBuckets = [
         { label: '0',    min: 0,  max: 0,        count: 0 },
         { label: '1-5',  min: 1,  max: 5,        count: 0 },
@@ -527,7 +585,6 @@ export const AdminPanel = () => {
         if (b) b.count++;
       });
 
-      // Реферальная воронка
       const referredCount   = users.filter(u => u.referredBy).length;
       const totalReferrals  = users.reduce((s, u) => s + (u.referralCount ?? 0), 0);
       const referralKeysOut = referredCount * 2 + totalReferrals * 2;
@@ -544,26 +601,46 @@ export const AdminPanel = () => {
 
   return (
     <div style={s.page}>
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={s.h1}>⚙️ Админ-панель</h1>
-        <p style={{ color: '#99A2AD', fontSize: 13, margin: 0 }}>АПГ — Альянс Партнёров Города</p>
+      {/* Шапка */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+            background: 'linear-gradient(135deg, #C9A84C, #E8C76D)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+            boxShadow: '0 4px 16px rgba(201,168,76,0.35)',
+          }}>⚙️</div>
+          <div>
+            <h1 style={s.h1}>Панель управления</h1>
+            <p style={{ color: A.gold, fontSize: 12, margin: 0, fontWeight: 600 }}>АПГ — Альянс Партнёров Города</p>
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+      {/* Навигация по разделам */}
+      <div style={s.tabs}>
         {[
-          { id: 'partners', label: `🤝 Партнёры (${partners.length})` },
-          { id: 'events',   label: `🎉 События (${events.length})` },
-          { id: 'news',     label: `📢 Новости (${news.length})` },
-          { id: 'notifs',   label: `🔔 Уведомления` },
-          { id: 'tasks',    label: `✅ Задания (${customTasks.length})` },
-          { id: 'prizes',   label: `🎁 Призы (${prizes.length})` },
+          { id: 'partners', label: `🤝 Партнёры`, count: partners.length },
+          { id: 'events',   label: `🎉 События`,  count: events.length },
+          { id: 'news',     label: `📢 Новости`,  count: news.length },
+          { id: 'notifs',   label: `🔔 Рассылка` },
+          { id: 'tasks',    label: `✅ Задания`,  count: customTasks.length },
+          { id: 'prizes',   label: `🎁 Призы`,    count: prizes.length },
           { id: 'analytics',label: '📊 Аналитика' },
         ].map(t => (
           <button key={t.id}
-            style={{ ...s.tab, flex: 'none', padding: '10px 14px', background: activeTab === t.id ? '#3F8AE0' : '#fff', color: activeTab === t.id ? '#fff' : '#000' }}
+            style={{
+              ...s.tab,
+              background: activeTab === t.id
+                ? 'linear-gradient(135deg, #C9A84C, #E8C76D)'
+                : 'rgba(255,255,255,0.06)',
+              color: activeTab === t.id ? '#0F0F1A' : A.textSec,
+              border: activeTab === t.id ? 'none' : '1px solid rgba(255,255,255,0.08)',
+              boxShadow: activeTab === t.id ? '0 4px 16px rgba(201,168,76,0.3)' : 'none',
+            }}
             onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); }}
           >
-            {t.label}
+            {t.label}{t.count != null ? ` (${t.count})` : ''}
           </button>
         ))}
       </div>
@@ -596,7 +673,7 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Ссылка на логотип (URL)</label>
             <input style={s.input} placeholder="https://..." value={pLogo} onChange={e => setPLogo(e.target.value)} />
-            {pLogo && <img src={pLogo} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 10 }} onError={e => e.target.style.display = 'none'} />}
+            {pLogo && <img src={pLogo} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, border: `2px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
 
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 (499) 123-45-67" value={pPhone} onChange={e => setPPhone(e.target.value)} />
@@ -610,15 +687,15 @@ export const AdminPanel = () => {
             <label style={s.label}>Соцсеть / сайт</label>
             <input style={s.input} placeholder="https://vk.com/..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
 
-            <div style={{ background: '#FFF3CD', border: '1px solid #FFC107', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
-              <label style={{ ...s.label, color: '#856404', marginBottom: 6 }}>🔑 VK ID владельца заведения</label>
+            <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
+              <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 VK ID владельца заведения</label>
               <input
-                style={{ ...s.input, marginBottom: 0, background: '#fff' }}
+                style={{ ...s.input, marginBottom: 0, background: 'rgba(255,255,255,0.06)' }}
                 placeholder="Например: 123456789"
                 value={pVkOwnerId}
                 onChange={e => setPVkOwnerId(e.target.value)}
               />
-              <div style={{ fontSize: 11, color: '#856404', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: A.gold, marginTop: 6, opacity: 0.8 }}>
                 Пользователь с этим VK ID получит доступ к статистике своего заведения в приложении
               </div>
             </div>
@@ -632,39 +709,39 @@ export const AdminPanel = () => {
           </div>
 
           <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <h2 style={{ ...s.h2, margin: 0 }}>Все партнёры</h2>
-              <span style={{ fontSize: 12, color: '#99A2AD' }}>
+              <span style={{ fontSize: 12, color: A.textSec, background: A.chip, borderRadius: 10, padding: '3px 10px', border: `1px solid ${A.border}` }}>
                 {partnerSearch
-                  ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} из ${partners.length}`
-                  : partners.length}
+                  ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} / ${partners.length}`
+                  : `${partners.length} партнёров`}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f2f3f5', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
-              <span style={{ fontSize: 14, color: '#99A2AD', flexShrink: 0 }}>🔍</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${A.inputBrd}`, borderRadius: 12, padding: '9px 12px', marginBottom: 14 }}>
+              <span style={{ fontSize: 14, color: A.textSec, flexShrink: 0 }}>🔍</span>
               <input
                 type="search"
                 placeholder="Поиск по названию..."
                 value={partnerSearch}
                 onChange={e => setPartnerSearch(e.target.value)}
-                style={{ background: 'none', border: 'none', outline: 'none', fontSize: 14, flex: 1, color: '#000' }}
+                style={{ background: 'none', border: 'none', outline: 'none', fontSize: 14, flex: 1, color: A.text }}
               />
               {partnerSearch && (
-                <button onClick={() => setPartnerSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#99A2AD', fontSize: 16, padding: 0, flexShrink: 0 }}>✕</button>
+                <button onClick={() => setPartnerSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: A.textSec, fontSize: 16, padding: 0, flexShrink: 0 }}>✕</button>
               )}
             </div>
-            {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
-              : partners.length === 0 ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет партнёров</p>
+            {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
+              : partners.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет партнёров</p>
               : partners.filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).map(p => (
                 <div key={p.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     {p.logoUrl
-                      ? <img src={p.logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-                      : <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{p.emoji ?? '🏪'}</div>
+                      ? <img src={p.logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                      : <div style={{ width: 40, height: 40, borderRadius: '50%', background: A.chip, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, border: `1px solid ${A.border}` }}>{p.emoji ?? '🏪'}</div>
                     }
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ fontSize: 12, color: A.textSec }}>
                         {CATEGORIES.find(c => c.id === p.category)?.emoji} {CATEGORIES.find(c => c.id === p.category)?.label ?? 'Другое'}
                         {p.offer && ' · 🎁'}
                       </div>
@@ -673,10 +750,10 @@ export const AdminPanel = () => {
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
                     <button
                       title={p.featured ? 'Партнёр дня (снять)' : 'Сделать партнёром дня'}
-                      style={{ ...s.btn, padding: '6px 10px', fontSize: 14, background: p.featured ? '#FFF3CD' : '#f2f3f5', border: p.featured ? '1.5px solid #FFD700' : 'none' }}
+                      style={{ ...s.btn, padding: '6px 10px', fontSize: 14, background: p.featured ? A.goldDim : A.chip, border: p.featured ? `1.5px solid ${A.gold}` : `1px solid ${A.border}` }}
                       onClick={() => setFeaturedPartner(p.featured ? null : p.id)}
                     >⭐</button>
-                    <button style={{ ...s.btn, background: '#E8F3FF', color: '#3F8AE0', padding: '6px 10px', fontSize: 11, fontWeight: 700 }} onClick={() => setQrPartner(p)}>QR</button>
+                    <button style={{ ...s.btn, padding: '6px 10px', fontSize: 11, fontWeight: 700, background: A.blueDim, color: A.blue, border: `1px solid rgba(74,144,217,0.3)` }} onClick={() => setQrPartner(p)}>QR</button>
                     <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPartner(p)}>✏️</button>
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePartner(p.id)}>🗑️</button>
                   </div>
@@ -711,43 +788,43 @@ export const AdminPanel = () => {
             <label style={s.label}>Адрес проведения</label>
             <input style={s.input} placeholder="Зеленоград, корпус 1234" value={eAddress} onChange={e => setEAddress(e.target.value)} />
 
-            <label style={s.label}>Дедлайн / конец акции (необязательно) ⏱️</label>
+            <label style={s.label}>Дедлайн / конец акции ⏱️</label>
             <input style={s.input} type="date" value={eDeadline} onChange={e => setEDeadline(e.target.value)} />
 
             <div
               onClick={() => setEIsPrivate(v => !v)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 14px', borderRadius: 12, marginBottom: 12, cursor: 'pointer',
-                background: eIsPrivate ? '#FFF3CD' : '#f2f3f5',
-                border: `2px solid ${eIsPrivate ? '#FFC107' : '#e0e0e0'}`,
+                padding: '12px 14px', borderRadius: 14, marginBottom: 12, cursor: 'pointer',
+                background: eIsPrivate ? A.goldDim : A.chip,
+                border: `1px solid ${eIsPrivate ? A.goldBrd : A.border}`,
                 transition: 'all 0.2s',
               }}
             >
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: eIsPrivate ? '#856404' : '#000' }}>🔒 Закрытое мероприятие</div>
-                <div style={{ fontSize: 12, color: eIsPrivate ? '#856404' : '#99A2AD', marginTop: 2 }}>Доступ по ключам АПГ</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: eIsPrivate ? A.gold : A.text }}>🔒 Закрытое мероприятие</div>
+                <div style={{ fontSize: 12, color: eIsPrivate ? A.gold : A.textSec, marginTop: 2, opacity: eIsPrivate ? 0.8 : 1 }}>Доступ по ключам АПГ</div>
               </div>
               <div style={{
                 width: 44, height: 26, borderRadius: 13, position: 'relative',
-                background: eIsPrivate ? '#FFC107' : '#C8C8C8', transition: 'background 0.2s', flexShrink: 0,
+                background: eIsPrivate ? A.gold : 'rgba(255,255,255,0.15)', transition: 'background 0.2s', flexShrink: 0,
               }}>
                 <div style={{
                   position: 'absolute', top: 3, left: eIsPrivate ? 21 : 3, width: 20, height: 20,
-                  borderRadius: 10, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  borderRadius: 10, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                 }} />
               </div>
             </div>
 
             {eIsPrivate && (
-              <div style={{ background: '#FFFBEB', border: '1px solid #FFC107', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
-                <label style={{ ...s.label, color: '#856404' }}>🗝️ Минимум ключей для входа</label>
-                <input style={{ ...s.input, marginBottom: 10 }} type="number" min="0" placeholder="10" value={eMinKeys} onChange={e => setEMinKeys(e.target.value)} />
+              <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '14px', marginBottom: 12 }}>
+                <label style={{ ...s.label, color: A.gold }}>🗝️ Минимум ключей для входа</label>
+                <input style={{ ...s.input, marginBottom: 12 }} type="number" min="0" placeholder="10" value={eMinKeys} onChange={e => setEMinKeys(e.target.value)} />
 
-                <label style={{ ...s.label, color: '#856404' }}>👥 Лимит участников (0 = без ограничения)</label>
-                <input style={{ ...s.input, marginBottom: 10 }} type="number" min="0" placeholder="50" value={eMaxParticipants} onChange={e => setEMaxParticipants(e.target.value)} />
+                <label style={{ ...s.label, color: A.gold }}>👥 Лимит участников (0 = без ограничения)</label>
+                <input style={{ ...s.input, marginBottom: 12 }} type="number" min="0" placeholder="50" value={eMaxParticipants} onChange={e => setEMaxParticipants(e.target.value)} />
 
-                <label style={{ ...s.label, color: '#856404' }}>📅 Дата и время мероприятия (для таймера)</label>
+                <label style={{ ...s.label, color: A.gold }}>📅 Дата и время мероприятия (для таймера)</label>
                 <input style={{ ...s.input, marginBottom: 0 }} type="datetime-local" value={eEventDate} onChange={e => setEEventDate(e.target.value)} />
               </div>
             )}
@@ -765,15 +842,15 @@ export const AdminPanel = () => {
 
           <div style={s.card}>
             <h2 style={s.h2}>Все события</h2>
-            {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
-              : events.length === 0 ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет событий</p>
+            {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
+              : events.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
               : events.map(e => (
                 <div key={e.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{e.emoji ?? '🎉'}</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{e.emoji ?? '🎉'}</div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.isPrivate ? '🔒 ' : ''}{e.title}</div>
-                      <div style={{ fontSize: 12, color: '#99A2AD' }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.isPrivate ? '🔒 ' : ''}{e.title}</div>
+                      <div style={{ fontSize: 12, color: A.textSec }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
@@ -786,6 +863,7 @@ export const AdminPanel = () => {
           </div>
         </>
       )}
+
       {/* ── НОВОСТИ ── */}
       {activeTab === 'news' && (
         <>
@@ -804,7 +882,7 @@ export const AdminPanel = () => {
             <label style={s.label}>URL картинки (необязательно)</label>
             <input style={s.input} placeholder="https://i.ibb.co/..." value={nImage} onChange={e => setNImage(e.target.value)} />
             {nImage && (
-              <img src={nImage} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, marginBottom: 10 }} onError={e => e.target.style.display = 'none'} />
+              <img src={nImage} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} onError={e => e.target.style.display = 'none'} />
             )}
 
             <label style={s.label}>Название ссылки (необязательно)</label>
@@ -823,8 +901,8 @@ export const AdminPanel = () => {
 
           <div style={s.card}>
             <h2 style={s.h2}>Все новости</h2>
-            {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
-              : news.length === 0 ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет новостей</p>
+            {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
+              : news.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет новостей</p>
               : news.map(item => {
                 const dateStr = item.createdAt?.toDate
                   ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -833,12 +911,12 @@ export const AdminPanel = () => {
                   <div key={item.id} style={s.row}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                       {item.imageUrl
-                        ? <img src={item.imageUrl} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-                        : <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{item.emoji ?? '📢'}</div>
+                        ? <img src={item.imageUrl} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                        : <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{item.emoji ?? '📢'}</div>
                       }
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                        <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                        <div style={{ fontSize: 12, color: A.textSec }}>
                           {dateStr && `📅 ${dateStr} · `}
                           {item.text.length > 50 ? item.text.slice(0, 50) + '…' : item.text}
                         </div>
@@ -861,7 +939,7 @@ export const AdminPanel = () => {
         <>
           <div style={s.card}>
             <h2 style={s.h2}>🔔 Отправить уведомление</h2>
-            <p style={{ color: '#99A2AD', fontSize: 13, margin: '0 0 12px' }}>
+            <p style={{ color: A.textSec, fontSize: 13, margin: '0 0 14px', lineHeight: '19px' }}>
               Уведомление появится у всех пользователей в разделе «Уведомления» при следующем открытии приложения.
             </p>
 
@@ -896,8 +974,8 @@ export const AdminPanel = () => {
 
           <div style={s.card}>
             <h2 style={s.h2}>История уведомлений</h2>
-            {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
-              : notifs.length === 0 ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет уведомлений</p>
+            {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
+              : notifs.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет уведомлений</p>
               : notifs.map(n => {
                 const dateStr = n.createdAt?.toDate
                   ? n.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -905,10 +983,10 @@ export const AdminPanel = () => {
                 return (
                   <div key={n.id} style={s.row}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{n.emoji ?? '🔔'}</div>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{n.emoji ?? '🔔'}</div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
-                        <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
+                        <div style={{ fontSize: 12, color: A.textSec }}>
                           {dateStr && `📅 ${dateStr}`}
                           {n.targetType && n.targetType !== 'all' && ` · 🎯 ${n.targetType}${n.targetValue ? ` ≥ ${n.targetValue}` : ''}`}
                           {n.body && ` · ${n.body.length > 40 ? n.body.slice(0, 40) + '…' : n.body}`}
@@ -929,7 +1007,7 @@ export const AdminPanel = () => {
         <>
           <div style={s.card}>
             <h2 style={s.h2}>➕ Новое задание</h2>
-            <p style={{ color: '#99A2AD', fontSize: 13, margin: '0 0 12px' }}>
+            <p style={{ color: A.textSec, fontSize: 13, margin: '0 0 14px', lineHeight: '19px' }}>
               Дополнительные задания поверх стандартных 17. Пользователи видят их в разделе «Задания».
             </p>
 
@@ -966,14 +1044,14 @@ export const AdminPanel = () => {
           <div style={s.card}>
             <h2 style={s.h2}>Активные задания ({customTasks.length})</h2>
             {customTasks.length === 0
-              ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет кастомных заданий</p>
+              ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет кастомных заданий</p>
               : customTasks.map(t => (
                 <div key={t.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{t.emoji ?? '🎯'}</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{t.emoji ?? '🎯'}</div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
-                      <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
+                      <div style={{ fontSize: 12, color: A.textSec }}>
                         +{t.reward} 🗝️ · {t.type === 'manual' ? 'ручное' : `${t.type} ≥ ${t.target}`}
                       </div>
                     </div>
@@ -1008,10 +1086,10 @@ export const AdminPanel = () => {
             <EmojiPicker emojis={PRIZE_EMOJIS} value={prEmoji} onChange={setPrEmoji} />
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-              <label style={{ fontSize: 14, color: '#000', fontWeight: 600, flex: 1 }}>Активен (показывать в магазине)</label>
+              <label style={{ fontSize: 14, color: A.text, fontWeight: 600, flex: 1 }}>Активен (показывать в магазине)</label>
               <button
                 onClick={() => setPrActive(v => !v)}
-                style={{ width: 48, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', background: prActive ? '#3F8AE0' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
+                style={{ width: 48, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', background: prActive ? A.gold : 'rgba(255,255,255,0.15)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
               >
                 <div style={{ position: 'absolute', top: 3, left: prActive ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </button>
@@ -1027,21 +1105,27 @@ export const AdminPanel = () => {
 
           <div style={s.card}>
             <h2 style={s.h2}>Все призы</h2>
-            {loading ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Загрузка...</p>
+            {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : prizes.length === 0
-                ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет призов — добавьте первый</p>
+                ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет призов — добавьте первый</p>
                 : prizes.map(p => (
                   <div key={p.id} style={s.row}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 12, background: p.active ? '#FFF3CD' : '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, filter: p.active ? 'none' : 'grayscale(1) opacity(0.5)' }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 12,
+                        background: p.active ? A.goldDim : A.chip,
+                        border: `1px solid ${p.active ? A.goldBrd : A.border}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0,
+                        filter: p.active ? 'none' : 'grayscale(1) opacity(0.4)',
+                      }}>
                         {p.emoji ?? '🎁'}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: p.active ? '#000' : '#99A2AD', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: p.active ? A.text : A.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {p.name}
-                          {!p.active && <span style={{ fontSize: 11, color: '#99A2AD', fontWeight: 400, marginLeft: 6 }}>скрыт</span>}
+                          {!p.active && <span style={{ fontSize: 11, color: A.textSec, fontWeight: 400, marginLeft: 6 }}>скрыт</span>}
                         </div>
-                        <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                        <div style={{ fontSize: 12, color: A.textSec }}>
                           🗝️ {p.cost} ключей
                           {p.stock !== null && p.stock !== undefined && ` · ${p.stock} шт.`}
                         </div>
@@ -1060,31 +1144,31 @@ export const AdminPanel = () => {
           <div style={s.card}>
             <h2 style={s.h2}>📋 Заявки на выдачу ({prizeClaims.filter(c => c.status !== 'given').length})</h2>
             {prizeClaims.length === 0
-              ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Заявок пока нет</p>
+              ? <p style={{ color: A.textSec, textAlign: 'center' }}>Заявок пока нет</p>
               : prizeClaims.map((c) => {
                 const given = c.status === 'given';
                 const dateStr = c.claimedAt?.toDate
                   ? c.claimedAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                   : '';
                 return (
-                  <div key={c.id} style={{ ...s.row, flexWrap: 'wrap', gap: 6, opacity: given ? 0.5 : 1 }}>
+                  <div key={c.id} style={{ ...s.row, flexWrap: 'wrap', gap: 6, opacity: given ? 0.45 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: given ? '#f2f3f5' : '#FFF3CD', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: given ? A.chip : A.goldDim, border: `1px solid ${given ? A.border : A.goldBrd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                         {c.prizeEmoji ?? '🎁'}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.prizeName} · {c.cost} 🗝️
                         </div>
-                        <div style={{ fontSize: 11, color: '#99A2AD' }}>
+                        <div style={{ fontSize: 11, color: A.textSec }}>
                           {c.userName || `ID ${c.userId}`} · {dateStr}
                         </div>
                       </div>
                     </div>
                     {given
-                      ? <div style={{ fontSize: 11, fontWeight: 700, color: '#99A2AD', background: '#f2f3f5', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>Выдан</div>
+                      ? <div style={{ fontSize: 11, fontWeight: 700, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>Выдан</div>
                       : <button
-                          style={{ ...s.btn, background: '#4BB34B', color: '#fff', padding: '5px 10px', fontSize: 12, flexShrink: 0 }}
+                          style={{ ...s.btn, background: 'rgba(75,179,75,0.15)', color: '#4BB34B', border: '1px solid rgba(75,179,75,0.35)', padding: '5px 10px', fontSize: 12, fontWeight: 700, flexShrink: 0 }}
                           onClick={async () => {
                             await updateDoc(doc(db, 'prizeClaims', c.id), { status: 'given' });
                             setPrizeClaims(prev => prev.map(x => x.id === c.id ? { ...x, status: 'given' } : x));
@@ -1105,10 +1189,15 @@ export const AdminPanel = () => {
       {activeTab === 'analytics' && (
         <div>
           {analyticsLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#99A2AD' }}>Загружаем данные...</div>
+            <div style={{ textAlign: 'center', padding: 48, color: A.textSec }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+              Загружаем аналитику...
+            </div>
           ) : !analytics ? (
             <div style={s.card}>
-              <p style={{ color: '#99A2AD', textAlign: 'center', marginBottom: 16 }}>Нажмите кнопку, чтобы загрузить статистику</p>
+              <p style={{ color: A.textSec, textAlign: 'center', marginBottom: 16, lineHeight: '19px' }}>
+                Нажмите кнопку, чтобы загрузить статистику по всем пользователям
+              </p>
               <button style={{ ...s.btn, ...s.btnPri, width: '100%' }} onClick={loadAnalytics}>📊 Загрузить аналитику</button>
             </div>
           ) : (
@@ -1116,17 +1205,17 @@ export const AdminPanel = () => {
               {/* Сводка */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
-                  { label: 'Всего пользователей', value: analytics.totalUsers, icon: '👥' },
-                  { label: 'Активных (с ключами)', value: analytics.activeUsers, icon: '✅' },
-                  { label: 'Ключей в обороте', value: analytics.totalKeys, icon: '🗝️' },
-                  { label: 'Ср. ключей на юзера', value: analytics.avgKeys, icon: '📈' },
-                  { label: 'Уникальных сканов', value: analytics.totalScans, icon: '📲' },
-                  { label: 'Рефералов всего', value: analytics.totalReferrals, icon: '👥' },
+                  { label: 'Пользователей',    value: analytics.totalUsers,  icon: '👥', color: A.blue },
+                  { label: 'Активных',          value: analytics.activeUsers, icon: '✅', color: '#4BB34B' },
+                  { label: 'Ключей в обороте',  value: analytics.totalKeys,   icon: '🗝️', color: A.gold },
+                  { label: 'Ср. ключей/юзер',   value: analytics.avgKeys,     icon: '📈', color: A.gold },
+                  { label: 'Уник. сканов',       value: analytics.totalScans,  icon: '📲', color: A.blue },
+                  { label: 'Рефералов',          value: analytics.totalReferrals, icon: '🔗', color: '#9B59B6' },
                 ].map(stat => (
-                  <div key={stat.label} style={{ ...s.card, marginBottom: 0, textAlign: 'center' }}>
+                  <div key={stat.label} style={{ ...s.card, marginBottom: 0, textAlign: 'center', border: `1px solid ${stat.color}25` }}>
                     <div style={{ fontSize: 24, marginBottom: 4 }}>{stat.icon}</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: '#3F8AE0' }}>{stat.value}</div>
-                    <div style={{ fontSize: 11, color: '#99A2AD', lineHeight: '14px', marginTop: 2 }}>{stat.label}</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                    <div style={{ fontSize: 11, color: A.textSec, lineHeight: '14px', marginTop: 4 }}>{stat.label}</div>
                   </div>
                 ))}
               </div>
@@ -1134,8 +1223,8 @@ export const AdminPanel = () => {
               {/* DAU — активность за 14 дней */}
               <div style={s.card}>
                 <h2 style={s.h2}>📅 Активные пользователи (14 дней)</h2>
-                <MiniBarChart data={analytics.dauData} labelKey="date" valueKey="count" color="#3F8AE0" shortDate />
-                <div style={{ fontSize: 11, color: '#99A2AD', marginTop: 6 }}>
+                <MiniBarChart data={analytics.dauData} labelKey="date" valueKey="count" color={A.blue} shortDate />
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 8 }}>
                   Кол-во юзеров, сделавших скан в этот день
                 </div>
               </div>
@@ -1143,8 +1232,8 @@ export const AdminPanel = () => {
               {/* Распределение ключей */}
               <div style={s.card}>
                 <h2 style={s.h2}>🗝️ Распределение ключей</h2>
-                <MiniBarChart data={analytics.keyBuckets} labelKey="label" valueKey="count" color="#F4A261" />
-                <div style={{ fontSize: 11, color: '#99A2AD', marginTop: 6 }}>
+                <MiniBarChart data={analytics.keyBuckets} labelKey="label" valueKey="count" color={A.gold} />
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 8 }}>
                   Сколько пользователей имеют данное количество ключей
                 </div>
               </div>
@@ -1154,13 +1243,13 @@ export const AdminPanel = () => {
                 <h2 style={s.h2}>🔗 Реферальная программа</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   {[
-                    { label: 'Пришли по реферальной', value: analytics.referredCount },
-                    { label: 'Активных рефереров', value: analytics.totalReferrals > 0 ? analytics.users.filter(u => (u.referralCount ?? 0) > 0).length : 0 },
+                    { label: 'Пришли по реф.', value: analytics.referredCount },
+                    { label: 'Активных реф.', value: analytics.totalReferrals > 0 ? analytics.users.filter(u => (u.referralCount ?? 0) > 0).length : 0 },
                     { label: 'Ключей роздано', value: analytics.referralKeysOut },
                   ].map(s2 => (
-                    <div key={s2.label} style={{ background: '#f2f3f5', borderRadius: 12, padding: '12px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: '#3F8AE0' }}>{s2.value}</div>
-                      <div style={{ fontSize: 10, color: '#99A2AD', lineHeight: '13px', marginTop: 3 }}>{s2.label}</div>
+                    <div key={s2.label} style={{ background: A.chip, borderRadius: 14, padding: '12px 8px', textAlign: 'center', border: `1px solid ${A.border}` }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: A.gold }}>{s2.value}</div>
+                      <div style={{ fontSize: 10, color: A.textSec, lineHeight: '13px', marginTop: 4 }}>{s2.label}</div>
                     </div>
                   ))}
                 </div>
@@ -1170,16 +1259,22 @@ export const AdminPanel = () => {
               <div style={s.card}>
                 <h2 style={s.h2}>🏆 Топ-10 пользователей</h2>
                 {analytics.topUsers.map((u, i) => (
-                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 9 ? '1px solid #f2f3f5' : 'none' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: i < 3 ? '#3F8AE0' : '#99A2AD', width: 22, flexShrink: 0 }}>#{i + 1}</span>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: i === 0 ? '#FFF3CD' : i === 1 ? '#F5F5F5' : i === 2 ? '#FBE9D0' : '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#000', flexShrink: 0 }}>
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < 9 ? `1px solid ${A.rowBrd}` : 'none' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: i === 0 ? A.gold : i < 3 ? A.textSec : A.textSec, width: 22, flexShrink: 0 }}>#{i + 1}</span>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      background: i === 0 ? A.goldDim : i === 1 ? 'rgba(192,192,192,0.12)' : i === 2 ? 'rgba(205,127,50,0.12)' : A.chip,
+                      border: `1px solid ${i === 0 ? A.goldBrd : A.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, fontWeight: 700, color: A.text, flexShrink: 0,
+                    }}>
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : u.name[0]?.toUpperCase() ?? '?'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
-                      <div style={{ fontSize: 11, color: '#99A2AD' }}>ID: {u.id} · {u.scans} партнёров</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
+                      <div style={{ fontSize: 11, color: A.textSec }}>ID: {u.id} · {u.scans} партнёров</div>
                     </div>
-                    <div style={{ flexShrink: 0, fontSize: 13, fontWeight: 800, color: '#3F8AE0' }}>🗝️ {u.keys}</div>
+                    <div style={{ flexShrink: 0, fontSize: 13, fontWeight: 800, color: A.gold }}>🗝️ {u.keys}</div>
                   </div>
                 ))}
               </div>
@@ -1203,14 +1298,14 @@ export const AdminPanel = () => {
                   onChange={e => setAwardAmount(e.target.value)}
                 />
                 <button
-                  style={{ ...s.btn, ...s.btnPri, width: '100%' }}
+                  style={{ ...s.btn, ...s.btnPri, width: '100%', opacity: (!awardUserId.trim() || !Number(awardAmount)) ? 0.5 : 1 }}
                   onClick={awardKeys}
                   disabled={!awardUserId.trim() || !Number(awardAmount)}
                 >
                   Начислить
                 </button>
                 {awardMsg && (
-                  <p style={{ marginTop: 8, textAlign: 'center', fontSize: 14, color: awardMsg.startsWith('✅') ? '#4CAF50' : '#E64646' }}>
+                  <p style={{ marginTop: 10, textAlign: 'center', fontSize: 14, color: awardMsg.startsWith('✅') ? '#4BB34B' : A.red }}>
                     {awardMsg}
                   </p>
                 )}
@@ -1221,7 +1316,7 @@ export const AdminPanel = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h2 style={{ ...s.h2, margin: '0 0 2px' }}>📥 Экспорт пользователей</h2>
-                    <p style={{ margin: 0, fontSize: 13, color: '#99A2AD' }}>{analytics.users.length} записей</p>
+                    <p style={{ margin: 0, fontSize: 13, color: A.textSec }}>{analytics.users.length} записей</p>
                   </div>
                   <button style={{ ...s.btn, ...s.btnPri }} onClick={exportCSV}>Скачать CSV</button>
                 </div>
@@ -1229,29 +1324,37 @@ export const AdminPanel = () => {
 
               {/* Рейтинг партнёров */}
               <div style={s.card}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                   <h2 style={{ ...s.h2, margin: 0 }}>🏆 Рейтинг партнёров</h2>
                   <button style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }} onClick={loadAnalytics}>↻ Обновить</button>
                 </div>
                 {analytics.partnerStats.length === 0 ? (
-                  <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет данных</p>
+                  <p style={{ color: A.textSec, textAlign: 'center' }}>Нет данных</p>
                 ) : (() => {
                   const max = analytics.partnerStats[0]?.visits || 1;
                   return analytics.partnerStats.map((p, i) => (
                     <div key={p.id} style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: i < 3 ? '#3F8AE0' : '#99A2AD', width: 22, flexShrink: 0 }}>#{i + 1}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? A.gold : A.textSec, width: 22, flexShrink: 0 }}>#{i + 1}</span>
                         {p.logoUrl
-                          ? <img src={p.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-                          : <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{p.emoji ?? '🏪'}</div>
+                          ? <img src={p.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                          : <div style={{ width: 28, height: 28, borderRadius: '50%', background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{p.emoji ?? '🏪'}</div>
                         }
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#3F8AE0', flexShrink: 0, marginLeft: 8 }}>{p.visits} чел.</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: A.gold, flexShrink: 0, marginLeft: 8 }}>{p.visits} чел.</span>
                           </div>
-                          <div style={{ height: 6, background: '#f2f3f5', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', borderRadius: 3, width: `${Math.round((p.visits / max) * 100)}%`, background: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#3F8AE0', transition: 'width 0.6s ease' }} />
+                          <div style={{ height: 5, background: A.chip, borderRadius: 3, overflow: 'hidden', border: `1px solid ${A.border}` }}>
+                            <div style={{
+                              height: '100%', borderRadius: 3,
+                              width: `${Math.round((p.visits / max) * 100)}%`,
+                              background: i === 0 ? 'linear-gradient(90deg, #C9A84C, #E8C76D)'
+                                : i === 1 ? 'linear-gradient(90deg, #C0C0C0, #E8E8E8)'
+                                : i === 2 ? 'linear-gradient(90deg, #CD7F32, #E09B52)'
+                                : A.blue,
+                              transition: 'width 0.6s ease',
+                            }} />
                           </div>
                         </div>
                       </div>
@@ -1269,19 +1372,26 @@ export const AdminPanel = () => {
       {/* QR-модал для партнёра */}
       {qrPartner && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
           onClick={() => setQrPartner(null)}
         >
           <div
-            style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 320, width: '100%', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}
+            style={{
+              background: 'rgba(20,20,40,0.96)',
+              backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 24, padding: 28, maxWidth: 320, width: '100%',
+              textAlign: 'center', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+            }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: '#000' }}>{qrPartner.name}</div>
-            <div style={{ fontSize: 12, color: '#99A2AD', marginBottom: 20 }}>ID: {qrPartner.id}</div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>{qrPartner.emoji ?? '🏪'}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4, color: A.text }}>{qrPartner.name}</div>
+            <div style={{ fontSize: 12, color: A.textSec, marginBottom: 20 }}>ID: {qrPartner.id}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, background: '#fff', borderRadius: 16, padding: 12 }}>
               <QRCodeSVG value={qrPartner.id} size={220} bgColor="#ffffff" fgColor="#0F0F1A" level="M" />
             </div>
-            <div style={{ fontSize: 12, color: '#99A2AD', marginBottom: 20, lineHeight: '17px' }}>
+            <div style={{ fontSize: 12, color: A.textSec, marginBottom: 20, lineHeight: '18px' }}>
               Распечатайте этот QR-код и разместите у партнёра.<br/>
               Клиент сканирует его через приложение АПГ и получает ключ.
             </div>
