@@ -120,9 +120,13 @@ export function UserApp() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // VK статусбар — обновляем safe-area инсеты; тема всегда light
+  // Sync data-theme attribute with appearance state
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-theme', appearance);
+  }, [appearance]);
+
+  // VK статусбар — обновляем safe-area инсеты
+  useEffect(() => {
     const handler = ({ detail }) => {
       if (detail?.type === 'VKWebAppUpdateConfig') {
         const top = detail.data?.insets?.top ?? 0;
@@ -131,6 +135,10 @@ export function UserApp() {
     };
     vkBridge.subscribe(handler);
     return () => vkBridge.unsubscribe(handler);
+  }, []);
+
+  const handleToggleTheme = useCallback(() => {
+    setAppearance(prev => prev === 'light' ? 'dark' : 'light');
   }, []);
 
   const T = useMemo(() => ({
@@ -833,6 +841,7 @@ export function UserApp() {
                 registeredEventIds={registeredEventIds}
                 userRank={userRank}
                 customTasks={customTasks}
+                appearance={appearance}
                 onEventRegister={handleEventRegister}
                 onOpenPartner={openPartner}
                 onToggleFavorite={toggleFavorite}
@@ -873,6 +882,8 @@ export function UserApp() {
                     streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
                     completedTasks={completedTasks} scanDates={scanDates}
                     notificationsEnabled={notifEnabled}
+                    appearance={appearance}
+                    onToggleTheme={handleToggleTheme}
                     onToggleFavorite={toggleFavorite}
                     onOpenPartner={openPartner}
                     onOpenActivity={() => goPanel('activity')}

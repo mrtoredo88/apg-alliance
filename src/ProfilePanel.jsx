@@ -30,6 +30,77 @@ function AchievementBadge({ a, unlocked }) {
   );
 }
 
+function ThemeToggle({ isDark, onToggle }) {
+  return (
+    <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 15, color: 'var(--c-text, #F0F0F0)', fontWeight: 600 }}>
+          {isDark ? '🌙 Тёмная тема' : '☀️ Светлая тема'}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--c-text-sec, rgba(240,240,240,0.5))', marginTop: 2 }}>
+          {isDark ? 'Звёздное небо · ночной режим' : 'Дневной свет · светлый фон'}
+        </div>
+      </div>
+
+      {/* Pill toggle */}
+      <button
+        onClick={onToggle}
+        aria-label={isDark ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
+        style={{
+          position: 'relative',
+          width: 76, height: 36,
+          borderRadius: 18,
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          flexShrink: 0,
+          overflow: 'hidden',
+          background: isDark
+            ? 'linear-gradient(135deg, #0D0D2A 0%, #1C1C50 100%)'
+            : 'linear-gradient(135deg, #87CEEB 0%, #FFF5A0 100%)',
+          boxShadow: isDark
+            ? '0 0 0 1.5px rgba(201,168,76,0.35), 0 4px 18px rgba(0,0,30,0.55)'
+            : '0 0 0 1.5px rgba(135,206,235,0.6), 0 4px 18px rgba(255,165,0,0.2)',
+          transition: 'background 0.45s ease, box-shadow 0.4s ease',
+        }}
+      >
+        {/* Stars — only visible in dark */}
+        {[{ x: 12, y: 9, s: 2.5 }, { x: 22, y: 20, s: 1.5 }, { x: 9, y: 22, s: 1.5 }, { x: 18, y: 10, s: 1 }].map((star, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            left: star.x, top: star.y,
+            width: star.s, height: star.s,
+            borderRadius: '50%',
+            background: '#E8C97A',
+            opacity: isDark ? 0.85 : 0,
+            transition: 'opacity 0.35s ease',
+          }} />
+        ))}
+
+        {/* Sliding thumb */}
+        <div style={{
+          position: 'absolute',
+          top: 4,
+          left: isDark ? 4 : 40,
+          width: 28, height: 28,
+          borderRadius: '50%',
+          background: isDark
+            ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
+            : 'linear-gradient(145deg, #FFD700, #FF8C00)',
+          boxShadow: isDark
+            ? '0 2px 10px rgba(201,168,76,0.7), 0 0 0 1px rgba(255,255,255,0.12)'
+            : '0 2px 10px rgba(255,140,0,0.55), 0 0 18px rgba(255,215,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13, lineHeight: 1,
+          transition: 'left 0.4s cubic-bezier(0.34,1.56,0.64,1), background 0.4s ease, box-shadow 0.4s ease',
+        }}>
+          {isDark ? '🌙' : '☀️'}
+        </div>
+      </button>
+    </div>
+  );
+}
+
 const FAQ_ITEMS = [
   {
     q: 'Что такое АПГ?',
@@ -221,7 +292,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {} }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -263,6 +334,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     setTimeout(() => { setAchievementToast(null); setToastExiting(false); }, 300);
   }, []);
 
+  const isDark = appearance === 'dark';
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
@@ -363,11 +435,15 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           <div style={{
             margin: '14px 16px',
             borderRadius: 28,
-            background: 'linear-gradient(145deg, rgba(18,12,50,0.97), rgba(22,18,62,0.95))',
+            background: isDark
+              ? 'linear-gradient(145deg, rgba(18,12,50,0.97), rgba(22,18,62,0.95))'
+              : 'linear-gradient(145deg, rgba(255,255,255,0.92), rgba(240,242,255,0.88))',
             backdropFilter: 'blur(40px) saturate(2)',
             WebkitBackdropFilter: 'blur(40px) saturate(2)',
             border: `1px solid rgba(201,168,76,0.28)`,
-            boxShadow: `0 16px 48px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(201,168,76,0.06)`,
+            boxShadow: isDark
+              ? `0 16px 48px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(201,168,76,0.06)`
+              : `0 8px 32px rgba(0,0,0,0.1), inset 0 2px 0 rgba(255,255,255,0.9), 0 0 0 1px rgba(201,168,76,0.08)`,
             padding: '20px 20px 18px',
             position: 'relative', overflow: 'hidden',
           }}>
@@ -405,16 +481,16 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
                 {/* Счётчик ключей */}
                 <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: -1 }}>{userKeys}</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: isDark ? '#fff' : T.textPri, lineHeight: 1, letterSpacing: -1 }}>{userKeys}</div>
                   <div style={{ fontSize: 10, color: T.goldL, fontWeight: 700, marginTop: 3 }}>🗝️ ключей</div>
                 </div>
               </div>
 
               {/* Прогресс */}
-              <div style={{ height: 7, background: 'rgba(255,255,255,0.1)', borderRadius: 7, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ height: 7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)', borderRadius: 7, overflow: 'hidden', marginBottom: 8 }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg, ${level.color}, ${T.goldL})`, borderRadius: 7, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)', boxShadow: `0 0 12px ${level.color}` }} />
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontWeight: 600 }}>
+              <div style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : T.textSec, textAlign: 'center', fontWeight: 600 }}>
                 {nextLevel
                   ? `До «${nextLevel.label}» ${nextLevel.emoji}: ещё ${toNext} ключей`
                   : '👑 Максимальный уровень — вы Амбассадор АПГ!'}
@@ -708,6 +784,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               </div>
             </button>
           ))}
+          <div style={{ borderTop: `1px solid ${T.border}` }}>
+            <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
+          </div>
         </div>
       </div>
 

@@ -132,14 +132,22 @@ function EventModal({ event, onClose }) {
 
 // ─── Карточка события ─────────────────────────────────────────────────────────
 
-function EventCard({ event, onClick, index = 0 }) {
-  const gradients = [
+function EventCard({ event, onClick, index = 0, isDark = true }) {
+  const gradientsDark = [
     'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
     'linear-gradient(135deg, #1a3a1a, #2d6a3a)',
     'linear-gradient(135deg, #3a1a1a, #7a3030)',
     'linear-gradient(135deg, #2a1a3a, #5a2d7a)',
     'linear-gradient(135deg, #1a3a3a, #2d7a6a)',
   ];
+  const gradientsLight = [
+    'linear-gradient(135deg, rgba(74,144,217,0.12), rgba(74,144,217,0.06))',
+    'linear-gradient(135deg, rgba(75,179,75,0.12), rgba(75,179,75,0.06))',
+    'linear-gradient(135deg, rgba(230,70,70,0.12), rgba(230,70,70,0.06))',
+    'linear-gradient(135deg, rgba(142,68,173,0.12), rgba(142,68,173,0.06))',
+    'linear-gradient(135deg, rgba(26,188,156,0.12), rgba(26,188,156,0.06))',
+  ];
+  const gradients = isDark ? gradientsDark : gradientsLight;
   const grad = gradients[(event.id?.charCodeAt(0) ?? 0) % gradients.length];
 
   return (
@@ -1045,6 +1053,7 @@ export function HomePanel({
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
   registeredEventIds = [], onEventRegister, userRank = null, customTasks = [],
+  appearance = 'light',
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1351,7 +1360,7 @@ export function HomePanel({
             ) : (
               <HorizontalScroll>
                 <div style={{ display: 'flex', gap: 12, padding: '0 16px 4px' }}>
-                  {events.map((e, i) => <EventCard key={e.id} event={e} index={i} onClick={setSelectedEvent} />)}
+                  {events.map((e, i) => <EventCard key={e.id} event={e} index={i} onClick={setSelectedEvent} isDark={appearance === 'dark'} />)}
                 </div>
               </HorizontalScroll>
             )}
