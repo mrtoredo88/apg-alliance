@@ -130,9 +130,9 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
             {notifications.map((n, i) => {
               const unread = isUnread(n);
               return (
-                <div key={n.id} style={{ background: unread ? 'rgba(201,168,76,0.06)' : 'rgba(255,255,255,0.07)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderRadius: 20, padding: '16px', border: `1px solid ${unread ? 'rgba(201,168,76,0.25)' : 'rgba(255,255,255,0.13)'}`, boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'flex', gap: 14, animation: `fadeInUp 0.3s ease ${i * 0.04}s both`, position: 'relative', overflow: 'hidden' }}>
+                <div key={n.id} style={{ background: unread ? 'rgba(201,168,76,0.06)' : T.chipBg, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderRadius: 20, padding: '16px', border: `1px solid ${unread ? 'rgba(201,168,76,0.25)' : T.border}`, boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'flex', gap: 14, animation: `fadeInUp 0.3s ease ${i * 0.04}s both`, position: 'relative', overflow: 'hidden' }}>
                   {unread && <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, borderRadius: '18px 0 0 18px', background: T.gold }} />}
-                  <div style={{ width: 44, height: 44, borderRadius: 13, background: unread ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${unread ? 'rgba(201,168,76,0.3)' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 13, background: unread ? 'rgba(201,168,76,0.15)' : T.chipBg, border: `1px solid ${unread ? 'rgba(201,168,76,0.3)' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
                     {n.emoji ?? '🔔'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>

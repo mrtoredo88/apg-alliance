@@ -82,7 +82,7 @@ function UserProfileModal({ user, rank, onClose }) {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: -60, right: -60, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
 
-        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textSec, fontSize: 16, cursor: 'pointer' }}>✕</button>
+        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textSec, fontSize: 16, cursor: 'pointer' }}>✕</button>
 
         {/* Аватар + имя */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 24, position: 'relative' }}>

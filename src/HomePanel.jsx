@@ -600,7 +600,7 @@ function NewsWidget({ news }) {
                 height: i === idx ? 20 : 6,
                 borderRadius: 3,
                 cursor: 'pointer',
-                background: i === idx ? T.gold : 'rgba(255,255,255,0.22)',
+                background: i === idx ? T.gold : T.border,
                 transition: 'all 0.25s ease',
               }} />
             ))}
@@ -679,22 +679,22 @@ function HeroBanner({ userKeys, userName, streak }) {
               </div>
               <div>
                 <div style={{ fontSize: 11, color: level.color, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{level.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: -0.5 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1, letterSpacing: -0.5 }}>
                   {userKeys} <span style={{ fontSize: 14, fontWeight: 700, color: T.goldL }}>🗝️</span>
                 </div>
               </div>
             </div>
             {nextLevel && (
-              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '6px 10px', border: '1px solid rgba(255,255,255,0.18)' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>следующий</div>
+              <div style={{ textAlign: 'center', background: T.chipBg, borderRadius: 10, padding: '6px 10px', border: `1px solid ${T.border}` }}>
+                <div style={{ fontSize: 9, color: T.textSec, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>следующий</div>
                 <div style={{ fontSize: 16 }}>{nextLevel.emoji}</div>
-                <div style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>{nextLevel.label}</div>
+                <div style={{ fontSize: 9, color: T.textPri, fontWeight: 700 }}>{nextLevel.label}</div>
               </div>
             )}
           </div>
 
           {/* Прогресс-бар */}
-          <div style={{ height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ height: 8, background: T.border, borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
             <div style={{
               height: '100%', width: `${pct}%`,
               background: `linear-gradient(90deg, ${level.color}, ${T.goldL})`,
@@ -704,7 +704,7 @@ function HeroBanner({ userKeys, userName, streak }) {
           </div>
 
           {/* Подпись */}
-          <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', fontWeight: 600 }}>
+          <div style={{ fontSize: 12, color: T.textPri, textAlign: 'center', fontWeight: 600 }}>
             {nextLevel
               ? `До ${nextLevel.emoji} ${nextLevel.label}: ещё ${toNext} ключей`
               : '👑 Максимальный уровень — вы Амбассадор АПГ!'}
@@ -873,7 +873,7 @@ function SkeletonHome() {
         <Skel h={11} w={140} radius={6} style={{ marginBottom: 10 }} />
         <Skel h={26} w={190} radius={8} style={{ marginBottom: 4 }} />
         <Skel h={18} w={110} radius={8} style={{ marginBottom: 18 }} />
-        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '12px 14px' }}>
+        <div style={{ background: T.chipBg, borderRadius: 14, padding: '12px 14px' }}>
           <Skel h={14} w={160} radius={6} style={{ marginBottom: 10 }} />
           <Skel h={5} radius={3} />
         </div>
@@ -982,7 +982,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
               {Math.min(userKeys, minKeys)} / {minKeys} 🗝️
             </span>
           </div>
-          <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: 6, background: T.border, borderRadius: 3, overflow: 'hidden' }}>
             <div style={{
               height: '100%', borderRadius: 3,
               width: `${Math.min((userKeys / minKeys) * 100, 100)}%`,
@@ -1001,7 +1001,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
           ✓ Я записан — отменить?
         </button>
       ) : isFull ? (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', color: T.textSec, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textSec, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
           Мест нет
         </div>
       ) : isPast ? null : hasEnough ? (
@@ -1009,7 +1009,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
           Я иду! 🎉
         </button>
       ) : (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', color: T.textSec, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textSec, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
           Нужно ещё {need} {need === 1 ? 'ключ' : need < 5 ? 'ключа' : 'ключей'} 🗝️
         </div>
       )}
@@ -1024,7 +1024,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
             const text = `🔒 Закрытое мероприятие АПГ: «${event.title}»${event.date ? ` — ${event.date}` : ''}. Нужно ${minKeys} ключей АПГ для входа!`;
             vkBridge.send('VKWebAppShare', { link: 'https://vk.com/app54601851', text }).catch(() => {});
           }}
-          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
+          style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
         >
           ↗ Поделиться
         </button>
@@ -1240,7 +1240,7 @@ export function HomePanel({
                 <div style={{ fontSize: 20, flexShrink: 0 }}>📱</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#5BA4F5', marginBottom: 2 }}>Демо-версия</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: '15px' }}>Полный функционал — в приложении ВКонтакте</div>
+                  <div style={{ fontSize: 11, color: T.textSec, lineHeight: '15px' }}>Полный функционал — в приложении ВКонтакте</div>
                 </div>
                 <button
                   onClick={openVKApp}
@@ -1289,25 +1289,25 @@ export function HomePanel({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {taskPreview.map(t => (
                     <button key={t.id} onClick={onOpenTasks} style={{
-                      background: t.ready ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.06)',
+                      background: t.ready ? 'rgba(201,168,76,0.12)' : T.chipBg,
                       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                      border: `1px solid ${t.ready ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.14)'}`,
+                      border: `1px solid ${t.ready ? 'rgba(201,168,76,0.4)' : T.border}`,
                       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
                       borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
                     }}>
                       <span style={{ fontSize: 22, flexShrink: 0 }}>{t.emoji}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{t.title}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri }}>{t.title}</div>
                         {t.total && (
                           <div style={{ marginTop: 6 }}>
-                            <div style={{ height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', background: t.ready ? `linear-gradient(90deg, ${T.gold}, ${T.goldL})` : 'rgba(255,255,255,0.45)', borderRadius: 2, width: `${Math.round((t.prog / t.total) * 100)}%`, transition: 'width 0.5s' }} />
+                            <div style={{ height: 4, background: T.border, borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', background: t.ready ? `linear-gradient(90deg, ${T.gold}, ${T.goldL})` : T.textSec, borderRadius: 2, width: `${Math.round((t.prog / t.total) * 100)}%`, transition: 'width 0.5s' }} />
                             </div>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>{t.prog} / {t.total}</div>
+                            <div style={{ fontSize: 10, color: T.textSec, marginTop: 3 }}>{t.prog} / {t.total}</div>
                           </div>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: t.ready ? T.gold : 'rgba(255,255,255,0.9)', background: t.ready ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.1)', border: `1px solid ${t.ready ? 'rgba(201,168,76,0.3)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 8, padding: '4px 9px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: t.ready ? T.gold : T.textPri, background: t.ready ? 'rgba(201,168,76,0.15)' : T.chipBg, border: `1px solid ${t.ready ? 'rgba(201,168,76,0.3)' : T.border}`, borderRadius: 8, padding: '4px 9px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                         {t.ready ? '🎁 Забрать' : `+${t.reward} 🗝️`}
                       </div>
                     </button>
@@ -1426,15 +1426,15 @@ export function HomePanel({
               </div>
 
               {filteredPartners.length === 0 ? (
-                <div style={{ borderRadius: 24, padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ borderRadius: 24, padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: T.chipBg, border: `1px solid ${T.border}` }}>
                   <div style={{ fontSize: 52, animation: 'float 3s ease-in-out infinite' }}>
                     {searchQuery.trim() ? '🔍' : '🏪'}
                   </div>
                   <div>
-                    <div style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
+                    <div style={{ color: T.textPri, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
                       {searchQuery.trim() ? 'Ничего не найдено' : 'Пока нет партнёров'}
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: '20px' }}>
+                    <div style={{ color: T.textSec, fontSize: 13, lineHeight: '20px' }}>
                       {searchQuery.trim()
                         ? `По запросу «${searchQuery.trim()}» партнёры не найдены`
                         : 'В этой категории пока нет партнёров — загляните позже'}
@@ -1472,7 +1472,7 @@ export function HomePanel({
                     <div key={r.id} style={{ ...GLASS, borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       {r.userPhoto
                         ? <img src={r.userPhoto} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
-                        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
+                        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: T.chipBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
                       }
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>

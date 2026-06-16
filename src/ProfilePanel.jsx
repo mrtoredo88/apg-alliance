@@ -169,7 +169,7 @@ function FaqSection() {
 
 function FavoriteCard({ partner, onOpen, onRemove }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+    <div style={{ background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
       {partner.logoUrl
         ? <Avatar size={44} src={partner.logoUrl} />
         : <div style={{ width: 44, height: 44, borderRadius: '50%', background: T.gold + '18', border: `2px solid ${T.gold}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
@@ -180,7 +180,7 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={() => onOpen(partner)} style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Открыть</button>
-        <button onClick={() => onRemove(partner.id)} style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'rgba(255,255,255,0.05)', color: T.textSec, fontSize: 12, cursor: 'pointer' }}>✕</button>
+        <button onClick={() => onRemove(partner.id)} style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textSec, fontSize: 12, cursor: 'pointer' }}>✕</button>
       </div>
     </div>
   );
@@ -205,7 +205,7 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
             }
             <div>
               <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{name}</div>
-              <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.title}</div>
+              <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.label}</div>
             </div>
           </div>
 
@@ -267,7 +267,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
                 ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
                 : c.isToday
                   ? 'rgba(201,168,76,0.15)'
-                  : 'rgba(255,255,255,0.05)',
+                  : T.chipBg,
               border: c.isToday ? `1px solid ${T.gold}60` : '1px solid transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 8, color: c.active ? '#0F0F1A' : T.textSec,
@@ -283,7 +283,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
             <span style={{ fontSize: 10, color: T.textSec }}>Посещение</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.gold}60` }} />
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: T.chipBg, border: `1px solid ${T.gold}60` }} />
             <span style={{ fontSize: 10, color: T.textSec }}>Сегодня</span>
           </div>
         </div>
@@ -389,7 +389,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {achievementToast && (
         <div style={{
           position: 'fixed', top: 60, left: 16, right: 16, zIndex: 700,
-          background: 'rgba(255,255,255,0.08)',
+          background: T.chipBg,
           backdropFilter: 'blur(48px) saturate(2)',
           WebkitBackdropFilter: 'blur(48px) saturate(2)',
           border: `1px solid ${achievementToast.color}60`,
@@ -527,15 +527,15 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 {!isLast && (
                   <div style={{
                     position: 'absolute', left: 19, top: 40, width: 2, height: 'calc(100% - 12px)',
-                    background: isReached ? lvl.color + '60' : 'rgba(255,255,255,0.08)',
+                    background: isReached ? lvl.color + '60' : T.border,
                     transition: 'background 0.4s ease',
                   }} />
                 )}
                 {/* Иконка уровня */}
                 <div style={{
                   width: 40, height: 40, borderRadius: 14, flexShrink: 0,
-                  background: isReached ? lvl.color + '22' : 'rgba(255,255,255,0.04)',
-                  border: `2px solid ${isReached ? lvl.color + '80' : 'rgba(255,255,255,0.1)'}`,
+                  background: isReached ? lvl.color + '22' : T.chipBg,
+                  border: `2px solid ${isReached ? lvl.color + '80' : T.border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: isReached ? 18 : 16,
                   filter: isReached ? 'none' : 'grayscale(1)',
@@ -573,7 +573,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Достижения</div>
-          <div style={{ fontSize: 11, color: T.textSec, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.13)' }}>{unlockedCount}/{achievements.length}</div>
+          <div style={{ fontSize: 11, color: T.textSec, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>{unlockedCount}/{achievements.length}</div>
         </div>
 
         {unlockedCount === 0
@@ -610,7 +610,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Избранное</div>
-          {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: T.textSec, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.13)' }}>{favoritePartners.length}</div>}
+          {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: T.textSec, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>{favoritePartners.length}</div>}
         </div>
 
         {favoritePartners.length === 0
@@ -651,8 +651,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                   <div key={event.id} style={{ padding: '14px 16px', borderBottom: i < myEvents.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                       width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                      background: isPast ? 'rgba(255,255,255,0.05)' : 'rgba(201,168,76,0.12)',
-                      border: `1px solid ${isPast ? 'rgba(255,255,255,0.1)' : 'rgba(201,168,76,0.3)'}`,
+                      background: isPast ? T.chipBg : 'rgba(201,168,76,0.12)',
+                      border: `1px solid ${isPast ? T.border : 'rgba(201,168,76,0.3)'}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                     }}>
                       {event.emoji ?? '🎉'}
@@ -663,9 +663,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                     </div>
                     <div style={{
                       fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, flexShrink: 0,
-                      background: isPast ? 'rgba(255,255,255,0.05)' : T.green + '12',
+                      background: isPast ? T.chipBg : T.green + '12',
                       color: isPast ? T.textSec : T.green,
-                      border: `1px solid ${isPast ? 'rgba(255,255,255,0.1)' : T.green + '40'}`,
+                      border: `1px solid ${isPast ? T.border : T.green + '40'}`,
                     }}>
                       {isPast ? 'Прошло' : 'Иду ✓'}
                     </div>
@@ -725,7 +725,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             <button onClick={() => setShowShareModal(true)} style={{ flex: 1, padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               📤 Поделиться
             </button>
-            <button onClick={onOpenReferral} style={{ flex: 1, padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: T.textPri, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <button onClick={onOpenReferral} style={{ flex: 1, padding: '12px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textPri, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               Подробнее ›
             </button>
           </div>
@@ -883,7 +883,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             📲 Добавить на экран телефона
           </button>
           {showIosHint && (
-            <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px' }}>
                 <div style={{ marginBottom: 8 }}>Чтобы установить приложение на iPhone / iPad:</div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
@@ -915,7 +915,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       <div style={{ padding: '8px 16px 0' }}>
         <button
           onClick={() => setShowDeleteConfirm(true)}
-          style={{ width: '100%', padding: '12px 0', borderRadius: 16, border: 'none', background: 'none', color: 'rgba(240,240,240,0.25)', fontSize: 13, fontWeight: 500, cursor: 'pointer', letterSpacing: 0.2 }}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 16, border: 'none', background: 'none', color: T.textSec, opacity: 0.45, fontSize: 13, fontWeight: 500, cursor: 'pointer', letterSpacing: 0.2 }}
         >
           Удалить профиль
         </button>
