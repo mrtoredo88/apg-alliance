@@ -12,7 +12,7 @@ function PrizeCard({ prize, userKeys, onClaim, isClaimed, index }) {
 
   return (
     <div style={{
-      background: isClaimed ? 'rgba(75,179,75,0.05)' : 'rgba(255,255,255,0.07)',
+      background: isClaimed ? 'rgba(75,179,75,0.05)' : T.chipBg,
       backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
       borderRadius: 24,
       padding: 16,
@@ -110,7 +110,7 @@ function ConfirmModal({ prize, userKeys, onConfirm, onCancel, claiming }) {
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={onCancel}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: T.textPri, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textPri, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
           >
             Отмена
           </button>

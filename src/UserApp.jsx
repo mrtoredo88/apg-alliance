@@ -759,7 +759,7 @@ export function UserApp() {
             <div style={{
               width: 50, height: 50, marginTop: -14, borderRadius: '50%',
               background: isScannerOpen ? 'rgba(201,168,76,0.25)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-              boxShadow: isScannerOpen ? 'none' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px rgba(8,8,24,0.9), 0 0 0 5px rgba(201,168,76,0.25)`,
+              boxShadow: isScannerOpen ? 'none' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#0F0F1A',
               transition: 'transform 0.2s, box-shadow 0.2s',
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',

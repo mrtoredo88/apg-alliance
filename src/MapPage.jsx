@@ -28,12 +28,12 @@ function PartnerLogo({ partner, size = 44 }) {
   const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   if (!partner.logoUrl || failed) {
     return (
-      <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg, hsl(${hue},45%,20%), hsl(${hue},35%,30%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.38), fontWeight: 800, color: 'rgba(255,255,255,0.9)', border: '1.5px solid rgba(255,255,255,0.1)' }}>
+      <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg, hsl(${hue},50%,52%), hsl(${hue},42%,44%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.38), fontWeight: 800, color: '#fff', border: `1.5px solid ${T.border}` }}>
         {name[0].toUpperCase()}
       </div>
     );
   }
-  return <img src={partner.logoUrl} alt={name} onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.1)', display: 'block', flexShrink: 0 }} />;
+  return <img src={partner.logoUrl} alt={name} onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${T.border}`, display: 'block', flexShrink: 0 }} />;
 }
 
 function openRoute(address) {
@@ -87,10 +87,10 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
       </div>
 
       {/* Карта — sticky под хедером */}
-      <div style={{ position: 'sticky', top: 52, zIndex: 50, height: 264, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))' }}>
+      <div style={{ position: 'sticky', top: 52, zIndex: 50, height: 264, background: T.chipBg, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))' }}>
         {/* Shimmer пока карта грузится */}
         {!mapLoaded && (
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(26,26,46,0.95), rgba(15,26,46,0.95))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 2 }}>
+          <div style={{ position: 'absolute', inset: 0, background: T.surface, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 2 }}>
             <div style={{ fontSize: 40, animation: 'float 2s ease-in-out infinite' }}>🗺️</div>
             <div style={{ fontSize: 13, color: T.textSec }}>Загрузка карты...</div>
           </div>
@@ -118,7 +118,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
               <button onClick={() => { onOpenPartner(selected); }} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 Открыть
               </button>
-              <button onClick={() => setSelected(null)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'rgba(255,255,255,0.07)', color: T.textSec, fontSize: 11, cursor: 'pointer' }}>
+              <button onClick={() => setSelected(null)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textSec, fontSize: 11, cursor: 'pointer' }}>
                 ✕
               </button>
             </div>
@@ -131,7 +131,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
 
         {/* Поиск */}
         <div style={{ padding: '12px 16px 8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 16, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 16, padding: '10px 14px', border: `1px solid ${T.border}` }}>
             <span style={{ fontSize: 15, opacity: 0.6, flexShrink: 0 }}>🔍</span>
             <input
               type="search"
@@ -186,7 +186,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
                   <button
                     key={p.id}
                     onClick={() => handleSelect(p)}
-                    style={{ width: '100%', textAlign: 'left', padding: '14px', borderRadius: 18, border: `1px solid ${isSelected ? 'rgba(201,168,76,0.45)' : 'rgba(255,255,255,0.08)'}`, background: isSelected ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, animation: `fadeInUp 0.35s ease ${i * 0.04}s both`, transition: 'border-color 0.2s, background 0.2s' }}
+                    style={{ width: '100%', textAlign: 'left', padding: '14px', borderRadius: 18, border: `1px solid ${isSelected ? 'rgba(201,168,76,0.45)' : T.border}`, background: isSelected ? 'rgba(201,168,76,0.08)' : T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, animation: `fadeInUp 0.35s ease ${i * 0.04}s both`, transition: 'border-color 0.2s, background 0.2s' }}
                   >
                     <PartnerLogo partner={p} size={44} />
                     <div style={{ flex: 1, minWidth: 0 }}>

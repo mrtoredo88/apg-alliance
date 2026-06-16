@@ -34,7 +34,7 @@ function EventModal({ event, onClose }) {
       backdropFilter: 'blur(4px)',
     }} onClick={onClose}>
       <div style={{
-        background: 'rgba(12,12,28,0.96)',
+        background: T.surface,
         backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
         borderRadius: '24px 24px 0 0',
         width: '100%', padding: '24px 20px 48px',
@@ -44,7 +44,7 @@ function EventModal({ event, onClose }) {
       }} onClick={e => e.stopPropagation()}>
 
         {/* Ручка */}
-        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 20px' }} />
+        <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '0 auto 20px' }} />
 
         {/* Обложка события */}
         {event.imageUrl && (
@@ -56,7 +56,7 @@ function EventModal({ event, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div style={{ fontSize: 52 }}>{event.emoji ?? '🎉'}</div>
           <button onClick={onClose} style={{
-            background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%',
+            background: T.chipBg, border: 'none', borderRadius: '50%',
             width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec,
           }}>✕</button>
         </div>
@@ -88,7 +88,7 @@ function EventModal({ event, onClose }) {
 
         {event.description && (
           <div style={{
-            background: 'rgba(255,255,255,0.05)', borderRadius: 14,
+            background: T.chipBg, borderRadius: 14,
             padding: 14, marginBottom: 20,
             border: `1px solid ${T.border}`,
           }}>
@@ -118,7 +118,7 @@ function EventModal({ event, onClose }) {
           <button onClick={onClose} style={{
             width: '100%', padding: '15px 0', borderRadius: 14,
             border: `1px solid ${T.border}`,
-            background: 'rgba(255,255,255,0.05)', color: T.textSec,
+            background: T.chipBg, color: T.textSec,
             fontSize: 15, fontWeight: 600, cursor: 'pointer',
           }}>
             Закрыть
@@ -261,8 +261,8 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         <PartnerLogo partner={partner} size={56} />
         <button onClick={() => onToggleFavorite(partner.id)} style={{
           position: 'absolute', top: -4, right: -4,
-          background: isFavorite ? T.red : 'rgba(255,255,255,0.1)',
-          border: `1px solid ${isFavorite ? T.red : 'rgba(255,255,255,0.15)'}`,
+          background: isFavorite ? T.red : T.chipBg,
+          border: `1px solid ${isFavorite ? T.red : T.border}`,
           borderRadius: '50%', width: 22, height: 22,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', fontSize: 10, padding: 0, color: '#fff',
@@ -432,7 +432,7 @@ function NewsModal({ item, onClose }) {
         onTouchEnd={onTouchEnd}
         onClick={e => e.stopPropagation()}
         style={{
-          background: 'rgba(10,10,26,0.97)',
+          background: T.surface,
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
           borderRadius: '24px 24px 0 0',
           width: '100%', maxHeight: '88vh',
@@ -444,7 +444,7 @@ function NewsModal({ item, onClose }) {
         }}
       >
         {/* Ручка — всегда активна для свайпа */}
-        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, margin: '14px auto 6px', flexShrink: 0 }} />
+        <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '14px auto 6px', flexShrink: 0 }} />
 
         {/* Скроллируемый контент */}
         <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
@@ -454,9 +454,9 @@ function NewsModal({ item, onClose }) {
           )}
           <div style={{ padding: '20px 20px 48px' }}>
             {!item.imageUrl && item.emoji && <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{item.emoji}</div>}
-            <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
-            {dateStr && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>{dateStr}</div>}
-            <div style={{ fontSize: 15, color: 'rgba(240,240,240,0.8)', lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
+            {dateStr && <div style={{ fontSize: 11, color: T.textSec, marginBottom: 14 }}>{dateStr}</div>}
+            <div style={{ fontSize: 15, color: T.textSec, lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
             {item.linkUrl && item.linkLabel && (
               <a
                 href={item.linkUrl}
@@ -466,10 +466,10 @@ function NewsModal({ item, onClose }) {
                   display: 'block',
                   marginTop: 24,
                   padding: '16px 18px',
-                  background: 'rgba(255,255,255,0.07)',
-                  border: '1px solid rgba(255,255,255,0.13)',
+                  background: T.chipBg,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 14,
-                  color: '#fff',
+                  color: T.textPri,
                   fontSize: 15,
                   fontWeight: 600,
                   textDecoration: 'none',

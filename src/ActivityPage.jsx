@@ -163,7 +163,7 @@ export function ActivityPage({ nav, userId, onBack }) {
                 { label: 'Визитов', value: items.filter(i => i.type === 'scan').length, color: T.gold },
                 { label: 'В избранное', value: items.filter(i => i.type === 'favorite_add').length, color: T.green },
               ].map(s => (
-                <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div key={s.label} style={{ background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, borderRadius: 16, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</span>
                   <span style={{ fontSize: 11, color: T.textSec }}>{s.label}</span>
                 </div>
