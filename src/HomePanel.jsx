@@ -39,7 +39,7 @@ function EventModal({ event, onClose }) {
         borderRadius: '24px 24px 0 0',
         width: '100%', padding: '24px 20px 48px',
         maxHeight: '85vh', overflowY: 'auto',
-        border: '1px solid rgba(255,255,255,0.1)',
+        border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
         borderBottom: 'none',
       }} onClick={e => e.stopPropagation()}>
 
@@ -428,7 +428,7 @@ function NewsModal({ item, onClose }) {
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
           borderRadius: '24px 24px 0 0',
           width: '100%', maxHeight: '88vh',
-          border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
+          border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderBottom: 'none',
           transform: `translateY(${dragY}px)`,
           transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.2,0,0,1)',
           willChange: 'transform',
@@ -993,7 +993,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
           ✓ Я записан — отменить?
         </button>
       ) : isFull ? (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: T.textSec, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', color: T.textSec, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
           Мест нет
         </div>
       ) : isPast ? null : hasEnough ? (
@@ -1001,7 +1001,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
           Я иду! 🎉
         </button>
       ) : (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: T.textSec, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', color: T.textSec, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
           Нужно ещё {need} {need === 1 ? 'ключ' : need < 5 ? 'ключа' : 'ключей'} 🗝️
         </div>
       )}
@@ -1016,7 +1016,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
             const text = `🔒 Закрытое мероприятие АПГ: «${event.title}»${event.date ? ` — ${event.date}` : ''}. Нужно ${minKeys} ключей АПГ для входа!`;
             vkBridge.send('VKWebAppShare', { link: 'https://vk.com/app54601851', text }).catch(() => {});
           }}
-          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
         >
           ↗ Поделиться
         </button>
@@ -1154,7 +1154,7 @@ export function HomePanel({
 
   return (
     <Panel id="home">
-      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(8,8,20,0.72)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52 }}>
+      <div style={{ position:'sticky', top:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52 }}>
         <ApgLogo />
         <button onClick={onOpenNotifications} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, position: 'relative', color: T.textSec, fontSize: 22, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           🔔
@@ -1383,13 +1383,13 @@ export function HomePanel({
                       whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700,
                       background: activeCategory === cat.id
                         ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
-                        : 'rgba(255,255,255,0.08)',
+                        : T.chipBg,
                       backdropFilter: 'blur(16px)',
                       WebkitBackdropFilter: 'blur(16px)',
-                      color: activeCategory === cat.id ? '#0F0F1A' : 'rgba(240,240,240,0.82)',
+                      color: activeCategory === cat.id ? '#0F0F1A' : T.chipText,
                       border: activeCategory === cat.id
                         ? 'none'
-                        : '1px solid rgba(255,255,255,0.16)',
+                        : `1px solid ${T.chipBorder}`,
                     }}>
                       {cat.emoji} {cat.label}
                     </button>

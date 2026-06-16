@@ -133,12 +133,12 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
       {/* Хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(8,8,20,0.82)', backdropFilter: 'blur(36px) saturate(2)',
+        background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)',
         WebkitBackdropFilter: 'blur(36px) saturate(2)',
-        borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '0 16px',
+        borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', padding: '0 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
-          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
+          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏪 {partner.name}</div>
             <div style={{ fontSize: 10, color: T.gold, marginTop: 1 }}>Личный кабинет партнёра</div>

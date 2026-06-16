@@ -76,9 +76,9 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
   return (
     <Panel id="map">
       {/* Хедер */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
-          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
+          <button onClick={onBack} style={{ background: T.chipBg, border: `1px solid ${T.headerBorder}`, borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>🗺️ Карта партнёров</div>
             <div style={{ fontSize: 11, color: T.textSec }}>{partnersWithAddress.length} адресов</div>
@@ -87,7 +87,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
       </div>
 
       {/* Карта — sticky под хедером */}
-      <div style={{ position: 'sticky', top: 52, zIndex: 50, height: 264, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      <div style={{ position: 'sticky', top: 52, zIndex: 50, height: 264, background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))' }}>
         {/* Shimmer пока карта грузится */}
         {!mapLoaded && (
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(26,26,46,0.95), rgba(15,26,46,0.95))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 2 }}>
@@ -149,7 +149,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
           <HorizontalScroll>
             <div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>
               {CATEGORIES.map(cat => (
-                <button key={cat.id} onClick={() => setCategory(cat.id)} style={{ padding: '6px 12px', borderRadius: 20, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, background: activeCategory === cat.id ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})` : 'rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', color: activeCategory === cat.id ? '#0F0F1A' : 'rgba(240,240,240,0.82)', border: activeCategory === cat.id ? 'none' : '1px solid rgba(255,255,255,0.13)' }}>
+                <button key={cat.id} onClick={() => setCategory(cat.id)} style={{ padding: '6px 12px', borderRadius: 20, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, background: activeCategory === cat.id ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})` : T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', color: activeCategory === cat.id ? '#0F0F1A' : T.chipText, border: activeCategory === cat.id ? 'none' : `1px solid ${T.chipBorder}` }}>
                   {cat.emoji} {cat.label}
                 </button>
               ))}

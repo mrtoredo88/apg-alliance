@@ -86,7 +86,7 @@ export function UserApp() {
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
-  const [appearance, setAppearance]             = useState('dark');
+  const [appearance, setAppearance]             = useState('light');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;
@@ -120,18 +120,13 @@ export function UserApp() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // VK статусбар + тема — обновляем CSS-переменные
+  // VK статусбар — обновляем safe-area инсеты; тема всегда light
   useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'light');
     const handler = ({ detail }) => {
       if (detail?.type === 'VKWebAppUpdateConfig') {
         const top = detail.data?.insets?.top ?? 0;
         document.documentElement.style.setProperty('--safe-top', `${top}px`);
-
-        const scheme = detail.data?.scheme ?? '';
-        const isLight = scheme === 'bright_light' || scheme === 'vkcom_light';
-        const newAppearance = isLight ? 'light' : 'dark';
-        setAppearance(newAppearance);
-        document.documentElement.setAttribute('data-theme', newAppearance);
       }
     };
     vkBridge.subscribe(handler);

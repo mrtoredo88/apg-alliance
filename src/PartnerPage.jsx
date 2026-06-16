@@ -259,9 +259,9 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   return (
     <Panel id="partner">
       {/* position:fixed — работает независимо от overflow контейнера Panel и VK UI анимаций */}
-      <div style={{ position:'fixed', top:'var(--safe-top, 0px)', left:0, right:0, zIndex:50, background:'rgba(8,8,20,0.82)', backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid rgba(255,255,255,0.1)', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
+      <div style={{ position:'fixed', top:'var(--safe-top, 0px)', left:0, right:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
-          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
+          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
             {avgRating > 0 && (
@@ -272,7 +272,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               </div>
             )}
           </div>
-          <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
+          <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
           <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
             {isFavorite ? '♥' : '♡'}
           </button>

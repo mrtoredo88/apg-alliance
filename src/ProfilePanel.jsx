@@ -346,8 +346,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
+        borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
         boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
         padding: '0 16px',
         display: 'flex', alignItems: 'center', height: 52,

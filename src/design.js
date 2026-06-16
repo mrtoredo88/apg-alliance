@@ -1,18 +1,23 @@
 // Дизайн-токены через CSS-переменные — адаптируются к тёмной/светлой теме автоматически
 
 export const T = {
-  bg:       'var(--c-bg,      #0F0F1A)',
-  surface:  'var(--c-card,    #1A1A2E)',
-  surface2: 'var(--c-card2,   #16213E)',
-  border:   'var(--c-border,  rgba(255,255,255,0.07))',
-  textPri:  'var(--c-text,    #F0F0F0)',
-  textSec:  'var(--c-text-sec,rgba(240,240,240,0.5))',
-  gold:     '#C9A84C',
-  goldL:    '#E8C97A',
-  blue:     '#4A90D9',
-  green:    '#4BB34B',
-  red:      '#E64646',
-  white:    '#FFFFFF',
+  bg:           'var(--c-bg,           #0F0F1A)',
+  surface:      'var(--c-card,         #1A1A2E)',
+  surface2:     'var(--c-card2,        #16213E)',
+  border:       'var(--c-border,       rgba(255,255,255,0.07))',
+  textPri:      'var(--c-text,         #F0F0F0)',
+  textSec:      'var(--c-text-sec,     rgba(240,240,240,0.5))',
+  headerBg:     'var(--c-header-bg,    rgba(8,8,20,0.72))',
+  headerBorder: 'var(--c-header-border,rgba(255,255,255,0.1))',
+  chipBg:       'var(--c-chip-bg,      rgba(255,255,255,0.07))',
+  chipBorder:   'var(--c-chip-border,  rgba(255,255,255,0.13))',
+  chipText:     'var(--c-chip-text,    rgba(240,240,240,0.82))',
+  gold:         '#C9A84C',
+  goldL:        '#E8C97A',
+  blue:         '#4A90D9',
+  green:        '#4BB34B',
+  red:          '#E64646',
+  white:        '#FFFFFF',
 };
 
 export const GLASS = {
