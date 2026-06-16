@@ -78,7 +78,7 @@ function UserProfileModal({ user, rank, onClose }) {
   const medals = ['🥇', '🥈', '🥉'];
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 20px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, borderRadius: 28, background: 'linear-gradient(145deg, rgba(18,12,50,0.98), rgba(22,18,62,0.97))', border: '1px solid rgba(201,168,76,0.28)', boxShadow: '0 24px 80px rgba(0,0,0,0.65)', padding: '28px 24px', position: 'relative', overflow: 'hidden', animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.4,0.64,1)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, borderRadius: 28, background: T.surface, border: '1px solid rgba(201,168,76,0.28)', boxShadow: '0 24px 80px rgba(0,0,0,0.65)', padding: '28px 24px', position: 'relative', overflow: 'hidden', animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.4,0.64,1)' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: -60, right: -60, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
 
@@ -97,7 +97,7 @@ function UserProfileModal({ user, rank, onClose }) {
           {rank < 3 && <div style={{ position: 'absolute', top: 54, left: '50%', transform: 'translateX(20px)', fontSize: 22 }}>{medals[rank]}</div>}
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: T.textPri }}>{user.firstName ?? ''} {user.lastName ?? ''}</div>
-            <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 4 }}>{level.emoji} {level.title}</div>
+            <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 4 }}>{level.emoji} {level.label}</div>
           </div>
         </div>
 

@@ -37,7 +37,7 @@ function StarPicker({ value, onChange, size = 28 }) {
       {[1,2,3,4,5].map(s => (
         <button key={s} onClick={() => onChange(s)}
           onMouseEnter={() => setHover(s)} onMouseLeave={() => setHover(0)}
-          style={{ background:'none', border:'none', cursor:'pointer', padding:2, fontSize:size, lineHeight:1, color: s <= display ? '#FFD700' : 'rgba(255,255,255,0.15)', transition:'color 0.1s, transform 0.1s', transform: s <= display ? 'scale(1.15)' : 'scale(1)' }}>★</button>
+          style={{ background:'none', border:'none', cursor:'pointer', padding:2, fontSize:size, lineHeight:1, color: s <= display ? '#FFD700' : T.border, transition:'color 0.1s, transform 0.1s', transform: s <= display ? 'scale(1.15)' : 'scale(1)' }}>★</button>
       ))}
     </div>
   );
@@ -59,7 +59,7 @@ function PartnerLogo({ partner, size = 88 }) {
   const name = partner.name ?? '?';
   const hue = [...name].reduce((a,c) => a + c.charCodeAt(0), 0) % 360;
   if (!partner.logoUrl || failed) {
-    return <div style={{ width:size, height:size, borderRadius:'50%', background:`linear-gradient(135deg,hsl(${hue},45%,22%),hsl(${hue},35%,34%))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:Math.round(size*0.38), fontWeight:800, color:'rgba(255,255,255,0.92)', border:'3px solid rgba(255,255,255,0.15)' }}>{name[0].toUpperCase()}</div>;
+    return <div style={{ width:size, height:size, borderRadius:'50%', background:`linear-gradient(135deg,hsl(${hue},50%,52%),hsl(${hue},42%,44%))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:Math.round(size*0.38), fontWeight:800, color:'#fff', border:`3px solid ${T.border}` }}>{name[0].toUpperCase()}</div>;
   }
   return (
     <div style={{ width:size, height:size, borderRadius:'50%', padding:3, background:`linear-gradient(135deg,${T.gold},${T.goldL})` }}>
@@ -77,10 +77,10 @@ function SimilarCard({ partner, onOpen }) {
   const name = partner.name ?? '?';
   const hue = [...name].reduce((a,c) => a + c.charCodeAt(0), 0) % 360;
   return (
-    <button onClick={() => onOpen(partner)} style={{ width:140, flexShrink:0, background:'rgba(255,255,255,0.05)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderRadius:20, padding:'14px 12px', border:'1px solid rgba(255,255,255,0.08)', cursor:'pointer', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+    <button onClick={() => onOpen(partner)} style={{ width:140, flexShrink:0, background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderRadius:20, padding:'14px 12px', border:`1px solid ${T.border}`, cursor:'pointer', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
       {partner.logoUrl && !failed
         ? <img src={partner.logoUrl} alt="" onError={() => setFailed(true)} style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover', border:'1.5px solid rgba(255,255,255,0.1)' }} />
-        : <div style={{ width:48, height:48, borderRadius:'50%', background:`linear-gradient(135deg,hsl(${hue},45%,20%),hsl(${hue},35%,30%))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'rgba(255,255,255,0.9)' }}>{name[0].toUpperCase()}</div>
+        : <div style={{ width:48, height:48, borderRadius:'50%', background:`linear-gradient(135deg,hsl(${hue},50%,52%),hsl(${hue},42%,44%))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#fff' }}>{name[0].toUpperCase()}</div>
       }
       <div style={{ fontSize:12, fontWeight:700, color:T.textPri, lineHeight:'15px' }}>{name}</div>
       {partner.avgRating > 0 && (
@@ -284,7 +284,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
         <div style={{ height:52 }} />
 
         {/* Шапка партнёра */}
-        <div style={{ margin:'8px 16px', borderRadius:24, background:'linear-gradient(135deg,#0F0F2E,#1A1A4E)', position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>
+        <div style={{ margin:'8px 16px', borderRadius:24, background:T.surface, position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>
           {photos.length > 0 && (
             <div style={{ height:160, overflow:'hidden', borderRadius:'24px 24px 0 0' }}>
               <img src={photos[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />

@@ -188,8 +188,8 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '10px 36px 10px 38px',
-                background: 'rgba(255,255,255,0.07)',
-                border: `1px solid ${isSearching ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                background: T.chipBg,
+                border: `1px solid ${isSearching ? 'rgba(201,168,76,0.4)' : T.border}`,
                 borderRadius: 14,
                 color: T.textPri, fontSize: 14, outline: 'none',
                 transition: 'border-color 0.2s',
@@ -212,7 +212,7 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
               style={{
                 flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 700,
-                background: activeCategory === 'all' ? T.gold : 'rgba(255,255,255,0.07)',
+                background: activeCategory === 'all' ? T.gold : T.chipBg,
                 color: activeCategory === 'all' ? '#0F0F1A' : T.textSec,
                 transition: 'background 0.2s, color 0.2s',
               }}

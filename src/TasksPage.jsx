@@ -77,13 +77,13 @@ function TaskCard({ task, status, onClaim, claiming }) {
           {/* Прогресс-бар */}
           {task.total && !status.done && (
             <div>
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+              <div style={{ height: 4, background: T.border, borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
                 <div style={{
                   height: '100%', borderRadius: 2,
                   width: `${pct}%`,
                   background: status.ready
                     ? `linear-gradient(90deg, ${T.gold}, ${T.goldL})`
-                    : 'rgba(255,255,255,0.2)',
+                    : 'rgba(201,168,76,0.3)',
                   transition: 'width 0.5s ease',
                 }} />
               </div>
@@ -221,7 +221,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
             <div style={{ fontSize: 13, color: T.textSec }}>Выполнено заданий</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.gold }}>{done.length} / {totalTasks}</div>
           </div>
-          <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ height: 6, background: T.border, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
             <div style={{
               height: '100%', borderRadius: 3,
               width: `${totalTasks ? Math.round((done.length / totalTasks) * 100) : 0}%`,

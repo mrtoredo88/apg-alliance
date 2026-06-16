@@ -56,7 +56,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
       <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Hero */}
-        <div style={{ borderRadius: 24, background: 'linear-gradient(135deg, #0F0F2E 0%, #1A2A4E 50%, #0F1A2E 100%)', padding: '24px 20px', position: 'relative', overflow: 'hidden', border: '1px solid rgba(74,144,217,0.3)', marginBottom: 16, animation: 'fadeInUp 0.4s ease both' }}>
+        <div style={{ borderRadius: 24, background: T.surface, padding: '24px 20px', position: 'relative', overflow: 'hidden', border: '1px solid rgba(74,144,217,0.3)', marginBottom: 16, animation: 'fadeInUp 0.4s ease both' }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(74,144,217,0.06) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
           <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(74,144,217,0.12), transparent 70%)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative' }}>
@@ -64,7 +64,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
             <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1.2, marginBottom: 8 }}>
               Позови друга —<br />получите ключи вместе
             </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: '18px', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: T.textSec, lineHeight: '18px', marginBottom: 20 }}>
               За каждого друга, который присоединился по твоей ссылке, ты и он получаете по{' '}
               <span style={{ color: T.goldL, fontWeight: 700 }}>+2 🗝️</span>
             </div>
@@ -148,7 +148,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: done ? T.textSec : T.textPri }}>{m.label}</div>
                     <div style={{ marginTop: 6 }}>
-                      <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginBottom: 3 }}>
+                      <div style={{ height: 4, background: T.border, borderRadius: 2, overflow: 'hidden', marginBottom: 3 }}>
                         <div style={{ height: '100%', borderRadius: 2, width: `${Math.min((referralCount / m.count) * 100, 100)}%`, background: done ? `linear-gradient(90deg, ${T.green}, #6FE66F)` : `linear-gradient(90deg, ${T.gold}, ${T.goldL})`, transition: 'width 0.5s ease' }} />
                       </div>
                       <div style={{ fontSize: 11, color: done ? T.green : T.textSec }}>
@@ -178,7 +178,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
                   <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, marginBottom: 3 }}>{step.title}</div>
                   <div style={{ fontSize: 12, color: T.textSec, lineHeight: '17px' }}>{step.desc}</div>
                 </div>
-                <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.15)', flexShrink: 0, alignSelf: 'center' }}>{i + 1}</div>
+                <div style={{ fontSize: 18, color: T.border, flexShrink: 0, alignSelf: 'center' }}>{i + 1}</div>
               </div>
             ))}
           </div>
