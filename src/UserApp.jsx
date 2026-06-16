@@ -416,7 +416,8 @@ export function UserApp() {
       return;
     }
 
-    const newStreak  = alreadyToday ? streak : streak + 1;
+    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const newStreak  = alreadyToday ? streak : (lastScanDate === yesterdayKey ? streak + 1 : 1);
     const keyBonus   = (!alreadyHasKey && partner.featured) ? 2 : 1;
     const newScanDates = scanDates.includes(todayKey)
       ? scanDates

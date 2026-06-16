@@ -289,6 +289,23 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         ) : null}
       </div>
 
+      {partner.stampTarget > 0 && (() => {
+        const filled = Math.min(partner.visitCount ?? 0, partner.stampTarget);
+        const pct = (filled / partner.stampTarget) * 100;
+        const done = filled >= partner.stampTarget;
+        return (
+          <div style={{ width: '100%', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ fontSize: 9, color: done ? T.gold : T.textSec, fontWeight: 700 }}>🎟️ Штамп</span>
+              <span style={{ fontSize: 9, color: done ? T.gold : T.textSec, fontWeight: 700 }}>{filled}/{partner.stampTarget}</span>
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: done ? T.gold : 'rgba(201,168,76,0.5)', transition: 'width 0.3s' }} />
+            </div>
+          </div>
+        );
+      })()}
+
       <button onClick={() => onOpen(partner)} style={{
         width: '100%', padding: '9px 0', borderRadius: 12, border: 'none',
         background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,

@@ -109,7 +109,11 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
   const [search, setSearch]                 = useState('');
   const inputRef                            = useRef(null);
 
-  const withOffers = useMemo(() => partners.filter(p => p.offer?.trim()), [partners]);
+  const withOffers = useMemo(() =>
+    partners
+      .filter(p => p.offer?.trim())
+      .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0)),
+    [partners]);
 
   const categories = useMemo(() => {
     const counts = {};
