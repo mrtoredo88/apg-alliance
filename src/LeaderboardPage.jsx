@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { getLevel } from './levels.js';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
@@ -183,11 +183,10 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
   useEffect(() => {
     const fetch = async () => {
       try {
-        const snap = await getDocs(collection(db, 'users'));
-        const users = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(u => u.keys > 0)
-          .sort((a, b) => (b.keys ?? 0) - (a.keys ?? 0));
+        const snap = await getDocs(
+          query(collection(db, 'users'), where('keys', '>', 0), orderBy('keys', 'desc'), limit(100))
+        );
+        const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setLeaders(users);
       } catch (e) {
         console.error(e);

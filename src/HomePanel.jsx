@@ -4,6 +4,7 @@ import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
+import vkBridge from './vk.js';
 
 const CATEGORIES = [
   { id: 'all',     label: 'Все',          emoji: '✦' },
@@ -996,11 +997,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
         <button
           onClick={() => {
             const text = `🔒 Закрытое мероприятие АПГ: «${event.title}»${event.date ? ` — ${event.date}` : ''}. Нужно ${minKeys} ключей АПГ для входа!`;
-            if (navigator.share) {
-              navigator.share({ text });
-            } else {
-              navigator.clipboard?.writeText(text).then(() => {});
-            }
+            vkBridge.send('VKWebAppShare', { link: 'https://vk.com/app54601851', text }).catch(() => {});
           }}
           style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
         >

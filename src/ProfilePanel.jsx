@@ -563,42 +563,44 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       </div>
 
       {/* ── Мои мероприятия ── */}
-      {registeredEventIds.length > 0 && (
-        <div style={{ padding: '16px 16px 0' }}>
-          <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Мои мероприятия</div>
-          <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
-            {registeredEventIds.map((eid, i, arr) => {
-              const event = events.find(e => e.id === eid);
-              if (!event) return null;
-              const isPast = event.eventDate ? new Date(event.eventDate).getTime() < Date.now() : false;
-              return (
-                <div key={eid} style={{ padding: '14px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                    background: isPast ? 'rgba(255,255,255,0.05)' : 'rgba(201,168,76,0.12)',
-                    border: `1px solid ${isPast ? 'rgba(255,255,255,0.1)' : 'rgba(201,168,76,0.3)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                  }}>
-                    {event.emoji ?? '🎉'}
+      {(() => {
+        const myEvents = registeredEventIds.map(eid => events.find(e => e.id === eid)).filter(Boolean);
+        if (!myEvents.length) return null;
+        return (
+          <div style={{ padding: '16px 16px 0' }}>
+            <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Мои мероприятия</div>
+            <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+              {myEvents.map((event, i) => {
+                const isPast = event.eventDate ? new Date(event.eventDate).getTime() < Date.now() : false;
+                return (
+                  <div key={event.id} style={{ padding: '14px 16px', borderBottom: i < myEvents.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                      background: isPast ? 'rgba(255,255,255,0.05)' : 'rgba(201,168,76,0.12)',
+                      border: `1px solid ${isPast ? 'rgba(255,255,255,0.1)' : 'rgba(201,168,76,0.3)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                    }}>
+                      {event.emoji ?? '🎉'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</div>
+                      {event.date && <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>📅 {event.date}</div>}
+                    </div>
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, flexShrink: 0,
+                      background: isPast ? 'rgba(255,255,255,0.05)' : T.green + '12',
+                      color: isPast ? T.textSec : T.green,
+                      border: `1px solid ${isPast ? 'rgba(255,255,255,0.1)' : T.green + '40'}`,
+                    }}>
+                      {isPast ? 'Прошло' : 'Иду ✓'}
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</div>
-                    {event.date && <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>📅 {event.date}</div>}
-                  </div>
-                  <div style={{
-                    fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, flexShrink: 0,
-                    background: isPast ? 'rgba(255,255,255,0.05)' : T.green + '12',
-                    color: isPast ? T.textSec : T.green,
-                    border: `1px solid ${isPast ? 'rgba(255,255,255,0.1)' : T.green + '40'}`,
-                  }}>
-                    {isPast ? 'Прошло' : 'Иду ✓'}
-                  </div>
-                </div>
-              );
-            }).filter(Boolean)}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Реферальная программа ── */}
       <div style={{ padding: '16px 16px 0' }}>
