@@ -837,6 +837,7 @@ export function UserApp() {
                 unreadCount={unreadCount}
                 registeredEventIds={registeredEventIds}
                 userRank={userRank}
+                customTasks={customTasks}
                 onEventRegister={handleEventRegister}
                 onOpenPartner={openPartner}
                 onToggleFavorite={toggleFavorite}

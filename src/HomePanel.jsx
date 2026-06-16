@@ -1044,7 +1044,7 @@ export function HomePanel({
   user, userKeys = 0, favorites = [], partners = [], events = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
-  registeredEventIds = [], onEventRegister, userRank = null,
+  registeredEventIds = [], onEventRegister, userRank = null, customTasks = [],
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1111,16 +1111,35 @@ export function HomePanel({
   }, [events]);
 
   const taskPreview = useMemo(() => {
+    function checkCustom(t) {
+      const v = t.target ?? 0;
+      switch (t.type) {
+        case 'keys':      return userKeys >= v;
+        case 'favs':      return favorites.length >= v;
+        case 'referrals': return referralCount >= v;
+        case 'streak':    return streak >= v;
+        case 'scanned':   return scannedCount >= v;
+        case 'manual':    return true;
+        default:          return false;
+      }
+    }
     const statuses = TASKS.map(t => ({
       ...t,
       done:  completedTasks.includes(t.id),
       ready: t.check(userKeys, favorites.length, referralCount, streak, scannedCount) && !completedTasks.includes(t.id),
       prog:  t.progress ? t.progress(userKeys, favorites.length, referralCount, streak, scannedCount) : 0,
     }));
-    const claimable  = statuses.filter(s => s.ready);
-    const inProgress = statuses.filter(s => !s.done && !s.ready);
+    const customStatuses = customTasks.map(t => ({
+      ...t,
+      done:  completedTasks.includes(t.id),
+      ready: checkCustom(t) && !completedTasks.includes(t.id),
+      prog:  0,
+    }));
+    const all = [...statuses, ...customStatuses];
+    const claimable  = all.filter(s => s.ready);
+    const inProgress = all.filter(s => !s.done && !s.ready);
     return [...claimable, ...inProgress].slice(0, 2);
-  }, [userKeys, favorites.length, referralCount, streak, completedTasks]);
+  }, [userKeys, favorites.length, referralCount, streak, scannedCount, completedTasks, customTasks]);
 
   const isSearching = searchQuery.trim().length > 0;
   const filteredPartners = partners
