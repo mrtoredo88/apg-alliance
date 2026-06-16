@@ -117,7 +117,33 @@ function TaskCard({ task, status, onClaim, claiming }) {
   );
 }
 
-export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], onClaim, onBack }) {
+function checkCustom(task, keys, favs, refs, streak, scanned) {
+  const v = task.target ?? 0;
+  switch (task.type) {
+    case 'keys':      return keys >= v;
+    case 'favs':      return favs >= v;
+    case 'referrals': return refs >= v;
+    case 'streak':    return streak >= v;
+    case 'scanned':   return scanned >= v;
+    case 'manual':    return true;
+    default:          return false;
+  }
+}
+
+function progressCustom(task, keys, favs, refs, streak, scanned) {
+  const v = task.target ?? 0;
+  if (!v || task.type === 'manual') return 0;
+  switch (task.type) {
+    case 'keys':      return Math.min(keys, v);
+    case 'favs':      return Math.min(favs, v);
+    case 'referrals': return Math.min(refs, v);
+    case 'streak':    return Math.min(streak, v);
+    case 'scanned':   return Math.min(scanned, v);
+    default:          return 0;
+  }
+}
+
+export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], customTasks = [], onClaim, onBack }) {
   const [claiming, setClaiming] = useState(null);
 
   const handleClaim = async (taskId, reward) => {
@@ -142,12 +168,23 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
     prog:  t.progress ? t.progress(userKeys, favCount, referralCount, streak, scannedCount) : 0,
   }));
 
-  const claimable   = statuses.filter(s => s.ready);
-  const inProgress  = statuses.filter(s => !s.done && !s.ready);
-  const done        = statuses.filter(s => s.done);
+  const customStatuses = customTasks.map(t => ({
+    ...t,
+    done:  completedTasks.includes(t.id),
+    ready: checkCustom(t, userKeys, favCount, referralCount, streak, scannedCount) && !completedTasks.includes(t.id),
+    prog:  progressCustom(t, userKeys, favCount, referralCount, streak, scannedCount),
+    total: t.type !== 'manual' ? (t.target ?? null) : null,
+  }));
 
-  const totalKeys = TASKS.reduce((s, t) => s + t.reward, 0);
-  const earnedKeys = done.reduce((s, t) => s + t.reward, 0);
+  const allStatuses = [...statuses, ...customStatuses];
+
+  const claimable   = allStatuses.filter(s => s.ready);
+  const inProgress  = allStatuses.filter(s => !s.done && !s.ready);
+  const done        = allStatuses.filter(s => s.done);
+
+  const totalTasks  = allStatuses.length;
+  const totalKeys   = allStatuses.reduce((s, t) => s + (t.reward ?? 0), 0);
+  const earnedKeys  = done.reduce((s, t) => s + (t.reward ?? 0), 0);
 
   return (
     <Panel id="tasks">
@@ -170,7 +207,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
               ✦ Задания
             </div>
             <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>
-              {done.length} / {TASKS.length} выполнено · {earnedKeys} из {totalKeys} 🗝️
+              {done.length} / {totalTasks} выполнено · {earnedKeys} из {totalKeys} 🗝️
             </div>
           </div>
         </div>
@@ -182,12 +219,12 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
         <div style={{ ...GLASS, borderRadius: 24, padding: '16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textSec }}>Выполнено заданий</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.gold }}>{done.length} / {TASKS.length}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.gold }}>{done.length} / {totalTasks}</div>
           </div>
           <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
             <div style={{
               height: '100%', borderRadius: 3,
-              width: `${Math.round((done.length / TASKS.length) * 100)}%`,
+              width: `${totalTasks ? Math.round((done.length / totalTasks) * 100) : 0}%`,
               background: `linear-gradient(90deg, ${T.gold}, ${T.goldL})`,
               transition: 'width 0.6s ease',
             }} />

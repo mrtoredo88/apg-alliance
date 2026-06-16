@@ -75,6 +75,7 @@ export function UserApp() {
   const [events, setEvents]                     = useState([]);
   const [news, setNews]                         = useState([]);
   const [notifications, setNotifications]       = useState([]);
+  const [customTasks, setCustomTasks]           = useState([]);
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [showOnboarding, setShowOnboarding]     = useState(false);
@@ -215,12 +216,13 @@ export function UserApp() {
         ).catch(() => {});
       }
 
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
       ]);
 
       if (!isMounted.current) return;
@@ -237,6 +239,7 @@ export function UserApp() {
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
+      if (isMounted.current) setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
       try { localStorage.setItem('apg_notif_cache', JSON.stringify(notifList)); } catch {}
@@ -877,6 +880,7 @@ export function UserApp() {
                     streak={streak} referralCount={referralCount}
                     scannedCount={Object.keys(scannedPartnerIds).length}
                     completedTasks={completedTasks}
+                    customTasks={customTasks}
                     onBack={() => goPanel('home')}
                     onClaim={handleClaim}
                   />
@@ -941,6 +945,8 @@ export function UserApp() {
                   notificationsEnabled={notifEnabled}
                   onEnableNotifications={handleEnableNotifications}
                   lastSeenTs={lastSeenTs}
+                  userKeys={userKeys}
+                  lastScanDate={lastScanDate}
                   onBack={() => goPanel('home')}
                 />
               </Suspense>

@@ -74,6 +74,7 @@ export const AdminPanel = () => {
   const [events, setEvents]         = useState([]);
   const [news, setNews]             = useState([]);
   const [notifs, setNotifs]         = useState([]);
+  const [customTasks, setCustomTasks] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [activeTab, setActiveTab]   = useState('partners');
   const [editingPartner, setEditingPartner] = useState(null);
@@ -116,9 +117,19 @@ export const AdminPanel = () => {
   const [nLinkLabel, setNLinkLabel] = useState('');
 
   // Форма уведомления
-  const [ntTitle, setNtTitle] = useState('');
-  const [ntBody, setNtBody]   = useState('');
-  const [ntEmoji, setNtEmoji] = useState('🔔');
+  const [ntTitle, setNtTitle]       = useState('');
+  const [ntBody, setNtBody]         = useState('');
+  const [ntEmoji, setNtEmoji]       = useState('🔔');
+  const [ntTargetType, setNtTargetType] = useState('all');
+  const [ntTargetValue, setNtTargetValue] = useState('');
+
+  // Форма кастомного задания
+  const [ctEmoji, setCtEmoji]   = useState('🎯');
+  const [ctTitle, setCtTitle]   = useState('');
+  const [ctDesc, setCtDesc]     = useState('');
+  const [ctReward, setCtReward] = useState('');
+  const [ctType, setCtType]     = useState('manual');
+  const [ctTarget, setCtTarget] = useState('');
 
   // Форма события
   const [eTitle, setETitle] = useState('');
@@ -150,18 +161,20 @@ export const AdminPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pSnap, eSnap, nSnap, ntSnap, prSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
       ]);
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNotifs(ntSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPrizes(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -253,17 +266,43 @@ export const AdminPanel = () => {
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
-  const resetNotifForm = () => { setNtTitle(''); setNtBody(''); setNtEmoji('🔔'); };
+  const resetNotifForm = () => { setNtTitle(''); setNtBody(''); setNtEmoji('🔔'); setNtTargetType('all'); setNtTargetValue(''); };
 
   const sendNotif = async () => {
     if (!ntTitle.trim()) return;
-    await addDoc(collection(db, 'notifications'), {
+    const data = {
       title: ntTitle.trim(),
       body: ntBody.trim(),
       emoji: ntEmoji,
+      targetType: ntTargetType,
       createdAt: serverTimestamp(),
-    });
+    };
+    if (ntTargetType !== 'all' && ntTargetValue) data.targetValue = Number(ntTargetValue);
+    await addDoc(collection(db, 'notifications'), data);
     resetNotifForm();
+    fetchData();
+  };
+
+  // ─── Кастомные задания ───────────────────────────────────────────────────────
+
+  const resetCtForm = () => { setCtEmoji('🎯'); setCtTitle(''); setCtDesc(''); setCtReward(''); setCtType('manual'); setCtTarget(''); };
+
+  const saveCustomTask = async () => {
+    if (!ctTitle.trim() || !ctReward) return;
+    const data = {
+      emoji: ctEmoji, title: ctTitle.trim(), desc: ctDesc.trim(),
+      reward: Number(ctReward), type: ctType,
+      createdAt: serverTimestamp(),
+    };
+    if (ctType !== 'manual' && ctTarget) data.target = Number(ctTarget);
+    await addDoc(collection(db, 'customTasks'), data);
+    resetCtForm();
+    fetchData();
+  };
+
+  const deleteCustomTask = async (id) => {
+    if (!window.confirm('Удалить задание?')) return;
+    await deleteDoc(doc(db, 'customTasks', id));
     fetchData();
   };
 
@@ -510,6 +549,7 @@ export const AdminPanel = () => {
           { id: 'events',   label: `🎉 События (${events.length})` },
           { id: 'news',     label: `📢 Новости (${news.length})` },
           { id: 'notifs',   label: `🔔 Уведомления` },
+          { id: 'tasks',    label: `✅ Задания (${customTasks.length})` },
           { id: 'prizes',   label: `🎁 Призы (${prizes.length})` },
           { id: 'analytics',label: '📊 Аналитика' },
         ].map(t => (
@@ -815,6 +855,21 @@ export const AdminPanel = () => {
             <label style={s.label}>Эмодзи</label>
             <EmojiPicker emojis={NEWS_EMOJIS} value={ntEmoji} onChange={setNtEmoji} />
 
+            <label style={s.label}>Аудитория</label>
+            <select style={s.select} value={ntTargetType} onChange={e => setNtTargetType(e.target.value)}>
+              <option value="all">👥 Все пользователи</option>
+              <option value="min_keys">🔑 Ключей ≥ N (активные)</option>
+              <option value="max_keys">🆕 Ключей &lt; N (новые/неактивные)</option>
+              <option value="inactive_days">💤 Не заходили N дней</option>
+            </select>
+            {ntTargetType !== 'all' && (
+              <input
+                style={s.input} type="number" min="1"
+                placeholder={ntTargetType === 'inactive_days' ? 'Количество дней' : 'Количество ключей'}
+                value={ntTargetValue} onChange={e => setNtTargetValue(e.target.value)}
+              />
+            )}
+
             <button style={{ ...s.btn, ...s.btnPri, width: '100%' }} onClick={sendNotif}>
               🔔 Опубликовать
             </button>
@@ -836,6 +891,7 @@ export const AdminPanel = () => {
                         <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
                         <div style={{ fontSize: 12, color: '#99A2AD' }}>
                           {dateStr && `📅 ${dateStr}`}
+                          {n.targetType && n.targetType !== 'all' && ` · 🎯 ${n.targetType}${n.targetValue ? ` ≥ ${n.targetValue}` : ''}`}
                           {n.body && ` · ${n.body.length > 40 ? n.body.slice(0, 40) + '…' : n.body}`}
                         </div>
                       </div>
@@ -844,6 +900,68 @@ export const AdminPanel = () => {
                   </div>
                 );
               })
+            }
+          </div>
+        </>
+      )}
+
+      {/* ── ЗАДАНИЯ ── */}
+      {activeTab === 'tasks' && (
+        <>
+          <div style={s.card}>
+            <h2 style={s.h2}>➕ Новое задание</h2>
+            <p style={{ color: '#99A2AD', fontSize: 13, margin: '0 0 12px' }}>
+              Дополнительные задания поверх стандартных 17. Пользователи видят их в разделе «Задания».
+            </p>
+
+            <label style={s.label}>Эмодзи</label>
+            <EmojiPicker emojis={['🎯','🏆','🌟','🎁','🔥','💎','🚀','🎪','🏅','⚡','💫','🌈']} value={ctEmoji} onChange={setCtEmoji} />
+
+            <label style={s.label}>Название *</label>
+            <input style={s.input} placeholder="Посети 3 новых партнёра" value={ctTitle} onChange={e => setCtTitle(e.target.value)} />
+
+            <label style={s.label}>Описание</label>
+            <textarea style={s.textarea} placeholder="Подробности задания..." value={ctDesc} onChange={e => setCtDesc(e.target.value)} />
+
+            <label style={s.label}>Награда (ключей) *</label>
+            <input style={s.input} type="number" min="1" placeholder="5" value={ctReward} onChange={e => setCtReward(e.target.value)} />
+
+            <label style={s.label}>Тип условия</label>
+            <select style={s.select} value={ctType} onChange={e => setCtType(e.target.value)}>
+              <option value="manual">👆 Ручное (пользователь сам забирает)</option>
+              <option value="keys">🔑 Собери N ключей</option>
+              <option value="scanned">🗺️ Посети N партнёров</option>
+              <option value="streak">🔥 Стрик N дней подряд</option>
+              <option value="favs">💙 Добавь N в избранное</option>
+              <option value="referrals">👥 Пригласи N друзей</option>
+            </select>
+            {ctType !== 'manual' && (
+              <input style={s.input} type="number" min="1" placeholder="Целевое значение" value={ctTarget} onChange={e => setCtTarget(e.target.value)} />
+            )}
+
+            <button style={{ ...s.btn, ...s.btnPri, width: '100%' }} onClick={saveCustomTask}>
+              ✅ Добавить задание
+            </button>
+          </div>
+
+          <div style={s.card}>
+            <h2 style={s.h2}>Активные задания ({customTasks.length})</h2>
+            {customTasks.length === 0
+              ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Нет кастомных заданий</p>
+              : customTasks.map(t => (
+                <div key={t.id} style={s.row}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f2f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{t.emoji ?? '🎯'}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
+                      <div style={{ fontSize: 12, color: '#99A2AD' }}>
+                        +{t.reward} 🗝️ · {t.type === 'manual' ? 'ручное' : `${t.type} ≥ ${t.target}`}
+                      </div>
+                    </div>
+                  </div>
+                  <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12, flexShrink: 0, marginLeft: 8 }} onClick={() => deleteCustomTask(t.id)}>🗑️</button>
+                </div>
+              ))
             }
           </div>
         </>

@@ -19,25 +19,41 @@ function timeAgo(ts) {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
-export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications }) {
-  const [notifications, setNotifications] = useState(propNotifications ?? []);
+function matchesTarget(notif, userKeys, lastScanDate) {
+  const type = notif.targetType ?? 'all';
+  const val  = notif.targetValue ?? 0;
+  if (type === 'all') return true;
+  if (type === 'min_keys') return (userKeys ?? 0) >= val;
+  if (type === 'max_keys') return (userKeys ?? 0) < val;
+  if (type === 'inactive_days') {
+    if (!lastScanDate) return true;
+    const daysSince = Math.floor((Date.now() - new Date(lastScanDate).getTime()) / 86400000);
+    return daysSince >= val;
+  }
+  return true;
+}
+
+export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
+  const [allNotifications, setAllNotifications] = useState(propNotifications ?? []);
   const [loading, setLoading] = useState(!propNotifications);
   const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
     if (propNotifications) {
-      setNotifications(propNotifications);
+      setAllNotifications(propNotifications);
       setLoading(false);
       return;
     }
     (async () => {
       try {
         const snap = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')));
-        setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAllNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch {}
       setLoading(false);
     })();
   }, [propNotifications]);
+
+  const notifications = allNotifications.filter(n => matchesTarget(n, userKeys, lastScanDate));
 
   const handleEnable = async () => {
     setEnabling(true);
