@@ -197,7 +197,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
       <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Баланс-карточка */}
-        <div style={{ ...GLASS_GOLD, borderRadius: 24, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ ...GLASS_GOLD, borderRadius: 24, padding: '16px 20px', marginBottom: userKeys === 0 ? 12 : 20, display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ fontSize: 40 }}>🗝️</div>
           <div>
             <div style={{ fontSize: 28, fontWeight: 900, color: T.gold, lineHeight: 1 }}>{userKeys}</div>
@@ -210,6 +210,18 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
             </div>
           )}
         </div>
+
+        {userKeys === 0 && (
+          <div style={{ background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: 20, padding: '14px 16px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 22, flexShrink: 0 }}>💡</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri, marginBottom: 4 }}>Как заработать ключи?</div>
+              <div style={{ fontSize: 12, color: T.textSec, lineHeight: '18px' }}>
+                Сканируй QR-коды в заведениях-партнёрах АПГ — каждый визит даёт 1 ключ. За «Партнёра дня» — x2. Выполняй задания и приглашай друзей.
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

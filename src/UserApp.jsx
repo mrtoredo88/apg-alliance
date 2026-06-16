@@ -507,10 +507,13 @@ export function UserApp() {
     setCompletedTasks(next);
     setUserKeys(prev => prev + reward);
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), {
-        completedTasks: next,
-        keys: increment(reward),
-      });
+      const uid = String(user.id);
+      await updateDoc(doc(db, 'users', uid), { completedTasks: next, keys: increment(reward) });
+      addDoc(collection(db, 'users', uid, 'activity'), {
+        type: 'task', icon: '✅',
+        text: `Задание выполнено: +${reward} ключей`,
+        ts: serverTimestamp(),
+      }).catch(() => {});
     } catch (e) { console.error(e); }
   }, [user, completedTasks]);
 
@@ -530,6 +533,18 @@ export function UserApp() {
       }
       await Promise.all(batch);
       setUserKeys(prev => prev - prize.cost);
+      const uid = String(user.id);
+      addDoc(collection(db, 'users', uid, 'activity'), {
+        type: 'prize', icon: prize.emoji ?? '🎁',
+        text: `Приз получен: ${prize.name} (−${prize.cost} 🗝️)`,
+        ts: serverTimestamp(),
+      }).catch(() => {});
+      addDoc(collection(db, 'prizeClaims'), {
+        userId: uid, userName: user.first_name ?? '',
+        prizeId: prize.id, prizeName: prize.name,
+        prizeEmoji: prize.emoji ?? '🎁', cost: prize.cost,
+        status: 'pending', claimedAt: serverTimestamp(),
+      }).catch(() => {});
       return true;
     } catch (e) { console.error(e); return false; }
   }, [user, userKeys]);

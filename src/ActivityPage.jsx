@@ -9,6 +9,8 @@ const TYPE_COLORS = {
   scan:           '#C9A84C',
   favorite_add:   '#4BB34B',
   favorite_remove:'#E64646',
+  task:           '#4BB34B',
+  prize:          '#9B59B6',
 };
 
 function relativeTime(ts) {

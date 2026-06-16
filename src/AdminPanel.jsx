@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch, increment } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch, increment, limit } from 'firebase/firestore';
 
 const CATEGORIES = [
   { id: 'food',   label: 'Еда',         emoji: '🍽️' },
@@ -75,6 +75,7 @@ export const AdminPanel = () => {
   const [news, setNews]             = useState([]);
   const [notifs, setNotifs]         = useState([]);
   const [customTasks, setCustomTasks] = useState([]);
+  const [prizeClaims, setPrizeClaims] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [activeTab, setActiveTab]   = useState('partners');
   const [editingPartner, setEditingPartner] = useState(null);
@@ -161,13 +162,14 @@ export const AdminPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(() => ({ docs: [] })),
       ]);
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -175,6 +177,7 @@ export const AdminPanel = () => {
       setNotifs(ntSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPrizes(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -1034,6 +1037,49 @@ export const AdminPanel = () => {
                     </div>
                   </div>
                 ))
+            }
+          </div>
+
+          {/* Заявки на призы */}
+          <div style={s.card}>
+            <h2 style={s.h2}>📋 Заявки на выдачу ({prizeClaims.filter(c => c.status !== 'given').length})</h2>
+            {prizeClaims.length === 0
+              ? <p style={{ color: '#99A2AD', textAlign: 'center' }}>Заявок пока нет</p>
+              : prizeClaims.map((c) => {
+                const given = c.status === 'given';
+                const dateStr = c.claimedAt?.toDate
+                  ? c.claimedAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  : '';
+                return (
+                  <div key={c.id} style={{ ...s.row, flexWrap: 'wrap', gap: 6, opacity: given ? 0.5 : 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: given ? '#f2f3f5' : '#FFF3CD', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                        {c.prizeEmoji ?? '🎁'}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.prizeName} · {c.cost} 🗝️
+                        </div>
+                        <div style={{ fontSize: 11, color: '#99A2AD' }}>
+                          {c.userName || `ID ${c.userId}`} · {dateStr}
+                        </div>
+                      </div>
+                    </div>
+                    {given
+                      ? <div style={{ fontSize: 11, fontWeight: 700, color: '#99A2AD', background: '#f2f3f5', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>Выдан</div>
+                      : <button
+                          style={{ ...s.btn, background: '#4BB34B', color: '#fff', padding: '5px 10px', fontSize: 12, flexShrink: 0 }}
+                          onClick={async () => {
+                            await updateDoc(doc(db, 'prizeClaims', c.id), { status: 'given' });
+                            setPrizeClaims(prev => prev.map(x => x.id === c.id ? { ...x, status: 'given' } : x));
+                          }}
+                        >
+                          ✓ Выдан
+                        </button>
+                    }
+                  </div>
+                );
+              })
             }
           </div>
         </div>
