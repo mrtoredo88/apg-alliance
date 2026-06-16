@@ -79,7 +79,7 @@ function SimilarCard({ partner, onOpen }) {
   return (
     <button onClick={() => onOpen(partner)} style={{ width:140, flexShrink:0, background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderRadius:20, padding:'14px 12px', border:`1px solid ${T.border}`, cursor:'pointer', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
       {partner.logoUrl && !failed
-        ? <img src={partner.logoUrl} alt="" onError={() => setFailed(true)} style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover', border:'1.5px solid rgba(255,255,255,0.1)' }} />
+        ? <img src={partner.logoUrl} alt="" onError={() => setFailed(true)} style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover', border:`1.5px solid ${T.border}` }} />
         : <div style={{ width:48, height:48, borderRadius:'50%', background:`linear-gradient(135deg,hsl(${hue},50%,52%),hsl(${hue},42%,44%))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#fff' }}>{name[0].toUpperCase()}</div>
       }
       <div style={{ fontSize:12, fontWeight:700, color:T.textPri, lineHeight:'15px' }}>{name}</div>
@@ -144,6 +144,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const [formText, setFormText]           = useState('');
   const [submitting, setSubmitting]       = useState(false);
   const [submitDone, setSubmitDone]       = useState(false);
+  const [reviewError, setReviewError]     = useState('');
   const [phoneCopied, setPhoneCopied]     = useState(false);
 
   const userId = user?.id ? String(user.id) : null;
@@ -164,6 +165,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     setFormStars(0);
     setFormText('');
     setSubmitDone(false);
+    setReviewError('');
 
     (async () => {
       try {
@@ -211,6 +213,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       await updateDoc(doc(db, 'partners', partner.id), { avgRating: newAvg, reviewCount: newCount });
       onPartnerUpdate?.(partner.id, { avgRating: newAvg, reviewCount: newCount });
 
+      setReviewError('');
       setSubmitDone(true);
       setShowForm(false);
 
@@ -218,7 +221,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       const stars = '⭐'.repeat(formStars);
       const msg = `Побывал у партнёра АПГ «${partner.name}» — ${stars}\n${formText.trim() ? formText.trim() + '\n' : ''}\n#АПГ_Зеленоград`;
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setReviewError('Ошибка отправки. Проверьте соединение.'); }
     setSubmitting(false);
   }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate]);
 
@@ -437,6 +440,9 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
                   {submitting ? 'Отправка...' : '⭐ Опубликовать'}
                 </button>
               </div>
+              {reviewError && (
+                <div style={{ marginTop: 8, fontSize: 12, color: T.red, textAlign: 'center' }}>{reviewError}</div>
+              )}
             </div>
           )}
 
