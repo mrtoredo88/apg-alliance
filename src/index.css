@@ -46,7 +46,8 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: var(--c-bg);
+  background: var(--c-bg, #08081A);
+  overscroll-behavior: none;
 }
 
 #root {
@@ -61,7 +62,6 @@ html, body {
 
 /* VK UI — весь стек прозрачный, чтобы depth orbs просвечивали */
 .vkuiPanel,
-.vkuiPanel__in,
 .vkuiAppRoot,
 .vkuiAppRoot__wrapper,
 .vkuiSplitLayout,
@@ -75,6 +75,14 @@ html, body {
 .vkuiView__panel-in {
   background: transparent !important;
   background-color: transparent !important;
+}
+
+/* Скроллируемый контейнер панели: фон = цвет приложения
+   чтобы при прокрутке ниже контента не появлялся белый экран */
+.vkuiPanel__in {
+  background: var(--c-bg, #08081A) !important;
+  background-color: var(--c-bg, #08081A) !important;
+  overscroll-behavior: none;
 }
 
 /* Эффект легкой тени для карточек, чтобы они выглядели «парящими» */
