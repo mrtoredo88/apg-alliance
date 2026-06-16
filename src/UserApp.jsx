@@ -38,6 +38,8 @@ function formatCacheAge(ts) {
   return `${Math.round(hrs / 24)} д назад`;
 }
 
+const SWIPE_TABS = ['home', 'offers', 'tasks', 'profile'];
+
 function LazyFallback() {
   return (
     <div style={{ background: 'var(--c-bg, #0F0F1A)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -401,9 +403,11 @@ export function UserApp() {
 
   // ─── Скан ───────────────────────────────────────────────────────────────────
 
+  const toastTimerRef = useRef(null);
   const showToast = useCallback((msg, type = 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
   const handleConfirmScan = useCallback(async (placeIdentifier) => {
@@ -635,7 +639,6 @@ export function UserApp() {
 
   // ─── Свайп-навигация между основными табами ─────────────────────────────────
 
-  const SWIPE_TABS = ['home', 'offers', 'tasks', 'profile'];
   const swipeTouchX  = useRef(null);
   const swipeTouchY  = useRef(null);
 

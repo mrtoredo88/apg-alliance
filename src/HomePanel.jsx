@@ -195,11 +195,11 @@ function PartnerLogo({ partner, size = 56 }) {
     return (
       <div style={{
         width: size, height: size, borderRadius: '50%', flexShrink: 0,
-        background: `linear-gradient(135deg, hsl(${hue},45%,20%), hsl(${hue},35%,30%))`,
+        background: `linear-gradient(135deg, hsl(${hue},50%,52%), hsl(${hue},42%,44%))`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: Math.round(size * 0.38), fontWeight: 800,
-        color: 'rgba(255,255,255,0.9)',
-        border: '1.5px solid rgba(255,255,255,0.12)',
+        color: '#fff',
+        border: `1.5px solid ${T.border}`,
       }}>
         {initial}
       </div>
@@ -209,7 +209,7 @@ function PartnerLogo({ partner, size = 56 }) {
     <img
       src={partner.logoUrl} alt={name} loading="lazy"
       onError={() => setFailed(true)}
-      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.12)', display: 'block', flexShrink: 0 }}
+      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${T.border}`, display: 'block', flexShrink: 0 }}
     />
   );
 }
@@ -272,7 +272,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         {partner.visitCount > 0 && (
           <div style={{
             position: 'absolute', bottom: -4, left: -4,
-            background: 'rgba(15,15,26,0.9)', border: '1px solid rgba(255,255,255,0.15)',
+            background: T.surface, border: `1px solid ${T.border}`,
             borderRadius: 8, padding: '1px 5px',
             fontSize: 9, fontWeight: 700, color: T.textSec, lineHeight: '14px',
           }}>×{partner.visitCount}</div>
@@ -307,7 +307,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
               <span style={{ fontSize: 9, color: done ? T.gold : T.textSec, fontWeight: 700 }}>🎟️ Штамп</span>
               <span style={{ fontSize: 9, color: done ? T.gold : T.textSec, fontWeight: 700 }}>{filled}/{partner.stampTarget}</span>
             </div>
-            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div style={{ height: 4, borderRadius: 2, background: T.border, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: done ? T.gold : 'rgba(201,168,76,0.5)', transition: 'width 0.3s' }} />
             </div>
           </div>
@@ -349,15 +349,15 @@ function FeaturedPartnerCard({ partner, onOpen }) {
               <span style={{ fontSize: 9, fontWeight: 800, color: '#FFD700', letterSpacing: 1.2, textTransform: 'uppercase' }}>⭐ Партнёр дня</span>
               <span style={{ fontSize: 10, fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, padding: '1px 6px' }}>+2 🗝️</span>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{partner.name}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>{partner.name}</div>
             {partner.offer && (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 12, color: T.textSec, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 🎁 {partner.offer}
               </div>
             )}
           </div>
 
-          <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>›</div>
+          <div style={{ fontSize: 18, color: T.textSec, flexShrink: 0 }}>›</div>
         </div>
       </button>
     </div>
@@ -584,7 +584,7 @@ function NewsWidget({ news }) {
                   <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px', flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: n.imageUrl ? 3 : 4, WebkitBoxOrient: 'vertical' }}>
                     {n.text}
                   </div>
-                  {ds && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 8, flexShrink: 0 }}>{ds}</div>}
+                  {ds && <div style={{ fontSize: 11, color: T.textSec, marginTop: 8, flexShrink: 0 }}>{ds}</div>}
                 </div>
               );
             })}
@@ -654,8 +654,8 @@ function HeroBanner({ userKeys, userName, streak }) {
         </div>
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: T.white, lineHeight: 1.15, letterSpacing: -0.5 }}>
+            <div style={{ fontSize: 13, color: T.textSec, fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: T.textPri, lineHeight: 1.15, letterSpacing: -0.5 }}>
               {userName ?? 'участник'} 👋
             </div>
           </div>
@@ -663,7 +663,7 @@ function HeroBanner({ userKeys, userName, streak }) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.35)', borderRadius: 12, padding: '6px 10px', gap: 1 }}>
               <span style={{ fontSize: 18 }}>🔥</span>
               <span style={{ fontSize: 11, fontWeight: 800, color: '#FF8C42' }}>{streak}</span>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3 }}>дней</span>
+              <span style={{ fontSize: 8, color: T.textSec, textTransform: 'uppercase', letterSpacing: 0.3 }}>дней</span>
             </div>
           )}
         </div>
@@ -758,8 +758,8 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
               width: state === 'done' ? 18 : 16,
               height: state === 'done' ? 18 : 16,
               borderRadius: '50%',
-              background: state === 'done' ? 'linear-gradient(135deg, #FF8C42, #FF4500)' : state === 'today' ? 'rgba(255,140,66,0.2)' : 'rgba(255,255,255,0.1)',
-              border: state === 'today' ? '2px dashed rgba(255,140,66,0.6)' : state === 'done' ? '2px solid rgba(255,140,66,0.6)' : '1px solid rgba(255,255,255,0.12)',
+              background: state === 'done' ? 'linear-gradient(135deg, #FF8C42, #FF4500)' : state === 'today' ? 'rgba(255,140,66,0.2)' : T.border,
+              border: state === 'today' ? '2px dashed rgba(255,140,66,0.6)' : state === 'done' ? '2px solid rgba(255,140,66,0.6)' : `1px solid ${T.border}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 9, transition: 'all 0.3s',
               boxShadow: state === 'done' ? '0 0 6px rgba(255,140,66,0.4)' : 'none',
@@ -771,7 +771,7 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
 
         {/* Подсказка */}
         {scannedToday
-          ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{nextMilestone ? `До задания «${nextMilestone} дней»: ещё ${daysLeft}` : '🏆 Рекорд! Так держать!'}</div>
+          ? <div style={{ fontSize: 11, color: T.textSec }}>{nextMilestone ? `До задания «${nextMilestone} дней»: ещё ${daysLeft}` : '🏆 Рекорд! Так держать!'}</div>
           : <div style={{ fontSize: 11, color: '#FF8C42', fontWeight: 600 }}>Посети партнёра сегодня, чтобы не потерять серию</div>
         }
       </div>
@@ -857,7 +857,7 @@ function Skel({ w = '100%', h = 16, radius = 8, style: extra = {} }) {
   return (
     <div style={{
       width: w, height: h, borderRadius: radius, flexShrink: 0,
-      background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)',
+      background: `linear-gradient(90deg, ${T.border} 0%, rgba(201,168,76,0.08) 50%, ${T.border} 100%)`,
       backgroundSize: '200% 100%',
       animation: 'shimmer 1.5s ease-in-out infinite',
       ...extra,

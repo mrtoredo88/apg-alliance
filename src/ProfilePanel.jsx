@@ -338,7 +338,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
-  const progress = getLevelProgress(userKeys);
 
   const achievements = useMemo(() =>
     ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.cond(userKeys, favorites, referralCount) })),
