@@ -221,7 +221,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -656,6 +656,37 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           </div>
         </div>
       </div>
+
+      {/* ── Кабинет партнёра ── */}
+      {ownedPartner && onOpenPartnerCabinet && (
+        <div style={{ padding: '16px 16px 0' }}>
+          <button
+            onClick={onOpenPartnerCabinet}
+            style={{
+              width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: 0, background: 'none',
+              display: 'block', animation: 'fadeInUp 0.35s ease both',
+            }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.05))',
+              border: '1px solid rgba(201,168,76,0.35)', borderRadius: 20, padding: '14px 16px',
+              display: 'flex', alignItems: 'center', gap: 14,
+            }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0, overflow: 'hidden' }}>
+                {ownedPartner.logoUrl
+                  ? <img src={ownedPartner.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} onError={e => e.target.style.display='none'} />
+                  : ownedPartner.emoji ?? '🏪'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: T.gold, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 }}>Мой кабинет</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ownedPartner.name}</div>
+                <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>Статистика · Редактирование карточки</div>
+              </div>
+              <div style={{ color: T.gold, fontSize: 20, flexShrink: 0 }}>›</div>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* ── Настройки ── */}
       <div style={{ padding: '16px 16px 0' }}>

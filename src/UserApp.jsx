@@ -26,7 +26,8 @@ const OffersPage      = lazy(() => import('./OffersPage.jsx').then(m => ({ defau
 const TasksPage       = lazy(() => import('./TasksPage.jsx').then(m => ({ default: m.TasksPage })));
 const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ default: m.ReferralPage })));
 const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ default: m.RewardsPage })));
-const MapPage         = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
+const MapPage              = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
+const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(m => ({ default: m.PartnerCabinetPage })));
 
 function formatCacheAge(ts) {
   const mins = Math.round((Date.now() - ts) / 60000);
@@ -84,6 +85,7 @@ export function UserApp() {
   const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [userRank, setUserRank]                   = useState(null);
+  const [ownedPartner, setOwnedPartner]           = useState(null);
   const [appearance, setAppearance]             = useState('dark');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
@@ -229,6 +231,10 @@ export function UserApp() {
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
+      if (user && isMounted.current) {
+        const owned = freshPartners.find(p => p.vkOwnerId && String(p.vkOwnerId) === String(user.id));
+        setOwnedPartner(owned ?? null);
+      }
 
       const freshEvents = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setEvents(freshEvents);
@@ -377,6 +383,7 @@ export function UserApp() {
     setFavorites(next);
     try {
       await updateDoc(doc(db, 'users', String(user.id)), { favorites: next });
+      updateDoc(doc(db, 'partners', partnerId), { favoritesCount: increment(isAdding ? 1 : -1) }).catch(() => {});
       const partner = partners.find(p => p.id === partnerId);
       addDoc(collection(db, 'users', String(user.id), 'activity'), {
         type: isAdding ? 'favorite_add' : 'favorite_remove',
@@ -438,6 +445,7 @@ export function UserApp() {
 
     try {
       await updateDoc(doc(db, 'users', String(user.id)), updateData);
+      updateDoc(doc(db, 'partners', partner.id), { totalVisits: increment(1) }).catch(() => {});
       setLastScanDate(todayKey);
       setStreak(newStreak);
       setScanDates(newScanDates);
@@ -877,6 +885,8 @@ export function UserApp() {
                     onShare={handleShare}
                     onLogout={handleLogout}
                     onDeleteProfile={handleDeleteProfile}
+                    ownedPartner={ownedPartner}
+                    onOpenPartnerCabinet={() => goPanel('partner-cabinet')}
                   />
                 </Suspense>
               </Panel>
@@ -932,6 +942,16 @@ export function UserApp() {
                     completedTasks={completedTasks}
                     onBack={() => goPanel('profile')}
                     onShare={handleShare}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="partner-cabinet">
+                <Suspense fallback={<LazyFallback />}>
+                  <PartnerCabinetPage
+                    partner={ownedPartner}
+                    onBack={() => goPanel('profile')}
+                    onPartnerUpdate={(updated) => setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))}
                   />
                 </Suspense>
               </Panel>

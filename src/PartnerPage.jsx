@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Panel, HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge, { openUrl } from './vk.js';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 
@@ -149,6 +149,12 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
   const myReview = userId ? reviews.find(r => r.id === userId) : null;
+
+  // Считаем просмотр карточки (один раз при открытии каждого партнёра)
+  useEffect(() => {
+    if (!partner?.id) return;
+    updateDoc(doc(db, 'partners', partner.id), { viewCount: increment(1) }).catch(() => {});
+  }, [partner?.id]);
 
   useEffect(() => {
     if (!partner) return;

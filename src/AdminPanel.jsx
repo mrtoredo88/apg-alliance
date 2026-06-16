@@ -108,6 +108,7 @@ export const AdminPanel = () => {
   const [pSocial, setPSocial] = useState('');
   const [pOffer, setPOffer] = useState('');
   const [pStampTarget, setPStampTarget] = useState('');
+  const [pVkOwnerId, setPVkOwnerId] = useState('');
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -187,7 +188,7 @@ export const AdminPanel = () => {
   const resetPartnerForm = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
     setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
-    setPStampTarget('');
+    setPStampTarget(''); setPVkOwnerId('');
     setEditingPartner(null);
   };
 
@@ -197,6 +198,7 @@ export const AdminPanel = () => {
     setPEmoji(p.emoji ?? '🏪'); setPLogo(p.logoUrl ?? ''); setPPhone(p.phone ?? '');
     setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? '');
     setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
+    setPVkOwnerId(p.vkOwnerId ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -209,6 +211,7 @@ export const AdminPanel = () => {
       phone: pPhone.trim(), address: pAddress.trim(),
       hours: pHours.trim(), socialUrl: pSocial.trim(), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
+      vkOwnerId: pVkOwnerId.trim() || null,
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
@@ -606,6 +609,19 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Соцсеть / сайт</label>
             <input style={s.input} placeholder="https://vk.com/..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
+
+            <div style={{ background: '#FFF3CD', border: '1px solid #FFC107', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
+              <label style={{ ...s.label, color: '#856404', marginBottom: 6 }}>🔑 VK ID владельца заведения</label>
+              <input
+                style={{ ...s.input, marginBottom: 0, background: '#fff' }}
+                placeholder="Например: 123456789"
+                value={pVkOwnerId}
+                onChange={e => setPVkOwnerId(e.target.value)}
+              />
+              <div style={{ fontSize: 11, color: '#856404', marginTop: 4 }}>
+                Пользователь с этим VK ID получит доступ к статистике своего заведения в приложении
+              </div>
+            </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePartner}>
