@@ -111,7 +111,7 @@ function ReviewCard({ review, isOwn }) {
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
         {review.userPhoto
           ? <img src={review.userPhoto} alt="" style={{ width:32, height:32, borderRadius:'50%', objectFit:'cover', border:`1px solid ${isOwn ? T.gold+'44' : T.border}`, flexShrink:0 }} onError={e => e.target.style.display='none'} />
-          : <div style={{ width:32, height:32, borderRadius:'50%', background:'rgba(255,255,255,0.08)', border:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>👤</div>
+          : <div style={{ width:32, height:32, borderRadius:'50%', background:T.chipBg, border:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>👤</div>
         }
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -261,7 +261,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       {/* position:fixed — работает независимо от overflow контейнера Panel и VK UI анимаций */}
       <div style={{ position:'fixed', top:'var(--safe-top, 0px)', left:0, right:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
-          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
+          <button onClick={onBack} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
             {avgRating > 0 && (
@@ -272,7 +272,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               </div>
             )}
           </div>
-          <button onClick={handleShare} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
+          <button onClick={handleShare} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
           <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
             {isFavorite ? '♥' : '♡'}
           </button>
@@ -336,7 +336,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           const filled    = Math.min(stamps, target);
           const completed = stamps >= target;
           return (
-            <div style={{ margin:'12px 16px', borderRadius:24, padding:'16px', background: completed ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.05)', border:`1px solid ${completed ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.1)'}`, backdropFilter:'blur(20px)' }}>
+            <div style={{ margin:'12px 16px', borderRadius:24, padding:'16px', background: completed ? 'rgba(201,168,76,0.12)' : T.chipBg, border:`1px solid ${completed ? 'rgba(201,168,76,0.4)' : T.border}`, backdropFilter:'blur(20px)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                 <div style={{ fontSize:11, color: completed ? T.gold : T.textSec, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
                   🎟️ Штамп-карта
@@ -348,8 +348,8 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
                 {Array.from({ length: target }, (_, i) => (
                   <div key={i} style={{
-                    width:34, height:34, borderRadius:10, border:`2px solid ${i < filled ? T.gold : 'rgba(255,255,255,0.15)'}`,
-                    background: i < filled ? `linear-gradient(135deg,${T.gold},${T.goldL})` : 'rgba(255,255,255,0.04)',
+                    width:34, height:34, borderRadius:10, border:`2px solid ${i < filled ? T.gold : T.border}`,
+                    background: i < filled ? `linear-gradient(135deg,${T.gold},${T.goldL})` : T.chipBg,
                     display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0,
                     transition:'all 0.3s',
                     boxShadow: i < filled ? `0 0 8px rgba(201,168,76,0.45)` : 'none',
@@ -421,18 +421,18 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
                   onChange={e => setFormText(e.target.value)}
                   placeholder="Расскажите о своём визите..."
                   maxLength={400}
-                  style={{ width:'100%', background:'rgba(255,255,255,0.06)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:16, padding:'10px 12px', color:T.textPri, fontSize:13, resize:'none', minHeight:80, outline:'none', boxSizing:'border-box', fontFamily:'inherit', lineHeight:'18px' }}
+                  style={{ width:'100%', background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${T.border}`, borderRadius:16, padding:'10px 12px', color:T.textPri, fontSize:13, resize:'none', minHeight:80, outline:'none', boxSizing:'border-box', fontFamily:'inherit', lineHeight:'18px' }}
                 />
                 <div style={{ fontSize:10, color:T.textSec, textAlign:'right', marginTop:2 }}>{formText.length}/400</div>
               </div>
               <div style={{ display:'flex', gap:8 }}>
-                <button onClick={() => setShowForm(false)} style={{ flex:1, padding:'12px 0', borderRadius:14, background:'rgba(255,255,255,0.08)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:'1px solid rgba(255,255,255,0.12)', color:T.textPri, fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                <button onClick={() => setShowForm(false)} style={{ flex:1, padding:'12px 0', borderRadius:14, background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${T.border}`, color:T.textPri, fontSize:13, fontWeight:700, cursor:'pointer' }}>
                   Отмена
                 </button>
                 <button
                   onClick={submitReview}
                   disabled={formStars === 0 || submitting}
-                  style={{ flex:2, padding:'12px 0', borderRadius:14, border:'none', background: formStars === 0 ? 'rgba(255,255,255,0.07)' : `linear-gradient(135deg,${T.gold},${T.goldL})`, color: formStars === 0 ? T.textSec : '#0F0F1A', fontSize:13, fontWeight:800, cursor: formStars === 0 || submitting ? 'default' : 'pointer', opacity: submitting ? 0.7 : 1 }}
+                  style={{ flex:2, padding:'12px 0', borderRadius:14, border:'none', background: formStars === 0 ? T.chipBg : `linear-gradient(135deg,${T.gold},${T.goldL})`, color: formStars === 0 ? T.textSec : '#0F0F1A', fontSize:13, fontWeight:800, cursor: formStars === 0 || submitting ? 'default' : 'pointer', opacity: submitting ? 0.7 : 1 }}
                 >
                   {submitting ? 'Отправка...' : '⭐ Опубликовать'}
                 </button>
@@ -453,7 +453,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
           {/* Блок "только после скана" */}
           {!canReview && !reviewsLoading && (
-            <div style={{ background:'rgba(255,255,255,0.03)', border:`1px solid ${T.border}`, borderRadius:14, padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:14, padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:16, opacity:0.5 }}>◎</span>
               <span style={{ fontSize:12, color:T.textSec }}>Оставить отзыв можно после посещения — отсканируйте QR-код у партнёра</span>
             </div>
@@ -485,7 +485,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             <div style={{ ...GLASS, borderRadius:24, overflow:'hidden' }}>
               {infoRows.map((row,i) => (
                 <div key={row.label} onClick={row.onClick} style={{ padding:'14px 16px', display:'flex', alignItems:'center', gap:12, borderBottom:i<infoRows.length-1?`1px solid ${T.border}`:'none', cursor:row.onClick?'pointer':'default' }}>
-                  <div style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>{row.icon}</div>
+                  <div style={{ width:36, height:36, borderRadius:10, background:T.chipBg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>{row.icon}</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:11, color:T.textSec, marginBottom:2 }}>{row.label}</div>
                     <div style={{ fontSize:14, color:row.onClick?T.blue:T.textPri, fontWeight:500 }}>{row.value}</div>

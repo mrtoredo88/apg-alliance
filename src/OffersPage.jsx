@@ -89,7 +89,7 @@ function PartnerSearchCard({ partner, onOpenPartner, index, query }) {
         padding: '8px 14px', borderRadius: 12, border: 'none', cursor: 'pointer', flexShrink: 0,
         background: partner.offer
           ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
-          : 'rgba(255,255,255,0.08)',
+          : T.chipBg,
         color: partner.offer ? '#0F0F1A' : T.textPri,
         fontSize: 12, fontWeight: 700,
       }}>
@@ -198,7 +198,7 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
             {isSearching && (
               <button
                 onClick={() => { setSearch(''); inputRef.current?.focus(); }}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.textSec, fontSize: 12, padding: 0 }}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: T.chipBg, border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.textSec, fontSize: 12, padding: 0 }}
               >✕</button>
             )}
           </div>
@@ -226,7 +226,7 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
                 style={{
                   flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
                   fontSize: 12, fontWeight: 700,
-                  background: activeCategory === cat.id ? T.gold : 'rgba(255,255,255,0.07)',
+                  background: activeCategory === cat.id ? T.gold : T.chipBg,
                   color: activeCategory === cat.id ? '#0F0F1A' : T.textSec,
                   transition: 'background 0.2s, color 0.2s',
                 }}

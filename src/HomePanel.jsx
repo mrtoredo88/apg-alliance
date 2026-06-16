@@ -265,7 +265,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
           border: `1px solid ${isFavorite ? T.red : T.border}`,
           borderRadius: '50%', width: 22, height: 22,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', fontSize: 10, padding: 0, color: '#fff',
+          cursor: 'pointer', fontSize: 10, padding: 0, color: isFavorite ? '#fff' : T.textPri,
         }}>
           {isFavorite ? '♥' : '♡'}
         </button>
@@ -738,7 +738,7 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
   const flameSize = streak >= 30 ? 28 : streak >= 7 ? 24 : 20;
 
   return (
-    <div style={{ margin: '10px 16px 0', borderRadius: 24, padding: '14px 16px', background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', border: '1px solid rgba(255,100,0,0.22)', boxShadow: '0 8px 28px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 14, animation: 'fadeInUp 0.4s ease both' }}>
+    <div style={{ margin: '10px 16px 0', borderRadius: 24, padding: '14px 16px', background: T.chipBg, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', border: '1px solid rgba(255,100,0,0.22)', boxShadow: '0 8px 28px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 14, animation: 'fadeInUp 0.4s ease both' }}>
       {/* Иконка пламени */}
       <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: flameSize, flexShrink: 0 }}>
         🔥

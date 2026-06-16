@@ -104,7 +104,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
                 />
               </div>
             ) : (
-              <div style={{ width: 208, height: 208, borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>
+              <div style={{ width: 208, height: 208, borderRadius: 20, background: T.chipBg, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>
                 🔗
               </div>
             )}
@@ -125,7 +125,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
 
             <button
               onClick={handleCopy}
-              style={{ width: '100%', padding: '14px 0', borderRadius: 16, background: copied ? 'rgba(75,179,75,0.1)' : 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${copied ? 'rgba(75,179,75,0.4)' : 'rgba(255,255,255,0.12)'}`, color: copied ? T.green : T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.25s' }}
+              style={{ width: '100%', padding: '14px 0', borderRadius: 16, background: copied ? 'rgba(75,179,75,0.1)' : T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${copied ? 'rgba(75,179,75,0.4)' : T.border}`, color: copied ? T.green : T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.25s' }}
             >
               {copied ? '✓ Ссылка скопирована!' : '🔗 Скопировать ссылку'}
             </button>
@@ -141,8 +141,8 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
               const reached = referralCount >= m.count;
               const canClaim = reached && !done;
               return (
-                <div key={m.taskId} style={{ background: done ? 'rgba(75,179,75,0.05)' : canClaim ? 'rgba(201,168,76,0.07)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 16, padding: '14px 16px', border: `1px solid ${done ? 'rgba(75,179,75,0.2)' : canClaim ? 'rgba(201,168,76,0.35)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', gap: 14, opacity: done ? 0.7 : 1 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: done ? 'rgba(75,179,75,0.15)' : canClaim ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${done ? 'rgba(75,179,75,0.3)' : canClaim ? 'rgba(201,168,76,0.3)' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                <div key={m.taskId} style={{ background: done ? 'rgba(75,179,75,0.05)' : canClaim ? 'rgba(201,168,76,0.07)' : T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 16, padding: '14px 16px', border: `1px solid ${done ? 'rgba(75,179,75,0.2)' : canClaim ? 'rgba(201,168,76,0.35)' : T.border}`, display: 'flex', alignItems: 'center', gap: 14, opacity: done ? 0.7 : 1 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: done ? 'rgba(75,179,75,0.15)' : canClaim ? 'rgba(201,168,76,0.15)' : T.chipBg, border: `1px solid ${done ? 'rgba(75,179,75,0.3)' : canClaim ? 'rgba(201,168,76,0.3)' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
                     {done ? '✓' : '👥'}
                   </div>
                   <div style={{ flex: 1 }}>
@@ -156,7 +156,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
                       </div>
                     </div>
                   </div>
-                  <div style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: done ? T.textSec : T.gold, background: done ? 'rgba(255,255,255,0.05)' : 'rgba(201,168,76,0.12)', border: `1px solid ${done ? T.border : 'rgba(201,168,76,0.3)'}`, borderRadius: 10, padding: '4px 10px' }}>
+                  <div style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: done ? T.textSec : T.gold, background: done ? T.chipBg : 'rgba(201,168,76,0.12)', border: `1px solid ${done ? T.border : 'rgba(201,168,76,0.3)'}`, borderRadius: 10, padding: '4px 10px' }}>
                     +{m.reward} 🗝️
                   </div>
                 </div>
