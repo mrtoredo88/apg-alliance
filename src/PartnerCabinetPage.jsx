@@ -117,7 +117,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
   const viewCount      = partner.viewCount ?? 0;
   const favoritesCount = partner.favoritesCount ?? 0;
   const avgRating      = partner.avgRating ?? 0;
-  const ratingCount    = partner.ratingCount ?? reviews.length;
+  const ratingCount    = partner.reviewCount ?? reviews.length;
   const conversionPct  = viewCount > 0 ? Math.round((totalVisits / viewCount) * 100) : 0;
 
   const inputStyle = {
@@ -212,7 +212,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                       </div>
                       <div style={{ flex: 1 }}>
                         {[5,4,3,2,1].map(star => {
-                          const count = reviews.filter(r => r.rating === star).length;
+                          const count = reviews.filter(r => r.stars === star).length;
                           const pct = ratingCount > 0 ? (count / ratingCount) * 100 : 0;
                           return (
                             <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -233,7 +233,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                         {reviews.slice(0, 5).map(r => (
                           <div key={r.id} style={{ ...GLASS, borderRadius: 14, padding: '11px 13px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: r.text ? 5 : 0 }}>
-                              <Stars rating={r.rating} />
+                              <Stars rating={r.stars} />
                               <span style={{ fontSize: 10, color: T.textSec, marginLeft: 'auto' }}>
                                 {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}
                               </span>

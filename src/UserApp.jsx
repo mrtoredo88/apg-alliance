@@ -231,8 +231,8 @@ export function UserApp() {
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
-      if (user && isMounted.current) {
-        const owned = freshPartners.find(p => p.vkOwnerId && String(p.vkOwnerId) === String(user.id));
+      if (userData && isMounted.current) {
+        const owned = freshPartners.find(p => p.vkOwnerId && String(p.vkOwnerId) === String(userData.id));
         setOwnedPartner(owned ?? null);
       }
 
@@ -951,7 +951,10 @@ export function UserApp() {
                   <PartnerCabinetPage
                     partner={ownedPartner}
                     onBack={() => goPanel('profile')}
-                    onPartnerUpdate={(updated) => setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))}
+                    onPartnerUpdate={(updated) => {
+                      setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
+                      setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                    }}
                   />
                 </Suspense>
               </Panel>
