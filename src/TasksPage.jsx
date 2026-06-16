@@ -103,7 +103,7 @@ function TaskCard({ task, status, onClaim, claiming }) {
           style={{
             width: '100%', marginTop: 12, padding: '12px 0', borderRadius: 14, border: 'none',
             background: claiming === task.id
-              ? 'rgba(255,255,255,0.08)'
+              ? T.chipBg
               : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
             color: claiming === task.id ? T.textSec : '#0F0F1A',
             fontSize: 14, fontWeight: 800, cursor: claiming === task.id ? 'default' : 'pointer',
@@ -198,7 +198,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{
-            background: 'rgba(255,255,255,0.07)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
+            background: T.chipBg, border: `1px solid ${T.border}`,
             borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0,
           }}>‹</button>

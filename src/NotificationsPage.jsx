@@ -111,9 +111,9 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[1, 2, 3].map(i => (
               <div key={i} style={{ ...GLASS, borderRadius: 20, padding: '16px', animation: 'shimmer 1.5s ease-in-out infinite' }}>
-                <div style={{ width: '40%', height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 6, marginBottom: 8 }} />
-                <div style={{ width: '80%', height: 14, background: 'rgba(255,255,255,0.06)', borderRadius: 6, marginBottom: 6 }} />
-                <div style={{ width: '60%', height: 12, background: 'rgba(255,255,255,0.04)', borderRadius: 6 }} />
+                <div style={{ width: '40%', height: 10, background: T.chipBg, borderRadius: 6, marginBottom: 8 }} />
+                <div style={{ width: '80%', height: 14, background: T.chipBg, borderRadius: 6, marginBottom: 6 }} />
+                <div style={{ width: '60%', height: 12, background: T.border, borderRadius: 6 }} />
               </div>
             ))}
           </div>
