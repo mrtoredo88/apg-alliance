@@ -904,7 +904,7 @@ export function UserApp() {
               {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
               <Panel id="events">
                 <Suspense fallback={<LazyFallback />}>
-                  <EventsPage nav="events" events={events} onBack={() => goPanel('home')} />
+                  <EventsPage nav="events" events={events} onBack={() => goPanel('home')} appearance={appearance} />
                 </Suspense>
               </Panel>
 

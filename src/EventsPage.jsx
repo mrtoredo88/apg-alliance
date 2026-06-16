@@ -3,12 +3,19 @@ import { Panel } from '@vkontakte/vkui';
 
 import { T, GLASS, GLASS_STRONG } from './design.js';
 
-const GRADIENTS = [
+const GRADIENTS_DARK = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
   'linear-gradient(135deg, #1a3a1a, #2d6a3a)',
   'linear-gradient(135deg, #3a1a1a, #7a3030)',
   'linear-gradient(135deg, #2a1a3a, #5a2d7a)',
   'linear-gradient(135deg, #1a3a3a, #2d7a6a)',
+];
+const GRADIENTS_LIGHT = [
+  'linear-gradient(135deg, rgba(74,144,217,0.12), rgba(74,144,217,0.06))',
+  'linear-gradient(135deg, rgba(75,179,75,0.12), rgba(75,179,75,0.06))',
+  'linear-gradient(135deg, rgba(230,70,70,0.12), rgba(230,70,70,0.06))',
+  'linear-gradient(135deg, rgba(142,68,173,0.12), rgba(142,68,173,0.06))',
+  'linear-gradient(135deg, rgba(26,188,156,0.12), rgba(26,188,156,0.06))',
 ];
 
 function useCountdown(deadline) {
@@ -62,10 +69,10 @@ function EventModal({ event, onClose }) {
         width: '100%', padding: '24px 20px 48px',
         maxHeight: '85vh', overflowY: 'auto',
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 20px' }} />
+        <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '0 auto 20px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div style={{ fontSize: 52 }}>{event.emoji ?? '🎉'}</div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec }}>✕</button>
+          <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec }}>✕</button>
         </div>
         <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, marginBottom: 12, lineHeight: '26px' }}>{event.title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -94,7 +101,7 @@ function EventModal({ event, onClose }) {
           </div>
         )}
         {event.description && (
-          <div style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 14, padding: 14, marginBottom: 20, border: '1px solid rgba(255,255,255,0.12)' }}>
+          <div style={{ background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 14, padding: 14, marginBottom: 20, border: `1px solid ${T.border}` }}>
             <p style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', margin: 0 }}>{event.description}</p>
           </div>
         )}
@@ -109,7 +116,7 @@ function EventModal({ event, onClose }) {
               📲 Перейти к событию
             </button>
           )}
-          <button onClick={onClose} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: T.textSec, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textSec, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
             Закрыть
           </button>
         </div>
@@ -118,14 +125,15 @@ function EventModal({ event, onClose }) {
   );
 }
 
-function EventListCard({ event, index, onClick }) {
-  const grad = GRADIENTS[(event.id?.charCodeAt(0) ?? 0) % GRADIENTS.length];
+function EventListCard({ event, index, onClick, isDark = true }) {
+  const gradients = isDark ? GRADIENTS_DARK : GRADIENTS_LIGHT;
+  const grad = gradients[(event.id?.charCodeAt(0) ?? 0) % gradients.length];
   return (
     <div
       onClick={() => onClick(event)}
       style={{
         background: grad, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', borderRadius: 24, overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.13)', cursor: 'pointer',
+        border: `1px solid ${T.border}`, cursor: 'pointer',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
         display: 'flex', alignItems: 'stretch',
         animation: 'fadeInUp 0.4s ease both',
@@ -197,7 +205,8 @@ function EmptyState({ tab }) {
   );
 }
 
-export function EventsPage({ nav, events = [], onBack }) {
+export function EventsPage({ nav, events = [], onBack, appearance = 'dark' }) {
+  const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
 
@@ -233,7 +242,7 @@ export function EventsPage({ nav, events = [], onBack }) {
         ) : (
           <div style={{ padding: '8px 16px 80px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {list.map((event, i) => (
-              <EventListCard key={event.id} event={event} index={i} onClick={setSelectedEvent} />
+              <EventListCard key={event.id} event={event} index={i} onClick={setSelectedEvent} isDark={isDark} />
             ))}
           </div>
         )}

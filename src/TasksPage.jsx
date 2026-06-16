@@ -19,7 +19,7 @@ function TaskCard({ task, status, onClaim, claiming }) {
     ? 'rgba(75,179,75,0.05)'
     : status.ready
     ? 'rgba(201,168,76,0.07)'
-    : 'rgba(255,255,255,0.07)';
+    : T.chipBg;
 
   return (
     <div style={{
@@ -44,7 +44,7 @@ function TaskCard({ task, status, onClaim, claiming }) {
             ? 'rgba(75,179,75,0.12)'
             : status.ready
             ? 'rgba(201,168,76,0.15)'
-            : 'rgba(255,255,255,0.05)',
+            : T.chipBg,
           border: `1px solid ${status.done ? 'rgba(75,179,75,0.3)' : status.ready ? 'rgba(201,168,76,0.35)' : T.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: status.done ? 20 : 24,
@@ -62,7 +62,7 @@ function TaskCard({ task, status, onClaim, claiming }) {
             <div style={{
               flexShrink: 0, fontSize: 11, fontWeight: 800,
               color: status.done ? T.textSec : T.gold,
-              background: status.done ? 'rgba(255,255,255,0.05)' : 'rgba(201,168,76,0.12)',
+              background: status.done ? T.chipBg : 'rgba(201,168,76,0.12)',
               border: `1px solid ${status.done ? T.border : 'rgba(201,168,76,0.3)'}`,
               borderRadius: 10, padding: '3px 8px',
             }}>

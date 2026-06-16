@@ -23,9 +23,9 @@ function Stars({ rating }) {
 function StatCard({ icon, label, value, sub, color }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(28px)',
+      background: T.chipBg, backdropFilter: 'blur(28px)',
       WebkitBackdropFilter: 'blur(28px)', borderRadius: 20, padding: '14px 12px',
-      textAlign: 'center', border: `1px solid ${color ? color + '30' : 'rgba(255,255,255,0.12)'}`,
+      textAlign: 'center', border: `1px solid ${color ? color + '30' : T.border}`,
     }}>
       <div style={{ fontSize: 26, marginBottom: 5 }}>{icon}</div>
       <div style={{ fontSize: 24, fontWeight: 900, color: color ?? T.gold, lineHeight: 1 }}>{value}</div>
@@ -122,8 +122,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
 
   const inputStyle = {
     width: '100%', padding: '11px 13px', borderRadius: 12,
-    border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.06)', color: T.textPri,
+    border: `1px solid ${T.border}`,
+    background: T.chipBg, color: T.textPri,
     fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
   };
   const labelStyle = { fontSize: 12, color: T.textSec, marginBottom: 5, display: 'block', fontWeight: 600 };
@@ -138,7 +138,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
         borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', padding: '0 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
-          <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
+          <button onClick={onBack} style={{ background: T.chipBg, border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏪 {partner.name}</div>
             <div style={{ fontSize: 10, color: T.gold, marginTop: 1 }}>Личный кабинет партнёра</div>
@@ -150,7 +150,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
             <button key={id} onClick={() => setActiveTab(id)} style={{
               padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 700,
-              background: activeTab === id ? T.gold : 'rgba(255,255,255,0.07)',
+              background: activeTab === id ? T.gold : T.chipBg,
               color: activeTab === id ? '#0F0F1A' : T.textSec,
               transition: 'all 0.18s',
             }}>{label}</button>
@@ -218,7 +218,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                             <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                               <span style={{ fontSize: 10, color: T.textSec, width: 8 }}>{star}</span>
                               <span style={{ fontSize: 10, color: '#FFD700' }}>★</span>
-                              <div style={{ flex: 1, height: 5, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                              <div style={{ flex: 1, height: 5, borderRadius: 2, background: T.border, overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${pct}%`, background: T.gold, borderRadius: 2, transition: 'width 0.5s' }} />
                               </div>
                               <span style={{ fontSize: 10, color: T.textSec, width: 12 }}>{count}</span>
@@ -275,7 +275,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                   <button
                     onClick={() => logoInputRef.current?.click()}
                     disabled={uploading}
-                    style={{ padding: '7px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'rgba(255,255,255,0.07)', color: T.textPri, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}
+                    style={{ padding: '7px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}
                   >
                     {uploading ? 'Загрузка...' : '📷 Загрузить фото'}
                   </button>
