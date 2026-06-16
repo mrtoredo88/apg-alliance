@@ -201,8 +201,8 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
   const top3 = leaders.slice(0, 3);
   const rest = leaders.slice(3);
 
-  // Если текущий пользователь ниже 10 места — покажем его отдельно
-  const showCurrentUserSeparately = currentUserIndex >= 10;
+  // Если текущий пользователь ниже 50 места — покажем его отдельно (top3 + rest.slice(0,47) = 50)
+  const showCurrentUserSeparately = currentUserIndex >= 50;
 
   return (
     <Panel id={nav}>
