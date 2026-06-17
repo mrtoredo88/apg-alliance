@@ -66,6 +66,48 @@ const vkBridge = {
   unsubscribe: _vkBridge.unsubscribe?.bind(_vkBridge),
 };
 
+// VK OAuth для веб-браузера: открывает popup, ждёт токен, тянет данные пользователя
+export const vkWebLogin = () => new Promise((resolve, reject) => {
+  const REDIRECT = `${window.location.origin}/vk-auth.html`;
+  const authUrl = `https://oauth.vk.com/authorize?client_id=54601851&display=popup&redirect_uri=${encodeURIComponent(REDIRECT)}&scope=0&response_type=token&v=5.199`;
+  const popup = window.open(authUrl, 'vk_auth', 'width=620,height=540,left=200,top=80');
+
+  const onMessage = async ({ origin, data }) => {
+    if (origin !== window.location.origin) return;
+    if (!data || data.type !== 'vk_auth_callback') return;
+    window.removeEventListener('message', onMessage);
+    clearInterval(closedTimer);
+
+    const { access_token, user_id, error } = data;
+    if (error || !access_token) { reject(new Error(error || 'cancelled')); return; }
+
+    try {
+      const res = await fetch(
+        `https://api.vk.com/method/users.get?access_token=${access_token}&fields=photo_200&v=5.199&lang=ru`
+      );
+      const json = await res.json();
+      const u = json.response?.[0];
+      if (!u) throw new Error('no_user');
+      const userData = { id: u.id, first_name: u.first_name ?? 'Пользователь', last_name: u.last_name ?? '', photo_200: u.photo_200 ?? null };
+      localStorage.setItem('apg_web_user', JSON.stringify(userData));
+      resolve(userData);
+    } catch {
+      const userData = { id: parseInt(user_id, 10) || Date.now(), first_name: 'Пользователь', last_name: '', photo_200: null };
+      localStorage.setItem('apg_web_user', JSON.stringify(userData));
+      resolve(userData);
+    }
+  };
+
+  window.addEventListener('message', onMessage);
+  const closedTimer = setInterval(() => {
+    if (popup?.closed) {
+      clearInterval(closedTimer);
+      window.removeEventListener('message', onMessage);
+      reject(new Error('popup_closed'));
+    }
+  }, 500);
+});
+
 // Открывает URL из обработчика кнопки.
 // ВАЖНО: <a>.click() вызывается синхронно (пока есть контекст жеста пользователя),
 // иначе iOS WebView блокирует открытие новых окон.
