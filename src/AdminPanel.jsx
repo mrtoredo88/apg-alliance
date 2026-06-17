@@ -131,7 +131,69 @@ function EmojiPicker({ emojis, value, onChange }) {
   );
 }
 
+const ADMIN_PASSWORD = 'RealMadrid2025!';
+
+function PasswordGate({ onAllow }) {
+  const [pwd, setPwd]       = useState('');
+  const [shake, setShake]   = useState(false);
+  const [show, setShow]     = useState(false);
+
+  const check = () => {
+    if (pwd === ADMIN_PASSWORD) { onAllow(); }
+    else { setShake(true); setTimeout(() => setShake(false), 600); }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)', padding: 24,
+    }}>
+      <div style={{
+        background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(28px)',
+        borderRadius: 24, padding: 32, maxWidth: 360, width: '100%', textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        transform: shake ? 'translateX(0)' : 'none',
+        animation: shake ? 'shakeX 0.5s ease' : 'none',
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
+        <h2 style={{ color: '#F0F0F0', fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Панель управления</h2>
+        <p style={{ color: 'rgba(240,240,240,0.45)', fontSize: 13, margin: '0 0 24px' }}>АПГ — Альянс Партнёров Города</p>
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <input
+            type={show ? 'text' : 'password'}
+            placeholder="Введите пароль"
+            value={pwd}
+            onChange={e => setPwd(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && check()}
+            style={{
+              width: '100%', padding: '13px 44px 13px 16px', borderRadius: 14, boxSizing: 'border-box',
+              border: shake ? '1px solid #E64646' : '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.06)', color: '#F0F0F0', fontSize: 15, outline: 'none',
+              transition: 'border 0.2s',
+            }}
+          />
+          <button onClick={() => setShow(v => !v)} style={{
+            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+            background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0,
+          }}>{show ? '🙈' : '👁️'}</button>
+        </div>
+        {shake && <p style={{ color: '#E64646', fontSize: 12, margin: '0 0 12px' }}>Неверный пароль</p>}
+        <button onClick={check} style={{
+          width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', color: '#0F0F1A',
+          fontSize: 15, fontWeight: 700, boxShadow: '0 4px 16px rgba(201,168,76,0.35)',
+        }}>Войти</button>
+      </div>
+      <style>{`@keyframes shakeX {
+        0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)}
+        60%{transform:translateX(-6px)} 80%{transform:translateX(6px)}
+      }`}</style>
+    </div>
+  );
+}
+
 export const AdminPanel = () => {
+  const [authed, setAuthed]         = useState(false);
   const [partners, setPartners]     = useState([]);
   const [events, setEvents]         = useState([]);
   const [news, setNews]             = useState([]);
@@ -598,6 +660,8 @@ export const AdminPanel = () => {
     } catch (e) { console.error(e); }
     setAnalyticsLoading(false);
   }, [partners, analyticsLoading]);
+
+  if (!authed) return <PasswordGate onAllow={() => setAuthed(true)} />;
 
   return (
     <div style={s.page}>
