@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Avatar } from '@vkontakte/vkui';
-import vkBridge from './vk.js';
+import vkBridge, { isVK, vkWebLogin } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
@@ -295,6 +295,21 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {} }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [vkLoginLoading, setVkLoginLoading] = useState(false);
+  const [vkLoginError, setVkLoginError] = useState('');
+  const isGuest = !isVK() && String(user?.id ?? '').startsWith('guest_');
+
+  const handleVkLogin = async () => {
+    setVkLoginLoading(true);
+    setVkLoginError('');
+    try {
+      await vkWebLogin();
+      window.location.reload();
+    } catch (e) {
+      if (e.message !== 'popup_closed') setVkLoginError('Не удалось войти. Попробуйте ещё раз.');
+      setVkLoginLoading(false);
+    }
+  };
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -425,6 +440,43 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>✦ Профиль</div>
       </div>
+
+      {/* ── VK Login (веб-режим, гость) ── */}
+      {isGuest && (
+        <div style={{ margin: '14px 16px 0', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(0,119,255,0.25)', background: isDark ? 'rgba(0,80,200,0.1)' : 'rgba(0,100,255,0.07)' }}>
+          <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(0,119,255,0.15)', border: '1px solid rgba(0,119,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#0077FF">
+                  <path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.409 2.519h3.079c.701 0 1.092-.271.879-.951-.562-1.784-2.092-3.271-3.514-4.735-1.271-1.308-.879-1.953.122-3.294 1.438-1.918 3.608-5.004 2.087-5.004h-3.197c-.64 0-.949.455-1.192 1.004-.903 1.966-2.364 4.012-3.166 3.548-.645-.376-.523-1.472-.497-3.351.01-.79.01-1.666-1.12-1.87-.611-.111-1.236-.127-1.862-.008C9.498 4.658 8.389 6.026 7.829 6.9c-1.344 2.089-3.608 6.637-3.608 6.637s-.274.603.338.603h3.164c.604 0 .784-.335 1.036-1.002.394-1.05.898-2.177 1.498-3.054.578-.848 1.048-1.037 1.048-.278 0 .278-.04 1.476-.098 2.574-.113 2.126.405 2.897 1.955 2.614z"/>
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri }}>Войдите через ВКонтакте</div>
+                <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>чтобы сохранить прогресс и ключи</div>
+              </div>
+            </div>
+            <button
+              onClick={handleVkLogin}
+              disabled={vkLoginLoading}
+              style={{
+                width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
+                cursor: vkLoginLoading ? 'default' : 'pointer',
+                background: vkLoginLoading ? 'rgba(0,119,255,0.3)' : 'linear-gradient(135deg, #0077FF, #005DC1)',
+                color: '#fff', fontSize: 14, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: vkLoginLoading ? 'none' : '0 4px 16px rgba(0,119,255,0.35)',
+              }}
+            >
+              {vkLoginLoading
+                ? <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                : 'Войти через ВКонтакте'
+              }
+            </button>
+            {vkLoginError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{vkLoginError}</div>}
+          </div>
+        </div>
+      )}
 
       {/* ── Единая карточка профиля ── */}
       {(() => {

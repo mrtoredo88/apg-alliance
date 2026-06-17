@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
-import vkBridge, { isVK, vkWebLogin } from './vk.js';
+import vkBridge from './vk.js';
 import { db, auth } from './firebase';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
@@ -52,9 +52,6 @@ export function UserApp() {
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
   const [splashDone, setSplashDone]             = useState(false);
-  const [webLoginNeeded, setWebLoginNeeded]     = useState(() => !isVK() && !localStorage.getItem('apg_web_user'));
-  const [webLoginLoading, setWebLoginLoading]   = useState(false);
-  const [webLoginError, setWebLoginError]       = useState('');
   const [toast, setToast]                       = useState(null);
   const [scanDates, setScanDates]               = useState([]);
 
@@ -364,11 +361,10 @@ export function UserApp() {
   }, [pendingRefId]);
 
   useEffect(() => {
-    if (webLoginNeeded) return;
     const isMounted = { current: true };
     loadData(isMounted);
     return () => { isMounted.current = false; };
-  }, [loadData, webLoginNeeded]);
+  }, [loadData]);
 
   const handleRefresh = useCallback(async () => {
     const isMounted = { current: true };
@@ -802,64 +798,6 @@ export function UserApp() {
   );
 
   // ─── Render ─────────────────────────────────────────────────────────────────
-
-  if (webLoginNeeded) {
-    const handleVkLogin = async () => {
-      setWebLoginLoading(true);
-      setWebLoginError('');
-      try {
-        await vkWebLogin();
-        setWebLoginNeeded(false);
-      } catch (e) {
-        if (e.message !== 'popup_closed') setWebLoginError('Не удалось войти. Попробуйте ещё раз.');
-      } finally {
-        setWebLoginLoading(false);
-      }
-    };
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)', padding: 24,
-      }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(28px)',
-          borderRadius: 24, padding: 36, maxWidth: 360, width: '100%', textAlign: 'center',
-          border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
-        }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>🗝️</div>
-          <h2 style={{ color: '#F0F0F0', fontSize: 22, fontWeight: 800, margin: '0 0 6px' }}>АПГ</h2>
-          <p style={{ color: 'rgba(240,240,240,0.5)', fontSize: 14, margin: '0 0 28px', lineHeight: '1.5' }}>
-            Альянс Партнёров Города
-          </p>
-          <button
-            onClick={handleVkLogin}
-            disabled={webLoginLoading}
-            style={{
-              width: '100%', padding: '14px 0', borderRadius: 14, border: 'none', cursor: webLoginLoading ? 'default' : 'pointer',
-              background: webLoginLoading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #0077FF, #005DC1)',
-              color: '#fff', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: 10, transition: 'opacity 0.2s', boxShadow: webLoginLoading ? 'none' : '0 4px 20px rgba(0,119,255,0.4)',
-            }}
-          >
-            {webLoginLoading ? (
-              <span style={{ display: 'inline-block', width: 20, height: 20, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            ) : (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-                <path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.409 2.519h3.079c.701 0 1.092-.271.879-.951-.562-1.784-2.092-3.271-3.514-4.735-1.271-1.308-.879-1.953.122-3.294 1.438-1.918 3.608-5.004 2.087-5.004h-3.197c-.64 0-.949.455-1.192 1.004-.903 1.966-2.364 4.012-3.166 3.548-.645-.376-.523-1.472-.497-3.351.01-.79.01-1.666-1.12-1.87-.611-.111-1.236-.127-1.862-.008C9.498 4.658 8.389 6.026 7.829 6.9c-1.344 2.089-3.608 6.637-3.608 6.637s-.274.603.338.603h3.164c.604 0 .784-.335 1.036-1.002.394-1.05.898-2.177 1.498-3.054.578-.848 1.048-1.037 1.048-.278 0 .278-.04 1.476-.098 2.574-.113 2.126.405 2.897 1.955 2.614z"/>
-              </svg>
-            )}
-            {webLoginLoading ? 'Входим...' : 'Войти через ВКонтакте'}
-          </button>
-          {webLoginError && (
-            <p style={{ color: '#E64646', fontSize: 12, margin: '12px 0 0', textAlign: 'center' }}>{webLoginError}</p>
-          )}
-          <p style={{ color: 'rgba(240,240,240,0.3)', fontSize: 11, margin: '20px 0 0', lineHeight: '1.5' }}>
-            Нажимая кнопку, вы разрешаете приложению получить доступ к вашему профилю ВКонтакте
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <ConfigProvider appearance={appearance}>
