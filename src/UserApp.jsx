@@ -313,7 +313,7 @@ export function UserApp() {
         if (data.lastBonusDate !== todayKey) {
           updateDoc(userRef, { keys: increment(1), lastBonusDate: todayKey, ...profilePatch }).catch(() => {});
           setUserKeys(keys + 1);
-          if (isMounted.current) setTimeout(() => { setToast({ msg: '🎁 Ежедневный бонус — +1 ключ!', type: 'success' }); setTimeout(() => setToast(null), 3000); }, 1500);
+          setTimeout(() => { if (isMounted.current) { setToast({ msg: '🎁 Ежедневный бонус — +1 ключ!', type: 'success' }); setTimeout(() => { if (isMounted.current) setToast(null); }, 3000); } }, 1500);
         } else {
           updateDoc(userRef, profilePatch).catch(() => {});
         }

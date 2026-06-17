@@ -207,7 +207,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       setReviews(allReviews);
 
       // Считаем новый средний рейтинг
-      const avg = allReviews.reduce((s, r) => s + (r.stars ?? 0), 0) / allReviews.length;
+      const avg = allReviews.length > 0 ? allReviews.reduce((s, r) => s + (r.stars ?? 0), 0) / allReviews.length : 0;
       const newAvg = Math.round(avg * 10) / 10;
       const newCount = allReviews.length;
       await updateDoc(doc(db, 'partners', partner.id), { avgRating: newAvg, reviewCount: newCount });
