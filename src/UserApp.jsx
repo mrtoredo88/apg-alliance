@@ -122,9 +122,11 @@ export function UserApp() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // Sync data-theme attribute with appearance state
+  // Sync data-theme attribute and meta theme-color with appearance state
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', appearance);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', appearance === 'light' ? '#F0F2F5' : '#0F0F1A');
   }, [appearance]);
 
   // VK статусбар — обновляем safe-area инсеты
@@ -285,7 +287,7 @@ export function UserApp() {
         photo:     userData.photo_200  ?? null,
       };
 
-      const todayKey = new Date().toISOString().slice(0, 10);
+      const todayKey = new Date().toLocaleDateString('sv');
 
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -426,7 +428,7 @@ export function UserApp() {
     }
 
     const alreadyHasKey   = !!scannedPartnerIds[partner.id];
-    const todayKey        = new Date().toISOString().slice(0, 10);
+    const todayKey        = new Date().toLocaleDateString('sv');
     const alreadyToday    = lastScanDate === todayKey;
 
     // Ключ за этого партнёра уже получен И сегодня уже отмечались — ничего не делаем
@@ -437,7 +439,7 @@ export function UserApp() {
       return;
     }
 
-    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const yesterdayKey = new Date(Date.now() - 86400000).toLocaleDateString('sv');
     const newStreak  = alreadyToday ? streak : (lastScanDate === yesterdayKey ? streak + 1 : 1);
     const keyBonus   = (!alreadyHasKey && partner.featured) ? 2 : 1;
     const newScanDates = scanDates.includes(todayKey)

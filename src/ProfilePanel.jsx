@@ -247,7 +247,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   const cells = Array.from({ length: days }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() - (days - 1 - i));
-    const key = d.toISOString().slice(0, 10);
+    const key = d.toLocaleDateString('sv');
     const isToday = i === days - 1;
     return { key, active: dateSet.has(key), isToday, dayNum: d.getDate() };
   });
