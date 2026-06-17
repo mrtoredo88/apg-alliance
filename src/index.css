@@ -48,22 +48,25 @@
   --vkui--color_background_app:     transparent;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overscroll-behavior: none;
+}
+
+/* Gradient on html (fixed-position backdrop) so it never moves during scroll */
 html {
-  height: 100%;
   background:
     radial-gradient(ellipse at 50% 0%,   var(--c-orb-top) 0%, transparent 55%),
     radial-gradient(ellipse at 50% 100%, var(--c-orb-bot) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%),
     var(--c-bg, #08081A);
-  overscroll-behavior: none;
+  background-attachment: fixed;
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
   background: transparent;
-  overscroll-behavior: none;
 }
 
 #root {
