@@ -53,18 +53,19 @@ html, body {
   padding: 0;
   min-height: 100vh;
   overscroll-behavior: none;
-}
-
-/* Цвет оверскролла на iOS (зона резинки выше/ниже контента) */
-html {
-  background-color: var(--c-bg, #08081A);
+  /* Градиент на html/body — виден сквозь прозрачный VK UI стек */
+  background:
+    radial-gradient(ellipse at 50% 0%,   var(--c-orb-top) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, var(--c-orb-bot) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%),
+    var(--c-bg, #08081A);
 }
 
 body, #root {
   background: transparent;
 }
 
-/* VK UI — весь стек прозрачный, чтобы depth orbs просвечивали */
+/* VK UI — весь стек прозрачный, чтобы html-градиент просвечивал */
 .vkuiPanel,
 .vkuiAppRoot,
 .vkuiAppRoot__wrapper,
@@ -81,10 +82,14 @@ body, #root {
   background-color: transparent !important;
 }
 
-/* Скроллируемый контейнер панели: прозрачный — body-градиент просвечивает */
+/* Скролл-контейнер панели: тот же градиент чтобы оверскролл тоже выглядел правильно.
+   Элемент всегда = высота вьюпорта (VKUI), поэтому позиции 50%/0% и 50%/100% корректны. */
 .vkuiPanel__in {
-  background: transparent !important;
-  background-color: transparent !important;
+  background:
+    radial-gradient(ellipse at 50% 0%,   var(--c-orb-top) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, var(--c-orb-bot) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%),
+    var(--c-bg, #08081A) !important;
   overscroll-behavior: none;
 }
 
