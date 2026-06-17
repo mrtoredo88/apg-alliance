@@ -91,6 +91,11 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
 
   const handleSave = async () => {
     if (!partner?.id) return;
+    const phone = fPhone.trim();
+    if (phone && !/^[+\d()\s\-]{7,16}$/.test(phone)) {
+      alert('Некорректный формат номера телефона.\nПример: +7 (999) 123-45-67');
+      return;
+    }
     setSaving(true);
     try {
       const data = {

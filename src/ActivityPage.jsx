@@ -92,6 +92,7 @@ function ActivityItem({ item, index }) {
 export function ActivityPage({ nav, userId, onBack }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (!userId || userId === 'guest') { setLoading(false); return; }
@@ -106,6 +107,7 @@ export function ActivityPage({ nav, userId, onBack }) {
         setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
         console.error(e);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -136,6 +138,14 @@ export function ActivityPage({ nav, userId, onBack }) {
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: T.gold, animation: 'pulse-glow 2s ease-in-out infinite' }}>✦</div>
             </div>
             <span style={{ color: T.textSec, fontSize: 14 }}>Загружаем историю...</span>
+          </div>
+        ) : loadError ? (
+          <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+            <div style={{ fontSize: 48 }}>⚠️</div>
+            <div>
+              <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Ошибка загрузки</div>
+              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Не удалось загрузить историю. Проверьте соединение и попробуйте снова.</div>
+            </div>
           </div>
         ) : items.length === 0 ? (
           <div style={{ margin: '32px 16px', ...GLASS, borderRadius: 24, padding: '36px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>

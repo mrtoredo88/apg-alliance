@@ -11,13 +11,14 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
 function Avatar({ photo, name, size = 40 }) {
+  const [imgError, setImgError] = React.useState(false);
   const initials = (name ?? '?')[0].toUpperCase();
-  if (photo) {
+  if (photo && !imgError) {
     return (
       <img
         src={photo} alt=""
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-        onError={e => { e.target.style.display = 'none'; }}
+        onError={() => setImgError(true)}
       />
     );
   }

@@ -36,6 +36,7 @@ function matchesTarget(notif, userKeys, lastScanDate) {
 export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
   const [allNotifications, setAllNotifications] = useState(propNotifications ?? []);
   const [loading, setLoading] = useState(!propNotifications);
+  const [loadError, setLoadError] = useState(false);
   const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
       try {
         const snap = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')));
         setAllNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch {}
+      } catch { setLoadError(true); }
       setLoading(false);
     })();
   }, [propNotifications]);
@@ -107,6 +108,12 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
         )}
 
         {/* Список уведомлений */}
+        {loadError && (
+          <div style={{ ...GLASS, borderRadius: 16, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, border: '1px solid rgba(220,53,69,0.25)' }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span style={{ fontSize: 13, color: T.textSec }}>Не удалось загрузить уведомления. Проверьте соединение.</span>
+          </div>
+        )}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[1, 2, 3].map(i => (

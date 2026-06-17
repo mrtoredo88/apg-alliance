@@ -92,7 +92,9 @@ export const vkWebLogin = () => new Promise((resolve, reject) => {
       localStorage.setItem('apg_web_user', JSON.stringify(userData));
       resolve(userData);
     } catch {
-      const userData = { id: parseInt(user_id, 10) || Date.now(), first_name: 'Пользователь', last_name: '', photo_200: null };
+      const uid = parseInt(user_id, 10);
+      if (!uid) { reject(new Error('auth_failed')); return; }
+      const userData = { id: uid, first_name: 'Пользователь', last_name: '', photo_200: null };
       localStorage.setItem('apg_web_user', JSON.stringify(userData));
       resolve(userData);
     }
