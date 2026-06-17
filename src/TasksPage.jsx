@@ -213,7 +213,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Прогресс */}
         <div style={{ ...GLASS, borderRadius: 24, padding: '16px', marginBottom: 16 }}>

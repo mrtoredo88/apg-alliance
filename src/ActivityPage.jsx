@@ -127,7 +127,7 @@ export function ActivityPage({ nav, userId, onBack }) {
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', paddingBottom: 80 }}>
+      <div style={{ background: 'transparent', minHeight: '100%', paddingBottom: 80 }}>
 
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 280, flexDirection: 'column', gap: 16 }}>

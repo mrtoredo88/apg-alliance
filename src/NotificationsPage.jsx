@@ -77,7 +77,7 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* VK push-баннер */}
         {!notificationsEnabled && (

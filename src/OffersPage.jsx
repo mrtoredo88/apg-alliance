@@ -238,7 +238,7 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
         )}
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* ── Режим поиска ── */}
         {isSearching ? (

@@ -236,7 +236,7 @@ export function EventsPage({ nav, events = [], onBack, appearance = 'dark' }) {
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%' }}>
+      <div style={{ background: 'transparent', minHeight: '100%' }}>
         {list.length === 0 ? (
           <EmptyState tab={tab} />
         ) : (

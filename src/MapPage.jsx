@@ -127,7 +127,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
       </div>
 
       {/* Список ниже карты */}
-      <div style={{ background: T.bg, minHeight: 'calc(100% - 316px)', paddingBottom: 80 }}>
+      <div style={{ background: 'transparent', minHeight: 'calc(100% - 316px)', paddingBottom: 80 }}>
 
         {/* Поиск */}
         <div style={{ padding: '12px 16px 8px' }}>

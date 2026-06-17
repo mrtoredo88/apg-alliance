@@ -398,7 +398,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   };
 
   return (
-    <div style={{ background: T.bg, minHeight: '100%' }}>
+    <div style={{ background: 'transparent', minHeight: '100%' }}>
 
       {/* ── Toast достижения ── */}
       {achievementToast && (

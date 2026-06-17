@@ -282,7 +282,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
         </div>
       </div>
 
-      <div style={{ background: T.bg }}>
+      <div style={{ background: 'transparent' }}>
         {/* Отступ для фиксированного хедера */}
         <div style={{ height:52 }} />
 

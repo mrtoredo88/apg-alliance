@@ -194,7 +194,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Баланс-карточка */}
         <div style={{ ...GLASS_GOLD, borderRadius: 24, padding: '16px 20px', marginBottom: userKeys === 0 ? 12 : 20, display: 'flex', alignItems: 'center', gap: 16 }}>

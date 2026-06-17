@@ -158,7 +158,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* ── СТАТИСТИКА ── */}
         {activeTab === 'stats' && (

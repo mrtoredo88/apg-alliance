@@ -1181,7 +1181,7 @@ export function HomePanel({
         overflow: 'hidden',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         transition: (isRefreshing || pullY === 0) ? 'height 0.3s ease' : 'none',
-        background: T.bg, pointerEvents: 'none',
+        background: 'transparent', pointerEvents: 'none',
       }}>
         {(pullY > 12 || isRefreshing) && (
           <>
@@ -1203,7 +1203,7 @@ export function HomePanel({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ background: T.bg, minHeight: '100%' }}
+        style={{ background: 'transparent', minHeight: '100%' }}
       >
 
         {loading && <SkeletonHome />}

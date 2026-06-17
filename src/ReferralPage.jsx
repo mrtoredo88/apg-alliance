@@ -53,7 +53,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
         </div>
       </div>
 
-      <div style={{ background: T.bg, minHeight: '100%', padding: '12px 16px 90px' }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
         {/* Hero */}
         <div style={{ borderRadius: 24, background: T.surface, padding: '24px 20px', position: 'relative', overflow: 'hidden', border: '1px solid rgba(74,144,217,0.3)', marginBottom: 16, animation: 'fadeInUp 0.4s ease both' }}>
