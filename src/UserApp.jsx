@@ -803,6 +803,17 @@ export function UserApp() {
     <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
         <AppRoot>
+          {/* Градиент рендерится внутри React-дерева — гарантированно виден сквозь прозрачные VK UI панели */}
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 0, pointerEvents: 'none',
+            background: [
+              'radial-gradient(ellipse at 50% 0%, var(--c-orb-top) 0%, transparent 55%)',
+              'radial-gradient(ellipse at 50% 100%, var(--c-orb-bot) 0%, transparent 50%)',
+              'radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%)',
+              'var(--c-bg, #08081A)',
+            ].join(', '),
+          }} />
           <div
             style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1 }}
             onTouchStart={handleSwipeStart}
