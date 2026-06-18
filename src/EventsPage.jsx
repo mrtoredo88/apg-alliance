@@ -184,7 +184,7 @@ function EventListCard({ event, index, onClick, isDark = true }) {
 }
 
 function isEventPast(event) {
-  const dateStr = event.deadline; // только ISO-поле, eventDate — только для отображения
+  const dateStr = event.deadline ?? event.eventDate;
   if (!dateStr) return false;
   const d = new Date(dateStr.length <= 10 ? dateStr + 'T23:59:59' : dateStr);
   return !isNaN(d) && d.getTime() < Date.now();

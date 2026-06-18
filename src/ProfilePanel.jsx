@@ -375,6 +375,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     const timer = setTimeout(() => dismissToast(), 4000);
     return () => clearTimeout(timer);
   }, [achievements, dismissToast]);
+  useEffect(() => () => clearTimeout(dismissTimerRef.current), []);
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const favoritePartners = useMemo(() => partners.filter(p => favorites.includes(p.id)), [partners, favorites]);
 

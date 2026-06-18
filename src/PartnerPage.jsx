@@ -230,7 +230,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       const msg = `Побывал у партнёра АПГ «${partner.name}» — ${stars}\n${formText.trim() ? formText.trim() + '\n' : ''}\n#АПГ_Зеленоград`;
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
     } catch (e) { console.error(e); setReviewError('Ошибка отправки. Проверьте соединение.'); }
-    setSubmitting(false);
+    if (mountedRef.current) setSubmitting(false);
   }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate]);
 
   if (!partner) return null;
@@ -401,7 +401,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             <div style={{ fontSize:13, color:T.gold, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
               ✦ Отзывы {reviewCount > 0 && `· ${reviewCount}`}
             </div>
-            {canReview && !showForm && (!submitDone || myReview) && (
+            {canReview && !showForm && !submitDone && (
               <button
                 onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }}
                 style={{ fontSize:12, fontWeight:700, color:T.gold, background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', borderRadius:10, padding:'5px 12px', cursor:'pointer' }}

@@ -27,21 +27,21 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
   const refLink = user?.id ? `https://vk.com/app${APP_ID}#ref_${user.id}` : `https://vk.com/app${APP_ID}`;
 
   const handleCopy = async () => {
+    let ok = false;
     try {
       await vkBridge.send('VKWebAppCopyText', { text: refLink });
+      ok = true;
     } catch {
-      try { await navigator.clipboard.writeText(refLink); } catch {}
+      try { await navigator.clipboard.writeText(refLink); ok = true; } catch {}
     }
+    if (!ok) return;
     setCopied(true);
     clearTimeout(copyTimerRef.current);
     copyTimerRef.current = setTimeout(() => setCopied(false), 2500);
   };
 
   const handleShare = () => {
-    vkBridge.send('VKWebAppShare', {
-      link: refLink,
-      text: '🗝️ Присоединяйся к АПГ — Альянсу Партнёров Зеленограда! Оба получим по +2 ключа!',
-    }).catch(() => {});
+    vkBridge.send('VKWebAppShare', { link: refLink }).catch(() => {});
   };
 
   const milestoneKeys = MILESTONES
@@ -80,7 +80,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
               <div style={{ flex: 1, background: 'rgba(74,144,217,0.12)', border: '1px solid rgba(74,144,217,0.3)', borderRadius: 16, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 28, fontWeight: 900, color: T.textPri, lineHeight: 1 }}>{referralCount}</div>
                 <div style={{ fontSize: 11, color: T.textSec, marginTop: 4 }}>
-                  {referralCount === 1 ? 'друг пришёл' : referralCount >= 2 && referralCount <= 4 ? 'друга пришли' : 'друзей пришло'}
+                  {(() => { const n = referralCount % 100, n1 = n % 10; if (n >= 11 && n <= 19) return 'друзей пришло'; if (n1 === 1) return 'друг пришёл'; if (n1 >= 2 && n1 <= 4) return 'друга пришли'; return 'друзей пришло'; })()}
                 </div>
               </div>
               <div style={{ flex: 1, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 16, padding: '12px', textAlign: 'center' }}>

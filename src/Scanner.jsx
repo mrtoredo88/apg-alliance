@@ -30,6 +30,7 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
       doneRef.current = false;
       setErr(null);
       setTorchOn(false);
+      setHasTorch(false);
       return;
     }
 

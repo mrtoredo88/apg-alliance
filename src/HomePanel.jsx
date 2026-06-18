@@ -219,7 +219,7 @@ function PartnerLogo({ partner, size = 56 }) {
 function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 }) {
   const isNew = (() => {
     if (!partner.createdAt) return false;
-    const ts = partner.createdAt.toDate ? partner.createdAt.toDate() : new Date(partner.createdAt.seconds * 1000);
+    const ts = partner.createdAt.toDate ? partner.createdAt.toDate() : new Date(partner.createdAt);
     return Date.now() - ts.getTime() < 14 * 24 * 60 * 60 * 1000;
   })();
 
@@ -511,8 +511,6 @@ function NewsWidget({ news }) {
     setOffset(0);
     setIsDragging(false);
   }, [news.length]);
-
-  useEffect(() => { idxRef.current = idx; }, [idx]);
 
   // Non-passive touchmove: prevents page scroll while swiping inside the widget
   useEffect(() => {
@@ -1159,7 +1157,7 @@ export function HomePanel({
   }, [userKeys, favorites.length, referralCount, streak, scannedCount, completedTasks, customTasks]);
 
   const isSearching = searchQuery.trim().length > 0;
-  const filteredPartners = partners
+  const filteredPartners = useMemo(() => partners
     .filter(p => isSearching || activeCategory === 'all' || p.category === activeCategory)
     .filter(p => !isSearching || (() => {
       const q = searchQuery.trim().toLowerCase();
@@ -1167,7 +1165,7 @@ export function HomePanel({
         p.description?.toLowerCase().includes(q) ||
         p.categoryLabel?.toLowerCase().includes(q) ||
         p.offer?.toLowerCase().includes(q);
-    })());
+    })()), [partners, isSearching, activeCategory, searchQuery]);
 
   return (
     <Panel id="home">

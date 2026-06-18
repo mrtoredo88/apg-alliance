@@ -43,7 +43,7 @@ const send = async (method, params = {}) => {
         throw new Error('web_mode');
 
       case 'VKWebAppJoinGroup':
-        window.open(`https://vk.com/public${params.group_id}`, '_blank', 'noopener,noreferrer');
+        window.open(`https://vk.com/club${params.group_id}`, '_blank', 'noopener,noreferrer');
         throw new Error('web_mode');
 
       case 'VKWebAppGetAuthToken':

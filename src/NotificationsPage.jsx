@@ -45,13 +45,15 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
       setLoading(false);
       return;
     }
+    let cancelled = false;
     (async () => {
       try {
         const snap = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')));
-        setAllNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch { setLoadError(true); }
-      setLoading(false);
+        if (!cancelled) setAllNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch { if (!cancelled) setLoadError(true); }
+      if (!cancelled) setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [propNotifications]);
 
   const notifications = allNotifications.filter(n => matchesTarget(n, userKeys, lastScanDate));

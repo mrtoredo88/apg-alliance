@@ -323,7 +323,7 @@ export function UserApp() {
         if (data.lastBonusDate !== todayKey) {
           updateDoc(userRef, { keys: increment(1), lastBonusDate: todayKey, ...profilePatch }).catch(() => {});
           setUserKeys(keys + 1);
-          setTimeout(() => { if (isMounted.current) { setToast({ msg: '🎁 Ежедневный бонус — +1 ключ!', type: 'success' }); setTimeout(() => { if (isMounted.current) setToast(null); }, 3000); } }, 1500);
+          setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
         } else {
           updateDoc(userRef, profilePatch).catch(() => {});
         }
@@ -775,7 +775,7 @@ export function UserApp() {
     { id: 'profile', label: 'Профиль', icon: TabProfileIcon },
   ];
 
-  const TabBar = () => (
+  const tabBarEl = (
     <div style={{
       position: 'fixed', bottom: 16,
       left: '50%', transform: 'translateX(-50%)',
@@ -1054,7 +1054,7 @@ export function UserApp() {
             </View>
           </div>
 
-          {createPortal(<TabBar />, document.body)}
+          {createPortal(tabBarEl, document.body)}
 
           <Suspense fallback={null}>
             <ScannerComponent
