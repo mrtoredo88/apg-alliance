@@ -1098,18 +1098,19 @@ export function UserApp() {
                 </Suspense>
               </Panel>
 
-              <Suspense fallback={<Panel id="notifications"><LazyFallback /></Panel>}>
-                <NotificationsPage
-                  nav="notifications"
-                  notifications={notifications}
-                  notificationsEnabled={notifEnabled}
-                  onEnableNotifications={handleEnableNotifications}
-                  lastSeenTs={lastSeenTs}
-                  userKeys={userKeys}
-                  lastScanDate={lastScanDate}
-                  onBack={() => goPanel('home')}
-                />
-              </Suspense>
+              <Panel id="notifications">
+                <Suspense fallback={<LazyFallback />}>
+                  <NotificationsPage
+                    notifications={notifications}
+                    notificationsEnabled={notifEnabled}
+                    onEnableNotifications={handleEnableNotifications}
+                    lastSeenTs={lastSeenTs}
+                    userKeys={userKeys}
+                    lastScanDate={lastScanDate}
+                    onBack={() => goPanel('home')}
+                  />
+                </Suspense>
+              </Panel>
 
             </View>
           </div>

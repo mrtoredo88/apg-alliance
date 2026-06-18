@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Panel } from '@vkontakte/vkui';
+
+
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
@@ -71,7 +72,7 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
   };
 
   return (
-    <Panel id="notifications">
+    <>
       {/* Хедер */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
@@ -158,6 +159,6 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
           </div>
         )}
       </div>
-    </Panel>
+    </>
   );
 }
