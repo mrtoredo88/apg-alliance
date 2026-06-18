@@ -661,7 +661,10 @@ export function UserApp() {
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       }
     } else {
-      if (userKeys < (event.minKeys ?? 0)) return;
+      if (event.isPrivate && userKeys < (event.minKeys ?? 0)) {
+        showToast(`Нужно ещё ${(event.minKeys ?? 0) - userKeys} ключей для этого мероприятия`);
+        return;
+      }
       const next = [...registeredEventIds, eventId];
       setRegisteredEventIds(next);
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
