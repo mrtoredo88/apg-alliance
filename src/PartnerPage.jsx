@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Panel, HorizontalScroll } from '@vkontakte/vkui';
+import { HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge, { openUrl } from './vk.js';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
@@ -233,15 +233,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     if (mountedRef.current) setSubmitting(false);
   }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate]);
 
-  if (!partner) return (
-    <Panel id="partner">
-      <div style={{ position: 'fixed', top: 'var(--safe-top, 0px)', left: 0, right: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: `1px solid ${T.headerBorder}`, padding: '0 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', height: 52 }}>
-          <button onClick={onBack} style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
-        </div>
-      </div>
-    </Panel>
-  );
+  if (!partner) return null;
 
   const photos = partner.photos ?? [];
   const similar = partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6);
@@ -277,8 +269,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const ratingLabel = avg => avg >= 4.7 ? 'Отлично' : avg >= 4.0 ? 'Хорошо' : avg >= 3.0 ? 'Неплохо' : avg >= 2.0 ? 'Так себе' : 'Плохо';
 
   return (
-    <Panel id="partner">
-      {/* position:fixed — работает независимо от overflow контейнера Panel и VK UI анимаций */}
+    <>
       <div style={{ position:'fixed', top:'var(--safe-top, 0px)', left:0, right:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
           <button onClick={onBack} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
@@ -570,6 +561,6 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       {lightboxIdx !== null && (
         <PhotoLightbox photos={photos} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
-    </Panel>
+    </>
   );
 }

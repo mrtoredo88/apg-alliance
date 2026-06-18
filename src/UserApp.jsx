@@ -956,21 +956,22 @@ export function UserApp() {
                 onJoinGroup={handleJoinGroup}
               />
 
-              <Suspense fallback={<Panel id="partner"><LazyFallback /></Panel>}>
-                <PartnerPage
-                  nav="partner"
-                  partner={activePartner}
-                  isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
-                  onBack={() => goPanel('home')}
-                  onToggleFavorite={toggleFavorite}
-                  onOpenPartner={openPartner}
-                  partners={enrichedPartners}
-                  user={user}
-                  scannedPartnerIds={scannedPartnerIds}
-                  visitCounts={visitCounts}
-                  onPartnerUpdate={handlePartnerUpdate}
-                />
-              </Suspense>
+              <Panel id="partner">
+                <Suspense fallback={<LazyFallback />}>
+                  <PartnerPage
+                    partner={activePartner}
+                    isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
+                    onBack={() => goPanel('home')}
+                    onToggleFavorite={toggleFavorite}
+                    onOpenPartner={openPartner}
+                    partners={enrichedPartners}
+                    user={user}
+                    scannedPartnerIds={scannedPartnerIds}
+                    visitCounts={visitCounts}
+                    onPartnerUpdate={handlePartnerUpdate}
+                  />
+                </Suspense>
+              </Panel>
 
               {/* ProfilePanel не рендерит Panel — оборачиваем */}
               <Panel id="profile">
