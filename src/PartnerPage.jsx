@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Panel, HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge, { openUrl } from './vk.js';
@@ -146,6 +146,9 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const [submitDone, setSubmitDone]       = useState(false);
   const [reviewError, setReviewError]     = useState('');
   const [phoneCopied, setPhoneCopied]     = useState(false);
+  const phoneCopyTimerRef                 = useRef(null);
+  const mountedRef                        = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; clearTimeout(phoneCopyTimerRef.current); }; }, []);
 
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
@@ -159,6 +162,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   useEffect(() => {
     if (!partner) return;
+    let cancelled = false;
     setReviews([]);
     setReviewsLoading(true);
     setShowForm(false);
@@ -173,10 +177,12 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           collection(db, 'partners', partner.id, 'reviews'),
           orderBy('createdAt', 'desc'),
         ));
-        setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (!cancelled) setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) { console.error(e); }
-      setReviewsLoading(false);
+      if (!cancelled) setReviewsLoading(false);
     })();
+
+    return () => { cancelled = true; };
   }, [partner?.id]);
 
   const submitReview = useCallback(async () => {
@@ -203,6 +209,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
         collection(db, 'partners', partner.id, 'reviews'),
         orderBy('createdAt', 'desc'),
       ));
+      if (!mountedRef.current) return;
       const allReviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReviews(allReviews);
 
@@ -211,6 +218,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       const newAvg = Math.round(avg * 10) / 10;
       const newCount = allReviews.length;
       await updateDoc(doc(db, 'partners', partner.id), { avgRating: newAvg, reviewCount: newCount });
+      if (!mountedRef.current) return;
       onPartnerUpdate?.(partner.id, { avgRating: newAvg, reviewCount: newCount });
 
       setReviewError('');
@@ -244,7 +252,8 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       navigator.clipboard?.writeText(partner.phone).catch(() => {});
     });
     setPhoneCopied(true);
-    setTimeout(() => setPhoneCopied(false), 3000);
+    clearTimeout(phoneCopyTimerRef.current);
+    phoneCopyTimerRef.current = setTimeout(() => setPhoneCopied(false), 3000);
     // Попытка открыть диалер (может сработать в браузере)
     openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
   };

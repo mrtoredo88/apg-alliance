@@ -19,19 +19,20 @@ const GRADIENTS_LIGHT = [
 ];
 
 function useCountdown(deadline) {
-  const getRemaining = () => {
-    if (!deadline) return null;
-    const ms = new Date(deadline + 'T23:59:59').getTime() - Date.now();
+  const getRemaining = (dl) => {
+    if (!dl) return null;
+    const ms = new Date(dl + 'T23:59:59').getTime() - Date.now();
     if (ms <= 0) return null;
     const d = Math.floor(ms / 86400000);
     const h = Math.floor((ms % 86400000) / 3600000);
     const m = Math.floor((ms % 3600000) / 60000);
     return { d, h, m, ms };
   };
-  const [remaining, setRemaining] = useState(getRemaining);
+  const [remaining, setRemaining] = useState(() => getRemaining(deadline));
   useEffect(() => {
+    setRemaining(getRemaining(deadline)); // обновляем сразу при смене deadline
     if (!deadline) return;
-    const t = setInterval(() => setRemaining(getRemaining()), 60000);
+    const t = setInterval(() => setRemaining(getRemaining(deadline)), 60000);
     return () => clearInterval(t);
   }, [deadline]);
   return remaining;
@@ -183,7 +184,7 @@ function EventListCard({ event, index, onClick, isDark = true }) {
 }
 
 function isEventPast(event) {
-  const dateStr = event.eventDate || event.deadline;
+  const dateStr = event.deadline; // только ISO-поле, eventDate — только для отображения
   if (!dateStr) return false;
   const d = new Date(dateStr.length <= 10 ? dateStr + 'T23:59:59' : dateStr);
   return !isNaN(d) && d.getTime() < Date.now();

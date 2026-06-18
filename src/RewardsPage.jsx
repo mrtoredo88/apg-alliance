@@ -131,26 +131,30 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
   const [prizes, setPrizes] = useState([]);
   const [myClaims, setMyClaims] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [confirmPrize, setConfirmPrize] = useState(null);
   const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
         const prizesSnap = await getDocs(
           query(collection(db, 'prizes'), where('active', '==', true), orderBy('cost', 'asc'))
         );
+        if (!alive) return;
         setPrizes(prizesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         if (user && user.id !== 'guest') {
           const claimsSnap = await getDocs(
             query(collection(db, 'users', String(user.id), 'claims'), orderBy('claimedAt', 'desc'))
           );
-          setMyClaims(claimsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          if (alive) setMyClaims(claimsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         }
-      } catch (e) { console.error(e); }
-      setLoading(false);
+      } catch (e) { console.error(e); if (alive) setLoadError(true); }
+      if (alive) setLoading(false);
     })();
+    return () => { alive = false; };
   }, [user]);
 
   const handleConfirmClaim = async () => {
@@ -223,6 +227,12 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
           </div>
         )}
 
+        {loadError && (
+          <div style={{ ...GLASS, borderRadius: 16, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, border: '1px solid rgba(220,53,69,0.25)' }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span style={{ fontSize: 13, color: T.textSec }}>Не удалось загрузить призы. Проверьте соединение.</span>
+          </div>
+        )}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[1, 2, 3].map(i => (

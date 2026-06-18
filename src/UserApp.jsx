@@ -51,6 +51,8 @@ function LazyFallback() {
 export function UserApp() {
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
+  const mountedRef                              = useRef(true);
+  const claimingPrizeRef                        = useRef(false);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
   const [scanDates, setScanDates]               = useState([]);
@@ -322,8 +324,9 @@ export function UserApp() {
         const isRealUser = !String(userData.id).startsWith('guest_');
         const refId = isRealUser ? pendingRefId : null;
 
+        const isValidRef = refId && refId !== String(userData.id);
         await setDoc(userRef, {
-          keys: refId ? 2 : 0,          // +2 за переход по реферальной ссылке
+          keys: isValidRef ? 2 : 0,          // +2 за переход по реферальной ссылке
           favorites: [], scannedPartners: {},
           completedTasks: [], streak: 0, onboardingDone: false,
           scanDates: [], lastBonusDate: todayKey,
@@ -331,7 +334,7 @@ export function UserApp() {
           ...profilePatch,
         });
 
-        if (refId && refId !== String(userData.id)) {
+        if (isValidRef) {
           // Начисляем рефереру +2 ключа и +1 к счётчику
           updateDoc(doc(db, 'users', refId), {
             keys: increment(2),
@@ -339,13 +342,12 @@ export function UserApp() {
           }).catch(() => {});
           if (isMounted.current) {
             setTimeout(() => {
-              setToast({ msg: '🎁 +2 ключа — ты пришёл по реферальной ссылке!', type: 'success' });
-              setTimeout(() => setToast(null), 4000);
+              if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
             }, 1800);
           }
         }
 
-        if (refId) setUserKeys(2);
+        if (isValidRef) setUserKeys(2);
         setShowOnboarding(true);
       }
 
@@ -367,8 +369,7 @@ export function UserApp() {
   }, [loadData]);
 
   const handleRefresh = useCallback(async () => {
-    const isMounted = { current: true };
-    await loadData(isMounted);
+    await loadData(mountedRef);
   }, [loadData]);
 
   // ─── Onboarding ─────────────────────────────────────────────────────────────
@@ -410,6 +411,10 @@ export function UserApp() {
   // ─── Скан ───────────────────────────────────────────────────────────────────
 
   const toastTimerRef = useRef(null);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
   const showToast = useCallback((msg, type = 'info') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ msg, type });
@@ -420,7 +425,7 @@ export function UserApp() {
     if (!user || isScanningRef.current) return;
     isScanningRef.current = true;
 
-    const partner = partners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
+    const partner = enrichedPartners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
     if (!partner) {
       setIsScannerOpen(false);
       isScanningRef.current = false;
@@ -476,7 +481,8 @@ export function UserApp() {
         setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
         const bonusText = keyBonus > 1 ? ` x${keyBonus} (партнёр дня!)` : '';
         setToast({ msg: `+${keyBonus} ключ${bonusText} — ${partner.name}! 🔑`, type: 'success', sharePartner: partner });
-        setTimeout(() => setToast(null), 4500);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 4500);
         addDoc(collection(db, 'users', String(user.id), 'activity'), {
           type: 'scan', icon: keyBonus > 1 ? '⭐' : '🔑',
           text: `Посещён: ${partner.name}${keyBonus > 1 ? ' (партнёр дня × 2)' : ''}`,
@@ -499,7 +505,7 @@ export function UserApp() {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, partners, lastScanDate, streak, scannedPartnerIds, scanDates, haptic, showToast]);
+  }, [user, enrichedPartners, lastScanDate, streak, scannedPartnerIds, scanDates, haptic, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -524,23 +530,26 @@ export function UserApp() {
 
   const handleClaim = useCallback(async (taskId, reward) => {
     if (!user) return;
-    const next = [...completedTasks, taskId];
-    setCompletedTasks(next);
+    let captured;
+    setCompletedTasks(prev => { captured = [...prev, taskId]; return captured; });
     setUserKeys(prev => prev + reward);
     try {
       const uid = String(user.id);
-      await updateDoc(doc(db, 'users', uid), { completedTasks: next, keys: increment(reward) });
+      await updateDoc(doc(db, 'users', uid), { completedTasks: captured, keys: increment(reward) });
       addDoc(collection(db, 'users', uid, 'activity'), {
         type: 'task', icon: '✅',
         text: `Задание выполнено: +${reward} ключей`,
         ts: serverTimestamp(),
       }).catch(() => {});
     } catch (e) { console.error(e); }
-  }, [user, completedTasks]);
+  }, [user]);
 
   const handlePrizeClaim = useCallback(async (prize) => {
     if (!user || !prize) return false;
     if (userKeys < prize.cost) return false;
+    if (claimingPrizeRef.current) return false;
+    claimingPrizeRef.current = true;
+    setUserKeys(prev => prev - prize.cost); // оптимистичное списание
     try {
       const batch = [];
       batch.push(updateDoc(doc(db, 'users', String(user.id)), { keys: increment(-prize.cost) }));
@@ -553,7 +562,6 @@ export function UserApp() {
         batch.push(updateDoc(doc(db, 'prizes', prize.id), { stock: increment(-1) }));
       }
       await Promise.all(batch);
-      setUserKeys(prev => prev - prize.cost);
       const uid = String(user.id);
       addDoc(collection(db, 'users', uid, 'activity'), {
         type: 'prize', icon: prize.emoji ?? '🎁',
@@ -567,7 +575,13 @@ export function UserApp() {
         status: 'pending', claimedAt: serverTimestamp(),
       }).catch(() => {});
       return true;
-    } catch (e) { console.error(e); return false; }
+    } catch (e) {
+      console.error(e);
+      setUserKeys(prev => prev + prize.cost); // откат при ошибке
+      return false;
+    } finally {
+      claimingPrizeRef.current = false;
+    }
   }, [user, userKeys]);
 
   // ─── Мероприятия ────────────────────────────────────────────────────────────
@@ -855,7 +869,7 @@ export function UserApp() {
                 onOpenPartner={openPartner}
                 onToggleFavorite={toggleFavorite}
                 onScan={() => setIsScannerOpen(true)}
-                onRetry={() => { const m = { current: true }; loadData(m); }}
+                onRetry={() => loadData(mountedRef)}
                 onRefresh={handleRefresh}
                 onOpenEvents={() => goPanel('events')}
                 onOpenTasks={() => goPanel('tasks')}

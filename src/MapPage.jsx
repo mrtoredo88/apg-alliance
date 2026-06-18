@@ -96,6 +96,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
           </div>
         )}
         <iframe
+          key={selected?.id ?? 'default'}
           src={mapSrc}
           title="Яндекс.Карты"
           onLoad={() => setMapLoaded(true)}

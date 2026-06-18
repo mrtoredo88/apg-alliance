@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Panel } from '@vkontakte/vkui';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
@@ -126,6 +126,12 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
       id, label: CATEGORY_LABELS[id] ?? id, count,
     }));
   }, [withOffers]);
+
+  useEffect(() => {
+    if (activeCategory !== 'all' && !categories.find(c => c.id === activeCategory)) {
+      setActiveCategory('all');
+    }
+  }, [categories, activeCategory]);
 
   const isSearching = search.trim().length > 0;
 

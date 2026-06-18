@@ -7,12 +7,15 @@ QrScanner.WORKER_PATH = qrWorkerSrc;
 const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
 
 export default function Scanner({ isOpen, onClose, onConfirm }) {
-  const videoRef    = useRef(null);
-  const scannerRef  = useRef(null);
-  const doneRef     = useRef(false);
-  const [err, setErr]       = useState(null);
+  const videoRef       = useRef(null);
+  const scannerRef     = useRef(null);
+  const doneRef        = useRef(false);
+  const onConfirmRef   = useRef(onConfirm);
+  const [err, setErr]           = useState(null);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn]   = useState(false);
+
+  useEffect(() => { onConfirmRef.current = onConfirm; }, [onConfirm]);
 
   const stopScanner = useCallback(() => {
     if (scannerRef.current) {
@@ -30,9 +33,11 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
       return;
     }
 
+    let active = true;
+
     // Wait for video element to mount
     const timer = setTimeout(() => {
-      if (!videoRef.current) return;
+      if (!videoRef.current || !active) return;
 
       const scanner = new QrScanner(
         videoRef.current,
@@ -40,7 +45,7 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
           if (doneRef.current) return;
           doneRef.current = true;
           stopScanner();
-          onConfirm?.(result.data);
+          onConfirmRef.current?.(result.data);
         },
         {
           returnDetailedScanResult: true,
@@ -54,18 +59,19 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
 
       scanner.start()
         .then(() => {
-          scanner.hasFlash().then(has => setHasTorch(has));
+          scanner.hasFlash().then(has => { if (active) setHasTorch(has); });
         })
         .catch(() => {
-          setErr('Нет доступа к камере. Разрешите его в настройках браузера.');
+          if (active) setErr('Нет доступа к камере. Разрешите его в настройках браузера.');
         });
     }, 50);
 
     return () => {
+      active = false;
       clearTimeout(timer);
       stopScanner();
     };
-  }, [isOpen, stopScanner, onConfirm]);
+  }, [isOpen, stopScanner]);
 
   const handleClose = useCallback(() => {
     stopScanner();

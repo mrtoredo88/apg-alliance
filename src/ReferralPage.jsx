@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -21,6 +21,8 @@ const STEPS = [
 
 export function ReferralPage({ user, referralCount = 0, completedTasks = [], onBack, onShare }) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const refLink = user?.id ? `https://vk.com/app${APP_ID}#ref_${user.id}` : `https://vk.com/app${APP_ID}`;
 
@@ -31,7 +33,8 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
       try { await navigator.clipboard.writeText(refLink); } catch {}
     }
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2500);
   };
 
   const handleShare = () => {
@@ -74,7 +77,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
               <div style={{ flex: 1, background: 'rgba(74,144,217,0.12)', border: '1px solid rgba(74,144,217,0.3)', borderRadius: 16, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 28, fontWeight: 900, color: T.textPri, lineHeight: 1 }}>{referralCount}</div>
                 <div style={{ fontSize: 11, color: T.textSec, marginTop: 4 }}>
-                  {referralCount === 1 ? 'друг пришёл' : referralCount < 5 ? 'друга пришло' : 'друзей пришло'}
+                  {referralCount === 1 ? 'друг пришёл' : referralCount >= 2 && referralCount <= 4 ? 'друга пришли' : 'друзей пришло'}
                 </div>
               </div>
               <div style={{ flex: 1, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 16, padding: '12px', textAlign: 'center' }}>

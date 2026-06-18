@@ -71,6 +71,7 @@ export const vkWebLogin = () => new Promise((resolve, reject) => {
   const REDIRECT = `${window.location.origin}/vk-auth.html`;
   const authUrl = `https://oauth.vk.com/authorize?client_id=54601851&display=popup&redirect_uri=${encodeURIComponent(REDIRECT)}&scope=0&response_type=token&v=5.199`;
   const popup = window.open(authUrl, 'vk_auth', 'width=620,height=540,left=200,top=80');
+  if (!popup) { reject(new Error('popup_blocked')); return; }
 
   const onMessage = async ({ origin, data }) => {
     if (origin !== window.location.origin) return;
@@ -82,9 +83,12 @@ export const vkWebLogin = () => new Promise((resolve, reject) => {
     if (error || !access_token) { reject(new Error(error || 'cancelled')); return; }
 
     try {
-      const res = await fetch(
-        `https://api.vk.com/method/users.get?access_token=${access_token}&fields=photo_200&v=5.199&lang=ru`
-      );
+      const apiUrl = new URL('https://api.vk.com/method/users.get');
+      apiUrl.searchParams.set('access_token', access_token);
+      apiUrl.searchParams.set('fields', 'photo_200');
+      apiUrl.searchParams.set('v', '5.199');
+      apiUrl.searchParams.set('lang', 'ru');
+      const res = await fetch(apiUrl.toString());
       const json = await res.json();
       const u = json.response?.[0];
       if (!u) throw new Error('no_user');

@@ -147,6 +147,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
   const [claiming, setClaiming] = useState(null);
 
   const handleClaim = async (taskId, reward) => {
+    if (claiming !== null) return; // блокируем параллельные клаймы
     setClaiming(taskId);
     try {
       await onClaim(taskId, reward);
@@ -157,8 +158,11 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
         colors: ['#C9A84C', '#E8C97A', '#ffffff', '#4BB34B'],
         disableForReducedMotion: true,
       });
+    } catch (e) {
+      console.error('Claim failed', e);
+    } finally {
+      setClaiming(null);
     }
-    finally { setClaiming(null); }
   };
 
   const statuses = TASKS.map(t => ({

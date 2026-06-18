@@ -78,7 +78,7 @@ export function SplashScreen({ isReady, onDone, startTime }) {
           ? 'opacity 0.55s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1)'
           : 'none',
       }}
-        onTransitionEnd={() => { if (exiting) onDone?.(); }}
+        onTransitionEnd={e => { if (exiting && e.propertyName === 'opacity') onDone?.(); }}
       >
 
         {/* Фоновые орбы */}
@@ -201,10 +201,9 @@ export function SplashScreen({ isReady, onDone, startTime }) {
             width: 64, height: 1,
             background: SHIMMER_GRAD,
             backgroundSize: '200% 100%',
-            animation: 'apg-shimmer 2.6s linear 1.0s infinite',
+            animation: 'apg-fadein 0.4s ease 1.0s forwards, apg-shimmer 2.6s linear 1.0s infinite',
             opacity: 0,
-            animationFillMode: 'both',
-            animationDelay: '1.0s',
+            animationFillMode: 'forwards, none',
           }} />
 
           {/* ЗЕЛЕНОГРАД */}
