@@ -135,14 +135,7 @@ export const openUrl = (url) => {
   }
 
   // http/https:
-  if (isVK()) {
-    // Внутри VK Mini App — только Bridge. Якорный клик вызывает перехват
-    // навигации WebView для vk.com-ссылок и приводит к "страница не существует".
-    _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
-    return;
-  }
-
-  // Браузер — синхронный anchor click
+  // 1. Синхронный anchor click — работает в VK-браузере и обычных браузерах
   const a = document.createElement('a');
   a.href = url;
   a.target = '_blank';
@@ -150,6 +143,9 @@ export const openUrl = (url) => {
   document.body.appendChild(a);
   a.click();
   setTimeout(() => a.remove(), 100);
+
+  // 2. VK Bridge — для нативного VK Mini App (Android/iOS)
+  _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
 };
 
 export default vkBridge;
