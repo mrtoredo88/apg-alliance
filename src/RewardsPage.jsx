@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
@@ -183,7 +183,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
     }
   };
 
-  const claimedIds = new Set(myClaims.map(c => c.prizeId));
+  const claimedIds = useMemo(() => new Set(myClaims.map(c => c.prizeId)), [myClaims]);
 
   return (
     <Panel id={nav}>

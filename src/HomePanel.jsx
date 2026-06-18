@@ -369,9 +369,11 @@ function FeaturedPartnerCard({ partner, onOpen }) {
 function NewsModal({ item, onClose }) {
   const [dragY, setDragY]           = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const touchY    = useRef(null);
-  const sheetRef  = useRef(null);
-  const scrollRef = useRef(null);
+  const touchY      = useRef(null);
+  const sheetRef    = useRef(null);
+  const scrollRef   = useRef(null);
+  const closeTimer  = useRef(null);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   const THRESHOLD = 110;
 
@@ -403,7 +405,8 @@ function NewsModal({ item, onClose }) {
     setIsDragging(false);
     if (dy >= THRESHOLD) {
       setDragY(700);
-      setTimeout(onClose, 300);
+      clearTimeout(closeTimer.current);
+      closeTimer.current = setTimeout(onClose, 300);
     } else {
       setDragY(0);
     }

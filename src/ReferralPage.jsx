@@ -44,7 +44,10 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
     }).catch(() => {});
   };
 
-  const earnedKeys = referralCount * 2;
+  const milestoneKeys = MILESTONES
+    .filter(m => completedTasks.includes(m.taskId))
+    .reduce((s, m) => s + m.reward, 0);
+  const earnedKeys = referralCount * 2 + milestoneKeys;
 
   return (
     <Panel id="referral">

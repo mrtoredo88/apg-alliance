@@ -211,6 +211,13 @@ export function EventsPage({ nav, events = [], onBack, appearance = 'dark' }) {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
 
+  useEffect(() => {
+    if (selectedEvent) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [selectedEvent]);
+
   const upcoming = events.filter(e => !isEventPast(e));
   const past     = events.filter(e => isEventPast(e)).reverse();
   const list     = tab === 'upcoming' ? upcoming : past;

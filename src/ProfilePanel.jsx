@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -312,6 +312,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   };
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
+  const dismissTimerRef = useRef(null);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIosHint, setShowIosHint] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -346,7 +347,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
   const dismissToast = useCallback(() => {
     setToastExiting(true);
-    setTimeout(() => { setAchievementToast(null); setToastExiting(false); }, 300);
+    clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => { setAchievementToast(null); setToastExiting(false); }, 300);
   }, []);
 
   const isDark = appearance === 'dark';
@@ -367,6 +369,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     const toShow = newOnes[newOnes.length - 1];
     newOnes.forEach(a => seen.add(a.id));
     localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+    clearTimeout(dismissTimerRef.current); // сбрасываем предыдущий dismiss если был
     setAchievementToast(toShow);
     setToastExiting(false);
     const timer = setTimeout(() => dismissToast(), 4000);
