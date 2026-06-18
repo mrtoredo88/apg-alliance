@@ -232,6 +232,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
       position: 'relative', overflow: 'hidden',
       animation: 'fadeInUp 0.45s ease both',
       animationDelay: `${index * 0.07}s`,
+      height: '100%', boxSizing: 'border-box',
     }}>
       {/* Золотая точка если в избранном */}
       {isFavorite && (
@@ -280,7 +281,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         )}
       </div>
 
-      <div>
+      <div style={{ flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: T.textPri, lineHeight: '16px', marginBottom: 3 }}>
           {partner.name ?? 'Партнёр'}
         </div>
@@ -319,6 +320,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         width: '100%', padding: '9px 0', borderRadius: 12, border: 'none',
         background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
         color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+        marginTop: 'auto',
       }}>
         Подробнее
       </button>
