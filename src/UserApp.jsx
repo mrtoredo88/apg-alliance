@@ -29,6 +29,7 @@ const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ def
 const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ default: m.RewardsPage })));
 const MapPage              = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
 const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(m => ({ default: m.PartnerCabinetPage })));
+const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 
 function formatCacheAge(ts) {
   const mins = Math.round((Date.now() - ts) / 60000);
@@ -39,7 +40,7 @@ function formatCacheAge(ts) {
   return `${Math.round(hrs / 24)} д назад`;
 }
 
-const SWIPE_TABS = ['home', 'offers', 'tasks', 'profile'];
+const SWIPE_TABS = ['home', 'experts', 'tasks', 'profile'];
 
 function LazyFallback() {
   return (
@@ -78,6 +79,8 @@ export function UserApp() {
 
   const [isScannerOpen, setIsScannerOpen]       = useState(false);
   const [partners, setPartners]                 = useState([]);
+  const [experts, setExperts]                   = useState([]);
+  const [scannedExperts, setScannedExperts]     = useState({});
   const [events, setEvents]                     = useState([]);
   const [news, setNews]                         = useState([]);
   const [notifications, setNotifications]       = useState([]);
@@ -233,7 +236,7 @@ export function UserApp() {
         ).catch(() => {});
       }
 
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw] = await Promise.all([
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
@@ -241,6 +244,7 @@ export function UserApp() {
         getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
         fetch('/api/vk-news').then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
+        getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
       ]);
 
       if (!isMounted.current) return;
@@ -265,6 +269,7 @@ export function UserApp() {
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
+      if (isMounted.current) setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       if (isMounted.current) setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
@@ -312,6 +317,7 @@ export function UserApp() {
         setVisitCounts(data.visitCounts ?? {});
         setRegisteredEventIds(data.registeredEvents ?? []);
         setJoinedGroup(data.joinedGroup ?? false);
+        setScannedExperts(data.scannedExperts ?? {});
         if (!data.onboardingDone) setShowOnboarding(true);
 
         // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
@@ -433,6 +439,45 @@ export function UserApp() {
     if (!user || isScanningRef.current) return;
     isScanningRef.current = true;
 
+    // Expert QR: value = "expert_<id>"
+    if (typeof placeIdentifier === 'string' && placeIdentifier.startsWith('expert_')) {
+      const expertId = placeIdentifier.slice(7);
+      const expert = experts.find(e => e.id === expertId);
+      if (!expert) {
+        setIsScannerOpen(false); isScanningRef.current = false;
+        showToast('QR-код эксперта не распознан');
+        return;
+      }
+      if (scannedExperts[expertId]) {
+        setIsScannerOpen(false); isScanningRef.current = false;
+        showToast('Посещение уже отмечено 👋');
+        return;
+      }
+      const keyBonus = expert.keys ?? 1;
+      try {
+        await updateDoc(doc(db, 'users', String(user.id)), {
+          keys: increment(keyBonus),
+          [`scannedExperts.${expertId}`]: true,
+        });
+        setUserKeys(prev => prev + keyBonus);
+        setScannedExperts(prev => ({ ...prev, [expertId]: true }));
+        haptic('medium');
+        setKeyBurst({ amount: keyBonus, id: Date.now() });
+        showToast(`+${keyBonus} ключ — консультация с ${expert.name}! 🔑`, 'success');
+        addDoc(collection(db, 'users', String(user.id), 'activity'), {
+          type: 'expert_scan', icon: '🧑‍💼',
+          text: `Посещение эксперта: ${expert.name}`,
+          ts: serverTimestamp(),
+        }).catch(() => {});
+      } catch (e) {
+        console.error(e);
+        showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+      } finally {
+        setIsScannerOpen(false); isScanningRef.current = false;
+      }
+      return;
+    }
+
     const partner = enrichedPartners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
     if (!partner) {
       setIsScannerOpen(false);
@@ -513,7 +558,7 @@ export function UserApp() {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, lastScanDate, streak, scannedPartnerIds, scanDates, haptic, showToast]);
+  }, [user, enrichedPartners, experts, lastScanDate, streak, scannedPartnerIds, scannedExperts, scanDates, haptic, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -739,40 +784,41 @@ export function UserApp() {
   // ─── TabBar ─────────────────────────────────────────────────────────────────
 
   const TabHomeIcon    = ({ active }) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
       <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z"
         fill={active ? T.gold : 'none'} stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   );
-  const TabOffersIcon  = ({ active }) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <rect x="2" y="7" width="20" height="14" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
-      <path d="M16 7V5C16 3.9 15.1 3 14 3H10C8.9 3 8 3.9 8 5V7" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
-      <path d="M12 12V16M10 14H14" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+  const TabExpertsIcon = ({ active }) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="7" r="3.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M5 20C5 16.5 8 14 12 14C16 14 19 16.5 19 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M16 10L17.5 11.5L20 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabTasksIcon   = ({ active }) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
       <rect x="3" y="3" width="18" height="18" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M8 12L11 15L16 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabProfileIcon = ({ active }) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
 
-  const TAB_PANELS = ['home', 'offers', null, 'tasks', 'profile'];
+  // 5 regular tabs + center scan button (index 2)
+  const TAB_PANELS = ['home', 'experts', null, 'tasks', 'profile'];
   const pillIdx    = isScannerOpen ? -1 : TAB_PANELS.indexOf(activePanel);
 
   const TABS = [
-    { id: 'home',    label: 'Главная', icon: TabHomeIcon },
-    { id: 'offers',  label: 'Акции',   icon: TabOffersIcon },
-    { id: null,      label: 'Скан',    icon: null },
-    { id: 'tasks',   label: 'Задания', icon: TabTasksIcon },
-    { id: 'profile', label: 'Профиль', icon: TabProfileIcon },
+    { id: 'home',    label: 'Главная',  icon: TabHomeIcon },
+    { id: 'experts', label: 'Эксперты', icon: TabExpertsIcon },
+    { id: null,      label: 'Скан',     icon: null },
+    { id: 'tasks',   label: 'Задания',  icon: TabTasksIcon },
+    { id: 'profile', label: 'Профиль',  icon: TabProfileIcon },
   ];
 
   const tabBarEl = (
@@ -1028,6 +1074,18 @@ export function UserApp() {
                     user={user} userKeys={userKeys}
                     onBack={() => goPanel('home')}
                     onClaim={handlePrizeClaim}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="experts">
+                <Suspense fallback={<LazyFallback />}>
+                  <ExpertsPage
+                    nav="experts"
+                    experts={experts}
+                    user={user}
+                    scannedExperts={scannedExperts}
+                    onBack={() => goPanel('home')}
                   />
                 </Suspense>
               </Panel>

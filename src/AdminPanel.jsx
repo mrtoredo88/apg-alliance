@@ -195,6 +195,7 @@ function PasswordGate({ onAllow }) {
 export const AdminPanel = () => {
   const [authed, setAuthed]         = useState(false);
   const [partners, setPartners]     = useState([]);
+  const [experts, setExperts]       = useState([]);
   const [events, setEvents]         = useState([]);
   const [news, setNews]             = useState([]);
   const [notifs, setNotifs]         = useState([]);
@@ -202,6 +203,22 @@ export const AdminPanel = () => {
   const [prizeClaims, setPrizeClaims] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [activeTab, setActiveTab]   = useState('partners');
+
+  // Форма эксперта
+  const [editingExpert, setEditingExpert] = useState(null);
+  const [exName, setExName]         = useState('');
+  const [exSpec, setExSpec]         = useState('');
+  const [exDesc, setExDesc]         = useState('');
+  const [exPhoto, setExPhoto]       = useState('');
+  const [exPhone, setExPhone]       = useState('');
+  const [exVkUrl, setExVkUrl]       = useState('');
+  const [exBooking, setExBooking]   = useState('');
+  const [exKeys, setExKeys]         = useState('1');
+  const [exVerified, setExVerified] = useState(false);
+  const [exActive, setExActive]     = useState(true);
+  const [exOnline, setExOnline]     = useState(false);
+  const [exOffline, setExOffline]   = useState(false);
+  const [exGroup, setExGroup]       = useState(false);
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
@@ -270,6 +287,9 @@ export const AdminPanel = () => {
   const [eMinKeys, setEMinKeys] = useState('');
   const [eMaxParticipants, setEMaxParticipants] = useState('');
   const [eEventDate, setEEventDate] = useState('');
+  const [eIsExpert, setEIsExpert] = useState(false);
+  const [ePriceClub, setEPriceClub] = useState('');
+  const [ePricePublic, setEPricePublic] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -287,7 +307,7 @@ export const AdminPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
@@ -295,8 +315,10 @@ export const AdminPanel = () => {
         getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(() => ({ docs: [] })),
+        getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
       ]);
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNotifs(ntSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -305,6 +327,49 @@ export const AdminPanel = () => {
       setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     setLoading(false);
+  };
+
+  const resetExpertForm = () => {
+    setEditingExpert(null); setExName(''); setExSpec(''); setExDesc('');
+    setExPhoto(''); setExPhone(''); setExVkUrl(''); setExBooking('');
+    setExKeys('1'); setExVerified(false); setExActive(true);
+    setExOnline(false); setExOffline(false); setExGroup(false);
+  };
+
+  const startEditExpert = (ex) => {
+    setEditingExpert(ex);
+    setExName(ex.name ?? ''); setExSpec(ex.specialization ?? ''); setExDesc(ex.description ?? '');
+    setExPhoto(ex.photo ?? ''); setExPhone(ex.phone ?? ''); setExVkUrl(ex.vkUrl ?? '');
+    setExBooking(ex.bookingUrl ?? ''); setExKeys(String(ex.keys ?? 1));
+    setExVerified(ex.verified ?? false); setExActive(ex.active !== false);
+    setExOnline(ex.formats?.includes('online') ?? false);
+    setExOffline(ex.formats?.includes('offline') ?? false);
+    setExGroup(ex.formats?.includes('group') ?? false);
+    window.scrollTo(0, 0);
+  };
+
+  const saveExpert = async () => {
+    if (!exName.trim()) return;
+    const formats = [exOnline && 'online', exOffline && 'offline', exGroup && 'group'].filter(Boolean);
+    const data = {
+      name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
+      photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
+      bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
+      verified: exVerified, active: exActive, formats,
+    };
+    if (editingExpert) {
+      await updateDoc(doc(db, 'experts', editingExpert.id), data);
+    } else {
+      await addDoc(collection(db, 'experts'), { ...data, avgRating: 0, reviewCount: 0, createdAt: serverTimestamp() });
+    }
+    resetExpertForm();
+    fetchData();
+  };
+
+  const deleteExpert = async (id) => {
+    if (!window.confirm('Удалить эксперта?')) return;
+    await deleteDoc(doc(db, 'experts', id));
+    fetchData();
   };
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
@@ -448,6 +513,7 @@ export const AdminPanel = () => {
     setETitle(''); setEDate(''); setEPartner(''); setEEmoji('🎉');
     setEDesc(''); setESocial(''); setEAddress(''); setEDeadline('');
     setEIsPrivate(false); setEMinKeys(''); setEMaxParticipants(''); setEEventDate('');
+    setEIsExpert(false); setEPriceClub(''); setEPricePublic('');
     setEditingEvent(null);
   };
 
@@ -461,6 +527,9 @@ export const AdminPanel = () => {
     setEMinKeys(e.minKeys != null ? String(e.minKeys) : '');
     setEMaxParticipants(e.maxParticipants != null ? String(e.maxParticipants) : '');
     setEEventDate(e.eventDate ?? '');
+    setEIsExpert(e.isExpertEvent ?? false);
+    setEPriceClub(e.priceClub ?? '');
+    setEPricePublic(e.pricePublic ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -475,6 +544,9 @@ export const AdminPanel = () => {
       minKeys: eMinKeys !== '' ? Number(eMinKeys) : 0,
       maxParticipants: eMaxParticipants !== '' ? Number(eMaxParticipants) : 0,
       eventDate: eEventDate.trim(),
+      isExpertEvent: eIsExpert,
+      priceClub: ePriceClub.trim(),
+      pricePublic: ePricePublic.trim(),
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
@@ -685,6 +757,7 @@ export const AdminPanel = () => {
       <div style={s.tabs}>
         {[
           { id: 'partners', label: `🤝 Партнёры`, count: partners.length },
+          { id: 'experts',  label: `🧑‍💼 Эксперты`, count: experts.length },
           { id: 'events',   label: `🎉 События`,  count: events.length },
           { id: 'news',     label: `📢 Новости`,  count: news.length },
           { id: 'notifs',   label: `🔔 Рассылка` },
@@ -708,6 +781,99 @@ export const AdminPanel = () => {
           </button>
         ))}
       </div>
+
+      {/* ── ЭКСПЕРТЫ ── */}
+      {activeTab === 'experts' && (
+        <>
+          <div style={s.card}>
+            <h2 style={s.h2}>{editingExpert ? `✏️ ${editingExpert.name}` : '➕ Новый эксперт'}</h2>
+
+            <label style={s.label}>Имя *</label>
+            <input style={s.input} placeholder="Анна Смирнова" value={exName} onChange={e => setExName(e.target.value)} />
+
+            <label style={s.label}>Специализация *</label>
+            <input style={s.input} placeholder="Психолог, коуч, нутрициолог..." value={exSpec} onChange={e => setExSpec(e.target.value)} />
+
+            <label style={s.label}>Описание</label>
+            <textarea style={s.textarea} placeholder="Расскажите об эксперте..." value={exDesc} onChange={e => setExDesc(e.target.value)} />
+
+            <label style={s.label}>Фото (URL)</label>
+            <input style={s.input} placeholder="https://..." value={exPhoto} onChange={e => setExPhoto(e.target.value)} />
+            {exPhoto && <img src={exPhoto} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', marginBottom: 12 }} onError={e => e.target.style.display='none'} />}
+
+            <label style={s.label}>Телефон</label>
+            <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
+
+            <label style={s.label}>ВКонтакте (URL)</label>
+            <input style={s.input} placeholder="https://vk.com/..." value={exVkUrl} onChange={e => setExVkUrl(e.target.value)} />
+
+            <label style={s.label}>Ссылка для записи</label>
+            <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
+
+            <label style={s.label}>Ключей за QR-скан</label>
+            <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />
+
+            <label style={s.label}>Форматы работы</label>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+              {[['online','💻 Онлайн', exOnline, setExOnline], ['offline','📍 Офлайн', exOffline, setExOffline], ['group','👥 Группа', exGroup, setExGroup]].map(([key, lbl, val, setter]) => (
+                <button key={key} onClick={() => setter(v => !v)} style={{ padding: '8px 14px', borderRadius: 12, border: `2px solid ${val ? A.gold : A.border}`, background: val ? A.goldDim : 'transparent', color: val ? A.gold : A.textSec, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: A.text }}>
+                <input type="checkbox" checked={exVerified} onChange={e => setExVerified(e.target.checked)} />
+                ✓ Верифицирован АПГ
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: A.text }}>
+                <input type="checkbox" checked={exActive} onChange={e => setExActive(e.target.checked)} />
+                Активен
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={saveExpert} style={{ ...s.btn, ...s.btnPri, flex: 1 }}>
+                {editingExpert ? 'Сохранить' : 'Добавить'}
+              </button>
+              {editingExpert && (
+                <button onClick={resetExpertForm} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
+              )}
+            </div>
+          </div>
+
+          {/* Список экспертов */}
+          <div style={s.card}>
+            <h2 style={s.h2}>Список экспертов ({experts.length})</h2>
+            {experts.length === 0 ? (
+              <p style={{ color: A.textSec, fontSize: 14, margin: 0 }}>Экспертов пока нет.</p>
+            ) : experts.map(ex => (
+              <div key={ex.id} style={s.row}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  {ex.photo
+                    ? <img src={ex.photo} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                    : <div style={{ width: 36, height: 36, borderRadius: '50%', background: A.goldDim, border: `1px solid ${A.goldBrd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🧑‍💼</div>
+                  }
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: A.text, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {ex.name}
+                      {ex.verified && <span style={{ fontSize: 10, color: A.blue, fontWeight: 800 }}>✓</span>}
+                      {!ex.active && <span style={{ fontSize: 10, color: A.textSec }}>(неактивен)</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: A.textSec }}>{ex.specialization}</div>
+                    {(ex.avgRating ?? 0) > 0 && <div style={{ fontSize: 10, color: '#FFD700' }}>{'★'.repeat(Math.round(ex.avgRating ?? 0))} {ex.avgRating?.toFixed(1)} ({ex.reviewCount ?? 0})</div>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => startEditExpert(ex)} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>✏️</button>
+                  <button onClick={() => deleteExpert(ex.id)} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>🗑</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── ПАРТНЁРЫ ── */}
       {activeTab === 'partners' && (
@@ -892,6 +1058,30 @@ export const AdminPanel = () => {
                 <input style={{ ...s.input, marginBottom: 0 }} type="datetime-local" value={eEventDate} onChange={e => setEEventDate(e.target.value)} />
               </div>
             )}
+
+            {/* Эксперт-событие */}
+            <div style={{ marginBottom: 14 }}>
+              <button
+                onClick={() => setEIsExpert(v => !v)}
+                style={{ width: '100%', padding: 14, borderRadius: 14, border: `1px solid ${eIsExpert ? 'rgba(74,144,217,0.4)' : A.border}`, background: eIsExpert ? 'rgba(74,144,217,0.12)' : A.chip, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: eIsExpert ? '#6AABEC' : A.text }}>🧑‍💼 Событие эксперта</div>
+                  <div style={{ fontSize: 12, color: A.textSec, marginTop: 2 }}>Показывает метку ЭКСПЕРТ и два ценника</div>
+                </div>
+                <div style={{ width: 44, height: 26, borderRadius: 13, border: `1px solid ${eIsExpert ? 'rgba(74,144,217,0.5)' : A.border}`, background: eIsExpert ? '#4A90D9' : 'rgba(255,255,255,0.1)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                  <div style={{ position: 'absolute', top: 3, left: eIsExpert ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+                </div>
+              </button>
+              {eIsExpert && (
+                <div style={{ background: 'rgba(74,144,217,0.08)', border: '1px solid rgba(74,144,217,0.2)', borderRadius: 14, padding: 14, marginTop: 10 }}>
+                  <label style={{ ...s.label, color: '#6AABEC' }}>🗝️ Цена для клуба АПГ</label>
+                  <input style={s.input} placeholder="500 ₽" value={ePriceClub} onChange={e => setEPriceClub(e.target.value)} />
+                  <label style={{ ...s.label, color: '#6AABEC' }}>💰 Цена для всех</label>
+                  <input style={{ ...s.input, marginBottom: 0 }} placeholder="1 200 ₽" value={ePricePublic} onChange={e => setEPricePublic(e.target.value)} />
+                </div>
+              )}
+            </div>
 
             <label style={s.label}>Эмодзи события</label>
             <EmojiPicker emojis={EVENT_EMOJIS} value={eEmoji} onChange={setEEmoji} />

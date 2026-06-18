@@ -75,7 +75,12 @@ function EventModal({ event, onClose }) {
           <div style={{ fontSize: 52 }}>{event.emoji ?? '🎉'}</div>
           <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec }}>✕</button>
         </div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, marginBottom: 12, lineHeight: '26px' }}>{event.title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, lineHeight: '26px', flex: 1 }}>{event.title}</div>
+          {event.isExpertEvent && (
+            <div style={{ flexShrink: 0, background: 'rgba(74,144,217,0.18)', border: '1px solid rgba(74,144,217,0.35)', borderRadius: 10, padding: '3px 9px', fontSize: 11, fontWeight: 800, color: '#6AABEC' }}>ЭКСПЕРТ</div>
+          )}
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {event.date && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -93,6 +98,28 @@ function EventModal({ event, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 32, height: 32, borderRadius: 10, background: T.green + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📍</div>
               <span style={{ color: T.textPri, fontSize: 14 }}>{event.address}</span>
+            </div>
+          )}
+          {(event.priceClub || event.pricePublic) && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {event.priceClub && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: T.gold + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🗝️</div>
+                  <div>
+                    <div style={{ fontSize: 10, color: T.textSec, fontWeight: 600 }}>Для клуба АПГ</div>
+                    <div style={{ fontSize: 14, color: T.gold, fontWeight: 700 }}>{event.priceClub}</div>
+                  </div>
+                </div>
+              )}
+              {event.pricePublic && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>💰</div>
+                  <div>
+                    <div style={{ fontSize: 10, color: T.textSec, fontWeight: 600 }}>Для всех</div>
+                    <div style={{ fontSize: 14, color: T.textPri, fontWeight: 700 }}>{event.pricePublic}</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -154,8 +181,15 @@ function EventListCard({ event, index, onClick, isDark = true }) {
 
       {/* Контент */}
       <div style={{ flex: 1, padding: '14px 14px 14px 4px', minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, lineHeight: '19px', marginBottom: 6 }}>
-          {event.title}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, lineHeight: '19px', flex: 1 }}>
+            {event.title}
+          </div>
+          {event.isExpertEvent && (
+            <div style={{ flexShrink: 0, background: 'rgba(74,144,217,0.2)', border: '1px solid rgba(74,144,217,0.4)', borderRadius: 8, padding: '2px 7px', fontSize: 10, fontWeight: 800, color: '#6AABEC', letterSpacing: 0.4 }}>
+              ЭКСПЕРТ
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {event.date && (
@@ -167,6 +201,20 @@ function EventListCard({ event, index, onClick, isDark = true }) {
           {event.address && (
             <div style={{ fontSize: 12, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               📍 {event.address}
+            </div>
+          )}
+          {(event.priceClub || event.pricePublic) && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+              {event.priceClub && (
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.gold, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 8, padding: '2px 7px' }}>
+                  🗝️ {event.priceClub}
+                </div>
+              )}
+              {event.pricePublic && (
+                <div style={{ fontSize: 11, fontWeight: 600, color: T.textSec, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '2px 7px' }}>
+                  {event.pricePublic}
+                </div>
+              )}
             </div>
           )}
           {event.deadline && (
