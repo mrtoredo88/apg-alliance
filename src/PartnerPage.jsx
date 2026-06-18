@@ -233,7 +233,15 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     if (mountedRef.current) setSubmitting(false);
   }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate]);
 
-  if (!partner) return null;
+  if (!partner) return (
+    <Panel id="partner">
+      <div style={{ position: 'fixed', top: 'var(--safe-top, 0px)', left: 0, right: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: `1px solid ${T.headerBorder}`, padding: '0 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', height: 52 }}>
+          <button onClick={onBack} style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
+        </div>
+      </div>
+    </Panel>
+  );
 
   const photos = partner.photos ?? [];
   const similar = partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6);

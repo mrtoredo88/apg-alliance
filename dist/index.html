@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>АПГ — Альянс Партнёров Города</title>
 
-    <!-- Шрифт Manrope — геометрический, отличная кириллица, читается на любом размере -->
+    <!-- Manrope: неблокирующая загрузка — VK WebView может блокировать render-blocking CSS -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
 
     <!-- Preconnect к Firebase и ImgBB для ускорения первого запроса -->
     <link rel="preconnect" href="https://firestore.googleapis.com" />
@@ -25,15 +25,15 @@
     <style>html,body{background:#08081A;margin:0;padding:0;}</style>
     <link rel="apple-touch-icon" href="/icon.png" />
     <link rel="icon" type="image/png" href="/icon.png" />
-    <script type="module" crossorigin src="/assets/index-CrElmT9h.js"></script>
+    <script type="module" crossorigin src="/assets/index-DM--M1oj.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vendor-react-BFhlPQxZ.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vkui-DUQHXJlU.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-Dw7tvUqI.js">
     <link rel="stylesheet" crossorigin href="/assets/vendor-vkui-BAwIx3uw.css">
-    <link rel="stylesheet" crossorigin href="/assets/index-BVMXjPOM.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-D-AS7m46.css">
   </head>
   <body>
-    <script>try{var t=localStorage.getItem('apg_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+    <script>try{var t=localStorage.getItem('apg_theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
     <div id="root"></div>
   </body>
 </html>

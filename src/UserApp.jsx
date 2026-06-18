@@ -95,7 +95,7 @@ export function UserApp() {
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
   const [joinedGroup, setJoinedGroup]             = useState(false);
-  const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'light');
+  const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'dark');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;

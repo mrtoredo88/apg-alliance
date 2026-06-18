@@ -401,7 +401,6 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
     return true;
   });
 
-  // Закрываем модал при уходе с панели — иначе portal остаётся поверх всего приложения
   useEffect(() => {
     if (!isActive && selected) setSelected(null);
   }, [isActive, selected]);
@@ -414,8 +413,6 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
   }, [selected]);
 
   return (
-    // Намеренно не используем Panel здесь: UserApp уже оборачивает ExpertsPage в <Panel id="experts">.
-    // Двойной Panel путает VK UI View и ломает анимацию переходов для ВСЕХ панелей.
     <>
       {/* Header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>

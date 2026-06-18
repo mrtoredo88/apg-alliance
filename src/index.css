@@ -27,25 +27,25 @@
 }
 
 [data-theme="light"] {
-  --c-bg:            #F0F2F5;
-  --c-text:          #1C1B1E;
-  --c-text-sec:      rgba(28,27,30,0.5);
-  --c-border:        rgba(0,0,0,0.09);
-  --c-surface:       rgba(255,255,255,0.65);
-  --c-card:          rgba(255,255,255,0.75);
-  --c-card2:         rgba(255,255,255,0.55);
-  --c-tabbar-bg:     rgba(232,234,240,0.85);
-  --c-tabbar-border: rgba(0,0,0,0.1);
-  --c-orb-top:       rgba(120,100,230,0.12);
-  --c-orb-bot:       rgba(100,130,230,0.08);
+  --c-bg:            #ECEEF2;
+  --c-text:          #0D0D14;
+  --c-text-sec:      rgba(13,13,20,0.6);
+  --c-border:        rgba(0,0,0,0.13);
+  --c-surface:       rgba(255,255,255,0.92);
+  --c-card:          rgba(255,255,255,0.96);
+  --c-card2:         rgba(255,255,255,0.88);
+  --c-tabbar-bg:     rgba(240,242,248,0.95);
+  --c-tabbar-border: rgba(0,0,0,0.14);
+  --c-orb-top:       rgba(100,80,200,0.09);
+  --c-orb-bot:       rgba(80,110,200,0.06);
 
-  --c-header-bg:     rgba(245,245,252,0.88);
-  --c-header-border: rgba(0,0,0,0.09);
-  --c-chip-bg:       rgba(0,0,0,0.06);
-  --c-chip-border:   rgba(0,0,0,0.1);
-  --c-chip-text:     rgba(28,27,30,0.65);
+  --c-header-bg:     rgba(244,245,252,0.97);
+  --c-header-border: rgba(0,0,0,0.13);
+  --c-chip-bg:       rgba(0,0,0,0.07);
+  --c-chip-border:   rgba(0,0,0,0.14);
+  --c-chip-text:     rgba(13,13,20,0.78);
 
-  --vkui--color_text_primary:       #1C1B1E;
+  --vkui--color_text_primary:       #0D0D14;
   --vkui--color_background:         transparent;
   --vkui--color_background_content: transparent;
   --vkui--color_background_app:     transparent;
