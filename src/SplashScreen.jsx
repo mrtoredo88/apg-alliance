@@ -25,9 +25,9 @@ const CSS = `
   0%, 100% { opacity: 0.35; transform: scale(1); }
   50%       { opacity: 0.65; transform: scale(1.1); }
 }
-@keyframes apg-dots {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
-  40%           { transform: scale(1);   opacity: 1; }
+@keyframes apg-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
 }
 `;
 
@@ -156,15 +156,19 @@ export function SplashScreen({ isReady, onDone, startTime }) {
             </div>
           </div>
 
-          {/* Индикатор загрузки — три точки */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{
-                width: 7, height: 7, borderRadius: '50%',
-                background: '#C9A84C',
-                animation: `apg-dots 1.2s ease-in-out ${i * 0.18}s infinite`,
-              }} />
-            ))}
+          {/* Прогресс-бар */}
+          <div style={{
+            width: 140, height: 2,
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: 1, overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', borderRadius: 1,
+              background: SHIMMER_GRAD,
+              backgroundSize: '200% 100%',
+              animation: `apg-progress ${MIN_SHOW_MS}ms cubic-bezier(0.4,0,0.2,1) 0.1s forwards,
+                          apg-shimmer 2.6s linear 0.3s infinite`,
+            }} />
           </div>
 
         </div>
