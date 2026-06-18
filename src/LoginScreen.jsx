@@ -57,22 +57,16 @@ export function LoginScreen({ onLogin, onWebLogin, isWebMode = false }) {
         {/* Логотип */}
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16, animation:'fadeInUp 0.5s ease both' }}>
           <div style={{ position:'relative' }}>
-            <div style={{ position:'absolute', inset:-12, borderRadius:36, background:'radial-gradient(circle, rgba(201,168,76,0.18), transparent 70%)' }} />
-            <div style={{ width:96, height:96, borderRadius:28, background:'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.05))', border:'1.5px solid rgba(201,168,76,0.4)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', boxShadow:'0 0 40px rgba(201,168,76,0.15), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-              <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-                <polygon points="26,4 44,26 26,48 8,26" fill="rgba(201,168,76,0.08)" stroke="#C9A84C" strokeWidth="1.8" strokeLinejoin="round"/>
-                <line x1="26" y1="4" x2="26" y2="48" stroke="rgba(201,168,76,0.25)" strokeWidth="1"/>
-                <line x1="8" y1="26" x2="44" y2="26" stroke="rgba(201,168,76,0.25)" strokeWidth="1"/>
-                <circle cx="26" cy="26" r="5" fill="#C9A84C"/>
-                <circle cx="26" cy="26" r="2.5" fill="#0F0F1A"/>
-              </svg>
-            </div>
+            <div style={{ position:'absolute', inset:-16, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,0.18), transparent 70%)' }} />
+            <img
+              src="/logo.png"
+              alt="АПГ"
+              style={{ width:160, height:160, borderRadius:32, display:'block', position:'relative', boxShadow:'0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,168,76,0.2)' }}
+            />
           </div>
 
           <div style={{ textAlign:'center' }}>
-            <div style={{ fontSize:32, fontWeight:900, color:T.textPri, letterSpacing:4, lineHeight:1 }}>АПГ</div>
-            <div style={{ fontSize:11, color:T.gold, fontWeight:700, letterSpacing:2.5, textTransform:'uppercase', marginTop:6 }}>Альянс Партнёров Города</div>
-            <div style={{ fontSize:13, color:T.textSec, marginTop:10, lineHeight:'19px' }}>
+            <div style={{ fontSize:13, color:T.textSec, lineHeight:'19px' }}>
               Программа лояльности лучших<br/>заведений Зеленограда
             </div>
           </div>

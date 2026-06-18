@@ -105,7 +105,7 @@ export function SplashScreen({ isReady, onDone, startTime }) {
 
         {/* Логотип */}
         <div style={{
-          position: 'relative', marginBottom: 40,
+          position: 'relative', marginBottom: 36,
           opacity: 0,
           animation: 'apg-logo-in 0.7s cubic-bezier(0.2,0,0,1) 0.15s forwards',
         }}>
@@ -117,67 +117,30 @@ export function SplashScreen({ isReady, onDone, startTime }) {
           }} />
           {/* Второе кольцо */}
           <div style={{
-            position: 'absolute', inset: -16, borderRadius: 44,
+            position: 'absolute', inset: -16, borderRadius: 52,
             border: '1px solid rgba(201,168,76,0.12)',
             animation: 'apg-ring-pulse 2.6s ease-in-out 1.3s infinite',
           }} />
 
-          {/* Карточка логотипа */}
+          {/* Логотип */}
           <div style={{
-            width: 112, height: 112, borderRadius: 34,
-            background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)',
-            backdropFilter: 'blur(32px)',
-            WebkitBackdropFilter: 'blur(32px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.22)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
             position: 'relative', overflow: 'hidden',
+            borderRadius: 36,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(201,168,76,0.18)',
           }}>
-            {/* Внутренний шиммер — синхронизирован с текстом */}
+            {/* Шиммер поверх лого */}
             <div style={{
-              position: 'absolute', inset: 0,
-              background: `linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%)`,
+              position: 'absolute', inset: 0, zIndex: 1, borderRadius: 36,
+              background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%)',
               backgroundSize: '200% 100%',
               animation: 'apg-shimmer 2.6s linear 1.0s infinite',
+              pointerEvents: 'none',
             }} />
-
-            <svg width="58" height="58" viewBox="0 0 60 60" fill="none">
-              <defs>
-                <linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%"   stopColor="#E8C97A" />
-                  <stop offset="50%"  stopColor="#C9A84C" />
-                  <stop offset="100%" stopColor="#9A7030" />
-                </linearGradient>
-                <filter id="df">
-                  <feGaussianBlur stdDeviation="1.2" result="b"/>
-                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-              </defs>
-              <polygon
-                points="30,5 53,30 30,55 7,30"
-                fill="rgba(201,168,76,0.08)"
-                stroke="url(#dg)" strokeWidth="1.6"
-                strokeDasharray="200" strokeDashoffset="200"
-                filter="url(#df)"
-                style={{ animation: 'apg-draw 1.1s cubic-bezier(0.4,0,0.2,1) 0.2s forwards' }}
-              />
-              <line x1="7" y1="30" x2="53" y2="30"
-                stroke="rgba(201,168,76,0.28)" strokeWidth="0.8"
-                strokeDasharray="46" strokeDashoffset="46"
-                style={{ animation: 'apg-draw 0.5s ease 1.0s forwards' }}
-              />
-              <line x1="30" y1="5" x2="30" y2="55"
-                stroke="rgba(201,168,76,0.28)" strokeWidth="0.8"
-                strokeDasharray="50" strokeDashoffset="50"
-                style={{ animation: 'apg-draw 0.5s ease 1.0s forwards' }}
-              />
-              <circle cx="30" cy="30" r="4" fill="#C9A84C"
-                style={{ opacity: 0, animation: 'apg-fadein 0.35s ease 1.3s forwards' }}
-              />
-              <circle cx="30" cy="30" r="1.6" fill="#080818"
-                style={{ opacity: 0, animation: 'apg-fadein 0.35s ease 1.3s forwards' }}
-              />
-            </svg>
+            <img
+              src="/logo.png"
+              alt="АПГ"
+              style={{ width: 200, height: 200, display: 'block', borderRadius: 36 }}
+            />
           </div>
         </div>
 
@@ -217,21 +180,6 @@ export function SplashScreen({ isReady, onDone, startTime }) {
             <span style={{ ...shimmerText() }}>Зеленоград</span>
           </div>
 
-          {/* Альянс Партнёров Города */}
-          <div style={{
-            fontSize: 12, letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            marginTop: 8,
-            opacity: 0,
-            animation: 'apg-fadein 0.4s ease 1.1s forwards',
-          }}>
-            <span style={{
-              ...shimmerText({ WebkitTextFillColor: undefined, backgroundClip: undefined }),
-              background: undefined,
-              color: 'rgba(201,168,76,0.45)',
-              WebkitTextFillColor: 'rgba(201,168,76,0.45)',
-            }}>Альянс Партнёров Города</span>
-          </div>
         </div>
 
         {/* Прогресс-бар */}
