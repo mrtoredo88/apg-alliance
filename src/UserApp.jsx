@@ -8,7 +8,7 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
-  where, getCountFromServer,
+  where, getCountFromServer, limit,
 } from 'firebase/firestore';
 import { HomePanel }         from './HomePanel.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
@@ -237,16 +237,18 @@ export function UserApp() {
         ).catch(() => {});
       }
 
+      console.time('apg:load-all');
       const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap] = await Promise.all([
-        getDocs(collection(db, 'partners')),
-        getDocs(collection(db, 'events')),
-        getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
+        (console.time('apg:partners'), getDocs(collection(db, 'partners')).then(s => (console.timeEnd('apg:partners'), s))),
+        (console.time('apg:events'),   getDocs(collection(db, 'events')).then(s => (console.timeEnd('apg:events'), s))),
+        getDocs(query(collection(db, 'news'),        orderBy('createdAt', 'desc'), limit(30))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'reviews'),     orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
         fetch('/api/vk-news').then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
         getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
       ]);
+      console.timeEnd('apg:load-all');
 
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));

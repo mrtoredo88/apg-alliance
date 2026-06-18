@@ -81,6 +81,11 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 1024 * 1024) {
+      alert('Файл слишком большой. Максимум 1 МБ.');
+      e.target.value = '';
+      return;
+    }
     setUploading(true);
     try {
       const url = await uploadToImgBB(file);

@@ -50,7 +50,7 @@ function EventModal({ event, onClose }) {
         {/* Обложка события */}
         {event.imageUrl && (
           <div style={{ margin: '-24px -20px 20px', overflow: 'hidden', borderRadius: '0' }}>
-            <img src={event.imageUrl} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display='none'} />
+            <img src={event.imageUrl} alt="" loading="lazy" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display='none'} />
           </div>
         )}
 
@@ -457,7 +457,7 @@ function NewsModal({ item, onClose }) {
         {/* Скроллируемый контент */}
         <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
           {item.imageUrl && (
-            <img src={item.imageUrl} alt="" onError={e => { e.target.style.display = 'none'; }}
+            <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
               style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', marginTop: 8 }} />
           )}
           <div style={{ padding: '20px 20px 48px' }}>
@@ -578,7 +578,7 @@ function NewsWidget({ news }) {
                 <div key={n.id} style={{ height: ITEM_H, display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
                   {n.imageUrl ? (
                     <div style={{ margin: '0 -16px 12px', position: 'relative', flexShrink: 0 }}>
-                      <img src={n.imageUrl} alt="" onError={e => { e.target.style.display = 'none'; }}
+                      <img src={n.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
                         style={{ width: '100%', height: 132, objectFit: 'cover', display: 'block' }} />
                       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(8,8,26,0.55) 0%, transparent 55%)', pointerEvents: 'none' }} />
                     </div>
@@ -1522,7 +1522,7 @@ export function HomePanel({
                   {recentReviews.slice(0, 5).map(r => (
                     <div key={r.id} style={{ ...GLASS, borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       {r.userPhoto
-                        ? <img src={r.userPhoto} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                        ? <img src={r.userPhoto} alt="" loading="lazy" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
                         : <div style={{ width: 36, height: 36, borderRadius: '50%', background: T.chipBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👤</div>
                       }
                       <div style={{ flex: 1, minWidth: 0 }}>

@@ -200,7 +200,7 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
             {user?.photo_200
-              ? <img src={user.photo_200} alt="" style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.gold}88`, objectFit: 'cover', flexShrink: 0 }} />
+              ? <img src={user.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.gold}88`, objectFit: 'cover', flexShrink: 0 }} />
               : <div style={{ width: 56, height: 56, borderRadius: '50%', background: T.gold + '20', border: `2px solid ${T.gold}60`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>👤</div>
             }
             <div>
@@ -514,7 +514,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 <div style={{ width: 72, height: 72, borderRadius: '50%', padding: 2.5, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
                     {safeUser.photo_200
-                      ? <img src={safeUser.photo_200} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#C9A84C', background: 'rgba(201,168,76,0.12)' }}>
                           {(safeUser.first_name || '?')[0].toUpperCase()}
                         </div>
@@ -821,7 +821,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0, overflow: 'hidden' }}>
                 {ownedPartner.logoUrl
-                  ? <img src={ownedPartner.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} onError={e => e.target.style.display='none'} />
+                  ? <img src={ownedPartner.logoUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} onError={e => e.target.style.display='none'} />
                   : ownedPartner.emoji ?? '🏪'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

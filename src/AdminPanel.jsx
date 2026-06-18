@@ -905,7 +905,7 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Фото (URL)</label>
             <input style={s.input} placeholder="https://..." value={exPhoto} onChange={e => setExPhoto(e.target.value)} />
-            {exPhoto && <img src={exPhoto} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', marginBottom: 12 }} onError={e => e.target.style.display='none'} />}
+            {exPhoto && <img src={exPhoto} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', marginBottom: 12 }} onError={e => e.target.style.display='none'} />}
 
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
@@ -958,7 +958,7 @@ export const AdminPanel = () => {
               <div key={ex.id} style={s.row}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                   {ex.photo
-                    ? <img src={ex.photo} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                    ? <img src={ex.photo} alt="" loading="lazy" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
                     : <div style={{ width: 36, height: 36, borderRadius: '50%', background: A.goldDim, border: `1px solid ${A.goldBrd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🧑‍💼</div>
                   }
                   <div style={{ minWidth: 0 }}>
@@ -1009,7 +1009,7 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Ссылка на логотип (URL)</label>
             <input style={s.input} placeholder="https://..." value={pLogo} onChange={e => setPLogo(e.target.value)} />
-            {pLogo && <img src={pLogo} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, border: `2px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+            {pLogo && <img src={pLogo} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, border: `2px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
 
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 (499) 123-45-67" value={pPhone} onChange={e => setPPhone(e.target.value)} />
@@ -1084,7 +1084,7 @@ export const AdminPanel = () => {
                 <div key={p.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     {p.logoUrl
-                      ? <img src={p.logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                      ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
                       : <div style={{ width: 40, height: 40, borderRadius: '50%', background: A.chip, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, border: `1px solid ${A.border}` }}>{p.emoji ?? '🏪'}</div>
                     }
                     <div style={{ minWidth: 0 }}>
@@ -1254,7 +1254,7 @@ export const AdminPanel = () => {
             <label style={s.label}>URL картинки (необязательно)</label>
             <input style={s.input} placeholder="https://i.ibb.co/..." value={nImage} onChange={e => setNImage(e.target.value)} />
             {nImage && (
-              <img src={nImage} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} onError={e => e.target.style.display = 'none'} />
+              <img src={nImage} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} onError={e => e.target.style.display = 'none'} />
             )}
 
             <label style={s.label}>Название ссылки (необязательно)</label>
@@ -1283,7 +1283,7 @@ export const AdminPanel = () => {
                   <div key={item.id} style={s.row}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                       {item.imageUrl
-                        ? <img src={item.imageUrl} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                        ? <img src={item.imageUrl} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
                         : <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{item.emoji ?? '📢'}</div>
                       }
                       <div style={{ minWidth: 0 }}>
@@ -1750,7 +1750,7 @@ export const AdminPanel = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? A.gold : A.textSec, width: 22, flexShrink: 0 }}>#{i + 1}</span>
                         {p.logoUrl
-                          ? <img src={p.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                          ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
                           : <div style={{ width: 28, height: 28, borderRadius: '50%', background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{p.emoji ?? '🏪'}</div>
                         }
                         <div style={{ flex: 1, minWidth: 0 }}>

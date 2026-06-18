@@ -17,7 +17,7 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
     <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.93)', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)' }}>
       <button onClick={onClose} style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'50%', width:38, height:38, color:'#fff', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10 }}>✕</button>
       {photos.length > 1 && <div style={{ position:'absolute', top:22, left:'50%', transform:'translateX(-50%)', fontSize:12, color:'rgba(255,255,255,0.6)', fontWeight:600, zIndex:10 }}>{idx+1}/{photos.length}</div>}
-      <img src={photos[idx]} alt="" onClick={e => e.stopPropagation()} style={{ maxWidth:'94vw', maxHeight:'82vh', objectFit:'contain', borderRadius:16 }} />
+      <img src={photos[idx]} alt="" loading="lazy" onClick={e => e.stopPropagation()} style={{ maxWidth:'94vw', maxHeight:'82vh', objectFit:'contain', borderRadius:16 }} />
       {photos.length > 1 && <>
         <button onClick={e => { e.stopPropagation(); prev(); }} style={{ position:'absolute', left:12, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'50%', width:42, height:42, color:'#fff', fontSize:22, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>‹</button>
         <button onClick={e => { e.stopPropagation(); next(); }} style={{ position:'absolute', right:12, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'50%', width:42, height:42, color:'#fff', fontSize:22, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
@@ -79,7 +79,7 @@ function SimilarCard({ partner, onOpen }) {
   return (
     <button onClick={() => onOpen(partner)} style={{ width:140, flexShrink:0, background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderRadius:20, padding:'14px 12px', border:`1px solid ${T.border}`, cursor:'pointer', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
       {partner.logoUrl && !failed
-        ? <img src={partner.logoUrl} alt="" onError={() => setFailed(true)} style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover', border:`1.5px solid ${T.border}` }} />
+        ? <img src={partner.logoUrl} alt="" loading="lazy" onError={() => setFailed(true)} style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover', border:`1.5px solid ${T.border}` }} />
         : <div style={{ width:48, height:48, borderRadius:'50%', background:`linear-gradient(135deg,hsl(${hue},50%,52%),hsl(${hue},42%,44%))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#fff' }}>{name[0].toUpperCase()}</div>
       }
       <div style={{ fontSize:12, fontWeight:700, color:T.textPri, lineHeight:'15px' }}>{name}</div>
@@ -110,7 +110,7 @@ function ReviewCard({ review, isOwn }) {
     <div style={{ padding:'14px 16px', borderBottom:`1px solid ${T.border}`, animation:'fadeInUp 0.3s ease both' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
         {review.userPhoto
-          ? <img src={review.userPhoto} alt="" style={{ width:32, height:32, borderRadius:'50%', objectFit:'cover', border:`1px solid ${isOwn ? T.gold+'44' : T.border}`, flexShrink:0 }} onError={e => e.target.style.display='none'} />
+          ? <img src={review.userPhoto} alt="" loading="lazy" style={{ width:32, height:32, borderRadius:'50%', objectFit:'cover', border:`1px solid ${isOwn ? T.gold+'44' : T.border}`, flexShrink:0 }} onError={e => e.target.style.display='none'} />
           : <div style={{ width:32, height:32, borderRadius:'50%', background:T.chipBg, border:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>👤</div>
         }
         <div style={{ flex:1, minWidth:0 }}>
@@ -298,7 +298,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
         <div style={{ margin:'8px 16px', borderRadius:24, background:T.surface, position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>
           {photos.length > 0 && (
             <div style={{ height:160, overflow:'hidden', borderRadius:'24px 24px 0 0' }}>
-              <img src={photos[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
+              <img src={photos[0]} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
               <div style={{ position:'absolute', top:0, left:0, right:0, height:160, background:'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(15,15,46,0.7))' }} />
             </div>
           )}
@@ -385,7 +385,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               <div style={{ display:'flex', gap:8, paddingRight:4 }}>
                 {photos.map((url, i) => (
                   <button key={i} onClick={() => setLightboxIdx(i)} style={{ padding:0, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', cursor:'pointer', flexShrink:0, background:'none' }}>
-                    <img src={url} alt="" style={{ width:160, height:110, objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
+                    <img src={url} alt="" loading="lazy" style={{ width:160, height:110, objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
                   </button>
                 ))}
               </div>

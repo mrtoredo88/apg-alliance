@@ -51,7 +51,7 @@ function PodiumCard({ user, rank }) {
         }}>
           <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
             {user.photo
-              ? <img src={user.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }}/>
+              ? <img src={user.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }}/>
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: s * 0.38, color, fontWeight: 700 }}>{(user.firstName ?? '?')[0]}</div>
             }
           </div>
@@ -90,7 +90,7 @@ function UserProfileModal({ user, rank, onClose }) {
           <div style={{ width: 80, height: 80, borderRadius: '50%', padding: 3, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})` }}>
             <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
               {user.photo
-                ? <img src={user.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <img src={user.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: T.gold, fontWeight: 700 }}>{(user.firstName ?? '?')[0]}</div>
               }
             </div>

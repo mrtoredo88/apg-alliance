@@ -34,7 +34,7 @@ function PartnerLogo({ partner, size = 44 }) {
       </div>
     );
   }
-  return <img src={partner.logoUrl} alt={name} onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${T.border}`, display: 'block', flexShrink: 0 }} />;
+  return <img src={partner.logoUrl} alt={name} loading="lazy" onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${T.border}`, display: 'block', flexShrink: 0 }} />;
 }
 
 function openRoute(address) {

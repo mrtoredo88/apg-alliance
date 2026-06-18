@@ -34,7 +34,7 @@ function ExpertAvatar({ expert, size = 64 }) {
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', padding: 2.5, flexShrink: 0, background: `linear-gradient(135deg,${T.gold},${T.goldL})` }}>
       <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
-        <img src={expert.photo} alt="" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={expert.photo} alt="" loading="lazy" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
     </div>
   );
@@ -99,7 +99,7 @@ function ReviewCard({ review }) {
     <div style={{ ...GLASS, borderRadius: 16, padding: '14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         {review.userPhoto
-          ? <img src={review.userPhoto} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          ? <img src={review.userPhoto} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
           : <div style={{ width: 34, height: 34, borderRadius: '50%', background: T.chipBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>👤</div>
         }
         <div style={{ flex: 1 }}>
