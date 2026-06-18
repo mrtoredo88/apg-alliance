@@ -251,6 +251,8 @@ export const AdminPanel = () => {
   const [analytics, setAnalytics]           = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [partnerSearch, setPartnerSearch]   = useState('');
+  const [migrating, setMigrating]           = useState(false);
+  const [migrateResult, setMigrateResult]   = useState(null);
 
   // Призы
   const [prizes, setPrizes]               = useState([]);
@@ -654,6 +656,40 @@ export const AdminPanel = () => {
     fetchData();
   };
 
+  const CATEGORY_MIGRATION = {
+    edu:     { id: 'education',     label: 'Обучение' },
+    fun:     { id: 'entertainment', label: 'Развлечения' },
+    shop:    { id: 'other',         label: 'Другое' },
+    kids:    { id: 'other',         label: 'Другое' },
+    service: { id: 'services',      label: 'Услуги' },
+    home:    { id: 'home',          label: 'Дом и ремонт' },
+  };
+
+  const migrateCategories = async () => {
+    setMigrating(true);
+    setMigrateResult(null);
+    try {
+      const snap = await getDocs(collection(db, 'partners'));
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.docs.forEach(d => {
+        const p = d.data();
+        const mapping = CATEGORY_MIGRATION[p.category];
+        if (mapping) {
+          batch.update(doc(db, 'partners', d.id), { category: mapping.id, categoryLabel: mapping.label });
+          count++;
+        }
+      });
+      if (count > 0) await batch.commit();
+      setMigrateResult(`Обновлено: ${count} партнёров`);
+      fetchData();
+    } catch (e) {
+      setMigrateResult(`Ошибка: ${e.message}`);
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   const drawRaffle = async (prize) => {
     if (!window.confirm(`Провести розыгрыш «${prize.name}»? Победитель будет выбран случайно.`)) return;
     setRaffleDrawing(prize.id);
@@ -1016,6 +1052,18 @@ export const AdminPanel = () => {
                   ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} / ${partners.length}`
                   : `${partners.length} партнёров`}
               </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 12px', background: 'rgba(201,168,76,0.08)', borderRadius: 12, border: `1px solid ${A.goldBrd}` }}>
+              <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
+                {migrateResult ?? 'Обновить старые категории (edu→education, fun→entertainment, service→services и др.)'}
+              </div>
+              <button
+                style={{ ...s.btn, ...s.btnPri, padding: '6px 14px', fontSize: 12, flexShrink: 0 }}
+                onClick={migrateCategories}
+                disabled={migrating}
+              >
+                {migrating ? '...' : '🔄 Мигрировать'}
+              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${A.inputBrd}`, borderRadius: 12, padding: '9px 12px', marginBottom: 14 }}>
               <span style={{ fontSize: 14, color: A.textSec, flexShrink: 0 }}>🔍</span>
