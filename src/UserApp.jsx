@@ -1036,7 +1036,7 @@ export function UserApp() {
           {/* Toast-уведомления */}
           {toast && (
             <div style={{
-              position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+              position: 'fixed', top: 'calc(var(--safe-top, 0px) + 12px)', left: '50%', transform: 'translateX(-50%)',
               zIndex: 10000, pointerEvents: toast.sharePartner ? 'auto' : 'none',
               background: toast.type === 'success' ? 'rgba(75,179,75,0.88)' : 'rgba(20,20,50,0.85)',
               border: `1px solid ${toast.type === 'success' ? 'rgba(75,179,75,0.35)' : 'rgba(255,255,255,0.12)'}`,
