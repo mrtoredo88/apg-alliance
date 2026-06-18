@@ -347,7 +347,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           const filled    = Math.min(stamps, target);
           const completed = stamps >= target;
           return (
-            <div style={{ margin:'12px 16px', borderRadius:24, padding:'16px', background: completed ? 'rgba(201,168,76,0.12)' : T.chipBg, border:`1px solid ${completed ? 'rgba(201,168,76,0.4)' : T.border}`, backdropFilter:'blur(20px)' }}>
+            <div style={{ margin:'12px 16px', borderRadius:24, padding:'16px 18px', background: completed ? 'rgba(201,168,76,0.1)' : T.chipBg, border:`1px solid ${completed ? 'rgba(201,168,76,0.4)' : T.border}`, backdropFilter:'blur(20px)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                 <div style={{ fontSize:11, color: completed ? T.gold : T.textSec, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
                   🎟️ Штамп-карта
@@ -356,23 +356,22 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
                   {filled} / {target}
                 </div>
               </div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
                 {Array.from({ length: target }, (_, i) => (
                   <div key={i} style={{
-                    width:34, height:34, borderRadius:10, border:`2px solid ${i < filled ? T.gold : T.border}`,
-                    background: i < filled ? `linear-gradient(135deg,${T.gold},${T.goldL})` : T.chipBg,
-                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0,
+                    width:32, height:32, borderRadius:'50%',
+                    border:`2px solid ${i < filled ? T.gold : T.border}`,
+                    background: i < filled ? `linear-gradient(135deg,${T.gold},${T.goldL})` : 'transparent',
+                    flexShrink:0,
                     transition:'all 0.3s',
-                    boxShadow: i < filled ? `0 0 8px rgba(201,168,76,0.45)` : 'none',
-                  }}>
-                    {i < filled ? '✦' : ''}
-                  </div>
+                    boxShadow: i < filled ? `0 0 8px rgba(201,168,76,0.4)` : 'none',
+                  }} />
                 ))}
               </div>
-              <div style={{ fontSize:12, color: completed ? T.gold : T.textSec, lineHeight:'17px', fontWeight: completed ? 700 : 400 }}>
+              <div style={{ fontSize:13, color: completed ? T.gold : T.textSec, fontWeight: completed ? 700 : 400 }}>
                 {completed
-                  ? '🏆 Карта заполнена! Покажи администратору для получения награды'
-                  : `Посети ещё ${target - filled} раз${target - filled === 1 ? '' : 'а'} — и получи особый бонус`}
+                  ? 'Награда получена! 🎉'
+                  : `Ещё ${target - filled} визит${target - filled === 1 ? '' : target - filled < 5 ? 'а' : 'ов'} до награды`}
               </div>
             </div>
           );
