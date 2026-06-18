@@ -96,6 +96,44 @@ function PrizeCard({ prize, userKeys, onClaim, isClaimed, index }) {
   );
 }
 
+function ClaimSuccessModal({ prize, onClose }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
+      <div style={{ width: '100%', maxWidth: 420, ...GLASS_STRONG, borderRadius: '28px 28px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease' }}>
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 64, marginBottom: 12, animation: 'float 2.5s ease-in-out infinite' }}>{prize.emoji ?? '🎁'}</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: T.gold, marginBottom: 6 }}>Приз получен! 🎉</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: T.textPri, marginBottom: 16 }}>{prize.name}</div>
+          <div style={{ background: 'rgba(75,179,75,0.08)', border: '1px solid rgba(75,179,75,0.3)', borderRadius: 16, padding: '12px 16px' }}>
+            <div style={{ fontSize: 13, color: T.green, fontWeight: 600, lineHeight: '20px' }}>
+              Покажи этот экран сотруднику при получении
+            </div>
+          </div>
+        </div>
+
+        {(prize.partnerName || prize.partnerContact || prize.partnerPhone) && (
+          <div style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 16, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>📍 Партнёр</div>
+            {prize.partnerName && (
+              <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, marginBottom: prize.partnerContact || prize.partnerPhone ? 4 : 0 }}>{prize.partnerName}</div>
+            )}
+            {(prize.partnerContact || prize.partnerPhone) && (
+              <div style={{ fontSize: 13, color: T.textSec }}>{prize.partnerContact ?? prize.partnerPhone}</div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          style={{ width: '100%', padding: '16px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}
+        >
+          Понятно
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ConfirmModal({ prize, userKeys, onConfirm, onCancel, claiming }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
@@ -133,6 +171,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [confirmPrize, setConfirmPrize] = useState(null);
+  const [claimedPrize, setClaimedPrize] = useState(null);
   const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
@@ -176,7 +215,9 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
             p.id === confirmPrize.id ? { ...p, stock: (p.stock ?? 1) - 1 } : p
           ).filter(p => p.stock === null || p.stock === undefined || p.stock > 0));
         }
+        const won = confirmPrize;
         setConfirmPrize(null);
+        setClaimedPrize(won);
       }
     } finally {
       setClaiming(false);
@@ -300,6 +341,9 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim }
           onCancel={() => !claiming && setConfirmPrize(null)}
           claiming={claiming}
         />
+      )}
+      {claimedPrize && (
+        <ClaimSuccessModal prize={claimedPrize} onClose={() => setClaimedPrize(null)} />
       )}
     </Panel>
   );
