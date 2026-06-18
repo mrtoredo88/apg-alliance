@@ -242,7 +242,12 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   const openVkGroup = () => {
     if (!partner.vkGroupUrl) return;
-    const url = partner.vkGroupUrl.startsWith('http') ? partner.vkGroupUrl : `https://vk.com/${partner.vkGroupUrl}`;
+    let raw = partner.vkGroupUrl.trim();
+    // strip protocol if present, then rebuild properly
+    raw = raw.replace(/^https?:\/\//i, '');
+    // vk.me/slug → vk.com/slug
+    raw = raw.replace(/^vk\.me\//i, 'vk.com/');
+    const url = raw.startsWith('vk.com/') ? `https://${raw}` : `https://vk.com/${raw}`;
     openUrl(url);
   };
   const handlePhone = () => {
