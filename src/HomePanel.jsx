@@ -687,6 +687,9 @@ function HeroBanner({ userKeys, userName, streak }) {
                 <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1, letterSpacing: -0.5 }}>
                   {userKeys} <span style={{ fontSize: 14, fontWeight: 700, color: T.goldL }}>🗝️</span>
                 </div>
+                <div style={{ fontSize: 11, color: T.textSec, marginTop: 3 }}>
+                  {nextLevel ? `До ${nextLevel.label}: ${toNext} ключей` : 'Максимальный уровень 👑'}
+                </div>
               </div>
             </div>
             {nextLevel && (
