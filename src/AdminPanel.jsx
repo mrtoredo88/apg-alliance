@@ -248,6 +248,8 @@ export const AdminPanel = () => {
 
   // Призы
   const [prizes, setPrizes]               = useState([]);
+  const [raffleDrawing, setRaffleDrawing] = useState(null);  // prizeId в процессе
+  const [raffleResult, setRaffleResult]   = useState(null);  // { prizeId, winner } или { prizeId, error }
   const [editingPrize, setEditingPrize]   = useState(null);
   const [prName, setPrName]               = useState('');
   const [prDesc, setPrDesc]               = useState('');
@@ -632,6 +634,32 @@ export const AdminPanel = () => {
     if (!window.confirm('Удалить приз?')) return;
     await deleteDoc(doc(db, 'prizes', id));
     fetchData();
+  };
+
+  const drawRaffle = async (prize) => {
+    if (!window.confirm(`Провести розыгрыш «${prize.name}»? Победитель будет выбран случайно.`)) return;
+    setRaffleDrawing(prize.id);
+    setRaffleResult(null);
+    try {
+      const res = await fetch('/api/raffle-draw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: 'apg2026raffle', prizeId: prize.id }),
+      });
+      const data = await res.json();
+      if (data.winner) {
+        setRaffleResult({ prizeId: prize.id, winner: data.winner.userName });
+        fetchData();
+      } else if (data.skipped) {
+        setRaffleResult({ prizeId: prize.id, error: data.skipped });
+      } else {
+        setRaffleResult({ prizeId: prize.id, error: data.error ?? 'Неизвестная ошибка' });
+      }
+    } catch (e) {
+      setRaffleResult({ prizeId: prize.id, error: e.message });
+    } finally {
+      setRaffleDrawing(null);
+    }
   };
 
   // ─── Начисление ключей ──────────────────────────────────────────────────────
@@ -1399,17 +1427,39 @@ export const AdminPanel = () => {
                         {p.emoji ?? '🎁'}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: p.active ? A.text : A.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.name}
-                          {!p.active && <span style={{ fontSize: 11, color: A.textSec, fontWeight: 400, marginLeft: 6 }}>скрыт</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: p.active ? A.text : A.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.name}
+                            {!p.active && <span style={{ fontSize: 11, color: A.textSec, fontWeight: 400, marginLeft: 6 }}>скрыт</span>}
+                          </div>
+                          {p.type === 'raffle' && (
+                            <span style={{ fontSize: 9, fontWeight: 800, color: '#9664FF', background: 'rgba(150,100,255,0.15)', border: '1px solid rgba(150,100,255,0.3)', borderRadius: 5, padding: '1px 6px', flexShrink: 0, letterSpacing: 0.5 }}>РОЗЫГРЫШ</span>
+                          )}
                         </div>
                         <div style={{ fontSize: 12, color: A.textSec }}>
-                          🗝️ {p.cost} ключей
-                          {p.stock !== null && p.stock !== undefined && ` · ${p.stock} шт.`}
+                          {p.type === 'raffle'
+                            ? `🎟️ ${p.ticketCost ?? 0} 🗝️/билет · ${p.raffleDate?.toDate ? p.raffleDate.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '—'}`
+                            : `🗝️ ${p.cost} ключей${p.stock !== null && p.stock !== undefined ? ` · ${p.stock} шт.` : ''}`
+                          }
+                          {p.winner && <span style={{ color: '#4BB34B', marginLeft: 6 }}>✓ Победитель: {p.winner.userName}</span>}
                         </div>
+                        {raffleResult?.prizeId === p.id && (
+                          <div style={{ fontSize: 12, marginTop: 4, color: raffleResult.winner ? '#4BB34B' : '#E53935', fontWeight: 600 }}>
+                            {raffleResult.winner ? `🏆 Победитель: ${raffleResult.winner}` : `⚠️ ${raffleResult.error}`}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {p.type === 'raffle' && !p.winner && (
+                        <button
+                          style={{ ...s.btn, padding: '6px 10px', fontSize: 12, background: 'linear-gradient(135deg,#9664FF,#7B4FD4)', color: '#fff', border: 'none', opacity: raffleDrawing === p.id ? 0.6 : 1 }}
+                          disabled={raffleDrawing === p.id}
+                          onClick={() => drawRaffle(p)}
+                        >
+                          {raffleDrawing === p.id ? '...' : '🎟️ Розыгрыш'}
+                        </button>
+                      )}
                       <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPrize(p)}>✏️</button>
                       <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePrize(p.id)}>🗑️</button>
                     </div>
