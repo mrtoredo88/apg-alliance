@@ -139,7 +139,7 @@ export function SplashScreen({ isReady, onDone, startTime }) {
             <img
               src="/logo.png"
               alt="АПГ"
-              style={{ width: 200, height: 200, display: 'block', borderRadius: 36 }}
+              style={{ width: 240, height: 240, display: 'block', borderRadius: 40 }}
             />
           </div>
         </div>
