@@ -95,6 +95,7 @@ export function UserApp() {
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
   const [joinedGroup, setJoinedGroup]             = useState(false);
+  const [lastBonusDate, setLastBonusDate]         = useState(null);
   const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'dark');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
@@ -317,6 +318,7 @@ export function UserApp() {
         setVisitCounts(data.visitCounts ?? {});
         setRegisteredEventIds(data.registeredEvents ?? []);
         setJoinedGroup(data.joinedGroup ?? false);
+        setLastBonusDate(data.lastBonusDate ?? null);
         setScannedExperts(data.scannedExperts ?? {});
         if (!data.onboardingDone) setShowOnboarding(true);
 
@@ -997,6 +999,7 @@ export function UserApp() {
                     onShare={handleShare}
                     onLogout={handleLogout}
                     onDeleteProfile={handleDeleteProfile}
+                    lastBonusDate={lastBonusDate}
                     ownedPartner={ownedPartner}
                     onOpenPartnerCabinet={() => goPanel('partner-cabinet')}
                   />

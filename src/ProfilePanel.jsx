@@ -292,7 +292,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   );
 }
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {} }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -568,6 +568,22 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           ))}
         </div>
       </div>
+
+      {/* ── Ежедневный бонус ── */}
+      {(() => {
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const received = lastBonusDate === todayKey;
+        return (
+          <div style={{ padding: '12px 16px 0' }}>
+            <div style={{ ...GLASS, borderRadius: 16, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 16 }}>🗝️</span>
+              <span style={{ fontSize: 13, color: received ? T.green : T.textSec, fontWeight: received ? 600 : 400 }}>
+                {received ? '+1 ключ за вход · Сегодня получен ✓' : '+1 ключ за вход · Зайди завтра'}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Путь участника ── */}
       <div style={{ padding: '16px 16px 0' }}>
