@@ -1057,6 +1057,7 @@ export function HomePanel({
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
   registeredEventIds = [], onEventRegister, userRank = null, customTasks = [],
   appearance = 'light',
+  joinedGroup = false, onJoinGroup,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1258,6 +1259,45 @@ export function HomePanel({
             <NewsFeed news={news} />
 
             <StreakWidget streak={streak} lastScanDate={lastScanDate} onOpenTasks={onOpenTasks} />
+
+            {/* Баннер подписки на сообщество ВКонтакте */}
+            {!joinedGroup && (
+              <div style={{ padding: '12px 16px 0' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(74,144,217,0.13), rgba(120,80,220,0.10))',
+                  border: '1px solid rgba(74,144,217,0.28)',
+                  borderRadius: 20, padding: '14px 16px',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  animation: 'fadeInUp 0.3s ease',
+                }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                    background: 'linear-gradient(135deg, rgba(74,144,217,0.25), rgba(120,80,220,0.2))',
+                    border: '1px solid rgba(74,144,217,0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+                  }}>🤝</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri, marginBottom: 2 }}>
+                      Вступи в сообщество АПГ
+                    </div>
+                    <div style={{ fontSize: 11, color: T.textSec, lineHeight: '15px' }}>
+                      Новости, акции и события — и <span style={{ color: '#C9A84C', fontWeight: 700 }}>+1 🗝️</span> за подписку
+                    </div>
+                  </div>
+                  <button
+                    onClick={onJoinGroup}
+                    style={{
+                      background: 'linear-gradient(135deg, #4A90D9, #7850DC)',
+                      border: 'none', borderRadius: 12, padding: '9px 14px',
+                      color: '#fff', fontSize: 12, fontWeight: 700,
+                      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Вступить
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div style={{ padding: '12px 0 4px' }}>
               <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} onOpenRewards={onOpenRewards} userRank={userRank} />

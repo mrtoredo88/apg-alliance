@@ -42,6 +42,10 @@ const send = async (method, params = {}) => {
       case 'VKWebAppOpenCodeReader':
         throw new Error('web_mode');
 
+      case 'VKWebAppJoinGroup':
+        window.open(`https://vk.com/public${params.group_id}`, '_blank', 'noopener,noreferrer');
+        throw new Error('web_mode');
+
       case 'VKWebAppGetAuthToken':
         throw new Error('web_mode');
 

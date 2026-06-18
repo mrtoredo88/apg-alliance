@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
-import vkBridge from './vk.js';
+import vkBridge, { isVK } from './vk.js';
 import { db, auth } from './firebase';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
@@ -90,6 +90,7 @@ export function UserApp() {
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
+  const [joinedGroup, setJoinedGroup]             = useState(false);
   const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'light');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
@@ -304,6 +305,7 @@ export function UserApp() {
         setScanDates(data.scanDates ?? []);
         setVisitCounts(data.visitCounts ?? {});
         setRegisteredEventIds(data.registeredEvents ?? []);
+        setJoinedGroup(data.joinedGroup ?? false);
         if (!data.onboardingDone) setShowOnboarding(true);
 
         // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
@@ -697,6 +699,28 @@ export function UserApp() {
     } catch {}
   }, []);
 
+  const VK_GROUP_ID = 229980067;
+  const handleJoinGroup = useCallback(async () => {
+    try {
+      await vkBridge.send('VKWebAppJoinGroup', { group_id: VK_GROUP_ID });
+      // Успешно вступил (или уже был членом) — начисляем бонус только если ещё не получал
+      if (user && !joinedGroup) {
+        updateDoc(doc(db, 'users', String(user.id)), { joinedGroup: true, keys: increment(1) }).catch(() => {});
+        setUserKeys(prev => prev + 1);
+        showToast('🎉 +1 ключ за подписку на сообщество!', 'success');
+      }
+      setJoinedGroup(true);
+    } catch (e) {
+      if (isVK()) {
+        // Пользователь отменил — не даём бонус
+      } else {
+        // Веб-режим: открыли группу, считаем выполненным (без бонуса)
+        setJoinedGroup(true);
+        if (user) updateDoc(doc(db, 'users', String(user.id)), { joinedGroup: true }).catch(() => {});
+      }
+    }
+  }, [user, joinedGroup, showToast]);
+
   // ─── Навигация ──────────────────────────────────────────────────────────────
 
   const goPanel = useCallback((id) => setActivePanel(id), []);
@@ -876,6 +900,8 @@ export function UserApp() {
                 onOpenLeaderboard={() => goPanel('leaderboard')}
                 onOpenRewards={() => goPanel('rewards')}
                 onOpenNotifications={openNotifications}
+                joinedGroup={joinedGroup}
+                onJoinGroup={handleJoinGroup}
               />
 
               <Suspense fallback={<Panel id="partner"><LazyFallback /></Panel>}>
