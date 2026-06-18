@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
@@ -1053,7 +1054,7 @@ export function UserApp() {
             </View>
           </div>
 
-          <TabBar />
+          {createPortal(<TabBar />, document.body)}
 
           <Suspense fallback={null}>
             <ScannerComponent
