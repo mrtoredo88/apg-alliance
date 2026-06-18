@@ -639,6 +639,40 @@ export function UserApp() {
     }
   }, [user, userKeys]);
 
+  const handleRaffleEnter = useCallback(async (prize, ticketCount) => {
+    if (!user || !prize) return false;
+    const cost = ticketCount * (prize.ticketCost ?? 0);
+    if (userKeys < cost) return false;
+    if (claimingPrizeRef.current) return false;
+    claimingPrizeRef.current = true;
+    setUserKeys(prev => prev - cost);
+    try {
+      const uid = String(user.id);
+      const userName = user.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : 'Участник АПГ';
+      await Promise.all([
+        updateDoc(doc(db, 'users', uid), { keys: increment(-cost) }),
+        setDoc(doc(db, 'raffleEntries', `${prize.id}_${uid}`), {
+          prizeId: prize.id, userId: uid, userName,
+          userPhoto: user.photo_200 ?? null,
+          ticketsCount: increment(ticketCount),
+          updatedAt: serverTimestamp(),
+        }, { merge: true }),
+      ]);
+      addDoc(collection(db, 'users', uid, 'activity'), {
+        type: 'raffle_enter', icon: prize.emoji ?? '🎟️',
+        text: `Участие в розыгрыше: ${prize.name} (−${cost} 🗝️)`,
+        ts: serverTimestamp(),
+      }).catch(() => {});
+      return true;
+    } catch (e) {
+      console.error(e);
+      setUserKeys(prev => prev + cost);
+      return false;
+    } finally {
+      claimingPrizeRef.current = false;
+    }
+  }, [user, userKeys]);
+
   // ─── Мероприятия ────────────────────────────────────────────────────────────
 
   const handleEventRegister = useCallback(async (event) => {
@@ -999,6 +1033,7 @@ export function UserApp() {
                     onShare={handleShare}
                     onLogout={handleLogout}
                     onDeleteProfile={handleDeleteProfile}
+                    onRaffleEnter={handleRaffleEnter}
                     lastBonusDate={lastBonusDate}
                     ownedPartner={ownedPartner}
                     onOpenPartnerCabinet={() => goPanel('partner-cabinet')}
@@ -1081,6 +1116,7 @@ export function UserApp() {
                     user={user} userKeys={userKeys}
                     onBack={() => goPanel('home')}
                     onClaim={handlePrizeClaim}
+                    onRaffleEnter={handleRaffleEnter}
                   />
                 </Suspense>
               </Panel>
