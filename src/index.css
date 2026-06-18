@@ -20,6 +20,7 @@
   --vkui--color_text_primary:       #f0f0f0;
   --vkui--color_text_accent:        #C9A84C;
   --vkui--color_background_accent:  #1e2a44;
+  --vkui--font_family_base:         'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
 
   --vkui--size_border_radius_paper--regular: 16px;
   --vkui--size_border_radius_button--m:      12px;
@@ -55,6 +56,7 @@ html, body {
   padding: 0;
   min-height: 100vh;
   overscroll-behavior: none;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* Градиент на body с fixed-attachment: позиция всегда относительно вьюпорта.

@@ -42,7 +42,6 @@ const A = {
 const s = {
   page:     {
     padding: '16px 14px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
     background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)',
     minHeight: '100vh',
   },
