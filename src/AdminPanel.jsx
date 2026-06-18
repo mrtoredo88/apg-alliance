@@ -6,12 +6,18 @@ import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch, increment, limit } from 'firebase/firestore';
 
 const CATEGORIES = [
-  { id: 'food',   label: 'Еда',         emoji: '🍽️' },
-  { id: 'beauty', label: 'Красота',     emoji: '💄' },
-  { id: 'sport',  label: 'Спорт',       emoji: '💪' },
-  { id: 'edu',    label: 'Обучение',    emoji: '📚' },
-  { id: 'fun',    label: 'Развлечения', emoji: '🎉' },
-  { id: 'other',  label: 'Другое',      emoji: '🏪' },
+  { id: 'food',          label: 'Еда',          emoji: '🍕' },
+  { id: 'beauty',        label: 'Красота',       emoji: '💄' },
+  { id: 'sport',         label: 'Спорт',         emoji: '💪' },
+  { id: 'education',     label: 'Обучение',      emoji: '📚' },
+  { id: 'entertainment', label: 'Развлечения',   emoji: '🎉' },
+  { id: 'health',        label: 'Здоровье',      emoji: '🏥' },
+  { id: 'home',          label: 'Дом и ремонт',  emoji: '🏠' },
+  { id: 'pets',          label: 'Животные',      emoji: '🐾' },
+  { id: 'fashion',       label: 'Одежда',        emoji: '👗' },
+  { id: 'auto',          label: 'Авто',          emoji: '🚗' },
+  { id: 'services',      label: 'Услуги',        emoji: '💼' },
+  { id: 'other',         label: 'Другое',        emoji: '📦' },
 ];
 
 const EVENT_EMOJIS   = ['🎉','🎓','🍕','💆','🏋️','🎨','🎤','🤝','🎁','🌟','🎭','☕'];

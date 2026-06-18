@@ -5,18 +5,19 @@ import vkBridge from './vk.js';
 import { T, GLASS } from './design.js';
 
 const CATEGORIES = [
-  { id: 'all',     label: 'Все',         emoji: '✦' },
-  { id: 'food',    label: 'Еда',         emoji: '🍽' },
-  { id: 'beauty',  label: 'Красота',     emoji: '💄' },
-  { id: 'health',  label: 'Здоровье',    emoji: '💊' },
-  { id: 'sport',   label: 'Спорт',       emoji: '💪' },
-  { id: 'edu',     label: 'Обучение',    emoji: '📚' },
-  { id: 'fun',     label: 'Развлечения', emoji: '🎉' },
-  { id: 'shop',    label: 'Магазины',    emoji: '🛍️' },
-  { id: 'auto',    label: 'Авто',        emoji: '🚗' },
-  { id: 'home',    label: 'Дом',         emoji: '🏠' },
-  { id: 'kids',    label: 'Дети',        emoji: '👶' },
-  { id: 'service', label: 'Сервис',      emoji: '🔧' },
+  { id: 'all',           label: 'Все',          emoji: '✦' },
+  { id: 'food',          label: 'Еда',          emoji: '🍕' },
+  { id: 'beauty',        label: 'Красота',       emoji: '💄' },
+  { id: 'sport',         label: 'Спорт',         emoji: '💪' },
+  { id: 'education',     label: 'Обучение',      emoji: '📚' },
+  { id: 'entertainment', label: 'Развлечения',   emoji: '🎉' },
+  { id: 'health',        label: 'Здоровье',      emoji: '🏥' },
+  { id: 'home',          label: 'Дом и ремонт',  emoji: '🏠' },
+  { id: 'pets',          label: 'Животные',      emoji: '🐾' },
+  { id: 'fashion',       label: 'Одежда',        emoji: '👗' },
+  { id: 'auto',          label: 'Авто',          emoji: '🚗' },
+  { id: 'services',      label: 'Услуги',        emoji: '💼' },
+  { id: 'other',         label: 'Другое',        emoji: '📦' },
 ];
 
 // Центр Зеленограда
