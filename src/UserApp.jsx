@@ -232,13 +232,14 @@ export function UserApp() {
         ).catch(() => {});
       }
 
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw] = await Promise.all([
         getDocs(collection(db, 'partners')),
         getDocs(collection(db, 'events')),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
+        fetch('/api/vk-news').then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
       ]);
 
       if (!isMounted.current) return;
@@ -254,7 +255,11 @@ export function UserApp() {
       setEvents(freshEvents);
       try { localStorage.setItem('apg_events_cache', JSON.stringify(freshEvents)); } catch {}
 
-      const freshNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const firestoreNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const getMs = n => n.createdAt?.toDate ? n.createdAt.toDate().getTime() : (n.createdAt ?? 0);
+      const freshNews = [...firestoreNews, ...vkPostsRaw]
+        .sort((a, b) => getMs(b) - getMs(a))
+        .slice(0, 20);
       setNews(freshNews);
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
 

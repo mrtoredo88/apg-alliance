@@ -414,6 +414,8 @@ function NewsModal({ item, onClose }) {
 
   const dateStr = item.createdAt?.toDate
     ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    : item.createdAt
+    ? new Date(item.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
     : '';
 
   const pct = Math.max(0, 1 - dragY / 280);
@@ -568,6 +570,8 @@ function NewsWidget({ news }) {
             {news.map((n) => {
               const ds = n.createdAt?.toDate
                 ? n.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+                : n.createdAt
+                ? new Date(n.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
                 : '';
               return (
                 <div key={n.id} style={{ height: ITEM_H, display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
