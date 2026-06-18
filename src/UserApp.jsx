@@ -1095,22 +1095,35 @@ export function UserApp() {
             }}>
               <span style={{ whiteSpace: 'nowrap' }}>{toast.msg}</span>
               {toast.sharePartner && (
-                <button
-                  onClick={() => {
-                    vkBridge.send('VKWebAppShare', {
-                      link: 'https://vk.com/app54601851',
-                      text: `Только что посетил ${toast.sharePartner.name} — +${toast.sharePartner.featured ? 2 : 1} ключ! 🗝️ Присоединяйся к АПГ — Альянсу Партнёров Зеленограда`,
-                    }).catch(() => {});
-                    setToast(null);
-                  }}
-                  style={{
-                    background: 'rgba(74,144,217,0.15)', border: '1px solid rgba(74,144,217,0.35)',
-                    borderRadius: 10, padding: '5px 12px', color: '#6AABEC',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-start',
-                  }}
-                >
-                  📤 Рассказать друзьям
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => {
+                      const msg = `Только что посетил ${toast.sharePartner.name} — участника Альянса Партнёров Зеленограда! Получил ${toast.sharePartner.featured ? '2' : '1'} 🗝️\n\nПрисоединяйся: vk.com/app54601851\n#АПГ #Зеленоград`;
+                      vkBridge.send('VKWebAppShowWallPostBox', {
+                        message: msg,
+                        attachments: 'https://vk.com/app54601851',
+                      }).catch(() => {});
+                      setToast(null);
+                    }}
+                    style={{
+                      background: 'rgba(74,144,217,0.18)', border: '1px solid rgba(74,144,217,0.4)',
+                      borderRadius: 10, padding: '6px 12px', color: '#6AABEC',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer', flex: 1,
+                    }}
+                  >
+                    📝 Поделиться
+                  </button>
+                  <button
+                    onClick={() => setToast(null)}
+                    style={{
+                      background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 10, padding: '6px 10px', color: 'rgba(240,240,240,0.6)',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    Позже
+                  </button>
+                </div>
               )}
             </div>
           )}
