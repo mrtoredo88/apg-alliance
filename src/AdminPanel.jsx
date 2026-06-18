@@ -257,6 +257,9 @@ export const AdminPanel = () => {
   const [prEmoji, setPrEmoji]             = useState('🎁');
   const [prStock, setPrStock]             = useState('');
   const [prActive, setPrActive]           = useState(true);
+  const [prType, setPrType]               = useState('purchase');
+  const [prTicketCost, setPrTicketCost]   = useState('');
+  const [prRaffleDate, setPrRaffleDate]   = useState('');
 
   // Форма партнёра
   const [pName, setPName] = useState('');
@@ -602,6 +605,7 @@ export const AdminPanel = () => {
   const resetPrizeForm = () => {
     setPrName(''); setPrDesc(''); setPrCost(''); setPrEmoji('🎁');
     setPrStock(''); setPrActive(true); setEditingPrize(null);
+    setPrType('purchase'); setPrTicketCost(''); setPrRaffleDate('');
   };
 
   const startEditPrize = (p) => {
@@ -610,6 +614,9 @@ export const AdminPanel = () => {
     setPrCost(String(p.cost ?? '')); setPrEmoji(p.emoji ?? '🎁');
     setPrStock(p.stock !== null && p.stock !== undefined ? String(p.stock) : '');
     setPrActive(p.active !== false);
+    setPrType(p.type ?? 'purchase');
+    setPrTicketCost(p.ticketCost !== undefined ? String(p.ticketCost) : '');
+    setPrRaffleDate(p.raffleDate?.toDate ? p.raffleDate.toDate().toISOString().slice(0, 16) : '');
     window.scrollTo(0, 0);
   };
 
@@ -620,7 +627,12 @@ export const AdminPanel = () => {
       cost: Number(prCost), emoji: prEmoji,
       stock: prStock !== '' ? Number(prStock) : null,
       active: prActive,
+      type: prType,
     };
+    if (prType === 'raffle') {
+      data.ticketCost = prTicketCost !== '' ? Number(prTicketCost) : 1;
+      data.raffleDate = prRaffleDate ? new Date(prRaffleDate) : null;
+    }
     if (editingPrize) {
       await updateDoc(doc(db, 'prizes', editingPrize.id), data);
     } else {
@@ -1400,6 +1412,25 @@ export const AdminPanel = () => {
                 <div style={{ position: 'absolute', top: 3, left: prActive ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </button>
             </div>
+
+            <label style={s.label}>Тип приза</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {['purchase', 'raffle'].map(t => (
+                <button key={t} onClick={() => setPrType(t)} style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: prType === t ? A.gold : 'rgba(255,255,255,0.1)', color: prType === t ? '#000' : A.text, transition: 'background 0.2s' }}>
+                  {t === 'purchase' ? '🛒 Покупка' : '🎟️ Розыгрыш'}
+                </button>
+              ))}
+            </div>
+
+            {prType === 'raffle' && (
+              <>
+                <label style={s.label}>Стоимость одного билета (ключей)</label>
+                <input style={s.input} type="number" min="1" placeholder="5" value={prTicketCost} onChange={e => setPrTicketCost(e.target.value)} />
+
+                <label style={s.label}>Дата и время розыгрыша</label>
+                <input style={s.input} type="datetime-local" value={prRaffleDate} onChange={e => setPrRaffleDate(e.target.value)} />
+              </>
+            )}
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePrize}>
