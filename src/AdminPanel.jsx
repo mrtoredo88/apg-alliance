@@ -40,10 +40,30 @@ const A = {
 };
 
 const s = {
-  page:     {
-    padding: '16px 14px',
+  page: {
+    display: 'flex',
+    height: '100vh',
+    overflow: 'hidden',
     background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)',
-    minHeight: '100vh',
+  },
+  sidebar: {
+    width: 220,
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    overflowY: 'auto',
+    background: 'rgba(255,255,255,0.025)',
+    borderRight: '1px solid rgba(255,255,255,0.07)',
+    padding: '20px 12px',
+    boxSizing: 'border-box',
+  },
+  content: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '24px 28px',
+    boxSizing: 'border-box',
+    maxWidth: 960,
   },
   card:     {
     background: 'rgba(255,255,255,0.04)',
@@ -736,50 +756,55 @@ export const AdminPanel = () => {
 
   return (
     <div style={s.page}>
-      {/* Шапка */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-            background: 'linear-gradient(135deg, #C9A84C, #E8C76D)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
-            boxShadow: '0 4px 16px rgba(201,168,76,0.35)',
-          }}>⚙️</div>
+      {/* Боковое меню */}
+      <aside style={s.sidebar}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 4px 12px rgba(201,168,76,0.35)' }}>⚙️</div>
           <div>
-            <h1 style={s.h1}>Панель управления</h1>
-            <p style={{ color: A.gold, fontSize: 12, margin: 0, fontWeight: 600 }}>АПГ — Альянс Партнёров Города</p>
+            <div style={{ fontSize: 13, fontWeight: 800, color: A.text, lineHeight: 1.3 }}>Управление</div>
+            <div style={{ fontSize: 10, color: A.gold, fontWeight: 700, letterSpacing: 0.5 }}>АПГ Зеленоград</div>
           </div>
         </div>
-      </div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {[
+            { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
+            { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
+            { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
+            { id: 'news',      emoji: '📢', label: 'Новости',   count: news.length },
+            { id: 'notifs',    emoji: '🔔', label: 'Рассылка' },
+            { id: 'tasks',     emoji: '✅', label: 'Задания',   count: customTasks.length },
+            { id: 'prizes',    emoji: '🎁', label: 'Призы',     count: prizes.length },
+            { id: 'analytics', emoji: '📊', label: 'Аналитика' },
+          ].map(t => {
+            const active = activeTab === t.id;
+            return (
+              <button key={t.id}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: active ? 'rgba(201,168,76,0.13)' : 'transparent',
+                  borderLeft: active ? `3px solid ${A.gold}` : '3px solid transparent',
+                  color: active ? A.gold : A.textSec,
+                  fontSize: 13, fontWeight: active ? 700 : 400,
+                  textAlign: 'left', width: '100%', transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ fontSize: 15, flexShrink: 0 }}>{t.emoji}</span>
+                <span style={{ flex: 1 }}>{t.label}</span>
+                {t.count != null && t.count > 0 && (
+                  <span style={{ fontSize: 11, background: active ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.08)', color: active ? A.gold : A.textSec, padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>
+                    {t.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
 
-      {/* Навигация по разделам */}
-      <div style={s.tabs}>
-        {[
-          { id: 'partners', label: `🤝 Партнёры`, count: partners.length },
-          { id: 'experts',  label: `🧑‍💼 Эксперты`, count: experts.length },
-          { id: 'events',   label: `🎉 События`,  count: events.length },
-          { id: 'news',     label: `📢 Новости`,  count: news.length },
-          { id: 'notifs',   label: `🔔 Рассылка` },
-          { id: 'tasks',    label: `✅ Задания`,  count: customTasks.length },
-          { id: 'prizes',   label: `🎁 Призы`,    count: prizes.length },
-          { id: 'analytics',label: '📊 Аналитика' },
-        ].map(t => (
-          <button key={t.id}
-            style={{
-              ...s.tab,
-              background: activeTab === t.id
-                ? 'linear-gradient(135deg, #C9A84C, #E8C76D)'
-                : 'rgba(255,255,255,0.06)',
-              color: activeTab === t.id ? '#0F0F1A' : A.textSec,
-              border: activeTab === t.id ? 'none' : '1px solid rgba(255,255,255,0.08)',
-              boxShadow: activeTab === t.id ? '0 4px 16px rgba(201,168,76,0.3)' : 'none',
-            }}
-            onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); }}
-          >
-            {t.label}{t.count != null ? ` (${t.count})` : ''}
-          </button>
-        ))}
-      </div>
+      {/* Основной контент */}
+      <div style={s.content}>
 
       {/* ── ЭКСПЕРТЫ ── */}
       {activeTab === 'experts' && (
@@ -1621,6 +1646,7 @@ export const AdminPanel = () => {
       )}
 
       <div style={{ height: 32 }} />
+      </div>{/* end content */}
 
       {/* QR-модал для партнёра */}
       {qrPartner && (
