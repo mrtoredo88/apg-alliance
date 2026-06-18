@@ -1086,6 +1086,7 @@ export function UserApp() {
                     user={user}
                     scannedExperts={scannedExperts}
                     onBack={() => goPanel('home')}
+                    isActive={activePanel === 'experts'}
                   />
                 </Suspense>
               </Panel>

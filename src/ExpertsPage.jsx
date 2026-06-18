@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Panel } from '@vkontakte/vkui';
 import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from './firebase';
@@ -387,7 +386,7 @@ const FILTERS = [
   { id: 'group',   label: 'Группа', emoji: '👥' },
 ];
 
-export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBack }) {
+export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBack, isActive }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
@@ -402,6 +401,11 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
     return true;
   });
 
+  // Закрываем модал при уходе с панели — иначе portal остаётся поверх всего приложения
+  useEffect(() => {
+    if (!isActive && selected) setSelected(null);
+  }, [isActive, selected]);
+
   useEffect(() => {
     if (selected) {
       document.body.style.overflow = 'hidden';
@@ -410,7 +414,9 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
   }, [selected]);
 
   return (
-    <Panel id={nav}>
+    // Намеренно не используем Panel здесь: UserApp уже оборачивает ExpertsPage в <Panel id="experts">.
+    // Двойной Panel путает VK UI View и ломает анимацию переходов для ВСЕХ панелей.
+    <>
       {/* Header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
@@ -471,6 +477,6 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
           onClose={() => setSelected(null)}
         />
       )}
-    </Panel>
+    </>
   );
 }
