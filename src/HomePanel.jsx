@@ -117,6 +117,15 @@ function EventModal({ event, onClose }) {
               📲 Перейти к событию
             </button>
           )}
+          {event.linkUrl && event.linkLabel && (
+            <button onClick={() => window.open(event.linkUrl, '_blank')} style={{
+              width: '100%', padding: '15px 0', borderRadius: 14, border: `1px solid ${T.border}`,
+              background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              color: T.textPri, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+            }}>
+              {event.linkLabel} →
+            </button>
+          )}
           <button onClick={onClose} style={{
             width: '100%', padding: '15px 0', borderRadius: 14,
             border: `1px solid ${T.border}`,

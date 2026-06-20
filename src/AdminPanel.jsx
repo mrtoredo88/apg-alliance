@@ -372,6 +372,8 @@ export const AdminPanel = () => {
   const [ePriceClub, setEPriceClub] = useState('');
   const [ePricePublic, setEPricePublic] = useState('');
   const [ePartnerId, setEPartnerId] = useState('');
+  const [eLinkLabel, setELinkLabel] = useState('');
+  const [eLinkUrl, setELinkUrl]     = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -597,6 +599,7 @@ export const AdminPanel = () => {
     setEIsPrivate(false); setEMinKeys(''); setEMaxParticipants(''); setEEventDate('');
     setEIsExpert(false); setEPriceClub(''); setEPricePublic('');
     setEPartnerId('');
+    setELinkLabel(''); setELinkUrl('');
     setEditingEvent(null);
   };
 
@@ -614,6 +617,7 @@ export const AdminPanel = () => {
     setEPriceClub(e.priceClub ?? '');
     setEPricePublic(e.pricePublic ?? '');
     setEPartnerId(e.partnerId ?? '');
+    setELinkLabel(e.linkLabel ?? ''); setELinkUrl(e.linkUrl ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -632,6 +636,8 @@ export const AdminPanel = () => {
       priceClub: ePriceClub.trim(),
       pricePublic: ePricePublic.trim(),
       partnerId: ePartnerId || null,
+      linkLabel: eLinkLabel.trim(),
+      linkUrl:   eLinkUrl.trim(),
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
@@ -1201,6 +1207,12 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Ссылка на соцсеть / регистрацию</label>
             <input style={s.input} placeholder="https://vk.com/event..." value={eSocial} onChange={e => setESocial(e.target.value)} />
+
+            <label style={s.label}>Название кнопки-ссылки (необязательно)</label>
+            <input style={s.input} placeholder="Зарегистрироваться, Купить билет..." value={eLinkLabel} onChange={e => setELinkLabel(e.target.value)} />
+
+            <label style={s.label}>URL кнопки-ссылки</label>
+            <input style={s.input} placeholder="https://..." value={eLinkUrl} onChange={e => setELinkUrl(e.target.value)} />
 
             <label style={s.label}>Адрес проведения</label>
             <input style={s.input} placeholder="Зеленоград, корпус 1234" value={eAddress} onChange={e => setEAddress(e.target.value)} />
