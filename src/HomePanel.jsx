@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { RichText } from './components/RichText.jsx';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
@@ -93,7 +94,7 @@ function EventModal({ event, onClose }) {
             padding: 14, marginBottom: 20,
             border: `1px solid ${T.border}`,
           }}>
-            <p style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', margin: 0 }}>{event.description}</p>
+            <RichText color={T.textSec} fontSize={14}>{event.description}</RichText>
           </div>
         )}
 

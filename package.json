@@ -20,12 +20,16 @@
     "axios": "^1.16.1",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.13.0",
+    "firebase-admin": "^13.10.0",
     "prop-types": "^15.8.1",
     "qr-scanner": "^1.4.2",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.15.1"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.15.1",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@vitejs/plugin-legacy": "^5.3.1",

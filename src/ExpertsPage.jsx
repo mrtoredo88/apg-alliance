@@ -7,6 +7,7 @@ import {
   addDoc, updateDoc, doc, increment, serverTimestamp,
 } from 'firebase/firestore';
 import { T, GLASS, GLASS_STRONG } from './design.js';
+import { RichText } from './components/RichText.jsx';
 
 const FORMAT_LABELS = {
   online:  { label: 'Онлайн',  emoji: '💻', bg: 'rgba(74,144,217,0.15)',  border: 'rgba(74,144,217,0.35)',  text: '#6AABEC' },
@@ -246,7 +247,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         {/* Description */}
         {expert.description && (
           <div style={{ ...GLASS, borderRadius: 16, padding: '14px', marginBottom: 14 }}>
-            <p style={{ color: T.textSec, fontSize: 13, lineHeight: '20px', margin: 0 }}>{expert.description}</p>
+            <RichText color={T.textSec} fontSize={13}>{expert.description}</RichText>
           </div>
         )}
 

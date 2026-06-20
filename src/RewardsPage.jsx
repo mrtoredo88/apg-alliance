@@ -4,6 +4,7 @@ import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
+import { RichText } from './components/RichText.jsx';
 
 // ─── Таймер обратного отсчёта ─────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ function PrizeCard({ prize, userKeys, onClaim, isClaimed, index }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: outOfStock ? T.textSec : T.textPri, marginBottom: 3 }}>{prize.name}</div>
-          {prize.description && <div style={{ fontSize: 12, color: T.textSec, lineHeight: '16px' }}>{prize.description}</div>}
+          {prize.description && <RichText color={T.textSec} fontSize={12}>{prize.description}</RichText>}
         </div>
         {isClaimed && (
           <div style={{ fontSize: 10, fontWeight: 700, color: T.green, background: 'rgba(75,179,75,0.12)', border: '1px solid rgba(75,179,75,0.3)', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>ПОЛУЧЕНО</div>
@@ -138,7 +139,7 @@ function RaffleCard({ prize, userKeys, myEntry, counts, onEnter, index }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: T.textPri }}>{prize.name}</div>
             <div style={{ fontSize: 9, fontWeight: 800, color: '#9664FF', background: 'rgba(150,100,255,0.15)', border: '1px solid rgba(150,100,255,0.3)', borderRadius: 6, padding: '2px 7px', flexShrink: 0, letterSpacing: 0.5 }}>РОЗЫГРЫШ</div>
           </div>
-          {prize.description && <div style={{ fontSize: 12, color: T.textSec, lineHeight: '16px' }}>{prize.description}</div>}
+          {prize.description && <RichText color={T.textSec} fontSize={12}>{prize.description}</RichText>}
         </div>
       </div>
 

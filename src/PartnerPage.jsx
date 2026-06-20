@@ -6,6 +6,7 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
+import { RichText } from './components/RichText.jsx';
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
                 <div style={{ fontSize:12, color:T.textSec, marginTop:4 }}>Отзывов пока нет</div>
               )}
             </div>
-            {partner.description && <div style={{ fontSize:14, color:T.textSec, textAlign:'center', lineHeight:'20px', maxWidth:280 }}>{partner.description}</div>}
+            {partner.description && <div style={{ maxWidth:280, textAlign:'center' }}><RichText color={T.textSec} fontSize={14}>{partner.description}</RichText></div>}
           </div>
         </div>
 

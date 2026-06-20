@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Panel } from '@vkontakte/vkui';
 
 import { T, GLASS, GLASS_STRONG } from './design.js';
+import { RichText } from './components/RichText.jsx';
 
 const GRADIENTS_DARK = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
@@ -130,7 +131,7 @@ function EventModal({ event, onClose }) {
         )}
         {event.description && (
           <div style={{ background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 14, padding: 14, marginBottom: 20, border: `1px solid ${T.border}` }}>
-            <p style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', margin: 0 }}>{event.description}</p>
+            <RichText color={T.textSec} fontSize={14}>{event.description}</RichText>
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

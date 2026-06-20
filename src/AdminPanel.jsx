@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db, auth } from './firebase';
@@ -957,7 +958,7 @@ export const AdminPanel = () => {
             <input style={s.input} placeholder="Психолог, коуч, нутрициолог..." value={exSpec} onChange={e => setExSpec(e.target.value)} />
 
             <label style={s.label}>Описание</label>
-            <textarea style={s.textarea} placeholder="Расскажите об эксперте..." value={exDesc} onChange={e => setExDesc(e.target.value)} />
+            <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
 
             <label style={s.label}>Фото (URL)</label>
             <input style={s.input} placeholder="https://..." value={exPhoto} onChange={e => setExPhoto(e.target.value)} />
@@ -1047,7 +1048,7 @@ export const AdminPanel = () => {
             <input style={s.input} placeholder="Студия красоты SEIUNA" value={pName} onChange={e => setPName(e.target.value)} />
 
             <label style={s.label}>Описание</label>
-            <textarea style={s.textarea} placeholder="Краткое описание..." value={pDesc} onChange={e => setPDesc(e.target.value)} />
+            <MdEditor value={pDesc} onChange={setPDesc} placeholder="Краткое описание..." style={s.textarea} />
 
             <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
             <input style={s.input} placeholder="Скидка 10% на первый визит" value={pOffer} onChange={e => setPOffer(e.target.value)} />
@@ -1196,7 +1197,7 @@ export const AdminPanel = () => {
             </select>
 
             <label style={s.label}>Описание</label>
-            <textarea style={s.textarea} placeholder="Подробное описание..." value={eDesc} onChange={e => setEDesc(e.target.value)} />
+            <MdEditor value={eDesc} onChange={setEDesc} placeholder="Подробное описание..." style={s.textarea} />
 
             <label style={s.label}>Ссылка на соцсеть / регистрацию</label>
             <input style={s.input} placeholder="https://vk.com/event..." value={eSocial} onChange={e => setESocial(e.target.value)} />
@@ -1514,7 +1515,7 @@ export const AdminPanel = () => {
             <input style={s.input} placeholder="Кофе в подарок" value={prName} onChange={e => setPrName(e.target.value)} />
 
             <label style={s.label}>Описание</label>
-            <textarea style={s.textarea} placeholder="Один напиток на выбор в любом заведении-партнёре" value={prDesc} onChange={e => setPrDesc(e.target.value)} />
+            <MdEditor value={prDesc} onChange={setPrDesc} placeholder="Один напиток на выбор в любом заведении-партнёре" style={s.textarea} />
 
             <label style={s.label}>Стоимость в ключах *</label>
             <input style={s.input} type="number" min="1" placeholder="10" value={prCost} onChange={e => setPrCost(e.target.value)} />
