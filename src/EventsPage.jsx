@@ -77,7 +77,10 @@ function EventModal({ event, onClose }) {
           <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec }}>✕</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, lineHeight: '26px', flex: 1 }}>{event.title}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, lineHeight: '26px', flex: 1 }}>
+            {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
+            {event.title}
+          </div>
           {event.isExpertEvent && (
             <div style={{ flexShrink: 0, background: 'rgba(74,144,217,0.18)', border: '1px solid rgba(74,144,217,0.35)', borderRadius: 10, padding: '3px 9px', fontSize: 11, fontWeight: 800, color: '#6AABEC' }}>ЭКСПЕРТ</div>
           )}
@@ -189,6 +192,7 @@ function EventListCard({ event, index, onClick, isDark = true }) {
       <div style={{ flex: 1, padding: '14px 14px 14px 4px', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, lineHeight: '19px', flex: 1 }}>
+            {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 4, padding: '1px 5px', marginRight: 5, verticalAlign: 'middle' }}>📌</span>}
             {event.title}
           </div>
           {event.isExpertEvent && (

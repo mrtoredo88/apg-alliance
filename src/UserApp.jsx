@@ -259,14 +259,25 @@ export function UserApp() {
         setOwnedPartner(owned ?? null);
       }
 
-      const freshEvents = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const freshEvents = eSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const dp = (b.priority ?? 0) - (a.priority ?? 0);
+          if (dp !== 0) return dp;
+          const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt ?? 0);
+          const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ?? 0);
+          return tb - ta;
+        });
       setEvents(freshEvents);
       try { localStorage.setItem('apg_events_cache', JSON.stringify(freshEvents)); } catch {}
 
       const firestoreNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const getMs = n => n.createdAt?.toDate ? n.createdAt.toDate().getTime() : (n.createdAt ?? 0);
       const freshNews = [...firestoreNews, ...vkPostsRaw]
-        .sort((a, b) => getMs(b) - getMs(a))
+        .sort((a, b) => {
+          const dp = (b.priority ?? 0) - (a.priority ?? 0);
+          return dp !== 0 ? dp : getMs(b) - getMs(a);
+        })
         .slice(0, 20);
       setNews(freshNews);
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}

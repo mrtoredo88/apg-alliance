@@ -339,6 +339,7 @@ export const AdminPanel = () => {
   const [nImage, setNImage]         = useState('');
   const [nLinkUrl, setNLinkUrl]     = useState('');
   const [nLinkLabel, setNLinkLabel] = useState('');
+  const [nPriority, setNPriority]   = useState(0);
 
   // Форма уведомления
   const [ntTitle, setNtTitle]       = useState('');
@@ -374,6 +375,7 @@ export const AdminPanel = () => {
   const [ePartnerId, setEPartnerId] = useState('');
   const [eLinkLabel, setELinkLabel] = useState('');
   const [eLinkUrl, setELinkUrl]     = useState('');
+  const [ePriority, setEPriority]   = useState(0);
 
   useEffect(() => {
     const init = async () => {
@@ -505,7 +507,7 @@ export const AdminPanel = () => {
 
   const resetNewsForm = () => {
     setNTitle(''); setNText(''); setNEmoji('📢'); setNImage('');
-    setNLinkUrl(''); setNLinkLabel('');
+    setNLinkUrl(''); setNLinkLabel(''); setNPriority(0);
     setEditingNews(null);
   };
 
@@ -514,6 +516,7 @@ export const AdminPanel = () => {
     setNTitle(item.title ?? ''); setNText(item.text ?? '');
     setNEmoji(item.emoji ?? '📢'); setNImage(item.imageUrl ?? '');
     setNLinkUrl(item.linkUrl ?? ''); setNLinkLabel(item.linkLabel ?? '');
+    setNPriority(item.priority ?? 0);
     window.scrollTo(0, 0);
   };
 
@@ -526,6 +529,7 @@ export const AdminPanel = () => {
       imageUrl: nImage.trim(),
       linkUrl: nLinkUrl.trim(),
       linkLabel: nLinkLabel.trim(),
+      priority: Number(nPriority) || 0,
       ...(editingNews ? {} : { createdAt: serverTimestamp() }),
     };
     if (editingNews) {
@@ -599,7 +603,7 @@ export const AdminPanel = () => {
     setEIsPrivate(false); setEMinKeys(''); setEMaxParticipants(''); setEEventDate('');
     setEIsExpert(false); setEPriceClub(''); setEPricePublic('');
     setEPartnerId('');
-    setELinkLabel(''); setELinkUrl('');
+    setELinkLabel(''); setELinkUrl(''); setEPriority(0);
     setEditingEvent(null);
   };
 
@@ -618,6 +622,7 @@ export const AdminPanel = () => {
     setEPricePublic(e.pricePublic ?? '');
     setEPartnerId(e.partnerId ?? '');
     setELinkLabel(e.linkLabel ?? ''); setELinkUrl(e.linkUrl ?? '');
+    setEPriority(e.priority ?? 0);
     window.scrollTo(0, 0);
   };
 
@@ -638,6 +643,7 @@ export const AdminPanel = () => {
       partnerId: ePartnerId || null,
       linkLabel: eLinkLabel.trim(),
       linkUrl:   eLinkUrl.trim(),
+      priority:  Number(ePriority) || 0,
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
@@ -1214,6 +1220,27 @@ export const AdminPanel = () => {
             <label style={s.label}>URL кнопки-ссылки</label>
             <input style={s.input} placeholder="https://..." value={eLinkUrl} onChange={e => setELinkUrl(e.target.value)} />
 
+            <label style={s.label}>Приоритет показа</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <input
+                type="number" min="0" max="10"
+                style={{ ...s.input, width: 80, marginBottom: 0, textAlign: 'center' }}
+                value={ePriority}
+                onChange={e => setEPriority(Math.min(10, Math.max(0, Number(e.target.value) || 0)))}
+              />
+              <div style={{ flex: 1 }}>
+                <input type="range" min="0" max="10" value={ePriority}
+                  onChange={e => setEPriority(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: A.gold }} />
+              </div>
+              <span style={{ fontSize: 11, color: A.textSec, flexShrink: 0 }}>
+                {ePriority >= 8 ? '📌 Важно' : ePriority > 0 ? `↑ ${ePriority}` : '0 (обычный)'}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: A.textSec, marginBottom: 14, lineHeight: '16px' }}>
+              Чем выше число — тем выше материал в списке. По умолчанию — 0. При 8+ показывается метка 📌.
+            </div>
+
             <label style={s.label}>Адрес проведения</label>
             <input style={s.input} placeholder="Зеленоград, корпус 1234" value={eAddress} onChange={e => setEAddress(e.target.value)} />
 
@@ -1297,12 +1324,26 @@ export const AdminPanel = () => {
             <h2 style={s.h2}>Все события</h2>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : events.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
-              : events.map(e => (
+              : [...events]
+                  .sort((a, b) => {
+                    const dp = (b.priority ?? 0) - (a.priority ?? 0);
+                    if (dp !== 0) return dp;
+                    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ?? 0);
+                    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ?? 0);
+                    return tb - ta;
+                  })
+                  .map(e => {
+                const pri = e.priority ?? 0;
+                return (
                 <div key={e.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{e.emoji ?? '🎉'}</div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.isPrivate ? '🔒 ' : ''}{e.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        {pri >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: A.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>📌 {pri}</span>}
+                        {pri > 0 && pri < 8 && <span style={{ fontSize: 9, fontWeight: 700, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>↑ {pri}</span>}
+                        <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.isPrivate ? '🔒 ' : ''}{e.title}</div>
+                      </div>
                       <div style={{ fontSize: 12, color: A.textSec }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
                     </div>
                   </div>
@@ -1311,7 +1352,8 @@ export const AdminPanel = () => {
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteEvent(e.id)}>🗑️</button>
                   </div>
                 </div>
-              ))
+                );
+              })
             }
           </div>
         </>
@@ -1344,6 +1386,27 @@ export const AdminPanel = () => {
             <label style={s.label}>URL ссылки</label>
             <input style={s.input} placeholder="https://..." value={nLinkUrl} onChange={e => setNLinkUrl(e.target.value)} />
 
+            <label style={s.label}>Приоритет показа</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <input
+                type="number" min="0" max="10"
+                style={{ ...s.input, width: 80, marginBottom: 0, textAlign: 'center' }}
+                value={nPriority}
+                onChange={e => setNPriority(Math.min(10, Math.max(0, Number(e.target.value) || 0)))}
+              />
+              <div style={{ flex: 1 }}>
+                <input type="range" min="0" max="10" value={nPriority}
+                  onChange={e => setNPriority(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: A.gold }} />
+              </div>
+              <span style={{ fontSize: 11, color: A.textSec, flexShrink: 0 }}>
+                {nPriority >= 8 ? '📌 Важно' : nPriority > 0 ? `↑ ${nPriority}` : '0 (обычный)'}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: A.textSec, marginBottom: 14, lineHeight: '16px' }}>
+              Чем выше число — тем выше материал в списке. По умолчанию — 0. При 8+ показывается метка 📌.
+            </div>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>
                 {editingNews ? '💾 Сохранить' : '➕ Опубликовать'}
@@ -1356,10 +1419,19 @@ export const AdminPanel = () => {
             <h2 style={s.h2}>Все новости</h2>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : news.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет новостей</p>
-              : news.map(item => {
+              : [...news]
+                  .sort((a, b) => {
+                    const dp = (b.priority ?? 0) - (a.priority ?? 0);
+                    if (dp !== 0) return dp;
+                    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ?? 0);
+                    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ?? 0);
+                    return tb - ta;
+                  })
+                  .map(item => {
                 const dateStr = item.createdAt?.toDate
                   ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
                   : '';
+                const pri = item.priority ?? 0;
                 return (
                   <div key={item.id} style={s.row}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
@@ -1368,7 +1440,11 @@ export const AdminPanel = () => {
                         : <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{item.emoji ?? '📢'}</div>
                       }
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          {pri >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: A.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>📌 {pri}</span>}
+                          {pri > 0 && pri < 8 && <span style={{ fontSize: 9, fontWeight: 700, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>↑ {pri}</span>}
+                          <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                        </div>
                         <div style={{ fontSize: 12, color: A.textSec }}>
                           {dateStr && `📅 ${dateStr} · `}
                           {item.text.length > 50 ? item.text.slice(0, 50) + '…' : item.text}

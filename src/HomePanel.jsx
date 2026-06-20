@@ -64,6 +64,7 @@ function EventModal({ event, onClose }) {
         </div>
 
         <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, marginBottom: 12, lineHeight: '26px' }}>
+          {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
           {event.title}
         </div>
 
@@ -647,6 +648,7 @@ function NewsWidget({ news }) {
                     n.emoji && <div style={{ fontSize: 42, lineHeight: 1, marginBottom: 10, flexShrink: 0 }}>{n.emoji}</div>
                   )}
                   <div style={{ fontSize: 17, fontWeight: 900, color: T.textPri, lineHeight: 1.35, marginBottom: 8, letterSpacing: -0.3, flexShrink: 0 }}>
+                    {(n.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
                     {n.imageUrl && n.emoji && <span style={{ marginRight: 6 }}>{n.emoji}</span>}
                     {n.title}
                   </div>
@@ -1016,7 +1018,10 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
           <span style={{ fontSize: 26, flexShrink: 0 }}>{event.emoji ?? '🎉'}</span>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: T.gold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>✦ Следующее мероприятие АПГ</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: '19px' }}>{event.title}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: '19px' }}>
+              {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 4, padding: '1px 5px', marginRight: 5, verticalAlign: 'middle' }}>📌</span>}
+              {event.title}
+            </div>
           </div>
         </div>
         {isRegistered && (
