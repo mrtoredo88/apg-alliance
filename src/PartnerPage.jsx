@@ -279,7 +279,12 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
           <button onClick={onBack} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
+              <div style={{ fontSize:15, fontWeight:800, color:T.textPri, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{partner.name}</div>
+              {partner.partnerOfMonth && (
+                <span style={{ fontSize:9, fontWeight:800, color:T.gold, background:'rgba(201,168,76,0.15)', border:`1px solid rgba(201,168,76,0.35)`, borderRadius:8, padding:'2px 6px', flexShrink:0, whiteSpace:'nowrap' }}>🏆 месяца</span>
+              )}
+            </div>
             {avgRating > 0 && (
               <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
                 <span style={{ fontSize:11, color:'#FFD700', letterSpacing:1 }}>{'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5-Math.round(avgRating))}</span>
@@ -312,6 +317,11 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             <PartnerLogo partner={partner} />
             <div style={{ textAlign:'center' }}>
               <div style={{ fontSize:22, fontWeight:800, color:T.textPri, marginBottom:4 }}>{partner.name}</div>
+              {partner.partnerOfMonth && (
+                <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,rgba(201,168,76,0.18),rgba(201,168,76,0.06))', border:`1px solid rgba(201,168,76,0.4)`, borderRadius:20, padding:'5px 14px', marginBottom:8 }}>
+                  <span style={{ fontSize:12, color:T.gold, fontWeight:800, letterSpacing:0.3 }}>🏆 Партнёр месяца</span>
+                </div>
+              )}
               {partner.categoryLabel && (
                 <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:T.gold+'18', border:`1px solid ${T.gold}40`, borderRadius:20, padding:'4px 12px', marginBottom:8 }}>
                   <span style={{ fontSize:11, color:T.gold, fontWeight:700 }}>✦ {partner.categoryLabel}</span>

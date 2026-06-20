@@ -367,6 +367,57 @@ function FeaturedPartnerCard({ partner, onOpen }) {
   );
 }
 
+// ─── Партнёр месяца ──────────────────────────────────────────────────────────
+
+function PartnerOfMonthCard({ partner, onOpen }) {
+  const stats = partner.activityStats;
+  const parts = [];
+  if (stats?.newClients > 0) parts.push(`${stats.newClients} новых клиентов`);
+  if (stats?.avgRating > 0) parts.push(`рейтинг ${stats.avgRating.toFixed(1)} ⭐`);
+  const reason = parts.join(', ');
+
+  return (
+    <div style={{ margin: '8px 16px 4px', animation: 'fadeInUp 0.4s ease both' }}>
+      <button onClick={() => onOpen(partner)} style={{
+        width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: 0, background: 'none',
+      }}>
+        <div style={{
+          borderRadius: 24,
+          background: 'linear-gradient(135deg, rgba(201,168,76,0.14) 0%, rgba(201,168,76,0.05) 100%)',
+          border: '1px solid rgba(201,168,76,0.35)',
+          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+          boxShadow: '0 4px 20px rgba(201,168,76,0.1), inset 0 1px 0 rgba(255,255,255,0.1)',
+          padding: '14px 16px',
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{ flexShrink: 0, position: 'relative' }}>
+            <PartnerLogo partner={partner} size={52} />
+            <div style={{
+              position: 'absolute', bottom: -4, right: -4,
+              width: 20, height: 20, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #C9A84C, #E8C76D)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, border: '2px solid rgba(15,15,26,0.9)',
+            }}>🏆</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: T.gold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3 }}>
+              🏆 Партнёр месяца
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>{partner.name}</div>
+            {reason && (
+              <div style={{ fontSize: 12, color: T.textSec, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {reason}
+              </div>
+            )}
+          </div>
+          <div style={{ fontSize: 18, color: T.textSec, flexShrink: 0 }}>›</div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
 // ─── Новостной виджет ────────────────────────────────────────────────────────
 
 function NewsModal({ item, onClose }) {
@@ -1118,7 +1169,8 @@ export function HomePanel({
     }
   }, [onRefresh]);
 
-  const featuredPartner = partners.find(p => p.featured === true) ?? null;
+  const featuredPartner   = partners.find(p => p.featured === true) ?? null;
+  const partnerOfMonth    = partners.find(p => p.partnerOfMonth === true) ?? null;
 
   const nextPrivateEvent = useMemo(() => {
     const privates = events.filter(e => e.isPrivate);
@@ -1321,8 +1373,13 @@ export function HomePanel({
               />
             )}
 
-            {/* Партнёр дня */}
-            {featuredPartner && (
+            {/* Партнёр месяца */}
+            {partnerOfMonth && (
+              <PartnerOfMonthCard partner={partnerOfMonth} onOpen={onOpenPartner} />
+            )}
+
+            {/* Партнёр дня — не показываем если он же партнёр месяца */}
+            {featuredPartner && featuredPartner.id !== partnerOfMonth?.id && (
               <FeaturedPartnerCard partner={featuredPartner} onOpen={onOpenPartner} />
             )}
 

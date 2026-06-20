@@ -47,12 +47,19 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // ── Отзывы партнёров (подколлекция) ──────────────────────────────────────
+    // Документ хранится по пути partners/{id}/reviews/{userId} где userId — VK id
+    match /partners/{partnerId}/reviews/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && isOwner(userId);
+    }
+
     // ── Данные пользователей ──────────────────────────────────────────────────
-    // Пользователь может читать и писать только в свой документ.
-    // userId — VK user id (строка), хранится в auth_map после анонимного входа.
+    // Чтение документа открыто любому авторизованному пользователю —
+    // это необходимо для рейтинга (leaderboard) и аналитики.
+    // Запись и чтение подколлекций (activity, claims) — только владелец.
     match /users/{userId} {
-      allow read:  if request.auth != null
-                   && isOwner(userId);
+      allow read:  if request.auth != null;
       allow write: if request.auth != null
                    && isOwner(userId);
 
@@ -60,6 +67,19 @@ service cloud.firestore {
         allow read, write: if request.auth != null
                            && isOwner(userId);
       }
+    }
+
+    // ── Скан-события для расчёта activityIndex ───────────────────────────────
+    // Клиент только пишет; читает только Admin SDK (backend).
+    match /scans/{id} {
+      allow read: if false;
+      allow create: if request.auth != null;
+    }
+
+    // ── Победители месяца — читают все, пишет только Admin SDK ───────────────
+    match /monthlyWinners/{month} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ── Маппинг Firebase UID → VK user id ────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db, auth } from './firebase';
@@ -217,6 +217,51 @@ function PasswordGate({ onAllow }) {
   );
 }
 
+function MonthlyWinnersCard({ partners }) {
+  const [winners, setWinners]   = useState([]);
+  const [loaded, setLoaded]     = useState(false);
+
+  const load = async () => {
+    const snap = await getDocs(query(collection(db, 'monthlyWinners'), orderBy('awardedAt', 'desc'), limit(12)));
+    setWinners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    setLoaded(true);
+  };
+
+  if (!loaded) {
+    return (
+      <div style={{ ...A.card ?? {}, background: 'rgba(255,255,255,0.04)', borderRadius: 20, padding: 16, marginTop: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#F0F0F0' }}>🗓️ Победители прошлых месяцев</span>
+          <button onClick={load} style={{ fontSize: 12, color: A.gold, background: 'transparent', border: `1px solid ${A.goldBrd}`, borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>
+            Загрузить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 20, padding: 16, marginTop: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 14px', color: '#F0F0F0' }}>🗓️ Победители прошлых месяцев</h2>
+      {winners.length === 0 ? (
+        <p style={{ color: A.textSec, textAlign: 'center', fontSize: 13, margin: 0 }}>Пока никого нет</p>
+      ) : winners.map(w => {
+        const partner = partners.find(p => p.id === w.partnerId);
+        return (
+          <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ fontSize: 11, color: A.gold, fontWeight: 700, minWidth: 52 }}>{w.id}</span>
+            <span style={{ flex: 1, fontWeight: 600, color: '#F0F0F0', fontSize: 13 }}>
+              {partner?.name ?? w.partnerName ?? w.partnerId}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: A.gold }}>{w.activityIndex} / 100</span>
+            <span style={{ fontSize: 11, color: A.textSec }}>{w.newClients ?? 0} новых</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export const AdminPanel = () => {
   const [authed, setAuthed]         = useState(false);
   const [partners, setPartners]     = useState([]);
@@ -250,6 +295,8 @@ export const AdminPanel = () => {
   const [qrPartner, setQrPartner]           = useState(null);
   const [analytics, setAnalytics]           = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [activityLoading, setActivityLoading]   = useState(false);
+  const [activityMsg, setActivityMsg]           = useState('');
   const [partnerSearch, setPartnerSearch]   = useState('');
   const [migrating, setMigrating]           = useState(false);
   const [migrateResult, setMigrateResult]   = useState(null);
@@ -268,6 +315,7 @@ export const AdminPanel = () => {
   const [prType, setPrType]               = useState('purchase');
   const [prTicketCost, setPrTicketCost]   = useState('');
   const [prRaffleDate, setPrRaffleDate]   = useState('');
+  const [prPartnerId, setPrPartnerId]     = useState('');
 
   // Форма партнёра
   const [pName, setPName] = useState('');
@@ -322,6 +370,7 @@ export const AdminPanel = () => {
   const [eIsExpert, setEIsExpert] = useState(false);
   const [ePriceClub, setEPriceClub] = useState('');
   const [ePricePublic, setEPricePublic] = useState('');
+  const [ePartnerId, setEPartnerId] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -546,6 +595,7 @@ export const AdminPanel = () => {
     setEDesc(''); setESocial(''); setEAddress(''); setEDeadline('');
     setEIsPrivate(false); setEMinKeys(''); setEMaxParticipants(''); setEEventDate('');
     setEIsExpert(false); setEPriceClub(''); setEPricePublic('');
+    setEPartnerId('');
     setEditingEvent(null);
   };
 
@@ -562,6 +612,7 @@ export const AdminPanel = () => {
     setEIsExpert(e.isExpertEvent ?? false);
     setEPriceClub(e.priceClub ?? '');
     setEPricePublic(e.pricePublic ?? '');
+    setEPartnerId(e.partnerId ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -579,11 +630,12 @@ export const AdminPanel = () => {
       isExpertEvent: eIsExpert,
       priceClub: ePriceClub.trim(),
       pricePublic: ePricePublic.trim(),
+      partnerId: ePartnerId || null,
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
     } else {
-      await addDoc(collection(db, 'events'), data);
+      await addDoc(collection(db, 'events'), { ...data, createdAt: serverTimestamp() });
     }
     resetEventForm();
     fetchData();
@@ -614,6 +666,7 @@ export const AdminPanel = () => {
     setPrName(''); setPrDesc(''); setPrCost(''); setPrEmoji('🎁');
     setPrStock(''); setPrActive(true); setEditingPrize(null);
     setPrType('purchase'); setPrTicketCost(''); setPrRaffleDate('');
+    setPrPartnerId('');
   };
 
   const startEditPrize = (p) => {
@@ -625,6 +678,7 @@ export const AdminPanel = () => {
     setPrType(p.type ?? 'purchase');
     setPrTicketCost(p.ticketCost !== undefined ? String(p.ticketCost) : '');
     setPrRaffleDate(p.raffleDate?.toDate ? p.raffleDate.toDate().toISOString().slice(0, 16) : '');
+    setPrPartnerId(p.partnerId ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -636,6 +690,7 @@ export const AdminPanel = () => {
       stock: prStock !== '' ? Number(prStock) : null,
       active: prActive,
       type: prType,
+      partnerId: prPartnerId || null,
     };
     if (prType === 'raffle') {
       data.ticketCost = prTicketCost !== '' ? Number(prTicketCost) : 1;
@@ -644,7 +699,7 @@ export const AdminPanel = () => {
     if (editingPrize) {
       await updateDoc(doc(db, 'prizes', editingPrize.id), data);
     } else {
-      await addDoc(collection(db, 'prizes'), data);
+      await addDoc(collection(db, 'prizes'), { ...data, createdAt: serverTimestamp() });
     }
     resetPrizeForm();
     fetchData();
@@ -856,6 +911,7 @@ export const AdminPanel = () => {
             { id: 'notifs',    emoji: '🔔', label: 'Рассылка' },
             { id: 'tasks',     emoji: '✅', label: 'Задания',   count: customTasks.length },
             { id: 'prizes',    emoji: '🎁', label: 'Призы',     count: prizes.length },
+            { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
           ].map(t => {
             const active = activeTab === t.id;
@@ -1126,6 +1182,18 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Партнёр / Место</label>
             <input style={s.input} placeholder="Студия AspireMod" value={ePartner} onChange={e => setEPartner(e.target.value)} />
+
+            <label style={s.label}>Партнёр АПГ (для индекса активности)</label>
+            <select
+              style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }}
+              value={ePartnerId}
+              onChange={e => setEPartnerId(e.target.value)}
+            >
+              <option value="">— Не привязывать —</option>
+              {[...partners].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
 
             <label style={s.label}>Описание</label>
             <textarea style={s.textarea} placeholder="Подробное описание..." value={eDesc} onChange={e => setEDesc(e.target.value)} />
@@ -1486,6 +1554,18 @@ export const AdminPanel = () => {
               </>
             )}
 
+            <label style={s.label}>Партнёр АПГ (для индекса активности)</label>
+            <select
+              style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }}
+              value={prPartnerId}
+              onChange={e => setPrPartnerId(e.target.value)}
+            >
+              <option value="">— Не привязывать —</option>
+              {[...partners].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePrize}>
                 {editingPrize ? '💾 Сохранить' : '➕ Добавить'}
@@ -1597,6 +1677,130 @@ export const AdminPanel = () => {
           </div>
         </div>
       )}
+
+      {/* ── АКТИВНОСТЬ ПАРТНЁРОВ ── */}
+      {activeTab === 'activity' && (() => {
+        const sortedByActivity = [...partners].sort(
+          (a, b) => (b.activityStats?.activityIndex ?? 0) - (a.activityStats?.activityIndex ?? 0),
+        );
+        const activityMonth = partners.find(p => p.activityStats?.month)?.activityStats?.month ?? '';
+
+        const recalcActivity = async () => {
+          setActivityLoading(true);
+          setActivityMsg('');
+          try {
+            const res = await fetch('/api/activity-index', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ secret: 'apg2026activity' }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setActivityMsg(`✅ Обновлено ${data.updated} партнёров за ${data.month}`);
+            const snap = await getDocs(collection(db, 'partners'));
+            setPartners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+          } catch (e) {
+            setActivityMsg(`❌ ${e.message}`);
+          } finally {
+            setActivityLoading(false);
+          }
+        };
+
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
+              <div>
+                <h1 style={s.h1}>🏆 Индекс активности</h1>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: A.textSec }}>
+                  Пересчитывается автоматически каждый день в 03:00 UTC
+                  {activityMonth && ` · Месяц: ${activityMonth}`}
+                </p>
+              </div>
+              <button
+                style={{ ...s.btn, ...s.btnPri, flexShrink: 0, opacity: activityLoading ? 0.6 : 1 }}
+                disabled={activityLoading}
+                onClick={recalcActivity}
+              >
+                {activityLoading ? '...' : '↻ Пересчитать'}
+              </button>
+            </div>
+
+            {activityMsg && (
+              <div style={{
+                ...s.card,
+                background: activityMsg.startsWith('✅') ? 'rgba(75,179,75,0.08)' : 'rgba(230,70,70,0.08)',
+                border: `1px solid ${activityMsg.startsWith('✅') ? 'rgba(75,179,75,0.3)' : 'rgba(230,70,70,0.3)'}`,
+                marginBottom: 16,
+              }}>
+                <p style={{ margin: 0, color: activityMsg.startsWith('✅') ? '#4BB34B' : A.red, fontSize: 14 }}>{activityMsg}</p>
+              </div>
+            )}
+
+            <div style={s.card}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ color: A.textSec, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                    <th style={{ textAlign: 'left', padding: '0 6px 10px 0', fontWeight: 700, width: 28 }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '0 8px 10px 0', fontWeight: 700 }}>Партнёр</th>
+                    <th style={{ textAlign: 'right', padding: '0 8px 10px', fontWeight: 700 }}>Индекс</th>
+                    <th style={{ textAlign: 'right', padding: '0 8px 10px', fontWeight: 700 }}>Новых</th>
+                    <th style={{ textAlign: 'right', padding: '0 8px 10px', fontWeight: 700 }}>Повт.</th>
+                    <th style={{ textAlign: 'right', padding: '0 8px 10px', fontWeight: 700 }}>★</th>
+                    <th style={{ textAlign: 'right', padding: '0 0 10px', fontWeight: 700 }}>Профиль</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedByActivity.map((p, i) => {
+                    const st = p.activityStats;
+                    const isWinner = p.partnerOfMonth === true;
+                    return (
+                      <tr key={p.id} style={{
+                        borderTop: `1px solid ${A.rowBrd}`,
+                        background: isWinner ? 'rgba(201,168,76,0.06)' : 'transparent',
+                      }}>
+                        <td style={{ padding: '9px 6px 9px 0', color: i < 3 ? A.gold : A.textSec, fontWeight: 800, fontSize: 12 }}>
+                          {i + 1}
+                        </td>
+                        <td style={{ padding: '9px 8px 9px 0', maxWidth: 180 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontWeight: 600, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {p.name}
+                            </span>
+                            {isWinner && (
+                              <span style={{ fontSize: 10, color: A.gold, background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 6, padding: '1px 5px', flexShrink: 0 }}>
+                                🏆
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', fontWeight: 800, color: (st?.activityIndex ?? 0) > 0 ? A.gold : A.textSec }}>
+                          {st?.activityIndex ?? '—'}
+                        </td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: A.text }}>{st?.newClients ?? '—'}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: A.text }}>{st?.returningVisits ?? '—'}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: (st?.avgRating ?? 0) >= 4 ? A.green : A.text }}>
+                          {st?.avgRating ? st.avgRating.toFixed(1) : '—'}
+                        </td>
+                        <td style={{ padding: '9px 0', textAlign: 'right', color: st?.profileUpdated ? A.green : A.textSec }}>
+                          {st?.profileUpdated ? '✓' : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {sortedByActivity.every(p => !p.activityStats) && (
+                <p style={{ color: A.textSec, textAlign: 'center', marginTop: 16, fontSize: 13 }}>
+                  Данных пока нет — нажмите «Пересчитать» или дождитесь утреннего cron
+                </p>
+              )}
+            </div>
+
+            {/* Победители прошлых месяцев — отдельная карточка */}
+            <MonthlyWinnersCard partners={partners} />
+          </div>
+        );
+      })()}
 
       {/* ── АНАЛИТИКА ── */}
       {activeTab === 'analytics' && (

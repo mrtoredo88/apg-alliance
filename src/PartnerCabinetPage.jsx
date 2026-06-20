@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 
 const IMGBB_KEY = '0c37a46d4e13e9a30cddb1c79c8e6374';
@@ -104,12 +104,13 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
     setSaving(true);
     try {
       const data = {
-        description: fDesc.trim(),
-        offer: fOffer.trim(),
-        phone: fPhone.trim(),
-        hours: fHours.trim(),
-        socialUrl: fSocial.trim(),
-        logoUrl: fLogo.trim(),
+        description:      fDesc.trim(),
+        offer:            fOffer.trim(),
+        phone:            fPhone.trim(),
+        hours:            fHours.trim(),
+        socialUrl:        fSocial.trim(),
+        logoUrl:          fLogo.trim(),
+        profileUpdatedAt: serverTimestamp(),
       };
       await updateDoc(doc(db, 'partners', partner.id), data);
       const updated = { ...partner, ...data };

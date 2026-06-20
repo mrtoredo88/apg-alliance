@@ -521,6 +521,14 @@ export function UserApp() {
     try {
       await updateDoc(doc(db, 'users', String(user.id)), updateData);
       updateDoc(doc(db, 'partners', partner.id), { totalVisits: increment(1) }).catch(() => {});
+      // Пишем событие скана для расчёта activityIndex
+      addDoc(collection(db, 'scans'), {
+        partnerId: partner.id,
+        userId:    String(user.id),
+        isNew:     !alreadyHasKey,
+        monthKey:  todayKey.slice(0, 7),
+        scannedAt: serverTimestamp(),
+      }).catch(() => {});
       setLastScanDate(todayKey);
       setStreak(newStreak);
       setScanDates(newScanDates);
