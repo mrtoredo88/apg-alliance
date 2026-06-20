@@ -503,6 +503,38 @@ export const AdminPanel = () => {
     fetchData();
   };
 
+  // ─── Сортировка (shared) ────────────────────────────────────────────────────
+
+  const byPriorityDate = (a, b) => {
+    const dp = (b.priority ?? 0) - (a.priority ?? 0);
+    if (dp !== 0) return dp;
+    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ?? 0);
+    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ?? 0);
+    return tb - ta;
+  };
+
+  const moveItem = async (col, items, setItems, item, dir) => {
+    const sorted = [...items].sort(byPriorityDate);
+    const idx    = sorted.findIndex(x => x.id === item.id);
+    const swap   = sorted[idx + dir];
+    if (!swap) return;
+    const a = item.priority ?? 0;
+    const b = swap.priority ?? 0;
+    const [newA, newB] = a === b
+      ? dir === -1
+        ? [Math.min(10, a + 1), b]
+        : [a, Math.min(10, b + 1)]
+      : [b, a];
+    await Promise.all([
+      updateDoc(doc(db, col, item.id), { priority: newA }),
+      newB !== b ? updateDoc(doc(db, col, swap.id), { priority: newB }) : Promise.resolve(),
+    ]);
+    setItems(prev => prev.map(x =>
+      x.id === item.id ? { ...x, priority: newA } :
+      x.id === swap.id ? { ...x, priority: newB } : x
+    ));
+  };
+
   // ─── Новости ────────────────────────────────────────────────────────────────
 
   const resetNewsForm = () => {
@@ -1324,15 +1356,7 @@ export const AdminPanel = () => {
             <h2 style={s.h2}>Все события</h2>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : events.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
-              : [...events]
-                  .sort((a, b) => {
-                    const dp = (b.priority ?? 0) - (a.priority ?? 0);
-                    if (dp !== 0) return dp;
-                    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ?? 0);
-                    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ?? 0);
-                    return tb - ta;
-                  })
-                  .map(e => {
+              : [...events].sort(byPriorityDate).map((e, idx, arr) => {
                 const pri = e.priority ?? 0;
                 return (
                 <div key={e.id} style={s.row}>
@@ -1347,7 +1371,9 @@ export const AdminPanel = () => {
                       <div style={{ fontSize: 12, color: A.textSec }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                    <button disabled={idx === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === 0 ? 0.3 : 1 }} onClick={() => moveItem('events', events, setEvents, e, -1)}>↑</button>
+                    <button disabled={idx === arr.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === arr.length - 1 ? 0.3 : 1 }} onClick={() => moveItem('events', events, setEvents, e, 1)}>↓</button>
                     <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditEvent(e)}>✏️</button>
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteEvent(e.id)}>🗑️</button>
                   </div>
@@ -1419,15 +1445,7 @@ export const AdminPanel = () => {
             <h2 style={s.h2}>Все новости</h2>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : news.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет новостей</p>
-              : [...news]
-                  .sort((a, b) => {
-                    const dp = (b.priority ?? 0) - (a.priority ?? 0);
-                    if (dp !== 0) return dp;
-                    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ?? 0);
-                    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ?? 0);
-                    return tb - ta;
-                  })
-                  .map(item => {
+              : [...news].sort(byPriorityDate).map((item, idx, arr) => {
                 const dateStr = item.createdAt?.toDate
                   ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
                   : '';
@@ -1451,7 +1469,9 @@ export const AdminPanel = () => {
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                      <button disabled={idx === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === 0 ? 0.3 : 1 }} onClick={() => moveItem('news', news, setNews, item, -1)}>↑</button>
+                      <button disabled={idx === arr.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === arr.length - 1 ? 0.3 : 1 }} onClick={() => moveItem('news', news, setNews, item, 1)}>↓</button>
                       <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditNews(item)}>✏️</button>
                       <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteNews(item.id)}>🗑️</button>
                     </div>
