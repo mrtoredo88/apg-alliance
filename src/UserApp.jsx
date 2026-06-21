@@ -452,6 +452,10 @@ export function UserApp() {
 
   const handleConfirmScan = useCallback(async (placeIdentifier) => {
     if (!user || isScanningRef.current) return;
+    if (!navigator.onLine) {
+      showToast('Нет интернета. Проверьте соединение и попробуйте ещё раз.');
+      return;
+    }
     isScanningRef.current = true;
 
     // Expert QR: value = "expert_<id>"
@@ -497,6 +501,7 @@ export function UserApp() {
     if (!partner) {
       setIsScannerOpen(false);
       isScanningRef.current = false;
+      showToast('QR-код не распознан. Попробуйте ещё раз.');
       return;
     }
 
@@ -617,14 +622,29 @@ export function UserApp() {
         text: `Задание выполнено: +${reward} ключей`,
         ts: serverTimestamp(),
       }).catch(() => {});
-    } catch (e) { console.error(e); }
-  }, [user]);
+    } catch (e) {
+      console.error(e);
+      setCompletedTasks(prev => prev.filter(id => id !== taskId));
+      setUserKeys(prev => prev - reward);
+      showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+    }
+  }, [user, showToast]);
 
   const handlePrizeClaim = useCallback(async (prize) => {
     if (!user || !prize) return false;
     if (userKeys < prize.cost) return false;
     if (claimingPrizeRef.current) return false;
     claimingPrizeRef.current = true;
+    try {
+      if (prize.stock !== null && prize.stock !== undefined) {
+        const fresh = await getDoc(doc(db, 'prizes', prize.id));
+        if ((fresh.data()?.stock ?? 0) <= 0) {
+          showToast('Приз уже разобрали 😔');
+          claimingPrizeRef.current = false;
+          return false;
+        }
+      }
+    } catch {}
     setUserKeys(prev => prev - prize.cost); // оптимистичное списание
     try {
       const batch = [];
@@ -720,6 +740,10 @@ export function UserApp() {
     } else {
       if (event.isPrivate && userKeys < (event.minKeys ?? 0)) {
         showToast(`Нужно ещё ${(event.minKeys ?? 0) - userKeys} ключей для этого мероприятия`);
+        return;
+      }
+      if (event.maxParticipants > 0 && (event.registeredCount ?? 0) >= event.maxParticipants) {
+        showToast('Все места уже заняты');
         return;
       }
       const next = [...registeredEventIds, eventId];

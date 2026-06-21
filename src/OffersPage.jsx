@@ -100,9 +100,18 @@ function PartnerSearchCard({ partner, onOpenPartner, index, query }) {
 }
 
 const CATEGORY_LABELS = {
-  food: '🍽️ Еда', beauty: '💅 Красота', health: '💊 Здоровье',
-  sport: '🏋️ Спорт', retail: '🛍️ Магазины', services: '🔧 Услуги',
-  edu: '📚 Обучение', fun: '🎉 Развлечения', other: '📦 Прочее',
+  food:          '🍕 Еда',
+  beauty:        '💄 Красота',
+  sport:         '💪 Спорт',
+  education:     '📚 Обучение',
+  entertainment: '🎉 Развлечения',
+  health:        '🏥 Здоровье',
+  home:          '🏠 Дом и ремонт',
+  pets:          '🐾 Животные',
+  fashion:       '👗 Одежда',
+  auto:          '🚗 Авто',
+  services:      '💼 Услуги',
+  other:         '📦 Другое',
 };
 
 export function OffersPage({ partners = [], onBack, onOpenPartner }) {
