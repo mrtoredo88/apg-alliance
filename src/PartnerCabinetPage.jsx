@@ -35,7 +35,7 @@ function StatCard({ icon, label, value, sub, color }) {
   );
 }
 
-export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPartner, onBack, onPartnerUpdate }) {
+export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPartner, expert, onBack, onPartnerUpdate }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -170,6 +170,34 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
       </div>
 
       <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
+
+        {/* ── Ссылка эксперта ── */}
+        {expert && (() => {
+          const link = `https://apg-alliance.vercel.app/?scan=expert_${expert.id}`;
+          return (
+            <div style={{ ...GLASS_GOLD, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.gold, marginBottom: 8 }}>🔗 Ссылка для клиента</div>
+              <div style={{ fontSize: 11, color: T.textSec, lineHeight: '16px', marginBottom: 10 }}>
+                Отправьте ссылку клиенту — при открытии ему автоматически начислится {expert.keys ?? 1} {(expert.keys ?? 1) === 1 ? 'ключ' : 'ключа'}. Каждый клиент может воспользоваться ссылкой только один раз.
+              </div>
+              <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: T.textPri, wordBreak: 'break-all', marginBottom: 10 }}>
+                {link}
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(link).catch(() => {});
+                }}
+                style={{
+                  width: '100%', padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+                  color: '#0F0F1A', fontSize: 13, fontWeight: 700,
+                }}
+              >
+                Скопировать ссылку
+              </button>
+            </div>
+          );
+        })()}
 
         {/* ── СТАТИСТИКА ── */}
         {activeTab === 'stats' && (

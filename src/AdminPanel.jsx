@@ -286,6 +286,7 @@ export const AdminPanel = () => {
   const [exBooking, setExBooking]   = useState('');
   const [exKeys, setExKeys]         = useState('1');
   const [exVerified, setExVerified] = useState(false);
+  const [exVkOwnerId, setExVkOwnerId] = useState('');
   const [exActive, setExActive]     = useState(true);
   const [exOnline, setExOnline]     = useState(false);
   const [exOffline, setExOffline]   = useState(false);
@@ -418,7 +419,7 @@ export const AdminPanel = () => {
   const resetExpertForm = () => {
     setEditingExpert(null); setExName(''); setExSpec(''); setExDesc('');
     setExPhoto(''); setExPhone(''); setExVkUrl(''); setExBooking('');
-    setExKeys('1'); setExVerified(false); setExActive(true);
+    setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
     setExOnline(false); setExOffline(false); setExGroup(false);
   };
 
@@ -428,6 +429,7 @@ export const AdminPanel = () => {
     setExPhoto(ex.photo ?? ''); setExPhone(ex.phone ?? ''); setExVkUrl(ex.vkUrl ?? '');
     setExBooking(ex.bookingUrl ?? ''); setExKeys(String(ex.keys ?? 1));
     setExVerified(ex.verified ?? false); setExActive(ex.active !== false);
+    setExVkOwnerId(String(ex.vkOwnerId ?? ''));
     setExOnline(ex.formats?.includes('online') ?? false);
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
@@ -442,6 +444,7 @@ export const AdminPanel = () => {
       photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
       bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
+      vkOwnerId: exVkOwnerId.trim() || null,
     };
     if (editingExpert) {
       await updateDoc(doc(db, 'experts', editingExpert.id), data);
@@ -1019,6 +1022,9 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Ключей за QR-скан</label>
             <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />
+
+            <label style={s.label}>VK ID владельца (для личной ссылки)</label>
+            <input style={s.input} placeholder="123456789" value={exVkOwnerId} onChange={e => setExVkOwnerId(e.target.value)} />
 
             <label style={s.label}>Форматы работы</label>
             <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>

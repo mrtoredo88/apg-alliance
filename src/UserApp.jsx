@@ -94,6 +94,7 @@ export function UserApp() {
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
+  const [ownedExpert, setOwnedExpert]             = useState(null);
   const [joinedGroup, setJoinedGroup]             = useState(false);
   const [lastBonusDate, setLastBonusDate]         = useState(null);
   const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'dark');
@@ -116,6 +117,12 @@ export function UserApp() {
     return fromHash ?? fromSearch ?? null;
   }, []);
   const deepLinkOpened = useRef(false);
+
+  // Deep link для скана эксперта: ?scan=expert_ID
+  const pendingScanId = useMemo(() => {
+    return new URLSearchParams(window.location.search).get('scan') ?? null;
+  }, []);
+  const scanDeepLinkTriggered = useRef(false);
 
   const haptic = useCallback((style = 'light') => {
     vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
@@ -283,7 +290,14 @@ export function UserApp() {
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
-      if (isMounted.current) setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const freshExperts = exSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (isMounted.current) {
+        setExperts(freshExperts);
+        if (userData) {
+          const ownedEx = freshExperts.find(e => e.vkOwnerId && String(e.vkOwnerId) === String(userData.id));
+          setOwnedExpert(ownedEx ?? null);
+        }
+      }
       if (isMounted.current) setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
@@ -606,6 +620,14 @@ export function UserApp() {
     const p = partners.find(p => p.id === pendingPartnerId);
     if (p) { deepLinkOpened.current = true; openPartner(p); }
   }, [pendingPartnerId, partners, openPartner]);
+
+  // Авто-скан эксперта из deep link ?scan=expert_ID
+  useEffect(() => {
+    if (!pendingScanId || !user || !experts.length || scanDeepLinkTriggered.current) return;
+    if (!pendingScanId.startsWith('expert_')) return;
+    scanDeepLinkTriggered.current = true;
+    handleConfirmScan(pendingScanId);
+  }, [pendingScanId, user, experts, handleConfirmScan]);
 
   // ─── Задания ────────────────────────────────────────────────────────────────
 
@@ -1145,6 +1167,7 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <PartnerCabinetPage
                     partner={ownedPartner}
+                    expert={ownedExpert}
                     onBack={() => goPanel('profile')}
                     onPartnerUpdate={(updated) => {
                       setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
