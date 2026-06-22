@@ -1132,6 +1132,7 @@ export function HomePanel({
   registeredEventIds = [], onEventRegister, userRank = null, customTasks = [],
   appearance = 'light',
   joinedGroup = false, onJoinGroup,
+  userCount = 0, onOpenForPartners,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1377,6 +1378,28 @@ export function HomePanel({
             <div style={{ padding: '12px 0 4px' }}>
               <QuickActions onShare={onShare} onOpenLeaderboard={onOpenLeaderboard} onOpenEvents={onOpenEvents} onOpenTasks={onOpenTasks} onOpenRewards={onOpenRewards} userRank={userRank} />
             </div>
+
+            {userCount > 0 && (
+              <div style={{ margin: '4px 16px 0' }}>
+                <button
+                  onClick={onOpenForPartners}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'linear-gradient(135deg, rgba(201,168,76,0.10), rgba(201,168,76,0.05))',
+                    border: '1px solid rgba(201,168,76,0.22)',
+                    borderRadius: 16, padding: '11px 16px',
+                    cursor: onOpenForPartners ? 'pointer' : 'default',
+                    textAlign: 'left', gap: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>👥</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.textPri }}>
+                    Уже <span style={{ color: T.gold }}>{userCount.toLocaleString('ru')}</span> жителей Зеленограда в АПГ
+                  </span>
+                  {onOpenForPartners && <span style={{ fontSize: 12, color: T.textSec, flexShrink: 0 }}>→</span>}
+                </button>
+              </div>
+            )}
 
             {/* Закрытое мероприятие АПГ */}
             {nextPrivateEvent && (

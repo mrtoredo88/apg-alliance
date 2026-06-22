@@ -30,6 +30,7 @@ const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ defa
 const MapPage              = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
 const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(m => ({ default: m.PartnerCabinetPage })));
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
+const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
 
 function formatCacheAge(ts) {
   const mins = Math.round((Date.now() - ts) / 60000);
@@ -80,6 +81,7 @@ export function UserApp() {
   const [isScannerOpen, setIsScannerOpen]       = useState(false);
   const [partners, setPartners]                 = useState([]);
   const [experts, setExperts]                   = useState([]);
+  const [platformStats, setPlatformStats]       = useState({ userCount: 0, totalScans: 0 });
   const [scannedExperts, setScannedExperts]     = useState({});
   const [events, setEvents]                     = useState([]);
   const [news, setNews]                         = useState([]);
@@ -245,7 +247,7 @@ export function UserApp() {
       }
 
       console.time('apg:load-all');
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap] = await Promise.all([
         (console.time('apg:partners'), getDocs(collection(db, 'partners')).then(s => (console.timeEnd('apg:partners'), s))),
         (console.time('apg:events'),   getDocs(collection(db, 'events')).then(s => (console.timeEnd('apg:events'), s))),
         getDocs(query(collection(db, 'news'),        orderBy('createdAt', 'desc'), limit(30))).catch(() => ({ docs: [] })),
@@ -254,6 +256,7 @@ export function UserApp() {
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
         fetch('/api/vk-news').then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
         getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
+        getDoc(doc(db, 'stats', 'global')).catch(() => null),
       ]);
       console.timeEnd('apg:load-all');
 
@@ -299,6 +302,10 @@ export function UserApp() {
         }
       }
       if (isMounted.current) setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      if (isMounted.current && statsSnap?.exists?.()) {
+        const sd = statsSnap.data();
+        setPlatformStats({ userCount: sd.userCount ?? 0, totalScans: sd.totalScans ?? 0 });
+      }
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
       try { localStorage.setItem('apg_notif_cache', JSON.stringify(notifList)); } catch {}
@@ -378,6 +385,10 @@ export function UserApp() {
           registeredAt: serverTimestamp(),
           ...profilePatch,
         });
+
+        if (isRealUser) {
+          setDoc(doc(db, 'stats', 'global'), { userCount: increment(1) }, { merge: true }).catch(() => {});
+        }
 
         if (isValidRef) {
           // Начисляем рефереру +2 ключа и +1 к счётчику
@@ -553,6 +564,7 @@ export function UserApp() {
     try {
       await updateDoc(doc(db, 'users', String(user.id)), updateData);
       updateDoc(doc(db, 'partners', partner.id), { totalVisits: increment(1) }).catch(() => {});
+      setDoc(doc(db, 'stats', 'global'), { totalScans: increment(1) }, { merge: true }).catch(() => {});
       // Пишем событие скана для расчёта activityIndex
       addDoc(collection(db, 'scans'), {
         partnerId: partner.id,
@@ -1062,6 +1074,8 @@ export function UserApp() {
                 onOpenNotifications={openNotifications}
                 joinedGroup={joinedGroup}
                 onJoinGroup={handleJoinGroup}
+                userCount={platformStats.userCount}
+                onOpenForPartners={() => goPanel('for-partners')}
               />
 
               <Panel id="partner">
@@ -1219,6 +1233,17 @@ export function UserApp() {
                     lastSeenTs={lastSeenTs}
                     userKeys={userKeys}
                     lastScanDate={lastScanDate}
+                    onBack={() => goPanel('home')}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="for-partners">
+                <Suspense fallback={<LazyFallback />}>
+                  <ForPartnersPage
+                    userCount={platformStats.userCount}
+                    partnerCount={partners.length}
+                    totalScans={platformStats.totalScans}
                     onBack={() => goPanel('home')}
                   />
                 </Suspense>
