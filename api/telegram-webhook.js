@@ -19,6 +19,25 @@ async function tgSend(chatId, text) {
   }).catch(() => {});
 }
 
+async function tgGetPhotoUrl(userId) {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const photosRes = await fetch(
+      `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`
+    ).then(r => r.json());
+    if (!photosRes.ok || !photosRes.result?.photos?.length) return null;
+    const sizes   = photosRes.result.photos[0];
+    const fileId  = sizes[sizes.length - 1].file_id; // наибольший размер
+    const fileRes = await fetch(
+      `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`
+    ).then(r => r.json());
+    if (!fileRes.ok || !fileRes.result?.file_path) return null;
+    return `https://api.telegram.org/file/bot${token}/${fileRes.result.file_path}`;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -50,6 +69,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // Получаем фото профиля (параллельно с остальным)
+    const photoUrl = await tgGetPhotoUrl(from.id);
+
     // Помечаем сессию как завершённую
     await ref.update({
       status:    'done',
@@ -57,6 +79,7 @@ export default async function handler(req, res) {
       firstName: from.first_name ?? '',
       lastName:  from.last_name  ?? '',
       username:  from.username   ?? '',
+      photoUrl:  photoUrl ?? null,
     });
 
     // Создаём/обновляем пользователя в Firestore
@@ -67,7 +90,7 @@ export default async function handler(req, res) {
       authProvider: 'telegram',
       firstName: from.first_name ?? null,
       lastName:  from.last_name  ?? null,
-      photo:     null,
+      photo:     photoUrl ?? null,
       lastSeen:  FieldValue.serverTimestamp(),
     };
 

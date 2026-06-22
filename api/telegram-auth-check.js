@@ -43,10 +43,10 @@ export default async function handler(req, res) {
     return res.json({
       status: 'done', token,
       user: {
-        id: uid,
+        id:         uid,
         first_name: data.firstName ?? '',
         last_name:  data.lastName  ?? '',
-        photo_200:  null,
+        photo_200:  data.photoUrl  ?? null,
       },
     });
   }
