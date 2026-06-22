@@ -90,6 +90,7 @@ export function UserApp() {
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [showOnboarding, setShowOnboarding]     = useState(false);
+  const [showScannerHint, setShowScannerHint]   = useState(false);
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
   const [recentReviews, setRecentReviews]       = useState([]);
   const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
@@ -463,6 +464,7 @@ export function UserApp() {
 
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
+    setShowScannerHint(true);
     if (user) {
       try { await updateDoc(doc(db, 'users', String(user.id)), { onboardingDone: true }); }
       catch (e) { console.error(e); }
@@ -1298,6 +1300,70 @@ export function UserApp() {
             <Suspense fallback={null}>
               <Onboarding onComplete={handleOnboardingComplete} />
             </Suspense>
+          )}
+
+          {showScannerHint && (
+            <div
+              onClick={() => setShowScannerHint(false)}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 1500,
+                background: 'rgba(0,0,0,0.78)',
+                backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'flex-end',
+                paddingBottom: 100,
+              }}
+            >
+              {/* Текст-подсказка */}
+              <div style={{
+                textAlign: 'center', marginBottom: 16, padding: '0 32px',
+                animation: 'fadeInUp 0.4s ease both',
+              }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                  Нажми ◎, чтобы начать
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: '20px' }}>
+                  Наведи камеру на QR-код у партнёра и получи первый ключ
+                </div>
+              </div>
+
+              {/* Стрелка вниз */}
+              <div style={{
+                width: 0, height: 0,
+                borderLeft: '10px solid transparent',
+                borderRight: '10px solid transparent',
+                borderTop: '14px solid rgba(201,168,76,0.9)',
+                marginBottom: 10,
+                animation: 'bounce 1s ease-in-out infinite',
+              }} />
+
+              {/* Пульсирующее кольцо вокруг кнопки */}
+              <div style={{ position: 'relative', width: 64, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                  position: 'absolute', inset: -10,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(201,168,76,0.6)',
+                  animation: 'pulse 1.4s ease-in-out infinite',
+                }} />
+                <div style={{
+                  position: 'absolute', inset: -22,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(201,168,76,0.25)',
+                  animation: 'pulse 1.4s ease-in-out 0.4s infinite',
+                }} />
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: 'rgba(201,168,76,0.15)',
+                  border: '2px solid rgba(201,168,76,0.7)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28, color: '#C9A84C',
+                }}>◎</div>
+              </div>
+
+              <div style={{ marginTop: 24, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                Нажми в любом месте, чтобы закрыть
+              </div>
+            </div>
           )}
 
           {!splashDone && (

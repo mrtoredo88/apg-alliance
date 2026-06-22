@@ -198,6 +198,17 @@ input::placeholder {
   to   { opacity: 1; transform: translateY(0);    }
 }
 
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(8px); }
+}
+
+@keyframes pulse {
+  0%   { transform: scale(1);    opacity: 0.7; }
+  50%  { transform: scale(1.25); opacity: 0.2; }
+  100% { transform: scale(1.5);  opacity: 0;   }
+}
+
 @keyframes keyPop {
   0%   { transform: scale(0.4); opacity: 0; }
   30%  { transform: scale(1.3); opacity: 1; }
