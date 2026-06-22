@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
+import { auth } from './firebase';
+import { signInWithCustomToken } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
@@ -297,6 +299,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
   const [vkLoginError, setVkLoginError] = useState('');
+  const [tgLoading, setTgLoading] = useState(false);
+  const [tgError, setTgError] = useState('');
+  const tgContainerRef = useRef(null);
   const isGuest = !isVK() && String(user?.id ?? '').startsWith('guest_');
 
   const handleVkLogin = async () => {
@@ -310,6 +315,47 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       setVkLoginLoading(false);
     }
   };
+
+  const handleTelegramAuth = useCallback(async (tgUser) => {
+    setTgLoading(true);
+    setTgError('');
+    try {
+      const res = await fetch('/api/verify-telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tgUser),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? 'server_error');
+      await signInWithCustomToken(auth, data.token);
+      localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
+      window.location.reload();
+    } catch (e) {
+      console.error('[TG auth]', e);
+      setTgError('Не удалось войти. Попробуйте ещё раз.');
+      setTgLoading(false);
+    }
+  }, []);
+
+  // Монтируем Telegram Login Widget
+  useEffect(() => {
+    if (!isGuest || !tgContainerRef.current) return;
+    window.onTelegramAuth = handleTelegramAuth;
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.setAttribute('data-telegram-login', 'apg_zelenograd_bot');
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    script.async = true;
+    tgContainerRef.current.appendChild(script);
+    return () => {
+      delete window.onTelegramAuth;
+      if (tgContainerRef.current?.contains(script)) {
+        tgContainerRef.current.removeChild(script);
+      }
+    };
+  }, [isGuest, handleTelegramAuth]);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const dismissTimerRef = useRef(null);
@@ -478,6 +524,33 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               }
             </button>
             {vkLoginError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{vkLoginError}</div>}
+
+            {/* Разделитель */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+              <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>или</span>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+            </div>
+
+            {/* Telegram Login Widget */}
+            <div>
+              <div style={{
+                width: '100%', borderRadius: 12, overflow: 'hidden',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minHeight: 44,
+                opacity: tgLoading ? 0.5 : 1,
+                pointerEvents: tgLoading ? 'none' : 'auto',
+              }}>
+                <div ref={tgContainerRef} />
+              </div>
+              {tgLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0' }}>
+                  <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <span style={{ fontSize: 13, color: T.textSec }}>Входим через Telegram...</span>
+                </div>
+              )}
+              {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
+            </div>
           </div>
         </div>
       )}

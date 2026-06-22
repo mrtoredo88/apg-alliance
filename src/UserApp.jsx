@@ -4,7 +4,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
 import { db, auth } from './firebase';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
@@ -225,6 +225,12 @@ export function UserApp() {
         vkBridge.send('VKWebAppGetUserInfo'),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
       ]).catch(() => {
+        // Telegram-пользователь (авторизован через виджет ранее)
+        try {
+          const tgRaw = localStorage.getItem('apg_tg_user');
+          if (tgRaw) return JSON.parse(tgRaw);
+        } catch {}
+        // Гость
         let guestId = localStorage.getItem('apg_guest_id');
         if (!guestId) {
           guestId = 'guest_' + Math.random().toString(36).slice(2, 9);
