@@ -301,7 +301,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [vkLoginError, setVkLoginError] = useState('');
   const [tgLoading, setTgLoading] = useState(false);
   const [tgError, setTgError] = useState('');
-  const tgContainerRef = useRef(null);
+  const [tgStatus, setTgStatus] = useState('');
   const isGuest = !isVK() && String(user?.id ?? '').startsWith('guest_');
 
   const handleVkLogin = async () => {
@@ -316,45 +316,50 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }
   };
 
-  const handleTelegramAuth = useCallback(async (tgUser) => {
-    setTgLoading(true);
+  const handleTelegramAuth = useCallback(async () => {
     setTgError('');
+    // Открываем окно синхронно (иначе браузер блокирует popup)
+    const popup = window.open('', '_blank');
+    setTgLoading(true);
+    setTgStatus('Открываем Telegram...');
     try {
-      const res = await fetch('/api/verify-telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tgUser),
+      const startRes = await fetch('/api/telegram-auth-start', { method: 'POST' });
+      const { state, url } = await startRes.json();
+      if (popup) popup.location.href = url;
+      setTgStatus('Нажмите Start в боте, затем вернитесь сюда');
+
+      // Поллинг каждые 2 секунды, до 5 минут
+      await new Promise((resolve, reject) => {
+        let attempts = 0;
+        const iv = setInterval(async () => {
+          attempts++;
+          if (attempts > 150) { clearInterval(iv); reject(new Error('timeout')); return; }
+          try {
+            const r = await fetch(`/api/telegram-auth-check?state=${state}`);
+            const d = await r.json();
+            if (d.status === 'done') {
+              clearInterval(iv);
+              await signInWithCustomToken(auth, d.token);
+              localStorage.setItem('apg_tg_user', JSON.stringify(d.user));
+              resolve();
+            } else if (d.status === 'expired' || d.status === 'not_found') {
+              clearInterval(iv);
+              reject(new Error('expired'));
+            }
+          } catch (e) { if (e.message !== 'expired') return; clearInterval(iv); reject(e); }
+        }, 2000);
       });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? 'server_error');
-      await signInWithCustomToken(auth, data.token);
-      localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
+
       window.location.reload();
     } catch (e) {
-      console.error('[TG auth]', e);
-      setTgError('Не удалось войти. Попробуйте ещё раз.');
+      popup?.close();
+      setTgError(e.message === 'timeout' || e.message === 'expired'
+        ? 'Время вышло. Попробуйте снова.'
+        : 'Не удалось войти. Попробуйте снова.');
       setTgLoading(false);
+      setTgStatus('');
     }
   }, []);
-
-  // Монтируем Telegram Login Widget
-  useEffect(() => {
-    if (!isGuest || !tgContainerRef.current) return;
-    window.onTelegramAuth = handleTelegramAuth;
-    const script = document.createElement('script');
-    script.src = 'https://telegram.org/js/telegram-widget.js?22';
-    script.setAttribute('data-telegram-login', 'apg_zelenograd_bot');
-    script.setAttribute('data-size', 'large');
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-    script.async = true;
-    tgContainerRef.current.appendChild(script);
-    return () => {
-      delete window.onTelegramAuth;
-      if (tgContainerRef.current?.contains(script)) {
-        tgContainerRef.current.removeChild(script);
-      }
-    };
-  }, [isGuest, handleTelegramAuth]);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const dismissTimerRef = useRef(null);
@@ -531,24 +536,30 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
             </div>
 
-            {/* Telegram Login Widget */}
+            {/* Telegram */}
             <div>
-              <div style={{
-                width: '100%', borderRadius: 12, overflow: 'hidden',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                minHeight: 44,
-                opacity: tgLoading ? 0.5 : 1,
-                pointerEvents: tgLoading ? 'none' : 'auto',
-              }}>
-                <div ref={tgContainerRef} />
-              </div>
-              {tgLoading && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0' }}>
-                  <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  <span style={{ fontSize: 13, color: T.textSec }}>Входим через Telegram...</span>
-                </div>
+              <button
+                onClick={handleTelegramAuth}
+                disabled={tgLoading}
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
+                  cursor: tgLoading ? 'default' : 'pointer',
+                  background: tgLoading ? 'rgba(38,168,234,0.3)' : 'linear-gradient(135deg, #26A8EA, #1A8CC7)',
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: tgLoading ? 'none' : '0 4px 16px rgba(38,168,234,0.35)',
+                }}
+              >
+                {tgLoading
+                  ? <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
+                }
+                {tgLoading ? 'Ожидаем Telegram...' : 'Войти через Telegram'}
+              </button>
+              {tgStatus && !tgError && (
+                <div style={{ fontSize: 12, color: T.textSec, textAlign: 'center', marginTop: 6, lineHeight: '16px' }}>{tgStatus}</div>
               )}
-              {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
+              {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center', marginTop: 6 }}>{tgError}</div>}
             </div>
           </div>
         </div>
