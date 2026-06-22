@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, writeBatch, increment, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -977,12 +977,33 @@ export const AdminPanel = () => {
       const totalReferrals  = users.reduce((s, u) => s + (u.referralCount ?? 0), 0);
       const referralKeysOut = referredCount * 2 + totalReferrals * 2;
 
+      // Гостевые сессии (последние 30 дней)
+      const guestSnap = await getDocs(
+        query(collection(db, 'guestSessions'),
+          where('date', '>=', cutoff30.toISOString().slice(0, 10)),
+          orderBy('date'),
+          limit(2000),
+        )
+      ).catch(() => ({ docs: [] }));
+      const guestDocs      = guestSnap.docs.map(d => d.data());
+      const guestTotal     = guestDocs.length;
+      const guestConverted = guestDocs.filter(d => d.converted).length;
+      const guestRate      = guestTotal > 0 ? ((guestConverted / guestTotal) * 100).toFixed(1) : '0';
+
+      const guestMap = {};
+      last30.forEach(date => { guestMap[date] = 0; });
+      guestDocs.forEach(d => {
+        if (d.date && guestMap[d.date] !== undefined) guestMap[d.date]++;
+      });
+      const guestGrowthData = last30.map(date => ({ date, count: guestMap[date] }));
+
       setAnalytics({
         totalUsers, totalKeys, avgKeys, activeUsers, totalScans,
         partnerStats, users,
         dauData, topUsers, keyBuckets,
         referredCount, totalReferrals, referralKeysOut,
         newUsers7d, newUsers30d, regGrowthData, activeUsers7d,
+        guestTotal, guestConverted, guestRate, guestGrowthData,
       });
     } catch (e) { console.error(e); }
     setAnalyticsLoading(false);
@@ -2027,6 +2048,30 @@ export const AdminPanel = () => {
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: A.textSec, marginBottom: 8 }}>📈 Регистрации по дням (30 дней)</div>
                 <MiniBarChart data={analytics.regGrowthData} labelKey="date" valueKey="count" color='#4BB34B' shortDate />
+              </div>
+
+              {/* Гостевые сессии */}
+              <div style={s.card}>
+                <h2 style={s.h2}>👁️ Гостевые сессии (30 дней)</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { label: 'Гостевых открытий', value: analytics.guestTotal,     color: A.blue },
+                    { label: 'Конверсий в юзера', value: analytics.guestConverted, color: '#4BB34B' },
+                    { label: 'Конверсия',          value: analytics.guestRate + '%', color: A.gold },
+                  ].map(stat => (
+                    <div key={stat.label} style={{ background: A.chip, borderRadius: 14, padding: '12px 8px', textAlign: 'center', border: `1px solid ${stat.color}25` }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                      <div style={{ fontSize: 10, color: A.textSec, lineHeight: '13px', marginTop: 4 }}>{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: A.textSec, marginBottom: 8 }}>👁️ Гостевые открытия по дням</div>
+                <MiniBarChart data={analytics.guestGrowthData} labelKey="date" valueKey="count" color={A.blue} shortDate />
+                <div style={{ fontSize: 12, fontWeight: 700, color: A.textSec, margin: '12px 0 8px' }}>✅ Регистрации по дням (для сравнения)</div>
+                <MiniBarChart data={analytics.regGrowthData} labelKey="date" valueKey="count" color='#4BB34B' shortDate />
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 8 }}>
+                  Данные накапливаются с момента обновления. Конверсия — доля гостей, авторизовавшихся в той же сессии.
+                </div>
               </div>
 
               {/* Сводка */}

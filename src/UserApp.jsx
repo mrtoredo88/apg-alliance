@@ -237,6 +237,31 @@ export function UserApp() {
       setUser(userData);
 
       const isGuest = String(userData.id).startsWith('guest_');
+
+      // ── Гостевые сессии ────────────────────────────────────────────────────
+      const GS_KEY = 'apg_gsid';
+      if (isGuest) {
+        let sid = sessionStorage.getItem(GS_KEY);
+        if (!sid) {
+          sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+          sessionStorage.setItem(GS_KEY, sid);
+          setDoc(doc(db, 'guestSessions', sid), {
+            timestamp: serverTimestamp(),
+            date: new Date().toISOString().slice(0, 10),
+            converted: false,
+          }).catch(() => {});
+        }
+      } else {
+        const sid = sessionStorage.getItem(GS_KEY);
+        if (sid) {
+          updateDoc(doc(db, 'guestSessions', sid), {
+            converted: true,
+            userId: String(userData.id),
+          }).catch(() => {});
+          sessionStorage.removeItem(GS_KEY);
+        }
+      }
+
       // auth_map нужно создать ДО getDoc(userRef) — isOwner() проверяет его наличие
       if (!isGuest && auth.currentUser) {
         await setDoc(

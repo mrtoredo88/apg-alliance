@@ -76,6 +76,20 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
 
+    // ── Агрегированная статистика платформы (счётчик на главном экране) ───────
+    match /stats/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ── Гостевые сессии (аналитика) ───────────────────────────────────────────
+    // Создаёт любой аноним (Firebase anonymous auth); читает только AdminPanel.
+    match /guestSessions/{id} {
+      allow read: if false;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
     // ── Победители месяца — читают все, пишет только Admin SDK ───────────────
     match /monthlyWinners/{month} {
       allow read: if true;
