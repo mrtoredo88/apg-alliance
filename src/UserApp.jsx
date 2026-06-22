@@ -362,6 +362,8 @@ export function UserApp() {
       const docSnap = await getDoc(userRef);
       if (!isMounted.current) return;
 
+      const todayKey = new Date().toLocaleDateString('sv');
+
       const profilePatch = {
         firstName: userData.first_name ?? null,
         lastName:  userData.last_name  ?? null,
@@ -369,10 +371,17 @@ export function UserApp() {
         lastSeen:  serverTimestamp(),
       };
 
-      const todayKey = new Date().toLocaleDateString('sv');
-
       if (docSnap.exists()) {
         const data = docSnap.data();
+
+        // Если в localStorage фото нет, но в Firestore есть — используем Firestore и не перезаписываем его null
+        if (data.photo && !userData.photo_200) {
+          profilePatch.photo = data.photo;
+          setUser(u => ({ ...u, photo_200: data.photo }));
+          if (String(userData.id).startsWith('tg_')) {
+            try { localStorage.setItem('apg_tg_user', JSON.stringify({ ...userData, photo_200: data.photo })); } catch {}
+          }
+        }
         const keys = data.keys ?? 0;
         setUserKeys(keys);
         setFavorites(data.favorites ?? []);

@@ -19,20 +19,37 @@ async function tgSend(chatId, text) {
   }).catch(() => {});
 }
 
+async function tgFileUrl(token, fileId) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`).then(r => r.json());
+  if (!r.ok || !r.result?.file_path) return null;
+  return `https://api.telegram.org/file/bot${token}/${r.result.file_path}`;
+}
+
 async function tgGetPhotoUrl(userId) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
+
+    // Способ 1: getUserProfilePhotos
     const photosRes = await fetch(
       `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`
     ).then(r => r.json());
-    if (!photosRes.ok || !photosRes.result?.photos?.length) return null;
-    const sizes   = photosRes.result.photos[0];
-    const fileId  = sizes[sizes.length - 1].file_id; // наибольший размер
-    const fileRes = await fetch(
-      `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`
+    if (photosRes.ok && photosRes.result?.photos?.length) {
+      const sizes  = photosRes.result.photos[0];
+      const fileId = sizes[sizes.length - 1].file_id;
+      const url    = await tgFileUrl(token, fileId);
+      if (url) return url;
+    }
+
+    // Способ 2: getChat (fallback — работает даже при некоторых privacy-настройках)
+    const chatRes = await fetch(
+      `https://api.telegram.org/bot${token}/getChat?chat_id=${userId}`
     ).then(r => r.json());
-    if (!fileRes.ok || !fileRes.result?.file_path) return null;
-    return `https://api.telegram.org/file/bot${token}/${fileRes.result.file_path}`;
+    if (chatRes.ok && chatRes.result?.photo?.big_file_id) {
+      const url = await tgFileUrl(token, chatRes.result.photo.big_file_id);
+      if (url) return url;
+    }
+
+    return null;
   } catch {
     return null;
   }
