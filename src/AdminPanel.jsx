@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch, increment, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, writeBatch, increment, limit } from 'firebase/firestore';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -824,6 +824,8 @@ export const AdminPanel = () => {
   const [awardUserId, setAwardUserId] = useState('');
   const [awardAmount, setAwardAmount] = useState('');
   const [awardMsg, setAwardMsg]       = useState('');
+  const [recalcLoading, setRecalcLoading] = useState(false);
+  const [recalcMsg, setRecalcMsg]         = useState('');
 
   const awardKeys = async () => {
     if (!awardUserId.trim() || !Number(awardAmount)) return;
@@ -834,6 +836,26 @@ export const AdminPanel = () => {
       setAwardUserId(''); setAwardAmount('');
     } catch { setAwardMsg('❌ Ошибка — проверьте ID'); }
     setTimeout(() => setAwardMsg(''), 3000);
+  };
+
+  const recalcStats = async () => {
+    if (recalcLoading) return;
+    setRecalcLoading(true);
+    setRecalcMsg('Считаем...');
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const userCount  = users.filter(u => !u.id.startsWith('guest_')).length;
+      const totalScans = users.reduce((sum, u) =>
+        sum + Object.values(u.visitCounts ?? {}).reduce((s, v) => s + (Number(v) || 0), 0), 0);
+      await setDoc(doc(db, 'stats', 'global'), { userCount, totalScans }, { merge: true });
+      setRecalcMsg(`✅ Обновлено: ${userCount} пользователей, ${totalScans} визитов`);
+    } catch (e) {
+      console.error(e);
+      setRecalcMsg('❌ Ошибка при пересчёте');
+    }
+    setRecalcLoading(false);
+    setTimeout(() => setRecalcMsg(''), 5000);
   };
 
   const exportCSV = () => {
@@ -1949,6 +1971,26 @@ export const AdminPanel = () => {
       {/* ── АНАЛИТИКА ── */}
       {activeTab === 'analytics' && (
         <div>
+          {/* Пересчёт публичного счётчика — всегда видна */}
+          <div style={{ ...s.card, marginBottom: 12 }}>
+            <h2 style={s.h2}>🔄 Публичный счётчик</h2>
+            <p style={{ color: A.textSec, fontSize: 13, lineHeight: '18px', marginBottom: 12 }}>
+              Пересчитывает реальное количество уникальных пользователей и визитов к партнёрам, затем обновляет счётчик на главном экране приложения.
+            </p>
+            <button
+              style={{ ...s.btn, ...s.btnPri, width: '100%', opacity: recalcLoading ? 0.6 : 1 }}
+              onClick={recalcStats}
+              disabled={recalcLoading}
+            >
+              {recalcLoading ? '⏳ Считаем...' : '🔄 Пересчитать и синхронизировать'}
+            </button>
+            {recalcMsg && (
+              <p style={{ marginTop: 10, textAlign: 'center', fontSize: 13, color: recalcMsg.startsWith('✅') ? '#4BB34B' : A.red }}>
+                {recalcMsg}
+              </p>
+            )}
+          </div>
+
           {analyticsLoading ? (
             <div style={{ textAlign: 'center', padding: 48, color: A.textSec }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
