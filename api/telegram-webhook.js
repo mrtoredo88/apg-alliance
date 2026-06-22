@@ -25,10 +25,7 @@ export default async function handler(req, res) {
   const update  = req.body ?? {};
   const message = update.message;
 
-  // Отвечаем Telegram немедленно (иначе он будет повторять запрос)
-  res.status(200).json({ ok: true });
-
-  if (!message?.text) return;
+  if (!message?.text) return res.status(200).json({ ok: true });
 
   const from = message.from;
 
@@ -42,16 +39,15 @@ export default async function handler(req, res) {
 
     if (!snap.exists || snap.data().status !== 'pending') {
       await tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
-      return;
+      return res.status(200).json({ ok: true });
     }
 
-    const expired = snap.data().expiresAt instanceof Date
-      ? snap.data().expiresAt < new Date()
-      : snap.data().expiresAt.toDate() < new Date();
+    const expiresAt = snap.data().expiresAt;
+    const expired   = (expiresAt?.toDate ? expiresAt.toDate() : new Date(expiresAt)) < new Date();
     if (expired) {
       await ref.update({ status: 'expired' });
       await tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
-      return;
+      return res.status(200).json({ ok: true });
     }
 
     // Помечаем сессию как завершённую
@@ -64,8 +60,8 @@ export default async function handler(req, res) {
     });
 
     // Создаём/обновляем пользователя в Firestore
-    const uid     = `tg_${from.id}`;
-    const userRef = db.collection('users').doc(uid);
+    const uid      = `tg_${from.id}`;
+    const userRef  = db.collection('users').doc(uid);
     const userSnap = await userRef.get();
     const profilePatch = {
       authProvider: 'telegram',
@@ -91,10 +87,11 @@ export default async function handler(req, res) {
       await userRef.update(profilePatch);
     }
 
-    await tgSend(from.id, `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.`);
-    return;
+    await tgSend(from.id, '✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.');
+    return res.status(200).json({ ok: true });
   }
 
   // Любое другое сообщение
   await tgSend(from.id, 'Привет! Этот бот используется для авторизации в приложении АПГ Зеленоград.\n\nОткройте приложение и нажмите «Войти через Telegram».');
+  return res.status(200).json({ ok: true });
 }
