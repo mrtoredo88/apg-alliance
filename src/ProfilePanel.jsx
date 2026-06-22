@@ -346,7 +346,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     script.setAttribute('data-telegram-login', 'apg_zelenograd_bot');
     script.setAttribute('data-size', 'large');
     script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-    script.setAttribute('data-request-access', 'write');
     script.async = true;
     tgContainerRef.current.appendChild(script);
     return () => {
