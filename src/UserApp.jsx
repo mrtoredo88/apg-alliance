@@ -327,6 +327,7 @@ export function UserApp() {
         firstName: userData.first_name ?? null,
         lastName:  userData.last_name  ?? null,
         photo:     userData.photo_200  ?? null,
+        lastSeen:  serverTimestamp(),
       };
 
       const todayKey = new Date().toLocaleDateString('sv');
@@ -374,6 +375,7 @@ export function UserApp() {
           completedTasks: [], streak: 0, onboardingDone: false,
           scanDates: [], lastBonusDate: todayKey,
           referredBy: refId ?? null,
+          registeredAt: serverTimestamp(),
           ...profilePatch,
         });
 

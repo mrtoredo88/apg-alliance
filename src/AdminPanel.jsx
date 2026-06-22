@@ -899,6 +899,34 @@ export const AdminPanel = () => {
       });
       const dauData = last14.map(date => ({ date, count: dauMap[date] }));
 
+      // Регистрации по дням (последние 30 дней)
+      const last30 = Array.from({ length: 30 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - (29 - i));
+        return d.toISOString().slice(0, 10);
+      });
+      const regMap = {};
+      last30.forEach(date => { regMap[date] = 0; });
+      const cutoff7  = new Date(today); cutoff7.setDate(cutoff7.getDate() - 7);
+      const cutoff30 = new Date(today); cutoff30.setDate(cutoff30.getDate() - 30);
+      let newUsers7d = 0, newUsers30d = 0;
+      users.forEach(u => {
+        const ts = u.registeredAt?.toDate ? u.registeredAt.toDate() : null;
+        if (!ts) return;
+        const dateStr = ts.toISOString().slice(0, 10);
+        if (regMap[dateStr] !== undefined) regMap[dateStr]++;
+        if (ts >= cutoff7)  newUsers7d++;
+        if (ts >= cutoff30) newUsers30d++;
+      });
+      const regGrowthData = last30.map(date => ({ date, count: regMap[date] }));
+
+      // Активные за последние 7 дней — по lastSeen или lastBonusDate
+      const cutoff7str = cutoff7.toISOString().slice(0, 10);
+      const activeUsers7d = users.filter(u => {
+        if (u.lastSeen?.toDate) return u.lastSeen.toDate() >= cutoff7;
+        return (u.lastBonusDate ?? '') >= cutoff7str;
+      }).length;
+
       const topUsers = [...users]
         .sort((a, b) => (b.keys ?? 0) - (a.keys ?? 0))
         .slice(0, 10)
@@ -932,6 +960,7 @@ export const AdminPanel = () => {
         partnerStats, users,
         dauData, topUsers, keyBuckets,
         referredCount, totalReferrals, referralKeysOut,
+        newUsers7d, newUsers30d, regGrowthData, activeUsers7d,
       });
     } catch (e) { console.error(e); }
     setAnalyticsLoading(false);
@@ -1934,15 +1963,39 @@ export const AdminPanel = () => {
             </div>
           ) : (
             <>
+              {/* Рост аудитории */}
+              <div style={s.card}>
+                <h2 style={s.h2}>👥 Аудитория</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: 'Всего пользователей', value: analytics.totalUsers,    icon: '👥', color: A.blue },
+                    { label: 'Активных за 7 дней',  value: analytics.activeUsers7d, icon: '✅', color: '#4BB34B' },
+                    { label: 'Новых за 7 дней',     value: analytics.newUsers7d,    icon: '🆕', color: A.gold },
+                    { label: 'Новых за 30 дней',    value: analytics.newUsers30d,   icon: '📅', color: A.gold },
+                  ].map(stat => (
+                    <div key={stat.label} style={{ background: A.chip, borderRadius: 16, padding: '14px 10px', textAlign: 'center', border: `1px solid ${stat.color}30` }}>
+                      <div style={{ fontSize: 22, marginBottom: 4 }}>{stat.icon}</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                      <div style={{ fontSize: 11, color: A.textSec, lineHeight: '14px', marginTop: 5 }}>{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: A.textSec, marginBottom: 12 }}>
+                  📌 «Новых за N дней» считается по полю registeredAt — данные есть только для пользователей, зарегистрировавшихся после обновления.
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: A.textSec, marginBottom: 8 }}>📈 Регистрации по дням (30 дней)</div>
+                <MiniBarChart data={analytics.regGrowthData} labelKey="date" valueKey="count" color='#4BB34B' shortDate />
+              </div>
+
               {/* Сводка */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
-                  { label: 'Пользователей',    value: analytics.totalUsers,  icon: '👥', color: A.blue },
-                  { label: 'Активных',          value: analytics.activeUsers, icon: '✅', color: '#4BB34B' },
-                  { label: 'Ключей в обороте',  value: analytics.totalKeys,   icon: '🗝️', color: A.gold },
-                  { label: 'Ср. ключей/юзер',   value: analytics.avgKeys,     icon: '📈', color: A.gold },
-                  { label: 'Уник. сканов',       value: analytics.totalScans,  icon: '📲', color: A.blue },
-                  { label: 'Рефералов',          value: analytics.totalReferrals, icon: '🔗', color: '#9B59B6' },
+                  { label: 'Всего пользователей', value: analytics.totalUsers,  icon: '👥', color: A.blue },
+                  { label: 'Активных (ключи>0)',   value: analytics.activeUsers, icon: '✅', color: '#4BB34B' },
+                  { label: 'Ключей в обороте',     value: analytics.totalKeys,   icon: '🗝️', color: A.gold },
+                  { label: 'Ср. ключей/юзер',      value: analytics.avgKeys,     icon: '📈', color: A.gold },
+                  { label: 'Уник. сканов',          value: analytics.totalScans,  icon: '📲', color: A.blue },
+                  { label: 'Рефералов',             value: analytics.totalReferrals, icon: '🔗', color: '#9B59B6' },
                 ].map(stat => (
                   <div key={stat.label} style={{ ...s.card, marginBottom: 0, textAlign: 'center', border: `1px solid ${stat.color}25` }}>
                     <div style={{ fontSize: 24, marginBottom: 4 }}>{stat.icon}</div>
