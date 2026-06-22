@@ -4,7 +4,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
 import { db, auth } from './firebase';
-import { signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
@@ -840,13 +840,11 @@ export function UserApp() {
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
-  const handleLogout = useCallback(() => {
-    setUser(null); setUserKeys(0); setFavorites([]);
-    setScannedPartnerIds({}); setCompletedTasks([]); setStreak(0);
-    setActivePanel('home');
-    const isMounted = { current: true };
-    loadData(isMounted);
-  }, [loadData]);
+  const handleLogout = useCallback(async () => {
+    localStorage.removeItem('apg_tg_user');
+    try { await signOut(auth); } catch {}
+    window.location.reload();
+  }, []);
 
   const handleDeleteProfile = useCallback(async () => {
     if (!user || String(user.id).startsWith('guest_')) return;
