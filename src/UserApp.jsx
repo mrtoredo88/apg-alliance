@@ -94,6 +94,8 @@ export function UserApp() {
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
   const [recentReviews, setRecentReviews]       = useState([]);
   const [keyBurst, setKeyBurst]                 = useState(null); // { amount, id }
+  const [counterPulse, setCounterPulse]         = useState(false);
+  const keyBurstTimersRef                        = useRef([]);
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
@@ -518,6 +520,17 @@ export function UserApp() {
     setToast({ msg, type });
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }, []);
+
+  useEffect(() => {
+    keyBurstTimersRef.current.forEach(clearTimeout);
+    keyBurstTimersRef.current = [];
+    if (!keyBurst) return;
+    const t1 = setTimeout(() => { if (mountedRef.current) setCounterPulse(true); }, 1200);
+    const t2 = setTimeout(() => {
+      if (mountedRef.current) { setCounterPulse(false); setKeyBurst(null); }
+    }, 1650);
+    keyBurstTimersRef.current = [t1, t2];
+  }, [keyBurst?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConfirmScan = useCallback(async (placeIdentifier) => {
     if (!user || isScanningRef.current) return;
@@ -1061,19 +1074,29 @@ export function UserApp() {
 
             {/* Анимация получения ключа */}
             {keyBurst && (
-              <div
-                key={keyBurst.id}
-                onAnimationEnd={() => setKeyBurst(null)}
-                style={{
-                  position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
-                  zIndex: 9998, pointerEvents: 'none',
-                  fontSize: 28, fontWeight: 900, color: '#C9A84C',
-                  textShadow: '0 0 20px rgba(201,168,76,0.8)',
-                  animation: 'keyFlyUp 1.1s cubic-bezier(0.2,0.8,0.4,1) forwards',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                +{keyBurst.amount} 🗝️
+              <div style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}>
+                <div
+                  key={keyBurst.id}
+                  style={{
+                    position: 'absolute', top: '50%', left: '50%',
+                    fontSize: 76, lineHeight: 1,
+                    animation: 'keyBounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards, keyFlyToCounter 0.42s 0.83s ease-in forwards',
+                  }}
+                >
+                  🔑
+                </div>
+                <div
+                  key={`plus-${keyBurst.id}`}
+                  style={{
+                    position: 'absolute', top: 'calc(50% - 46px)', left: '50%',
+                    fontSize: 34, fontWeight: 900, color: '#C9A84C',
+                    textShadow: '0 0 28px rgba(201,168,76,0.95), 0 2px 8px rgba(0,0,0,0.5)',
+                    animation: 'keyPlusFloat 0.92s 0.18s ease-out forwards',
+                    opacity: 0, whiteSpace: 'nowrap',
+                  }}
+                >
+                  +{keyBurst.amount}
+                </div>
               </div>
             )}
 
@@ -1089,6 +1112,7 @@ export function UserApp() {
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
               <HomePanel
                 nav="home"
+                counterPulse={counterPulse}
                 user={user} userKeys={userKeys} favorites={favorites}
                 partners={enrichedPartners} events={events} news={news}
                 recentReviews={recentReviews}

@@ -553,6 +553,26 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           {partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && (
             <button onClick={() => openUrl(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
           )}
+          {partner.bookingUrl && (
+            <button onClick={() => openUrl(partner.bookingUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:`0 4px 16px rgba(201,168,76,0.35)` }}>
+              📅 Записаться онлайн
+            </button>
+          )}
+          {partner.websiteUrl && (
+            <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>
+              🌐 Сайт
+            </button>
+          )}
+          {partner.telegramCommunityUrl && (
+            <button onClick={() => openUrl(partner.telegramCommunityUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+              ✈️ Telegram
+            </button>
+          )}
+          {partner.maxCommunityUrl && (
+            <button onClick={() => openUrl(partner.maxCommunityUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+              💬 Max
+            </button>
+          )}
           <button onClick={() => onToggleFavorite(partner.id)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:isFavorite?`1px solid ${T.red}44`:'none', background:isFavorite?T.red+'15':`linear-gradient(135deg,${T.gold},${T.goldL})`, color:isFavorite?T.red:'#0F0F1A', fontSize:15, fontWeight:700, cursor:'pointer' }}>
             {isFavorite ? '♥ Убрать из избранного' : '♡ Добавить в избранное'}
           </button>

@@ -291,6 +291,11 @@ export const AdminPanel = () => {
   const [exOnline, setExOnline]     = useState(false);
   const [exOffline, setExOffline]   = useState(false);
   const [exGroup, setExGroup]       = useState(false);
+  const [exTelegram, setExTelegram] = useState('');
+  const [exWebsite, setExWebsite]   = useState('');
+  const [exMax, setExMax]           = useState('');
+  const [exSaving, setExSaving]     = useState(false);
+  const [exError, setExError]       = useState('');
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
@@ -332,6 +337,10 @@ export const AdminPanel = () => {
   const [pOffer, setPOffer] = useState('');
   const [pStampTarget, setPStampTarget] = useState('');
   const [pVkOwnerId, setPVkOwnerId] = useState('');
+  const [pBooking, setPBooking]           = useState('');
+  const [pWebsite, setPWebsite]           = useState('');
+  const [pTelegramCom, setPTelegramCom]   = useState('');
+  const [pMaxCom, setPMaxCom]             = useState('');
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -391,6 +400,13 @@ export const AdminPanel = () => {
     init();
   }, []);
 
+  const normalizeUrl = (val) => {
+    const trimmed = (val ?? '').trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    return `https://${trimmed}`;
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -421,6 +437,8 @@ export const AdminPanel = () => {
     setExPhoto(''); setExPhone(''); setExVkUrl(''); setExBooking('');
     setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
     setExOnline(false); setExOffline(false); setExGroup(false);
+    setExTelegram(''); setExWebsite(''); setExMax('');
+    setExError(''); setExSaving(false);
   };
 
   const startEditExpert = (ex) => {
@@ -433,11 +451,15 @@ export const AdminPanel = () => {
     setExOnline(ex.formats?.includes('online') ?? false);
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
+    setExTelegram(ex.telegramUrl ?? ''); setExWebsite(ex.websiteUrl ?? ''); setExMax(ex.maxUrl ?? '');
     window.scrollTo(0, 0);
   };
 
   const saveExpert = async () => {
-    if (!exName.trim()) return;
+    if (!exName.trim()) { setExError('Укажите имя эксперта'); return; }
+    if (!exSpec.trim()) { setExError('Укажите специализацию'); return; }
+    setExError('');
+    setExSaving(true);
     const formats = [exOnline && 'online', exOffline && 'offline', exGroup && 'group'].filter(Boolean);
     const data = {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
@@ -445,14 +467,23 @@ export const AdminPanel = () => {
       bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
       vkOwnerId: exVkOwnerId.trim() || null,
+      telegramUrl: normalizeUrl(exTelegram),
+      websiteUrl: normalizeUrl(exWebsite),
+      maxUrl: normalizeUrl(exMax),
     };
-    if (editingExpert) {
-      await updateDoc(doc(db, 'experts', editingExpert.id), data);
-    } else {
-      await addDoc(collection(db, 'experts'), { ...data, avgRating: 0, reviewCount: 0, createdAt: serverTimestamp() });
+    try {
+      if (editingExpert) {
+        await updateDoc(doc(db, 'experts', editingExpert.id), data);
+      } else {
+        await addDoc(collection(db, 'experts'), { ...data, avgRating: 0, reviewCount: 0, createdAt: serverTimestamp() });
+      }
+      resetExpertForm();
+      fetchData();
+    } catch (e) {
+      setExError(`Ошибка сохранения: ${e.message ?? 'проверьте соединение'}`);
+    } finally {
+      setExSaving(false);
     }
-    resetExpertForm();
-    fetchData();
   };
 
   const deleteExpert = async (id) => {
@@ -467,6 +498,7 @@ export const AdminPanel = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
     setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
     setPStampTarget(''); setPVkOwnerId('');
+    setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setEditingPartner(null);
   };
 
@@ -477,6 +509,8 @@ export const AdminPanel = () => {
     setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? '');
     setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
     setPVkOwnerId(p.vkOwnerId ?? '');
+    setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
+    setPTelegramCom(p.telegramCommunityUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? '');
     window.scrollTo(0, 0);
   };
 
@@ -490,6 +524,10 @@ export const AdminPanel = () => {
       hours: pHours.trim(), socialUrl: pSocial.trim(), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       vkOwnerId: pVkOwnerId.trim() || null,
+      bookingUrl: normalizeUrl(pBooking),
+      websiteUrl: normalizeUrl(pWebsite),
+      telegramCommunityUrl: normalizeUrl(pTelegramCom),
+      maxCommunityUrl: normalizeUrl(pMaxCom),
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
@@ -1092,6 +1130,15 @@ export const AdminPanel = () => {
             <label style={s.label}>Ссылка для записи</label>
             <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
 
+            <label style={s.label}>Telegram эксперта</label>
+            <input style={s.input} placeholder="https://t.me/..." value={exTelegram} onChange={e => setExTelegram(e.target.value)} />
+
+            <label style={s.label}>Личный сайт / портфолио</label>
+            <input style={s.input} placeholder="https://..." value={exWebsite} onChange={e => setExWebsite(e.target.value)} />
+
+            <label style={s.label}>Профиль в Max</label>
+            <input style={s.input} placeholder="https://..." value={exMax} onChange={e => setExMax(e.target.value)} />
+
             <label style={s.label}>Ключей за QR-скан</label>
             <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />
 
@@ -1118,12 +1165,17 @@ export const AdminPanel = () => {
               </label>
             </div>
 
+            {exError && (
+              <div style={{ background: 'rgba(230,70,70,0.15)', border: '1px solid rgba(230,70,70,0.4)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#f87171' }}>
+                ❌ {exError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={saveExpert} style={{ ...s.btn, ...s.btnPri, flex: 1 }}>
-                {editingExpert ? 'Сохранить' : 'Добавить'}
+              <button onClick={saveExpert} disabled={exSaving} style={{ ...s.btn, ...s.btnPri, flex: 1, opacity: exSaving ? 0.7 : 1 }}>
+                {exSaving ? 'Сохранение...' : (editingExpert ? 'Сохранить' : 'Добавить')}
               </button>
               {editingExpert && (
-                <button onClick={resetExpertForm} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
+                <button onClick={resetExpertForm} disabled={exSaving} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
               )}
             </div>
           </div>
@@ -1201,6 +1253,18 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Соцсеть / сайт</label>
             <input style={s.input} placeholder="https://vk.com/..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
+
+            <label style={s.label}>Онлайн-запись (Yclients, Dikidi и др.)</label>
+            <input style={s.input} placeholder="https://..." value={pBooking} onChange={e => setPBooking(e.target.value)} />
+
+            <label style={s.label}>Сайт партнёра</label>
+            <input style={s.input} placeholder="https://..." value={pWebsite} onChange={e => setPWebsite(e.target.value)} />
+
+            <label style={s.label}>Telegram-сообщество (канал или чат)</label>
+            <input style={s.input} placeholder="https://t.me/..." value={pTelegramCom} onChange={e => setPTelegramCom(e.target.value)} />
+
+            <label style={s.label}>Max-сообщество</label>
+            <input style={s.input} placeholder="https://..." value={pMaxCom} onChange={e => setPMaxCom(e.target.value)} />
 
             <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
               <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 VK ID владельца заведения</label>

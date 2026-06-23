@@ -750,7 +750,11 @@ function HeroBanner({ userKeys, userName, streak }) {
               </div>
               <div>
                 <div style={{ fontSize: 11, color: level.color, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{level.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1, letterSpacing: -0.5 }}>
+                <div style={{
+                  fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1, letterSpacing: -0.5,
+                  display: 'inline-block',
+                  animation: counterPulse ? 'keyCounterPulse 0.42s ease-out' : undefined,
+                }}>
                   {userKeys} <span style={{ fontSize: 14, fontWeight: 700, color: T.goldL }}>🗝️</span>
                 </div>
                 <div style={{ fontSize: 11, color: T.textSec, marginTop: 3 }}>
@@ -1133,6 +1137,7 @@ export function HomePanel({
   appearance = 'light',
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
+  counterPulse = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
