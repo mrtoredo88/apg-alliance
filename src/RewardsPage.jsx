@@ -390,6 +390,8 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
 
   useEffect(() => {
     let alive = true;
+    setLoadError(false);
+    setLoading(true);
     (async () => {
       try {
         const prizesSnap = await getDocs(collection(db, 'prizes'));
