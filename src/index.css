@@ -98,6 +98,10 @@ html {
   background-color: transparent !important;
 }
 
+.vkuiView__host {
+  transform: translateZ(0);
+}
+
 .vkuiView,
 .vkuiView__panels {
   overflow: hidden !important;
