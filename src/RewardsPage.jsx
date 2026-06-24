@@ -396,30 +396,36 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
         if (!alive) return;
         const loaded = prizesSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(p => p.active === true)
+          .filter(p => p.active !== false)
           .sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0));
         setPrizes(loaded);
+      } catch (e) {
+        console.error('prizes fetch error:', e);
+        if (alive) setLoadError(true);
+      }
+      if (alive) setLoading(false);
 
-        if (user && user.id !== 'guest') {
-          const uid = String(user.id);
-
-          // Мои purchases
-          const claimsSnap = await getDocs(
-            query(collection(db, 'users', uid, 'claims'), orderBy('claimedAt', 'desc'))
-          );
-          if (alive) setMyClaims(claimsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-          // Мои записи в розыгрышах
-          const entriesSnap = await getDocs(
-            query(collection(db, 'raffleEntries'), where('userId', '==', uid))
-          );
+      if (!alive) return;
+      if (user && user.id !== 'guest') {
+        const uid = String(user.id);
+        try {
+          const [claimsSnap, entriesSnap] = await Promise.all([
+            getDocs(query(collection(db, 'users', uid, 'claims'), orderBy('claimedAt', 'desc'))),
+            getDocs(query(collection(db, 'raffleEntries'), where('userId', '==', uid))),
+          ]);
           if (!alive) return;
+          setMyClaims(claimsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           const entries = {};
           entriesSnap.docs.forEach(d => { entries[d.data().prizeId] = { id: d.id, ...d.data() }; });
           setMyRaffleEntries(entries);
+        } catch (e) { console.error('user claims/entries fetch error:', e); }
 
-          // Счётчики по каждому розыгрышу
-          const rafflePrizes = loaded.filter(p => p.type === 'raffle');
+        try {
+          const prizesSnap2 = await getDocs(collection(db, 'prizes'));
+          if (!alive) return;
+          const rafflePrizes = prizesSnap2.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(p => p.active !== false && p.type === 'raffle');
           if (rafflePrizes.length > 0) {
             const counts = {};
             await Promise.all(rafflePrizes.map(async p => {
@@ -432,9 +438,8 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
             }));
             if (alive) setRaffleCounts(counts);
           }
-        }
-      } catch (e) { console.error(e); if (alive) setLoadError(true); }
-      if (alive) setLoading(false);
+        } catch (e) { console.error('raffle counts fetch error:', e); }
+      }
     })();
     return () => { alive = false; };
   }, [user]);
