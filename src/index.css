@@ -107,6 +107,11 @@ html {
   overflow: hidden !important;
 }
 
+.vkuiView__animated .vkuiView__panel,
+.vkuiView__swipingBack .vkuiView__panel {
+  position: absolute !important;
+}
+
 .vkuiPanel__in {
   overscroll-behavior: none;
 }
