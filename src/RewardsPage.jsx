@@ -392,11 +392,12 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
     let alive = true;
     (async () => {
       try {
-        const prizesSnap = await getDocs(
-          query(collection(db, 'prizes'), where('active', '==', true), orderBy('cost', 'asc'))
-        );
+        const prizesSnap = await getDocs(collection(db, 'prizes'));
         if (!alive) return;
-        const loaded = prizesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const loaded = prizesSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(p => p.active === true)
+          .sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0));
         setPrizes(loaded);
 
         if (user && user.id !== 'guest') {
