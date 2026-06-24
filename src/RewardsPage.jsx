@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
@@ -496,7 +495,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
   const rafflePrizes   = useMemo(() => prizes.filter(p => p.type === 'raffle'), [prizes]);
 
   return (
-    <Panel id={nav}>
+    <>
       {/* Хедер */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
@@ -652,6 +651,6 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
           confirming={enteringRaffle}
         />
       )}
-    </Panel>
+    </>
   );
 }

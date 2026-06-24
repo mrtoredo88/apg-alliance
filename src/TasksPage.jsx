@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Panel } from '@vkontakte/vkui';
 import confetti from 'canvas-confetti';
 import { TASKS } from './tasks.js';
 import { T, GLASS } from './design.js';
@@ -191,7 +190,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
   const earnedKeys  = done.reduce((s, t) => s + (t.reward ?? 0), 0);
 
   return (
-    <Panel id="tasks">
+    <>
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
@@ -268,6 +267,6 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
           </>
         )}
       </div>
-    </Panel>
+    </>
   );
 }

@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
-import { openUrl } from './vk.js';
+import { openUrl, isVK } from './vk.js';
 
 const FORMAT_LABELS = {
   online:  { label: 'Онлайн',  emoji: '💻', bg: 'rgba(74,144,217,0.15)',  border: 'rgba(74,144,217,0.35)',  text: '#6AABEC' },
@@ -260,9 +260,9 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         )}
 
         {/* Contact links */}
-        {(expert.telegramUrl || expert.websiteUrl || expert.maxUrl) && (
+        {(expert.websiteUrl || (!isVK() && (expert.telegramUrl || expert.maxUrl))) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            {expert.telegramUrl && (
+            {!isVK() && expert.telegramUrl && (
               <button onClick={() => openUrl(expert.telegramUrl)} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 ✈️ Telegram
               </button>
@@ -272,7 +272,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
                 🌐 Сайт
               </button>
             )}
-            {expert.maxUrl && (
+            {!isVK() && expert.maxUrl && (
               <button onClick={() => openUrl(expert.maxUrl)} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 💬 Max
               </button>

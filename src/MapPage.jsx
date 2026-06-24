@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Panel, HorizontalScroll } from '@vkontakte/vkui';
+import { HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge from './vk.js';
 
 import { T, GLASS } from './design.js';
@@ -75,7 +75,7 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
   };
 
   return (
-    <Panel id="map">
+    <>
       {/* Хедер */}
       <div style={{ position: 'sticky', top: 0, zIndex: 60, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
@@ -225,6 +225,6 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
           </div>
         )}
       </div>
-    </Panel>
+    </>
   );
 }

@@ -1,5 +1,4 @@
 import React from 'react';
-import { Panel } from '@vkontakte/vkui';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 
 const LAUNCH_DATE = 'Январь 2025';
@@ -23,7 +22,7 @@ function StatCard({ icon, value, label, color, sub }) {
 
 export function ForPartnersPage({ userCount = 0, partnerCount = 0, totalScans = 0, onBack }) {
   return (
-    <Panel id="for-partners">
+    <>
       {/* Хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
@@ -137,6 +136,6 @@ export function ForPartnersPage({ userCount = 0, partnerCount = 0, totalScans = 
         </div>
 
       </div>
-    </Panel>
+    </>
   );
 }

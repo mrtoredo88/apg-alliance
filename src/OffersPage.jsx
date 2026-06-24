@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Panel } from '@vkontakte/vkui';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
 
@@ -163,7 +162,7 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
   );
 
   return (
-    <Panel id="offers">
+    <>
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
@@ -319,6 +318,6 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
           )
         )}
       </div>
-    </Panel>
+    </>
   );
 }

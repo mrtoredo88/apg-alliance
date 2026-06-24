@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
-import vkBridge, { openUrl } from './vk.js';
+import vkBridge, { openUrl, isVK } from './vk.js';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 
@@ -563,12 +563,12 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               🌐 Сайт
             </button>
           )}
-          {partner.telegramCommunityUrl && (
+          {!isVK() && partner.telegramCommunityUrl && (
             <button onClick={() => openUrl(partner.telegramCommunityUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               ✈️ Telegram
             </button>
           )}
-          {partner.maxCommunityUrl && (
+          {!isVK() && partner.maxCommunityUrl && (
             <button onClick={() => openUrl(partner.maxCommunityUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               💬 Max
             </button>

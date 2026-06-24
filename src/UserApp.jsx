@@ -1067,7 +1067,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <div
-            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1 }}
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
             onTouchStart={handleSwipeStart}
             onTouchEnd={handleSwipeEnd}
           >

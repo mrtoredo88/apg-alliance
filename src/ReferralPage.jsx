@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Panel } from '@vkontakte/vkui';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { T, GLASS } from './design.js';
@@ -50,7 +49,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
   const earnedKeys = referralCount * 2 + milestoneKeys;
 
   return (
-    <Panel id="referral">
+    <>
       {/* Хедер */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
@@ -191,6 +190,6 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
         </div>
 
       </div>
-    </Panel>
+    </>
   );
 }

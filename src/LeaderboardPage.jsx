@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { getLevel } from './levels.js';
@@ -206,7 +205,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
   const showCurrentUserSeparately = currentUserIndex >= 50;
 
   return (
-    <Panel id={nav}>
+    <>
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: T.chipBg, border: `1px solid ${T.headerBorder}`, borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
@@ -304,6 +303,6 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
           onClose={() => setSelectedUser(null)}
         />
       )}
-    </Panel>
+    </>
   );
 }

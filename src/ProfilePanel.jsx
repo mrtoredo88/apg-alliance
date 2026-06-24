@@ -557,15 +557,14 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             </button>
             {vkLoginError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{vkLoginError}</div>}
 
-            {/* Разделитель */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Telegram (скрыт в VK Mini App — п. 4.1.8 правил VK) */}
+            {!isVK() && <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
               <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>или</span>
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-            </div>
+            </div>}
 
-            {/* Telegram */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {!isVK() && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {!tgBotUrl ? (
                 <button
                   onClick={handleTelegramAuth}
@@ -623,7 +622,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 </div>
               )}
               {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
-            </div>
+            </div>}
           </div>
         </div>
       )}
