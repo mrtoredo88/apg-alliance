@@ -142,7 +142,10 @@ export default async function handler(req, res) {
       await userRef.update(profilePatch);
     }
 
-    await tgSend(from.id, '✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.');
+    await tgSend(from.id,
+      '✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:',
+      { reply_markup: SOCIAL_KEYBOARD },
+    );
     return res.status(200).json({ ok: true });
   }
 
