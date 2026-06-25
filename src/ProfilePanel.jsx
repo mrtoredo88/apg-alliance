@@ -296,6 +296,74 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   );
 }
 
+function TgAuthSteps({ tgBotUrl, tgState, onCheck }) {
+  const [copied, setCopied] = useState(false);
+  const command = `/start auth_${tgState}`;
+
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(command).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  return (
+    <>
+      <a
+        href={tgBotUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
+          background: 'linear-gradient(135deg, #26A8EA, #1A8CC7)',
+          color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none',
+          boxShadow: '0 4px 16px rgba(38,168,234,0.35)', boxSizing: 'border-box',
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
+        1. Открыть бота в Telegram
+      </a>
+
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', textAlign: 'center', margin: '2px 0' }}>
+        Если бот уже открыт — скопируй и отправь боту эту команду:
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+        <div style={{
+          flex: 1, padding: '8px 10px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(38,168,234,0.3)',
+          fontFamily: 'monospace', fontSize: 11, color: '#26A8EA',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {command}
+        </div>
+        <button
+          onClick={handleCopy}
+          style={{
+            padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(38,168,234,0.4)',
+            background: copied ? 'rgba(75,179,75,0.2)' : 'rgba(38,168,234,0.15)',
+            color: copied ? '#4BB34B' : '#26A8EA', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          {copied ? '✓' : 'Копировать'}
+        </button>
+      </div>
+
+      <button
+        onClick={onCheck}
+        style={{
+          width: '100%', padding: '12px 0', borderRadius: 12,
+          border: '1px solid rgba(38,168,234,0.4)', background: 'rgba(38,168,234,0.1)',
+          color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+        }}
+      >
+        2. Отправил команду — войти
+      </button>
+    </>
+  );
+}
+
 export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -594,35 +662,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                   {tgLoading ? 'Создаём ссылку...' : 'Войти через Telegram'}
                 </button>
               ) : (
-                <>
-                  {/* Шаг 1: открыть бота */}
-                  <a
-                    href={tgBotUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-                      background: 'linear-gradient(135deg, #26A8EA, #1A8CC7)',
-                      color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none',
-                      boxShadow: '0 4px 16px rgba(38,168,234,0.35)', boxSizing: 'border-box',
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
-                    1. Открыть бота и нажать Start
-                  </a>
-                  {/* Шаг 2: вернуться */}
-                  <button
-                    onClick={handleTgManualCheck}
-                    style={{
-                      width: '100%', padding: '12px 0', borderRadius: 12,
-                      border: '1px solid rgba(38,168,234,0.4)', background: 'rgba(38,168,234,0.1)',
-                      color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                    }}
-                  >
-                    2. Я нажал Start — войти
-                  </button>
-                </>
+                <TgAuthSteps tgBotUrl={tgBotUrl} tgState={tgState} onCheck={handleTgManualCheck} />
               )}
               {tgStatus && !tgError && (
                 <div style={{ fontSize: 12, color: T.textSec, textAlign: 'center', lineHeight: '16px' }}>
