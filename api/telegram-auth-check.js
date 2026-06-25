@@ -35,18 +35,15 @@ export default async function handler(req, res) {
   if (!snap.exists) return res.json({ status: 'not_found' });
 
   const data = snap.data();
-  const svcAcc = process.env.FIREBASE_SERVICE_ACCOUNT;
-  const pid    = svcAcc ? JSON.parse(svcAcc).project_id.slice(-6) : '?';
-  const _d   = { raw: data.status, tg: !!data.tgUserId, pid };
 
   if (data.status === 'pending') {
     const expDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
     const expired = expDate < new Date();
     if (expired) {
       await ref.update({ status: 'expired' });
-      return res.json({ status: 'expired', _d });
+      return res.json({ status: 'expired' });
     }
-    return res.json({ status: 'pending', _d });
+    return res.json({ status: 'pending' });
   }
 
   if (data.status === 'done') {
@@ -63,5 +60,5 @@ export default async function handler(req, res) {
     });
   }
 
-  return res.json({ status: data.status, _d });
+  return res.json({ status: data.status });
 }

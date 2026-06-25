@@ -304,8 +304,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgError, setTgError] = useState('');
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
-  const [tgDbg, setTgDbg] = useState('');
-
   const tgPollRef = useRef(null);
   const tgStateRef = useRef(null);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
@@ -317,9 +315,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const checkSession = useCallback(async (state) => {
     try {
       const r = await fetch(`/api/telegram-auth-check?state=${state}`);
-      const raw = await r.text();
-      setTgDbg(`state:${state.slice(0,8)} → HTTP${r.status}: ${raw.slice(0,80)}`);
-      const resp = JSON.parse(raw);
+      const resp = await r.json();
       if (resp.status === 'done') {
         stopPolling();
         localStorage.removeItem('apg_tg_pending');
@@ -334,7 +330,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         setTgStep('idle');
         return true;
       }
-    } catch (e) { setTgDbg(`ERR: ${e.message}`); }
+    } catch {}
     return false;
   }, [stopPolling]);
 
@@ -605,13 +601,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                       >
                         Открыть Telegram
                       </a>
-                      <button
-                        onClick={() => tgStateRef.current && checkSession(tgStateRef.current)}
-                        style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: 'none', color: T.textSec, fontSize: 12, cursor: 'pointer' }}
-                      >
-                        Проверить вход
-                      </button>
-                      {tgDbg ? <div style={{ fontSize: 10, color: T.textSec, wordBreak: 'break-all', background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '5px 8px', width: '100%' }}>{tgDbg}</div> : null}
                     </div>
                   : <button
                       onClick={handleTelegramAuth}
