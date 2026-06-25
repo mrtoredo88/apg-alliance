@@ -924,40 +924,13 @@ export function UserApp() {
     setActivePanel('notifications');
   }, []);
 
-  const handleEnableNotifications = useCallback(async () => {
-    if (!isVK()) {
-      if ('Notification' in window) {
-        try {
-          const perm = await Notification.requestPermission();
-          if (perm === 'granted') {
-            localStorage.setItem('apg_notif_enabled', '1');
-            setNotifEnabled(true);
-            if (user) updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true }).catch(() => {});
-            showToast('🔔 Уведомления включены!', 'success');
-          } else {
-            showToast('Разреши уведомления в настройках браузера');
-          }
-        } catch {
-          showToast('Не удалось запросить разрешение');
-        }
-      } else {
-        showToast('Браузер не поддерживает уведомления');
-      }
-      return;
-    }
-
-    try {
-      await Promise.race([
-        vkBridge.send('VKWebAppAllowNotifications'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
-      ]);
-      localStorage.setItem('apg_notif_enabled', '1');
-      setNotifEnabled(true);
-      if (user) updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true }).catch(() => {});
-      showToast('🔔 Уведомления включены!', 'success');
-    } catch (e) {
-      if (e?.message === 'timeout') showToast('Не удалось включить — попробуй позже');
-    }
+  const handleEnableNotifications = useCallback(() => {
+    localStorage.setItem('apg_notif_enabled', '1');
+    setNotifEnabled(true);
+    if (user) updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true }).catch(() => {});
+    showToast('🔔 Уведомления включены!', 'success');
+    // VK push — fire-and-forget, не блокирует UX
+    if (isVK()) vkBridge.send('VKWebAppAllowNotifications').catch(() => {});
   }, [user, showToast]);
 
   const VK_GROUP_ID = 229980067;
