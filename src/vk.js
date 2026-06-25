@@ -1,11 +1,11 @@
 import _vkBridge from '@vkontakte/vk-bridge';
 
 // true когда запущено внутри VK Mini App
+// Намеренно НЕ используем _vkBridge.supports() — он возвращает true даже в обычном браузере
 export const isVK = () =>
   /VKAndroidApp|VKiOSApp/i.test(navigator.userAgent) ||
   new URLSearchParams(window.location.search).has('vk_app_id') ||
-  new URLSearchParams(window.location.search).has('vk_user_id') ||
-  !!_vkBridge.supports?.('VKWebAppGetUserInfo');
+  new URLSearchParams(window.location.search).has('vk_user_id');
 
 const send = async (method, params = {}) => {
   if (!isVK()) {

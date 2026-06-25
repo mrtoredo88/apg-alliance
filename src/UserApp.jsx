@@ -876,6 +876,7 @@ export function UserApp() {
   const handleLogout = useCallback(async () => {
     localStorage.removeItem('apg_tg_user');
     localStorage.removeItem('apg_guest_id');
+    localStorage.removeItem('apg_web_user');
     localStorage.removeItem('apg_notif_enabled');
     try { await signOut(auth); } catch {}
     window.location.reload();
