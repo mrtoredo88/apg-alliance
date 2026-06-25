@@ -112,6 +112,14 @@ html {
   position: absolute !important;
 }
 
+/* VK UI sets pointer-events:none on all panels during animation.
+   If animationend doesn't fire (web context), panels stay unclickable.
+   Force-restore pointer-events on the entering/leaving panels. */
+.vkuiView__animated .vkuiView__panelNext,
+.vkuiView__animated .vkuiView__panelPrev {
+  pointer-events: auto !important;
+}
+
 .vkuiPanel__in {
   overscroll-behavior: none;
 }

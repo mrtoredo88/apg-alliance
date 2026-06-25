@@ -128,17 +128,30 @@ function pluralReviews(n) {
 function ExpertModal({ expert, user, scannedExperts, onClose }) {
   const [showQR, setShowQR] = useState(false);
 
-  const handleShare = () => {
-    const lines = [
+  const handleShare = async () => {
+    const appLink = 'https://vk.com/app54601851';
+    const siteLink = expert.websiteUrl || appLink;
+    const message = [
       `${expert.name} — эксперт АПГ Зеленоград! ⭐`,
       expert.specialization && expert.specialization,
       expert.description   && expert.description.slice(0, 120),
-      `\nАльянс Партнёров Города`,
+      `Альянс Партнёров Города`,
     ].filter(Boolean).join('\n');
-    vkBridge.send('VKWebAppShare', {
-      link: expert.websiteUrl || expert.telegramUrl || 'https://vk.com/app54601851',
-      text: lines,
-    }).catch(() => {});
+
+    if (isVK()) {
+      try {
+        await vkBridge.send('VKWebAppShowWallPostBox', {
+          message,
+          attachments: appLink,
+        });
+      } catch {}
+      return;
+    }
+
+    if (navigator.share) {
+      try { await navigator.share({ url: siteLink, text: message }); return; } catch {}
+    }
+    navigator.clipboard?.writeText(`${message}\n${siteLink}`).catch(() => {});
   };
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);

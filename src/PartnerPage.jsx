@@ -273,33 +273,41 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   };
 
   const handleShare = async () => {
-    const link = partner.websiteUrl || 'https://vk.com/app54601851';
-    const text = [
+    const appLink = 'https://vk.com/app54601851';
+    const siteLink = partner.websiteUrl || appLink;
+    const message = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,
       partner.offer   && `🎁 ${partner.offer}`,
       partner.address && `📍 ${partner.address}`,
       `Присоединяйся к программе лояльности АПГ`,
     ].filter(Boolean).join('\n');
 
-    try {
-      await vkBridge.send('VKWebAppShare', { link, text });
-      showShareToast('✅ Поделились!');
-    } catch {
-      // Fallback: Web Share API
-      if (navigator.share) {
-        try {
-          await navigator.share({ url: link, text });
-          showShareToast('✅ Поделились!');
-          return;
-        } catch {}
-      }
-      // Last resort: copy link
+    if (isVK()) {
       try {
-        await navigator.clipboard.writeText(link);
-        showShareToast('📋 Ссылка скопирована');
+        await vkBridge.send('VKWebAppShowWallPostBox', {
+          message,
+          attachments: appLink,
+        });
+        showShareToast('✅ Опубликовано!');
       } catch {
         showShareToast('❌ Не удалось поделиться');
       }
+      return;
+    }
+
+    // Web fallback
+    if (navigator.share) {
+      try {
+        await navigator.share({ url: siteLink, text: message });
+        showShareToast('✅ Поделились!');
+        return;
+      } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(`${message}\n${siteLink}`);
+      showShareToast('📋 Ссылка скопирована');
+    } catch {
+      showShareToast('❌ Не удалось поделиться');
     }
   };
 
