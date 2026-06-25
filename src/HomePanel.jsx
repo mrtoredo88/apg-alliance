@@ -459,6 +459,7 @@ function NewsModal({ item, onClose }) {
   }, []);
 
   const onTouchStart = (e) => {
+    e.stopPropagation();
     touchY.current = e.touches[0].clientY;
     setIsDragging(true);
   };
@@ -584,6 +585,7 @@ function NewsWidget({ news }) {
     const onMove = (e) => {
       if (touchY.current === null) return;
       e.preventDefault();
+      e.stopPropagation();
       const dy = e.touches[0].clientY - touchY.current;
       const cur = idxRef.current;
       const atEdge = (cur === 0 && dy > 0) || (cur === news.length - 1 && dy < 0);
@@ -596,6 +598,7 @@ function NewsWidget({ news }) {
   if (!news.length) return null;
 
   const onTouchStart = (e) => {
+    e.stopPropagation();
     touchY.current = e.touches[0].clientY;
     setIsDragging(true);
   };
@@ -1509,11 +1512,13 @@ export function HomePanel({
                 </div>
               </div>
             ) : (
-              <HorizontalScroll>
-                <div style={{ display: 'flex', gap: 12, padding: '0 16px 4px' }}>
-                  {events.map((e, i) => <EventCard key={e.id} event={e} index={i} onClick={setSelectedEvent} isDark={appearance === 'dark'} />)}
-                </div>
-              </HorizontalScroll>
+              <div onTouchStart={e => e.stopPropagation()}>
+                <HorizontalScroll>
+                  <div style={{ display: 'flex', gap: 12, padding: '0 16px 4px' }}>
+                    {events.map((e, i) => <EventCard key={e.id} event={e} index={i} onClick={setSelectedEvent} isDark={appearance === 'dark'} />)}
+                  </div>
+                </HorizontalScroll>
+              </div>
             )}
 
             {/* Поиск */}
