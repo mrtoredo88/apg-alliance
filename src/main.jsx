@@ -21,8 +21,8 @@ if (_vkHash.includes('access_token=') && window.opener) {
 
   createRoot(document.getElementById('root')).render(<App />);
 
-  // PWA: перезагружаем страницу когда новый service worker активируется
   if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       window.location.reload();
     });
