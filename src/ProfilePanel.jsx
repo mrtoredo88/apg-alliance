@@ -341,8 +341,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         const d = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
         if (d.status === 'done') {
           stopPolling();
-          await signInWithCustomToken(auth, d.token);
           localStorage.setItem('apg_tg_user', JSON.stringify(d.user));
+          try { await signInWithCustomToken(auth, d.token); } catch {}
           window.location.reload();
         } else if (d.status === 'expired' || d.status === 'not_found') {
           stopPolling();
@@ -378,8 +378,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       const d = await fetch(`/api/telegram-auth-check?state=${tgState}`).then(r => r.json());
       if (d.status === 'done') {
         stopPolling();
-        await signInWithCustomToken(auth, d.token);
         localStorage.setItem('apg_tg_user', JSON.stringify(d.user));
+        try { await signInWithCustomToken(auth, d.token); } catch {}
         window.location.reload();
       } else if (d.status === 'pending') {
         setTgStatus('Откройте бота и нажмите Start');
