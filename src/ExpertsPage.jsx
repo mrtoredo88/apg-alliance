@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
-import { openUrl, isVK } from './vk.js';
+import vkBridge, { openUrl, isVK } from './vk.js';
 
 const FORMAT_LABELS = {
   online:  { label: 'Онлайн',  emoji: '💻', bg: 'rgba(74,144,217,0.15)',  border: 'rgba(74,144,217,0.35)',  text: '#6AABEC' },
@@ -127,6 +127,19 @@ function pluralReviews(n) {
 
 function ExpertModal({ expert, user, scannedExperts, onClose }) {
   const [showQR, setShowQR] = useState(false);
+
+  const handleShare = () => {
+    const lines = [
+      `${expert.name} — эксперт АПГ Зеленоград! ⭐`,
+      expert.specialization && expert.specialization,
+      expert.description   && expert.description.slice(0, 120),
+      `\nАльянс Партнёров Города`,
+    ].filter(Boolean).join('\n');
+    vkBridge.send('VKWebAppShare', {
+      link: expert.websiteUrl || expert.telegramUrl || 'https://vk.com/app54601851',
+      text: lines,
+    }).catch(() => {});
+  };
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [myRating, setMyRating] = useState(0);
@@ -227,6 +240,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
               </div>
             )}
           </div>
+          <button onClick={handleShare} style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0 }}>📤</button>
           <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0 }}>✕</button>
         </div>
 

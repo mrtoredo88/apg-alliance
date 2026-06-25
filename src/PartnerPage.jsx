@@ -264,7 +264,18 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
   };
   const handleMap   = () => partner.address && openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
-  const handleShare  = () => vkBridge.send('VKWebAppShare', { link:`https://vk.com/app54601851`, text:`${partner.name} — партнёр АПГ! ${partner.offer ? partner.offer+' · ' : ''}Зеленоград` }).catch(() => {});
+  const handleShare = () => {
+    const lines = [
+      `${partner.name} — партнёр АПГ Зеленоград! 🔑`,
+      partner.offer   && `🎁 ${partner.offer}`,
+      partner.address && `📍 ${partner.address}`,
+      `\nПрисоединяйся к программе лояльности АПГ`,
+    ].filter(Boolean).join('\n');
+    vkBridge.send('VKWebAppShare', {
+      link: partner.websiteUrl || 'https://vk.com/app54601851',
+      text: lines,
+    }).catch(() => {});
+  };
 
   const infoRows = [
     partner.hours   && { icon:'🕐', label:'Часы работы', value:partner.hours },
