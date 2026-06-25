@@ -307,11 +307,50 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
   const tgPollRef = useRef(null);
+  const tgStateRef = useRef(null);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const stopPolling = useCallback(() => {
     if (tgPollRef.current) { clearInterval(tgPollRef.current); tgPollRef.current = null; }
   }, []);
+
+  const checkSession = useCallback(async (state) => {
+    try {
+      const resp = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
+      if (resp.status === 'done') {
+        stopPolling();
+        localStorage.removeItem('apg_tg_pending');
+        localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
+        try { await signInWithCustomToken(auth, resp.token); } catch {}
+        window.location.reload();
+        return true;
+      }
+      if (resp.status === 'expired' || resp.status === 'not_found') {
+        stopPolling();
+        localStorage.removeItem('apg_tg_pending');
+        setTgError('Сессия истекла. Попробуйте снова.');
+        setTgStep('idle');
+        return true;
+      }
+    } catch {}
+    return false;
+  }, [stopPolling]);
+
+  const startPolling = useCallback((state) => {
+    stopPolling();
+    tgStateRef.current = state;
+    const deadline = Date.now() + 5 * 60 * 1000;
+    tgPollRef.current = setInterval(() => {
+      if (Date.now() > deadline) {
+        stopPolling();
+        localStorage.removeItem('apg_tg_pending');
+        setTgError('Время ожидания истекло. Попробуйте снова.');
+        setTgStep('idle');
+        return;
+      }
+      checkSession(state);
+    }, 2000);
+  }, [stopPolling, checkSession]);
 
   const handleTelegramAuth = useCallback(async () => {
     setTgLoading(true);
@@ -319,38 +358,16 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     stopPolling();
     try {
       const { state, url } = await fetch('/api/telegram-auth-start', { method: 'POST' }).then(r => r.json());
+      localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));
       setTgBotUrl(url);
       setTgLoading(false);
       setTgStep('waiting');
-      window.open(url, '_blank', 'noopener,noreferrer');
-
-      const deadline = Date.now() + 5 * 60 * 1000;
-      tgPollRef.current = setInterval(async () => {
-        if (Date.now() > deadline) {
-          stopPolling();
-          setTgError('Время ожидания истекло. Попробуйте снова.');
-          setTgStep('idle');
-          return;
-        }
-        try {
-          const resp = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
-          if (resp.status === 'done') {
-            stopPolling();
-            localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
-            try { await signInWithCustomToken(auth, resp.token); } catch {}
-            window.location.reload();
-          } else if (resp.status === 'expired' || resp.status === 'not_found') {
-            stopPolling();
-            setTgError('Ссылка устарела. Попробуйте снова.');
-            setTgStep('idle');
-          }
-        } catch {}
-      }, 2000);
+      startPolling(state);
     } catch {
       setTgError('Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
     }
-  }, [stopPolling]);
+  }, [stopPolling, startPolling]);
 
   const handleVkLogin = async () => {
     setVkLoginLoading(true);
@@ -363,6 +380,31 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       setVkLoginLoading(false);
     }
   };
+
+  // Восстанавливаем сессию после перезагрузки страницы (мобильный редирект)
+  useEffect(() => {
+    const saved = localStorage.getItem('apg_tg_pending');
+    if (!saved) return;
+    try {
+      const { state, url, at } = JSON.parse(saved);
+      if (Date.now() - at > 5 * 60 * 1000) { localStorage.removeItem('apg_tg_pending'); return; }
+      setTgBotUrl(url);
+      setTgStep('waiting');
+      checkSession(state).then(done => { if (!done) startPolling(state); });
+    } catch { localStorage.removeItem('apg_tg_pending'); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Проверяем сразу при возврате в браузер (мобильный Telegram)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden) return;
+      const state = tgStateRef.current;
+      if (state) checkSession(state);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [checkSession]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -548,16 +590,24 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                     Создаём сессию...
                   </div>
                 : tgStep === 'waiting'
-                  ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '4px 0' }}>
+                  ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '4px 0', width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#26A8EA', fontSize: 13, fontWeight: 600 }}>
                         <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                         Ждём подтверждения в Telegram...
                       </div>
-                      <button
-                        onClick={() => tgBotUrl && window.open(tgBotUrl, '_blank', 'noopener,noreferrer')}
-                        style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                      <a
+                        href={tgBotUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'block', width: '100%', padding: '11px 0', borderRadius: 12, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}
                       >
-                        Открыть Telegram снова
+                        Открыть Telegram
+                      </a>
+                      <button
+                        onClick={() => tgStateRef.current && checkSession(tgStateRef.current)}
+                        style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: 'none', color: T.textSec, fontSize: 12, cursor: 'pointer' }}
+                      >
+                        Проверить вход
                       </button>
                     </div>
                   : <button
