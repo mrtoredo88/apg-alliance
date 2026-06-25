@@ -1,8 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
-import { auth } from './firebase';
-import { signInWithCustomToken } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
@@ -322,12 +320,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         stopPolling();
         localStorage.removeItem('apg_tg_pending');
         localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
-        try {
-          await Promise.race([
-            signInWithCustomToken(auth, resp.token),
-            new Promise(r => setTimeout(r, 3000)),
-          ]);
-        } catch {}
         window.location.reload();
         return true;
       }

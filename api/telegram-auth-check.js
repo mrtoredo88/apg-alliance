@@ -1,8 +1,7 @@
 // GET /api/telegram-auth-check?state=XXX
-// Опрашивает статус сессии, при готовности возвращает Firebase custom token
+// Опрашивает статус сессии, при готовности возвращает данные пользователя
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
 
 let _app = null;
 function getAdminApp() {
@@ -37,11 +36,10 @@ export default async function handler(req, res) {
   }
 
   if (data.status === 'done') {
-    const uid   = `tg_${data.tgUserId}`;
-    const token = await getAuth(getAdminApp()).createCustomToken(uid);
+    const uid = `tg_${data.tgUserId}`;
     ref.delete().catch(() => {});
     return res.json({
-      status: 'done', token,
+      status: 'done',
       user: {
         id:         uid,
         first_name: data.firstName ?? '',
