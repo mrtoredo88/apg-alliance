@@ -127,8 +127,16 @@ function pluralReviews(n) {
 
 function ExpertModal({ expert, user, scannedExperts, onClose }) {
   const [showQR, setShowQR] = useState(false);
+  const [shareToast, setShareToast] = useState('');
+  const shareToastRef = useRef(null);
 
-  const handleShare = async () => {
+  const showToast = (msg) => {
+    setShareToast(msg);
+    clearTimeout(shareToastRef.current);
+    shareToastRef.current = setTimeout(() => setShareToast(''), 2500);
+  };
+
+  const handleShare = () => {
     const appLink = 'https://vk.com/app54601851';
     const siteLink = expert.websiteUrl || appLink;
     const message = [
@@ -139,10 +147,26 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
     ].filter(Boolean).join('\n');
     const shareText = `${message}\n${siteLink}`;
 
-    if (navigator.share) {
-      try { await navigator.share({ url: siteLink, text: message }); return; } catch {}
+    if (isVK()) {
+      vkBridge.send('VKWebAppCopyText', { text: shareText })
+        .then(() => showToast('📋 Скопировано!'))
+        .catch(() => showToast('❌ Ошибка'));
+      return;
     }
-    navigator.clipboard?.writeText(shareText).catch(() => {});
+
+    if (navigator.share) {
+      navigator.share({ url: siteLink, text: message })
+        .then(() => showToast('✅ Поделились!'))
+        .catch(() => {
+          navigator.clipboard?.writeText(shareText)
+            .then(() => showToast('📋 Скопировано'))
+            .catch(() => showToast('❌ Ошибка'));
+        });
+    } else {
+      navigator.clipboard?.writeText(shareText)
+        .then(() => showToast('📋 Скопировано'))
+        .catch(() => showToast('❌ Ошибка'));
+    }
   };
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -226,6 +250,11 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
       >
         {/* Handle */}
         <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '0 auto 20px' }} />
+        {shareToast && (
+          <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 60px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20000, background: 'rgba(30,30,50,0.95)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 18px', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+            {shareToast}
+          </div>
+        )}
 
         {/* Header */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
@@ -244,7 +273,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
               </div>
             )}
           </div>
-          <button onClick={handleShare} style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0 }}>📤</button>
+          <button onClick={handleShare} style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0, pointerEvents: 'auto' }}>📤</button>
           <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0 }}>✕</button>
         </div>
 

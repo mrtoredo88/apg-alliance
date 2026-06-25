@@ -272,7 +272,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     shareToastRef.current = setTimeout(() => setShareToast(''), 2500);
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
     const appLink = 'https://vk.com/app54601851';
     const siteLink = partner.websiteUrl || appLink;
     const message = [
@@ -283,18 +283,25 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     ].filter(Boolean).join('\n');
     const shareText = `${message}\n${siteLink}`;
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ url: siteLink, text: message });
-        showShareToast('✅ Поделились!');
-        return;
-      } catch {}
+    if (isVK()) {
+      vkBridge.send('VKWebAppCopyText', { text: shareText })
+        .then(() => showShareToast('📋 Скопировано!'))
+        .catch(() => showShareToast('❌ Ошибка'));
+      return;
     }
-    try {
-      await navigator.clipboard.writeText(shareText);
-      showShareToast('📋 Скопировано в буфер');
-    } catch {
-      showShareToast('❌ Не удалось скопировать');
+
+    if (navigator.share) {
+      navigator.share({ url: siteLink, text: message })
+        .then(() => showShareToast('✅ Поделились!'))
+        .catch(() => {
+          navigator.clipboard?.writeText(shareText)
+            .then(() => showShareToast('📋 Скопировано'))
+            .catch(() => showShareToast('❌ Ошибка'));
+        });
+    } else {
+      navigator.clipboard?.writeText(shareText)
+        .then(() => showShareToast('📋 Скопировано'))
+        .catch(() => showShareToast('❌ Ошибка'));
     }
   };
 
@@ -308,10 +315,11 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   return (
     <>
-      {shareToast && (
-        <div style={{ position:'fixed', top:'calc(var(--safe-top, 0px) + 60px)', left:'50%', transform:'translateX(-50%)', zIndex:200, background:'rgba(30,30,50,0.95)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:12, padding:'10px 18px', fontSize:13, fontWeight:700, color:'#fff', whiteSpace:'nowrap', pointerEvents:'none' }}>
+      {shareToast && createPortal(
+        <div style={{ position:'fixed', top:'calc(var(--safe-top, 0px) + 60px)', left:'50%', transform:'translateX(-50%)', zIndex:20000, background:'rgba(30,30,50,0.95)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:12, padding:'10px 18px', fontSize:13, fontWeight:700, color:'#fff', whiteSpace:'nowrap', pointerEvents:'none' }}>
           {shareToast}
-        </div>
+        </div>,
+        document.body
       )}
       <div style={{ position:'sticky', top:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
@@ -331,7 +339,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
               </div>
             )}
           </div>
-          <button onClick={handleShare} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>📤</button>
+          <button onClick={handleShare} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0, pointerEvents:'auto' }}>📤</button>
           <button onClick={() => onToggleFavorite(partner.id)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:22, color:isFavorite ? T.red : T.textSec, padding:4, flexShrink:0 }}>
             {isFavorite ? '♥' : '♡'}
           </button>
