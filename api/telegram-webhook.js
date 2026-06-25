@@ -120,6 +120,7 @@ export default async function handler(req, res) {
     const userSnap = await userRef.get();
     const profilePatch = {
       authProvider: 'telegram',
+      displayName: [from.first_name, from.last_name].filter(Boolean).join(' ') || null,
       firstName: from.first_name ?? null,
       lastName:  from.last_name  ?? null,
       photo:     photoUrl ?? null,

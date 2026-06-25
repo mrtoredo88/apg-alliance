@@ -367,6 +367,7 @@ export function UserApp() {
       const todayKey = new Date().toLocaleDateString('sv');
 
       const profilePatch = {
+        displayName: [userData.first_name, userData.last_name].filter(Boolean).join(' ') || null,
         firstName: userData.first_name ?? null,
         lastName:  userData.last_name  ?? null,
         photo:     userData.photo_200  ?? null,
@@ -385,6 +386,7 @@ export function UserApp() {
           }
         }
         const keys = data.keys ?? 0;
+        if (data.displayName) setUser(u => ({ ...u, displayName: data.displayName }));
         setUserKeys(keys);
         setFavorites(data.favorites ?? []);
         setScannedPartnerIds(data.scannedPartners ?? {});
@@ -873,6 +875,8 @@ export function UserApp() {
 
   const handleLogout = useCallback(async () => {
     localStorage.removeItem('apg_tg_user');
+    localStorage.removeItem('apg_guest_id');
+    localStorage.removeItem('apg_notif_enabled');
     try { await signOut(auth); } catch {}
     window.location.reload();
   }, []);

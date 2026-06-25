@@ -189,7 +189,9 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
 }
 
 function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlockedAchievements, level, onClose, onShareVK }) {
-  const name = user ? `${user.first_name} ${user.last_name}`.trim() : 'Участник АПГ';
+  const name = user
+    ? (user.displayName || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Участник АПГ')
+    : 'Участник АПГ';
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 32px' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, padding: '0 16px', animation: 'slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1)' }}>
@@ -302,7 +304,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgLoading, setTgLoading] = useState(false);
   const [tgError, setTgError] = useState('');
   const [tgStatus, setTgStatus] = useState('');
-  const isGuest = !isVK() && String(user?.id ?? '').startsWith('guest_');
+  const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const handleVkLogin = async () => {
     setVkLoginLoading(true);
@@ -661,7 +663,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                     {safeUser.photo_200
                       ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#C9A84C', background: 'rgba(201,168,76,0.12)' }}>
-                          {(safeUser.first_name || '?')[0].toUpperCase()}
+                          {(safeUser.displayName || safeUser.first_name || '?')[0].toUpperCase()}
                         </div>
                     }
                   </div>
@@ -670,7 +672,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 {/* Имя + город + уровень */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri, lineHeight: 1.2, marginBottom: 2 }}>
-                    {safeUser.first_name} {safeUser.last_name}
+                    {safeUser.displayName || [safeUser.first_name, safeUser.last_name].filter(Boolean).join(' ') || 'Участник АПГ'}
                   </div>
                   <div style={{ fontSize: 11, color: T.textSec, marginBottom: 8 }}>Участник АПГ · Зеленоград</div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: level.color + '22', border: `1px solid ${level.color}55`, borderRadius: 16, padding: '4px 10px' }}>
