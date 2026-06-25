@@ -546,6 +546,18 @@ export const AdminPanel = () => {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
     } else {
       await addDoc(collection(db, 'partners'), { ...data, createdAt: serverTimestamp() });
+      // Уведомляем webpush-подписчиков о новом партнёре
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-push-secret': 'apg2026raffle' },
+        body: JSON.stringify({
+          broadcast: true,
+          title: `🏪 Новый партнёр АПГ: ${data.name}`,
+          body: data.offer ? `🎁 ${data.offer}` : 'Открой страницу партнёра в приложении',
+          url: 'https://apg-alliance.vercel.app',
+          tag: 'new-partner',
+        }),
+      }).catch(() => {});
     }
     resetPartnerForm();
     fetchData();

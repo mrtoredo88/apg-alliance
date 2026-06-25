@@ -17,3 +17,13 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 export const auth = getAuth(app);
+
+export async function getMessagingIfSupported() {
+  try {
+    const { getMessaging, isSupported } = await import('firebase/messaging');
+    if (!(await isSupported())) return null;
+    return getMessaging(app);
+  } catch {
+    return null;
+  }
+}

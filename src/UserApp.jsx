@@ -6,7 +6,7 @@ import vkBridge, { isVK } from './vk.js';
 import { db, auth } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc, increment,
+  doc, getDoc, setDoc, updateDoc, deleteDoc, increment, arrayUnion,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
@@ -924,14 +924,90 @@ export function UserApp() {
     setActivePanel('notifications');
   }, []);
 
-  const handleEnableNotifications = useCallback(() => {
-    localStorage.setItem('apg_notif_enabled', '1');
-    setNotifEnabled(true);
-    if (user) updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true }).catch(() => {});
-    showToast('🔔 Уведомления включены!', 'success');
-    // VK push — fire-and-forget, не блокирует UX
-    if (isVK()) vkBridge.send('VKWebAppAllowNotifications').catch(() => {});
+  const VAPID_KEY = 'BAWMFhQ-O6D25-j9s7I_y4kcNDfUMcnqHAdvDoFn-wY4GrMGrgB0I0tU_aPz_7jcr6X0vbkSs0Q1T6UsuyHR8r0';
+
+  const requestWebPushPermission = useCallback(async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      showToast('❌ Push не поддерживается в этом браузере', 'error');
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        showToast('❌ Разрешение не получено', 'error');
+        return;
+      }
+      const { getToken }              = await import('firebase/messaging');
+      const { getMessagingIfSupported } = await import('./firebase');
+      const msg = await getMessagingIfSupported();
+      if (!msg) { showToast('❌ Push не поддерживается', 'error'); return; }
+
+      const swReg = await (window.__swRegPromise ?? navigator.serviceWorker.ready);
+      const token = await getToken(msg, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+
+      if (token && user?.id) {
+        await updateDoc(doc(db, 'users', String(user.id)), {
+          fcmTokens: arrayUnion(token),
+          notificationProvider: 'webpush',
+          notificationsEnabled: true,
+        });
+      }
+      localStorage.setItem('apg_notif_enabled', '1');
+      setNotifEnabled(true);
+      showToast('🔔 Уведомления включены!', 'success');
+    } catch (e) {
+      console.error('WebPush error:', e);
+      showToast('❌ Не удалось включить уведомления', 'error');
+    }
   }, [user, showToast]);
+
+  // Уведомления в foreground (приложение открыто)
+  useEffect(() => {
+    if (isVK()) return;
+    let unsub = () => {};
+    (async () => {
+      try {
+        const { onMessage }             = await import('firebase/messaging');
+        const { getMessagingIfSupported } = await import('./firebase');
+        const msg = await getMessagingIfSupported();
+        if (!msg) return;
+        unsub = onMessage(msg, payload => {
+          const title = payload.notification?.title ?? 'АПГ';
+          const body  = payload.notification?.body  ?? '';
+          showToast(`🔔 ${title}${body ? ': ' + body : ''}`);
+        });
+      } catch {}
+    })();
+    return () => unsub();
+  }, [showToast]);
+
+  const handleEnableNotifications = useCallback(() => {
+    const uid = user ? String(user.id) : null;
+
+    if (isVK()) {
+      localStorage.setItem('apg_notif_enabled', '1');
+      setNotifEnabled(true);
+      if (uid) updateDoc(doc(db, 'users', uid), {
+        notificationsEnabled: true, notificationProvider: 'vk',
+      }).catch(() => {});
+      showToast('🔔 Уведомления включены!', 'success');
+      vkBridge.send('VKWebAppAllowNotifications').catch(() => {});
+      return;
+    }
+
+    if (uid?.startsWith('tg_')) {
+      localStorage.setItem('apg_notif_enabled', '1');
+      setNotifEnabled(true);
+      updateDoc(doc(db, 'users', uid), {
+        notificationsEnabled: true, notificationProvider: 'telegram',
+      }).catch(() => {});
+      showToast('🔔 Уведомления в Telegram включены!', 'success');
+      return;
+    }
+
+    // Web / PWA — FCM Web Push
+    requestWebPushPermission();
+  }, [user, showToast, requestWebPushPermission]);
 
   const VK_GROUP_ID = 229980067;
   const handleJoinGroup = useCallback(async () => {

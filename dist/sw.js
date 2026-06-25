@@ -87,3 +87,43 @@ self.addEventListener('fetch', (e) => {
     })
   );
 });
+
+// ─── Web Push (FCM) ───────────────────────────────────────────────────────────
+
+self.addEventListener('push', e => {
+  if (!e.data) return;
+  let payload = {};
+  try { payload = e.data.json(); } catch { return; }
+
+  const n     = payload.notification ?? {};
+  const data  = payload.data ?? {};
+  const title = n.title ?? 'АПГ';
+  const body  = n.body  ?? '';
+
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon:              '/192.png',
+      badge:             '/32.png',
+      data,
+      tag:               data.tag ?? 'apg-push',
+      renotify:          true,
+      requireInteraction: false,
+    })
+  );
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url ?? '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if (new URL(c.url).origin === self.location.origin && 'focus' in c) {
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
