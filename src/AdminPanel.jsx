@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
-import { db, auth } from './firebase';
+import { db, auth, storage } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -159,6 +160,33 @@ function EmojiPicker({ emojis, value, onChange }) {
 
 const ADMIN_PASSWORD = 'RealMadrid2025!';
 
+async function compressImage(file, maxPx = 1200, quality = 0.82) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxPx || height > maxPx) {
+        if (width > height) { height = Math.round(height * maxPx / width); width = maxPx; }
+        else { width = Math.round(width * maxPx / height); height = maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+    };
+    img.src = url;
+  });
+}
+
+async function uploadImage(file, path) {
+  const blob = await compressImage(file);
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+  return getDownloadURL(storageRef);
+}
+
 function PasswordGate({ onAllow }) {
   const [pwd, setPwd]       = useState('');
   const [shake, setShake]   = useState(false);
@@ -296,6 +324,10 @@ export const AdminPanel = () => {
   const [exMax, setExMax]           = useState('');
   const [exSaving, setExSaving]     = useState(false);
   const [exError, setExError]       = useState('');
+  const [exCoverPhoto, setExCoverPhoto] = useState('');
+  const [exGallery, setExGallery]       = useState([]);
+  const [exCoverUploading, setExCoverUploading] = useState(false);
+  const [exGalleryUploading, setExGalleryUploading] = useState(false);
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
@@ -341,6 +373,10 @@ export const AdminPanel = () => {
   const [pWebsite, setPWebsite]           = useState('');
   const [pTelegramCom, setPTelegramCom]   = useState('');
   const [pMaxCom, setPMaxCom]             = useState('');
+  const [pCoverPhoto, setPCoverPhoto]     = useState('');
+  const [pGallery, setPGallery]           = useState([]);
+  const [pCoverUploading, setPCoverUploading] = useState(false);
+  const [pGalleryUploading, setPGalleryUploading] = useState(false);
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -438,6 +474,7 @@ export const AdminPanel = () => {
     setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
     setExOnline(false); setExOffline(false); setExGroup(false);
     setExTelegram(''); setExWebsite(''); setExMax('');
+    setExCoverPhoto(''); setExGallery([]);
     setExError(''); setExSaving(false);
   };
 
@@ -452,6 +489,7 @@ export const AdminPanel = () => {
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
     setExTelegram(ex.telegramUrl ?? ''); setExWebsite(ex.websiteUrl ?? ''); setExMax(ex.maxUrl ?? '');
+    setExCoverPhoto(ex.coverPhoto ?? ''); setExGallery(ex.gallery ?? []);
     window.scrollTo(0, 0);
   };
 
@@ -470,6 +508,8 @@ export const AdminPanel = () => {
       telegramUrl: normalizeUrl(exTelegram),
       websiteUrl: normalizeUrl(exWebsite),
       maxUrl: normalizeUrl(exMax),
+      coverPhoto: exCoverPhoto.trim(),
+      gallery: exGallery,
     };
     try {
       if (editingExpert) {
@@ -499,6 +539,7 @@ export const AdminPanel = () => {
     setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
     setPStampTarget(''); setPVkOwnerId('');
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
+    setPCoverPhoto(''); setPGallery([]);
     setEditingPartner(null);
   };
 
@@ -511,6 +552,7 @@ export const AdminPanel = () => {
     setPVkOwnerId(p.vkOwnerId ?? '');
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
     setPTelegramCom(p.telegramCommunityUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? '');
+    setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
     window.scrollTo(0, 0);
   };
 
@@ -528,6 +570,8 @@ export const AdminPanel = () => {
       websiteUrl: normalizeUrl(pWebsite),
       telegramCommunityUrl: normalizeUrl(pTelegramCom),
       maxCommunityUrl: normalizeUrl(pMaxCom),
+      coverPhoto: pCoverPhoto.trim(),
+      gallery: pGallery,
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
@@ -1121,6 +1165,52 @@ export const AdminPanel = () => {
             <input style={s.input} placeholder="https://..." value={exPhoto} onChange={e => setExPhoto(e.target.value)} />
             {exPhoto && <img src={exPhoto} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', marginBottom: 12 }} onError={e => e.target.style.display='none'} />}
 
+            <label style={s.label}>Фото-шапка (обложка)</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="https://... или загрузить ↓" value={exCoverPhoto} onChange={e => setExCoverPhoto(e.target.value)} />
+              <label style={{ ...s.btn, ...s.btnGray, flexShrink: 0, cursor: exCoverUploading ? 'default' : 'pointer', opacity: exCoverUploading ? 0.6 : 1, userSelect: 'none' }}>
+                {exCoverUploading ? '...' : '📤'}
+                <input type="file" accept="image/*" style={{ display: 'none' }} disabled={exCoverUploading} onChange={async e => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setExCoverUploading(true);
+                  try { setExCoverPhoto(await uploadImage(file, `uploads/experts/covers/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`)); }
+                  catch (err) { alert('Ошибка загрузки: ' + err.message); }
+                  setExCoverUploading(false); e.target.value = '';
+                }} />
+              </label>
+            </div>
+            {exCoverPhoto && <img src={exCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 10, marginBottom: 12, border: `1px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+
+            <label style={s.label}>Галерея (до 6 фото)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
+              {exGallery.map((url, i) => (
+                <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: `1px solid ${A.border}` }}>
+                  <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display = 'none'} />
+                  <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: 3 }}>
+                    {i > 0 && <button onClick={() => setExGallery(g => { const a=[...g]; [a[i-1],a[i]]=[a[i],a[i-1]]; return a; })} style={{ background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>↑</button>}
+                    {i < exGallery.length - 1 && <button onClick={() => setExGallery(g => { const a=[...g]; [a[i],a[i+1]]=[a[i+1],a[i]]; return a; })} style={{ background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>↓</button>}
+                    <button onClick={() => setExGallery(g => g.filter((_, j) => j !== i))} style={{ background: 'rgba(230,70,70,0.8)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 12, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>✕</button>
+                  </div>
+                </div>
+              ))}
+              {exGallery.length < 6 && (
+                <label style={{ aspectRatio: '1', border: `2px dashed ${A.border}`, borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: exGalleryUploading ? 'default' : 'pointer', opacity: exGalleryUploading ? 0.6 : 1, userSelect: 'none' }}>
+                  <span style={{ fontSize: 22, color: A.textSec }}>{exGalleryUploading ? '…' : '+'}</span>
+                  <span style={{ fontSize: 10, color: A.textSec }}>фото</span>
+                  <input type="file" accept="image/*" multiple style={{ display: 'none' }} disabled={exGalleryUploading} onChange={async e => {
+                    const files = [...(e.target.files ?? [])].slice(0, 6 - exGallery.length);
+                    if (!files.length) return;
+                    setExGalleryUploading(true);
+                    try {
+                      const urls = await Promise.all(files.map(f => uploadImage(f, `uploads/experts/gallery/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`)));
+                      setExGallery(g => [...g, ...urls].slice(0, 6));
+                    } catch (err) { alert('Ошибка загрузки: ' + err.message); }
+                    setExGalleryUploading(false); e.target.value = '';
+                  }} />
+                </label>
+              )}
+            </div>
+
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
 
@@ -1241,6 +1331,52 @@ export const AdminPanel = () => {
             <label style={s.label}>Ссылка на логотип (URL)</label>
             <input style={s.input} placeholder="https://..." value={pLogo} onChange={e => setPLogo(e.target.value)} />
             {pLogo && <img src={pLogo} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, border: `2px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+
+            <label style={s.label}>Фото-шапка (обложка)</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="https://... или загрузить ↓" value={pCoverPhoto} onChange={e => setPCoverPhoto(e.target.value)} />
+              <label style={{ ...s.btn, ...s.btnGray, flexShrink: 0, cursor: pCoverUploading ? 'default' : 'pointer', opacity: pCoverUploading ? 0.6 : 1, userSelect: 'none' }}>
+                {pCoverUploading ? '...' : '📤'}
+                <input type="file" accept="image/*" style={{ display: 'none' }} disabled={pCoverUploading} onChange={async e => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setPCoverUploading(true);
+                  try { setPCoverPhoto(await uploadImage(file, `uploads/partners/covers/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`)); }
+                  catch (err) { alert('Ошибка загрузки: ' + err.message); }
+                  setPCoverUploading(false); e.target.value = '';
+                }} />
+              </label>
+            </div>
+            {pCoverPhoto && <img src={pCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 10, marginBottom: 12, border: `1px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+
+            <label style={s.label}>Галерея (до 6 фото)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
+              {pGallery.map((url, i) => (
+                <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: `1px solid ${A.border}` }}>
+                  <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display = 'none'} />
+                  <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: 3 }}>
+                    {i > 0 && <button onClick={() => setPGallery(g => { const a=[...g]; [a[i-1],a[i]]=[a[i],a[i-1]]; return a; })} style={{ background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>↑</button>}
+                    {i < pGallery.length - 1 && <button onClick={() => setPGallery(g => { const a=[...g]; [a[i],a[i+1]]=[a[i+1],a[i]]; return a; })} style={{ background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>↓</button>}
+                    <button onClick={() => setPGallery(g => g.filter((_, j) => j !== i))} style={{ background: 'rgba(230,70,70,0.8)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 12, cursor: 'pointer', lineHeight: 1, padding: '2px 4px' }}>✕</button>
+                  </div>
+                </div>
+              ))}
+              {pGallery.length < 6 && (
+                <label style={{ aspectRatio: '1', border: `2px dashed ${A.border}`, borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: pGalleryUploading ? 'default' : 'pointer', opacity: pGalleryUploading ? 0.6 : 1, userSelect: 'none' }}>
+                  <span style={{ fontSize: 22, color: A.textSec }}>{pGalleryUploading ? '…' : '+'}</span>
+                  <span style={{ fontSize: 10, color: A.textSec }}>фото</span>
+                  <input type="file" accept="image/*" multiple style={{ display: 'none' }} disabled={pGalleryUploading} onChange={async e => {
+                    const files = [...(e.target.files ?? [])].slice(0, 6 - pGallery.length);
+                    if (!files.length) return;
+                    setPGalleryUploading(true);
+                    try {
+                      const urls = await Promise.all(files.map(f => uploadImage(f, `uploads/partners/gallery/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`)));
+                      setPGallery(g => [...g, ...urls].slice(0, 6));
+                    } catch (err) { alert('Ошибка загрузки: ' + err.message); }
+                    setPGalleryUploading(false); e.target.value = '';
+                  }} />
+                </label>
+              )}
+            </div>
 
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 (499) 123-45-67" value={pPhone} onChange={e => setPPhone(e.target.value)} />

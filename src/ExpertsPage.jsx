@@ -125,8 +125,27 @@ function pluralReviews(n) {
   return `${n} отзывов`;
 }
 
+function PhotoLightbox({ photos, startIndex, onClose }) {
+  const [idx, setIdx] = useState(startIndex);
+  const prev = () => setIdx(i => (i - 1 + photos.length) % photos.length);
+  const next = () => setIdx(i => (i + 1) % photos.length);
+  return createPortal(
+    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.93)', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)' }}>
+      <button onClick={onClose} style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'50%', width:38, height:38, color:'#fff', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10 }}>✕</button>
+      {photos.length > 1 && <div style={{ position:'absolute', top:22, left:'50%', transform:'translateX(-50%)', fontSize:12, color:'rgba(255,255,255,0.6)', fontWeight:600, zIndex:10 }}>{idx+1}/{photos.length}</div>}
+      <img src={photos[idx]} alt="" loading="lazy" onClick={e => e.stopPropagation()} style={{ maxWidth:'94vw', maxHeight:'82vh', objectFit:'contain', borderRadius:16 }} />
+      {photos.length > 1 && <>
+        <button onClick={e => { e.stopPropagation(); prev(); }} style={{ position:'absolute', left:12, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'50%', width:42, height:42, color:'#fff', fontSize:22, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>‹</button>
+        <button onClick={e => { e.stopPropagation(); next(); }} style={{ position:'absolute', right:12, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'50%', width:42, height:42, color:'#fff', fontSize:22, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
+      </>}
+    </div>,
+    document.body,
+  );
+}
+
 function ExpertModal({ expert, user, scannedExperts, onClose }) {
   const [showQR, setShowQR] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
   const shareToastRef = useRef(null);
 
@@ -240,6 +259,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
   const qrValue = `expert_${expert.id}`;
 
   return createPortal(
+    <>
     <div
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
       onClick={onClose}
@@ -253,6 +273,14 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         {shareToast && (
           <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 60px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20000, background: 'rgba(30,30,50,0.95)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 18px', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
             {shareToast}
+          </div>
+        )}
+
+        {/* Обложка */}
+        {expert.coverPhoto && (
+          <div style={{ position:'relative', height:160, borderRadius:16, overflow:'hidden', margin:'-4px -4px 16px' }}>
+            <img src={expert.coverPhoto} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, transparent 40%, rgba(15,15,46,0.85))' }} />
           </div>
         )}
 
@@ -296,6 +324,20 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         {expert.description && (
           <div style={{ ...GLASS, borderRadius: 16, padding: '14px', marginBottom: 14 }}>
             <RichText color={T.textSec} fontSize={13}>{expert.description}</RichText>
+          </div>
+        )}
+
+        {/* Галерея */}
+        {(expert.gallery?.length > 0) && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>✦ Галерея</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+              {expert.gallery.map((url, i) => (
+                <button key={i} onClick={() => setLightboxIdx(i)} style={{ padding: 0, border: `1px solid ${T.border}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: 'none', aspectRatio: '1' }}>
+                  <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.target.parentElement.style.display='none'} />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -408,7 +450,11 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
           )}
         </div>
       </div>
-    </div>,
+    </div>
+    {lightboxIdx !== null && expert.gallery?.length > 0 && (
+      <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+    )}
+    </>,
     document.body,
   );
 }

@@ -239,6 +239,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   if (!partner) return null;
 
   const photos = partner.photos ?? [];
+  const gallery = partner.gallery ?? partner.photos ?? [];
   const similar = partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6);
   const avgRating = partner.avgRating ?? 0;
   const reviewCount = partner.reviewCount ?? reviews.length;
@@ -352,6 +353,18 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
       <div style={{ background: 'transparent' }}>
 
+        {/* Обложка */}
+        {partner.coverPhoto && (
+          <div style={{ position:'relative', height:200, overflow:'hidden' }}>
+            <img src={partner.coverPhoto} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, transparent 40%, rgba(15,15,46,0.95))' }} />
+            <div style={{ position:'absolute', bottom:18, left:20, right:20 }}>
+              <div style={{ fontSize:22, fontWeight:800, color:'#fff', textShadow:'0 2px 10px rgba(0,0,0,0.7)', lineHeight:'26px' }}>{partner.name}</div>
+              {partner.categoryLabel && <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', marginTop:4 }}>{partner.categoryLabel}</div>}
+            </div>
+          </div>
+        )}
+
         {/* Шапка партнёра */}
         <div style={{ margin:'8px 16px', borderRadius:24, background:T.surface, position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>
           {photos.length > 0 && (
@@ -440,19 +453,17 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           );
         })()}
 
-        {/* Фото */}
-        {photos.length > 0 && (
+        {/* Галерея */}
+        {gallery.length > 0 && (
           <div style={{ margin:'12px 16px' }}>
-            <div style={{ fontSize:13, color:T.gold, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>✦ Фотографии</div>
-            <HorizontalScroll>
-              <div style={{ display:'flex', gap:8, paddingRight:4 }}>
-                {photos.map((url, i) => (
-                  <button key={i} onClick={() => setLightboxIdx(i)} style={{ padding:0, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', cursor:'pointer', flexShrink:0, background:'none' }}>
-                    <img src={url} alt="" loading="lazy" style={{ width:160, height:110, objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
-                  </button>
-                ))}
-              </div>
-            </HorizontalScroll>
+            <div style={{ fontSize:13, color:T.gold, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>✦ Галерея</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+              {gallery.map((url, i) => (
+                <button key={i} onClick={() => setLightboxIdx(i)} style={{ padding:0, border:`1px solid ${T.border}`, borderRadius:12, overflow:'hidden', cursor:'pointer', background:'none', aspectRatio:'1' }}>
+                  <img src={url} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} onError={e => e.target.parentElement.style.display='none'} />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -641,7 +652,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       </div>
 
       {lightboxIdx !== null && (
-        <PhotoLightbox photos={photos} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+        <PhotoLightbox photos={gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
     </>
   );
