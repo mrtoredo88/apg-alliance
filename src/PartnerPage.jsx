@@ -147,9 +147,11 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const [submitDone, setSubmitDone]       = useState(false);
   const [reviewError, setReviewError]     = useState('');
   const [phoneCopied, setPhoneCopied]     = useState(false);
+  const [shareToast, setShareToast]       = useState('');
   const phoneCopyTimerRef                 = useRef(null);
+  const shareToastRef                     = useRef(null);
   const mountedRef                        = useRef(true);
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; clearTimeout(phoneCopyTimerRef.current); }; }, []);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; clearTimeout(phoneCopyTimerRef.current); clearTimeout(shareToastRef.current); }; }, []);
 
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
@@ -264,17 +266,41 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
   };
   const handleMap   = () => partner.address && openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
-  const handleShare = () => {
-    const lines = [
+  const showShareToast = (msg) => {
+    setShareToast(msg);
+    clearTimeout(shareToastRef.current);
+    shareToastRef.current = setTimeout(() => setShareToast(''), 2500);
+  };
+
+  const handleShare = async () => {
+    const link = partner.websiteUrl || 'https://vk.com/app54601851';
+    const text = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,
       partner.offer   && `🎁 ${partner.offer}`,
       partner.address && `📍 ${partner.address}`,
-      `\nПрисоединяйся к программе лояльности АПГ`,
+      `Присоединяйся к программе лояльности АПГ`,
     ].filter(Boolean).join('\n');
-    vkBridge.send('VKWebAppShare', {
-      link: partner.websiteUrl || 'https://vk.com/app54601851',
-      text: lines,
-    }).catch(() => {});
+
+    try {
+      await vkBridge.send('VKWebAppShare', { link, text });
+      showShareToast('✅ Поделились!');
+    } catch {
+      // Fallback: Web Share API
+      if (navigator.share) {
+        try {
+          await navigator.share({ url: link, text });
+          showShareToast('✅ Поделились!');
+          return;
+        } catch {}
+      }
+      // Last resort: copy link
+      try {
+        await navigator.clipboard.writeText(link);
+        showShareToast('📋 Ссылка скопирована');
+      } catch {
+        showShareToast('❌ Не удалось поделиться');
+      }
+    }
   };
 
   const infoRows = [
@@ -287,6 +313,11 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   return (
     <>
+      {shareToast && (
+        <div style={{ position:'fixed', top:'calc(var(--safe-top, 0px) + 60px)', left:'50%', transform:'translateX(-50%)', zIndex:200, background:'rgba(30,30,50,0.95)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:12, padding:'10px 18px', fontSize:13, fontWeight:700, color:'#fff', whiteSpace:'nowrap', pointerEvents:'none' }}>
+          {shareToast}
+        </div>
+      )}
       <div style={{ position:'fixed', top:'var(--safe-top, 0px)', left:0, right:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
           <button onClick={onBack} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
