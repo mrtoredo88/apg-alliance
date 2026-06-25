@@ -58,11 +58,14 @@ export function LoginScreen({ onLogin, onWebLogin, isWebMode = false }) {
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16, animation:'fadeInUp 0.5s ease both' }}>
           <div style={{ position:'relative' }}>
             <div style={{ position:'absolute', inset:-16, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,0.18), transparent 70%)' }} />
-            <img
-              src="/logo.png"
-              alt="АПГ"
-              style={{ width:160, height:160, borderRadius:32, display:'block', position:'relative', boxShadow:'0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,168,76,0.2)' }}
-            />
+            <picture>
+              <source srcSet="/logo.webp" type="image/webp" />
+              <img
+                src="/logo.png"
+                alt="АПГ"
+                style={{ width:160, height:160, borderRadius:32, display:'block', position:'relative', boxShadow:'0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,168,76,0.2)' }}
+              />
+            </picture>
           </div>
 
           <div style={{ textAlign:'center' }}>

@@ -127,7 +127,10 @@ export function SplashScreen({ isReady, onDone, startTime }) {
                 animation: 'apg-shimmer 2.6s linear 0.3s infinite',
                 pointerEvents: 'none',
               }} />
-              <img src="/logo.png" alt="АПГ" style={{ width: 240, height: 240, display: 'block', borderRadius: 40 }} />
+              <picture>
+                <source srcSet="/logo.webp" type="image/webp" />
+                <img src="/logo.png" alt="АПГ" style={{ width: 240, height: 240, display: 'block', borderRadius: 40 }} />
+              </picture>
             </div>
           </div>
 
