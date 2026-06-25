@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
-import { auth, db } from './firebase';
+import { auth } from './firebase';
 import { signInWithCustomToken } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
@@ -307,8 +306,51 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgError, setTgError] = useState('');
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
-  const tgUnsubRef = useRef(null);
+  const tgPollRef = useRef(null);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
+
+  const stopPolling = useCallback(() => {
+    if (tgPollRef.current) { clearInterval(tgPollRef.current); tgPollRef.current = null; }
+  }, []);
+
+  const handleTelegramAuth = useCallback(async () => {
+    setTgLoading(true);
+    setTgError('');
+    stopPolling();
+    try {
+      const { state, url } = await fetch('/api/telegram-auth-start', { method: 'POST' }).then(r => r.json());
+      setTgBotUrl(url);
+      setTgLoading(false);
+      setTgStep('waiting');
+      window.open(url, '_blank', 'noopener,noreferrer');
+
+      const deadline = Date.now() + 5 * 60 * 1000;
+      tgPollRef.current = setInterval(async () => {
+        if (Date.now() > deadline) {
+          stopPolling();
+          setTgError('Время ожидания истекло. Попробуйте снова.');
+          setTgStep('idle');
+          return;
+        }
+        try {
+          const resp = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
+          if (resp.status === 'done') {
+            stopPolling();
+            localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
+            try { await signInWithCustomToken(auth, resp.token); } catch {}
+            window.location.reload();
+          } else if (resp.status === 'expired' || resp.status === 'not_found') {
+            stopPolling();
+            setTgError('Ссылка устарела. Попробуйте снова.');
+            setTgStep('idle');
+          }
+        } catch {}
+      }, 2000);
+    } catch {
+      setTgError('Ошибка сети. Попробуйте снова.');
+      setTgLoading(false);
+    }
+  }, [stopPolling]);
 
   const handleVkLogin = async () => {
     setVkLoginLoading(true);
@@ -322,43 +364,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }
   };
 
-  const handleTelegramAuth = useCallback(async () => {
-    setTgLoading(true);
-    setTgError('');
-    try {
-      const { state, url } = await fetch('/api/telegram-auth-start', { method: 'POST' }).then(r => r.json());
-      setTgBotUrl(url);
-      setTgLoading(false);
-      setTgStep('waiting');
-      window.open(url, '_blank', 'noopener,noreferrer');
-
-      if (tgUnsubRef.current) tgUnsubRef.current();
-      tgUnsubRef.current = onSnapshot(doc(db, 'telegramAuthSessions', state), async (snap) => {
-        if (!snap.exists() || snap.data().status !== 'done') return;
-        tgUnsubRef.current?.();
-        tgUnsubRef.current = null;
-        try {
-          const resp = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
-          if (resp.status === 'done') {
-            localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
-            try { await signInWithCustomToken(auth, resp.token); } catch {}
-            window.location.reload();
-          } else {
-            setTgError('Не удалось войти. Попробуйте снова.');
-            setTgStep('idle');
-          }
-        } catch {
-          setTgError('Ошибка при входе. Попробуйте снова.');
-          setTgStep('idle');
-        }
-      });
-    } catch {
-      setTgError('Ошибка сети. Попробуйте снова.');
-      setTgLoading(false);
-    }
-  }, []);
-
-  useEffect(() => () => { tgUnsubRef.current?.(); }, []);
+  useEffect(() => () => stopPolling(), [stopPolling]);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const dismissTimerRef = useRef(null);
