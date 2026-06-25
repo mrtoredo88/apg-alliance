@@ -157,10 +157,21 @@ export default async function handler(req, res) {
     try {
       const q = await db.collection('telegramAuthSessions')
         .where('status', '==', 'pending')
-        .limit(1)
         .get();
-      if (!q.empty) {
-        const recentDoc = q.docs[0];
+      const now = Date.now();
+      const valid = q.docs
+        .filter(d => {
+          const exp = d.data().expiresAt;
+          const t = exp?.toDate ? exp.toDate().getTime() : new Date(exp).getTime();
+          return t > now;
+        })
+        .sort((a, b) => {
+          const ta = a.data().expiresAt?.toDate?.() ?? new Date(a.data().expiresAt);
+          const tb = b.data().expiresAt?.toDate?.() ?? new Date(b.data().expiresAt);
+          return tb.getTime() - ta.getTime();
+        });
+      if (valid.length > 0) {
+        const recentDoc = valid[0];
         const photoUrl = await tgGetPhotoUrl(from.id);
         await recentDoc.ref.update({
           status:    'done',
