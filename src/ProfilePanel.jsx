@@ -372,23 +372,30 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   }, [startPolling]);
 
   const handleTgManualCheck = useCallback(async () => {
-    if (!tgState) return;
+    if (!tgState) {
+      setTgStatus('state пуст — нажмите «Войти через Telegram» заново');
+      return;
+    }
     setTgStatus('Проверяем...');
     try {
-      const d = await fetch(`/api/telegram-auth-check?state=${tgState}`).then(r => r.json());
+      const resp = await fetch(`/api/telegram-auth-check?state=${tgState}`);
+      const d = await resp.json();
       if (d.status === 'done') {
+        setTgStatus('✅ Входим...');
         stopPolling();
         localStorage.setItem('apg_tg_user', JSON.stringify(d.user));
         try { await signInWithCustomToken(auth, d.token); } catch {}
         window.location.reload();
       } else if (d.status === 'pending') {
-        setTgStatus('Откройте бота и нажмите Start');
+        setTgStatus('Бот ещё не подтвердил — подождите и попробуйте снова');
       } else {
         stopPolling();
-        setTgError('Ссылка устарела. Попробуйте снова.');
+        setTgError(`Ошибка: ${d.status} — нажмите «Войти через Telegram» заново`);
         setTgLoading(false); setTgStatus(''); setTgBotUrl(''); setTgState('');
       }
-    } catch { setTgStatus('Откройте бота и нажмите Start'); }
+    } catch (e) {
+      setTgStatus(`Ошибка сети: ${e.message}`);
+    }
   }, [tgState, stopPolling]);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
