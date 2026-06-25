@@ -1540,6 +1540,7 @@ export function HomePanel({
 
             {/* Фильтр категорий */}
             <div style={{ padding: '10px 0 8px' }}>
+              <div onTouchStart={e => e.stopPropagation()}>
               <HorizontalScroll>
                 <div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>
                   {CATEGORIES.map(cat => (
@@ -1561,6 +1562,7 @@ export function HomePanel({
                   ))}
                 </div>
               </HorizontalScroll>
+              </div>
             </div>
 
             {/* Партнёры */}
