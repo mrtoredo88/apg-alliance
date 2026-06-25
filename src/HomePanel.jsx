@@ -164,8 +164,8 @@ function EventCard({ event, onClick, index = 0, isDark = true }) {
 
   return (
     <div onClick={() => onClick(event)} style={{
-      minWidth: 200, borderRadius: 20, overflow: 'hidden',
-      background: grad, flexShrink: 0, cursor: 'pointer',
+      width: 220, flexShrink: 0, borderRadius: 20, overflow: 'hidden',
+      background: grad, cursor: 'pointer',
       border: `1px solid ${T.border}`,
       position: 'relative',
       animation: 'fadeInUp 0.4s ease both',

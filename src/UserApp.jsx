@@ -398,6 +398,10 @@ export function UserApp() {
         setJoinedGroup(data.joinedGroup ?? false);
         setLastBonusDate(data.lastBonusDate ?? null);
         setScannedExperts(data.scannedExperts ?? {});
+        if (data.notificationsEnabled) {
+          localStorage.setItem('apg_notif_enabled', '1');
+          setNotifEnabled(true);
+        }
         if (!data.onboardingDone) setShowOnboarding(true);
 
         // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
@@ -921,12 +925,40 @@ export function UserApp() {
   }, []);
 
   const handleEnableNotifications = useCallback(async () => {
+    if (!isVK()) {
+      if ('Notification' in window) {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            localStorage.setItem('apg_notif_enabled', '1');
+            setNotifEnabled(true);
+            if (user) updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true }).catch(() => {});
+            showToast('🔔 Уведомления включены!', 'success');
+          } else {
+            showToast('Разреши уведомления в настройках браузера');
+          }
+        } catch {
+          showToast('Не удалось запросить разрешение');
+        }
+      } else {
+        showToast('Браузер не поддерживает уведомления');
+      }
+      return;
+    }
+
     try {
-      await vkBridge.send('VKWebAppAllowNotifications');
+      await Promise.race([
+        vkBridge.send('VKWebAppAllowNotifications'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+      ]);
       localStorage.setItem('apg_notif_enabled', '1');
       setNotifEnabled(true);
-    } catch {}
-  }, []);
+      if (user) updateDoc(doc(db, 'users', String(user.id)), { notificationsEnabled: true }).catch(() => {});
+      showToast('🔔 Уведомления включены!', 'success');
+    } catch (e) {
+      if (e?.message === 'timeout') showToast('Не удалось включить — попробуй позже');
+    }
+  }, [user, showToast]);
 
   const VK_GROUP_ID = 229980067;
   const handleJoinGroup = useCallback(async () => {
