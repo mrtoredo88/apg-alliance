@@ -273,33 +273,37 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   };
 
   const handleShare = () => {
-    const appLink = 'https://vk.com/app54601851';
-    const siteLink = partner.websiteUrl || appLink;
-    const message = [
+    const deepLink = isVK()
+      ? `https://vk.com/app54601851#partner_${partner.id}`
+      : `https://apg-alliance.vercel.app/?partner=${partner.id}`;
+
+    const textLines = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,
-      partner.offer   && `🎁 ${partner.offer}`,
+      `🎁 ${partner.offer || 'Скоро будут спецпредложения'}`,
       partner.address && `📍 ${partner.address}`,
-      `Присоединяйся к программе лояльности АПГ`,
-    ].filter(Boolean).join('\n');
-    const shareText = `${message}\n${siteLink}`;
+      '',
+      'Присоединяйся к программе лояльности АПГ.',
+      `👉 ${deepLink}`,
+    ].filter(v => v !== false && v !== null && v !== undefined).join('\n');
 
     if (isVK()) {
-      vkBridge.send('VKWebAppCopyText', { text: shareText })
+      vkBridge.send('VKWebAppCopyText', { text: textLines })
         .then(() => showShareToast('📋 Скопировано!'))
         .catch(() => showShareToast('❌ Ошибка'));
       return;
     }
 
+    const webText = textLines.split('\n').slice(0, -1).join('\n'); // без строки со ссылкой — браузер добавит url сам
     if (navigator.share) {
-      navigator.share({ url: siteLink, text: message })
+      navigator.share({ url: deepLink, text: webText })
         .then(() => showShareToast('✅ Поделились!'))
         .catch(() => {
-          navigator.clipboard?.writeText(shareText)
+          navigator.clipboard?.writeText(textLines)
             .then(() => showShareToast('📋 Скопировано'))
             .catch(() => showShareToast('❌ Ошибка'));
         });
     } else {
-      navigator.clipboard?.writeText(shareText)
+      navigator.clipboard?.writeText(textLines)
         .then(() => showShareToast('📋 Скопировано'))
         .catch(() => showShareToast('❌ Ошибка'));
     }

@@ -686,9 +686,14 @@ export function UserApp() {
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
     if (!pendingPartnerId || !partners.length || deepLinkOpened.current) return;
+    deepLinkOpened.current = true;
     const p = partners.find(p => p.id === pendingPartnerId);
-    if (p) { deepLinkOpened.current = true; openPartner(p); }
-  }, [pendingPartnerId, partners, openPartner]);
+    if (p) {
+      openPartner(p);
+    } else {
+      showToast('🔍 Партнёр не найден');
+    }
+  }, [pendingPartnerId, partners, openPartner, showToast]);
 
   // Авто-скан эксперта из deep link ?scan=expert_ID
   useEffect(() => {
