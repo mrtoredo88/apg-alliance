@@ -296,72 +296,21 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   );
 }
 
-function TgAuthSteps({ tgBotUrl, tgState, onCheck }) {
-  const [copied, setCopied] = useState(false);
-  const command = `/start auth_${tgState}`;
-
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(command).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
-  };
-
-  return (
-    <>
-      <a
-        href={tgBotUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-          background: 'linear-gradient(135deg, #26A8EA, #1A8CC7)',
-          color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none',
-          boxShadow: '0 4px 16px rgba(38,168,234,0.35)', boxSizing: 'border-box',
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
-        1. Открыть бота в Telegram
-      </a>
-
-      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', textAlign: 'center', margin: '2px 0' }}>
-        Если бот уже открыт — скопируй и отправь боту эту команду:
-      </div>
-
-      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-        <div style={{
-          flex: 1, padding: '8px 10px', borderRadius: 10,
-          background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(38,168,234,0.3)',
-          fontFamily: 'monospace', fontSize: 11, color: '#26A8EA',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {command}
-        </div>
-        <button
-          onClick={handleCopy}
-          style={{
-            padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(38,168,234,0.4)',
-            background: copied ? 'rgba(75,179,75,0.2)' : 'rgba(38,168,234,0.15)',
-            color: copied ? '#4BB34B' : '#26A8EA', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
-          }}
-        >
-          {copied ? '✓' : 'Копировать'}
-        </button>
-      </div>
-
-      <button
-        onClick={onCheck}
-        style={{
-          width: '100%', padding: '12px 0', borderRadius: 12,
-          border: '1px solid rgba(38,168,234,0.4)', background: 'rgba(38,168,234,0.1)',
-          color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-        }}
-      >
-        2. Отправил команду — войти
-      </button>
-    </>
-  );
+function TelegramLoginWidget({ onAuth }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    window.__tgWidgetCb = onAuth;
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-widget.js?22';
+    s.setAttribute('data-telegram-login', 'apg_zelenograd_bot');
+    s.setAttribute('data-size', 'large');
+    s.setAttribute('data-onauth', '__tgWidgetCb(user)');
+    s.setAttribute('data-request-access', 'write');
+    s.async = true;
+    if (ref.current) ref.current.appendChild(s);
+    return () => { s.remove(); delete window.__tgWidgetCb; };
+  }, [onAuth]);
+  return <div ref={ref} style={{ display: 'flex', justifyContent: 'center', minHeight: 50 }} />;
 }
 
 export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null }) {
@@ -371,7 +320,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [vkLoginError, setVkLoginError] = useState('');
   const [tgLoading, setTgLoading] = useState(false);
   const [tgError, setTgError] = useState('');
-  const [tgStatus, setTgStatus] = useState('');
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const handleVkLogin = async () => {
@@ -386,85 +334,28 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }
   };
 
-  const [tgBotUrl, setTgBotUrl]   = useState('');
-  const [tgState, setTgState]     = useState('');
-  const tgIntervalRef = useRef(null);
-
-  const stopPolling = useCallback(() => {
-    if (tgIntervalRef.current) { clearInterval(tgIntervalRef.current); tgIntervalRef.current = null; }
-  }, []);
-
-  const startPolling = useCallback((state) => {
-    stopPolling();
-    let attempts = 0;
-    tgIntervalRef.current = setInterval(async () => {
-      attempts++;
-      if (attempts > 150) {
-        stopPolling();
-        setTgError('Время вышло. Попробуйте снова.');
-        setTgLoading(false); setTgStatus(''); setTgBotUrl(''); setTgState('');
-        return;
-      }
-      try {
-        const d = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
-        if (d.status === 'done') {
-          stopPolling();
-          localStorage.setItem('apg_tg_user', JSON.stringify(d.user));
-          try { await signInWithCustomToken(auth, d.token); } catch {}
-          window.location.reload();
-        } else if (d.status === 'expired' || d.status === 'not_found') {
-          stopPolling();
-          setTgError('Ссылка устарела. Попробуйте снова.');
-          setTgLoading(false); setTgStatus(''); setTgBotUrl(''); setTgState('');
-        }
-      } catch { /* network error — try next tick */ }
-    }, 2000);
-  }, [stopPolling]);
-
-  useEffect(() => stopPolling, [stopPolling]);
-
-  const handleTelegramAuth = useCallback(async () => {
-    setTgError(''); setTgBotUrl(''); setTgState('');
+  const handleTgWidgetAuth = useCallback(async (userData) => {
     setTgLoading(true);
-    setTgStatus('Создаём ссылку...');
+    setTgError('');
     try {
-      const { state, url } = await fetch('/api/telegram-auth-start', { method: 'POST' }).then(r => r.json());
-      setTgBotUrl(url);
-      setTgState(state);
-      setTgStatus('Откройте бота и нажмите Start');
-      startPolling(state);
-    } catch {
-      setTgError('Не удалось создать ссылку. Попробуйте снова.');
-      setTgLoading(false); setTgStatus('');
-    }
-  }, [startPolling]);
-
-  const handleTgManualCheck = useCallback(async () => {
-    if (!tgState) {
-      setTgStatus('state пуст — нажмите «Войти через Telegram» заново');
-      return;
-    }
-    setTgStatus('Проверяем...');
-    try {
-      const resp = await fetch(`/api/telegram-auth-check?state=${tgState}`);
-      const d = await resp.json();
-      if (d.status === 'done') {
-        setTgStatus('✅ Входим...');
-        stopPolling();
-        localStorage.setItem('apg_tg_user', JSON.stringify(d.user));
-        try { await signInWithCustomToken(auth, d.token); } catch {}
+      const resp = await fetch('/api/verify-telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      }).then(r => r.json());
+      if (resp.ok) {
+        localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
+        try { await signInWithCustomToken(auth, resp.token); } catch {}
         window.location.reload();
-      } else if (d.status === 'pending') {
-        setTgStatus('Бот ещё не подтвердил — подождите и попробуйте снова');
       } else {
-        stopPolling();
-        setTgError(`Ошибка: ${d.status} — нажмите «Войти через Telegram» заново`);
-        setTgLoading(false); setTgStatus(''); setTgBotUrl(''); setTgState('');
+        setTgError('Не удалось войти. Попробуйте снова.');
+        setTgLoading(false);
       }
-    } catch (e) {
-      setTgStatus(`Ошибка сети: ${e.message}`);
+    } catch {
+      setTgError('Ошибка сети. Попробуйте снова.');
+      setTgLoading(false);
     }
-  }, [tgState, stopPolling]);
+  }, []);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const dismissTimerRef = useRef(null);
@@ -641,35 +532,14 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
             </div>}
 
-            {!isVK() && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {!tgBotUrl ? (
-                <button
-                  onClick={handleTelegramAuth}
-                  disabled={tgLoading}
-                  style={{
-                    width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-                    cursor: tgLoading ? 'default' : 'pointer',
-                    background: tgLoading ? 'rgba(38,168,234,0.3)' : 'linear-gradient(135deg, #26A8EA, #1A8CC7)',
-                    color: '#fff', fontSize: 14, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: tgLoading ? 'none' : '0 4px 16px rgba(38,168,234,0.35)',
-                  }}
-                >
-                  {tgLoading
-                    ? <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                    : <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
-                  }
-                  {tgLoading ? 'Создаём ссылку...' : 'Войти через Telegram'}
-                </button>
-              ) : (
-                <TgAuthSteps tgBotUrl={tgBotUrl} tgState={tgState} onCheck={handleTgManualCheck} />
-              )}
-              {tgStatus && !tgError && (
-                <div style={{ fontSize: 12, color: T.textSec, textAlign: 'center', lineHeight: '16px' }}>
-                  {tgBotUrl && <span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 6, verticalAlign: 'middle' }} />}
-                  {tgStatus}
-                </div>
-              )}
+            {!isVK() && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+              {tgLoading
+                ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSec, fontSize: 14, padding: '12px 0' }}>
+                    <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    Входим...
+                  </div>
+                : <TelegramLoginWidget onAuth={handleTgWidgetAuth} />
+              }
               {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
             </div>}
           </div>
