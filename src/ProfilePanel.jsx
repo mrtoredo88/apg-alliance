@@ -322,7 +322,12 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         stopPolling();
         localStorage.removeItem('apg_tg_pending');
         localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
-        try { await signInWithCustomToken(auth, resp.token); } catch {}
+        try {
+          await Promise.race([
+            signInWithCustomToken(auth, resp.token),
+            new Promise(r => setTimeout(r, 3000)),
+          ]);
+        } catch {}
         window.location.reload();
         return true;
       }
