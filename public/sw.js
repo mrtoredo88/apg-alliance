@@ -4,9 +4,9 @@ const CACHE = 'apg-v1';
 const PRECACHE = [
   '/',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/apple-touch-icon.png',
+  '/192.png',
+  '/512.png',
+  '/180.png',
 ];
 
 // Hosts to never cache — always fetch live
