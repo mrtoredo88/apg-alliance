@@ -281,21 +281,8 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       partner.address && `📍 ${partner.address}`,
       `Присоединяйся к программе лояльности АПГ`,
     ].filter(Boolean).join('\n');
+    const shareText = `${message}\n${siteLink}`;
 
-    if (isVK()) {
-      try {
-        await vkBridge.send('VKWebAppShowWallPostBox', {
-          message,
-          attachments: appLink,
-        });
-        showShareToast('✅ Опубликовано!');
-      } catch {
-        showShareToast('❌ Не удалось поделиться');
-      }
-      return;
-    }
-
-    // Web fallback
     if (navigator.share) {
       try {
         await navigator.share({ url: siteLink, text: message });
@@ -304,10 +291,10 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       } catch {}
     }
     try {
-      await navigator.clipboard.writeText(`${message}\n${siteLink}`);
-      showShareToast('📋 Ссылка скопирована');
+      await navigator.clipboard.writeText(shareText);
+      showShareToast('📋 Скопировано в буфер');
     } catch {
-      showShareToast('❌ Не удалось поделиться');
+      showShareToast('❌ Не удалось скопировать');
     }
   };
 
@@ -326,7 +313,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           {shareToast}
         </div>
       )}
-      <div style={{ position:'fixed', top:'var(--safe-top, 0px)', left:0, right:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
+      <div style={{ position:'sticky', top:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'0 1px 12px rgba(0,0,0,0.4)', padding:'0 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, height:52 }}>
           <button onClick={onBack} style={{ background:T.chipBg, border:`1px solid ${T.border}`, borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, color:T.textPri, flexShrink:0 }}>‹</button>
           <div style={{ flex:1, minWidth:0 }}>
@@ -352,8 +339,6 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       </div>
 
       <div style={{ background: 'transparent' }}>
-        {/* Отступ для фиксированного хедера */}
-        <div style={{ height:52 }} />
 
         {/* Шапка партнёра */}
         <div style={{ margin:'8px 16px', borderRadius:24, background:T.surface, position:'relative', overflow:'hidden', border:`1px solid rgba(201,168,76,0.2)` }}>

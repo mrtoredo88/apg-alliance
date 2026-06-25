@@ -137,21 +137,12 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
       expert.description   && expert.description.slice(0, 120),
       `Альянс Партнёров Города`,
     ].filter(Boolean).join('\n');
-
-    if (isVK()) {
-      try {
-        await vkBridge.send('VKWebAppShowWallPostBox', {
-          message,
-          attachments: appLink,
-        });
-      } catch {}
-      return;
-    }
+    const shareText = `${message}\n${siteLink}`;
 
     if (navigator.share) {
       try { await navigator.share({ url: siteLink, text: message }); return; } catch {}
     }
-    navigator.clipboard?.writeText(`${message}\n${siteLink}`).catch(() => {});
+    navigator.clipboard?.writeText(shareText).catch(() => {});
   };
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
