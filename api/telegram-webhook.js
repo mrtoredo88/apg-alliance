@@ -150,24 +150,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── /start без payload — пробуем завершить свежую сессию, иначе приветствие ─
+  // ── /start без payload — завершаем любую pending-сессию, иначе приветствие ──
   if (text === '/start') {
     const db = getFirestore(getAdminApp());
     let authed = false;
     try {
-      // Сессии живут 5 минут; если expiresAt > now+3min — создана < 2 мин назад
-      const minExpiry = new Date(Date.now() + 3 * 60 * 1000);
       const q = await db.collection('telegramAuthSessions')
         .where('status', '==', 'pending')
-        .limit(10)
+        .limit(1)
         .get();
-      let recentDoc = null;
-      for (const d of q.docs) {
-        const exp = d.data().expiresAt;
-        const expTime = exp?.toDate ? exp.toDate().getTime() : new Date(exp).getTime();
-        if (expTime > minExpiry.getTime()) { recentDoc = d; break; }
-      }
-      if (recentDoc) {
+      if (!q.empty) {
+        const recentDoc = q.docs[0];
         const photoUrl = await tgGetPhotoUrl(from.id);
         await recentDoc.ref.update({
           status:    'done',
