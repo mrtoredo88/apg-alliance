@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import { signInWithCustomToken } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
@@ -296,22 +297,6 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   );
 }
 
-function TelegramLoginWidget({ onAuth }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    window.__tgWidgetCb = onAuth;
-    const s = document.createElement('script');
-    s.src = 'https://telegram.org/js/telegram-widget.js?22';
-    s.setAttribute('data-telegram-login', 'apg_zelenograd_bot');
-    s.setAttribute('data-size', 'large');
-    s.setAttribute('data-onauth', '__tgWidgetCb(user)');
-    s.setAttribute('data-request-access', 'write');
-    s.async = true;
-    if (ref.current) ref.current.appendChild(s);
-    return () => { s.remove(); delete window.__tgWidgetCb; };
-  }, [onAuth]);
-  return <div ref={ref} style={{ display: 'flex', justifyContent: 'center', minHeight: 50 }} />;
-}
 
 export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -320,6 +305,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [vkLoginError, setVkLoginError] = useState('');
   const [tgLoading, setTgLoading] = useState(false);
   const [tgError, setTgError] = useState('');
+  const [tgStep, setTgStep] = useState('idle');
+  const [tgBotUrl, setTgBotUrl] = useState('');
+  const tgUnsubRef = useRef(null);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const handleVkLogin = async () => {
@@ -334,28 +322,43 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }
   };
 
-  const handleTgWidgetAuth = useCallback(async (userData) => {
+  const handleTelegramAuth = useCallback(async () => {
     setTgLoading(true);
     setTgError('');
     try {
-      const resp = await fetch('/api/verify-telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      }).then(r => r.json());
-      if (resp.ok) {
-        localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
-        try { await signInWithCustomToken(auth, resp.token); } catch {}
-        window.location.reload();
-      } else {
-        setTgError('Не удалось войти. Попробуйте снова.');
-        setTgLoading(false);
-      }
+      const { state, url } = await fetch('/api/telegram-auth-start', { method: 'POST' }).then(r => r.json());
+      setTgBotUrl(url);
+      setTgLoading(false);
+      setTgStep('waiting');
+      window.open(url, '_blank', 'noopener,noreferrer');
+
+      if (tgUnsubRef.current) tgUnsubRef.current();
+      tgUnsubRef.current = onSnapshot(doc(db, 'telegramAuthSessions', state), async (snap) => {
+        if (!snap.exists() || snap.data().status !== 'done') return;
+        tgUnsubRef.current?.();
+        tgUnsubRef.current = null;
+        try {
+          const resp = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
+          if (resp.status === 'done') {
+            localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
+            try { await signInWithCustomToken(auth, resp.token); } catch {}
+            window.location.reload();
+          } else {
+            setTgError('Не удалось войти. Попробуйте снова.');
+            setTgStep('idle');
+          }
+        } catch {
+          setTgError('Ошибка при входе. Попробуйте снова.');
+          setTgStep('idle');
+        }
+      });
     } catch {
       setTgError('Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
     }
   }, []);
+
+  useEffect(() => () => { tgUnsubRef.current?.(); }, []);
   const [achievementToast, setAchievementToast] = useState(null);
   const [toastExiting, setToastExiting] = useState(false);
   const dismissTimerRef = useRef(null);
@@ -532,13 +535,32 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
             </div>}
 
-            {!isVK() && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+            {!isVK() && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
               {tgLoading
-                ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSec, fontSize: 14, padding: '12px 0' }}>
+                ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: T.textSec, fontSize: 14, padding: '12px 0' }}>
                     <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                    Входим...
+                    Создаём сессию...
                   </div>
-                : <TelegramLoginWidget onAuth={handleTgWidgetAuth} />
+                : tgStep === 'waiting'
+                  ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '4px 0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#26A8EA', fontSize: 13, fontWeight: 600 }}>
+                        <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        Ждём подтверждения в Telegram...
+                      </div>
+                      <button
+                        onClick={() => tgBotUrl && window.open(tgBotUrl, '_blank', 'noopener,noreferrer')}
+                        style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Открыть Telegram снова
+                      </button>
+                    </div>
+                  : <button
+                      onClick={handleTelegramAuth}
+                      style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #26A8EA, #1A8BC4)', color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 16px rgba(38,168,234,0.35)' }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
+                      Войти через Telegram
+                    </button>
               }
               {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
             </div>}
