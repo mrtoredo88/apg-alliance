@@ -257,8 +257,8 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
       {isNew && !partner.offer && (
         <div style={{
           position: 'absolute', top: 8, right: 8,
-          background: 'rgba(74,144,217,0.2)', border: '1px solid rgba(74,144,217,0.5)',
-          borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, color: '#4A90D9',
+          background: 'rgba(74,144,217,0.85)', border: '1px solid rgba(74,144,217,0.9)',
+          borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, color: '#ffffff',
         }}>✦ NEW</div>
       )}
       {/* Бейдж акции */}

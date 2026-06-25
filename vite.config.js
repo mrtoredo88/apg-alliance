@@ -25,6 +25,9 @@ function versionPlugin() {
 
 export default defineConfig({
   plugins: [react(), versionPlugin()],
+  esbuild: {
+    legalComments: 'none',
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {

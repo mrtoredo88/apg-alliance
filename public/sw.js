@@ -58,6 +58,9 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Navigation requests — browser handles natively (avoids redirect overhead in Lighthouse)
+  if (request.mode === 'navigate') return;
+
   // Pass through Vite HMR / dev server events
   if (url.pathname.startsWith('/@')) return;
 
