@@ -362,6 +362,8 @@ export const AdminPanel = () => {
   const [ntEmoji, setNtEmoji]       = useState('🔔');
   const [ntTargetType, setNtTargetType] = useState('all');
   const [ntTargetValue, setNtTargetValue] = useState('');
+  const [ntSendPush, setNtSendPush] = useState(true);
+  const [ntPushResult, setNtPushResult] = useState(null);
 
   // Форма кастомного задания
   const [ctEmoji, setCtEmoji]   = useState('🎯');
@@ -647,7 +649,7 @@ export const AdminPanel = () => {
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
-  const resetNotifForm = () => { setNtTitle(''); setNtBody(''); setNtEmoji('🔔'); setNtTargetType('all'); setNtTargetValue(''); };
+  const resetNotifForm = () => { setNtTitle(''); setNtBody(''); setNtEmoji('🔔'); setNtTargetType('all'); setNtTargetValue(''); setNtPushResult(null); };
 
   const sendNotif = async () => {
     if (!ntTitle.trim()) return;
@@ -660,6 +662,21 @@ export const AdminPanel = () => {
     };
     if (ntTargetType !== 'all' && ntTargetValue) data.targetValue = Number(ntTargetValue);
     await addDoc(collection(db, 'notifications'), data);
+
+    if (ntSendPush) {
+      try {
+        const r = await fetch('/api/send-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-push-secret': 'apg-push-2024' },
+          body: JSON.stringify({ broadcast: true, title: ntTitle.trim(), body: ntBody.trim() || undefined }),
+        });
+        const result = await r.json();
+        setNtPushResult(result.sent != null ? `Push: ${result.sent} доставлено` : 'Push: нет подписчиков');
+      } catch {
+        setNtPushResult('Push: ошибка отправки');
+      }
+    }
+
     resetNotifForm();
     fetchData();
   };
@@ -1725,9 +1742,25 @@ export const AdminPanel = () => {
               />
             )}
 
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={ntSendPush}
+                onChange={e => setNtSendPush(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: '#4BB34B', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 14, color: A.text }}>Отправить Web Push подписчикам</span>
+            </label>
+
             <button style={{ ...s.btn, ...s.btnPri, width: '100%' }} onClick={sendNotif}>
               🔔 Опубликовать
             </button>
+
+            {ntPushResult && (
+              <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(75,179,75,0.12)', border: '1px solid rgba(75,179,75,0.3)', fontSize: 13, color: '#4BB34B', textAlign: 'center' }}>
+                {ntPushResult}
+              </div>
+            )}
           </div>
 
           <div style={s.card}>
