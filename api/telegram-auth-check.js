@@ -35,7 +35,9 @@ export default async function handler(req, res) {
   if (!snap.exists) return res.json({ status: 'not_found' });
 
   const data = snap.data();
-  const _d   = { raw: data.status, tg: !!data.tgUserId };
+  const svcAcc = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const pid    = svcAcc ? JSON.parse(svcAcc).project_id.slice(-6) : '?';
+  const _d   = { raw: data.status, tg: !!data.tgUserId, pid };
 
   if (data.status === 'pending') {
     const expDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);

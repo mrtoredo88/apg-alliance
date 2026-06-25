@@ -115,6 +115,12 @@ export default async function handler(req, res) {
       photoUrl:  photoUrl ?? null,
     });
 
+    // Self-verify: re-read document immediately to confirm write landed
+    const verifySnap = await ref.get();
+    const verifiedStatus = verifySnap.data()?.status ?? 'missing';
+    const svcAcc = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const wpid   = svcAcc ? JSON.parse(svcAcc).project_id.slice(-6) : '?';
+
     const uid      = `tg_${from.id}`;
     const userRef  = db.collection('users').doc(uid);
     const userSnap = await userRef.get();
@@ -144,7 +150,7 @@ export default async function handler(req, res) {
     }
 
     await tgSend(from.id,
-      `✅ Вы вошли в приложение АПГ! [${state.slice(0,8)}]\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
+      `✅ Вы вошли! [${state.slice(0,8)}] v:${verifiedStatus} p:${wpid}\n\nВернитесь в браузер — страница обновится.\n\n📌 Наши площадки:`,
       { reply_markup: SOCIAL_KEYBOARD },
     );
     return res.status(200).json({ ok: true });
@@ -181,6 +187,10 @@ export default async function handler(req, res) {
           username:  from.username   ?? '',
           photoUrl:  photoUrl ?? null,
         });
+        const verifySnap2 = await recentDoc.ref.get();
+        const vStatus2    = verifySnap2.data()?.status ?? 'missing';
+        const svcAcc2     = process.env.FIREBASE_SERVICE_ACCOUNT;
+        const wpid2       = svcAcc2 ? JSON.parse(svcAcc2).project_id.slice(-6) : '?';
         const uid     = `tg_${from.id}`;
         const userRef = db.collection('users').doc(uid);
         const userSnap = await userRef.get();
@@ -208,7 +218,7 @@ export default async function handler(req, res) {
           await userRef.update(profilePatch);
         }
         await tgSend(from.id,
-          `✅ Вы вошли в приложение АПГ! [${recentDoc.id.slice(0,8)}]\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
+          `✅ Вы вошли! [${recentDoc.id.slice(0,8)}] v:${vStatus2} p:${wpid2}\n\nВернитесь в браузер — страница обновится.\n\n📌 Наши площадки:`,
           { reply_markup: SOCIAL_KEYBOARD },
         );
         authed = true;
