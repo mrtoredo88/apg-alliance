@@ -1000,17 +1000,7 @@ export function UserApp() {
       return;
     }
 
-    if (uid?.startsWith('tg_')) {
-      localStorage.setItem('apg_notif_enabled', '1');
-      setNotifEnabled(true);
-      updateDoc(doc(db, 'users', uid), {
-        notificationsEnabled: true, notificationProvider: 'telegram',
-      }).catch(() => {});
-      showToast('🔔 Уведомления в Telegram включены!', 'success');
-      return;
-    }
-
-    // Web / PWA — FCM Web Push
+    // Web / PWA — FCM Web Push (включая Telegram-пользователей)
     requestWebPushPermission();
   }, [user, showToast, requestWebPushPermission]);
 
