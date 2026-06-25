@@ -306,6 +306,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgError, setTgError] = useState('');
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
+  const [tgDebug, setTgDebug] = useState('');
   const tgPollRef = useRef(null);
   const tgStateRef = useRef(null);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
@@ -316,7 +317,10 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
   const checkSession = useCallback(async (state) => {
     try {
-      const resp = await fetch(`/api/telegram-auth-check?state=${state}`).then(r => r.json());
+      const r = await fetch(`/api/telegram-auth-check?state=${state}`);
+      const text = await r.text();
+      setTgDebug(`HTTP ${r.status}: ${text.slice(0, 120)}`);
+      const resp = JSON.parse(text);
       if (resp.status === 'done') {
         stopPolling();
         localStorage.removeItem('apg_tg_pending');
@@ -332,7 +336,9 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         setTgStep('idle');
         return true;
       }
-    } catch {}
+    } catch (e) {
+      setTgDebug(`Ошибка: ${e.message}`);
+    }
     return false;
   }, [stopPolling]);
 
@@ -619,6 +625,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                     </button>
               }
               {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
+              {tgDebug && <div style={{ fontSize: 10, color: T.textSec, wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '6px 8px' }}>{tgDebug}</div>}
             </div>}
           </div>
         </div>
