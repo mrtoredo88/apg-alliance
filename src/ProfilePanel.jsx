@@ -363,9 +363,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     tgStateRef.current = state;
     const deadline = Date.now() + 5 * 60 * 1000;
 
+    console.log('[APG TG] listening', state.slice(0, 8));
     const unsub = onSnapshot(
       doc(db, 'telegramAuthSessions', state),
       (snap) => {
+        console.log('[APG TG] snap exists:', snap.exists(), 'status:', snap.data()?.status, 'fromCache:', snap.metadata.fromCache);
         if (Date.now() > deadline) {
           stopPolling();
           localStorage.removeItem('apg_tg_pending');
@@ -376,6 +378,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         if (!snap.exists()) return;
         const data = snap.data();
         if (data.status === 'done') {
+          console.log('[APG TG] done → reload');
           stopPolling();
           localStorage.removeItem('apg_tg_pending');
           localStorage.setItem('apg_tg_user', JSON.stringify({
@@ -392,8 +395,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           setTgStep('idle');
         }
       },
-      () => {
-        // Firestore rules block client read → fall back to API polling
+      (err) => {
+        console.log('[APG TG] snapshot error:', err.code, '→ fallback polling');
         stopPolling();
         startPolling(state);
       }
