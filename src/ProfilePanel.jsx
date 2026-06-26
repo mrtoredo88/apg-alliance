@@ -3,6 +3,8 @@ import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
+import { db } from './firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 
@@ -309,7 +311,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const stopPolling = useCallback(() => {
-    if (tgPollRef.current) { clearInterval(tgPollRef.current); tgPollRef.current = null; }
+    if (!tgPollRef.current) return;
+    const ref = tgPollRef.current;
+    tgPollRef.current = null;
+    if (typeof ref === 'function') ref(); // onSnapshot unsubscribe
+    else clearInterval(ref);             // setInterval fallback
   }, []);
 
   const checkSession = useCallback(async (state) => {
@@ -350,6 +356,51 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }, 2000);
   }, [stopPolling, checkSession]);
 
+  // Primary listener: Firestore onSnapshot (real-time, no setInterval throttling)
+  // Falls back to API polling if permission denied
+  const startWaiting = useCallback((state) => {
+    stopPolling();
+    tgStateRef.current = state;
+    const deadline = Date.now() + 5 * 60 * 1000;
+
+    const unsub = onSnapshot(
+      doc(db, 'telegramAuthSessions', state),
+      (snap) => {
+        if (Date.now() > deadline) {
+          stopPolling();
+          localStorage.removeItem('apg_tg_pending');
+          setTgError('Время ожидания истекло. Попробуйте снова.');
+          setTgStep('idle');
+          return;
+        }
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (data.status === 'done') {
+          stopPolling();
+          localStorage.removeItem('apg_tg_pending');
+          localStorage.setItem('apg_tg_user', JSON.stringify({
+            id: `tg_${data.tgUserId}`,
+            first_name: data.firstName ?? '',
+            last_name:  data.lastName  ?? '',
+            photo_200:  data.photoUrl  ?? null,
+          }));
+          window.location.reload();
+        } else if (data.status === 'expired') {
+          stopPolling();
+          localStorage.removeItem('apg_tg_pending');
+          setTgError('Сессия истекла. Попробуйте снова.');
+          setTgStep('idle');
+        }
+      },
+      () => {
+        // Firestore rules block client read → fall back to API polling
+        stopPolling();
+        startPolling(state);
+      }
+    );
+    tgPollRef.current = unsub;
+  }, [stopPolling, startPolling]);
+
   const handleTelegramAuth = useCallback(async () => {
     setTgLoading(true);
     setTgError('');
@@ -360,7 +411,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       setTgBotUrl(url);
       setTgLoading(false);
       setTgStep('waiting');
-      startPolling(state);
+      startWaiting(state);
     } catch {
       setTgError('Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
@@ -388,7 +439,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       if (Date.now() - at > 5 * 60 * 1000) { localStorage.removeItem('apg_tg_pending'); return; }
       setTgBotUrl(url);
       setTgStep('waiting');
-      checkSession(state).then(done => { if (!done) startPolling(state); });
+      startWaiting(state);
     } catch { localStorage.removeItem('apg_tg_pending'); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -399,11 +450,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       if (document.hidden) return;
       const state = tgStateRef.current;
       if (!state) return;
-      checkSession(state).then(done => { if (!done) startPolling(state); });
+      startWaiting(state);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [checkSession, startPolling]);
+  }, [startWaiting]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
   const [achievementToast, setAchievementToast] = useState(null);
