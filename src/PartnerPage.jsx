@@ -239,8 +239,6 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
 
   if (!partner) return null;
 
-  console.log('[APG videos]', partner.id, partner.videos);
-
   const photos = partner.photos ?? [];
   const gallery = partner.gallery ?? partner.photos ?? [];
   const similar = partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6);

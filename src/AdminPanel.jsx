@@ -481,6 +481,13 @@ export const AdminPanel = () => {
     if (!exSpec.trim()) { setExError('Укажите специализацию'); return; }
     setExError('');
     setExSaving(true);
+    let finalExVideos = exVideos;
+    if (exVideoUrl.trim()) {
+      const parsed = parseVideoUrl(exVideoUrl);
+      if (parsed && finalExVideos.length < 5) {
+        finalExVideos = [...finalExVideos, { url: exVideoUrl.trim(), title: exVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }];
+      }
+    }
     const formats = [exOnline && 'online', exOffline && 'offline', exGroup && 'group'].filter(Boolean);
     const data = {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
@@ -493,7 +500,7 @@ export const AdminPanel = () => {
       maxUrl: normalizeUrl(exMax),
       coverPhoto: exCoverPhoto.trim(),
       gallery: exGallery,
-      videos: exVideos,
+      videos: finalExVideos,
     };
     try {
       if (editingExpert) {
@@ -545,6 +552,13 @@ export const AdminPanel = () => {
 
   const savePartner = async () => {
     if (!pName.trim()) return;
+    let finalVideos = pVideos;
+    if (pVideoUrl.trim()) {
+      const parsed = parseVideoUrl(pVideoUrl);
+      if (parsed && finalVideos.length < 5) {
+        finalVideos = [...finalVideos, { url: pVideoUrl.trim(), title: pVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }];
+      }
+    }
     const data = {
       name: pName.trim(), description: pDesc.trim(), category: pCategory,
       emoji: pEmoji, logoUrl: pLogo.trim(),
@@ -559,7 +573,7 @@ export const AdminPanel = () => {
       maxCommunityUrl: normalizeUrl(pMaxCom),
       coverPhoto: pCoverPhoto.trim(),
       gallery: pGallery,
-      videos: pVideos,
+      videos: finalVideos,
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
