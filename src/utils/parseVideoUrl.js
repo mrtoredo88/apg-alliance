@@ -28,9 +28,9 @@ export function parseVideoUrl(raw) {
       };
     }
 
-    // VK Видео
-    if (host === 'vk.com' || host === 'vkvideo.ru') {
-      const match = u.pathname.match(/video(-?\d+)_(\d+)/);
+    // VK Видео и клипы (vk.com, vk.ru, vkvideo.ru)
+    if (host === 'vk.com' || host === 'vk.ru' || host === 'vkvideo.ru') {
+      const match = u.pathname.match(/(?:video|clip)(-?\d+)_(\d+)/);
       if (!match) return null;
       const ownerId = match[1];
       const videoId = match[2];
