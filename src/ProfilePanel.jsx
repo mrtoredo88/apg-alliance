@@ -362,7 +362,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       setTgError('Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
     }
-  }, [stopPolling, startPolling]);
+  }, [stopPolling, startWaiting]);
 
   const handleVkLogin = async () => {
     setVkLoginLoading(true);
