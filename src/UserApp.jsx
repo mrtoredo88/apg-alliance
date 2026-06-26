@@ -1226,7 +1226,7 @@ export function UserApp() {
               <Panel id="partner">
                 <Suspense fallback={<LazyFallback />}>
                   <PartnerPage
-                    partner={activePartner}
+                    partner={activePartner ? (enrichedPartners.find(p => p.id === activePartner.id) ?? activePartner) : null}
                     isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
                     onBack={() => goPanel('home')}
                     onToggleFavorite={toggleFavorite}
