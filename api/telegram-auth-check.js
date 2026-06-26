@@ -26,8 +26,8 @@ export default async function handler(req, res) {
 
   let snap = await ref.get();
 
-  // Retry once after 1 s if still pending — covers Firestore write propagation lag
-  if (snap.exists && snap.data().status === 'pending') {
+  // Retry up to 3 times (1 s apart) — webhook cold start can take 2-3 s
+  for (let i = 0; i < 3 && snap.exists && snap.data()?.status === 'pending'; i++) {
     await new Promise(r => setTimeout(r, 1000));
     snap = await ref.get();
   }

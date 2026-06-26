@@ -393,16 +393,17 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Проверяем сразу при возврате в браузер (мобильный Telegram)
+  // При возврате в браузер из Telegram — перезапускаем polling (браузер мог throttle-ить setInterval в фоне)
   useEffect(() => {
     const onVisible = () => {
       if (document.hidden) return;
       const state = tgStateRef.current;
-      if (state) checkSession(state);
+      if (!state) return;
+      checkSession(state).then(done => { if (!done) startPolling(state); });
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [checkSession]);
+  }, [checkSession, startPolling]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
   const [achievementToast, setAchievementToast] = useState(null);
