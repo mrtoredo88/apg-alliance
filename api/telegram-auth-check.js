@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   while (Date.now() < deadline) {
     const snap = await ref.get();
 
-    if (!snap.exists()) return res.json({ status: 'not_found' });
+    if (!snap.exists) return res.json({ status: 'not_found' });
 
     const data = snap.data();
 
