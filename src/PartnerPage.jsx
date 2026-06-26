@@ -7,6 +7,7 @@ import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTime
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { RichText } from './components/RichText.jsx';
+import { VideoSection } from './components/VideoSection.jsx';
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
 
@@ -466,6 +467,9 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             </div>
           </div>
         )}
+
+        {/* Видео */}
+        <VideoSection videos={partner.videos} />
 
         {/* Отзывы */}
         <div style={{ margin:'12px 16px' }}>

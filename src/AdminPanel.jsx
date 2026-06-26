@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
+import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
@@ -299,6 +300,10 @@ export const AdminPanel = () => {
   const [exError, setExError]       = useState('');
   const [exCoverPhoto, setExCoverPhoto] = useState('');
   const [exGallery, setExGallery]       = useState([]);
+  const [exVideos, setExVideos]         = useState([]);
+  const [exVideoUrl, setExVideoUrl]     = useState('');
+  const [exVideoTitle, setExVideoTitle] = useState('');
+  const [exVideoError, setExVideoError] = useState('');
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
@@ -346,6 +351,10 @@ export const AdminPanel = () => {
   const [pMaxCom, setPMaxCom]             = useState('');
   const [pCoverPhoto, setPCoverPhoto]     = useState('');
   const [pGallery, setPGallery]           = useState([]);
+  const [pVideos, setPVideos]             = useState([]);
+  const [pVideoUrl, setPVideoUrl]         = useState('');
+  const [pVideoTitle, setPVideoTitle]     = useState('');
+  const [pVideoError, setPVideoError]     = useState('');
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -445,7 +454,8 @@ export const AdminPanel = () => {
     setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
     setExOnline(false); setExOffline(false); setExGroup(false);
     setExTelegram(''); setExWebsite(''); setExMax('');
-    setExCoverPhoto(''); setExGallery([]);
+    setExCoverPhoto(''); setExGallery([]); setExVideos([]);
+    setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     setExError(''); setExSaving(false);
   };
 
@@ -461,6 +471,8 @@ export const AdminPanel = () => {
     setExGroup(ex.formats?.includes('group') ?? false);
     setExTelegram(ex.telegramUrl ?? ''); setExWebsite(ex.websiteUrl ?? ''); setExMax(ex.maxUrl ?? '');
     setExCoverPhoto(ex.coverPhoto ?? ''); setExGallery(ex.gallery ?? []);
+    setExVideos(ex.videos ?? []);
+    setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     window.scrollTo(0, 0);
   };
 
@@ -481,6 +493,7 @@ export const AdminPanel = () => {
       maxUrl: normalizeUrl(exMax),
       coverPhoto: exCoverPhoto.trim(),
       gallery: exGallery,
+      videos: exVideos,
     };
     try {
       if (editingExpert) {
@@ -510,7 +523,8 @@ export const AdminPanel = () => {
     setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
     setPStampTarget(''); setPVkOwnerId('');
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
-    setPCoverPhoto(''); setPGallery([]);
+    setPCoverPhoto(''); setPGallery([]); setPVideos([]);
+    setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setEditingPartner(null);
   };
 
@@ -524,6 +538,8 @@ export const AdminPanel = () => {
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
     setPTelegramCom(p.telegramCommunityUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? '');
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
+    setPVideos(p.videos ?? []);
+    setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     window.scrollTo(0, 0);
   };
 
@@ -543,6 +559,7 @@ export const AdminPanel = () => {
       maxCommunityUrl: normalizeUrl(pMaxCom),
       coverPhoto: pCoverPhoto.trim(),
       gallery: pGallery,
+      videos: pVideos,
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
@@ -1184,6 +1201,35 @@ export const AdminPanel = () => {
               </div>
             )}
 
+            <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {exVideos.length}/5</label>
+            {exVideos.length < 5 && (
+              <div style={{ marginBottom: 8 }}>
+                <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video... или rutube.ru/video/..." value={exVideoUrl} onChange={e => { setExVideoUrl(e.target.value); setExVideoError(''); }} />
+                <input style={{ ...s.input, marginTop: 6 }} placeholder="Название (необязательно)" value={exVideoTitle} onChange={e => setExVideoTitle(e.target.value)} />
+                {exVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{exVideoError}</div>}
+                <button style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
+                  const parsed = parseVideoUrl(exVideoUrl);
+                  if (!parsed) { setExVideoError('Не удалось распознать ссылку, проверь формат'); return; }
+                  setExVideos(v => [...v, { url: exVideoUrl.trim(), title: exVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
+                  setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
+                }}>+ Добавить видео</button>
+              </div>
+            )}
+            {exVideos.map((v, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
+                <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111' }}>
+                  <img src={v.thumbnailUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || v.url}</div>
+                  <div style={{ fontSize: 11, color: A.gold }}>{v.platform === 'youtube' ? 'YouTube' : v.platform === 'vk' ? 'VK Видео' : 'Rutube'}</div>
+                </div>
+                <button onClick={() => setExVideos(vs => { const a = [...vs]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a; })} disabled={i === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                <button onClick={() => setExVideos(vs => { const a = [...vs]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a; })} disabled={i === exVideos.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === exVideos.length - 1 ? 0.3 : 1 }}>↓</button>
+                <button onClick={() => setExVideos(vs => vs.filter((_, j) => j !== i))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px', fontSize: 12 }}>✕</button>
+              </div>
+            ))}
+
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
 
@@ -1325,6 +1371,35 @@ export const AdminPanel = () => {
                 ))}
               </div>
             )}
+
+            <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {pVideos.length}/5</label>
+            {pVideos.length < 5 && (
+              <div style={{ marginBottom: 8 }}>
+                <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video... или rutube.ru/video/..." value={pVideoUrl} onChange={e => { setPVideoUrl(e.target.value); setPVideoError(''); }} />
+                <input style={{ ...s.input, marginTop: 6 }} placeholder="Название (необязательно)" value={pVideoTitle} onChange={e => setPVideoTitle(e.target.value)} />
+                {pVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{pVideoError}</div>}
+                <button style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
+                  const parsed = parseVideoUrl(pVideoUrl);
+                  if (!parsed) { setPVideoError('Не удалось распознать ссылку, проверь формат'); return; }
+                  setPVideos(v => [...v, { url: pVideoUrl.trim(), title: pVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
+                  setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
+                }}>+ Добавить видео</button>
+              </div>
+            )}
+            {pVideos.map((v, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
+                <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111' }}>
+                  <img src={v.thumbnailUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || v.url}</div>
+                  <div style={{ fontSize: 11, color: A.gold }}>{v.platform === 'youtube' ? 'YouTube' : v.platform === 'vk' ? 'VK Видео' : 'Rutube'}</div>
+                </div>
+                <button onClick={() => setPVideos(vs => { const a = [...vs]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a; })} disabled={i === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                <button onClick={() => setPVideos(vs => { const a = [...vs]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a; })} disabled={i === pVideos.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === pVideos.length - 1 ? 0.3 : 1 }}>↓</button>
+                <button onClick={() => setPVideos(vs => vs.filter((_, j) => j !== i))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px', fontSize: 12 }}>✕</button>
+              </div>
+            ))}
 
             <label style={s.label}>Телефон</label>
             <input style={s.input} placeholder="+7 (499) 123-45-67" value={pPhone} onChange={e => setPPhone(e.target.value)} />

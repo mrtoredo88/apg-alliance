@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
+import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 
 const FORMAT_LABELS = {
@@ -338,6 +339,13 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Видео */}
+        {expert.videos?.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <VideoSection videos={expert.videos} />
           </div>
         )}
 
