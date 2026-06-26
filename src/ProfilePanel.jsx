@@ -3,8 +3,6 @@ import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
-import { db } from './firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 
@@ -311,98 +309,43 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const stopPolling = useCallback(() => {
-    if (!tgPollRef.current) return;
-    const ref = tgPollRef.current;
+    tgStateRef.current = null;
     tgPollRef.current = null;
-    if (typeof ref === 'function') ref(); // onSnapshot unsubscribe
-    else clearInterval(ref);             // setInterval fallback
   }, []);
 
-  const checkSession = useCallback(async (state) => {
-    try {
-      const r = await fetch(`/api/telegram-auth-check?state=${state}`);
-      const resp = await r.json();
-      if (resp.status === 'done') {
-        stopPolling();
-        localStorage.removeItem('apg_tg_pending');
-        localStorage.setItem('apg_tg_user', JSON.stringify(resp.user));
-        window.location.reload();
-        return true;
-      }
-      if (resp.status === 'expired' || resp.status === 'not_found') {
-        stopPolling();
-        localStorage.removeItem('apg_tg_pending');
-        setTgError('Сессия истекла. Попробуйте снова.');
-        setTgStep('idle');
-        return true;
-      }
-    } catch {}
-    return false;
-  }, [stopPolling]);
-
-  const startPolling = useCallback((state) => {
-    stopPolling();
-    tgStateRef.current = state;
-    const deadline = Date.now() + 5 * 60 * 1000;
-    tgPollRef.current = setInterval(() => {
-      if (Date.now() > deadline) {
-        stopPolling();
-        localStorage.removeItem('apg_tg_pending');
-        setTgError('Время ожидания истекло. Попробуйте снова.');
-        setTgStep('idle');
-        return;
-      }
-      checkSession(state);
-    }, 2000);
-  }, [stopPolling, checkSession]);
-
-  // Primary listener: Firestore onSnapshot (real-time, no setInterval throttling)
-  // Falls back to API polling if permission denied
+  // Long-poll: одним fetch ждём до 25 с на сервере, при timeout — сразу повторяем
   const startWaiting = useCallback((state) => {
     stopPolling();
     tgStateRef.current = state;
-    const deadline = Date.now() + 5 * 60 * 1000;
 
-    console.log('[APG TG] listening', state.slice(0, 8));
-    const unsub = onSnapshot(
-      doc(db, 'telegramAuthSessions', state),
-      (snap) => {
-        console.log('[APG TG] snap exists:', snap.exists(), 'status:', snap.data()?.status, 'fromCache:', snap.metadata.fromCache);
-        if (Date.now() > deadline) {
-          stopPolling();
-          localStorage.removeItem('apg_tg_pending');
-          setTgError('Время ожидания истекло. Попробуйте снова.');
-          setTgStep('idle');
-          return;
-        }
-        if (!snap.exists()) return;
-        const data = snap.data();
+    const poll = async () => {
+      if (tgStateRef.current !== state) return;
+      try {
+        const r    = await fetch(`/api/telegram-auth-check?state=${state}`);
+        const data = await r.json();
+        if (tgStateRef.current !== state) return;
         if (data.status === 'done') {
-          console.log('[APG TG] done → reload');
-          stopPolling();
+          tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
-          localStorage.setItem('apg_tg_user', JSON.stringify({
-            id: `tg_${data.tgUserId}`,
-            first_name: data.firstName ?? '',
-            last_name:  data.lastName  ?? '',
-            photo_200:  data.photoUrl  ?? null,
-          }));
+          localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
           window.location.reload();
-        } else if (data.status === 'expired') {
-          stopPolling();
+        } else if (data.status === 'expired' || data.status === 'not_found') {
+          tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
           setTgError('Сессия истекла. Попробуйте снова.');
           setTgStep('idle');
+        } else {
+          poll(); // 'pending' — сервер вернул timeout после 25 с, сразу повторяем
         }
-      },
-      (err) => {
-        console.log('[APG TG] snapshot error:', err.code, '→ fallback polling');
-        stopPolling();
-        startPolling(state);
+      } catch {
+        if (tgStateRef.current !== state) return;
+        await new Promise(r => setTimeout(r, 2000));
+        poll();
       }
-    );
-    tgPollRef.current = unsub;
-  }, [stopPolling, startPolling]);
+    };
+
+    poll();
+  }, [stopPolling]);
 
   const handleTelegramAuth = useCallback(async () => {
     setTgLoading(true);
@@ -458,6 +401,8 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [startWaiting]);
+
+
 
   useEffect(() => () => stopPolling(), [stopPolling]);
   const [achievementToast, setAchievementToast] = useState(null);
