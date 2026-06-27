@@ -7,6 +7,7 @@ export const EXPERT_CATEGORIES = [
   { id: 'pets',      label: 'Животные',      emoji: '🐾' },
   { id: 'fashion',   label: 'Одежда',        emoji: '👔' },
   { id: 'auto',      label: 'Авто',          emoji: '🚙' },
+  { id: 'psychology', label: 'Психология',    emoji: '🧠' },
   { id: 'kids',      label: 'Дети',          emoji: '🧸' },
   { id: 'law',       label: 'Право',         emoji: '⚖️' },
   { id: 'insurance', label: 'Страхование',   emoji: '🛡️' },
