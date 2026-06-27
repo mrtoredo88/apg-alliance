@@ -570,7 +570,7 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 8, paddingBottom: 8, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 8, paddingBottom: 8, overflowX: 'auto' }} onTouchStart={e => e.stopPropagation()}>
           {FILTERS.map(opt => (
             <button key={opt.id} onClick={() => setFilter(opt.id)} style={{ padding: '5px 12px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, background: filter === opt.id ? T.gold : T.chipBg, color: filter === opt.id ? '#0F0F1A' : T.textSec, transition: 'all 0.18s' }}>
               {opt.emoji} {opt.label}
@@ -578,7 +578,7 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
           ))}
         </div>
 
-        <div style={{ paddingBottom: 10 }}>
+        <div style={{ paddingBottom: 10 }} onTouchStart={e => e.stopPropagation()}>
           <HorizontalScroll>
             <div style={{ display: 'flex', gap: 8, padding: '0 2px' }}>
               {CATEGORY_FILTERS.map(c => (
