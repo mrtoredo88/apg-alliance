@@ -17,8 +17,11 @@ function normalizeZelenograd(address) {
   a = a.replace(/^г\.?\s*зеленоград[,\s]*/i, '').trim();
   a = a.replace(/\bк\.?\s*(\d+)/i, 'корпус $1');
   a = a.replace(/\bкорп\.?\s*(\d+)/i, 'корпус $1');
-  a = a.replace(/\bр\.?п\.?\s*/i, 'посёлок ');
-  a = a.replace(/\bп\.?\s*/i, 'посёлок ');
+  a = a.replace(/\bр\.?п\.?\s*андреевка/i, 'деревня Андреевка');
+  a = a.replace(/\bп\.?\s*андреевка/i, 'деревня Андреевка');
+  a = a.replace(/\bрп\s*андреевка/i, 'деревня Андреевка');
+  a = a.replace(/\bЖК\s+/i, '');
+  a = a.replace(/\bстр\.?\s*(\d+)/i, 'строение $1');
   return a;
 }
 
@@ -34,12 +37,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function geocodeBest(address) {
   const norm = normalizeZelenograd(address);
+  const isAndreevka = /андреевка/i.test(address);
   const queries = [
     `${address}, Зеленоград, Москва`,
     `${norm}, Зеленоград, Москва`,
-    `${norm}, Зеленоград`,
+    `${norm}, Солнечногорск, Московская область`,
+    `${norm}, Москва`,
     address,
     norm,
+    ...(isAndreevka ? ['деревня Андреевка, Солнечногорск, Московская область'] : []),
   ];
   for (const q of queries) {
     await sleep(1100);
