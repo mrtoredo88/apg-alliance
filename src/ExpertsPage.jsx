@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { HorizontalScroll } from '@vkontakte/vkui';
+import { EXPERT_CATEGORIES } from './constants.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from './firebase';
 import {
@@ -296,11 +298,18 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri, marginBottom: 3, lineHeight: '22px' }}>{expert.name}</div>
             <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginBottom: 8 }}>{expert.specialization}</div>
-            {expert.verified && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(74,144,217,0.12)', border: '1px solid rgba(74,144,217,0.28)', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: '#6AABEC' }}>
-                ✓ Верифицирован АПГ
-              </div>
-            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              {expert.verified && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(74,144,217,0.12)', border: '1px solid rgba(74,144,217,0.28)', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: '#6AABEC' }}>
+                  ✓ Верифицирован АПГ
+                </div>
+              )}
+              {(() => { const cat = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other')); return cat ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: T.gold }}>
+                  {cat.emoji} {cat.label}
+                </div>
+              ) : null; })()}
+            </div>
           </div>
           <button onClick={handleShare} style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0, pointerEvents: 'auto' }}>📤</button>
           <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec, flexShrink: 0 }}>✕</button>
@@ -492,10 +501,13 @@ function ExpertCard({ expert, index, onClick }) {
         )}
 
         {expert.formats?.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 4 }}>
             {expert.formats.map(f => <FormatChip key={f} format={f} />)}
           </div>
         )}
+        {(() => { const cat = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other')); return cat ? (
+          <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>{cat.emoji} {cat.label}</div>
+        ) : null; })()}
       </div>
 
       <div style={{ color: T.gold, fontSize: 18, flexShrink: 0, alignSelf: 'center' }}>›</div>
@@ -510,14 +522,18 @@ const FILTERS = [
   { id: 'group',   label: 'Группа', emoji: '👥' },
 ];
 
+const CATEGORY_FILTERS = [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES];
+
 export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBack, isActive }) {
   const [filter, setFilter] = useState('all');
+  const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
 
   const filtered = experts.filter(e => {
     if (e.active === false) return false;
     if (filter !== 'all' && !e.formats?.includes(filter)) return false;
+    if (activeCategory !== 'all' && (e.category ?? 'other') !== activeCategory) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       return e.name?.toLowerCase().includes(q) || e.specialization?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q);
@@ -554,12 +570,24 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 8, paddingBottom: 12, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 8, paddingBottom: 8, overflowX: 'auto' }}>
           {FILTERS.map(opt => (
             <button key={opt.id} onClick={() => setFilter(opt.id)} style={{ padding: '5px 12px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, background: filter === opt.id ? T.gold : T.chipBg, color: filter === opt.id ? '#0F0F1A' : T.textSec, transition: 'all 0.18s' }}>
               {opt.emoji} {opt.label}
             </button>
           ))}
+        </div>
+
+        <div style={{ paddingBottom: 10 }}>
+          <HorizontalScroll>
+            <div style={{ display: 'flex', gap: 8, padding: '0 2px' }}>
+              {CATEGORY_FILTERS.map(c => (
+                <button key={c.id} onClick={() => setActiveCategory(c.id)} style={{ padding: '5px 12px', borderRadius: 16, border: activeCategory === c.id ? 'none' : `1px solid ${T.chipBorder ?? 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, background: activeCategory === c.id ? `linear-gradient(135deg,${T.gold},${T.goldL})` : T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', color: activeCategory === c.id ? '#0F0F1A' : T.chipText ?? T.textSec, transition: 'all 0.18s' }}>
+                  {c.emoji} {c.label}
+                </button>
+              ))}
+            </div>
+          </HorizontalScroll>
         </div>
       </div>
 

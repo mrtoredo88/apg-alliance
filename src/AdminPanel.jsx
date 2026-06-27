@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
+import { EXPERT_CATEGORIES } from './constants.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
@@ -299,6 +300,7 @@ export const AdminPanel = () => {
   const [exMax, setExMax]           = useState('');
   const [exSaving, setExSaving]     = useState(false);
   const [exError, setExError]       = useState('');
+  const [exCategory, setExCategory]     = useState('other');
   const [exCoverPhoto, setExCoverPhoto] = useState('');
   const [exGallery, setExGallery]       = useState([]);
   const [exVideos, setExVideos]         = useState([]);
@@ -460,6 +462,7 @@ export const AdminPanel = () => {
     setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
     setExOnline(false); setExOffline(false); setExGroup(false);
     setExTelegram(''); setExWebsite(''); setExMax('');
+    setExCategory('other');
     setExCoverPhoto(''); setExGallery([]); setExVideos([]);
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     setExError(''); setExSaving(false);
@@ -476,6 +479,7 @@ export const AdminPanel = () => {
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
     setExTelegram(ex.telegramUrl ?? ''); setExWebsite(ex.websiteUrl ?? ''); setExMax(ex.maxUrl ?? '');
+    setExCategory(ex.category ?? 'other');
     setExCoverPhoto(ex.coverPhoto ?? ''); setExGallery(ex.gallery ?? []);
     setExVideos(ex.videos ?? []);
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
@@ -497,6 +501,7 @@ export const AdminPanel = () => {
     const formats = [exOnline && 'online', exOffline && 'offline', exGroup && 'group'].filter(Boolean);
     const data = {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
+      category: exCategory,
       photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
       bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
@@ -1197,6 +1202,15 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Специализация *</label>
             <input style={s.input} placeholder="Психолог, коуч, нутрициолог..." value={exSpec} onChange={e => setExSpec(e.target.value)} />
+
+            <label style={s.label}>Категория</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {EXPERT_CATEGORIES.map(c => (
+                <button key={c.id} onClick={() => setExCategory(c.id)} style={{ padding: '6px 12px', borderRadius: 12, border: `2px solid ${exCategory === c.id ? A.gold : A.border}`, background: exCategory === c.id ? A.goldDim : 'transparent', color: exCategory === c.id ? A.gold : A.textSec, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {c.emoji} {c.label}
+                </button>
+              ))}
+            </div>
 
             <label style={s.label}>Описание</label>
             <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
