@@ -6,6 +6,7 @@
 // Returns: { ok: true, token: <firebase custom token>, user: { id, first_name, last_name, photo } }
 
 import { createHash, createHmac } from 'crypto';
+import { APP_URL } from './config.js';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
@@ -35,7 +36,7 @@ function verifyTelegramHash(data, botToken) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', 'https://apg-alliance.vercel.app');
+  res.setHeader('Access-Control-Allow-Origin', APP_URL);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

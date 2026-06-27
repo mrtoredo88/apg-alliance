@@ -4,6 +4,8 @@
 //
 // Body: { secret, action: 'set' | 'info' | 'delete' }
 
+import { APP_URL } from './config.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -28,7 +30,7 @@ export default async function handler(req, res) {
   }
 
   // action === 'set'
-  const webhookUrl = `https://apg-alliance.vercel.app/api/telegram-webhook`;
+  const webhookUrl = `${APP_URL}/api/telegram-webhook`;
   const r = await fetch(`${base}/setWebhook`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },

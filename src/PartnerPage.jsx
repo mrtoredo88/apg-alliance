@@ -6,6 +6,7 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
+import { APP_URL } from './constants.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 
@@ -277,7 +278,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const handleShare = () => {
     const deepLink = isVK()
       ? `https://vk.com/app54601851#partner_${partner.id}`
-      : `https://apg-alliance.vercel.app/?partner=${partner.id}`;
+      : `${APP_URL}/?partner=${partner.id}`;
 
     const textLines = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,

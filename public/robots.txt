@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://apg-alliance.vercel.app/sitemap.xml
+Sitemap: https://myapg.ru/sitemap.xml

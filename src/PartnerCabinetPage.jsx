@@ -3,6 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
+import { APP_URL } from './constants.js';
 
 const IMGBB_KEY = '0c37a46d4e13e9a30cddb1c79c8e6374';
 
@@ -173,7 +174,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
 
         {/* ── Ссылка эксперта ── */}
         {expert && (() => {
-          const link = `https://apg-alliance.vercel.app/?scan=expert_${expert.id}`;
+          const link = `${APP_URL}/?scan=expert_${expert.id}`;
           return (
             <div style={{ ...GLASS_GOLD, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.gold, marginBottom: 8 }}>🔗 Ссылка для клиента</div>

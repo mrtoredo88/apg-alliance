@@ -9,6 +9,6 @@
 
 ## Ссылки
 
-- [Приложение](https://apg-alliance.vercel.app/)
+- [Приложение](https://myapg.ru/)
 - [VK-группа](https://vk.com/zelcenter)
-- [Manifest](https://apg-alliance.vercel.app/manifest.json)
+- [Manifest](https://myapg.ru/manifest.json)

@@ -2,6 +2,7 @@
 // Telegram вызывает этот endpoint при каждом сообщении боту
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { APP_URL } from './config.js';
 
 let _app = null;
 function getAdminApp() {
@@ -15,7 +16,7 @@ const TOKEN = () => process.env.TELEGRAM_BOT_TOKEN;
 
 const SOCIAL_KEYBOARD = {
   inline_keyboard: [
-    [{ text: '🔗 Приложение АПГ', url: 'https://apg-alliance.vercel.app' }],
+    [{ text: '🔗 Приложение АПГ', url: APP_URL }],
     [{ text: '📱 ВКонтакте',      url: 'https://vk.com/apgzelenograd'   },
      { text: '📢 Telegram-канал', url: 'https://t.me/apgzel'            }],
     [{ text: '🎥 YouTube',        url: 'https://www.youtube.com/@ВиталийСтроитАПГ' }],
@@ -232,14 +233,14 @@ export default async function handler(req, res) {
       '/start — приветствие и ссылки\n' +
       '/links — наши соцсети\n' +
       '/help — эта справка\n\n' +
-      'Для входа в приложение открой apg-alliance.vercel.app и нажми «Войти через Telegram».'
+      `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».`
     );
     return res.status(200).json({ ok: true });
   }
 
   // ── Любое другое сообщение ───────────────────────────────────────────────────
   await tgSend(from.id,
-    'Для входа в приложение открой apg-alliance.vercel.app и нажми «Войти через Telegram».\n\n' +
+    `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».\n\n` +
     'Чтобы увидеть наши соцсети — напиши /links',
   );
   return res.status(200).json({ ok: true });

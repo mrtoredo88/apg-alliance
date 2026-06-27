@@ -8,6 +8,7 @@
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { APP_URL } from './config.js';
 import { getMessaging } from 'firebase-admin/messaging';
 
 let _db = null;
@@ -84,7 +85,6 @@ async function drawPrize(db, prizeId) {
         const userSnap = await db.collection('users').doc(uid).get();
         const { fcmTokens = [], notificationProvider } = userSnap.data() ?? {};
         if (notificationProvider !== 'webpush' || !fcmTokens.length) return;
-        const APP_URL = 'https://apg-alliance.vercel.app';
         await getMessaging().sendEachForMulticast({
           tokens: fcmTokens,
           notification: { title: pushTitle, body: pushBody },

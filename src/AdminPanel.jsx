@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
-import { EXPERT_CATEGORIES } from './constants.js';
+import { EXPERT_CATEGORIES, APP_URL } from './constants.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
@@ -603,7 +603,7 @@ export const AdminPanel = () => {
           broadcast: true,
           title: `🏪 Новый партнёр АПГ: ${data.name}`,
           body: data.offer ? `🎁 ${data.offer}` : 'Открой страницу партнёра в приложении',
-          url: 'https://apg-alliance.vercel.app',
+          url: APP_URL,
           tag: 'new-partner',
         }),
       }).catch(() => {});

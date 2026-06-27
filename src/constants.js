@@ -1,3 +1,5 @@
+export const APP_URL = 'https://myapg.ru';
+
 export const EXPERT_CATEGORIES = [
   { id: 'food',      label: 'Еда',          emoji: '🍳' },
   { id: 'beauty',    label: 'Красота',       emoji: '💅' },

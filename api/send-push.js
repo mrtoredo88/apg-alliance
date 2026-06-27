@@ -12,6 +12,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import { APP_URL } from './config.js';
 
 function initAdmin() {
   if (!getApps().length) {
@@ -19,8 +20,6 @@ function initAdmin() {
   }
   return { db: getFirestore(), messaging: getMessaging() };
 }
-
-const APP_URL = 'https://apg-alliance.vercel.app';
 
 async function sendToTokens(messaging, db, tokens, userIds, title, body, url, tag) {
   if (!tokens.length) return { sent: 0, failed: 0, cleaned: 0 };
