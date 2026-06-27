@@ -1141,7 +1141,7 @@ export function HomePanel({
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
   counterPulse = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenRewards,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -1573,9 +1573,14 @@ export function HomePanel({
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {!isSearching && (
-                    <button onClick={onOpenMap} style={{ padding: '4px 10px', borderRadius: 16, border: `1px solid rgba(74,144,217,0.35)`, background: 'rgba(74,144,217,0.1)', color: '#4A90D9', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                      🗺️ Карта
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={onOpenNearby} style={{ padding: '4px 10px', borderRadius: 16, border: `1px solid rgba(201,168,76,0.35)`, background: 'rgba(201,168,76,0.1)', color: T.gold, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        📍 Рядом
+                      </button>
+                      <button onClick={onOpenMap} style={{ padding: '4px 10px', borderRadius: 16, border: `1px solid rgba(74,144,217,0.35)`, background: 'rgba(74,144,217,0.1)', color: '#4A90D9', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        🗺️ Карта
+                      </button>
+                    </div>
                   )}
                   <div style={{ fontSize: 11, color: isSearching ? T.gold : T.textSec, background: isSearching ? 'rgba(201,168,76,0.12)' : T.surface, padding: '4px 10px', borderRadius: 20, border: `1px solid ${isSearching ? 'rgba(201,168,76,0.3)' : T.border}`, transition: 'all 0.2s', fontWeight: isSearching ? 700 : 400 }}>
                     {isSearching ? `${filteredPartners.length} из ${partners.length}` : filteredPartners.length}

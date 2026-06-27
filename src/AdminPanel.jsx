@@ -3,6 +3,7 @@ import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
+import { geocodeAddress } from './utils/geo.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
@@ -355,6 +356,11 @@ export const AdminPanel = () => {
   const [pVideoUrl, setPVideoUrl]         = useState('');
   const [pVideoTitle, setPVideoTitle]     = useState('');
   const [pVideoError, setPVideoError]     = useState('');
+  const [pLat, setPLat]                   = useState('');
+  const [pLon, setPLon]                   = useState('');
+  const [pGeoLoading, setPGeoLoading]     = useState(false);
+  const [bulkGeoRunning, setBulkGeoRunning] = useState(false);
+  const [bulkGeoResult, setBulkGeoResult]   = useState(null);
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -532,6 +538,7 @@ export const AdminPanel = () => {
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
+    setPLat(''); setPLon('');
     setEditingPartner(null);
   };
 
@@ -547,6 +554,8 @@ export const AdminPanel = () => {
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
     setPVideos(p.videos ?? []);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
+    setPLat(p.latitude != null ? String(p.latitude) : '');
+    setPLon(p.longitude != null ? String(p.longitude) : '');
     window.scrollTo(0, 0);
   };
 
@@ -574,6 +583,8 @@ export const AdminPanel = () => {
       coverPhoto: pCoverPhoto.trim(),
       gallery: pGallery,
       videos: finalVideos,
+      latitude:  pLat.trim() ? parseFloat(pLat) : null,
+      longitude: pLon.trim() ? parseFloat(pLon) : null,
     };
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
@@ -1421,6 +1432,25 @@ export const AdminPanel = () => {
             <label style={s.label}>Адрес</label>
             <input style={s.input} placeholder="Зеленоград, корпус 1234" value={pAddress} onChange={e => setPAddress(e.target.value)} />
 
+            <label style={s.label}>Координаты (для раздела "Рядом")</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="Широта (55.983...)" value={pLat} onChange={e => setPLat(e.target.value)} />
+              <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="Долгота (37.196...)" value={pLon} onChange={e => setPLon(e.target.value)} />
+            </div>
+            <button
+              style={{ ...s.btn, ...s.btnGray, marginBottom: 14, opacity: pGeoLoading ? 0.6 : 1 }}
+              disabled={pGeoLoading || !pAddress.trim()}
+              onClick={async () => {
+                setPGeoLoading(true);
+                const r = await geocodeAddress(pAddress).catch(() => null);
+                if (r) { setPLat(String(r.lat)); setPLon(String(r.lon)); }
+                else alert('Не удалось определить координаты по адресу. Введите вручную.');
+                setPGeoLoading(false);
+              }}
+            >
+              {pGeoLoading ? '⏳ Определяем...' : '🌍 Определить по адресу'}
+            </button>
+
             <label style={s.label}>Часы работы</label>
             <input style={s.input} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={pHours} onChange={e => setPHours(e.target.value)} />
 
@@ -1469,7 +1499,7 @@ export const AdminPanel = () => {
                   : `${partners.length} партнёров`}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 12px', background: 'rgba(201,168,76,0.08)', borderRadius: 12, border: `1px solid ${A.goldBrd}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '10px 12px', background: 'rgba(201,168,76,0.08)', borderRadius: 12, border: `1px solid ${A.goldBrd}` }}>
               <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
                 {migrateResult ?? 'Обновить старые категории (edu→education, fun→entertainment, service→services и др.)'}
               </div>
@@ -1479,6 +1509,37 @@ export const AdminPanel = () => {
                 disabled={migrating}
               >
                 {migrating ? '...' : '🔄 Мигрировать'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 12px', background: 'rgba(74,144,217,0.08)', borderRadius: 12, border: 'rgba(74,144,217,0.25) 1px solid' }}>
+              <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
+                {bulkGeoResult ?? `Геокодировать адреса партнёров без координат (${partners.filter(p => !p.latitude && p.address?.trim()).length} шт.)`}
+              </div>
+              <button
+                style={{ ...s.btn, padding: '6px 14px', fontSize: 12, flexShrink: 0, background: 'rgba(74,144,217,0.2)', color: '#6AABEC', border: '1px solid rgba(74,144,217,0.3)' }}
+                disabled={bulkGeoRunning}
+                onClick={async () => {
+                  const toGeo = partners.filter(p => !p.latitude && p.address?.trim());
+                  if (!toGeo.length) { setBulkGeoResult('Все партнёры уже имеют координаты ✓'); return; }
+                  setBulkGeoRunning(true);
+                  setBulkGeoResult(`Обрабатываем 0 / ${toGeo.length}...`);
+                  let ok = 0, fail = 0;
+                  for (let i = 0; i < toGeo.length; i++) {
+                    const p = toGeo[i];
+                    setBulkGeoResult(`Обрабатываем ${i + 1} / ${toGeo.length}: ${p.name}`);
+                    const r = await geocodeAddress(p.address).catch(() => null);
+                    if (r) {
+                      await updateDoc(doc(db, 'partners', p.id), { latitude: r.lat, longitude: r.lon }).catch(() => {});
+                      ok++;
+                    } else { fail++; }
+                    if (i < toGeo.length - 1) await new Promise(res => setTimeout(res, 1100));
+                  }
+                  setBulkGeoRunning(false);
+                  setBulkGeoResult(`Готово: ${ok} успешно, ${fail} не найдено`);
+                  fetchData();
+                }}
+              >
+                {bulkGeoRunning ? '⏳...' : '🌍 Геокодировать'}
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${A.inputBrd}`, borderRadius: 12, padding: '9px 12px', marginBottom: 14 }}>

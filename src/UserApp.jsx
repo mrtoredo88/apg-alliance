@@ -28,6 +28,7 @@ const TasksPage       = lazy(() => import('./TasksPage.jsx').then(m => ({ defaul
 const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ default: m.ReferralPage })));
 const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ default: m.RewardsPage })));
 const MapPage              = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
+const NearbyPage           = lazy(() => import('./NearbyPage.jsx').then(m => ({ default: m.NearbyPage })));
 const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(m => ({ default: m.PartnerCabinetPage })));
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
@@ -1221,6 +1222,8 @@ export function UserApp() {
                 onJoinGroup={handleJoinGroup}
                 userCount={platformStats.userCount}
                 onOpenForPartners={() => goPanel('for-partners')}
+                onOpenMap={() => goPanel('map')}
+                onOpenNearby={() => goPanel('nearby')}
               />
 
               <Panel id="partner">
@@ -1366,6 +1369,12 @@ export function UserApp() {
               <Panel id="map">
                 <Suspense fallback={<LazyFallback />}>
                   <MapPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                </Suspense>
+              </Panel>
+
+              <Panel id="nearby">
+                <Suspense fallback={<LazyFallback />}>
+                  <NearbyPage partners={enrichedPartners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
                 </Suspense>
               </Panel>
 
