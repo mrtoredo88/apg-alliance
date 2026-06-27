@@ -66,12 +66,21 @@ export default async function handler(req, res) {
     const app = getAdminApp();
     const db = getFirestore(app);
 
+    // Accept manual overrides: { manual: [{ id, lat, lon }] }
+    const body = req.body ?? {};
+    if (Array.isArray(body.manual) && body.manual.length) {
+      const manualResults = [];
+      for (const m of body.manual) {
+        await db.collection('partners').doc(m.id).update({ latitude: m.lat, longitude: m.lon });
+        manualResults.push({ id: m.id, ok: true, lat: m.lat, lon: m.lon, query: 'manual' });
+      }
+      return res.json({ total: body.manual.length, results: manualResults });
+    }
+
     const snap = await db.collection('partners').get();
     const toGeo = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(p => p.address && (!p.latitude || !p.longitude));
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
 
     const results = [];
     for (const p of toGeo) {
@@ -84,7 +93,7 @@ export default async function handler(req, res) {
       }
     }
 
-    res.end(JSON.stringify({ total: toGeo.length, results }));
+    res.json({ total: toGeo.length, results });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
