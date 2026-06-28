@@ -4,7 +4,7 @@ import imageCompression from 'browser-image-compression';
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
 async function compressAndUpload(file, folder, onProgress) {
-  onProgress(0);
+  onProgress(10);
   let compressed;
   try {
     compressed = await imageCompression(file, {
@@ -12,35 +12,28 @@ async function compressAndUpload(file, folder, onProgress) {
       initialQuality: 0.85,
       fileType: 'image/webp',
       useWebWorker: true,
-      onProgress: p => onProgress(Math.round(p * 0.4)),
+      onProgress: p => onProgress(10 + Math.round(p * 0.4)),
     });
   } catch {
     compressed = file;
   }
 
+  onProgress(55);
+  const buffer = await compressed.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
   const baseName = file.name.replace(/\.[^.]+$/, '');
-  const res = await fetch('/api/upload-sign', {
+
+  onProgress(60);
+  const res = await fetch('/api/upload-photo', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ folder, filename: baseName, contentType: compressed.type }),
+    body: JSON.stringify({ folder, filename: baseName, contentType: compressed.type, data: base64 }),
   });
-  if (!res.ok) throw new Error('sign failed');
-  const { signedUrl, publicUrl } = await res.json();
+  if (!res.ok) throw new Error('upload failed');
+  const { url } = await res.json();
 
-  onProgress(50);
-  await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', signedUrl);
-    xhr.setRequestHeader('Content-Type', compressed.type);
-    xhr.upload.onprogress = e => {
-      if (e.lengthComputable) onProgress(50 + Math.round((e.loaded / e.total) * 50));
-    };
-    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error('upload failed')));
-    xhr.onerror = reject;
-    xhr.send(compressed);
-  });
-
-  return publicUrl;
+  onProgress(100);
+  return url;
 }
 
 // Single photo upload — shape: 'round' | 'cover'
