@@ -1,4 +1,5 @@
-export const APP_URL = 'https://myapg.ru';
+// export const APP_URL = 'https://myapg.ru';
+export const APP_URL = 'https://apg-alliance.vercel.app';
 
 export const EXPERT_CATEGORIES = [
   { id: 'food',      label: 'Еда',          emoji: '🍳' },
