@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import PhotoUpload from './PhotoUpload.jsx';
+import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
@@ -1220,26 +1220,12 @@ export const AdminPanel = () => {
             <PhotoUpload value={exPhoto} onChange={setExPhoto} folder="experts" label="Загрузить фото" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
             {exPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exPhoto} onChange={e => setExPhoto(e.target.value)} />}
 
-            <label style={s.label}>Фото-шапка (обложка) — URL из ВК</label>
-            <input style={s.input} placeholder="https://sun9-xx.userapi.com/..." value={exCoverPhoto} onChange={e => setExCoverPhoto(e.target.value)} />
-            {exCoverPhoto && <img src={exCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 10, marginBottom: 12, border: `1px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+            <label style={s.label}>Фото-шапка (обложка)</label>
+            <PhotoUpload value={exCoverPhoto} onChange={setExCoverPhoto} folder="experts/covers" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {exCoverPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exCoverPhoto} onChange={e => setExCoverPhoto(e.target.value)} />}
 
-            <label style={s.label}>Галерея — URL из ВК (до 6 штук, по одному на строку)</label>
-            <textarea
-              style={{ ...s.textarea, minHeight: 96, fontFamily: 'monospace', fontSize: 12 }}
-              placeholder={'https://sun9-xx.userapi.com/photo1.jpg\nhttps://sun9-xx.userapi.com/photo2.jpg'}
-              value={exGallery.join('\n')}
-              onChange={e => setExGallery(e.target.value.split('\n').map(u => u.trim()).filter(Boolean).slice(0, 6))}
-            />
-            {exGallery.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
-                {exGallery.map((url, i) => (
-                  <div key={i} style={{ aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: `1px solid ${A.border}` }}>
-                    <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display = 'none'} />
-                  </div>
-                ))}
-              </div>
-            )}
+            <label style={s.label}>Галерея (до 6 фото)</label>
+            <GalleryUpload value={exGallery} onChange={setExGallery} folder="experts/gallery" max={6} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
 
             <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {exVideos.length}/5</label>
             {exVideos.length < 5 && (
@@ -1391,26 +1377,12 @@ export const AdminPanel = () => {
             <PhotoUpload value={pLogo} onChange={setPLogo} folder="partners" label="Загрузить логотип" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
             {pLogo && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pLogo} onChange={e => setPLogo(e.target.value)} />}
 
-            <label style={s.label}>Фото-шапка (обложка) — URL из ВК</label>
-            <input style={s.input} placeholder="https://sun9-xx.userapi.com/..." value={pCoverPhoto} onChange={e => setPCoverPhoto(e.target.value)} />
-            {pCoverPhoto && <img src={pCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 10, marginBottom: 12, border: `1px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+            <label style={s.label}>Фото-шапка (обложка)</label>
+            <PhotoUpload value={pCoverPhoto} onChange={setPCoverPhoto} folder="partners/covers" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {pCoverPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pCoverPhoto} onChange={e => setPCoverPhoto(e.target.value)} />}
 
-            <label style={s.label}>Галерея — URL из ВК (до 6 штук, по одному на строку)</label>
-            <textarea
-              style={{ ...s.textarea, minHeight: 96, fontFamily: 'monospace', fontSize: 12 }}
-              placeholder={'https://sun9-xx.userapi.com/photo1.jpg\nhttps://sun9-xx.userapi.com/photo2.jpg'}
-              value={pGallery.join('\n')}
-              onChange={e => setPGallery(e.target.value.split('\n').map(u => u.trim()).filter(Boolean).slice(0, 6))}
-            />
-            {pGallery.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
-                {pGallery.map((url, i) => (
-                  <div key={i} style={{ aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: `1px solid ${A.border}` }}>
-                    <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display = 'none'} />
-                  </div>
-                ))}
-              </div>
-            )}
+            <label style={s.label}>Галерея (до 6 фото)</label>
+            <GalleryUpload value={pGallery} onChange={setPGallery} folder="partners/gallery" max={6} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
 
             <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {pVideos.length}/5</label>
             {pVideos.length < 5 && (
