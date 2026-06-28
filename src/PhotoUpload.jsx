@@ -48,15 +48,19 @@ export function PhotoUpload({ value, onChange, folder, label = 'Загрузит
   const inputRef = useRef();
   const [progress, setProgress] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState(null);
 
   const T = theme ?? { chipBg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)', textSec: 'rgba(255,255,255,0.5)', gold: '#C9A84C' };
 
   async function upload(file) {
     if (!file) return;
+    setError(null);
     try {
       const url = await compressAndUpload(file, folder, setProgress);
       onChange(url);
-    } catch { } finally { setProgress(null); }
+    } catch (e) {
+      setError('Ошибка загрузки. Проверьте настройки бакета.');
+    } finally { setProgress(null); }
   }
 
   const preview = shape === 'round'
@@ -87,6 +91,7 @@ export function PhotoUpload({ value, onChange, folder, label = 'Загрузит
         </div>
       )}
       {progress !== null && <ProgressBar progress={progress} textSec={T.textSec} gold={T.gold} border={T.border} />}
+      {error && <div style={{ fontSize: 12, color: '#E64646', marginTop: 6 }}>{error}</div>}
       <input ref={inputRef} type="file" accept={ACCEPT} onChange={e => upload(e.target.files[0])} style={{ display: 'none' }} />
     </div>
   );
@@ -96,22 +101,26 @@ export function PhotoUpload({ value, onChange, folder, label = 'Загрузит
 export function GalleryUpload({ value = [], onChange, folder, max = 6, theme }) {
   const inputRef = useRef();
   const [progresses, setProgresses] = useState({});
+  const accRef = useRef(null);
 
   const T = theme ?? { chipBg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)', textSec: 'rgba(255,255,255,0.5)', gold: '#C9A84C' };
 
-  async function upload(file) {
-    if (!file || value.length >= max) return;
-    const id = Math.random().toString(36).slice(2);
-    try {
-      const url = await compressAndUpload(file, folder, p => setProgresses(prev => ({ ...prev, [id]: p })));
-      onChange([...value, url]);
-    } catch { } finally {
-      setProgresses(prev => { const n = { ...prev }; delete n[id]; return n; });
-    }
-  }
-
   async function uploadMany(files) {
-    for (const f of Array.from(files).slice(0, max - value.length)) await upload(f);
+    const list = Array.from(files);
+    accRef.current = [...value];
+    const slots = max - accRef.current.length;
+    if (slots <= 0) return;
+    await Promise.all(list.slice(0, slots).map(async file => {
+      const id = Math.random().toString(36).slice(2);
+      try {
+        const url = await compressAndUpload(file, folder, p => setProgresses(prev => ({ ...prev, [id]: p })));
+        accRef.current = [...accRef.current, url];
+        onChange([...accRef.current]);
+      } catch { } finally {
+        setProgresses(prev => { const n = { ...prev }; delete n[id]; return n; });
+      }
+    }));
+    accRef.current = null;
   }
 
   function remove(i) { onChange(value.filter((_, idx) => idx !== i)); }

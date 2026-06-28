@@ -11,6 +11,7 @@ function getClient() {
   return new S3Client({
     endpoint: ENDPOINT,
     region: 'ru-central1',
+    forcePathStyle: true,
     credentials: {
       accessKeyId: process.env.YC_ACCESS_KEY,
       secretAccessKey: process.env.YC_SECRET_KEY,
