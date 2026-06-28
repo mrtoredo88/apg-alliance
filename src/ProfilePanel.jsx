@@ -555,24 +555,27 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>чтобы сохранить прогресс и ключи</div>
               </div>
             </div>
-            <button
-              onClick={handleVkLogin}
-              disabled={vkLoginLoading}
-              style={{
-                width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-                cursor: vkLoginLoading ? 'default' : 'pointer',
-                background: vkLoginLoading ? 'rgba(0,119,255,0.3)' : 'linear-gradient(135deg, #0077FF, #005DC1)',
-                color: '#fff', fontSize: 14, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: vkLoginLoading ? 'none' : '0 4px 16px rgba(0,119,255,0.35)',
-              }}
-            >
-              {vkLoginLoading
-                ? <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                : 'Войти через ВКонтакте'
-              }
-            </button>
-            {vkLoginError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{vkLoginError}</div>}
+            {/* VK login временно скрыт до прохождения модерации */}
+            {false && <>
+              <button
+                onClick={handleVkLogin}
+                disabled={vkLoginLoading}
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
+                  cursor: vkLoginLoading ? 'default' : 'pointer',
+                  background: vkLoginLoading ? 'rgba(0,119,255,0.3)' : 'linear-gradient(135deg, #0077FF, #005DC1)',
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: vkLoginLoading ? 'none' : '0 4px 16px rgba(0,119,255,0.35)',
+                }}
+              >
+                {vkLoginLoading
+                  ? <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  : 'Войти через ВКонтакте'
+                }
+              </button>
+              {vkLoginError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{vkLoginError}</div>}
+            </>}
 
             {/* Telegram (скрыт в VK Mini App — п. 4.1.8 правил VK) */}
             {!isVK() && <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
