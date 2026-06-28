@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import PhotoUpload from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import vkBridge from './vk.js';
@@ -1215,9 +1216,9 @@ export const AdminPanel = () => {
             <label style={s.label}>Описание</label>
             <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
 
-            <label style={s.label}>Фото (URL)</label>
-            <input style={s.input} placeholder="https://..." value={exPhoto} onChange={e => setExPhoto(e.target.value)} />
-            {exPhoto && <img src={exPhoto} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', marginBottom: 12 }} onError={e => e.target.style.display='none'} />}
+            <label style={s.label}>Фото</label>
+            <PhotoUpload value={exPhoto} onChange={setExPhoto} folder="experts" label="Загрузить фото" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {exPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exPhoto} onChange={e => setExPhoto(e.target.value)} />}
 
             <label style={s.label}>Фото-шапка (обложка) — URL из ВК</label>
             <input style={s.input} placeholder="https://sun9-xx.userapi.com/..." value={exCoverPhoto} onChange={e => setExCoverPhoto(e.target.value)} />
@@ -1386,9 +1387,9 @@ export const AdminPanel = () => {
             <label style={s.label}>Иконка</label>
             <EmojiPicker emojis={PARTNER_EMOJIS} value={pEmoji} onChange={setPEmoji} />
 
-            <label style={s.label}>Ссылка на логотип (URL)</label>
-            <input style={s.input} placeholder="https://..." value={pLogo} onChange={e => setPLogo(e.target.value)} />
-            {pLogo && <img src={pLogo} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, border: `2px solid ${A.goldBrd}` }} onError={e => e.target.style.display = 'none'} />}
+            <label style={s.label}>Логотип</label>
+            <PhotoUpload value={pLogo} onChange={setPLogo} folder="partners" label="Загрузить логотип" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {pLogo && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pLogo} onChange={e => setPLogo(e.target.value)} />}
 
             <label style={s.label}>Фото-шапка (обложка) — URL из ВК</label>
             <input style={s.input} placeholder="https://sun9-xx.userapi.com/..." value={pCoverPhoto} onChange={e => setPCoverPhoto(e.target.value)} />
