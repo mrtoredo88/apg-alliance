@@ -20,7 +20,12 @@ async function compressAndUpload(file, folder, onProgress) {
 
   onProgress(55);
   const buffer = await compressed.arrayBuffer();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  const base64 = btoa(binary);
   const baseName = file.name.replace(/\.[^.]+$/, '');
 
   onProgress(60);
@@ -94,11 +99,13 @@ export function PhotoUpload({ value, onChange, folder, label = 'Загрузит
 export function GalleryUpload({ value = [], onChange, folder, max = 6, theme }) {
   const inputRef = useRef();
   const [progresses, setProgresses] = useState({});
+  const [error, setError] = useState(null);
   const accRef = useRef(null);
 
   const T = theme ?? { chipBg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)', textSec: 'rgba(255,255,255,0.5)', gold: '#C9A84C' };
 
   async function uploadMany(files) {
+    setError(null);
     const list = Array.from(files);
     accRef.current = [...value];
     const slots = max - accRef.current.length;
@@ -109,7 +116,9 @@ export function GalleryUpload({ value = [], onChange, folder, max = 6, theme }) 
         const url = await compressAndUpload(file, folder, p => setProgresses(prev => ({ ...prev, [id]: p })));
         accRef.current = [...accRef.current, url];
         onChange([...accRef.current]);
-      } catch { } finally {
+      } catch (e) {
+        setError('Ошибка загрузки фото');
+      } finally {
         setProgresses(prev => { const n = { ...prev }; delete n[id]; return n; });
       }
     }));
@@ -147,6 +156,7 @@ export function GalleryUpload({ value = [], onChange, folder, max = 6, theme }) 
       {Object.values(progresses).map((p, i) => (
         <ProgressBar key={i} progress={p} textSec={T.textSec} gold={T.gold} border={T.border} />
       ))}
+      {error && <div style={{ fontSize: 12, color: '#E64646', marginTop: 6 }}>{error}</div>}
       <input ref={inputRef} type="file" accept={ACCEPT} multiple onChange={e => uploadMany(e.target.files)} style={{ display: 'none' }} />
     </div>
   );
