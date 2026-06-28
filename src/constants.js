@@ -15,5 +15,6 @@ export const EXPERT_CATEGORIES = [
   { id: 'law',       label: 'Право',         emoji: '⚖️' },
   { id: 'insurance', label: 'Страхование',   emoji: '🛡️' },
   { id: 'photo',     label: 'Фото/Видео',    emoji: '📸' },
+  { id: 'entertainment', label: 'Развлечения', emoji: '🎉' },
   { id: 'other',     label: 'Другое',        emoji: '✨' },
 ];
