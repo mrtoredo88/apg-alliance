@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import { EXPERT_CATEGORIES } from './constants.js';
@@ -8,6 +8,15 @@ import {
   collection, getDocs, query, where,
   addDoc, updateDoc, doc, increment, serverTimestamp,
 } from 'firebase/firestore';
+
+function getISOWeekKey(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const year = d.getUTCFullYear();
+  const week = Math.ceil((((d - new Date(Date.UTC(year, 0, 1))) / 86400000) + 1) / 7);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
 import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
@@ -484,11 +493,11 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
   );
 }
 
-function ExpertCard({ expert, index, onClick }) {
+function ExpertCard({ expert, index, onClick, isTop }) {
   return (
     <div
       onClick={() => onClick(expert)}
-      style={{ ...GLASS, borderRadius: 20, padding: '16px', cursor: 'pointer', display: 'flex', gap: 14, alignItems: 'flex-start', animation: 'fadeInUp 0.35s ease both', animationDelay: `${index * 0.05}s` }}
+      style={{ ...GLASS, borderRadius: 20, padding: '16px', cursor: 'pointer', display: 'flex', gap: 14, alignItems: 'flex-start', animation: 'fadeInUp 0.35s ease both', animationDelay: `${index * 0.05}s`, ...(isTop ? { border: '1.5px solid rgba(201,168,76,0.4)', background: 'rgba(201,168,76,0.06)' } : {}) }}
     >
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <ExpertAvatar expert={expert} size={64} />
@@ -498,7 +507,10 @@ function ExpertCard({ expert, index, onClick }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: '19px', marginBottom: 3 }}>{expert.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: '19px' }}>{expert.name}</div>
+          {isTop && <div style={{ fontSize: 10, fontWeight: 700, color: T.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 6, padding: '2px 6px', flexShrink: 0 }}>🌟 В топе</div>}
+        </div>
         <div style={{ fontSize: 12, color: T.gold, fontWeight: 600, marginBottom: 6 }}>{expert.specialization}</div>
 
         {(expert.avgRating ?? 0) > 0 && (
@@ -537,17 +549,50 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
+  const [rotation, setRotation] = useState({});
 
-  const filtered = experts.filter(e => {
-    if (e.active === false) return false;
-    if (filter !== 'all' && !e.formats?.includes(filter)) return false;
-    if (activeCategory !== 'all' && (e.category ?? 'other') !== activeCategory) return false;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      return e.name?.toLowerCase().includes(q) || e.specialization?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q);
-    }
-    return true;
-  });
+  useEffect(() => {
+    const currentWeek = getISOWeekKey();
+    getDocs(collection(db, 'expertRotation')).then(snap => {
+      const map = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.weekKey === currentWeek) map[d.id] = data.expertId;
+      });
+      setRotation(map);
+    }).catch(() => {});
+  }, []);
+
+  const topExperts = useMemo(() => {
+    return Object.entries(rotation)
+      .map(([catId, expertId]) => {
+        const e = experts.find(x => x.id === expertId && x.active !== false);
+        if (!e) return null;
+        const cat = EXPERT_CATEGORIES.find(c => c.id === catId);
+        return { ...e, _topCategory: cat };
+      })
+      .filter(Boolean);
+  }, [rotation, experts]);
+
+  const topIds = useMemo(() => new Set(Object.values(rotation)), [rotation]);
+
+  const filtered = useMemo(() => {
+    const list = experts.filter(e => {
+      if (e.active === false) return false;
+      if (filter !== 'all' && !e.formats?.includes(filter)) return false;
+      if (activeCategory !== 'all' && (e.category ?? 'other') !== activeCategory) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        return e.name?.toLowerCase().includes(q) || e.specialization?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q);
+      }
+      return true;
+    });
+    return list.sort((a, b) => {
+      const aTop = topIds.has(a.id) ? 0 : 1;
+      const bTop = topIds.has(b.id) ? 0 : 1;
+      return aTop - bTop;
+    });
+  }, [experts, filter, activeCategory, search, topIds]);
 
   useEffect(() => {
     if (!isActive && selected) setSelected(null);
@@ -600,6 +645,24 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
       </div>
 
       <div style={{ padding: '12px 16px 90px', minHeight: '100%' }}>
+        {topExperts.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.textSec, marginBottom: 10, letterSpacing: 0.3, textTransform: 'uppercase' }}>🌟 В топе на этой неделе</div>
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }} onTouchStart={e => e.stopPropagation()}>
+              {topExperts.map(e => (
+                <div key={e.id} onClick={() => setSelected(e)} style={{ flexShrink: 0, width: 140, background: 'rgba(201,168,76,0.08)', border: '1.5px solid rgba(201,168,76,0.35)', borderRadius: 20, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' }}>
+                  <ExpertAvatar expert={e} size={56} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.textPri, lineHeight: '16px', marginBottom: 3 }}>{e.name}</div>
+                    <div style={{ fontSize: 11, color: T.gold, fontWeight: 600, marginBottom: 4 }}>{e.specialization}</div>
+                    {e._topCategory && <div style={{ fontSize: 11, color: T.textSec }}>{e._topCategory.emoji} {e._topCategory.label}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div style={{ ...GLASS, borderRadius: 24, padding: '40px 20px', textAlign: 'center', marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
             <div style={{ fontSize: 52 }}>🧑‍💼</div>
@@ -620,7 +683,7 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
               {filtered.length} {filtered.length === 1 ? 'эксперт' : filtered.length < 5 ? 'эксперта' : 'экспертов'}
             </div>
             {filtered.map((expert, i) => (
-              <ExpertCard key={expert.id} expert={expert} index={i} onClick={setSelected} />
+              <ExpertCard key={expert.id} expert={expert} index={i} onClick={setSelected} isTop={topIds.has(expert.id)} />
             ))}
           </div>
         )}

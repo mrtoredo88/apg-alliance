@@ -268,6 +268,123 @@ function MonthlyWinnersCard({ partners }) {
   );
 }
 
+function getISOWeekKey(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const year = d.getUTCFullYear();
+  const week = Math.ceil((((d - new Date(Date.UTC(year, 0, 1))) / 86400000) + 1) / 7);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function RotationTab({ experts, A, s }) {
+  const [rotation, setRotation]   = useState({});
+  const [running, setRunning]     = useState(false);
+  const [msg, setMsg]             = useState('');
+
+  const ambassadors = experts.filter(e => e.tier === 'ambassador' && e.active !== false);
+  const byCategory  = {};
+  for (const e of ambassadors) {
+    const cat = e.category ?? 'other';
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(e);
+  }
+
+  useEffect(() => {
+    if (!Object.keys(byCategory).length) return;
+    const { collection: col, getDocs: gd } = require('firebase/firestore');
+    import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
+      gd(c(db, 'expertRotation')).then(snap => {
+        const map = {};
+        snap.docs.forEach(d => { map[d.id] = d.data(); });
+        setRotation(map);
+      }).catch(() => {});
+    });
+  }, [ambassadors.length]);
+
+  const loadRotation = () => {
+    import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
+      gd(c(db, 'expertRotation')).then(snap => {
+        const map = {};
+        snap.docs.forEach(d => { map[d.id] = d.data(); });
+        setRotation(map);
+      });
+    });
+  };
+
+  useEffect(() => { loadRotation(); }, []);
+
+  const runRotation = async () => {
+    setRunning(true); setMsg('');
+    try {
+      const res = await fetch('/api/expert-rotation', { method: 'POST' });
+      const data = await res.json();
+      setMsg(`✅ Ротация выполнена: ${data.results?.length ?? 0} категорий обновлено`);
+      loadRotation();
+    } catch { setMsg('❌ Ошибка запуска ротации'); }
+    finally { setRunning(false); }
+  };
+
+  const currentWeek = getISOWeekKey();
+
+  return (
+    <div>
+      <div style={s.card}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: A.textPri, marginBottom: 4 }}>Текущая неделя: {currentWeek}</div>
+        <div style={{ fontSize: 12, color: A.textSec, marginBottom: 14 }}>
+          Амбассадоров в системе: {ambassadors.length} · Категорий с амбассадорами: {Object.keys(byCategory).length}
+        </div>
+        <button
+          onClick={runRotation} disabled={running}
+          style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: running ? A.border : `linear-gradient(135deg,${A.gold},${A.goldL})`, color: running ? A.textSec : '#0F0F1A', fontSize: 13, fontWeight: 700, cursor: running ? 'default' : 'pointer' }}
+        >
+          {running ? '⏳ Запуск...' : '🔄 Запустить ротацию сейчас'}
+        </button>
+        {msg && <div style={{ marginTop: 10, fontSize: 13, color: msg.startsWith('✅') ? A.gold : '#E64646' }}>{msg}</div>}
+      </div>
+
+      {Object.entries(byCategory).map(([catId, list]) => {
+        const catMeta  = EXPERT_CATEGORIES.find(c => c.id === catId);
+        const rot      = rotation[catId];
+        const topId    = rot?.weekKey === currentWeek ? rot.expertId : null;
+        const sorted   = [...list].sort((a, b) => {
+          const ta = a.ambassadorSince?.toDate?.()?.getTime() ?? (a.createdAt?.toDate?.()?.getTime() ?? 0);
+          const tb = b.ambassadorSince?.toDate?.()?.getTime() ?? (b.createdAt?.toDate?.()?.getTime() ?? 0);
+          return ta - tb;
+        });
+        return (
+          <div key={catId} style={{ ...s.card, marginBottom: 10 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: A.textPri, marginBottom: 10 }}>
+              {catMeta?.emoji} {catMeta?.label ?? catId} · {list.length} амбассадор{list.length !== 1 ? 'а' : ''}
+            </div>
+            {sorted.map((e, i) => {
+              const isTop = e.id === topId;
+              return (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${A.border}` }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: isTop ? A.goldDim : A.border, border: `2px solid ${isTop ? A.gold : 'transparent'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: isTop ? A.gold : A.textSec, flexShrink: 0 }}>{i + 1}</div>
+                  {e.photo ? <img src={e.photo} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 32, height: 32, borderRadius: '50%', background: A.border, flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: A.textPri, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
+                    <div style={{ fontSize: 11, color: A.textSec }}>{e.specialization}</div>
+                  </div>
+                  {isTop && <div style={{ fontSize: 11, fontWeight: 700, color: A.gold, background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>В топе</div>}
+                </div>
+              );
+            })}
+            {!topId && <div style={{ fontSize: 12, color: A.textSec, marginTop: 8 }}>Ротация не запускалась — нажмите «Запустить»</div>}
+          </div>
+        );
+      })}
+
+      {ambassadors.length === 0 && (
+        <div style={{ ...s.card, textAlign: 'center', color: A.textSec, fontSize: 13 }}>
+          Нет экспертов с тарифом Амбассадор. Установите тариф в форме эксперта.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const AdminPanel = () => {
   const [authed, setAuthed]         = useState(false);
   const [partners, setPartners]     = useState([]);
@@ -302,6 +419,7 @@ export const AdminPanel = () => {
   const [exSaving, setExSaving]     = useState(false);
   const [exError, setExError]       = useState('');
   const [exCategory, setExCategory]     = useState('other');
+  const [exTier, setExTier]             = useState('practice');
   const [exCoverPhoto, setExCoverPhoto] = useState('');
   const [exGallery, setExGallery]       = useState([]);
   const [exVideos, setExVideos]         = useState([]);
@@ -463,7 +581,7 @@ export const AdminPanel = () => {
     setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
     setExOnline(false); setExOffline(false); setExGroup(false);
     setExTelegram(''); setExWebsite(''); setExMax('');
-    setExCategory('other');
+    setExCategory('other'); setExTier('practice');
     setExCoverPhoto(''); setExGallery([]); setExVideos([]);
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     setExError(''); setExSaving(false);
@@ -480,7 +598,7 @@ export const AdminPanel = () => {
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
     setExTelegram(ex.telegramUrl ?? ''); setExWebsite(ex.websiteUrl ?? ''); setExMax(ex.maxUrl ?? '');
-    setExCategory(ex.category ?? 'other');
+    setExCategory(ex.category ?? 'other'); setExTier(ex.tier ?? 'practice');
     setExCoverPhoto(ex.coverPhoto ?? ''); setExGallery(ex.gallery ?? []);
     setExVideos(ex.videos ?? []);
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
@@ -500,9 +618,12 @@ export const AdminPanel = () => {
       }
     }
     const formats = [exOnline && 'online', exOffline && 'offline', exGroup && 'group'].filter(Boolean);
+    const prevTier = editingExpert?.tier ?? 'practice';
     const data = {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
       category: exCategory,
+      tier: exTier,
+      ...(exTier === 'ambassador' && prevTier !== 'ambassador' ? { ambassadorSince: serverTimestamp() } : {}),
       photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
       bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
@@ -1159,6 +1280,7 @@ export const AdminPanel = () => {
             { id: 'notifs',    emoji: '🔔', label: 'Рассылка' },
             { id: 'tasks',     emoji: '✅', label: 'Задания',   count: customTasks.length },
             { id: 'prizes',    emoji: '🎁', label: 'Призы',     count: prizes.length },
+            { id: 'rotation',  emoji: '🔄', label: 'Ротация' },
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
           ].map(t => {
@@ -1203,6 +1325,15 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Специализация *</label>
             <input style={s.input} placeholder="Психолог, коуч, нутрициолог..." value={exSpec} onChange={e => setExSpec(e.target.value)} />
+
+            <label style={s.label}>Тариф</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {[{ id: 'practice', label: '📋 Практика' }, { id: 'ambassador', label: '🌟 Амбассадор' }].map(t => (
+                <button key={t.id} onClick={() => setExTier(t.id)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${exTier === t.id ? A.gold : A.border}`, background: exTier === t.id ? A.goldDim : 'transparent', color: exTier === t.id ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
             <label style={s.label}>Категория</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
@@ -2289,6 +2420,9 @@ export const AdminPanel = () => {
           </div>
         );
       })()}
+
+      {/* ── РОТАЦИЯ АМБАССАДОРОВ ── */}
+      {activeTab === 'rotation' && <RotationTab experts={experts} A={A} s={s} />}
 
       {/* ── АНАЛИТИКА ── */}
       {activeTab === 'analytics' && (

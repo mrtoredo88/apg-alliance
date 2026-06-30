@@ -26,7 +26,8 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/raffle-draw",    "schedule": "0 10 * * *" },
-    { "path": "/api/activity-index", "schedule": "0 3 * * *"  }
+    { "path": "/api/raffle-draw",     "schedule": "0 10 * * *" },
+    { "path": "/api/activity-index",  "schedule": "0 3 * * *"  },
+    { "path": "/api/expert-rotation", "schedule": "0 0 * * 1"  }
   ]
 }
