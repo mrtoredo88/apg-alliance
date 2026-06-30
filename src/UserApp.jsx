@@ -889,11 +889,10 @@ export function UserApp() {
     window.location.reload();
   }, []);
 
-  const handleLoginAfterLogout = useCallback(async () => {
+  const handleLoginAfterLogout = useCallback(() => {
     localStorage.removeItem('manualLogout');
-    setLoggedOut(false);
-    await loadData(mountedRef);
-  }, [loadData]);
+    window.location.reload();
+  }, []);
 
   const handleDeleteProfile = useCallback(async () => {
     if (!user || String(user.id).startsWith('guest_')) return;
