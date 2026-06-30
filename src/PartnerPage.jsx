@@ -2,6 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge, { openUrl, isVK } from './vk.js';
+
+function sanitizeForVK(text) {
+  if (!text) return '';
+  return text
+    .replace(/https?:\/\/\S+/gi, '[ссылка скрыта]')
+    .replace(/\b(t\.me|telegram|tg|instagram|inst|whatsapp|youtube|youtu\.be|tiktok|rutube|max\.ru|yclients|dikidi)\S*/gi, '[скрыто]')
+    .replace(/@\S+/g, '[скрыто]');
+}
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 
@@ -130,7 +138,7 @@ function ReviewCard({ review, isOwn }) {
         </div>
       </div>
       {review.text && (
-        <div style={{ fontSize:13, color:T.textSec, lineHeight:'18px', paddingLeft:42 }}>{review.text}</div>
+        <div style={{ fontSize:13, color:T.textSec, lineHeight:'18px', paddingLeft:42 }}>{isVK() ? sanitizeForVK(review.text) : review.text}</div>
       )}
     </div>
   );
@@ -403,7 +411,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
                 <div style={{ fontSize:12, color:T.textSec, marginTop:4 }}>Отзывов пока нет</div>
               )}
             </div>
-            {partner.description && <div style={{ maxWidth:280, textAlign:'center' }}><RichText color={T.textSec} fontSize={14}>{partner.description}</RichText></div>}
+            {partner.description && <div style={{ maxWidth:280, textAlign:'center' }}><RichText color={T.textSec} fontSize={14}>{isVK() ? sanitizeForVK(partner.description) : partner.description}</RichText></div>}
           </div>
         </div>
 
@@ -613,15 +621,15 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             </div>
           )}
           {partner.address && <button onClick={handleMap}    style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
-          {partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && (
+          {!isVK() && partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && (
             <button onClick={() => openUrl(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.blue},#2D6FBC)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>📱 Перейти в соцсеть</button>
           )}
-          {partner.bookingUrl && (
+          {!isVK() && partner.bookingUrl && (
             <button onClick={() => openUrl(partner.bookingUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:`0 4px 16px rgba(201,168,76,0.35)` }}>
               📅 Записаться онлайн
             </button>
           )}
-          {partner.websiteUrl && (
+          {!isVK() && partner.websiteUrl && (
             <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>
               🌐 Сайт
             </button>

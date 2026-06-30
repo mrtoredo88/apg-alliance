@@ -90,6 +90,7 @@ export function UserApp() {
   const [customTasks, setCustomTasks]           = useState([]);
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
+  const [loggedOut, setLoggedOut]               = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
@@ -196,7 +197,11 @@ export function UserApp() {
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
   const loadData = useCallback(async (isMounted) => {
-    setLoading(true); setError(null);
+    if (localStorage.getItem('manualLogout') === 'true') {
+      if (isMounted.current) { setLoading(false); setLoggedOut(true); }
+      return;
+    }
+    setLoading(true); setError(null); setLoggedOut(false);
 
     // Анонимный вход в Firebase (нужен для Firestore Security Rules)
     if (!auth.currentUser) {
@@ -875,6 +880,7 @@ export function UserApp() {
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
   const handleLogout = useCallback(async () => {
+    localStorage.setItem('manualLogout', 'true');
     localStorage.removeItem('apg_tg_user');
     localStorage.removeItem('apg_guest_id');
     localStorage.removeItem('apg_web_user');
@@ -882,6 +888,12 @@ export function UserApp() {
     try { await signOut(auth); } catch {}
     window.location.reload();
   }, []);
+
+  const handleLoginAfterLogout = useCallback(async () => {
+    localStorage.removeItem('manualLogout');
+    setLoggedOut(false);
+    await loadData(mountedRef);
+  }, [loadData]);
 
   const handleDeleteProfile = useCallback(async () => {
     if (!user || String(user.id).startsWith('guest_')) return;
@@ -1143,6 +1155,28 @@ export function UserApp() {
   );
 
   // ─── Render ─────────────────────────────────────────────────────────────────
+
+  if (loggedOut) {
+    return (
+      <ConfigProvider appearance={appearance}>
+        <AdaptivityProvider>
+          <AppRoot>
+            <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24, background: T.bg }}>
+              <div style={{ fontSize: 56 }}>👋</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: T.textPri, textAlign: 'center' }}>Вы вышли из аккаунта</div>
+              <div style={{ fontSize: 14, color: T.textSec, textAlign: 'center', lineHeight: 1.5 }}>Нажмите кнопку ниже, чтобы войти снова</div>
+              <button
+                onClick={handleLoginAfterLogout}
+                style={{ width: '100%', maxWidth: 320, padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
+              >
+                Войти
+              </button>
+            </div>
+          </AppRoot>
+        </AdaptivityProvider>
+      </ConfigProvider>
+    );
+  }
 
   return (
     <ConfigProvider appearance={appearance}>

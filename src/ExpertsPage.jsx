@@ -13,6 +13,14 @@ import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 
+function sanitizeForVK(text) {
+  if (!text) return '';
+  return text
+    .replace(/https?:\/\/\S+/gi, '[ссылка скрыта]')
+    .replace(/\b(t\.me|telegram|tg|instagram|inst|whatsapp|youtube|youtu\.be|tiktok|rutube|max\.ru|yclients|dikidi)\S*/gi, '[скрыто]')
+    .replace(/@\S+/g, '[скрыто]');
+}
+
 const FORMAT_LABELS = {
   online:  { label: 'Онлайн',  emoji: '💻', bg: 'rgba(74,144,217,0.15)',  border: 'rgba(74,144,217,0.35)',  text: '#6AABEC' },
   offline: { label: 'Офлайн', emoji: '📍', bg: 'rgba(75,179,75,0.15)',   border: 'rgba(75,179,75,0.35)',   text: '#4BB34B' },
@@ -333,7 +341,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         {/* Description */}
         {expert.description && (
           <div style={{ ...GLASS, borderRadius: 16, padding: '14px', marginBottom: 14 }}>
-            <RichText color={T.textSec} fontSize={13}>{expert.description}</RichText>
+            <RichText color={T.textSec} fontSize={13}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
           </div>
         )}
 
@@ -366,9 +374,9 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         )}
 
         {/* Contact links */}
-        {(expert.websiteUrl || (!isVK() && (expert.telegramUrl || expert.maxUrl))) && (
+        {(!isVK() && (expert.websiteUrl || expert.telegramUrl || expert.maxUrl)) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            {!isVK() && expert.telegramUrl && (
+            {expert.telegramUrl && (
               <button onClick={() => openUrl(expert.telegramUrl)} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 ✈️ Telegram
               </button>
