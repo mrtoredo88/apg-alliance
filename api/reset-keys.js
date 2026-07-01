@@ -11,7 +11,6 @@ function getAdminApp() {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  if (req.headers['x-secret'] !== process.env.RAFFLE_SECRET) return res.status(401).json({ error: 'unauthorized' });
 
   const db = getFirestore(getAdminApp());
   const snap = await db.collection('users').get();
