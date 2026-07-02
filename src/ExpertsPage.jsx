@@ -268,12 +268,6 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
     finally { if (mountedRef.current) setSubmitting(false); }
   };
 
-  const handleBook = () => {
-    const url = expert.bookingUrl || expert.vkUrl;
-    if (url) openUrl(url);
-    else if (expert.phone) openUrl(`tel:${expert.phone}`);
-  };
-
   const hasScanned = scannedExperts?.[expert.id];
   const canBook = expert.bookingUrl || expert.vkUrl || expert.phone;
   const qrValue = `expert_${expert.id}`;
@@ -411,28 +405,36 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
           </div>
         )}
 
-        {/* Book button */}
-        {canBook && (
-          <button onClick={handleBook} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', marginBottom: 12, boxShadow: '0 4px 16px rgba(201,168,76,0.35)' }}>
-            📅 Записаться
-          </button>
-        )}
-
-        {/* Contact links */}
-        {(!isVK() && (expert.websiteUrl || expert.telegramUrl || expert.maxUrl)) && (
+        {/* Кнопки действий */}
+        {(canBook || !isVK() && (expert.websiteUrl || expert.telegramUrl || expert.vkUrl || expert.maxUrl)) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            {expert.telegramUrl && (
-              <button onClick={() => openUrl(expert.telegramUrl)} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                ✈️ Telegram
+            {expert.phone && (
+              <button onClick={() => openUrl(`tel:${expert.phone}`)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.green},#3a9a3a)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                📞 Позвонить
               </button>
             )}
-            {expert.websiteUrl && (
-              <button onClick={() => openUrl(expert.websiteUrl)} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            {expert.bookingUrl && (
+              <button onClick={() => openUrl(expert.bookingUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 16px rgba(201,168,76,0.35)' }}>
+                📅 Записаться онлайн
+              </button>
+            )}
+            {!isVK() && expert.websiteUrl && (
+              <button onClick={() => openUrl(expert.websiteUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🌐 Сайт
               </button>
             )}
+            {!isVK() && expert.vkUrl && (
+              <button onClick={() => openUrl(expert.vkUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,#4A76A8,#2D5F8A)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                🔵 ВКонтакте
+              </button>
+            )}
+            {!isVK() && expert.telegramUrl && (
+              <button onClick={() => openUrl(expert.telegramUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                ✈️ Telegram
+              </button>
+            )}
             {!isVK() && expert.maxUrl && (
-              <button onClick={() => openUrl(expert.maxUrl)} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openUrl(expert.maxUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 💬 Max
               </button>
             )}
