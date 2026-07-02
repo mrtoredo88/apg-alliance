@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -1214,7 +1215,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         </div>
       )}
 
-      {showShareModal && (
+      {showShareModal && createPortal(
         <ShareModal
           user={user}
           userKeys={userKeys}
@@ -1230,11 +1231,12 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             const msg = `${name} — участник АПГ!\n\n🗝️ ${userKeys} ключей · ${levelLabel}\n🔥 Стрик: ${streak} дней\n🏪 Партнёров посещено: ${scannedCount}\n\nПрисоединяйся к Альянсу Партнёров Зеленограда 👇`;
             vkBridge.send('VKWebAppShowWallPostBox', {
               message: msg,
-              attachments: 'https://vk.com/app54601851',
+              attachments: APP_URL,
             }).catch(() => {});
             setShowShareModal(false);
           }}
-        />
+        />,
+        document.body
       )}
     </div>
   );
