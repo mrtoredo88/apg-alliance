@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
+import { initErrorLogger, setErrorLoggerUser } from './errorLogger.js';
 import { db, auth } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -41,6 +42,8 @@ function formatCacheAge(ts) {
   if (hrs < 24)  return `${hrs} ч назад`;
   return `${Math.round(hrs / 24)} д назад`;
 }
+
+initErrorLogger();
 
 const SWIPE_TABS = ['home', 'experts', 'tasks', 'profile'];
 
@@ -260,6 +263,7 @@ export function UserApp() {
 
       if (!isMounted.current) return;
       setUser(userData);
+      setErrorLoggerUser(String(userData.id));
 
       const isGuest = String(userData.id).startsWith('guest_');
 

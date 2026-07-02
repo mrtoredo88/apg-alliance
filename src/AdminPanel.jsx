@@ -530,6 +530,29 @@ export const AdminPanel = () => {
   const [eLinkUrl, setELinkUrl]     = useState('');
   const [ePriority, setEPriority]   = useState(0);
 
+  // Ошибки
+  const [errorLogs, setErrorLogs]           = useState([]);
+  const [errorsLoading, setErrorsLoading]   = useState(false);
+  const [errShowResolved, setErrShowResolved] = useState(false);
+  const [errExpanded, setErrExpanded]       = useState({});
+
+  const loadErrors = useCallback(async () => {
+    setErrorsLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)));
+      setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      console.error('loadErrors', e);
+    } finally {
+      setErrorsLoading(false);
+    }
+  }, []);
+
+  const resolveError = useCallback(async (id) => {
+    await updateDoc(doc(db, 'errorLogs', id), { resolved: true }).catch(() => {});
+    setErrorLogs(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -1283,11 +1306,12 @@ export const AdminPanel = () => {
             { id: 'rotation',  emoji: '🔄', label: 'Ротация' },
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
+            { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
           ].map(t => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -2674,6 +2698,89 @@ export const AdminPanel = () => {
           )}
         </div>
       )}
+
+      {/* ── ОШИБКИ ── */}
+      {activeTab === 'errors' && (() => {
+        const visible = errorLogs.filter(e => errShowResolved ? true : !e.resolved);
+        return (
+          <div>
+            <div style={{ ...s.card, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h2 style={{ ...s.h2, margin: 0, flex: 1 }}>🐛 Ошибки клиента</h2>
+                <button
+                  style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }}
+                  onClick={loadErrors}
+                  disabled={errorsLoading}
+                >
+                  {errorsLoading ? '⏳' : '↻ Обновить'}
+                </button>
+                <button
+                  style={{ ...s.btn, padding: '6px 12px', fontSize: 12, background: errShowResolved ? 'rgba(75,179,75,0.15)' : A.chip, border: `1px solid ${errShowResolved ? '#4BB34B' : A.border}`, color: errShowResolved ? '#4BB34B' : A.textSec, borderRadius: 10, cursor: 'pointer' }}
+                  onClick={() => setErrShowResolved(v => !v)}
+                >
+                  {errShowResolved ? '✓ Показываю решённые' : 'Скрыты решённые'}
+                </button>
+              </div>
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: A.textSec }}>
+                {visible.length} из {errorLogs.length} • нерешённых: {errorLogs.filter(e => !e.resolved).length}
+              </p>
+            </div>
+
+            {errorsLoading && !errorLogs.length ? (
+              <div style={{ textAlign: 'center', padding: 48, color: A.textSec }}>⏳ Загружаем...</div>
+            ) : visible.length === 0 ? (
+              <div style={{ ...s.card, textAlign: 'center', color: A.textSec }}>
+                {errorLogs.length === 0 ? 'Ошибок нет' : 'Все ошибки решены'}
+              </div>
+            ) : visible.map(e => {
+              const ts = e.timestamp?.toDate ? e.timestamp.toDate() : e.timestamp ? new Date(e.timestamp) : null;
+              const tsStr = ts ? ts.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+              const isExp = errExpanded[e.id];
+              return (
+                <div key={e.id} style={{ ...s.card, marginBottom: 10, opacity: e.resolved ? 0.55 : 1, borderLeft: `3px solid ${e.resolved ? '#4BB34B' : A.red}` }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: e.resolved ? '#4BB34B' : A.red, wordBreak: 'break-word', lineHeight: '17px', marginBottom: 4 }}>
+                        {e.message}
+                      </div>
+                      <div style={{ fontSize: 11, color: A.textSec, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+                        <span>🕒 {tsStr}</span>
+                        <span>📱 {e.device} / {e.browser}</span>
+                        {e.userId && <span>👤 {String(e.userId).slice(0, 30)}</span>}
+                        {e.version && e.version !== '?' && <span>v{e.version}</span>}
+                        {e.source && <span style={{ color: A.textSec, opacity: 0.7 }}>📄 {String(e.source).slice(0, 60)}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                      {!e.resolved && (
+                        <button
+                          style={{ ...s.btn, padding: '4px 10px', fontSize: 11, background: 'rgba(75,179,75,0.12)', border: `1px solid #4BB34B40`, color: '#4BB34B', borderRadius: 8, cursor: 'pointer' }}
+                          onClick={() => resolveError(e.id)}
+                        >
+                          ✓ Решено
+                        </button>
+                      )}
+                      {e.stack && (
+                        <button
+                          style={{ ...s.btn, ...s.btnGray, padding: '4px 10px', fontSize: 11 }}
+                          onClick={() => setErrExpanded(prev => ({ ...prev, [e.id]: !prev[e.id] }))}
+                        >
+                          {isExp ? 'Скрыть' : 'Stack'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isExp && e.stack && (
+                    <pre style={{ marginTop: 10, fontSize: 10, color: A.textSec, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '15px', maxHeight: 260, overflow: 'auto' }}>
+                      {e.stack}
+                    </pre>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <div style={{ height: 32 }} />
       </div>{/* end content */}
