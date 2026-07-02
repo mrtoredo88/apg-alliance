@@ -582,22 +582,27 @@ export function UserApp() {
         showToast('QR-код эксперта не распознан');
         return;
       }
-      if (scannedExperts[expertId]) {
-        setIsScannerOpen(false); isScanningRef.current = false;
-        showToast('Посещение уже отмечено 👋');
-        return;
-      }
-      const keyBonus = expert.keys ?? 1;
+      const prevCount = Number(scannedExperts[expertId]) || (scannedExperts[expertId] ? 1 : 0);
+      const stampTarget = expert.stampTarget ?? 0;
+      const isFirstScan = prevCount === 0;
+      const keyBonus = isFirstScan ? (expert.keys ?? 1) : 0;
+      const newCount = prevCount + 1;
+      const updateData = { [`scannedExperts.${expertId}`]: increment(1) };
+      if (keyBonus > 0) updateData.keys = increment(keyBonus);
       try {
-        await updateDoc(doc(db, 'users', String(user.id)), {
-          keys: increment(keyBonus),
-          [`scannedExperts.${expertId}`]: true,
-        });
-        setUserKeys(prev => prev + keyBonus);
-        setScannedExperts(prev => ({ ...prev, [expertId]: true }));
+        await updateDoc(doc(db, 'users', String(user.id)), updateData);
+        if (keyBonus > 0) setUserKeys(prev => prev + keyBonus);
+        setScannedExperts(prev => ({ ...prev, [expertId]: newCount }));
         haptic('medium');
-        setKeyBurst({ amount: keyBonus, id: Date.now() });
-        showToast(`+${keyBonus} ключ — консультация с ${expert.name}! 🔑`, 'success');
+        if (keyBonus > 0) setKeyBurst({ amount: keyBonus, id: Date.now() });
+        const stampMsg = stampTarget > 0 ? ` (${newCount}/${stampTarget})` : '';
+        if (keyBonus > 0) {
+          showToast(`+${keyBonus} ключ — консультация с ${expert.name}!${stampMsg} 🔑`, 'success');
+        } else if (stampTarget > 0 && newCount >= stampTarget) {
+          showToast(`🎟️ Штамп-карта заполнена! Попросите награду у ${expert.name}`, 'success');
+        } else {
+          showToast(`Визит отмечен${stampMsg} 👋`, 'success');
+        }
         addDoc(collection(db, 'users', String(user.id), 'activity'), {
           type: 'expert_scan', icon: '🧑‍💼',
           text: `Посещение эксперта: ${expert.name}`,

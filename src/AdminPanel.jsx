@@ -426,6 +426,8 @@ export const AdminPanel = () => {
   const [exVideoUrl, setExVideoUrl]     = useState('');
   const [exVideoTitle, setExVideoTitle] = useState('');
   const [exVideoError, setExVideoError] = useState('');
+  const [exOffer, setExOffer]               = useState('');
+  const [exStampTarget, setExStampTarget]   = useState('');
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
@@ -607,6 +609,7 @@ export const AdminPanel = () => {
     setExCategory('other'); setExTier('practice');
     setExCoverPhoto(''); setExGallery([]); setExVideos([]);
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
+    setExOffer(''); setExStampTarget('');
     setExError(''); setExSaving(false);
   };
 
@@ -624,6 +627,7 @@ export const AdminPanel = () => {
     setExCategory(ex.category ?? 'other'); setExTier(ex.tier ?? 'practice');
     setExCoverPhoto(ex.coverPhoto ?? ''); setExGallery(ex.gallery ?? []);
     setExVideos(ex.videos ?? []);
+    setExOffer(ex.offer ?? ''); setExStampTarget(ex.stampTarget ? String(ex.stampTarget) : '');
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     window.scrollTo(0, 0);
   };
@@ -657,6 +661,8 @@ export const AdminPanel = () => {
       coverPhoto: exCoverPhoto.trim(),
       gallery: exGallery,
       videos: finalExVideos,
+      offer: exOffer.trim(),
+      stampTarget: Number(exStampTarget) || 0,
     };
     try {
       if (editingExpert) {
@@ -1370,6 +1376,12 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Описание</label>
             <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
+
+            <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
+            <input style={s.input} placeholder="Скидка 15% на первую консультацию" value={exOffer} onChange={e => setExOffer(e.target.value)} />
+
+            <label style={s.label}>Штамп-карта: визитов до награды (0 = выключено) 🎟️</label>
+            <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={exStampTarget} onChange={e => setExStampTarget(e.target.value)} />
 
             <label style={s.label}>Фото</label>
             <PhotoUpload value={exPhoto} onChange={setExPhoto} folder="experts" label="Загрузить фото" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />

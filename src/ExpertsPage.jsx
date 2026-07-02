@@ -354,6 +354,42 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
           </div>
         )}
 
+        {/* Спецпредложение */}
+        {expert.offer && (
+          <div style={{ marginBottom: 14, borderRadius: 20, background: 'linear-gradient(135deg,rgba(201,168,76,0.13),rgba(232,201,122,0.08))', border: '1px solid rgba(201,168,76,0.3)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 26, flexShrink: 0 }}>🎁</div>
+            <div>
+              <div style={{ fontSize: 11, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Предложение для участников АПГ</div>
+              <div style={{ fontSize: 14, color: T.textPri, fontWeight: 600 }}>{expert.offer}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Штамп-карта */}
+        {expert.stampTarget > 0 && (() => {
+          const raw     = scannedExperts?.[expert.id];
+          const stamps  = Number(raw) || (raw ? 1 : 0);
+          const target  = expert.stampTarget;
+          const filled  = Math.min(stamps, target);
+          const done    = stamps >= target;
+          return (
+            <div style={{ marginBottom: 14, borderRadius: 20, padding: '16px 18px', background: done ? 'rgba(201,168,76,0.1)' : T.chipBg, border: `1px solid ${done ? 'rgba(201,168,76,0.4)' : T.border}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: done ? T.gold : T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>🎟️ Штамп-карта</div>
+                <div style={{ fontSize: 12, color: done ? T.gold : T.textSec, fontWeight: 700 }}>{filled} / {target}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                {Array.from({ length: target }, (_, i) => (
+                  <div key={i} style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${i < filled ? T.gold : T.border}`, background: i < filled ? `linear-gradient(135deg,${T.gold},${T.goldL})` : 'transparent', flexShrink: 0, transition: 'all 0.3s', boxShadow: i < filled ? '0 0 8px rgba(201,168,76,0.4)' : 'none' }} />
+                ))}
+              </div>
+              <div style={{ fontSize: 13, color: done ? T.gold : T.textSec, fontWeight: done ? 700 : 400 }}>
+                {done ? 'Карта заполнена! Попросите награду у эксперта 🎉' : `Ещё ${target - filled} визит${target - filled === 1 ? '' : target - filled < 5 ? 'а' : 'ов'} до награды`}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Галерея */}
         {(expert.gallery?.length > 0) && (
           <div style={{ marginBottom: 14 }}>
