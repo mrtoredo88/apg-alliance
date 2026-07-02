@@ -293,7 +293,6 @@ function RotationTab({ experts, A, s }) {
 
   useEffect(() => {
     if (!Object.keys(byCategory).length) return;
-    const { collection: col, getDocs: gd } = require('firebase/firestore');
     import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
       gd(c(db, 'expertRotation')).then(snap => {
         const map = {};
