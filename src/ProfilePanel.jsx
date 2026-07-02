@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
+import { APP_URL } from './constants.js';
 
 const ACHIEVEMENTS = [
   { id: 'first_scan',   title: 'Первый шаг',    emoji: '🎯', color: '#4A90D9', cond: (k)       => k >= 1 },
@@ -917,7 +918,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               </div>
               <div style={{ background: '#fff', borderRadius: 16, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                 <QRCodeSVG
-                  value={`https://vk.com/app54601851#ref_${user.id}`}
+                  value={`${APP_URL}/?ref=${user.id}`}
                   size={160}
                   bgColor="#ffffff"
                   fgColor="#0F0F1A"

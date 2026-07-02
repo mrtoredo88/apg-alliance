@@ -3,8 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 import { T, GLASS } from './design.js';
 import vkBridge from './vk.js';
-
-const APP_ID = 54601851;
+import { APP_URL } from './constants.js';
 
 const MILESTONES = [
   { count: 1, reward: 3,  label: '1 друг',   taskId: 'referral_1' },
@@ -23,15 +22,17 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
   const copyTimerRef = useRef(null);
   useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
-  const refLink = user?.id ? `https://vk.com/app${APP_ID}#ref_${user.id}` : `https://vk.com/app${APP_ID}`;
+  const refLink = user?.id ? `${APP_URL}/?ref=${user.id}` : APP_URL;
+  const inviteText = `Привет! Присоединяйся к АПГ — Альянсу Партнёров Города. Открывай классные места Зеленограда и получай награды за визиты 🔑`;
 
   const handleCopy = async () => {
     let ok = false;
-    try {
-      await vkBridge.send('VKWebAppCopyText', { text: refLink });
-      ok = true;
-    } catch {
-      try { await navigator.clipboard.writeText(refLink); ok = true; } catch {}
+    try { await navigator.clipboard.writeText(refLink); ok = true; } catch {}
+    if (!ok) {
+      try {
+        await vkBridge.send('VKWebAppCopyText', { text: refLink });
+        ok = true;
+      } catch {}
     }
     if (!ok) return;
     setCopied(true);
@@ -39,7 +40,15 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
     copyTimerRef.current = setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: inviteText, url: refLink });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
     vkBridge.send('VKWebAppShare', { link: refLink }).catch(() => {});
   };
 
@@ -125,7 +134,7 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
               onClick={handleShare}
               style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.blue}, #2D6FBC)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
-              📤 Поделиться в ВКонтакте
+              📤 Поделиться
             </button>
 
             <button

@@ -114,7 +114,12 @@ export function UserApp() {
   const pendingRefId = useMemo(() => {
     const fromHash   = window.location.hash.match(/[#&]ref[=_](\w+)/)?.[1];
     const fromSearch = new URLSearchParams(window.location.search).get('ref');
-    return fromHash ?? fromSearch ?? null;
+    const fromUrl = fromHash ?? fromSearch ?? null;
+    if (fromUrl) {
+      localStorage.setItem('apg_pending_ref', fromUrl);
+      return fromUrl;
+    }
+    return localStorage.getItem('apg_pending_ref') ?? null;
   }, []);
 
   // Deep link на конкретного партнёра: #partner_ID или ?partner=ID
@@ -446,6 +451,7 @@ export function UserApp() {
         }
 
         if (isValidRef) {
+          localStorage.removeItem('apg_pending_ref');
           // Начисляем рефереру +2 ключа и +1 к счётчику
           updateDoc(doc(db, 'users', refId), {
             keys: increment(2),

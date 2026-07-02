@@ -6,6 +6,7 @@ import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './level
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge from './vk.js';
+import { APP_URL } from './constants.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -1104,9 +1105,12 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
           {event.date && `📅 ${event.date}`}{event.address && ` · ${event.address}`}
         </div>
         <button
-          onClick={() => {
+          onClick={async () => {
             const text = `🔒 Закрытое мероприятие АПГ: «${event.title}»${event.date ? ` — ${event.date}` : ''}. Нужно ${minKeys} ключей АПГ для входа!`;
-            vkBridge.send('VKWebAppShare', { link: 'https://vk.com/app54601851', text }).catch(() => {});
+            if (navigator.share) {
+              try { await navigator.share({ title: 'АПГ', text, url: APP_URL }); return; } catch (err) { if (err.name === 'AbortError') return; }
+            }
+            vkBridge.send('VKWebAppShare', { link: APP_URL, text }).catch(() => {});
           }}
           style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
         >
