@@ -67,21 +67,41 @@ function openPosterPdfWindow(posterUrl, partnerName) {
 
 function detectWhiteRegion(ctx, W, H) {
   const data = ctx.getImageData(0, 0, W, H).data;
-  let minX = W, minY = H, maxX = 0, maxY = 0, found = false;
-  const step = 3;
-  for (let y = 0; y < H; y += step) {
-    for (let x = 0; x < W; x += step) {
-      const i = (y * W + x) * 4;
-      if (data[i + 3] > 200 && data[i] > 230 && data[i + 1] > 230 && data[i + 2] > 230) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+  // Divide image into grid; only treat a cell as "white" if 70%+ of its pixels are white.
+  // This ignores white text/thin lines that inflate the bounding box.
+  const GRID = 32, step = 3;
+  const cW = W / GRID, cH = H / GRID;
+  let minCx = W, minCy = H, maxCx = 0, maxCy = 0, found = false;
+
+  for (let gy = 0; gy < GRID; gy++) {
+    for (let gx = 0; gx < GRID; gx++) {
+      let white = 0, total = 0;
+      const x0 = Math.floor(gx * cW), x1 = Math.floor((gx + 1) * cW);
+      const y0 = Math.floor(gy * cH), y1 = Math.floor((gy + 1) * cH);
+      for (let y = y0; y < y1; y += step) {
+        for (let x = x0; x < x1; x += step) {
+          const i = (y * W + x) * 4;
+          if (data[i + 3] > 200) {
+            total++;
+            if (data[i] > 230 && data[i + 1] > 230 && data[i + 2] > 230) white++;
+          }
+        }
+      }
+      if (total > 0 && white / total >= 0.7) {
+        const cx = (gx + 0.5) * cW, cy = (gy + 0.5) * cH;
+        if (cx < minCx) minCx = cx;
+        if (cx > maxCx) maxCx = cx;
+        if (cy < minCy) minCy = cy;
+        if (cy > maxCy) maxCy = cy;
         found = true;
       }
     }
   }
-  return found ? { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY } : null;
+
+  if (!found) return null;
+  const w = maxCx - minCx, h = maxCy - minCy;
+  if (w < W * 0.05 || h < H * 0.05) return null; // too small — likely noise
+  return { cx: (minCx + maxCx) / 2, cy: (minCy + maxCy) / 2, w, h };
 }
 
 async function buildPoster(partnerName, qrDataUrl) {
