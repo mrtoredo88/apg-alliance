@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -306,6 +307,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgError, setTgError] = useState('');
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
   const tgPollRef = useRef(null);
   const tgStateRef = useRef(null);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
@@ -618,6 +620,28 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
 
             </div>}
+
+            {/* Email auth */}
+            {!isVK() && !showEmailAuth && tgStep === 'idle' && !tgLoading && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+                  <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>или</span>
+                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+                </div>
+                <button
+                  onClick={() => setShowEmailAuth(true)}
+                  style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: `1px solid ${T.border}`, cursor: 'pointer', background: T.chipBg, color: T.textPri, fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  ✉️ Войти по email
+                </button>
+              </>
+            )}
+
+            {showEmailAuth && (
+              <EmailAuth onCancel={() => setShowEmailAuth(false)} />
+            )}
+
           </div>
         </div>
       )}

@@ -239,6 +239,11 @@ export function UserApp() {
         vkBridge.send('VKWebAppGetUserInfo'),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
       ]).catch(() => {
+        // Email-пользователь (авторизован ранее)
+        try {
+          const emailRaw = localStorage.getItem('apg_email_user');
+          if (emailRaw) return JSON.parse(emailRaw);
+        } catch {}
         // Telegram-пользователь (авторизован через виджет ранее)
         try {
           const tgRaw = localStorage.getItem('apg_tg_user');
@@ -888,6 +893,7 @@ export function UserApp() {
   const handleLogout = useCallback(async () => {
     localStorage.setItem('manualLogout', 'true');
     localStorage.removeItem('apg_tg_user');
+    localStorage.removeItem('apg_email_user');
     localStorage.removeItem('apg_guest_id');
     localStorage.removeItem('apg_web_user');
     localStorage.removeItem('apg_notif_enabled');
