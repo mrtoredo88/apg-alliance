@@ -298,7 +298,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {} }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -335,11 +335,21 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           if (tgLinkingRef.current && user?.id) {
             // Режим привязки — записываем tgLinks, не перезагружаем
             tgLinkingRef.current = false;
+            const tgPayload = { tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name ?? null, photo: data.user.photo_200 ?? null };
             fetch('/api/email-auth', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name, photo: data.user.photo_200 }),
+              body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
             }).catch(() => {});
+            // Обновляем user в UserApp и в localStorage
+            onUserUpdate({ linkedTelegram: tgPayload });
+            try {
+              const stored = localStorage.getItem('apg_email_user');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                localStorage.setItem('apg_email_user', JSON.stringify({ ...parsed, linkedTelegram: tgPayload }));
+              }
+            } catch {}
             setTgStep('linked');
           } else {
             localStorage.setItem('apg_tg_user', JSON.stringify(data.user));

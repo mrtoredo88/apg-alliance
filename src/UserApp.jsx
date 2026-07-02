@@ -1323,6 +1323,7 @@ export function UserApp() {
                     lastBonusDate={lastBonusDate}
                     ownedPartner={ownedPartner}
                     onOpenPartnerCabinet={() => goPanel('partner-cabinet')}
+                    onUserUpdate={(patch) => setUser(u => ({ ...u, ...patch }))}
                   />
                 </Suspense>
               </Panel>
