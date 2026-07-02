@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
 import { QRCodeSVG } from 'qrcode.react';
+import { PartnerQRSection } from './PartnerQRSection.jsx';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
@@ -745,7 +746,12 @@ export const AdminPanel = () => {
     if (editingPartner) {
       await updateDoc(doc(db, 'partners', editingPartner.id), data);
     } else {
-      await addDoc(collection(db, 'partners'), { ...data, createdAt: serverTimestamp() });
+      const newRef = await addDoc(collection(db, 'partners'), { ...data, createdAt: serverTimestamp() });
+      // Persist QR values on the doc so they're always queryable
+      updateDoc(newRef, {
+        publicQRUrl:     `${APP_URL}/?partner=${newRef.id}`,
+        serviceQRValue:  newRef.id,
+      }).catch(() => {});
       // Уведомляем webpush-подписчиков о новом партнёре
       fetch('/api/send-push', {
         method: 'POST',
@@ -2800,30 +2806,45 @@ export const AdminPanel = () => {
       {/* QR-модал для партнёра */}
       {qrPartner && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
           onClick={() => setQrPartner(null)}
         >
           <div
             style={{
-              background: 'rgba(20,20,40,0.96)',
+              background: 'rgba(18,18,36,0.97)',
               backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
               border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 24, padding: 28, maxWidth: 320, width: '100%',
-              textAlign: 'center', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+              borderRadius: 24, padding: 20, maxWidth: 360, width: '100%',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+              maxHeight: '92vh', overflowY: 'auto',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 32, marginBottom: 8 }}>{qrPartner.emoji ?? '🏪'}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4, color: A.text }}>{qrPartner.name}</div>
-            <div style={{ fontSize: 12, color: A.textSec, marginBottom: 20 }}>ID: {qrPartner.id}</div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, background: '#fff', borderRadius: 16, padding: 12 }}>
-              <QRCodeSVG value={qrPartner.id} size={220} bgColor="#ffffff" fgColor="#0F0F1A" level="M" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ fontSize: 28 }}>{qrPartner.emoji ?? '🏪'}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qrPartner.name}</div>
+                <div style={{ fontSize: 10, color: A.textSec }}>QR-коды партнёра</div>
+              </div>
+              <button onClick={() => setQrPartner(null)} style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 13, flexShrink: 0 }}>✕</button>
             </div>
-            <div style={{ fontSize: 12, color: A.textSec, marginBottom: 20, lineHeight: '18px' }}>
-              Распечатайте этот QR-код и разместите у партнёра.<br/>
-              Клиент сканирует его через приложение АПГ и получает ключ.
+
+            {/* Stats summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+              {[
+                { icon: '📲', label: 'Серв. QR', value: qrPartner.totalVisits ?? 0 },
+                { icon: '🌐', label: 'Публ. QR', value: qrPartner.publicQRScans ?? 0 },
+                { icon: '👁', label: 'Просмотры', value: qrPartner.viewCount ?? 0 },
+              ].map(s2 => (
+                <div key={s2.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '9px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ fontSize: 16 }}>{s2.icon}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: A.gold, lineHeight: 1.1 }}>{s2.value}</div>
+                  <div style={{ fontSize: 9, color: A.textSec, marginTop: 2 }}>{s2.label}</div>
+                </div>
+              ))}
             </div>
-            <button onClick={() => setQrPartner(null)} style={{ ...s.btn, ...s.btnGray, width: '100%' }}>Закрыть</button>
+
+            <PartnerQRSection partner={qrPartner} />
           </div>
         </div>
       )}

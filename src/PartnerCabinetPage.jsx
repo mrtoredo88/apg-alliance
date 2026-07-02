@@ -4,6 +4,7 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
+import { PartnerQRSection } from './PartnerQRSection.jsx';
 
 const IMGBB_KEY = '0c37a46d4e13e9a30cddb1c79c8e6374';
 
@@ -126,6 +127,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
   if (!partner) return null;
 
   const totalVisits    = partner.totalVisits ?? 0;
+  const publicQRScans  = partner.publicQRScans ?? 0;
   const viewCount      = partner.viewCount ?? 0;
   const favoritesCount = partner.favoritesCount ?? 0;
   const avgRating      = partner.avgRating ?? 0;
@@ -158,7 +160,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
         </div>
         {/* Вкладки */}
         <div style={{ display: 'flex', gap: 8, paddingBottom: 12 }}>
-          {[['stats', '📊 Статистика'], ['edit', '✏️ Карточка']].map(([id, label]) => (
+          {[['stats', '📊 Статистика'], ['qr', '📲 QR-коды'], ['edit', '✏️ Карточка']].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)} style={{
               padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 700,
@@ -230,7 +232,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
               <>
                 <div style={{ fontSize: 11, color: T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>Ключевые метрики</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-                  <StatCard icon="📲" label="QR-сканирований" value={totalVisits} color={T.gold} />
+                  <StatCard icon="🔑" label="Служебный QR" value={totalVisits} color={T.gold} sub="ключи начислены" />
+                  <StatCard icon="🌐" label="Публичный QR" value={publicQRScans} color="#4A90D9" sub="переходов" />
                   <StatCard icon="👁" label="Просмотров карточки" value={viewCount} color={T.blue} />
                   <StatCard icon="❤️" label="В избранном" value={favoritesCount} color="#E64646" />
                   <StatCard
@@ -238,6 +241,9 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                     value={viewCount > 0 ? `${conversionPct}%` : '—'}
                     sub={viewCount > 0 ? 'просмотр → скан' : 'пока нет данных'}
                   />
+                  {(avgRating > 0 || ratingCount > 0) && (
+                    <StatCard icon="⭐" label="Средняя оценка" value={avgRating > 0 ? avgRating.toFixed(1) : '—'} color="#FFD700" sub={`${ratingCount} отзывов`} />
+                  )}
                 </div>
 
                 {/* Рейтинг */}
@@ -296,6 +302,14 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
               </>
             )}
           </>
+        )}
+
+        {/* ── QR-КОДЫ ── */}
+        {activeTab === 'qr' && (
+          <div style={{ ...GLASS, borderRadius: 24, padding: '16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.gold, marginBottom: 14 }}>📲 QR-коды партнёра</div>
+            <PartnerQRSection partner={partner} />
+          </div>
         )}
 
         {/* ── РЕДАКТИРОВАНИЕ ── */}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
+import { APP_URL } from './constants.js';
 import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
@@ -598,6 +599,21 @@ export function UserApp() {
     }
     isScanningRef.current = true;
 
+    // Public partner QR: value = "https://myapg.ru/?partner=<id>"
+    if (typeof placeIdentifier === 'string' && placeIdentifier.includes('?partner=')) {
+      const partnerId = new URL(placeIdentifier).searchParams.get('partner');
+      const p = enrichedPartners.find(ep => ep.id === partnerId);
+      setIsScannerOpen(false); isScanningRef.current = false;
+      if (p) {
+        openPartner(p);
+        showToast('📲 Это публичный QR — ключи не начисляются', 'info');
+        updateDoc(doc(db, 'partners', p.id), { publicQRScans: increment(1) }).catch(() => {});
+      } else {
+        showToast('🔍 Партнёр не найден');
+      }
+      return;
+    }
+
     // Expert QR: value = "expert_<id>"
     if (typeof placeIdentifier === 'string' && placeIdentifier.startsWith('expert_')) {
       const expertId = placeIdentifier.slice(7);
@@ -753,6 +769,7 @@ export function UserApp() {
     const p = partners.find(p => p.id === pendingPartnerId);
     if (p) {
       openPartner(p);
+      updateDoc(doc(db, 'partners', p.id), { publicQRScans: increment(1) }).catch(() => {});
     } else {
       showToast('🔍 Партнёр не найден');
     }
