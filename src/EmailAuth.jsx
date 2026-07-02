@@ -57,7 +57,7 @@ export function EmailAuth({ onCancel }) {
         onChange={e => { setEmail(e.target.value); setError(''); }}
         onKeyDown={e => e.key === 'Enter' && handleLogin()}
         placeholder="Ваш email"
-        style={{ ...inputBase, width: '100%', padding: '12px 14px', fontSize: 15, boxSizing: 'border-box' }}
+        style={{ ...inputBase, width: '100%', padding: '12px 14px', fontSize: 16, boxSizing: 'border-box' }}
       />
       {error && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{error}</div>}
       <button

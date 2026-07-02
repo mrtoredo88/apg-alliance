@@ -670,11 +670,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
       {/* ── Привязка Telegram для email-пользователей ── */}
       {!isVK() && user && String(user.id).startsWith('email:') && (
-        <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px' }}>
+        <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px', overflow: 'hidden' }}>
           <div style={{ fontSize: 12, color: T.textSec, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: user.emailVerified === false ? 8 : 10 }}>
-            <span style={{ fontSize: 13, color: T.textPri }}>✉️ Email</span>
-            <span style={{ fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: user.emailVerified === false ? 8 : 10, minWidth: 0 }}>
+            <span style={{ fontSize: 13, color: T.textPri, flexShrink: 0 }}>✉️ Email</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
             <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
           </div>
           {user.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
