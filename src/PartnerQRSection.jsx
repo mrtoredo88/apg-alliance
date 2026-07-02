@@ -231,6 +231,10 @@ export function PartnerQRSection({ partner }) {
       {/* ── Плакат ── */}
       {tab === 'poster' && (
         <div>
+          {/* Скрытый канвас для получения QR data URL при генерации плаката */}
+          <div ref={publicWrapRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', top: -9999 }}>
+            <QRCodeCanvas value={publicQRValue} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
+          </div>
           <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px', marginBottom: 12 }}>
             Фирменный плакат с публичным QR. Шаблон: <code style={{ fontSize: 10, color: T.gold }}>/qr-poster-template.png</code>.
             Для замены шаблона положите новый файл с тем же именем.
