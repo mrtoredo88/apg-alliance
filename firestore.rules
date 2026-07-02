@@ -99,6 +99,15 @@ service cloud.firestore {
       allow update: if request.auth != null;
     }
 
+    // ── Лог клиентских ошибок ─────────────────────────────────────────────────
+    // Пишет любой авторизованный пользователь (включая анонимов).
+    // Читает и обновляет (resolved) только AdminPanel.
+    match /errorLogs/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
     // ── Победители месяца — читают все, пишет только Admin SDK ───────────────
     match /monthlyWinners/{month} {
       allow read: if true;

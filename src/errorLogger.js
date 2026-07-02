@@ -1,5 +1,6 @@
-import { db } from './firebase.js';
+import { db, auth } from './firebase.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 
 let _userId = null;
 let _version = '?';
@@ -28,6 +29,11 @@ async function log(message, stack, source) {
   if (_seen.has(key)) return;
   _seen.add(key);
   _count++;
+
+  if (!auth.currentUser) {
+    await signInAnonymously(auth).catch(() => {});
+  }
+  if (!auth.currentUser) return;
 
   const { device, browser } = deviceInfo();
   try {
