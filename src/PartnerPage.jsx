@@ -621,11 +621,18 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
             </button>
           )}
           {partner.address && <button onClick={handleMap} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
-          {!isVK() && partner.websiteUrl && (
-            <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>
-              🌐 Сайт
-            </button>
-          )}
+          {!isVK() && partner.websiteUrl && (() => {
+            const isVkUrl = partner.websiteUrl.includes('vk.com') || partner.websiteUrl.includes('vkontakte.ru');
+            return isVkUrl ? (
+              <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+                🔵 ВКонтакте
+              </button>
+            ) : (
+              <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>
+                🌐 Сайт
+              </button>
+            );
+          })()}
           {partner.vkGroupUrl && (
             <button onClick={openVkGroup} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               🔵 ВКонтакте
