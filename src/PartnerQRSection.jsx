@@ -65,22 +65,45 @@ function openPosterPdfWindow(posterUrl, partnerName) {
   win.document.close();
 }
 
+function detectWhiteRegion(ctx, W, H) {
+  const data = ctx.getImageData(0, 0, W, H).data;
+  let minX = W, minY = H, maxX = 0, maxY = 0, found = false;
+  const step = 3;
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      const i = (y * W + x) * 4;
+      if (data[i + 3] > 200 && data[i] > 230 && data[i + 1] > 230 && data[i + 2] > 230) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        found = true;
+      }
+    }
+  }
+  return found ? { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY } : null;
+}
+
 async function buildPoster(partnerName, qrDataUrl) {
   const offscreen = document.createElement('canvas');
   const ctx = offscreen.getContext('2d');
 
-  const drawQR = (W, H) => new Promise(res => {
-    const qrSz = Math.round(W * POSTER_QR_W);
-    const qrX  = Math.round(W * POSTER_QR_CX - qrSz / 2);
-    const qrY  = Math.round(H * POSTER_QR_CY - qrSz / 2);
-    const pad  = Math.round(qrSz * 0.07);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(qrX - pad, qrY - pad, qrSz + pad * 2, qrSz + pad * 2);
+  const placeQR = (cx, cy, size) => new Promise(res => {
     const img = new Image();
-    img.onload  = () => { ctx.drawImage(img, qrX, qrY, qrSz, qrSz); res(offscreen.toDataURL('image/png', 1.0)); };
+    img.onload  = () => { ctx.drawImage(img, Math.round(cx - size / 2), Math.round(cy - size / 2), size, size); res(offscreen.toDataURL('image/png', 1.0)); };
     img.onerror = () => res(offscreen.toDataURL('image/png', 1.0));
     img.src = qrDataUrl;
   });
+
+  const drawQRFallback = (W, H) => {
+    const size = Math.round(W * POSTER_QR_W);
+    const cx = W * POSTER_QR_CX;
+    const cy = H * POSTER_QR_CY;
+    const pad = Math.round(size * 0.07);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(Math.round(cx - size / 2) - pad, Math.round(cy - size / 2) - pad, size + pad * 2, size + pad * 2);
+    return placeQR(cx, cy, size);
+  };
 
   return new Promise(resolve => {
     const tmpl = new Image();
@@ -90,7 +113,14 @@ async function buildPoster(partnerName, qrDataUrl) {
       offscreen.width  = tmpl.naturalWidth;
       offscreen.height = tmpl.naturalHeight;
       ctx.drawImage(tmpl, 0, 0);
-      resolve(await drawQR(tmpl.naturalWidth, tmpl.naturalHeight));
+
+      const region = detectWhiteRegion(ctx, offscreen.width, offscreen.height);
+      if (region) {
+        const size = Math.round(Math.min(region.w, region.h) * 0.82);
+        resolve(await placeQR(region.cx, region.cy, size));
+      } else {
+        resolve(await drawQRFallback(offscreen.width, offscreen.height));
+      }
     };
 
     tmpl.onerror = async () => {
@@ -99,14 +129,11 @@ async function buildPoster(partnerName, qrDataUrl) {
       offscreen.width = W; offscreen.height = H;
       ctx.fillStyle = '#0F0F1A';
       ctx.fillRect(0, 0, W, H);
-      // Gold frame
       ctx.strokeStyle = '#C9A84C'; ctx.lineWidth = 14;
       ctx.strokeRect(44, 44, W - 88, H - 88);
-      // Subtitle
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(201,168,76,0.7)'; ctx.font = 'bold 38px Arial';
       ctx.fillText('АЛЬЯНС ПАРТНЁРОВ ГОРОДА · ЗЕЛЕНОГРАД', W / 2, 130);
-      // Partner name (word-wrap)
       ctx.fillStyle = '#ffffff'; ctx.font = 'bold 72px Arial';
       const words = partnerName.split(' ');
       let line = ''; let y = 260;
@@ -117,10 +144,9 @@ async function buildPoster(partnerName, qrDataUrl) {
         } else { line = test; }
       });
       if (line.trim()) ctx.fillText(line.trim(), W / 2, y);
-      // Footer
       ctx.fillStyle = 'rgba(201,168,76,0.5)'; ctx.font = '32px Arial';
       ctx.fillText('myapg.ru', W / 2, H - 80);
-      resolve(await drawQR(W, H));
+      resolve(await drawQRFallback(W, H));
     };
 
     tmpl.src = POSTER_TEMPLATE_URL;
