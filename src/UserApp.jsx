@@ -315,7 +315,10 @@ export function UserApp() {
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
       if (userData && isMounted.current) {
-        const owned = freshPartners.find(p => p.vkOwnerId && String(p.vkOwnerId) === String(userData.id));
+        const owned = freshPartners.find(p =>
+          (p.ownerEmail && userData.email && p.ownerEmail.toLowerCase() === userData.email.toLowerCase()) ||
+          (p.vkOwnerId && String(p.vkOwnerId) === String(userData.id))
+        );
         setOwnedPartner(owned ?? null);
       }
 
@@ -347,7 +350,10 @@ export function UserApp() {
       if (isMounted.current) {
         setExperts(freshExperts);
         if (userData) {
-          const ownedEx = freshExperts.find(e => e.vkOwnerId && String(e.vkOwnerId) === String(userData.id));
+          const ownedEx = freshExperts.find(e =>
+            (e.ownerEmail && userData.email && e.ownerEmail.toLowerCase() === userData.email.toLowerCase()) ||
+            (e.vkOwnerId && String(e.vkOwnerId) === String(userData.id))
+          );
           setOwnedExpert(ownedEx ?? null);
         }
       }

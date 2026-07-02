@@ -408,7 +408,7 @@ export const AdminPanel = () => {
   const [exBooking, setExBooking]   = useState('');
   const [exKeys, setExKeys]         = useState('1');
   const [exVerified, setExVerified] = useState(false);
-  const [exVkOwnerId, setExVkOwnerId] = useState('');
+  const [exOwnerEmail, setExOwnerEmail] = useState('');
   const [exActive, setExActive]     = useState(true);
   const [exOnline, setExOnline]     = useState(false);
   const [exOffline, setExOffline]   = useState(false);
@@ -466,7 +466,7 @@ export const AdminPanel = () => {
   const [pSocial, setPSocial] = useState('');
   const [pOffer, setPOffer] = useState('');
   const [pStampTarget, setPStampTarget] = useState('');
-  const [pVkOwnerId, setPVkOwnerId] = useState('');
+  const [pOwnerEmail, setPOwnerEmail] = useState('');
   const [pBooking, setPBooking]           = useState('');
   const [pWebsite, setPWebsite]           = useState('');
   const [pTelegramCom, setPTelegramCom]   = useState('');
@@ -578,7 +578,7 @@ export const AdminPanel = () => {
   const resetExpertForm = () => {
     setEditingExpert(null); setExName(''); setExSpec(''); setExDesc('');
     setExPhoto(''); setExPhone(''); setExVkUrl(''); setExBooking('');
-    setExKeys('1'); setExVerified(false); setExActive(true); setExVkOwnerId('');
+    setExKeys('1'); setExVerified(false); setExActive(true); setExOwnerEmail('');
     setExOnline(false); setExOffline(false); setExGroup(false);
     setExTelegram(''); setExWebsite(''); setExMax('');
     setExCategory('other'); setExTier('practice');
@@ -593,7 +593,7 @@ export const AdminPanel = () => {
     setExPhoto(ex.photo ?? ''); setExPhone(ex.phone ?? ''); setExVkUrl(ex.vkUrl ?? '');
     setExBooking(ex.bookingUrl ?? ''); setExKeys(String(ex.keys ?? 1));
     setExVerified(ex.verified ?? false); setExActive(ex.active !== false);
-    setExVkOwnerId(String(ex.vkOwnerId ?? ''));
+    setExOwnerEmail(ex.ownerEmail ?? '');
     setExOnline(ex.formats?.includes('online') ?? false);
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
@@ -627,7 +627,7 @@ export const AdminPanel = () => {
       photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
       bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
-      vkOwnerId: exVkOwnerId.trim() || null,
+      ownerEmail: exOwnerEmail.trim().toLowerCase() || null,
       telegramUrl: normalizeUrl(exTelegram),
       websiteUrl: normalizeUrl(exWebsite),
       maxUrl: normalizeUrl(exMax),
@@ -661,7 +661,7 @@ export const AdminPanel = () => {
   const resetPartnerForm = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
     setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
-    setPStampTarget(''); setPVkOwnerId('');
+    setPStampTarget(''); setPOwnerEmail('');
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
@@ -675,7 +675,7 @@ export const AdminPanel = () => {
     setPEmoji(p.emoji ?? '🏪'); setPLogo(p.logoUrl ?? ''); setPPhone(p.phone ?? '');
     setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? '');
     setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
-    setPVkOwnerId(p.vkOwnerId ?? '');
+    setPOwnerEmail(p.ownerEmail ?? '');
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
     setPTelegramCom(p.telegramCommunityUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? '');
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
@@ -702,7 +702,7 @@ export const AdminPanel = () => {
       phone: pPhone.trim(), address: pAddress.trim(),
       hours: pHours.trim(), socialUrl: pSocial.trim(), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
-      vkOwnerId: pVkOwnerId.trim() || null,
+      ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
       bookingUrl: normalizeUrl(pBooking),
       websiteUrl: normalizeUrl(pWebsite),
       telegramCommunityUrl: normalizeUrl(pTelegramCom),
@@ -1408,8 +1408,8 @@ export const AdminPanel = () => {
             <label style={s.label}>Ключей за QR-скан</label>
             <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />
 
-            <label style={s.label}>VK ID владельца (для личной ссылки)</label>
-            <input style={s.input} placeholder="123456789" value={exVkOwnerId} onChange={e => setExVkOwnerId(e.target.value)} />
+            <label style={s.label}>Email владельца (для доступа к кабинету)</label>
+            <input style={s.input} type="email" placeholder="expert@example.com" value={exOwnerEmail} onChange={e => setExOwnerEmail(e.target.value)} />
 
             <label style={s.label}>Форматы работы</label>
             <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -1588,15 +1588,16 @@ export const AdminPanel = () => {
             <input style={s.input} placeholder="https://..." value={pMaxCom} onChange={e => setPMaxCom(e.target.value)} />
 
             <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
-              <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 VK ID владельца заведения</label>
+              <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 Email владельца заведения</label>
               <input
+                type="email"
                 style={{ ...s.input, marginBottom: 0, background: 'rgba(255,255,255,0.06)' }}
-                placeholder="Например: 123456789"
-                value={pVkOwnerId}
-                onChange={e => setPVkOwnerId(e.target.value)}
+                placeholder="owner@example.com"
+                value={pOwnerEmail}
+                onChange={e => setPOwnerEmail(e.target.value)}
               />
               <div style={{ fontSize: 11, color: A.gold, marginTop: 6, opacity: 0.8 }}>
-                Пользователь с этим VK ID получит доступ к статистике своего заведения в приложении
+                Пользователь с этим email получит доступ к статистике своего заведения в приложении
               </div>
             </div>
 

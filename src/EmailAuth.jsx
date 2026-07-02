@@ -160,7 +160,7 @@ export function EmailAuth({ onCancel }) {
       </div>
 
       {/* 6 цифровых полей */}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }} onPaste={handlePaste}>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', width: '100%', maxWidth: 300 }} onPaste={handlePaste}>
         {digits.map((d, i) => (
           <input
             key={i}
@@ -175,7 +175,7 @@ export function EmailAuth({ onCancel }) {
             disabled={loading}
             style={{
               ...inputBase,
-              width: 44, height: 52,
+              flex: 1, minWidth: 0, height: 52,
               textAlign: 'center',
               fontSize: 22, fontWeight: 800,
               border: `1.5px solid ${d ? T.blue : T.border}`,

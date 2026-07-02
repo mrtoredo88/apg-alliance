@@ -35,10 +35,15 @@ export default async function handler(req, res) {
 
     if (data.status === 'done') {
       ref.delete().catch(() => {});
+      const tgId = `tg_${data.tgUserId}`;
+      // Проверяем привязку к email-аккаунту
+      const linkSnap = await db.collection('tgLinks').doc(tgId).get();
+      const linkedUserId = linkSnap.exists ? linkSnap.data().userId : null;
       return res.json({
         status: 'done',
+        tgId,
         user: {
-          id:         `tg_${data.tgUserId}`,
+          id:         linkedUserId ?? tgId,
           first_name: data.firstName ?? '',
           last_name:  data.lastName  ?? '',
           photo_200:  data.photoUrl  ?? null,

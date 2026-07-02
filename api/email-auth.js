@@ -136,6 +136,25 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── LINK TELEGRAM ───────────────────────────────────────────────────────────
+  if (action === 'link-telegram') {
+    const { userId, tgId, firstName, lastName, photo } = req.body ?? {};
+    if (!userId || !tgId) return res.status(400).json({ ok: false, error: 'missing_fields' });
+
+    // Проверяем что tgId не привязан к другому аккаунту
+    const existingLink = await db.collection('tgLinks').doc(tgId).get();
+    if (existingLink.exists && existingLink.data().userId !== userId) {
+      return res.status(409).json({ ok: false, error: 'already_linked', message: 'Этот Telegram уже привязан к другому аккаунту' });
+    }
+
+    await db.collection('tgLinks').doc(tgId).set({ userId, createdAt: FieldValue.serverTimestamp() });
+    await db.collection('users').doc(userId).update({
+      linkedTelegram: { tgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
+    }).catch(() => {});
+
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ ok: false, error: 'invalid_action' });
 }
 

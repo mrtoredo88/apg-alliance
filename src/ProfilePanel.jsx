@@ -310,6 +310,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [showEmailAuth, setShowEmailAuth] = useState(false);
   const tgPollRef = useRef(null);
   const tgStateRef = useRef(null);
+  const tgLinkingRef = useRef(false);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const stopPolling = useCallback(() => {
@@ -331,8 +332,19 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         if (data.status === 'done') {
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
-          localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
-          window.location.reload();
+          if (tgLinkingRef.current && user?.id) {
+            // Режим привязки — записываем tgLinks, не перезагружаем
+            tgLinkingRef.current = false;
+            fetch('/api/email-auth', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name, photo: data.user.photo_200 }),
+            }).catch(() => {});
+            setTgStep('linked');
+          } else {
+            localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
+            window.location.reload();
+          }
         } else if (data.status === 'expired' || data.status === 'not_found') {
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
@@ -349,9 +361,10 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     };
 
     poll();
-  }, [stopPolling]);
+  }, [stopPolling, user]);
 
-  const handleTelegramAuth = useCallback(async () => {
+  const handleTelegramAuth = useCallback(async (isLinking = false) => {
+    tgLinkingRef.current = isLinking;
     setTgLoading(true);
     setTgError('');
     stopPolling();
@@ -544,105 +557,103 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>✦ Профиль</div>
       </div>
 
-      {/* ── VK Login (веб-режим, гость) ── */}
-      {isGuest && (
-        <div style={{ margin: '14px 16px 0', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(0,119,255,0.25)', background: isDark ? 'rgba(0,80,200,0.1)' : 'rgba(0,100,255,0.07)' }}>
+      {/* ── Вход (гостевой режим) ── */}
+      {isGuest && !isVK() && (
+        <div style={{ margin: '14px 16px 0', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(74,144,217,0.3)', background: isDark ? 'rgba(74,144,217,0.08)' : 'rgba(74,144,217,0.06)' }}>
           <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(0,119,255,0.15)', border: '1px solid rgba(0,119,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="#0077FF">
-                  <path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.409 2.519h3.079c.701 0 1.092-.271.879-.951-.562-1.784-2.092-3.271-3.514-4.735-1.271-1.308-.879-1.953.122-3.294 1.438-1.918 3.608-5.004 2.087-5.004h-3.197c-.64 0-.949.455-1.192 1.004-.903 1.966-2.364 4.012-3.166 3.548-.645-.376-.523-1.472-.497-3.351.01-.79.01-1.666-1.12-1.87-.611-.111-1.236-.127-1.862-.008C9.498 4.658 8.389 6.026 7.829 6.9c-1.344 2.089-3.608 6.637-3.608 6.637s-.274.603.338.603h3.164c.604 0 .784-.335 1.036-1.002.394-1.05.898-2.177 1.498-3.054.578-.848 1.048-1.037 1.048-.278 0 .278-.04 1.476-.098 2.574-.113 2.126.405 2.897 1.955 2.614z"/>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri }}>Войдите через ВКонтакте</div>
-                <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>чтобы сохранить прогресс и ключи</div>
-              </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, marginBottom: 3 }}>Войдите в АПГ</div>
+              <div style={{ fontSize: 12, color: T.textSec }}>чтобы сохранить прогресс и ключи</div>
             </div>
-            {/* VK login временно скрыт до прохождения модерации */}
-            {false && <>
+
+            {/* Email — первичный способ входа */}
+            {!showEmailAuth && tgStep === 'idle' && !tgLoading && (
               <button
-                onClick={handleVkLogin}
-                disabled={vkLoginLoading}
-                style={{
-                  width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-                  cursor: vkLoginLoading ? 'default' : 'pointer',
-                  background: vkLoginLoading ? 'rgba(0,119,255,0.3)' : 'linear-gradient(135deg, #0077FF, #005DC1)',
-                  color: '#fff', fontSize: 14, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: vkLoginLoading ? 'none' : '0 4px 16px rgba(0,119,255,0.35)',
-                }}
+                onClick={() => setShowEmailAuth(true)}
+                style={{ width: '100%', padding: '13px 0', borderRadius: 13, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 16px rgba(74,144,217,0.4)' }}
               >
-                {vkLoginLoading
-                  ? <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  : 'Войти через ВКонтакте'
-                }
+                ✉️ Войти по email
               </button>
-              {vkLoginError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{vkLoginError}</div>}
-            </>}
+            )}
+            {showEmailAuth && <EmailAuth onCancel={() => setShowEmailAuth(false)} />}
 
-            {/* Telegram (скрыт в VK Mini App — п. 4.1.8 правил VK) */}
-            {!isVK() && <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-              <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>или</span>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-            </div>}
-
-            {!isVK() && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-              {tgLoading
-                ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: T.textSec, fontSize: 14, padding: '12px 0' }}>
-                    <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                    Создаём сессию...
-                  </div>
-                : tgStep === 'waiting'
-                  ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '4px 0', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#26A8EA', fontSize: 13, fontWeight: 600 }}>
-                        <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                        Ждём подтверждения в Telegram...
-                      </div>
-                      <a
-                        href={tgBotUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ display: 'block', width: '100%', padding: '11px 0', borderRadius: 12, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}
-                      >
-                        Открыть Telegram
-                      </a>
-                    </div>
-                  : <button
-                      onClick={handleTelegramAuth}
-                      style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #26A8EA, #1A8BC4)', color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 16px rgba(38,168,234,0.35)' }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
-                      Войти через Telegram
-                    </button>
-              }
-              {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
-
-            </div>}
-
-            {/* Email auth */}
-            {!isVK() && !showEmailAuth && tgStep === 'idle' && !tgLoading && (
+            {/* Telegram — дополнительный способ */}
+            {!showEmailAuth && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                   <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>или</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                 </div>
-                <button
-                  onClick={() => setShowEmailAuth(true)}
-                  style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: `1px solid ${T.border}`, cursor: 'pointer', background: T.chipBg, color: T.textPri, fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  ✉️ Войти по email
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                  {tgLoading
+                    ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: T.textSec, fontSize: 14, padding: '12px 0' }}>
+                        <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        Создаём сессию...
+                      </div>
+                    : tgStep === 'waiting'
+                      ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '4px 0', width: '100%' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#26A8EA', fontSize: 13, fontWeight: 600 }}>
+                            <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            Ждём подтверждения в Telegram...
+                          </div>
+                          <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', padding: '11px 0', borderRadius: 12, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
+                            Открыть Telegram
+                          </a>
+                        </div>
+                      : <button onClick={handleTelegramAuth} style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: `1px solid rgba(38,168,234,0.3)`, cursor: 'pointer', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="#26A8EA"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
+                          Войти через Telegram
+                        </button>
+                  }
+                  {tgError && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{tgError}</div>}
+                </div>
               </>
             )}
 
-            {showEmailAuth && (
-              <EmailAuth onCancel={() => setShowEmailAuth(false)} />
-            )}
-
           </div>
+        </div>
+      )}
+
+      {/* ── Привязка Telegram для email-пользователей ── */}
+      {!isVK() && user && String(user.id).startsWith('email:') && (
+        <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px' }}>
+          <div style={{ fontSize: 12, color: T.textSec, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: T.textPri }}>✉️ Email</span>
+            <span style={{ fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px' }}>✓ подключён</span>
+          </div>
+          {user.linkedTelegram
+            ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: T.textPri }}>✈️ Telegram</span>
+                <span style={{ fontSize: 11, color: T.textSec }}>{user.linkedTelegram.firstName}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px' }}>✓ привязан</span>
+              </div>
+            : tgStep === 'linked'
+              ? <div style={{ fontSize: 13, color: T.green, fontWeight: 600, textAlign: 'center', padding: '6px 0' }}>✓ Telegram привязан!</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {tgLoading
+                    ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSec, fontSize: 13, padding: '6px 0' }}>
+                        <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        Создаём сессию...
+                      </div>
+                    : tgStep === 'waiting'
+                      ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#26A8EA', fontSize: 12, fontWeight: 600 }}>
+                            <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            Ждём подтверждения...
+                          </div>
+                          <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 13, fontWeight: 700, textAlign: 'center', textDecoration: 'none' }}>Открыть Telegram</a>
+                        </div>
+                      : <button onClick={() => handleTelegramAuth(true)} style={{ padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.3)', background: 'rgba(38,168,234,0.08)', color: '#26A8EA', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="#26A8EA"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
+                          Привязать Telegram
+                        </button>
+                  }
+                  {tgError && <div style={{ fontSize: 12, color: '#E64646' }}>{tgError}</div>}
+                </div>
+          }
         </div>
       )}
 

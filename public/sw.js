@@ -105,10 +105,14 @@ self.addEventListener('push', e => {
       body,
       icon:              '/192.png',
       badge:             '/32.png',
+      image:             '/logo.webp',
       data,
       tag:               data.tag ?? 'apg-push',
       renotify:          true,
       requireInteraction: false,
+      actions: [
+        { action: 'open', title: '🏙️ Открыть приложение' },
+      ],
     })
   );
 });
