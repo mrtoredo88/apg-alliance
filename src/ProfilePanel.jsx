@@ -232,7 +232,7 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
         {/* Кнопки */}
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onShareVK} style={{ flex: 1, padding: '14px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-            📤 Поделиться в VK
+            📤 Поделиться
           </button>
           <button onClick={onClose} style={{ padding: '14px 20px', borderRadius: 16, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textPri, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Закрыть
@@ -1225,15 +1225,15 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           unlockedAchievements={achievements.filter(a => a.unlocked).length}
           level={level}
           onClose={() => setShowShareModal(false)}
-          onShareVK={() => {
+          onShareVK={async () => {
             const name = user ? user.first_name : 'Я';
             const levelLabel = level.label;
             const msg = `${name} — участник АПГ!\n\n🗝️ ${userKeys} ключей · ${levelLabel}\n🔥 Стрик: ${streak} дней\n🏪 Партнёров посещено: ${scannedCount}\n\nПрисоединяйся к Альянсу Партнёров Зеленограда 👇`;
-            vkBridge.send('VKWebAppShowWallPostBox', {
-              message: msg,
-              attachments: APP_URL,
-            }).catch(() => {});
             setShowShareModal(false);
+            if (navigator.share) {
+              try { await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: msg, url: APP_URL }); return; } catch (err) { if (err.name === 'AbortError') return; }
+            }
+            vkBridge.send('VKWebAppShare', { link: APP_URL, text: msg }).catch(() => {});
           }}
         />,
         document.body
