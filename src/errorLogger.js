@@ -45,6 +45,12 @@ async function log(message, stack, source) {
   } catch { /* не логируем ошибки логгера */ }
 }
 
+export function logError(error, source) {
+  const msg = error?.message ?? String(error);
+  const stack = error?.stack ?? String(source ?? '');
+  log(msg, stack, String(source ?? '').slice(0, 300));
+}
+
 export function initErrorLogger() {
   window.onerror = (msg, src, line, col, err) => {
     log(msg, err?.stack ?? `${src}:${line}:${col}`, src);

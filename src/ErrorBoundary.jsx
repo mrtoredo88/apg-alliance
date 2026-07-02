@@ -1,4 +1,5 @@
 import React from 'react';
+import { logError } from './errorLogger.js';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,6 +13,7 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('[APG] Uncaught error:', error, info.componentStack);
+    logError(error, 'ErrorBoundary:' + (info.componentStack ?? '').slice(0, 200));
   }
 
   render() {
