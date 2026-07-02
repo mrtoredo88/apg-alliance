@@ -148,8 +148,12 @@ export default async function handler(req, res) {
     }
 
     await db.collection('tgLinks').doc(tgId).set({ userId, createdAt: FieldValue.serverTimestamp() });
+    const tgName = [firstName, lastName].filter(Boolean).join(' ') || null;
     await db.collection('users').doc(userId).update({
       linkedTelegram: { tgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
+      ...(firstName  ? { firstName, displayName: tgName } : {}),
+      ...(lastName   ? { lastName } : {}),
+      ...(photo      ? { photo } : {}),
     }).catch(() => {});
 
     return res.status(200).json({ ok: true });

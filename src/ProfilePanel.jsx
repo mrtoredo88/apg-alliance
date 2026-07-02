@@ -341,13 +341,20 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
             }).catch(() => {});
-            // Обновляем user в UserApp и в localStorage
-            onUserUpdate({ linkedTelegram: tgPayload });
+            // Обновляем user в UserApp и в localStorage — имя и аватар из Telegram
+            const tgName = [tgPayload.firstName, tgPayload.lastName].filter(Boolean).join(' ') || null;
+            const userPatch = {
+              linkedTelegram: tgPayload,
+              ...(tgPayload.firstName ? { first_name: tgPayload.firstName, displayName: tgName } : {}),
+              ...(tgPayload.lastName  ? { last_name:  tgPayload.lastName  } : {}),
+              ...(tgPayload.photo     ? { photo_200:  tgPayload.photo     } : {}),
+            };
+            onUserUpdate(userPatch);
             try {
               const stored = localStorage.getItem('apg_email_user');
               if (stored) {
                 const parsed = JSON.parse(stored);
-                localStorage.setItem('apg_email_user', JSON.stringify({ ...parsed, linkedTelegram: tgPayload }));
+                localStorage.setItem('apg_email_user', JSON.stringify({ ...parsed, ...userPatch }));
               }
             } catch {}
             setTgStep('linked');
