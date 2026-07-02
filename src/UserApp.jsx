@@ -467,10 +467,11 @@ export function UserApp() {
 
         if (isValidRef) {
           localStorage.removeItem('apg_pending_ref');
-          // Начисляем рефереру +2 ключа и +1 к счётчику
-          updateDoc(doc(db, 'users', refId), {
-            keys: increment(2),
-            referralCount: increment(1),
+          // Начисляем рефереру через Admin SDK (клиент не может писать в чужой users-doc)
+          fetch('/api/email-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'grant-referral', referrerId: refId, newUserId: String(userData.id) }),
           }).catch(() => {});
           if (isMounted.current) {
             setTimeout(() => {

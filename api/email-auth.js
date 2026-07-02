@@ -159,6 +159,29 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── GRANT REFERRAL BONUS ────────────────────────────────────────────────────
+  // Клиент не может писать в чужой users-документ (Firestore rules isOwner).
+  // Поэтому реферальный бонус рефереру начисляем через Admin SDK здесь.
+  if (action === 'grant-referral') {
+    const { referrerId, newUserId } = req.body ?? {};
+    if (!referrerId || !newUserId) return res.status(400).json({ ok: false, error: 'missing_fields' });
+
+    // Проверяем что newUser действительно был создан с этим referredBy
+    const newUserSnap = await db.collection('users').doc(newUserId).get();
+    if (!newUserSnap.exists) return res.status(404).json({ ok: false, error: 'user_not_found' });
+    const newUserData = newUserSnap.data();
+    if (newUserData.referredBy !== referrerId) return res.status(403).json({ ok: false, error: 'ref_mismatch' });
+    if (newUserData.referralBonusGranted) return res.status(409).json({ ok: false, error: 'already_granted' });
+
+    await db.collection('users').doc(referrerId).update({
+      keys: FieldValue.increment(2),
+      referralCount: FieldValue.increment(1),
+    }).catch(() => {});
+    await db.collection('users').doc(newUserId).update({ referralBonusGranted: true });
+
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ ok: false, error: 'invalid_action' });
 }
 
