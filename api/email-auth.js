@@ -182,7 +182,91 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── LOGIN (мгновенный вход, без кода) ────────────────────────────────────────
+  if (action === 'login') {
+    const { ref } = req.body ?? {};
+    const userId = await resolveEmailUser(db, email, ref ?? null);
+    const userSnap = await db.collection('users').doc(userId).get();
+    const ud = userSnap.data() ?? {};
+    // Отправляем письмо-подтверждение только если ещё не подтверждён
+    if (ud.emailVerified === false) {
+      sendVerificationEmail(db, email, userId, APP_URL).catch(() => {});
+    }
+    return res.status(200).json({
+      ok: true,
+      user: {
+        id: userId,
+        first_name: ud.firstName ?? email.split('@')[0],
+        last_name:  ud.lastName  ?? '',
+        photo_200:  ud.photo     ?? null,
+        email,
+        emailVerified: ud.emailVerified ?? null,
+      },
+    });
+  }
+
+  // ── VERIFY-EMAIL (переход по ссылке из письма) ────────────────────────────
+  if (action === 'verify-email') {
+    const { token } = req.body ?? {};
+    if (!token) return res.status(400).json({ ok: false, error: 'missing_token' });
+    const tokenSnap = await db.collection('emailVerifyTokens').doc(String(token)).get();
+    if (!tokenSnap.exists) return res.status(404).json({ ok: false, error: 'invalid_token' });
+    const { userId, expiresAt } = tokenSnap.data();
+    await db.collection('emailVerifyTokens').doc(String(token)).delete();
+    if (expiresAt.toMillis() < Date.now()) {
+      return res.status(400).json({ ok: false, error: 'token_expired' });
+    }
+    await db.collection('users').doc(userId).update({ emailVerified: true }).catch(() => {});
+    return res.status(200).json({ ok: true, userId });
+  }
+
+  // ── RESEND-VERIFICATION (повторная отправка из профиля) ───────────────────
+  if (action === 'resend-verification') {
+    const { userId } = req.body ?? {};
+    if (!userId) return res.status(400).json({ ok: false, error: 'missing_fields' });
+    const userSnap = await db.collection('users').doc(userId).get();
+    if (!userSnap.exists) return res.status(404).json({ ok: false, error: 'user_not_found' });
+    const ud = userSnap.data();
+    if (ud.emailVerified) return res.status(200).json({ ok: true, alreadyVerified: true });
+    const userEmail = ud.email ?? email;
+    if (!userEmail) return res.status(400).json({ ok: false, error: 'no_email' });
+    await sendVerificationEmail(db, userEmail, userId, APP_URL);
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ ok: false, error: 'invalid_action' });
+}
+
+async function sendVerificationEmail(db, email, userId, appUrl) {
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  await db.collection('emailVerifyTokens').doc(token).set({
+    email, userId,
+    expiresAt: Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  const verifyUrl = `${appUrl}/?verify_email=${token}`;
+  const transport = nodemailer.createTransport({
+    host: 'smtp.yandex.ru', port: 465, secure: true,
+    auth: { user: process.env.YANDEX_EMAIL, pass: process.env.YANDEX_EMAIL_PASS },
+  });
+  await transport.sendMail({
+    from: `АПГ <${process.env.YANDEX_EMAIL}>`,
+    to: email,
+    subject: 'Подтвердите адрес электронной почты — АПГ',
+    text: [
+      'Добро пожаловать в АПГ Зеленоград!',
+      '',
+      'Нажмите на ссылку, чтобы подтвердить адрес электронной почты:',
+      '',
+      verifyUrl,
+      '',
+      'Ссылка действительна 48 часов.',
+      'Если вы не регистрировались в приложении АПГ — просто проигнорируйте это письмо.',
+      '',
+      'С уважением, команда АПГ',
+      'myapg.ru',
+    ].join('\n'),
+  });
 }
 
 async function resolveEmailUser(db, email, ref) {
@@ -222,6 +306,7 @@ async function resolveEmailUser(db, email, ref) {
     scanDates: [],
     lastBonusDate: today,
     referredBy: isValidRef ? ref : null,
+    emailVerified: false,
     registeredAt: FieldValue.serverTimestamp(),
   });
 

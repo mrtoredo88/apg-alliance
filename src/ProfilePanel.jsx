@@ -9,6 +9,42 @@ import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 
+function EmailVerifyBanner({ userId }) {
+  const [sent, setSent]       = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const resend = async () => {
+    if (loading || sent) return;
+    setLoading(true);
+    try {
+      await fetch('/api/email-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'resend-verification', userId }),
+      });
+      setSent(true);
+    } catch {}
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 12, padding: '10px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 16, flexShrink: 0 }}>📬</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: T.gold, fontWeight: 600, lineHeight: '16px' }}>Подтвердите адрес почты</div>
+        <div style={{ fontSize: 11, color: T.textSec, lineHeight: '15px' }}>Письмо уже отправлено при входе</div>
+      </div>
+      <button
+        onClick={resend}
+        disabled={loading || sent}
+        style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: `1px solid rgba(201,168,76,0.35)`, background: 'none', color: sent ? T.textSec : T.gold, fontSize: 11, fontWeight: 700, cursor: sent ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
+      >
+        {sent ? '✓ Отправлено' : loading ? '...' : 'Отправить ещё раз'}
+      </button>
+    </div>
+  );
+}
+
 const ACHIEVEMENTS = [
   { id: 'first_scan',   title: 'Первый шаг',    emoji: '🎯', color: '#4A90D9', cond: (k)       => k >= 1 },
   { id: 'five_keys',    title: 'Коллекционер',  emoji: '🗝️', color: '#C9A84C', cond: (k)       => k >= 5 },
@@ -636,11 +672,12 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
       {!isVK() && user && String(user.id).startsWith('email:') && (
         <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px' }}>
           <div style={{ fontSize: 12, color: T.textSec, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: user.emailVerified === false ? 8 : 10 }}>
             <span style={{ fontSize: 13, color: T.textPri }}>✉️ Email</span>
             <span style={{ fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px' }}>✓ подключён</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
           </div>
+          {user.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
           {user.linkedTelegram
             ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 13, color: T.textPri }}>✈️ Telegram</span>

@@ -139,6 +139,30 @@ export function UserApp() {
   }, []);
   const scanDeepLinkTriggered = useRef(false);
 
+  // Подтверждение email по ссылке из письма: ?verify_email=TOKEN
+  const verifyEmailToken = useMemo(() => new URLSearchParams(window.location.search).get('verify_email'), []);
+
+  useEffect(() => {
+    if (!verifyEmailToken) return;
+    fetch('/api/email-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify-email', token: verifyEmailToken }),
+    }).then(r => r.json()).then(data => {
+      if (data.ok) {
+        setUser(u => u ? { ...u, emailVerified: true } : u);
+        try {
+          const stored = localStorage.getItem('apg_email_user');
+          if (stored) localStorage.setItem('apg_email_user', JSON.stringify({ ...JSON.parse(stored), emailVerified: true }));
+        } catch {}
+        showToast('✅ Email подтверждён!', 'success');
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('verify_email');
+      window.history.replaceState({}, '', url.toString());
+    }).catch(() => {});
+  }, [verifyEmailToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const haptic = useCallback((style = 'light') => {
     vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
   }, []);
