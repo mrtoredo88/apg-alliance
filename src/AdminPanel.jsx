@@ -1614,14 +1614,14 @@ export const AdminPanel = () => {
             <label style={s.label}>Часы работы</label>
             <input style={s.input} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={pHours} onChange={e => setPHours(e.target.value)} />
 
-            <label style={s.label}>Соцсеть / сайт</label>
-            <input style={s.input} placeholder="https://vk.com/..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
+            <label style={s.label}>Сайт партнёра</label>
+            <input style={s.input} placeholder="https://..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
 
             <label style={s.label}>Онлайн-запись (Yclients, Dikidi и др.)</label>
             <input style={s.input} placeholder="https://..." value={pBooking} onChange={e => setPBooking(e.target.value)} />
 
-            <label style={s.label}>Сайт партнёра</label>
-            <input style={s.input} placeholder="https://..." value={pWebsite} onChange={e => setPWebsite(e.target.value)} />
+            <label style={s.label}>ВКонтакте</label>
+            <input style={s.input} placeholder="https://vk.com/..." value={pWebsite} onChange={e => setPWebsite(e.target.value)} />
 
             <label style={s.label}>Telegram-сообщество (канал или чат)</label>
             <input style={s.input} placeholder="https://t.me/..." value={pTelegramCom} onChange={e => setPTelegramCom(e.target.value)} />
