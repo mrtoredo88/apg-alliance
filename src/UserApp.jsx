@@ -496,6 +496,17 @@ export function UserApp() {
         setJoinedGroup(data.joinedGroup ?? false);
         setLastBonusDate(data.lastBonusDate ?? null);
         setScannedExperts(data.scannedExperts ?? {});
+
+        // Если email в userData не пришёл (VK/Telegram), проверяем email из Firestore.
+        // Это нужно чтобы ownerEmail у партнёра/эксперта матчился даже для VK-пользователей.
+        const fsEmail = (data.email || data.linkedEmail)?.trim().toLowerCase();
+        if (fsEmail && isMounted.current) {
+          const exByEmail = freshExperts.find(e => e.ownerEmail?.toLowerCase() === fsEmail);
+          if (exByEmail) setOwnedExpert(exByEmail);
+          const ptByEmail = freshPartners.find(p => p.ownerEmail?.toLowerCase() === fsEmail);
+          if (ptByEmail) setOwnedPartner(ptByEmail);
+        }
+
         if (data.notificationsEnabled) {
           localStorage.setItem('apg_notif_enabled', '1');
           setNotifEnabled(true);
