@@ -5,6 +5,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
 import { initErrorLogger, setErrorLoggerUser } from './errorLogger.js';
+import { sendDiagReport, runServiceChecks } from './diagnostics.js';
 import { db, auth } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -96,6 +97,8 @@ export function UserApp() {
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [networkError, setNetworkError]         = useState(false);
+  const [reportSent, setReportSent]             = useState(false);
+  const [reportSending, setReportSending]       = useState(false);
   const [loggedOut, setLoggedOut]               = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
@@ -372,6 +375,9 @@ export function UserApp() {
             await new Promise(r => setTimeout(r, 1000 * Math.pow(2, _attempt)));
           } else {
             if (isMounted.current) { setNetworkError(true); setLoading(false); }
+            runServiceChecks().then(checks =>
+              sendDiagReport({ checks, errorText: _e.message, userId: userData?.id })
+            );
             return;
           }
         }
@@ -1306,12 +1312,27 @@ export function UserApp() {
               </div>
               <button
                 onClick={() => {
+                  setReportSent(false); setReportSending(false);
                   const im = { current: true };
                   loadData(im);
                 }}
                 style={{ width: '100%', maxWidth: 320, padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
               >
                 Попробовать снова
+              </button>
+              <button
+                disabled={reportSent || reportSending}
+                onClick={async () => {
+                  if (reportSent || reportSending) return;
+                  setReportSending(true);
+                  const checks = await runServiceChecks();
+                  await sendDiagReport({ checks, errorText: 'Ручной отчёт', manual: true, userId: user?.id });
+                  setReportSending(false);
+                  setReportSent(true);
+                }}
+                style={{ width: '100%', maxWidth: 320, padding: '13px 0', borderRadius: 16, border: `1px solid rgba(255,255,255,0.12)`, background: 'transparent', color: reportSent ? '#4BB34B' : T.textSec, fontSize: 14, fontWeight: 600, cursor: reportSent ? 'default' : 'pointer', opacity: reportSending ? 0.6 : 1 }}
+              >
+                {reportSent ? '✓ Отчёт отправлен' : reportSending ? 'Отправляем...' : 'Отправить отчёт разработчику'}
               </button>
             </div>
           </AppRoot>

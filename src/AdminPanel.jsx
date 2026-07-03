@@ -10,6 +10,7 @@ import { EXPERT_CATEGORIES, APP_URL } from './constants.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
+import { runServiceChecks } from './diagnostics.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -276,6 +277,315 @@ function getISOWeekKey(date = new Date()) {
   const year = d.getUTCFullYear();
   const week = Math.ceil((((d - new Date(Date.UTC(year, 0, 1))) / 86400000) + 1) / 7);
   return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function DiagStatusCell({ check, A }) {
+  if (!check) return <span style={{ color: A.textSec }}>—</span>;
+  return (
+    <span style={{ fontWeight: 700, fontSize: 13, color: check.ok ? A.green : A.red }}>
+      {check.ok ? '✓' : '✗'}
+      {check.ms != null && <span style={{ color: A.textSec, fontWeight: 400, fontSize: 10 }}> {check.ms}мс</span>}
+    </span>
+  );
+}
+
+function DiagTab({ A, s }) {
+  const [svcChecks, setSvcChecks]       = useState(null);
+  const [svcLoading, setSvcLoading]     = useState(false);
+  const [svcTs, setSvcTs]               = useState(null);
+  const [reports, setReports]           = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [stats, setStats]               = useState(null);
+  const [fDate, setFDate]               = useState('24h');
+  const [fStatus, setFStatus]           = useState('all');
+  const [fService, setFService]         = useState('all');
+  const [fManual, setFManual]           = useState(false);
+
+  useEffect(() => { doRunChecks(); }, []);
+  useEffect(() => { loadReports(); }, [fDate, fStatus, fService, fManual]); // eslint-disable-line
+
+  async function doRunChecks() {
+    setSvcLoading(true);
+    try {
+      const results = await runServiceChecks();
+      setSvcChecks(results);
+    } catch {}
+    setSvcTs(new Date());
+    setSvcLoading(false);
+  }
+
+  async function loadReports() {
+    setReportsLoading(true);
+    const msAgo = fDate === '24h' ? 86400000 : fDate === '7d' ? 7 * 86400000 : 30 * 86400000;
+    const since = new Date(Date.now() - msAgo);
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'diagnostics'),
+        where('timestamp', '>=', since),
+        orderBy('timestamp', 'desc'),
+        limit(500)
+      ));
+      let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (fStatus === 'ok')    docs = docs.filter(r => isAllOk(r.checks));
+      if (fStatus === 'error') docs = docs.filter(r => !isAllOk(r.checks));
+      if (fService !== 'all')  docs = docs.filter(r => r.checks?.[fService]?.ok === false);
+      if (fManual)             docs = docs.filter(r => r.manual);
+      setReports(docs);
+      computeStats(docs);
+    } catch {}
+    setReportsLoading(false);
+  }
+
+  function isAllOk(checks) {
+    if (!checks || Object.keys(checks).length === 0) return true;
+    return Object.values(checks).every(c => c.ok !== false);
+  }
+
+  function computeStats(docs) {
+    const total = docs.length;
+    const withErrors = docs.filter(r => !isAllOk(r.checks)).length;
+    const ok = total - withErrors;
+    const successRate = total > 0 ? Math.round(ok / total * 100) : null;
+    const manualCount = docs.filter(r => r.manual).length;
+    const errCounts = {};
+    docs.forEach(r => {
+      Object.entries(r.checks ?? {}).forEach(([svc, c]) => {
+        if (c.ok === false) {
+          const key = svc + (c.error?.includes('timeout') ? ' timeout' : c.error ? ': ' + c.error.slice(0, 24) : ' error');
+          errCounts[key] = (errCounts[key] || 0) + 1;
+        }
+      });
+    });
+    const topErrors = Object.entries(errCounts)
+      .sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([key, count]) => ({ key, count, pct: total > 0 ? Math.round(count / total * 100) : 0 }));
+    setStats({ total, withErrors, ok, successRate, manualCount, topErrors });
+  }
+
+  function fmtTs(r) {
+    const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp ? new Date(r.timestamp) : null;
+    return ts ? ts.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+  }
+
+  const fDateLabel = fDate === '24h' ? '24 часа' : fDate === '7d' ? '7 дней' : '30 дней';
+  const filterBtn = (active, label, onClick) => (
+    <button onClick={onClick} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${active ? A.goldBrd : A.border}`, background: active ? A.goldDim : 'transparent', color: active ? A.gold : A.textSec, fontSize: 12, cursor: 'pointer', fontWeight: active ? 700 : 400 }}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div>
+      {/* ── Состояние сервисов ── */}
+      <div style={{ ...s.card, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <h2 style={{ ...s.h2, margin: 0, flex: 1 }}>📡 Состояние сервисов</h2>
+          <button style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }} onClick={doRunChecks} disabled={svcLoading}>
+            {svcLoading ? '⏳ Проверяем...' : '↻ Проверить'}
+          </button>
+        </div>
+        {svcTs && <div style={{ fontSize: 11, color: A.textSec, marginBottom: 12 }}>Проверено: {svcTs.toLocaleTimeString('ru-RU')}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+          {[
+            { key: 'frontend',  label: 'Frontend',       check: { ok: true, ms: 0 } },
+            { key: 'auth',      label: 'Firebase Auth',  check: svcChecks?.auth },
+            { key: 'firestore', label: 'Firestore',      check: svcChecks?.firestore },
+            { key: 'backend',   label: 'Backend API',    check: svcChecks?.backend },
+          ].map(({ key, label, check }) => (
+            <div key={key} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '13px 14px', border: `1px solid ${check?.ok === false ? A.redBrd : check?.ok ? 'rgba(75,179,75,0.2)' : A.border}` }}>
+              <div style={{ fontSize: 11, color: A.textSec, marginBottom: 5 }}>{label}</div>
+              {svcLoading && key !== 'frontend' ? (
+                <div style={{ fontSize: 13, color: A.textSec }}>⏳</div>
+              ) : check ? (
+                <>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: check.ok ? A.green : A.red }}>
+                    {check.ok ? '🟢 Работает' : '🔴 Недоступен'}
+                  </div>
+                  {check.ms > 0 && <div style={{ fontSize: 11, color: A.textSec, marginTop: 3 }}>{check.ms} мс</div>}
+                  {!check.ok && check.error && <div style={{ fontSize: 10, color: A.red, marginTop: 4, wordBreak: 'break-word' }}>{check.error}</div>}
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: A.textSec }}>Нажмите «Проверить»</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Статистика ── */}
+      {stats && (
+        <div style={{ ...s.card, marginBottom: 12 }}>
+          <h2 style={s.h2}>📊 Статистика за {fDateLabel}</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: stats.topErrors.length ? 18 : 0 }}>
+            {[
+              { label: 'Всего отчётов',   value: stats.total,        color: A.gold },
+              { label: 'С ошибками',      value: stats.withErrors,   color: stats.withErrors > 0 ? A.red : A.textSec },
+              { label: 'Успешных',        value: stats.ok,           color: stats.ok > 0 ? A.green : A.textSec },
+              { label: 'Успех %',         value: stats.successRate != null ? stats.successRate + '%' : '—', color: stats.successRate >= 80 ? A.green : stats.successRate != null ? A.red : A.textSec },
+              { label: 'Ручных отчётов',  value: stats.manualCount,  color: A.gold },
+            ].map(item => (
+              <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 14px', border: `1px solid ${A.border}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: item.color, lineHeight: 1.1 }}>{item.value}</div>
+                <div style={{ fontSize: 10, color: A.textSec, marginTop: 4 }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+          {stats.topErrors.length > 0 && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: A.textSec, marginBottom: 10 }}>Частые ошибки</div>
+              {stats.topErrors.map(e => (
+                <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
+                  <div style={{ flex: 1, fontSize: 12, color: A.text }}>{e.key}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, minWidth: 24, textAlign: 'right' }}>{e.count}×</div>
+                  <div style={{ width: 100, height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
+                    <div style={{ height: '100%', width: e.pct + '%', background: A.red, borderRadius: 3 }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: A.red, width: 30, textAlign: 'right' }}>{e.pct}%</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Фильтры ── */}
+      <div style={{ ...s.card, marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: A.textSec }}>Период:</span>
+          {filterBtn(fDate === '24h', '24 часа', () => setFDate('24h'))}
+          {filterBtn(fDate === '7d',  '7 дней',  () => setFDate('7d'))}
+          {filterBtn(fDate === '30d', '30 дней', () => setFDate('30d'))}
+          <div style={{ width: 1, height: 18, background: A.border, margin: '0 2px' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: A.textSec }}>Статус:</span>
+          {filterBtn(fStatus === 'all',   'Все',         () => setFStatus('all'))}
+          {filterBtn(fStatus === 'ok',    'Успешные',    () => setFStatus('ok'))}
+          {filterBtn(fStatus === 'error', 'С ошибками',  () => setFStatus('error'))}
+          <div style={{ width: 1, height: 18, background: A.border, margin: '0 2px' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: A.textSec }}>Сервис:</span>
+          {filterBtn(fService === 'all',       'Все',       () => setFService('all'))}
+          {filterBtn(fService === 'auth',      'Auth',      () => setFService('auth'))}
+          {filterBtn(fService === 'firestore', 'Firestore', () => setFService('firestore'))}
+          {filterBtn(fService === 'backend',   'Backend',   () => setFService('backend'))}
+          <div style={{ width: 1, height: 18, background: A.border, margin: '0 2px' }} />
+          {filterBtn(fManual, 'Только ручные', () => setFManual(v => !v))}
+          <button onClick={loadReports} style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 20, border: `1px solid ${A.border}`, background: 'transparent', color: A.textSec, fontSize: 12, cursor: 'pointer' }}>
+            {reportsLoading ? '⏳' : '↻ Обновить'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Таблица отчётов ── */}
+      <div style={s.card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <h2 style={{ ...s.h2, margin: 0, flex: 1 }}>📋 Отчёты пользователей</h2>
+          <span style={{ fontSize: 12, color: A.textSec }}>{reports.length} записей</span>
+        </div>
+        {reportsLoading ? (
+          <div style={{ textAlign: 'center', padding: 48, color: A.textSec }}>⏳ Загружаем...</div>
+        ) : reports.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 48, color: A.textSec }}>
+            {stats?.total === 0 ? 'За этот период отчётов нет' : 'Нет записей по выбранным фильтрам'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 720 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${A.border}` }}>
+                  {['Дата', 'Пользователь', 'Версия', 'ОС / Устройство', 'Браузер', 'Auth', 'Firestore', 'Backend', 'Ошибка'].map(h => (
+                    <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: A.textSec, fontWeight: 600, whiteSpace: 'nowrap', fontSize: 11 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map(r => {
+                  const hasError = !isAllOk(r.checks);
+                  return (
+                    <tr key={r.id}
+                      onClick={() => setSelectedReport(r)}
+                      style={{ borderBottom: `1px solid ${A.rowBrd}`, cursor: 'pointer', background: hasError ? 'rgba(230,70,70,0.04)' : 'transparent' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = hasError ? 'rgba(230,70,70,0.04)' : 'transparent'; }}
+                    >
+                      <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: A.textSec }}>{fmtTs(r)}</td>
+                      <td style={{ padding: '7px 10px', color: A.text }}>
+                        {r.userId ? String(r.userId).slice(0, 14) : '—'}
+                        {r.manual && <span title="Ручной отчёт" style={{ marginLeft: 5, fontSize: 10, color: A.gold }}>✉</span>}
+                      </td>
+                      <td style={{ padding: '7px 10px', color: A.textSec }}>{r.appVersion ?? '?'}</td>
+                      <td style={{ padding: '7px 10px', color: A.textSec, whiteSpace: 'nowrap' }}>{r.os} / {r.device}</td>
+                      <td style={{ padding: '7px 10px', color: A.textSec }}>{r.browser}</td>
+                      <td style={{ padding: '7px 10px' }}><DiagStatusCell check={r.checks?.auth}      A={A} /></td>
+                      <td style={{ padding: '7px 10px' }}><DiagStatusCell check={r.checks?.firestore} A={A} /></td>
+                      <td style={{ padding: '7px 10px' }}><DiagStatusCell check={r.checks?.backend}   A={A} /></td>
+                      <td style={{ padding: '7px 10px', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: r.errorText ? A.red : A.textSec, fontSize: 11 }}>
+                        {r.errorText || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Детальный просмотр ── */}
+      {selectedReport && (
+        <div
+          onClick={() => setSelectedReport(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'rgba(18,18,36,0.97)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: 24, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <h3 style={{ margin: 0, flex: 1, color: A.text, fontSize: 16 }}>🔍 Диагностический отчёт</h3>
+              <button onClick={() => setSelectedReport(null)} style={{ ...s.btn, ...s.btnGray, padding: '5px 12px', fontSize: 12 }}>✕</button>
+            </div>
+            {[
+              ['Дата',            fmtTs(selectedReport)],
+              ['Пользователь',    selectedReport.userId || '—'],
+              ['Версия',          selectedReport.appVersion || '?'],
+              ['ОС',              selectedReport.os || '—'],
+              ['Устройство',      selectedReport.device || '—'],
+              ['Браузер',         selectedReport.browser || '—'],
+              ['Онлайн',          selectedReport.online != null ? (selectedReport.online ? 'Да' : 'Нет') : '—'],
+              ['Ручной отчёт',    selectedReport.manual ? 'Да ✉' : 'Нет (авто)'],
+              ['Ошибка',          selectedReport.errorText || '—'],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: `1px solid ${A.border}`, fontSize: 13 }}>
+                <div style={{ color: A.textSec, width: 120, flexShrink: 0 }}>{k}</div>
+                <div style={{ color: A.text, wordBreak: 'break-all', flex: 1 }}>{v}</div>
+              </div>
+            ))}
+            <div style={{ marginTop: 18, marginBottom: 10, fontSize: 11, fontWeight: 700, color: A.textSec, letterSpacing: '0.06em' }}>РЕЗУЛЬТАТЫ ПРОВЕРОК</div>
+            {Object.keys(selectedReport.checks ?? {}).length === 0 ? (
+              <div style={{ fontSize: 13, color: A.textSec }}>Нет данных о проверках</div>
+            ) : Object.entries(selectedReport.checks).map(([svc, c]) => (
+              <div key={svc} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: `1px solid ${A.border}`, fontSize: 13, alignItems: 'flex-start' }}>
+                <div style={{ color: A.textSec, width: 120, flexShrink: 0, textTransform: 'capitalize' }}>{svc}</div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ color: c.ok ? A.green : A.red, fontWeight: 700 }}>{c.ok ? '✓ OK' : '✗ Ошибка'}</span>
+                  {c.ms != null && <span style={{ color: A.textSec, fontSize: 11 }}> · {c.ms} мс</span>}
+                  {c.error && <div style={{ color: A.red, fontSize: 11, marginTop: 3 }}>{c.error}</div>}
+                </div>
+              </div>
+            ))}
+            {selectedReport.stack && (
+              <>
+                <div style={{ marginTop: 18, marginBottom: 8, fontSize: 11, fontWeight: 700, color: A.textSec, letterSpacing: '0.06em' }}>СТЕК ОШИБКИ</div>
+                <pre style={{ fontSize: 10, color: A.textSec, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '15px', maxHeight: 200, overflow: 'auto', margin: 0 }}>
+                  {selectedReport.stack}
+                </pre>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function RotationTab({ experts, A, s }) {
@@ -1318,6 +1628,7 @@ export const AdminPanel = () => {
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
+            { id: 'diag',      emoji: '📡', label: 'Диагностика' },
           ].map(t => {
             const active = activeTab === t.id;
             return (
@@ -2798,6 +3109,8 @@ export const AdminPanel = () => {
           </div>
         );
       })()}
+
+      {activeTab === 'diag' && <DiagTab A={A} s={s} />}
 
       <div style={{ height: 32 }} />
       </div>{/* end content */}
