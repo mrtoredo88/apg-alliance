@@ -862,10 +862,10 @@ export function UserApp() {
     expertDeepLinkOpened.current = true;
     const e = experts.find(e => e.id === pendingExpertId);
     if (e) {
-      goPanel('experts');
+      setActivePanel('experts');
       updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
     }
-  }, [pendingExpertId, experts, goPanel]);
+  }, [pendingExpertId, experts]);
 
   // ─── Задания ────────────────────────────────────────────────────────────────
 
