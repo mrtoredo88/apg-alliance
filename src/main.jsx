@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import vkBridge from './vk.js';
 import { App } from './App.jsx';
+import './fonts.css';
 import './index.css';
 
 // VK OAuth popup: if hash has access_token and window has an opener,

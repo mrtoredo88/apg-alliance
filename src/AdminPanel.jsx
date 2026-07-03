@@ -2248,7 +2248,7 @@ export const AdminPanel = () => {
             <EmojiPicker emojis={NEWS_EMOJIS} value={nEmoji} onChange={setNEmoji} />
 
             <label style={s.label}>URL картинки (необязательно)</label>
-            <input style={s.input} placeholder="https://i.ibb.co/..." value={nImage} onChange={e => setNImage(e.target.value)} />
+            <input style={s.input} placeholder="https://storage.yandexcloud.net/..." value={nImage} onChange={e => setNImage(e.target.value)} />
             {nImage && (
               <img src={nImage} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} onError={e => e.target.style.display = 'none'} />
             )}

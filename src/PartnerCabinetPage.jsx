@@ -6,16 +6,7 @@ import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { PartnerQRSection } from './PartnerQRSection.jsx';
 
-const IMGBB_KEY = '0c37a46d4e13e9a30cddb1c79c8e6374';
-
-async function uploadToImgBB(file) {
-  const fd = new FormData();
-  fd.append('image', file);
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, { method: 'POST', body: fd });
-  const json = await res.json();
-  if (!json.success) throw new Error('ImgBB error');
-  return json.data.url;
-}
+import { uploadPhoto } from './utils/uploadPhoto.js';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -90,7 +81,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
     }
     setUploading(true);
     try {
-      const url = await uploadToImgBB(file);
+      const url = await uploadPhoto(file, `partners/${partner.id}`);
       setFLogo(url);
     } catch { alert('Ошибка загрузки фото'); }
     setUploading(false);
