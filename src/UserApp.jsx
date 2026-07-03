@@ -95,6 +95,7 @@ export function UserApp() {
   const [customTasks, setCustomTasks]           = useState([]);
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
+  const [networkError, setNetworkError]         = useState(false);
   const [loggedOut, setLoggedOut]               = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
@@ -241,14 +242,24 @@ export function UserApp() {
       if (isMounted.current) { setLoading(false); setLoggedOut(true); }
       return;
     }
-    setLoading(true); setError(null); setLoggedOut(false);
+    setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
 
     // Анонимный вход в Firebase (нужен для Firestore Security Rules)
+    const _diagT0 = performance.now();
     if (!auth.currentUser) {
-      await signInAnonymously(auth).catch((e) => {
-        console.warn('[APG] signInAnonymously failed:', e.code, e.message);
+      await signInAnonymously(auth).then(() => {
+        console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
+      }).catch((e) => {
+        console.warn(`[APG-DIAG] auth=fail ${e.code} ${Math.round(performance.now() - _diagT0)}ms`);
       });
+    } else {
+      console.log('[APG-DIAG] auth=cached');
     }
+    fetch('/manifest.json').then(() => {
+      console.log(`[APG-DIAG] static=ok ${Math.round(performance.now() - _diagT0)}ms`);
+    }).catch(() => {
+      console.warn(`[APG-DIAG] static=fail ${Math.round(performance.now() - _diagT0)}ms`);
+    });
 
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
     try {
@@ -332,19 +343,40 @@ export function UserApp() {
         ).catch(() => {});
       }
 
-      console.time('apg:load-all');
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap] = await Promise.all([
-        (console.time('apg:partners'), getDocs(collection(db, 'partners')).then(s => (console.timeEnd('apg:partners'), s))),
-        (console.time('apg:events'),   getDocs(collection(db, 'events')).then(s => (console.timeEnd('apg:events'), s))),
-        getDocs(query(collection(db, 'news'),        orderBy('createdAt', 'desc'), limit(30))).catch(() => ({ docs: [] })),
+      const _buildAll = () => Promise.all([
+        getDocs(collection(db, 'partners')),
+        getDocs(collection(db, 'events')),
+        getDocs(query(collection(db, 'news'),          orderBy('createdAt', 'desc'), limit(30))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'reviews'),     orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'reviews'),       orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'customTasks'),   orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
         fetch('/api/vk-news').then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
         getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
         getDoc(doc(db, 'stats', 'global')).catch(() => null),
       ]);
-      console.timeEnd('apg:load-all');
+
+      let _loadResult = null;
+      for (let _attempt = 0; _attempt < 3; _attempt++) {
+        try {
+          console.time('apg:load-all');
+          _loadResult = await Promise.race([
+            _buildAll(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('load_timeout')), 10000)),
+          ]);
+          console.timeEnd('apg:load-all');
+          console.log(`[APG-DIAG] firestore=ok attempt=${_attempt + 1} ${Math.round(performance.now() - _diagT0)}ms`);
+          break;
+        } catch (_e) {
+          console.warn(`[APG-DIAG] firestore=fail attempt=${_attempt + 1} err=${_e.message}`);
+          if (_attempt < 2) {
+            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, _attempt)));
+          } else {
+            if (isMounted.current) { setNetworkError(true); setLoading(false); }
+            return;
+          }
+        }
+      }
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap] = _loadResult;
 
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1257,6 +1289,36 @@ export function UserApp() {
   );
 
   // ─── Render ─────────────────────────────────────────────────────────────────
+
+  if (networkError) {
+    return (
+      <ConfigProvider appearance={appearance}>
+        <AdaptivityProvider>
+          <AppRoot>
+            <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20, background: T.bg }}>
+              <div style={{ fontSize: 52 }}>📡</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: T.textPri, textAlign: 'center' }}>Не удаётся загрузить данные</div>
+              <div style={{ fontSize: 14, color: T.textSec, textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
+                Похоже, ваш интернет-провайдер ограничивает доступ к нашим серверам.<br /><br />
+                Что можно попробовать:<br />
+                · Переключиться с Wi-Fi на мобильный интернет (или наоборот)<br />
+                · Попробовать позже
+              </div>
+              <button
+                onClick={() => {
+                  const im = { current: true };
+                  loadData(im);
+                }}
+                style={{ width: '100%', maxWidth: 320, padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
+              >
+                Попробовать снова
+              </button>
+            </div>
+          </AppRoot>
+        </AdaptivityProvider>
+      </ConfigProvider>
+    );
+  }
 
   if (loggedOut) {
     return (
