@@ -1595,6 +1595,8 @@ export function UserApp() {
                     onBack={() => goPanel('home')}
                     onClaim={handlePrizeClaim}
                     onRaffleEnter={handleRaffleEnter}
+                    partners={partners}
+                    experts={experts}
                   />
                 </Suspense>
               </Panel>

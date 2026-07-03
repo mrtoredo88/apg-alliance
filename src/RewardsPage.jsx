@@ -105,7 +105,7 @@ function PrizeCard({ prize, userKeys, onClaim, isClaimed, index }) {
 
 // ─── Карточка розыгрыша ───────────────────────────────────────────────────────
 
-function RaffleCard({ prize, userKeys, myEntry, counts, onEnter, index }) {
+function RaffleCard({ prize, userKeys, myEntry, counts, onEnter, index, partners = [], experts = [] }) {
   const left    = useCountdown(prize.raffleDate);
   const ended   = !left;
   const myTickets = myEntry?.ticketsCount ?? 0;
@@ -158,10 +158,18 @@ function RaffleCard({ prize, userKeys, myEntry, counts, onEnter, index }) {
           {isWinner ? (
             <>
               <div style={{ fontSize: 12, color: T.green, fontWeight: 700, marginBottom: 4 }}>🎉 Вы выиграли этот розыгрыш!</div>
-              {prize.partnerName && <div style={{ fontSize: 13, color: T.textPri }}>{prize.partnerName}</div>}
-              {(prize.partnerContact || prize.partnerPhone) && (
-                <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>{prize.partnerContact ?? prize.partnerPhone}</div>
-              )}
+              {(() => {
+                const donorName = prize.partnerName
+                  ?? partners.find(p => p.id === prize.partnerId)?.name
+                  ?? experts.find(e => e.id === prize.expertId)?.name;
+                const donorContact = prize.partnerContact ?? prize.partnerPhone;
+                return donorName ? (
+                  <>
+                    <div style={{ fontSize: 13, color: T.textPri }}>{donorName}</div>
+                    {donorContact && <div style={{ fontSize: 12, color: T.textSec, marginTop: 2 }}>{donorContact}</div>}
+                  </>
+                ) : null;
+              })()}
             </>
           ) : (
             <>
@@ -334,7 +342,7 @@ function ConfirmModal({ prize, userKeys, onConfirm, onCancel, claiming }) {
 
 // ─── Модал успешного получения ────────────────────────────────────────────────
 
-function ClaimSuccessModal({ prize, onClose }) {
+function ClaimSuccessModal({ prize, onClose, partners = [], experts = [] }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
       <div style={{ width: '100%', maxWidth: 420, ...GLASS_STRONG, borderRadius: '28px 28px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease' }}>
@@ -349,15 +357,22 @@ function ClaimSuccessModal({ prize, onClose }) {
           </div>
         </div>
 
-        {(prize.partnerName || prize.partnerContact || prize.partnerPhone) && (
-          <div style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 16, padding: '12px 16px', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>📍 Партнёр</div>
-            {prize.partnerName && <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, marginBottom: prize.partnerContact || prize.partnerPhone ? 4 : 0 }}>{prize.partnerName}</div>}
-            {(prize.partnerContact || prize.partnerPhone) && (
-              <div style={{ fontSize: 13, color: T.textSec }}>{prize.partnerContact ?? prize.partnerPhone}</div>
-            )}
-          </div>
-        )}
+        {(() => {
+          const donorName = prize.partnerName
+            ?? partners.find(p => p.id === prize.partnerId)?.name
+            ?? experts.find(e => e.id === prize.expertId)?.name;
+          const donorContact = prize.partnerContact ?? prize.partnerPhone;
+          const isExpert = !prize.partnerId && !prize.partnerName && !!prize.expertId;
+          return donorName ? (
+            <div style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 16, padding: '12px 16px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+                {isExpert ? '🎓 Эксперт' : '📍 Партнёр'}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, marginBottom: donorContact ? 4 : 0 }}>{donorName}</div>
+              {donorContact && <div style={{ fontSize: 13, color: T.textSec }}>{donorContact}</div>}
+            </div>
+          ) : null;
+        })()}
 
         <button
           onClick={onClose}
@@ -372,7 +387,7 @@ function ClaimSuccessModal({ prize, onClose }) {
 
 // ─── Главная страница наград ──────────────────────────────────────────────────
 
-export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, onRaffleEnter }) {
+export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, onRaffleEnter, partners = [], experts = [] }) {
   const [prizes, setPrizes]               = useState([]);
   const [myClaims, setMyClaims]           = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -575,6 +590,8 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
                       counts={raffleCounts[prize.id]}
                       onEnter={p => setRaffleSheet(p)}
                       index={i}
+                      partners={partners}
+                      experts={experts}
                     />
                   ))}
                 </div>
@@ -640,7 +657,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
         />
       )}
       {claimedPrize && (
-        <ClaimSuccessModal prize={claimedPrize} onClose={() => setClaimedPrize(null)} />
+        <ClaimSuccessModal prize={claimedPrize} onClose={() => setClaimedPrize(null)} partners={partners} experts={experts} />
       )}
       {raffleSheet && (
         <TicketSheet

@@ -21,6 +21,7 @@ import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
+import { APP_URL } from './constants.js';
 
 function sanitizeForVK(text) {
   if (!text) return '';
@@ -183,33 +184,36 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
   };
 
   const handleShare = () => {
-    const appLink = 'https://vk.com/app54601851';
-    const siteLink = expert.websiteUrl || appLink;
-    const message = [
+    const deepLink = isVK()
+      ? `https://vk.com/app54601851#expert_${expert.id}`
+      : `${APP_URL}/?expert=${expert.id}`;
+
+    const textLines = [
       `${expert.name} — эксперт АПГ Зеленоград! ⭐`,
       expert.specialization && expert.specialization,
       expert.description   && expert.description.slice(0, 120),
-      `Альянс Партнёров Города`,
+      'Присоединяйся к Альянсу Партнёров Города.',
+      `👉 ${deepLink}`,
     ].filter(Boolean).join('\n');
-    const shareText = `${message}\n${siteLink}`;
 
     if (isVK()) {
-      vkBridge.send('VKWebAppCopyText', { text: shareText })
+      vkBridge.send('VKWebAppCopyText', { text: textLines })
         .then(() => showToast('📋 Скопировано!'))
         .catch(() => showToast('❌ Ошибка'));
       return;
     }
 
+    const webText = textLines.split('\n').slice(0, -1).join('\n');
     if (navigator.share) {
-      navigator.share({ url: siteLink, text: message })
+      navigator.share({ url: deepLink, text: webText })
         .then(() => showToast('✅ Поделились!'))
         .catch(() => {
-          navigator.clipboard?.writeText(shareText)
+          navigator.clipboard?.writeText(textLines)
             .then(() => showToast('📋 Скопировано'))
             .catch(() => showToast('❌ Ошибка'));
         });
     } else {
-      navigator.clipboard?.writeText(shareText)
+      navigator.clipboard?.writeText(textLines)
         .then(() => showToast('📋 Скопировано'))
         .catch(() => showToast('❌ Ошибка'));
     }

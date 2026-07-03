@@ -766,6 +766,8 @@ export const AdminPanel = () => {
   const [prTicketCost, setPrTicketCost]   = useState('');
   const [prRaffleDate, setPrRaffleDate]   = useState('');
   const [prPartnerId, setPrPartnerId]     = useState('');
+  const [prExpertId, setPrExpertId]       = useState('');
+  const [prDonorType, setPrDonorType]     = useState('none');
 
   // Форма партнёра
   const [pName, setPName] = useState('');
@@ -1310,7 +1312,7 @@ export const AdminPanel = () => {
     setPrName(''); setPrDesc(''); setPrCost(''); setPrEmoji('🎁');
     setPrStock(''); setPrActive(true); setEditingPrize(null);
     setPrType('purchase'); setPrTicketCost(''); setPrRaffleDate('');
-    setPrPartnerId('');
+    setPrPartnerId(''); setPrExpertId(''); setPrDonorType('none');
   };
 
   const startEditPrize = (p) => {
@@ -1323,6 +1325,8 @@ export const AdminPanel = () => {
     setPrTicketCost(p.ticketCost !== undefined ? String(p.ticketCost) : '');
     setPrRaffleDate(p.raffleDate?.toDate ? p.raffleDate.toDate().toISOString().slice(0, 16) : '');
     setPrPartnerId(p.partnerId ?? '');
+    setPrExpertId(p.expertId ?? '');
+    setPrDonorType(p.expertId ? 'expert' : p.partnerId ? 'partner' : 'none');
     window.scrollTo(0, 0);
   };
 
@@ -1334,7 +1338,8 @@ export const AdminPanel = () => {
       stock: prStock !== '' ? Number(prStock) : null,
       active: prActive,
       type: prType,
-      partnerId: prPartnerId || null,
+      partnerId: prDonorType === 'partner' ? (prPartnerId || null) : null,
+      expertId:  prDonorType === 'expert'  ? (prExpertId  || null) : null,
     };
     if (prType === 'raffle') {
       data.ticketCost = prTicketCost !== '' ? Number(prTicketCost) : 1;
@@ -2541,17 +2546,35 @@ export const AdminPanel = () => {
               </>
             )}
 
-            <label style={s.label}>Партнёр АПГ (для индекса активности)</label>
-            <select
-              style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }}
-              value={prPartnerId}
-              onChange={e => setPrPartnerId(e.target.value)}
-            >
-              <option value="">— Не привязывать —</option>
-              {[...partners].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+            <label style={s.label}>Донор приза</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              {[{ id: 'none', label: '— Нет' }, { id: 'partner', label: '🏪 Партнёр' }, { id: 'expert', label: '🎓 Эксперт' }].map(t => (
+                <button key={t.id} onClick={() => { setPrDonorType(t.id); setPrPartnerId(''); setPrExpertId(''); }}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                    background: prDonorType === t.id ? A.gold : 'rgba(255,255,255,0.1)',
+                    color: prDonorType === t.id ? '#000' : A.text }}>
+                  {t.label}
+                </button>
               ))}
-            </select>
+            </div>
+            {prDonorType === 'partner' && (
+              <select style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }}
+                value={prPartnerId} onChange={e => setPrPartnerId(e.target.value)}>
+                <option value="">— Выбрать партнёра —</option>
+                {[...partners].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {prDonorType === 'expert' && (
+              <select style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }}
+                value={prExpertId} onChange={e => setPrExpertId(e.target.value)}>
+                <option value="">— Выбрать эксперта —</option>
+                {[...experts].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(e => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
+            )}
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePrize}>
@@ -2594,6 +2617,8 @@ export const AdminPanel = () => {
                             : `🗝️ ${p.cost} ключей${p.stock !== null && p.stock !== undefined ? ` · ${p.stock} шт.` : ''}`
                           }
                           {p.winner && <span style={{ color: '#4BB34B', marginLeft: 6 }}>✓ Победитель: {p.winner.userName}</span>}
+                          {p.partnerId && (() => { const pt = partners.find(x => x.id === p.partnerId); return pt ? <span style={{ marginLeft: 4 }}>· 🏪 {pt.name}</span> : null; })()}
+                          {p.expertId  && (() => { const ex = experts.find(x => x.id === p.expertId);  return ex ? <span style={{ marginLeft: 4 }}>· 🎓 {ex.name}</span> : null; })()}
                         </div>
                         {raffleResult?.prizeId === p.id && (
                           <div style={{ fontSize: 12, marginTop: 4, color: raffleResult.winner ? '#4BB34B' : '#E53935', fontWeight: 600 }}>
