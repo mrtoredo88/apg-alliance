@@ -776,6 +776,7 @@ export const AdminPanel = () => {
   const [pAddress, setPAddress] = useState('');
   const [pHours, setPHours] = useState('');
   const [pSocial, setPSocial] = useState('');
+  const [pVkGroup, setPVkGroup] = useState('');
   const [pOffer, setPOffer] = useState('');
   const [pStampTarget, setPStampTarget] = useState('');
   const [pOwnerEmail, setPOwnerEmail] = useState('');
@@ -999,7 +1000,7 @@ export const AdminPanel = () => {
 
   const resetPartnerForm = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
-    setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPOffer('');
+    setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPVkGroup(''); setPOffer('');
     setPStampTarget(''); setPOwnerEmail('');
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
@@ -1012,7 +1013,7 @@ export const AdminPanel = () => {
     setEditingPartner(p);
     setPName(p.name ?? ''); setPDesc(p.description ?? ''); setPCategory(p.category ?? 'other');
     setPEmoji(p.emoji ?? '🏪'); setPLogo(p.logoUrl ?? ''); setPPhone(p.phone ?? '');
-    setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? '');
+    setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? ''); setPVkGroup(p.vkGroupUrl ?? '');
     setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
     setPOwnerEmail(p.ownerEmail ?? '');
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
@@ -1039,7 +1040,7 @@ export const AdminPanel = () => {
       emoji: pEmoji, logoUrl: pLogo.trim(),
       categoryLabel: CATEGORIES.find(c => c.id === pCategory)?.label ?? '',
       phone: pPhone.trim(), address: pAddress.trim(),
-      hours: pHours.trim(), socialUrl: pSocial.trim(), offer: pOffer.trim(),
+      hours: pHours.trim(), socialUrl: pSocial.trim(), vkGroupUrl: normalizeUrl(pVkGroup), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
       bookingUrl: normalizeUrl(pBooking),
@@ -1924,8 +1925,11 @@ export const AdminPanel = () => {
             <label style={s.label}>Часы работы</label>
             <input style={s.input} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={pHours} onChange={e => setPHours(e.target.value)} />
 
-            <label style={s.label}>Соцсеть / сайт</label>
-            <input style={s.input} placeholder="https://vk.com/..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
+            <label style={s.label}>ВКонтакте (сообщество)</label>
+            <input style={s.input} placeholder="https://vk.com/..." value={pVkGroup} onChange={e => setPVkGroup(e.target.value)} />
+
+            <label style={s.label}>Соцсеть / сайт (другие)</label>
+            <input style={s.input} placeholder="https://..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
 
             <label style={s.label}>Онлайн-запись (Yclients, Dikidi и др.)</label>
             <input style={s.input} placeholder="https://..." value={pBooking} onChange={e => setPBooking(e.target.value)} />
