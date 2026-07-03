@@ -593,12 +593,18 @@ const FILTERS = [
 
 const CATEGORY_FILTERS = [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES];
 
-export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBack, isActive }) {
+export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [rotation, setRotation] = useState({});
+
+  useEffect(() => {
+    if (!initialExpertId || !experts.length || selected) return;
+    const e = experts.find(e => e.id === initialExpertId);
+    if (e) setSelected(e);
+  }, [initialExpertId, experts]);
 
   useEffect(() => {
     const currentWeek = getISOWeekKey();

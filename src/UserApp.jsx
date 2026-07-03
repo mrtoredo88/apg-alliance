@@ -862,9 +862,10 @@ export function UserApp() {
     expertDeepLinkOpened.current = true;
     const e = experts.find(e => e.id === pendingExpertId);
     if (e) {
+      goPanel('experts');
       updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
     }
-  }, [pendingExpertId, experts]);
+  }, [pendingExpertId, experts, goPanel]);
 
   // ─── Задания ────────────────────────────────────────────────────────────────
 
@@ -1610,6 +1611,7 @@ export function UserApp() {
                     scannedExperts={scannedExperts}
                     onBack={() => goPanel('home')}
                     isActive={activePanel === 'experts'}
+                    initialExpertId={pendingExpertId}
                   />
                 </Suspense>
               </Panel>
