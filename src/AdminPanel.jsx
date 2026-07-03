@@ -776,6 +776,7 @@ export const AdminPanel = () => {
   const [pPhone, setPPhone] = useState('');
   const [pAddress, setPAddress] = useState('');
   const [pHours, setPHours] = useState('');
+  const [pTier, setPTier]       = useState('start');
   const [pSocial, setPSocial] = useState('');
   const [pVkGroup, setPVkGroup] = useState('');
   const [pOffer, setPOffer] = useState('');
@@ -1001,7 +1002,7 @@ export const AdminPanel = () => {
 
   const resetPartnerForm = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
-    setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPVkGroup(''); setPOffer('');
+    setPTier('start'); setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPVkGroup(''); setPOffer('');
     setPStampTarget(''); setPOwnerEmail('');
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
@@ -1014,7 +1015,7 @@ export const AdminPanel = () => {
     setEditingPartner(p);
     setPName(p.name ?? ''); setPDesc(p.description ?? ''); setPCategory(p.category ?? 'other');
     setPEmoji(p.emoji ?? '🏪'); setPLogo(p.logoUrl ?? ''); setPPhone(p.phone ?? '');
-    setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? ''); setPVkGroup(p.vkGroupUrl ?? '');
+    setPTier(p.tier ?? 'start'); setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? ''); setPVkGroup(p.vkGroupUrl ?? '');
     setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
     setPOwnerEmail(p.ownerEmail ?? '');
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
@@ -1041,7 +1042,7 @@ export const AdminPanel = () => {
       emoji: pEmoji, logoUrl: pLogo.trim(),
       categoryLabel: CATEGORIES.find(c => c.id === pCategory)?.label ?? '',
       phone: pPhone.trim(), address: pAddress.trim(),
-      hours: pHours.trim(), socialUrl: pSocial.trim(), vkGroupUrl: normalizeUrl(pVkGroup), offer: pOffer.trim(),
+      tier: pTier, hours: pHours.trim(), socialUrl: pSocial.trim(), vkGroupUrl: normalizeUrl(pVkGroup), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
       bookingUrl: normalizeUrl(pBooking),
@@ -1849,6 +1850,15 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Штамп-карта: посещений до награды (0 = выключено) 🎟️</label>
             <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={pStampTarget} onChange={e => setPStampTarget(e.target.value)} />
+
+            <label style={s.label}>Тариф</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {[{ id: 'start', label: '🌱 Старт' }, { id: 'alliance', label: '🤝 Альянс' }, { id: 'premium', label: '⭐ Премиум' }].map(t => (
+                <button key={t.id} onClick={() => setPTier(t.id)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${pTier === t.id ? A.gold : A.border}`, background: pTier === t.id ? A.goldDim : 'transparent', color: pTier === t.id ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
             <label style={s.label}>Категория</label>
             <select style={s.select} value={pCategory} onChange={e => setPCategory(e.target.value)}>
