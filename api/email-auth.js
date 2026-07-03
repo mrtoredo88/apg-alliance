@@ -159,6 +159,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── LINK EMAIL TO TELEGRAM ACCOUNT ──────────────────────────────────────────
+  if (action === 'link-email') {
+    const { userId } = req.body ?? {};
+    if (!userId || !email) return res.status(400).json({ ok: false, error: 'missing_fields' });
+
+    const userSnap = await db.collection('users').doc(userId).get();
+    if (!userSnap.exists) return res.status(404).json({ ok: false, error: 'user_not_found' });
+
+    // Проверяем что email не занят другим аккаунтом
+    const existing = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (!existing.empty && existing.docs[0].id !== userId) {
+      return res.status(409).json({ ok: false, error: 'already_used', message: 'Этот email уже привязан к другому аккаунту' });
+    }
+
+    await db.collection('users').doc(userId).update({ linkedEmail: email });
+    return res.status(200).json({ ok: true });
+  }
+
   // ── GRANT REFERRAL BONUS ────────────────────────────────────────────────────
   // Клиент не может писать в чужой users-документ (Firestore rules isOwner).
   // Поэтому реферальный бонус рефереру начисляем через Admin SDK здесь.

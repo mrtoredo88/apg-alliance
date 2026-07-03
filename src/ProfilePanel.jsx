@@ -344,6 +344,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
   const [showEmailAuth, setShowEmailAuth] = useState(false);
+  const [showLinkEmail, setShowLinkEmail] = useState(false);
+  const [linkEmailValue, setLinkEmailValue] = useState('');
+  const [linkEmailLoading, setLinkEmailLoading] = useState(false);
+  const [linkEmailError, setLinkEmailError] = useState('');
+  const [linkEmailDone, setLinkEmailDone] = useState(false);
   const tgPollRef = useRef(null);
   const tgStateRef = useRef(null);
   const tgLinkingRef = useRef(false);
@@ -459,6 +464,34 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     } catch { localStorage.removeItem('apg_tg_pending'); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleLinkEmail = useCallback(async () => {
+    if (linkEmailLoading || !linkEmailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkEmailValue)) return;
+    setLinkEmailLoading(true);
+    setLinkEmailError('');
+    try {
+      const res = await fetch('/api/email-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'link-email', email: linkEmailValue, userId: String(user.id) }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setLinkEmailError(data.message || 'Ошибка привязки. Попробуйте снова.');
+      } else {
+        setLinkEmailDone(true);
+        setShowLinkEmail(false);
+        try {
+          const stored = localStorage.getItem('apg_tg_user');
+          if (stored) localStorage.setItem('apg_tg_user', JSON.stringify({ ...JSON.parse(stored), linkedEmail: linkEmailValue }));
+        } catch {}
+      }
+    } catch {
+      setLinkEmailError('Ошибка сети. Попробуйте снова.');
+    } finally {
+      setLinkEmailLoading(false);
+    }
+  }, [linkEmailLoading, linkEmailValue, user]);
 
   // При возврате в браузер из Telegram — перезапускаем polling (браузер мог throttle-ить setInterval в фоне)
   useEffect(() => {
@@ -707,6 +740,56 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                   }
                   {tgError && <div style={{ fontSize: 12, color: '#E64646' }}>{tgError}</div>}
                 </div>
+          }
+        </div>
+      )}
+
+      {/* ── Привязка Email для Telegram-пользователей ── */}
+      {!isVK() && user && String(user.id).startsWith('tg_') && (
+        <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px', overflow: 'hidden' }}>
+          <div style={{ fontSize: 12, color: T.textSec, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
+
+          {/* Telegram — основной */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: T.textPri, flexShrink: 0 }}>✈️ Telegram</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.first_name}{user.last_name ? ' ' + user.last_name : ''}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
+          </div>
+
+          {/* Email */}
+          {(user.linkedEmail || linkEmailDone)
+            ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: T.textPri, flexShrink: 0 }}>✉️ Email</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.linkedEmail ?? linkEmailValue}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ привязан</span>
+              </div>
+            : showLinkEmail
+              ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={linkEmailValue}
+                    onChange={e => { setLinkEmailValue(e.target.value); setLinkEmailError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && handleLinkEmail()}
+                    placeholder="Ваш email"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 11, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 16, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                  {linkEmailError && <div style={{ fontSize: 12, color: '#E64646' }}>{linkEmailError}</div>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setShowLinkEmail(false); setLinkEmailError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 11, background: 'none', border: `1px solid ${T.border}`, color: T.textSec, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
+                    <button
+                      onClick={handleLinkEmail}
+                      disabled={linkEmailLoading || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkEmailValue)}
+                      style={{ flex: 2, padding: '9px 0', borderRadius: 11, border: 'none', background: 'linear-gradient(135deg,#4A90D9,#2D6FBC)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: linkEmailLoading ? 0.7 : 1 }}
+                    >
+                      {linkEmailLoading ? '⏳ Привязка...' : '✉️ Привязать'}
+                    </button>
+                  </div>
+                </div>
+              : <button onClick={() => setShowLinkEmail(true)} style={{ width: '100%', padding: '9px 0', borderRadius: 11, border: '1px solid rgba(74,144,217,0.3)', background: 'rgba(74,144,217,0.08)', color: '#4A90D9', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  ✉️ Привязать почту
+                </button>
           }
         </div>
       )}
