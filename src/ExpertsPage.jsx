@@ -169,6 +169,13 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
   const [shareToast, setShareToast] = useState('');
   const shareToastRef = useRef(null);
 
+  useEffect(() => {
+    import('firebase/firestore').then(({ doc: d, updateDoc: u, increment: inc }) => {
+      u(d(db, 'experts', expert.id), { viewCount: inc(1) }).catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const showToast = (msg) => {
     setShareToast(msg);
     clearTimeout(shareToastRef.current);

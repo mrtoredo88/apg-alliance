@@ -1,18 +1,13 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { APP_URL } from './constants.js';
-import { T, GLASS } from './design.js';
+import { T } from './design.js';
 
-// ─── Poster template settings ───────────────────────────────────────────────
-// Update these when the actual template is provided.
-// POSTER_QR_CX/CY = center of QR area as fraction of template dimensions
-// POSTER_QR_W     = QR width as fraction of template width
 const POSTER_QR_CX = 0.5;
 const POSTER_QR_CY = 0.72;
 const POSTER_QR_W  = 0.30;
 const POSTER_TEMPLATE_URL = '/qr-poster-template.png';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 function triggerDownload(dataUrl, filename) {
   const a = document.createElement('a');
   a.download = filename;
@@ -44,11 +39,11 @@ function openPdfWindow(dataUrl, title, subtitle) {
   win.document.close();
 }
 
-function openPosterPdfWindow(posterUrl, partnerName) {
+function openPosterPdfWindow(posterUrl, entityName) {
   const win = window.open('', '_blank', 'width=720,height=900');
   if (!win) { alert('Разрешите всплывающие окна для скачивания PDF'); return; }
   win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="utf-8"><title>Плакат — ${partnerName}</title>
+    <meta charset="utf-8"><title>Плакат — ${entityName}</title>
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
       body{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -67,8 +62,6 @@ function openPosterPdfWindow(posterUrl, partnerName) {
 
 function detectWhiteRegion(ctx, W, H) {
   const data = ctx.getImageData(0, 0, W, H).data;
-  // Divide image into grid; only treat a cell as "white" if 70%+ of its pixels are white.
-  // This ignores white text/thin lines that inflate the bounding box.
   const GRID = 32, step = 3;
   const cW = W / GRID, cH = H / GRID;
   let minCx = W, minCy = H, maxCx = 0, maxCy = 0, found = false;
@@ -100,11 +93,11 @@ function detectWhiteRegion(ctx, W, H) {
 
   if (!found) return null;
   const w = maxCx - minCx, h = maxCy - minCy;
-  if (w < W * 0.05 || h < H * 0.05) return null; // too small — likely noise
+  if (w < W * 0.05 || h < H * 0.05) return null;
   return { cx: (minCx + maxCx) / 2, cy: (minCy + maxCy) / 2, w, h };
 }
 
-async function buildPoster(partnerName, qrDataUrl) {
+async function buildPoster(entityName, qrDataUrl) {
   const offscreen = document.createElement('canvas');
   const ctx = offscreen.getContext('2d');
 
@@ -133,7 +126,6 @@ async function buildPoster(partnerName, qrDataUrl) {
       offscreen.width  = tmpl.naturalWidth;
       offscreen.height = tmpl.naturalHeight;
       ctx.drawImage(tmpl, 0, 0);
-
       const region = detectWhiteRegion(ctx, offscreen.width, offscreen.height);
       if (region) {
         const size = Math.round(Math.min(region.w, region.h) * 0.82);
@@ -144,7 +136,6 @@ async function buildPoster(partnerName, qrDataUrl) {
     };
 
     tmpl.onerror = async () => {
-      // Fallback: dark branded poster (A4 portrait 150 dpi)
       const W = 1240, H = 1754;
       offscreen.width = W; offscreen.height = H;
       ctx.fillStyle = '#0F0F1A';
@@ -155,7 +146,7 @@ async function buildPoster(partnerName, qrDataUrl) {
       ctx.fillStyle = 'rgba(201,168,76,0.7)'; ctx.font = 'bold 38px Arial';
       ctx.fillText('АЛЬЯНС ПАРТНЁРОВ ГОРОДА · ЗЕЛЕНОГРАД', W / 2, 130);
       ctx.fillStyle = '#ffffff'; ctx.font = 'bold 72px Arial';
-      const words = partnerName.split(' ');
+      const words = entityName.split(' ');
       let line = ''; let y = 260;
       words.forEach(w => {
         const test = line + w + ' ';
@@ -173,56 +164,79 @@ async function buildPoster(partnerName, qrDataUrl) {
   });
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-export function PartnerQRSection({ partner }) {
-  const publicWrapRef  = useRef(null);
-  const serviceWrapRef = useRef(null);
-  const [tab,           setTab]    = useState('public');
-  const [posterUrl,     setPosterUrl] = useState(null);
+// ─── Generic cabinet QR section ───────────────────────────────────────────────
+// qr1 / qr2 = { tabLabel, value, linkText, desc, downloadPrefix, pdfTitle, pdfSub }
+export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
+  const qr1WrapRef = useRef(null);
+  const qr2WrapRef = useRef(null);
+  const [tab, setTab]             = useState('qr1');
+  const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
-
-  const publicQRValue  = `${APP_URL}/?partner=${partner.id}`;
-  const serviceQRValue = partner.id;
+  const [copied, setCopied]       = useState(null);
 
   const getCanvasDataUrl = useCallback((wrapRef) => {
     const canvas = wrapRef.current?.querySelector('canvas');
     return canvas ? canvas.toDataURL('image/png', 1.0) : null;
   }, []);
 
-  const downloadQRPng = useCallback((wrapRef, name) => {
+  const downloadPng = useCallback((wrapRef, prefix) => {
     const url = getCanvasDataUrl(wrapRef);
-    if (url) triggerDownload(url, `${name}-${partner.id}.png`);
-  }, [getCanvasDataUrl, partner.id]);
+    if (url) triggerDownload(url, `${prefix}-${entityId}.png`);
+  }, [getCanvasDataUrl, entityId]);
 
-  const downloadQRPdf = useCallback((wrapRef, title, subtitle) => {
+  const downloadPdf = useCallback((wrapRef, title, sub) => {
     const url = getCanvasDataUrl(wrapRef);
-    if (url) openPdfWindow(url, title, subtitle);
+    if (url) openPdfWindow(url, title, sub);
   }, [getCanvasDataUrl]);
 
+  const copyLink = useCallback((text, key) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  }, []);
+
   const handleGeneratePoster = useCallback(async () => {
-    const qrUrl = getCanvasDataUrl(publicWrapRef);
+    const qrUrl = getCanvasDataUrl(qr1WrapRef);
     if (!qrUrl) return;
     setPosterLoading(true);
     try {
-      const url = await buildPoster(partner.name, qrUrl);
+      const url = await buildPoster(entityName, qrUrl);
       setPosterUrl(url);
-    } catch { /* fallback already handled inside buildPoster */ }
+    } catch {}
     finally { setPosterLoading(false); }
-  }, [getCanvasDataUrl, partner.name]);
+  }, [getCanvasDataUrl, entityName]);
 
   const TABS = [
-    { id: 'public',  label: '🌐 Публичный' },
-    { id: 'service', label: '🔑 Служебный' },
-    { id: 'poster',  label: '🖼️ Плакат' },
+    { id: 'qr1',    label: qr1.tabLabel },
+    { id: 'qr2',    label: qr2.tabLabel },
+    { id: 'poster', label: '🖼️ Плакат' },
   ];
 
-  const btnRow = { display: 'flex', gap: 8 };
-  const btnBase = { flex: 1, padding: '10px 0', borderRadius: 12, border: `1px solid rgba(255,255,255,0.15)`, background: 'rgba(255,255,255,0.07)', color: T.textPri, fontSize: 12, fontWeight: 700, cursor: 'pointer' };
-  const btnGold = { ...btnBase, background: `linear-gradient(135deg, #C9A84C, #E4C76B)`, color: '#0F0F1A', border: 'none' };
+  const btnBase = { flex: 1, padding: '10px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: T.textPri, fontSize: 12, fontWeight: 700, cursor: 'pointer' };
+  const btnGold = { ...btnBase, background: 'linear-gradient(135deg, #C9A84C, #E4C76B)', color: '#0F0F1A', border: 'none' };
+  const btnCopy = { width: '100%', padding: '10px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: T.textPri, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 6 };
+
+  const QRBlock = ({ wrapRef, value, linkText, desc, downloadPrefix, pdfTitle, pdfSub, copyKey }) => (
+    <div>
+      <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px', marginBottom: 12 }}>{desc}</div>
+      <div ref={wrapRef} style={{ display: 'flex', justifyContent: 'center', background: '#fff', borderRadius: 16, padding: 16, marginBottom: 10 }}>
+        <QRCodeCanvas value={value} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
+      </div>
+      <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '7px 11px', fontSize: 10, color: T.textSec, fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 4 }}>
+        {linkText}
+      </div>
+      <button style={{ ...btnCopy, color: copied === copyKey ? T.green : T.textPri }} onClick={() => copyLink(linkText, copyKey)}>
+        {copied === copyKey ? '✓ Скопировано' : '📋 Скопировать ссылку'}
+      </button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button style={btnBase} onClick={() => downloadPng(wrapRef, downloadPrefix)}>⬇️ PNG</button>
+        <button style={btnGold} onClick={() => downloadPdf(wrapRef, pdfTitle, pdfSub)}>🖨️ PDF</button>
+      </div>
+    </div>
+  );
 
   return (
     <div>
-      {/* Tab row */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -234,71 +248,41 @@ export function PartnerQRSection({ partner }) {
         ))}
       </div>
 
-      {/* ── Публичный QR ── */}
-      {tab === 'public' && (
-        <div>
-          <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px', marginBottom: 12 }}>
-            Размещается на стойке. При сканировании новый пользователь видит регистрацию,
-            зарегистрированный — карточку партнёра.{' '}
-            <span style={{ color: '#E64646', fontWeight: 700 }}>Ключи не начисляются.</span>
-          </div>
-          <div ref={publicWrapRef} style={{ display: 'flex', justifyContent: 'center', background: '#fff', borderRadius: 16, padding: 16, marginBottom: 10 }}>
-            <QRCodeCanvas value={publicQRValue} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
-          </div>
-          <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '7px 11px', fontSize: 10, color: T.textSec, fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 12 }}>
-            {publicQRValue}
-          </div>
-          <div style={btnRow}>
-            <button style={btnBase} onClick={() => downloadQRPng(publicWrapRef, 'qr-public')}>⬇️ PNG</button>
-            <button style={btnGold} onClick={() => downloadQRPdf(publicWrapRef, `Публичный QR — ${partner.name}`, 'Размещается на стойке. Ключи не начисляются.')}>🖨️ PDF</button>
-          </div>
-        </div>
+      {tab === 'qr1' && (
+        <QRBlock
+          wrapRef={qr1WrapRef} value={qr1.value} linkText={qr1.linkText}
+          desc={qr1.desc} downloadPrefix={qr1.downloadPrefix}
+          pdfTitle={qr1.pdfTitle} pdfSub={qr1.pdfSub} copyKey="qr1"
+        />
       )}
 
-      {/* ── Служебный QR ── */}
-      {tab === 'service' && (
-        <div>
-          <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px', marginBottom: 12 }}>
-            Используется только после оказания услуги. При сканировании начисляются ключи, штампы и открывается форма отзыва.
-          </div>
-          <div ref={serviceWrapRef} style={{ display: 'flex', justifyContent: 'center', background: '#fff', borderRadius: 16, padding: 16, marginBottom: 10 }}>
-            <QRCodeCanvas value={serviceQRValue} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
-          </div>
-          <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '7px 11px', fontSize: 10, color: T.textSec, fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 12 }}>
-            Код: {serviceQRValue}
-          </div>
-          <div style={btnRow}>
-            <button style={btnBase} onClick={() => downloadQRPng(serviceWrapRef, 'qr-service')}>⬇️ PNG</button>
-            <button style={btnGold} onClick={() => downloadQRPdf(serviceWrapRef, `Служебный QR — ${partner.name}`, 'Только после оказания услуги. Начисляет ключи.')}>🖨️ PDF</button>
-          </div>
-        </div>
+      {tab === 'qr2' && (
+        <QRBlock
+          wrapRef={qr2WrapRef} value={qr2.value} linkText={qr2.linkText}
+          desc={qr2.desc} downloadPrefix={qr2.downloadPrefix}
+          pdfTitle={qr2.pdfTitle} pdfSub={qr2.pdfSub} copyKey="qr2"
+        />
       )}
 
-      {/* ── Плакат ── */}
       {tab === 'poster' && (
         <div>
-          {/* Скрытый канвас для получения QR data URL при генерации плаката */}
-          <div ref={publicWrapRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', top: -9999 }}>
-            <QRCodeCanvas value={publicQRValue} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
+          <div ref={qr1WrapRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', top: -9999 }}>
+            <QRCodeCanvas value={qr1.value} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
           </div>
           <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px', marginBottom: 12 }}>
             Фирменный плакат с публичным QR. Шаблон: <code style={{ fontSize: 10, color: T.gold }}>/qr-poster-template.png</code>.
-            Для замены шаблона положите новый файл с тем же именем.
           </div>
           {!posterUrl ? (
-            <button
-              onClick={handleGeneratePoster}
-              disabled={posterLoading}
-              style={{ ...btnGold, width: '100%', padding: '13px 0', fontSize: 13, marginBottom: 4, opacity: posterLoading ? 0.7 : 1 }}
-            >
+            <button onClick={handleGeneratePoster} disabled={posterLoading}
+              style={{ ...btnGold, width: '100%', padding: '13px 0', fontSize: 13, marginBottom: 4, opacity: posterLoading ? 0.7 : 1 }}>
               {posterLoading ? '⏳ Генерация...' : '✨ Сгенерировать плакат'}
             </button>
           ) : (
             <>
               <img src={posterUrl} alt="Плакат" style={{ width: '100%', borderRadius: 12, marginBottom: 10, display: 'block' }} />
-              <div style={{ ...btnRow, marginBottom: 8 }}>
-                <button style={btnBase} onClick={() => triggerDownload(posterUrl, `poster-${partner.id}.png`)}>⬇️ PNG</button>
-                <button style={btnGold} onClick={() => openPosterPdfWindow(posterUrl, partner.name)}>🖨️ PDF</button>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button style={btnBase} onClick={() => triggerDownload(posterUrl, `poster-${entityId}.png`)}>⬇️ PNG</button>
+                <button style={btnGold} onClick={() => openPosterPdfWindow(posterUrl, entityName)}>🖨️ PDF</button>
               </div>
               <button onClick={() => setPosterUrl(null)} style={{ ...btnBase, width: '100%', fontSize: 11 }}>↺ Перегенерировать</button>
             </>
@@ -306,5 +290,65 @@ export function PartnerQRSection({ partner }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Partner wrapper (backward compat) ────────────────────────────────────────
+export function PartnerQRSection({ partner }) {
+  const publicVal = `${APP_URL}/?partner=${partner.id}`;
+  return (
+    <CabinetQRSection
+      entityId={partner.id}
+      entityName={partner.name}
+      qr1={{
+        tabLabel: '🌐 Публичный',
+        value: publicVal,
+        linkText: publicVal,
+        desc: 'Размещается на стойке. При сканировании новый пользователь видит регистрацию, зарегистрированный — карточку партнёра. Ключи не начисляются.',
+        downloadPrefix: 'qr-public',
+        pdfTitle: `Публичный QR — ${partner.name}`,
+        pdfSub: 'Размещается на стойке. Ключи не начисляются.',
+      }}
+      qr2={{
+        tabLabel: '🔑 Служебный',
+        value: partner.id,
+        linkText: `Код: ${partner.id}`,
+        desc: 'Используется только после оказания услуги. При сканировании начисляются ключи, штампы и открывается форма отзыва.',
+        downloadPrefix: 'qr-service',
+        pdfTitle: `Служебный QR — ${partner.name}`,
+        pdfSub: 'Только после оказания услуги. Начисляет ключи.',
+      }}
+    />
+  );
+}
+
+// ─── Expert wrapper ────────────────────────────────────────────────────────────
+export function ExpertQRSection({ expert }) {
+  const publicVal  = `${APP_URL}/?expert=${expert.id}`;
+  const serviceVal = `expert_${expert.id}`;
+  const serviceLink = `${APP_URL}/?scan=${serviceVal}`;
+  return (
+    <CabinetQRSection
+      entityId={expert.id}
+      entityName={expert.name}
+      qr1={{
+        tabLabel: '🌐 Публичный',
+        value: publicVal,
+        linkText: publicVal,
+        desc: 'Для приглашения клиентов в АПГ. При сканировании открывается профиль эксперта. Ключи не начисляются.',
+        downloadPrefix: 'qr-expert-public',
+        pdfTitle: `Публичный QR — ${expert.name}`,
+        pdfSub: 'Для приглашения клиентов. Ключи не начисляются.',
+      }}
+      qr2={{
+        tabLabel: '🔑 Служебный',
+        value: serviceVal,
+        linkText: serviceLink,
+        desc: 'Предъявляется клиентом после оказания услуги. Начисляет ключи и открывает форму отзыва.',
+        downloadPrefix: 'qr-expert-service',
+        pdfTitle: `Служебный QR — ${expert.name}`,
+        pdfSub: 'После оказания услуги. Начисляет ключи.',
+      }}
+    />
   );
 }

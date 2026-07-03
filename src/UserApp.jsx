@@ -32,6 +32,7 @@ const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ defa
 const MapPage              = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
 const NearbyPage           = lazy(() => import('./NearbyPage.jsx').then(m => ({ default: m.NearbyPage })));
 const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(m => ({ default: m.PartnerCabinetPage })));
+const ExpertCabinetPage    = lazy(() => import('./ExpertCabinetPage.jsx').then(m => ({ default: m.ExpertCabinetPage })));
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
 
@@ -138,6 +139,12 @@ export function UserApp() {
   const pendingScanId = useMemo(() => {
     return new URLSearchParams(window.location.search).get('scan') ?? null;
   }, []);
+
+  // Deep link на конкретного эксперта: ?expert=ID
+  const pendingExpertId = useMemo(() => {
+    return new URLSearchParams(window.location.search).get('expert') ?? null;
+  }, []);
+  const expertDeepLinkOpened = useRef(false);
   const scanDeepLinkTriggered = useRef(false);
 
   // Подтверждение email по ссылке из письма: ?verify_email=TOKEN
@@ -599,6 +606,22 @@ export function UserApp() {
     }
     isScanningRef.current = true;
 
+    // Public expert QR: value = "https://myapg.ru/?expert=<id>"
+    if (typeof placeIdentifier === 'string' && placeIdentifier.includes('?expert=')) {
+      try {
+        const expertId = new URL(placeIdentifier).searchParams.get('expert');
+        const e = experts.find(ep => ep.id === expertId);
+        setIsScannerOpen(false); isScanningRef.current = false;
+        if (e) {
+          updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
+          showToast('📲 Это публичный QR — ключи не начисляются', 'info');
+        } else {
+          showToast('🔍 Эксперт не найден');
+        }
+      } catch { setIsScannerOpen(false); isScanningRef.current = false; }
+      return;
+    }
+
     // Public partner QR: value = "https://myapg.ru/?partner=<id>"
     if (typeof placeIdentifier === 'string' && placeIdentifier.includes('?partner=')) {
       const partnerId = new URL(placeIdentifier).searchParams.get('partner');
@@ -644,6 +667,7 @@ export function UserApp() {
         } else {
           showToast(`Визит отмечен${stampMsg} 👋`, 'success');
         }
+        updateDoc(doc(db, 'experts', expertId), { totalVisits: increment(1) }).catch(() => {});
         addDoc(collection(db, 'users', String(user.id), 'activity'), {
           type: 'expert_scan', icon: '🧑‍💼',
           text: `Посещение эксперта: ${expert.name}`,
@@ -782,6 +806,16 @@ export function UserApp() {
     scanDeepLinkTriggered.current = true;
     handleConfirmScan(pendingScanId);
   }, [pendingScanId, user, experts, handleConfirmScan]);
+
+  // Открываем эксперта из публичного deep link ?expert=ID
+  useEffect(() => {
+    if (!pendingExpertId || !experts.length || expertDeepLinkOpened.current) return;
+    expertDeepLinkOpened.current = true;
+    const e = experts.find(e => e.id === pendingExpertId);
+    if (e) {
+      updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
+    }
+  }, [pendingExpertId, experts]);
 
   // ─── Задания ────────────────────────────────────────────────────────────────
 
@@ -1370,6 +1404,8 @@ export function UserApp() {
                     lastBonusDate={lastBonusDate}
                     ownedPartner={ownedPartner}
                     onOpenPartnerCabinet={() => goPanel('partner-cabinet')}
+                    ownedExpert={ownedExpert}
+                    onOpenExpertCabinet={() => goPanel('expert-cabinet')}
                     onUserUpdate={(patch) => setUser(u => ({ ...u, ...patch }))}
                   />
                 </Suspense>
@@ -1439,6 +1475,19 @@ export function UserApp() {
                     onPartnerUpdate={(updated) => {
                       setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
                       setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                    }}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="expert-cabinet">
+                <Suspense fallback={<LazyFallback />}>
+                  <ExpertCabinetPage
+                    expert={ownedExpert}
+                    onBack={() => goPanel('profile')}
+                    onExpertUpdate={(updated) => {
+                      setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
+                      setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
                     }}
                   />
                 </Suspense>

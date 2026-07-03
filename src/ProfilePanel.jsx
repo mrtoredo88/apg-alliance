@@ -334,7 +334,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {} }) {
+export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {} }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -1142,6 +1142,34 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>Статистика · Редактирование карточки</div>
               </div>
               <div style={{ color: T.gold, fontSize: 20, flexShrink: 0 }}>›</div>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* ── Кабинет эксперта ── */}
+      {ownedExpert && onOpenExpertCabinet && (
+        <div style={{ padding: ownedPartner ? '12px 16px 0' : '16px 16px 0' }}>
+          <button
+            onClick={onOpenExpertCabinet}
+            style={{ width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: 0, background: 'none', display: 'block', animation: 'fadeInUp 0.35s ease both' }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(74,144,217,0.15), rgba(74,144,217,0.05))',
+              border: '1px solid rgba(74,144,217,0.35)', borderRadius: 20, padding: '14px 16px',
+              display: 'flex', alignItems: 'center', gap: 14,
+            }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(74,144,217,0.15)', border: '1px solid rgba(74,144,217,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0, overflow: 'hidden' }}>
+                {ownedExpert.photo
+                  ? <img src={ownedExpert.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => e.target.style.display='none'} />
+                  : '🧑‍💼'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: '#4A90D9', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 }}>Кабинет эксперта</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ownedExpert.name}</div>
+                <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>Статистика · QR-коды · Редактирование</div>
+              </div>
+              <div style={{ color: '#4A90D9', fontSize: 20, flexShrink: 0 }}>›</div>
             </div>
           </button>
         </div>

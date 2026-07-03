@@ -4,7 +4,8 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
-import { PartnerQRSection } from './PartnerQRSection.jsx';
+import { Stars, StatCard } from './PartnerCabinetPage.jsx';
+import { ExpertQRSection } from './PartnerQRSection.jsx';
 
 const IMGBB_KEY = '0c37a46d4e13e9a30cddb1c79c8e6374';
 
@@ -17,90 +18,71 @@ async function uploadToImgBB(file) {
   return json.data.url;
 }
 
-export function Stars({ rating }) {
-  const r = Math.round(rating ?? 0);
-  return <span style={{ color: '#FFD700', letterSpacing: 0.5 }}>{'★'.repeat(r)}{'☆'.repeat(5 - r)}</span>;
-}
-
-export function StatCard({ icon, label, value, sub, color }) {
-  return (
-    <div style={{
-      background: T.chipBg, backdropFilter: 'blur(28px)',
-      WebkitBackdropFilter: 'blur(28px)', borderRadius: 20, padding: '14px 12px',
-      textAlign: 'center', border: `1px solid ${color ? color + '30' : T.border}`,
-    }}>
-      <div style={{ fontSize: 26, marginBottom: 5 }}>{icon}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: color ?? T.gold, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 10, color: T.textSec, marginTop: 3, lineHeight: '14px' }}>{label}</div>
-      {sub && <div style={{ fontSize: 9, color: color ?? T.gold, fontWeight: 700, marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
-}
-
-export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPartner, expert, onBack, onPartnerUpdate }) {
-  const [partner, setPartner]     = useState(initialPartner);
+export function ExpertCabinetPage({ nav = 'expert-cabinet', expert: initialExpert, onBack, onExpertUpdate }) {
+  const [expert, setExpert]       = useState(initialExpert);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState('stats');
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
   const [uploading, setUploading] = useState(false);
-  const logoInputRef              = useRef(null);
+  const photoInputRef             = useRef(null);
 
-  // Поля редактирования
-  const [fDesc,   setFDesc]   = useState('');
-  const [fOffer,  setFOffer]  = useState('');
-  const [fPhone,  setFPhone]  = useState('');
-  const [fHours,  setFHours]  = useState('');
-  const [fSocial, setFSocial] = useState('');
-  const [fLogo,   setFLogo]   = useState('');
+  const [fDesc,     setFDesc]     = useState('');
+  const [fOffer,    setFOffer]    = useState('');
+  const [fPhone,    setFPhone]    = useState('');
+  const [fBooking,  setFBooking]  = useState('');
+  const [fWebsite,  setFWebsite]  = useState('');
+  const [fVk,       setFVk]       = useState('');
+  const [fTelegram, setFTelegram] = useState('');
+  const [fMax,      setFMax]      = useState('');
+  const [fPhoto,    setFPhoto]    = useState('');
 
   useEffect(() => {
-    if (!initialPartner?.id) return;
+    if (!initialExpert?.id) return;
     setLoading(true);
 
     Promise.all([
-      getDoc(doc(db, 'partners', initialPartner.id)),
+      getDoc(doc(db, 'experts', initialExpert.id)),
       getDocs(query(
-        collection(db, 'partners', initialPartner.id, 'reviews'),
+        collection(db, 'experts', initialExpert.id, 'reviews'),
         orderBy('createdAt', 'desc'),
         limit(20),
       )).catch(() => ({ docs: [] })),
-    ]).then(([pSnap, rSnap]) => {
-      const p = pSnap.exists() ? { id: pSnap.id, ...pSnap.data() } : initialPartner;
-      setPartner(p);
-      setFDesc(p.description ?? '');
-      setFOffer(p.offer ?? '');
-      setFPhone(p.phone ?? '');
-      setFHours(p.hours ?? '');
-      setFSocial(p.socialUrl ?? '');
-      setFLogo(p.logoUrl ?? '');
+    ]).then(([eSnap, rSnap]) => {
+      const e = eSnap.exists() ? { id: eSnap.id, ...eSnap.data() } : initialExpert;
+      setExpert(e);
+      setFDesc(e.description ?? '');
+      setFOffer(e.offer ?? '');
+      setFPhone(e.phone ?? '');
+      setFBooking(e.bookingUrl ?? '');
+      setFWebsite(e.websiteUrl ?? '');
+      setFVk(e.vkUrl ?? '');
+      setFTelegram(e.telegramUrl ?? '');
+      setFMax(e.maxUrl ?? '');
+      setFPhoto(e.photo ?? '');
       setReviews(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [initialPartner?.id]);
+  }, [initialExpert?.id]);
 
-  const handleLogoUpload = async (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) {
-      alert('Файл слишком большой. Максимум 1 МБ.');
-      e.target.value = '';
-      return;
-    }
+    if (file.size > 1024 * 1024) { alert('Файл слишком большой. Максимум 1 МБ.'); e.target.value = ''; return; }
     setUploading(true);
     try {
       const url = await uploadToImgBB(file);
-      setFLogo(url);
+      setFPhoto(url);
     } catch { alert('Ошибка загрузки фото'); }
     setUploading(false);
   };
 
   const handleSave = async () => {
-    if (!partner?.id) return;
+    if (!expert?.id) return;
     const phone = fPhone.trim();
     if (phone && !/^[+\d()\s\-]{7,16}$/.test(phone)) {
-      alert('Некорректный формат номера телефона.\nПример: +7 (999) 123-45-67');
+      alert('Некорректный формат номера телефона.\nПример: +7 (499) 123-45-67');
       return;
     }
     setSaving(true);
@@ -108,30 +90,32 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
       const data = {
         description:      fDesc.trim(),
         offer:            fOffer.trim(),
-        phone:            fPhone.trim(),
-        hours:            fHours.trim(),
-        socialUrl:        fSocial.trim(),
-        logoUrl:          fLogo.trim(),
+        phone:            phone,
+        bookingUrl:       fBooking.trim(),
+        websiteUrl:       fWebsite.trim(),
+        vkUrl:            fVk.trim(),
+        telegramUrl:      fTelegram.trim(),
+        maxUrl:           fMax.trim(),
+        photo:            fPhoto.trim(),
         profileUpdatedAt: serverTimestamp(),
       };
-      await updateDoc(doc(db, 'partners', partner.id), data);
-      const updated = { ...partner, ...data };
-      setPartner(updated);
-      onPartnerUpdate?.(updated);
+      await updateDoc(doc(db, 'experts', expert.id), data);
+      const updated = { ...expert, ...data };
+      setExpert(updated);
+      onExpertUpdate?.(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch { alert('Ошибка сохранения'); }
     setSaving(false);
   };
 
-  if (!partner) return null;
+  if (!expert) return null;
 
-  const totalVisits    = partner.totalVisits ?? 0;
-  const publicQRScans  = partner.publicQRScans ?? 0;
-  const viewCount      = partner.viewCount ?? 0;
-  const favoritesCount = partner.favoritesCount ?? 0;
-  const avgRating      = partner.avgRating ?? 0;
-  const ratingCount    = partner.reviewCount ?? reviews.length;
+  const totalVisits    = expert.totalVisits    ?? 0;
+  const publicQRScans  = expert.publicQRScans  ?? 0;
+  const viewCount      = expert.viewCount      ?? 0;
+  const avgRating      = expert.avgRating      ?? 0;
+  const ratingCount    = expert.reviewCount    ?? reviews.length;
   const conversionPct  = viewCount > 0 ? Math.round((totalVisits / viewCount) * 100) : 0;
 
   const inputStyle = {
@@ -154,11 +138,10 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: T.chipBg, border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏪 {partner.name}</div>
-            <div style={{ fontSize: 10, color: T.gold, marginTop: 1 }}>Личный кабинет партнёра</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🧑‍💼 {expert.name}</div>
+            <div style={{ fontSize: 10, color: T.gold, marginTop: 1 }}>Личный кабинет эксперта</div>
           </div>
         </div>
-        {/* Вкладки */}
         <div style={{ display: 'flex', gap: 8, paddingBottom: 12 }}>
           {[['stats', '📊 Статистика'], ['qr', '📲 QR-коды'], ['edit', '✏️ Карточка']].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)} style={{
@@ -174,47 +157,18 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
 
       <div style={{ background: 'transparent', minHeight: '100%', padding: '12px 16px 90px' }}>
 
-        {/* ── Ссылка эксперта ── */}
-        {expert && (() => {
-          const link = `${APP_URL}/?scan=expert_${expert.id}`;
-          return (
-            <div style={{ ...GLASS_GOLD, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.gold, marginBottom: 8 }}>🔗 Ссылка для клиента</div>
-              <div style={{ fontSize: 11, color: T.textSec, lineHeight: '16px', marginBottom: 10 }}>
-                Отправьте ссылку клиенту — при открытии ему автоматически начислится {expert.keys ?? 1} {(expert.keys ?? 1) === 1 ? 'ключ' : 'ключа'}. Каждый клиент может воспользоваться ссылкой только один раз.
-              </div>
-              <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: T.textPri, wordBreak: 'break-all', marginBottom: 10 }}>
-                {link}
-              </div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(link).catch(() => {});
-                }}
-                style={{
-                  width: '100%', padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-                  color: '#0F0F1A', fontSize: 13, fontWeight: 700,
-                }}
-              >
-                Скопировать ссылку
-              </button>
-            </div>
-          );
-        })()}
-
         {/* ── СТАТИСТИКА ── */}
         {activeTab === 'stats' && (
           <>
-            {/* Шапка карточки */}
             <div style={{ ...GLASS_GOLD, borderRadius: 24, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, overflow: 'hidden' }}>
-                {fLogo
-                  ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
-                  : partner.emoji ?? '🏪'}
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, overflow: 'hidden' }}>
+                {fPhoto
+                  ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                  : '🧑‍💼'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>{partner.name}</div>
-                {partner.address && <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>📍 {partner.address}</div>}
+                <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>{expert.name}</div>
+                {expert.specialization && <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>{expert.specialization}</div>}
                 {avgRating > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
                     <Stars rating={avgRating} />
@@ -235,9 +189,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                   <StatCard icon="🔑" label="Служебный QR" value={totalVisits} color={T.gold} sub="ключи начислены" />
                   <StatCard icon="🌐" label="Публичный QR" value={publicQRScans} color="#4A90D9" sub="переходов" />
                   <StatCard icon="👁" label="Просмотров карточки" value={viewCount} color={T.blue} />
-                  <StatCard icon="❤️" label="В избранном" value={favoritesCount} color="#E64646" />
-                  <StatCard
-                    icon="🎯" label="Конверсия" color={T.green}
+                  <StatCard icon="🎯" label="Конверсия" color={T.green}
                     value={viewCount > 0 ? `${conversionPct}%` : '—'}
                     sub={viewCount > 0 ? 'просмотр → скан' : 'пока нет данных'}
                   />
@@ -246,7 +198,6 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                   )}
                 </div>
 
-                {/* Рейтинг */}
                 {avgRating > 0 && (
                   <>
                     <div style={{ fontSize: 11, color: T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>Рейтинг и отзывы</div>
@@ -296,7 +247,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
                   <div style={{ ...GLASS, borderRadius: 24, padding: '32px 20px', textAlign: 'center' }}>
                     <div style={{ fontSize: 44, marginBottom: 10 }}>📊</div>
                     <div style={{ color: T.textPri, fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Статистика собирается</div>
-                    <div style={{ color: T.textSec, fontSize: 12, lineHeight: '18px' }}>Данные появятся после первых посещений вашего заведения участниками АПГ</div>
+                    <div style={{ color: T.textSec, fontSize: 12, lineHeight: '18px' }}>Данные появятся после первых посещений вашей карточки участниками АПГ</div>
                   </div>
                 )}
               </>
@@ -307,34 +258,31 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
         {/* ── QR-КОДЫ ── */}
         {activeTab === 'qr' && (
           <div style={{ ...GLASS, borderRadius: 24, padding: '16px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.gold, marginBottom: 14 }}>📲 QR-коды партнёра</div>
-            <PartnerQRSection partner={partner} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.gold, marginBottom: 14 }}>📲 QR-коды эксперта</div>
+            <ExpertQRSection expert={expert} />
           </div>
         )}
 
         {/* ── РЕДАКТИРОВАНИЕ ── */}
         {activeTab === 'edit' && (
           <>
-            {/* Логотип */}
+            {/* Фото */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
-              <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
-                {fLogo
-                  ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
-                  : partner.emoji ?? '🏪'}
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, flexShrink: 0, overflow: 'hidden' }}>
+                {fPhoto
+                  ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                  : '🧑‍💼'}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri, marginBottom: 6 }}>Логотип заведения</div>
-                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri, marginBottom: 6 }}>Фото профиля</div>
+                <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={() => logoInputRef.current?.click()}
-                    disabled={uploading}
-                    style={{ padding: '7px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}
-                  >
+                  <button onClick={() => photoInputRef.current?.click()} disabled={uploading}
+                    style={{ padding: '7px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}>
                     {uploading ? 'Загрузка...' : '📷 Загрузить фото'}
                   </button>
-                  {fLogo && (
-                    <button onClick={() => setFLogo('')} style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid rgba(230,70,70,0.3)`, background: 'rgba(230,70,70,0.08)', color: '#E64646', fontSize: 11, cursor: 'pointer' }}>
+                  {fPhoto && (
+                    <button onClick={() => setFPhoto('')} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(230,70,70,0.3)', background: 'rgba(230,70,70,0.08)', color: '#E64646', fontSize: 11, cursor: 'pointer' }}>
                       Удалить
                     </button>
                   )}
@@ -342,45 +290,46 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
               </div>
             </div>
 
-            <label style={labelStyle}>Описание заведения</label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
-              placeholder="Расскажите о своём заведении..."
-              value={fDesc} onChange={e => setFDesc(e.target.value)}
-            />
+            <label style={labelStyle}>О себе</label>
+            <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+              placeholder="Расскажите о своей деятельности, опыте, подходе к работе..."
+              value={fDesc} onChange={e => setFDesc(e.target.value)} />
 
             <label style={labelStyle}>🎁 Спецпредложение для участников АПГ</label>
-            <input style={inputStyle} placeholder="Скидка 10% на первый визит" value={fOffer} onChange={e => setFOffer(e.target.value)} />
+            <input style={inputStyle} placeholder="Скидка 10% на первую консультацию" value={fOffer} onChange={e => setFOffer(e.target.value)} />
 
             <label style={labelStyle}>📞 Телефон</label>
             <input style={inputStyle} placeholder="+7 (499) 123-45-67" value={fPhone} onChange={e => setFPhone(e.target.value)} />
 
-            <label style={labelStyle}>🕐 Часы работы</label>
-            <input style={inputStyle} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={fHours} onChange={e => setFHours(e.target.value)} />
+            <label style={labelStyle}>📅 Ссылка для записи</label>
+            <input style={inputStyle} placeholder="https://..." value={fBooking} onChange={e => setFBooking(e.target.value)} />
 
-            <label style={labelStyle}>🔗 Соцсеть / сайт</label>
-            <input style={inputStyle} placeholder="https://vk.com/mypage" value={fSocial} onChange={e => setFSocial(e.target.value)} />
+            <label style={labelStyle}>🌐 Сайт</label>
+            <input style={inputStyle} placeholder="https://..." value={fWebsite} onChange={e => setFWebsite(e.target.value)} />
 
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{
-                width: '100%', padding: '15px 0', borderRadius: 16, border: 'none',
-                background: saved
-                  ? 'rgba(75,179,75,0.2)'
-                  : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-                color: saved ? T.green : '#0F0F1A',
-                fontSize: 15, fontWeight: 800, cursor: saving ? 'default' : 'pointer',
-                opacity: saving ? 0.7 : 1, transition: 'all 0.25s',
-                outline: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
-              }}
-            >
+            <label style={labelStyle}>🔵 ВКонтакте</label>
+            <input style={inputStyle} placeholder="https://vk.com/..." value={fVk} onChange={e => setFVk(e.target.value)} />
+
+            <label style={labelStyle}>✈️ Telegram</label>
+            <input style={inputStyle} placeholder="https://t.me/..." value={fTelegram} onChange={e => setFTelegram(e.target.value)} />
+
+            <label style={labelStyle}>💬 Max</label>
+            <input style={inputStyle} placeholder="https://..." value={fMax} onChange={e => setFMax(e.target.value)} />
+
+            <button onClick={handleSave} disabled={saving} style={{
+              width: '100%', padding: '15px 0', borderRadius: 16, border: 'none',
+              background: saved ? 'rgba(75,179,75,0.2)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+              color: saved ? T.green : '#0F0F1A',
+              fontSize: 15, fontWeight: 800, cursor: saving ? 'default' : 'pointer',
+              opacity: saving ? 0.7 : 1, transition: 'all 0.25s',
+              outline: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
+            }}>
               {saving ? 'Сохраняем...' : saved ? '✓ Сохранено!' : 'Сохранить изменения'}
             </button>
 
             <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: 12 }}>
               <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px' }}>
-                💡 Название заведения, категория и QR-код управляются администратором АПГ. По всем вопросам пишите нам.
+                💡 Имя, специализация, количество ключей и категория управляются администратором АПГ. По всем вопросам пишите нам.
               </div>
             </div>
           </>
