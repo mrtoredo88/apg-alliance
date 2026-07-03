@@ -17,12 +17,9 @@ const BYPASS_HOSTS = [
   'securetoken.googleapis.com',
   'firebaseinstallations.googleapis.com',
   'fcmregistrations.googleapis.com',
-  'fonts.googleapis.com',
-  'fonts.gstatic.com',
   'vk.com',
   'vkontakte.ru',
   'api.vk.com',
-  'i.ibb.co',
 ];
 
 self.addEventListener('install', (e) => {
