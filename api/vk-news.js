@@ -33,6 +33,12 @@ function mapPost(post) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+
+  if (req.query.health !== undefined) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ ok: true, ts: Date.now() });
+  }
+
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
 
   const token = process.env.VK_GROUP_TOKEN;

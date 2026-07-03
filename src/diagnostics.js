@@ -50,7 +50,7 @@ export async function runServiceChecks() {
     }),
     checkWithTimeout(() => getDoc(doc(db, 'config', 'health'))),
     checkWithTimeout(() =>
-      fetch('/api/health').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+      fetch('/api/vk-news?health').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
     ),
   ]);
   return { auth: authCheck, firestore: firestoreCheck, backend: backendCheck };
