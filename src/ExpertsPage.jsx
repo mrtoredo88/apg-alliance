@@ -483,7 +483,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
                 value={myText}
                 onChange={e => setMyText(e.target.value)}
                 placeholder="Расскажите о своём опыте..."
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 13, resize: 'vertical', minHeight: 72, boxSizing: 'border-box', outline: 'none', marginBottom: 10, fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 16, resize: 'vertical', minHeight: 72, boxSizing: 'border-box', outline: 'none', marginBottom: 10, fontFamily: 'inherit' }}
               />
               <button
                 onClick={handleSubmitReview}

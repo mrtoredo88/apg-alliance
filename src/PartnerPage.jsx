@@ -518,7 +518,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
                   onChange={e => setFormText(e.target.value)}
                   placeholder="Расскажите о своём визите..."
                   maxLength={400}
-                  style={{ width:'100%', background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${T.border}`, borderRadius:16, padding:'10px 12px', color:T.textPri, fontSize:13, resize:'none', minHeight:80, outline:'none', boxSizing:'border-box', fontFamily:'inherit', lineHeight:'18px' }}
+                  style={{ width:'100%', background:T.chipBg, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${T.border}`, borderRadius:16, padding:'10px 12px', color:T.textPri, fontSize:16, resize:'none', minHeight:80, outline:'none', boxSizing:'border-box', fontFamily:'inherit', lineHeight:'22px' }}
                 />
                 <div style={{ fontSize:10, color:T.textSec, textAlign:'right', marginTop:2 }}>{formText.length}/400</div>
               </div>
