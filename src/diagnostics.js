@@ -1,4 +1,5 @@
 import { db, auth } from './firebase.js';
+import { API_BASE_URL } from './constants.js';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 
@@ -50,7 +51,7 @@ export async function runServiceChecks() {
     }),
     checkWithTimeout(() => getDoc(doc(db, 'config', 'health'))),
     checkWithTimeout(() =>
-      fetch('/api/vk-news?health').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+      fetch(`${API_BASE_URL}/api/vk-news?health`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
     ),
   ]);
   return { auth: authCheck, firestore: firestoreCheck, backend: backendCheck };

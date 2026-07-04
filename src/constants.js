@@ -1,5 +1,8 @@
 export const APP_URL = 'https://myapg.ru';
 
+// Для отката на Vercel API: установить VITE_API_BASE_URL='' и передеплоить
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net';
+
 export const EXPERT_CATEGORIES = [
   { id: 'food',      label: 'Еда',          emoji: '🍳' },
   { id: 'beauty',    label: 'Красота',       emoji: '💅' },

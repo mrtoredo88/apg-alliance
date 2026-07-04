@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
-import { APP_URL } from './constants.js';
+import { APP_URL, API_BASE_URL } from './constants.js';
 import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
@@ -156,7 +156,7 @@ export function UserApp() {
 
   useEffect(() => {
     if (!verifyEmailToken) return;
-    fetch('/api/email-auth', {
+    fetch(`${API_BASE_URL}/api/email-auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'verify-email', token: verifyEmailToken }),
@@ -353,7 +353,7 @@ export function UserApp() {
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'reviews'),       orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'customTasks'),   orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
-        fetch('/api/vk-news').then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
+        fetch(`${API_BASE_URL}/api/vk-news`).then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
         getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
         getDoc(doc(db, 'stats', 'global')).catch(() => null),
       ]);
@@ -549,7 +549,7 @@ export function UserApp() {
         if (isValidRef) {
           localStorage.removeItem('apg_pending_ref');
           // Начисляем рефереру через Admin SDK (клиент не может писать в чужой users-doc)
-          fetch('/api/email-auth', {
+          fetch(`${API_BASE_URL}/api/email-auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'grant-referral', referrerId: refId, newUserId: String(userData.id) }),

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { T } from './design.js';
+import { API_BASE_URL } from './constants.js';
 
 const SPINNER = (
   <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', verticalAlign: 'middle' }} />
@@ -18,7 +19,7 @@ export function EmailAuth({ onCancel }) {
     setError('');
     const ref = localStorage.getItem('apg_pending_ref') ?? undefined;
     try {
-      const res = await fetch('/api/email-auth', {
+      const res = await fetch(`${API_BASE_URL}/api/email-auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login', email, ref }),

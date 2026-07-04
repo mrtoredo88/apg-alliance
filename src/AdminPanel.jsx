@@ -6,7 +6,7 @@ import { PartnerQRSection } from './PartnerQRSection.jsx';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
-import { EXPERT_CATEGORIES, APP_URL } from './constants.js';
+import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
@@ -628,7 +628,7 @@ function RotationTab({ experts, A, s }) {
   const runRotation = async () => {
     setRunning(true); setMsg('');
     try {
-      const res = await fetch('/api/expert-rotation', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/expert-rotation`, { method: 'POST' });
       const data = await res.json();
       setMsg(`✅ Ротация выполнена: ${data.results?.length ?? 0} категорий обновлено`);
       loadRotation();
@@ -1067,7 +1067,7 @@ export const AdminPanel = () => {
         serviceQRValue:  newRef.id,
       }).catch(() => {});
       // Уведомляем webpush-подписчиков о новом партнёре
-      fetch('/api/send-push', {
+      fetch(`${API_BASE_URL}/api/send-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-push-secret': 'apg2026raffle' },
         body: JSON.stringify({
@@ -1183,7 +1183,7 @@ export const AdminPanel = () => {
 
     if (ntSendPush) {
       try {
-        const r = await fetch('/api/send-push', {
+        const r = await fetch(`${API_BASE_URL}/api/send-push`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-push-secret': 'apg-push-2024' },
           body: JSON.stringify({ broadcast: true, title: ntTitle.trim(), body: ntBody.trim() || undefined }),
@@ -1399,7 +1399,7 @@ export const AdminPanel = () => {
     setRaffleDrawing(prize.id);
     setRaffleResult(null);
     try {
-      const res = await fetch('/api/raffle-draw', {
+      const res = await fetch(`${API_BASE_URL}/api/raffle-draw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secret: 'apg2026raffle', prizeId: prize.id }),
@@ -2701,7 +2701,7 @@ export const AdminPanel = () => {
           setActivityLoading(true);
           setActivityMsg('');
           try {
-            const res = await fetch('/api/activity-index', {
+            const res = await fetch(`${API_BASE_URL}/api/activity-index`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ secret: 'apg2026activity' }),

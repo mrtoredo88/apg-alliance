@@ -1,10 +1,12 @@
+import { API_BASE_URL } from '../constants.js';
+
 export async function uploadPhoto(file, folder) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
         const base64 = reader.result.split(',')[1];
-        const res = await fetch('/api/upload-photo', {
+        const res = await fetch(`${API_BASE_URL}/api/upload-photo`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

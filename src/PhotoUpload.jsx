@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import imageCompression from 'browser-image-compression';
+import { API_BASE_URL } from './constants.js';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
@@ -29,7 +30,7 @@ async function compressAndUpload(file, folder, onProgress) {
   const baseName = file.name.replace(/\.[^.]+$/, '');
 
   onProgress(60);
-  const res = await fetch('/api/upload-photo', {
+  const res = await fetch(`${API_BASE_URL}/api/upload-photo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ folder, filename: baseName, contentType: compressed.type, data: base64 }),

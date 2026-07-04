@@ -7,7 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
-import { APP_URL } from './constants.js';
+import { APP_URL, API_BASE_URL } from './constants.js';
 
 function EmailVerifyBanner({ userId }) {
   const [sent, setSent]       = useState(false);
@@ -17,7 +17,7 @@ function EmailVerifyBanner({ userId }) {
     if (loading || sent) return;
     setLoading(true);
     try {
-      await fetch('/api/email-auth', {
+      await fetch(`${API_BASE_URL}/api/email-auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'resend-verification', userId }),
@@ -367,7 +367,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     const poll = async () => {
       if (tgStateRef.current !== state) return;
       try {
-        const r    = await fetch(`/api/telegram-auth-check?state=${state}`);
+        const r    = await fetch(`${API_BASE_URL}/api/telegram-auth-check?state=${state}`);
         const data = await r.json();
         if (tgStateRef.current !== state) return;
         if (data.status === 'done') {
@@ -377,7 +377,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             // Режим привязки — записываем tgLinks, не перезагружаем
             tgLinkingRef.current = false;
             const tgPayload = { tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name ?? null, photo: data.user.photo_200 ?? null };
-            fetch('/api/email-auth', {
+            fetch(`${API_BASE_URL}/api/email-auth`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
@@ -427,7 +427,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     setTgError('');
     stopPolling();
     try {
-      const { state, url } = await fetch('/api/telegram-auth-start', { method: 'POST' }).then(r => r.json());
+      const { state, url } = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST' }).then(r => r.json());
       localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));
       setTgBotUrl(url);
       setTgLoading(false);
@@ -470,7 +470,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     setLinkEmailLoading(true);
     setLinkEmailError('');
     try {
-      const res = await fetch('/api/email-auth', {
+      const res = await fetch(`${API_BASE_URL}/api/email-auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'link-email', email: linkEmailValue, userId: String(user.id) }),
