@@ -207,6 +207,187 @@ function V2FirstScreen({
   );
 }
 
+function V2SecondScreen({
+  partners,
+  events,
+  news,
+  featuredPartner,
+  partnerOfMonth,
+  onOpenPartner,
+  onOpenEvents,
+  onOpenRewards,
+}) {
+  const imageOf = (item) => item?.imageUrl || item?.coverPhoto || item?.logoUrl || item?.photoUrl || item?.photo || '';
+  const primaryPartner = partnerOfMonth ?? featuredPartner ?? partners[0] ?? null;
+  const promoPartner = partners.find(p => p.offer && p.id !== primaryPartner?.id) ?? partners[1] ?? primaryPartner;
+  const eventItem = events[0] ?? null;
+  const secondEvent = events.find(e => e.id !== eventItem?.id) ?? null;
+  const firstNews = news[0] ?? null;
+  const smallNews = news.slice(1, 3);
+  const raffleImage = imageOf(partners[2]) || imageOf(primaryPartner);
+
+  const forYouCards = [
+    {
+      label: 'Новое место',
+      title: primaryPartner?.name ?? 'Откройте место дня',
+      image: imageOf(primaryPartner),
+      onClick: primaryPartner ? () => onOpenPartner?.(primaryPartner) : undefined,
+    },
+    {
+      label: 'Событие',
+      title: eventItem?.title ?? 'Городская встреча',
+      image: imageOf(eventItem),
+      onClick: onOpenEvents,
+    },
+    {
+      label: 'Акция',
+      title: promoPartner?.offer ?? promoPartner?.name ?? 'Предложение партнёра',
+      image: imageOf(promoPartner),
+      onClick: promoPartner ? () => onOpenPartner?.(promoPartner) : undefined,
+    },
+    {
+      label: 'Новый эксперт',
+      title: 'Свежий взгляд на город',
+      image: imageOf(partners[3]) || imageOf(primaryPartner),
+      onClick: onOpenEvents,
+    },
+    {
+      label: 'Розыгрыш',
+      title: 'Подарки этой недели',
+      image: raffleImage,
+      onClick: onOpenRewards,
+    },
+  ];
+
+  const visibleEvents = [eventItem, secondEvent, events[2]].filter(Boolean).slice(0, 3);
+
+  const fallbackCardBg = 'radial-gradient(circle at 25% 15%, rgba(214,183,102,0.24), transparent 42%), linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025))';
+
+  return (
+    <section style={{
+      padding: '40px 0 38px',
+      background: 'radial-gradient(circle at 8% 10%, rgba(214,183,102,0.10), transparent 32%), radial-gradient(circle at 94% 72%, rgba(82,54,102,0.12), transparent 34%), linear-gradient(180deg, #101011 0%, #121217 56%, #101011 100%)',
+      overflow: 'hidden',
+    }}>
+      <div style={{ padding: '0 22px 18px' }}>
+        <div style={{ color: V2.text, fontSize: 28, lineHeight: '33px', fontWeight: 800, letterSpacing: 0, marginBottom: 8 }}>
+          Сегодня для вас
+        </div>
+        <div style={{ color: V2.textMuted, fontSize: 14, lineHeight: '22px', fontWeight: 400 }}>
+          Несколько поводов выйти в город
+        </div>
+      </div>
+
+      <div onTouchStart={e => e.stopPropagation()}>
+        <HorizontalScroll>
+          <div style={{ display: 'flex', gap: 14, padding: '0 22px 30px' }}>
+            {forYouCards.map((card, index) => (
+              <button
+                key={`${card.label}-${index}`}
+                onClick={card.onClick}
+                style={{
+                  width: 238, height: 286, flexShrink: 0, border: 'none', borderRadius: 34,
+                  overflow: 'hidden', padding: 0, position: 'relative', textAlign: 'left', cursor: 'pointer',
+                  background: fallbackCardBg,
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.28), inset 0 1.5px 0 rgba(255,255,255,0.22)',
+                }}
+              >
+                {card.image && (
+                  <img src={card.image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, filter: 'saturate(1.04) contrast(1.04)' }} />
+                )}
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,14,16,0.04), rgba(14,14,16,0.38) 50%, rgba(14,14,16,0.84))' }} />
+                <div style={{ position: 'relative', zIndex: 1, height: '100%', padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <span style={{ alignSelf: 'flex-start', padding: '7px 11px', borderRadius: 999, color: V2.text, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.105)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)' }}>
+                    {card.label}
+                  </span>
+                  <span style={{ color: V2.text, fontSize: 24, lineHeight: '28px', fontWeight: 800, textShadow: '0 10px 28px rgba(0,0,0,0.46)' }}>
+                    {card.title}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </HorizontalScroll>
+      </div>
+
+      <div style={{ padding: '0 22px' }}>
+        <div style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 800, marginBottom: 16 }}>
+          Что нового
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.08fr 0.92fr', gap: 12, marginBottom: 34 }}>
+          <button
+            onClick={onOpenEvents}
+            style={{
+              minHeight: 248, border: 'none', borderRadius: 32, overflow: 'hidden', position: 'relative',
+              padding: 0, textAlign: 'left', cursor: 'pointer', background: fallbackCardBg,
+              boxShadow: '0 22px 58px rgba(0,0,0,0.24), inset 0 1.5px 0 rgba(255,255,255,0.2)',
+            }}
+          >
+            {imageOf(firstNews) && <img src={imageOf(firstNews)} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.48 }} />}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,14,16,0.08), rgba(14,14,16,0.84))' }} />
+            <div style={{ position: 'relative', zIndex: 1, minHeight: 248, padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <div style={{ color: V2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 800, marginBottom: 8 }}>Главное</div>
+              <div style={{ color: V2.text, fontSize: 21, lineHeight: '25px', fontWeight: 800 }}>
+                {firstNews?.title ?? 'Город становится ближе'}
+              </div>
+            </div>
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {(smallNews.length ? smallNews : [{ title: 'Новые предложения' }, { title: 'Планы на неделю' }]).slice(0, 2).map((item, index) => (
+              <button
+                key={`${item.id ?? item.title}-${index}`}
+                onClick={onOpenEvents}
+                style={{
+                  flex: 1, border: 'none', borderRadius: 28, padding: 15, textAlign: 'left', cursor: 'pointer',
+                  ...V2.glass,
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ color: V2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 800 }}>{index === 0 ? 'Новость' : 'Коротко'}</span>
+                <span style={{ color: V2.text, fontSize: 15, lineHeight: '20px', fontWeight: 750 }}>{item.title}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 800, marginBottom: 16 }}>
+          Ближайшие события
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {(visibleEvents.length ? visibleEvents : [{ title: 'События скоро появятся', date: 'Скоро', partner: 'АПГ' }]).map((event, index) => (
+            <button
+              key={`${event.id ?? event.title}-${index}`}
+              onClick={onOpenEvents}
+              style={{
+                border: 'none', borderRadius: 30, padding: '18px 18px 17px', cursor: 'pointer', textAlign: 'left',
+                ...V2.glass,
+                display: 'grid', gridTemplateColumns: '74px 1fr auto', alignItems: 'center', gap: 14,
+              }}
+            >
+              <span style={{ color: V2.gold, fontSize: 22, lineHeight: '26px', fontWeight: 850 }}>
+                {event.date?.split(' ')?.slice(0, 2).join(' ') || 'Скоро'}
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', color: V2.text, fontSize: 16, lineHeight: '20px', fontWeight: 800, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {event.title}
+                </span>
+                <span style={{ display: 'block', color: V2.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {event.partner || event.address || 'Зеленоград'}
+                </span>
+              </span>
+              <span style={{ width: 38, height: 38, borderRadius: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', color: V2.text, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.16)', fontSize: 18 }}>
+                →
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Модальное окно события ───────────────────────────────────────────────────
 
 function EventModal({ event, onClose }) {
@@ -1515,6 +1696,17 @@ export function HomePanelV2({
 
         {!loading && !error && (
           <>
+            <V2SecondScreen
+              partners={partners}
+              events={events}
+              news={news}
+              featuredPartner={featuredPartner}
+              partnerOfMonth={partnerOfMonth}
+              onOpenPartner={onOpenPartner}
+              onOpenEvents={onOpenEvents}
+              onOpenRewards={onOpenRewards}
+            />
+
             {/* Демо-баннер для веб-версии */}
             {isWebMode && (
               <div style={{ margin: '10px 16px 0', borderRadius: 20, background: 'linear-gradient(135deg, rgba(39,135,245,0.14), rgba(39,135,245,0.06))', border: '1px solid rgba(39,135,245,0.28)', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, animation: 'fadeInUp 0.4s ease both' }}>
