@@ -799,6 +799,7 @@ export const AdminPanel = () => {
   const [pGeoLoading, setPGeoLoading]     = useState(false);
   const [bulkGeoRunning, setBulkGeoRunning] = useState(false);
   const [bulkGeoResult, setBulkGeoResult]   = useState(null);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -1022,6 +1023,7 @@ export const AdminPanel = () => {
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setPLat(''); setPLon('');
     setEditingPartner(null);
+    setShowPartnerModal(false);
   };
 
   const startEditPartner = (p) => {
@@ -1038,7 +1040,7 @@ export const AdminPanel = () => {
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setPLat(p.latitude != null ? String(p.latitude) : '');
     setPLon(p.longitude != null ? String(p.longitude) : '');
-    window.scrollTo(0, 0);
+    setShowPartnerModal(true);
   };
 
   const savePartner = async () => {
@@ -1854,154 +1856,174 @@ export const AdminPanel = () => {
       {/* ── ПАРТНЁРЫ ── */}
       {activeTab === 'partners' && (
         <>
-          <div style={s.card}>
-            <h2 style={s.h2}>{editingPartner ? `✏️ ${editingPartner.name}` : '➕ Новый партнёр'}</h2>
-
-            <label style={s.label}>Название *</label>
-            <input style={s.input} placeholder="Студия красоты SEIUNA" value={pName} onChange={e => setPName(e.target.value)} />
-
-            <label style={s.label}>Описание</label>
-            <MdEditor value={pDesc} onChange={setPDesc} placeholder="Краткое описание..." style={s.textarea} />
-
-            <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
-            <input style={s.input} placeholder="Скидка 10% на первый визит" value={pOffer} onChange={e => setPOffer(e.target.value)} />
-
-            <label style={s.label}>Штамп-карта: посещений до награды (0 = выключено) 🎟️</label>
-            <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={pStampTarget} onChange={e => setPStampTarget(e.target.value)} />
-
-            <label style={s.label}>Тариф</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {[{ id: 'start', label: '🌱 Старт' }, { id: 'alliance', label: '🤝 Альянс' }, { id: 'premium', label: '⭐ Премиум' }].map(t => (
-                <button key={t.id} onClick={() => setPTier(t.id)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${pTier === t.id ? A.gold : A.border}`, background: pTier === t.id ? A.goldDim : 'transparent', color: pTier === t.id ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <label style={s.label}>Категория</label>
-            <select style={s.select} value={pCategory} onChange={e => setPCategory(e.target.value)}>
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
-            </select>
-
-            <label style={s.label}>Иконка</label>
-            <EmojiPicker emojis={PARTNER_EMOJIS} value={pEmoji} onChange={setPEmoji} />
-
-            <label style={s.label}>Логотип</label>
-            <PhotoUpload value={pLogo} onChange={setPLogo} folder="partners" label="Загрузить логотип" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
-            {pLogo && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pLogo} onChange={e => setPLogo(e.target.value)} />}
-
-            <label style={s.label}>Фото-шапка (обложка)</label>
-            <PhotoUpload value={pCoverPhoto} onChange={setPCoverPhoto} folder="partners/covers" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
-            {pCoverPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pCoverPhoto} onChange={e => setPCoverPhoto(e.target.value)} />}
-
-            <label style={s.label}>Галерея (до 6 фото)</label>
-            <GalleryUpload value={pGallery} onChange={setPGallery} folder="partners/gallery" max={6} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
-
-            <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {pVideos.length}/5</label>
-            {pVideos.length < 5 && (
-              <div style={{ marginBottom: 8 }}>
-                <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video... или rutube.ru/video/..." value={pVideoUrl} onChange={e => { setPVideoUrl(e.target.value); setPVideoError(''); }} />
-                <input style={{ ...s.input, marginTop: 6 }} placeholder="Название (необязательно)" value={pVideoTitle} onChange={e => setPVideoTitle(e.target.value)} />
-                {pVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{pVideoError}</div>}
-                <button style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
-                  const parsed = parseVideoUrl(pVideoUrl);
-                  if (!parsed) { setPVideoError('Не удалось распознать ссылку, проверь формат'); return; }
-                  setPVideos(v => [...v, { url: pVideoUrl.trim(), title: pVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
-                  setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
-                }}>+ Добавить видео</button>
-              </div>
-            )}
-            {pVideos.map((v, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
-                <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111' }}>
-                  <img src={v.thumbnailUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || v.url}</div>
-                  <div style={{ fontSize: 11, color: A.gold }}>{v.platform === 'youtube' ? 'YouTube' : v.platform === 'vk' ? 'VK Видео' : 'Rutube'}</div>
-                </div>
-                <button onClick={() => setPVideos(vs => { const a = [...vs]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a; })} disabled={i === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
-                <button onClick={() => setPVideos(vs => { const a = [...vs]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a; })} disabled={i === pVideos.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === pVideos.length - 1 ? 0.3 : 1 }}>↓</button>
-                <button onClick={() => setPVideos(vs => vs.filter((_, j) => j !== i))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px', fontSize: 12 }}>✕</button>
-              </div>
-            ))}
-
-            <label style={s.label}>Телефон</label>
-            <input style={s.input} placeholder="+7 (499) 123-45-67" value={pPhone} onChange={e => setPPhone(e.target.value)} />
-
-            <label style={s.label}>Адрес</label>
-            <input style={s.input} placeholder="Зеленоград, корпус 1234" value={pAddress} onChange={e => setPAddress(e.target.value)} />
-
-            <label style={s.label}>Координаты (для раздела "Рядом")</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="Широта (55.983...)" value={pLat} onChange={e => setPLat(e.target.value)} />
-              <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="Долгота (37.196...)" value={pLon} onChange={e => setPLon(e.target.value)} />
-            </div>
-            <button
-              style={{ ...s.btn, ...s.btnGray, marginBottom: 14, opacity: pGeoLoading ? 0.6 : 1 }}
-              disabled={pGeoLoading || !pAddress.trim()}
-              onClick={async () => {
-                setPGeoLoading(true);
-                const r = await geocodeAddress(pAddress).catch(() => null);
-                if (r) { setPLat(String(r.lat)); setPLon(String(r.lon)); }
-                else alert('Не удалось определить координаты по адресу. Введите вручную.');
-                setPGeoLoading(false);
-              }}
+          {/* ── Модалка добавления / редактирования партнёра ── */}
+          {showPartnerModal && (
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
+              onClick={e => { if (e.target === e.currentTarget) resetPartnerForm(); }}
             >
-              {pGeoLoading ? '⏳ Определяем...' : '🌍 Определить по адресу'}
-            </button>
+              <div style={{ ...s.card, width: '100%', maxWidth: 620, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>{editingPartner ? `✏️ ${editingPartner.name}` : '➕ Новый партнёр'}</h2>
+                  <button onClick={resetPartnerForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+                </div>
 
-            <label style={s.label}>Часы работы</label>
-            <input style={s.input} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={pHours} onChange={e => setPHours(e.target.value)} />
+                <label style={s.label}>Название *</label>
+                <input style={s.input} placeholder="Студия красоты SEIUNA" value={pName} onChange={e => setPName(e.target.value)} />
 
-            <label style={s.label}>ВКонтакте (сообщество)</label>
-            <input style={s.input} placeholder="https://vk.com/..." value={pVkGroup} onChange={e => setPVkGroup(e.target.value)} />
+                <label style={s.label}>Описание</label>
+                <MdEditor value={pDesc} onChange={setPDesc} placeholder="Краткое описание..." style={s.textarea} />
 
-            <label style={s.label}>Соцсеть / сайт (другие)</label>
-            <input style={s.input} placeholder="https://..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
+                <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
+                <input style={s.input} placeholder="Скидка 10% на первый визит" value={pOffer} onChange={e => setPOffer(e.target.value)} />
 
-            <label style={s.label}>Онлайн-запись (Yclients, Dikidi и др.)</label>
-            <input style={s.input} placeholder="https://..." value={pBooking} onChange={e => setPBooking(e.target.value)} />
+                <label style={s.label}>Штамп-карта: посещений до награды (0 = выключено) 🎟️</label>
+                <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={pStampTarget} onChange={e => setPStampTarget(e.target.value)} />
 
-            <label style={s.label}>Сайт партнёра</label>
-            <input style={s.input} placeholder="https://..." value={pWebsite} onChange={e => setPWebsite(e.target.value)} />
+                <label style={s.label}>Тариф</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {[{ id: 'start', label: '🌱 Старт' }, { id: 'alliance', label: '🤝 Альянс' }, { id: 'premium', label: '⭐ Премиум' }].map(t => (
+                    <button key={t.id} onClick={() => setPTier(t.id)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${pTier === t.id ? A.gold : A.border}`, background: pTier === t.id ? A.goldDim : 'transparent', color: pTier === t.id ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
 
-            <label style={s.label}>Telegram-сообщество (канал или чат)</label>
-            <input style={s.input} placeholder="https://t.me/..." value={pTelegramCom} onChange={e => setPTelegramCom(e.target.value)} />
+                <label style={s.label}>Категория</label>
+                <select style={s.select} value={pCategory} onChange={e => setPCategory(e.target.value)}>
+                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
+                </select>
 
-            <label style={s.label}>Max-сообщество</label>
-            <input style={s.input} placeholder="https://..." value={pMaxCom} onChange={e => setPMaxCom(e.target.value)} />
+                <label style={s.label}>Иконка</label>
+                <EmojiPicker emojis={PARTNER_EMOJIS} value={pEmoji} onChange={setPEmoji} />
 
-            <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
-              <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 Email владельца заведения</label>
-              <input
-                type="email"
-                style={{ ...s.input, marginBottom: 0, background: 'rgba(255,255,255,0.06)' }}
-                placeholder="owner@example.com"
-                value={pOwnerEmail}
-                onChange={e => setPOwnerEmail(e.target.value)}
-              />
-              <div style={{ fontSize: 11, color: A.gold, marginTop: 6, opacity: 0.8 }}>
-                Пользователь с этим email получит доступ к статистике своего заведения в приложении
+                <label style={s.label}>Логотип</label>
+                <PhotoUpload value={pLogo} onChange={setPLogo} folder="partners" label="Загрузить логотип" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+                {pLogo && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pLogo} onChange={e => setPLogo(e.target.value)} />}
+
+                <label style={s.label}>Фото-шапка (обложка)</label>
+                <PhotoUpload value={pCoverPhoto} onChange={setPCoverPhoto} folder="partners/covers" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+                {pCoverPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={pCoverPhoto} onChange={e => setPCoverPhoto(e.target.value)} />}
+
+                <label style={s.label}>Галерея (до 6 фото)</label>
+                <GalleryUpload value={pGallery} onChange={setPGallery} folder="partners/gallery" max={6} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+
+                <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {pVideos.length}/5</label>
+                {pVideos.length < 5 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video... или rutube.ru/video/..." value={pVideoUrl} onChange={e => { setPVideoUrl(e.target.value); setPVideoError(''); }} />
+                    <input style={{ ...s.input, marginTop: 6 }} placeholder="Название (необязательно)" value={pVideoTitle} onChange={e => setPVideoTitle(e.target.value)} />
+                    {pVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{pVideoError}</div>}
+                    <button style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
+                      const parsed = parseVideoUrl(pVideoUrl);
+                      if (!parsed) { setPVideoError('Не удалось распознать ссылку, проверь формат'); return; }
+                      setPVideos(v => [...v, { url: pVideoUrl.trim(), title: pVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
+                      setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
+                    }}>+ Добавить видео</button>
+                  </div>
+                )}
+                {pVideos.map((v, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
+                    <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111' }}>
+                      <img src={v.thumbnailUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || v.url}</div>
+                      <div style={{ fontSize: 11, color: A.gold }}>{v.platform === 'youtube' ? 'YouTube' : v.platform === 'vk' ? 'VK Видео' : 'Rutube'}</div>
+                    </div>
+                    <button onClick={() => setPVideos(vs => { const a = [...vs]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a; })} disabled={i === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                    <button onClick={() => setPVideos(vs => { const a = [...vs]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a; })} disabled={i === pVideos.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === pVideos.length - 1 ? 0.3 : 1 }}>↓</button>
+                    <button onClick={() => setPVideos(vs => vs.filter((_, j) => j !== i))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px', fontSize: 12 }}>✕</button>
+                  </div>
+                ))}
+
+                <label style={s.label}>Телефон</label>
+                <input style={s.input} placeholder="+7 (499) 123-45-67" value={pPhone} onChange={e => setPPhone(e.target.value)} />
+
+                <label style={s.label}>Адрес</label>
+                <input style={s.input} placeholder="Зеленоград, корпус 1234" value={pAddress} onChange={e => setPAddress(e.target.value)} />
+
+                <label style={s.label}>Координаты (для раздела "Рядом")</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="Широта (55.983...)" value={pLat} onChange={e => setPLat(e.target.value)} />
+                  <input style={{ ...s.input, marginBottom: 0, flex: 1 }} placeholder="Долгота (37.196...)" value={pLon} onChange={e => setPLon(e.target.value)} />
+                </div>
+                <button
+                  style={{ ...s.btn, ...s.btnGray, marginBottom: 14, opacity: pGeoLoading ? 0.6 : 1 }}
+                  disabled={pGeoLoading || !pAddress.trim()}
+                  onClick={async () => {
+                    setPGeoLoading(true);
+                    const r = await geocodeAddress(pAddress).catch(() => null);
+                    if (r) { setPLat(String(r.lat)); setPLon(String(r.lon)); }
+                    else alert('Не удалось определить координаты по адресу. Введите вручную.');
+                    setPGeoLoading(false);
+                  }}
+                >
+                  {pGeoLoading ? '⏳ Определяем...' : '🌍 Определить по адресу'}
+                </button>
+
+                <label style={s.label}>Часы работы</label>
+                <input style={s.input} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={pHours} onChange={e => setPHours(e.target.value)} />
+
+                <label style={s.label}>ВКонтакте (сообщество)</label>
+                <input style={s.input} placeholder="https://vk.com/..." value={pVkGroup} onChange={e => setPVkGroup(e.target.value)} />
+
+                <label style={s.label}>Соцсеть / сайт (другие)</label>
+                <input style={s.input} placeholder="https://..." value={pSocial} onChange={e => setPSocial(e.target.value)} />
+
+                <label style={s.label}>Онлайн-запись (Yclients, Dikidi и др.)</label>
+                <input style={s.input} placeholder="https://..." value={pBooking} onChange={e => setPBooking(e.target.value)} />
+
+                <label style={s.label}>Сайт партнёра</label>
+                <input style={s.input} placeholder="https://..." value={pWebsite} onChange={e => setPWebsite(e.target.value)} />
+
+                <label style={s.label}>Telegram-сообщество (канал или чат)</label>
+                <input style={s.input} placeholder="https://t.me/..." value={pTelegramCom} onChange={e => setPTelegramCom(e.target.value)} />
+
+                <label style={s.label}>Max-сообщество</label>
+                <input style={s.input} placeholder="https://..." value={pMaxCom} onChange={e => setPMaxCom(e.target.value)} />
+
+                <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
+                  <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 Email владельца заведения</label>
+                  <input
+                    type="email"
+                    style={{ ...s.input, marginBottom: 0, background: 'rgba(255,255,255,0.06)' }}
+                    placeholder="owner@example.com"
+                    value={pOwnerEmail}
+                    onChange={e => setPOwnerEmail(e.target.value)}
+                  />
+                  <div style={{ fontSize: 11, color: A.gold, marginTop: 6, opacity: 0.8 }}>
+                    Пользователь с этим email получит доступ к статистике своего заведения в приложении
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePartner}>
+                    {editingPartner ? '💾 Сохранить' : '➕ Добавить'}
+                  </button>
+                  {editingPartner && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetPartnerForm}>Отмена</button>}
+                </div>
               </div>
             </div>
+          )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePartner}>
-                {editingPartner ? '💾 Сохранить' : '➕ Добавить'}
-              </button>
-              {editingPartner && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetPartnerForm}>Отмена</button>}
-            </div>
-          </div>
-
+          {/* ── Список партнёров ── */}
           <div style={s.card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 style={{ ...s.h2, margin: 0 }}>Все партнёры</h2>
-              <span style={{ fontSize: 12, color: A.textSec, background: A.chip, borderRadius: 10, padding: '3px 10px', border: `1px solid ${A.border}` }}>
-                {partnerSearch
-                  ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} / ${partners.length}`
-                  : `${partners.length} партнёров`}
-              </span>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все партнёры</h2>
+                <span style={{ fontSize: 12, color: A.textSec }}>
+                  {partnerSearch
+                    ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} / ${partners.length}`
+                    : `${partners.length} партнёров`}
+                </span>
+              </div>
+              <button
+                style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }}
+                onClick={() => { resetPartnerForm(); setShowPartnerModal(true); }}
+              >
+                ➕ Добавить партнёра
+              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '10px 12px', background: 'rgba(201,168,76,0.08)', borderRadius: 12, border: `1px solid ${A.goldBrd}` }}>
               <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
