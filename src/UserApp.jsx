@@ -14,6 +14,7 @@ import {
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
 import { HomePanel }         from './HomePanel.jsx';
+import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -49,6 +50,17 @@ function formatCacheAge(ts) {
 initErrorLogger();
 
 const SWIPE_TABS = ['home', 'experts', 'tasks', 'profile'];
+
+function isHomeV2Enabled() {
+  const fromSearch = new URLSearchParams(window.location.search).get('home');
+  if (fromSearch === 'v2') return true;
+
+  const hash = window.location.hash ?? '';
+  const queryStart = hash.indexOf('?');
+  if (queryStart === -1) return false;
+
+  return new URLSearchParams(hash.slice(queryStart + 1)).get('home') === 'v2';
+}
 
 function LazyFallback() {
   return (
@@ -114,6 +126,7 @@ export function UserApp() {
   const [joinedGroup, setJoinedGroup]             = useState(false);
   const [lastBonusDate, setLastBonusDate]         = useState(null);
   const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'dark');
+  const useHomeV2                                = useMemo(() => isHomeV2Enabled(), []);
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;
@@ -1376,6 +1389,47 @@ export function UserApp() {
     );
   }
 
+  const homePanelProps = {
+    nav: 'home',
+    counterPulse,
+    user,
+    userKeys,
+    favorites,
+    partners: enrichedPartners,
+    events,
+    news,
+    recentReviews,
+    loading,
+    error,
+    streak,
+    lastScanDate,
+    completedTasks,
+    referralCount,
+    scannedCount: Object.keys(scannedPartnerIds).length,
+    unreadCount,
+    registeredEventIds,
+    userRank,
+    customTasks,
+    appearance,
+    onEventRegister: handleEventRegister,
+    onOpenPartner: openPartner,
+    onToggleFavorite: toggleFavorite,
+    onScan: () => setIsScannerOpen(true),
+    onRetry: () => loadData(mountedRef),
+    onRefresh: handleRefresh,
+    onOpenEvents: () => goPanel('events'),
+    onOpenTasks: () => goPanel('tasks'),
+    onOpenLeaderboard: () => goPanel('leaderboard'),
+    onOpenRewards: () => goPanel('rewards'),
+    onOpenNotifications: openNotifications,
+    joinedGroup,
+    onJoinGroup: handleJoinGroup,
+    userCount: platformStats.userCount,
+    onOpenForPartners: () => goPanel('for-partners'),
+    onOpenMap: () => goPanel('map'),
+    onOpenNearby: () => goPanel('nearby'),
+  };
+
   return (
     <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
@@ -1424,39 +1478,11 @@ export function UserApp() {
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
-              <HomePanel
-                nav="home"
-                counterPulse={counterPulse}
-                user={user} userKeys={userKeys} favorites={favorites}
-                partners={enrichedPartners} events={events} news={news}
-                recentReviews={recentReviews}
-                loading={loading} error={error}
-                streak={streak} lastScanDate={lastScanDate}
-                completedTasks={completedTasks} referralCount={referralCount}
-                scannedCount={Object.keys(scannedPartnerIds).length}
-                unreadCount={unreadCount}
-                registeredEventIds={registeredEventIds}
-                userRank={userRank}
-                customTasks={customTasks}
-                appearance={appearance}
-                onEventRegister={handleEventRegister}
-                onOpenPartner={openPartner}
-                onToggleFavorite={toggleFavorite}
-                onScan={() => setIsScannerOpen(true)}
-                onRetry={() => loadData(mountedRef)}
-                onRefresh={handleRefresh}
-                onOpenEvents={() => goPanel('events')}
-                onOpenTasks={() => goPanel('tasks')}
-                onOpenLeaderboard={() => goPanel('leaderboard')}
-                onOpenRewards={() => goPanel('rewards')}
-                onOpenNotifications={openNotifications}
-                joinedGroup={joinedGroup}
-                onJoinGroup={handleJoinGroup}
-                userCount={platformStats.userCount}
-                onOpenForPartners={() => goPanel('for-partners')}
-                onOpenMap={() => goPanel('map')}
-                onOpenNearby={() => goPanel('nearby')}
-              />
+              {useHomeV2 ? (
+                <HomePanelV2 {...homePanelProps} />
+              ) : (
+                <HomePanel {...homePanelProps} />
+              )}
 
               <Panel id="partner">
                 <Suspense fallback={<LazyFallback />}>
