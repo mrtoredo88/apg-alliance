@@ -803,6 +803,8 @@ export const AdminPanel = () => {
   const [expandedPartnerId, setExpandedPartnerId] = useState(null);
   const [showExpertModal, setShowExpertModal]   = useState(false);
   const [expandedExpertId, setExpandedExpertId] = useState(null);
+  const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
+  const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -1104,6 +1106,19 @@ export const AdminPanel = () => {
     if (!window.confirm('Удалить партнёра?')) return;
     await deleteDoc(doc(db, 'partners', id));
     fetchData();
+  };
+
+  const isCheckedRecently = ts => {
+    if (!ts) return false;
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return Date.now() - d.getTime() < 30 * 24 * 60 * 60 * 1000;
+  };
+
+  const markLinksChecked = async (col, id, setList) => {
+    const ts = serverTimestamp();
+    await updateDoc(doc(db, col, id), { linksCheckedAt: ts });
+    const now = { toDate: () => new Date() };
+    setList(prev => prev.map(x => x.id === id ? { ...x, linksCheckedAt: now } : x));
   };
 
   // ─── Сортировка (shared) ────────────────────────────────────────────────────
@@ -1838,10 +1853,14 @@ export const AdminPanel = () => {
 
           {/* ── Список экспертов ── */}
           <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Список экспертов</h2>
-                <span style={{ fontSize: 12, color: A.textSec }}>{experts.length} экспертов</span>
+                <span style={{ fontSize: 12, color: A.textSec }}>
+                  {experts.length} · <span style={{ color: experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>
+                    {experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length} не проверено
+                  </span>
+                </span>
               </div>
               <button
                 style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }}
@@ -1850,9 +1869,23 @@ export const AdminPanel = () => {
                 ➕ Добавить эксперта
               </button>
             </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {[['unverified', '⚠ Сначала непроверенные'], ['all', 'Все']].map(([val, label]) => (
+                <button key={val} onClick={() => setExpertLinksFilter(val)}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${expertLinksFilter === val ? A.gold : A.border}`, background: expertLinksFilter === val ? A.goldDim : 'transparent', color: expertLinksFilter === val ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             {experts.length === 0 ? (
               <p style={{ color: A.textSec, fontSize: 14, margin: 0 }}>Экспертов пока нет.</p>
-            ) : experts.map(ex => {
+            ) : experts
+              .filter(ex => expertLinksFilter === 'all' || !isCheckedRecently(ex.linksCheckedAt))
+              .sort((a, b) => {
+                if (expertLinksFilter === 'unverified') return 0;
+                return 0;
+              })
+              .map(ex => {
               const isOpen = expandedExpertId === ex.id;
               const toggle = () => setExpandedExpertId(isOpen ? null : ex.id);
               const exLinks = [
@@ -1881,6 +1914,9 @@ export const AdminPanel = () => {
                           {ex.name}
                           {ex.verified && <span style={{ fontSize: 10, color: A.blue, fontWeight: 800 }}>✓</span>}
                           {!ex.active && <span style={{ fontSize: 10, color: A.textSec }}>(неактивен)</span>}
+                          {isCheckedRecently(ex.linksCheckedAt)
+                            ? <span title="Ссылки проверены" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700 }}>✓ок</span>
+                            : <span title="Ссылки не проверены" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>⚠</span>}
                         </div>
                         <div style={{ fontSize: 11, color: A.textSec }}>
                           {cat ? `${cat.emoji} ${cat.label}` : ex.specialization}
@@ -1917,6 +1953,19 @@ export const AdminPanel = () => {
                         {ex.phone      && <span>📞 {ex.phone}</span>}
                         {ex.ownerEmail && <span>📧 {ex.ownerEmail}</span>}
                         {ex.formats?.length > 0 && <span>🗂 {ex.formats.join(', ')}</span>}
+                      </div>
+
+                      {/* проверка ссылок */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: isCheckedRecently(ex.linksCheckedAt) ? 'rgba(74,222,128,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${isCheckedRecently(ex.linksCheckedAt) ? 'rgba(74,222,128,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
+                        <span style={{ fontSize: 12, color: isCheckedRecently(ex.linksCheckedAt) ? '#4ade80' : '#f59e0b', flex: 1 }}>
+                          {isCheckedRecently(ex.linksCheckedAt)
+                            ? `✓ Ссылки проверены ${ex.linksCheckedAt?.toDate ? ex.linksCheckedAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}`
+                            : '⚠ Ссылки не проверены (>30 дн.)'}
+                        </span>
+                        <button
+                          style={{ ...s.btn, padding: '4px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', flexShrink: 0 }}
+                          onClick={e => { e.stopPropagation(); markLinksChecked('experts', ex.id, setExperts); }}
+                        >Проверено ✓</button>
                       </div>
 
                       {/* действия */}
@@ -2089,13 +2138,13 @@ export const AdminPanel = () => {
 
           {/* ── Список партнёров ── */}
           <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все партнёры</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
-                  {partnerSearch
-                    ? `${partners.filter(p => p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).length} / ${partners.length}`
-                    : `${partners.length} партнёров`}
+                  {partners.length} · <span style={{ color: partners.filter(p => !isCheckedRecently(p.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>
+                    {partners.filter(p => !isCheckedRecently(p.linksCheckedAt)).length} не проверено
+                  </span>
                 </span>
               </div>
               <button
@@ -2104,6 +2153,14 @@ export const AdminPanel = () => {
               >
                 ➕ Добавить партнёра
               </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {[['unverified', '⚠ Сначала непроверенные'], ['all', 'Все']].map(([val, label]) => (
+                <button key={val} onClick={() => setPartnerLinksFilter(val)}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${partnerLinksFilter === val ? A.gold : A.border}`, background: partnerLinksFilter === val ? A.goldDim : 'transparent', color: partnerLinksFilter === val ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '10px 12px', background: 'rgba(201,168,76,0.08)', borderRadius: 12, border: `1px solid ${A.goldBrd}` }}>
               <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
@@ -2163,7 +2220,10 @@ export const AdminPanel = () => {
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : partners.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет партнёров</p>
-              : partners.filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).map(p => {
+              : partners
+                .filter(p => partnerLinksFilter === 'all' || !isCheckedRecently(p.linksCheckedAt))
+                .filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase()))
+                .map(p => {
                 const isOpen = expandedPartnerId === p.id;
                 const toggle = () => setExpandedPartnerId(isOpen ? null : p.id);
                 const pLinks = [
@@ -2188,7 +2248,12 @@ export const AdminPanel = () => {
                           : <div style={{ width: 38, height: 38, borderRadius: '50%', background: A.chip, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0, border: `1px solid ${A.border}` }}>{p.emoji ?? '🏪'}</div>
                         }
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            {p.name}
+                            {isCheckedRecently(p.linksCheckedAt)
+                              ? <span title="Ссылки проверены" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓ок</span>
+                              : <span title="Ссылки не проверены" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
+                          </div>
                           <div style={{ fontSize: 12, color: A.textSec }}>
                             {CATEGORIES.find(c => c.id === p.category)?.emoji} {CATEGORIES.find(c => c.id === p.category)?.label ?? 'Другое'}
                             {p.offer && ' · 🎁'}
@@ -2241,6 +2306,19 @@ export const AdminPanel = () => {
                             </div>
                           </div>
                         )}
+
+                        {/* проверка ссылок */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: isCheckedRecently(p.linksCheckedAt) ? 'rgba(74,222,128,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${isCheckedRecently(p.linksCheckedAt) ? 'rgba(74,222,128,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
+                          <span style={{ fontSize: 12, color: isCheckedRecently(p.linksCheckedAt) ? '#4ade80' : '#f59e0b', flex: 1 }}>
+                            {isCheckedRecently(p.linksCheckedAt)
+                              ? `✓ Ссылки проверены ${p.linksCheckedAt?.toDate ? p.linksCheckedAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}`
+                              : '⚠ Ссылки не проверены (>30 дн.)'}
+                          </span>
+                          <button
+                            style={{ ...s.btn, padding: '4px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', flexShrink: 0 }}
+                            onClick={e => { e.stopPropagation(); markLinksChecked('partners', p.id, setPartners); }}
+                          >Проверено ✓</button>
+                        </div>
 
                         {/* действия */}
                         <div style={{ display: 'flex', gap: 8 }}>
