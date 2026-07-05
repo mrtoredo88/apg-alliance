@@ -1,5 +1,5 @@
 // APG Service Worker — cache-first for static, pass-through for Firebase
-const CACHE = 'apg-v1';
+const CACHE = 'apg-v2';
 
 const PRECACHE = [
   '/',
