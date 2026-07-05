@@ -803,8 +803,11 @@ export const AdminPanel = () => {
   const [expandedPartnerId, setExpandedPartnerId] = useState(null);
   const [showExpertModal, setShowExpertModal]   = useState(false);
   const [expandedExpertId, setExpandedExpertId] = useState(null);
+  const [showEventModal, setShowEventModal]     = useState(false);
+  const [showNewsModal, setShowNewsModal]       = useState(false);
   const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
   const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
+  const [expertSearch, setExpertSearch]             = useState('');
   const [globalSearch, setGlobalSearch]     = useState('');
   const [showSearchDrop, setShowSearchDrop] = useState(false);
   const [showAddDrop, setShowAddDrop]       = useState(false);
@@ -1187,7 +1190,7 @@ export const AdminPanel = () => {
   const resetNewsForm = () => {
     setNTitle(''); setNText(''); setNEmoji('📢'); setNImage('');
     setNLinkUrl(''); setNLinkLabel(''); setNPriority(0);
-    setEditingNews(null);
+    setEditingNews(null); setShowNewsModal(false);
   };
 
   const startEditNews = (item) => {
@@ -1196,7 +1199,7 @@ export const AdminPanel = () => {
     setNEmoji(item.emoji ?? '📢'); setNImage(item.imageUrl ?? '');
     setNLinkUrl(item.linkUrl ?? ''); setNLinkLabel(item.linkLabel ?? '');
     setNPriority(item.priority ?? 0);
-    window.scrollTo(0, 0);
+    setShowNewsModal(true);
   };
 
   const saveNews = async () => {
@@ -1298,7 +1301,7 @@ export const AdminPanel = () => {
     setEIsExpert(false); setEPriceClub(''); setEPricePublic('');
     setEPartnerId('');
     setELinkLabel(''); setELinkUrl(''); setEPriority(0);
-    setEditingEvent(null);
+    setEditingEvent(null); setShowEventModal(false);
   };
 
   const startEditEvent = (e) => {
@@ -1317,7 +1320,7 @@ export const AdminPanel = () => {
     setEPartnerId(e.partnerId ?? '');
     setELinkLabel(e.linkLabel ?? ''); setELinkUrl(e.linkUrl ?? '');
     setEPriority(e.priority ?? 0);
-    window.scrollTo(0, 0);
+    setShowEventModal(true);
   };
 
   const saveEvent = async () => {
@@ -1811,8 +1814,8 @@ export const AdminPanel = () => {
               {[
                 ['🤝', 'Партнёра',  () => { resetPartnerForm(); setShowPartnerModal(true); setActiveTab('partners'); setShowAddDrop(false); }],
                 ['🧑‍💼', 'Эксперта', () => { resetExpertForm(); setShowExpertModal(true); setActiveTab('experts'); setShowAddDrop(false); }],
-                ['🎉', 'Событие',   () => { resetEventForm(); setActiveTab('events'); setShowAddDrop(false); }],
-                ['📢', 'Новость',   () => { resetNewsForm(); setActiveTab('news'); setShowAddDrop(false); }],
+                ['🎉', 'Событие',   () => { resetEventForm(); setActiveTab('events'); setShowEventModal(true); setShowAddDrop(false); }],
+                ['📢', 'Новость',   () => { resetNewsForm(); setActiveTab('news'); setShowNewsModal(true); setShowAddDrop(false); }],
               ].map(([emoji, label, action], i, arr) => (
                 <button key={label} onClick={action}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', width: '100%', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${A.border}` : 'none', background: 'none', cursor: 'pointer', color: A.text, fontSize: 13, textAlign: 'left' }}>
@@ -2006,9 +2009,9 @@ export const AdminPanel = () => {
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Список экспертов</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
-                  {experts.length} · <span style={{ color: experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>
-                    {experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length} не проверено
-                  </span>
+                  {expertSearch
+                    ? `${experts.filter(ex => ex.name?.toLowerCase().includes(expertSearch.toLowerCase())).length} / ${experts.length}`
+                    : <>{experts.length} · <span style={{ color: experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length} не проверено</span></>}
                 </span>
               </div>
               <button
@@ -2018,21 +2021,34 @@ export const AdminPanel = () => {
                 ➕ Добавить эксперта
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-              {[['unverified', '⚠ Сначала непроверенные'], ['all', 'Все']].map(([val, label]) => (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {[['unverified', '⚠ Непроверенные'], ['all', 'Все']].map(([val, label]) => (
                 <button key={val} onClick={() => setExpertLinksFilter(val)}
                   style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${expertLinksFilter === val ? A.gold : A.border}`, background: expertLinksFilter === val ? A.goldDim : 'transparent', color: expertLinksFilter === val ? A.gold : A.textSec }}>
                   {label}
                 </button>
               ))}
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${A.inputBrd}`, borderRadius: 12, padding: '9px 12px', marginBottom: 14 }}>
+              <span style={{ fontSize: 14, color: A.textSec, flexShrink: 0 }}>🔍</span>
+              <input
+                type="search"
+                placeholder="Поиск по имени..."
+                value={expertSearch}
+                onChange={e => setExpertSearch(e.target.value)}
+                style={{ background: 'none', border: 'none', outline: 'none', fontSize: 14, flex: 1, color: A.text }}
+              />
+              {expertSearch && <button onClick={() => setExpertSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: A.textSec, fontSize: 16, padding: 0, flexShrink: 0 }}>✕</button>}
+            </div>
             {experts.length === 0 ? (
               <p style={{ color: A.textSec, fontSize: 14, margin: 0 }}>Экспертов пока нет.</p>
             ) : experts
               .filter(ex => expertLinksFilter === 'all' || !isCheckedRecently(ex.linksCheckedAt))
+              .filter(ex => !expertSearch || ex.name?.toLowerCase().includes(expertSearch.toLowerCase()))
               .sort((a, b) => {
-                if (expertLinksFilter === 'unverified') return 0;
-                return 0;
+                const ta = a.linksCheckedAt?.toDate ? a.linksCheckedAt.toDate().getTime() : 0;
+                const tb = b.linksCheckedAt?.toDate ? b.linksCheckedAt.toDate().getTime() : 0;
+                return ta - tb;
               })
               .map(ex => {
               const isOpen = expandedExpertId === ex.id;
@@ -2329,6 +2345,11 @@ export const AdminPanel = () => {
               : partners
                 .filter(p => partnerLinksFilter === 'all' || !isCheckedRecently(p.linksCheckedAt))
                 .filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase()))
+                .sort((a, b) => {
+                  const ta = a.linksCheckedAt?.toDate ? a.linksCheckedAt.toDate().getTime() : 0;
+                  const tb = b.linksCheckedAt?.toDate ? b.linksCheckedAt.toDate().getTime() : 0;
+                  return ta - tb;
+                })
                 .map(p => {
                 const isOpen = expandedPartnerId === p.id;
                 const toggle = () => setExpandedPartnerId(isOpen ? null : p.id);
@@ -2444,8 +2465,14 @@ export const AdminPanel = () => {
       {/* ── СОБЫТИЯ ── */}
       {activeTab === 'events' && (
         <>
-          <div style={s.card}>
-            <h2 style={s.h2}>{editingEvent ? `✏️ ${editingEvent.title}` : '➕ Новое событие'}</h2>
+          {showEventModal && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
+              onClick={e => { if (e.target === e.currentTarget) resetEventForm(); }}>
+              <div style={{ ...s.card, width: '100%', maxWidth: 620, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>{editingEvent ? `✏️ ${editingEvent.title}` : '➕ Новое событие'}</h2>
+                  <button onClick={resetEventForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+                </div>
 
             <label style={s.label}>Название *</label>
             <input style={s.input} placeholder="Мастер-класс по флористике" value={eTitle} onChange={e => setETitle(e.target.value)} />
@@ -2572,16 +2599,21 @@ export const AdminPanel = () => {
             <label style={s.label}>Эмодзи события</label>
             <EmojiPicker emojis={EVENT_EMOJIS} value={eEmoji} onChange={setEEmoji} />
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveEvent}>
-                {editingEvent ? '💾 Сохранить' : '➕ Добавить'}
-              </button>
-              {editingEvent && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetEventForm}>Отмена</button>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveEvent}>
+                    {editingEvent ? '💾 Сохранить' : '➕ Добавить'}
+                  </button>
+                  {editingEvent && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetEventForm}>Отмена</button>}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div style={s.card}>
-            <h2 style={s.h2}>Все события</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h2 style={{ ...s.h2, margin: 0 }}>Все события <span style={{ fontSize: 12, color: A.textSec, fontWeight: 400 }}>({events.length})</span></h2>
+              <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetEventForm(); setShowEventModal(true); }}>➕ Добавить</button>
+            </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : events.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
               : [...events].sort(byPriorityDate).map((e, idx, arr) => {
@@ -2616,8 +2648,14 @@ export const AdminPanel = () => {
       {/* ── НОВОСТИ ── */}
       {activeTab === 'news' && (
         <>
-          <div style={s.card}>
-            <h2 style={s.h2}>{editingNews ? `✏️ ${editingNews.title}` : '➕ Новая новость'}</h2>
+          {showNewsModal && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
+              onClick={e => { if (e.target === e.currentTarget) resetNewsForm(); }}>
+              <div style={{ ...s.card, width: '100%', maxWidth: 620, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>{editingNews ? `✏️ ${editingNews.title}` : '➕ Новая новость'}</h2>
+                  <button onClick={resetNewsForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+                </div>
 
             <label style={s.label}>Заголовок *</label>
             <input style={s.input} placeholder="Новый партнёр АПГ!" value={nTitle} onChange={e => setNTitle(e.target.value)} />
@@ -2661,16 +2699,21 @@ export const AdminPanel = () => {
               Чем выше число — тем выше материал в списке. По умолчанию — 0. При 8+ показывается метка 📌.
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>
-                {editingNews ? '💾 Сохранить' : '➕ Опубликовать'}
-              </button>
-              {editingNews && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetNewsForm}>Отмена</button>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>
+                    {editingNews ? '💾 Сохранить' : '➕ Опубликовать'}
+                  </button>
+                  {editingNews && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetNewsForm}>Отмена</button>}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div style={s.card}>
-            <h2 style={s.h2}>Все новости</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h2 style={{ ...s.h2, margin: 0 }}>Все новости <span style={{ fontSize: 12, color: A.textSec, fontWeight: 400 }}>({news.length})</span></h2>
+              <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetNewsForm(); setShowNewsModal(true); }}>➕ Добавить</button>
+            </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : news.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет новостей</p>
               : [...news].sort(byPriorityDate).map((item, idx, arr) => {
