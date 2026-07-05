@@ -1255,15 +1255,15 @@ export function UserApp() {
   ];
 
   const tabBarShellStyle = useHomeV2 ? {
-    position: 'fixed', bottom: 28,
+    position: 'fixed', bottom: 34,
     left: '50%', transform: 'translateX(-50%)',
-    width: 'calc(100% - 68px)', maxWidth: 394, minHeight: 82,
-    padding: 10,
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.13), rgba(255,255,255,0.035))',
-    backdropFilter: 'blur(64px) saturate(1.9)', WebkitBackdropFilter: 'blur(64px) saturate(1.9)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: 42,
-    boxShadow: '0 26px 70px rgba(0,0,0,0.42), 0 0 54px rgba(214,183,102,0.10), inset 0 1.5px 0 rgba(255,255,255,0.28), inset 0 -24px 48px rgba(255,255,255,0.035)',
+    width: 'calc(100% - 76px)', maxWidth: 382, minHeight: 84,
+    padding: 11,
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.125), rgba(255,255,255,0.032))',
+    backdropFilter: 'blur(72px) saturate(1.92)', WebkitBackdropFilter: 'blur(72px) saturate(1.92)',
+    border: '1px solid rgba(255,255,255,0.19)',
+    borderRadius: 46,
+    boxShadow: '0 34px 82px rgba(0,0,0,0.45), 0 0 66px rgba(214,183,102,0.105), inset 0 1.5px 0 rgba(255,255,255,0.30), inset 0 -28px 56px rgba(255,255,255,0.04)',
     display: 'flex', alignItems: 'stretch', gap: 6,
     zIndex: 100, overflow: 'visible',
   } : {
@@ -1284,15 +1284,15 @@ export function UserApp() {
       {/* Скользящий pill */}
       {pillIdx >= 0 && pillIdx !== 2 && (
         <div style={{
-          position: 'absolute', top: useHomeV2 ? 10 : 7, height: useHomeV2 ? 62 : 44,
-          left: useHomeV2 ? `calc(${pillIdx * 20}% + 10px)` : `calc(${pillIdx * 20}% + 6px)`,
-          width: useHomeV2 ? 'calc(20% - 20px)' : 'calc(20% - 12px)',
-          background: useHomeV2 ? 'linear-gradient(145deg, rgba(255,255,255,0.2), rgba(214,183,102,0.095))' : 'rgba(201,168,76,0.1)',
-          backdropFilter: useHomeV2 ? 'blur(34px) saturate(1.8)' : 'none',
-          WebkitBackdropFilter: useHomeV2 ? 'blur(34px) saturate(1.8)' : 'none',
-          border: useHomeV2 ? '1px solid rgba(255,255,255,0.25)' : '1px solid rgba(201,168,76,0.2)',
-          borderRadius: useHomeV2 ? 30 : 14,
-          boxShadow: useHomeV2 ? '0 16px 38px rgba(0,0,0,0.22), inset 0 1.5px 0 rgba(255,255,255,0.3), inset 0 -14px 32px rgba(255,255,255,0.04)' : 'none',
+          position: 'absolute', top: useHomeV2 ? 11 : 7, height: useHomeV2 ? 62 : 44,
+          left: useHomeV2 ? `calc(${pillIdx * 20}% + 11px)` : `calc(${pillIdx * 20}% + 6px)`,
+          width: useHomeV2 ? 'calc(20% - 22px)' : 'calc(20% - 12px)',
+          background: useHomeV2 ? 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.24), transparent 58%), linear-gradient(145deg, rgba(255,255,255,0.18), rgba(214,183,102,0.09))' : 'rgba(201,168,76,0.1)',
+          backdropFilter: useHomeV2 ? 'blur(40px) saturate(1.85)' : 'none',
+          WebkitBackdropFilter: useHomeV2 ? 'blur(40px) saturate(1.85)' : 'none',
+          border: useHomeV2 ? '1px solid rgba(255,255,255,0.26)' : '1px solid rgba(201,168,76,0.2)',
+          borderRadius: useHomeV2 ? 32 : 14,
+          boxShadow: useHomeV2 ? '0 18px 42px rgba(0,0,0,0.20), 0 0 24px rgba(214,183,102,0.08), inset 0 1.5px 0 rgba(255,255,255,0.32), inset 0 -16px 36px rgba(255,255,255,0.045)' : 'none',
           transition: 'left 0.5s cubic-bezier(0.22, 1, 0.36, 1), width 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
           pointerEvents: 'none',
         }} />
@@ -1452,7 +1452,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <div
-            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: useHomeV2 ? 148 : 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: useHomeV2 ? 160 : 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
             onTouchStart={handleSwipeStart}
             onTouchEnd={handleSwipeEnd}
           >
