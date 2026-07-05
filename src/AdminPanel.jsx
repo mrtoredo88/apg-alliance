@@ -805,6 +805,8 @@ export const AdminPanel = () => {
   const [expandedExpertId, setExpandedExpertId] = useState(null);
   const [showEventModal, setShowEventModal]     = useState(false);
   const [showNewsModal, setShowNewsModal]       = useState(false);
+  const [eventLinksFilter, setEventLinksFilter] = useState('all');
+  const [newsLinksFilter, setNewsLinksFilter]   = useState('all');
   const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
   const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
   const [expertSearch, setExpertSearch]             = useState('');
@@ -1780,9 +1782,9 @@ export const AdminPanel = () => {
         </div>
 
         {/* Тоггл "только непроверенные" */}
-        {(activeTab === 'partners' || activeTab === 'experts') && (() => {
-          const curFilter = activeTab === 'partners' ? partnerLinksFilter : expertLinksFilter;
-          const setCurFilter = activeTab === 'partners' ? setPartnerLinksFilter : setExpertLinksFilter;
+        {['partners','experts','events','news'].includes(activeTab) && (() => {
+          const filterMap = { partners: [partnerLinksFilter, setPartnerLinksFilter], experts: [expertLinksFilter, setExpertLinksFilter], events: [eventLinksFilter, setEventLinksFilter], news: [newsLinksFilter, setNewsLinksFilter] };
+          const [curFilter, setCurFilter] = filterMap[activeTab];
           return (
             <button onClick={() => setCurFilter(v => v === 'unverified' ? 'all' : 'unverified')}
               style={{ padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${curFilter === 'unverified' ? '#f59e0b' : A.border}`, background: curFilter === 'unverified' ? 'rgba(245,158,11,0.12)' : 'transparent', color: curFilter === 'unverified' ? '#f59e0b' : A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -1800,6 +1802,16 @@ export const AdminPanel = () => {
         {activeTab === 'experts' && (
           <span style={{ fontSize: 12, color: A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
             {experts.length} эксп. · <span style={{ color: experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length} непров.</span>
+          </span>
+        )}
+        {activeTab === 'events' && (
+          <span style={{ fontSize: 12, color: A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {events.length} соб. · <span style={{ color: events.filter(e => !isCheckedRecently(e.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{events.filter(e => !isCheckedRecently(e.linksCheckedAt)).length} непров.</span>
+          </span>
+        )}
+        {activeTab === 'news' && (
+          <span style={{ fontSize: 12, color: A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {news.length} нов. · <span style={{ color: news.filter(n => !isCheckedRecently(n.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{news.filter(n => !isCheckedRecently(n.linksCheckedAt)).length} непров.</span>
           </span>
         )}
 
@@ -2610,13 +2622,29 @@ export const AdminPanel = () => {
           )}
 
           <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 style={{ ...s.h2, margin: 0 }}>Все события <span style={{ fontSize: 12, color: A.textSec, fontWeight: 400 }}>({events.length})</span></h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все события</h2>
+                <span style={{ fontSize: 12, color: A.textSec }}>
+                  {events.length} · <span style={{ color: events.filter(e => !isCheckedRecently(e.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{events.filter(e => !isCheckedRecently(e.linksCheckedAt)).length} не проверено</span>
+                </span>
+              </div>
               <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetEventForm(); setShowEventModal(true); }}>➕ Добавить</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {[['all', 'Все'], ['unverified', '⚠ Непроверенные']].map(([val, label]) => (
+                <button key={val} onClick={() => setEventLinksFilter(val)}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${eventLinksFilter === val ? A.gold : A.border}`, background: eventLinksFilter === val ? A.goldDim : 'transparent', color: eventLinksFilter === val ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : events.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
-              : [...events].sort(byPriorityDate).map((e, idx, arr) => {
+              : [...events]
+                .filter(e => eventLinksFilter === 'all' || !isCheckedRecently(e.linksCheckedAt))
+                .sort(byPriorityDate)
+                .map((e, idx, arr) => {
                 const pri = e.priority ?? 0;
                 return (
                 <div key={e.id} style={s.row}>
@@ -2627,6 +2655,9 @@ export const AdminPanel = () => {
                         {pri >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: A.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>📌 {pri}</span>}
                         {pri > 0 && pri < 8 && <span style={{ fontSize: 9, fontWeight: 700, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>↑ {pri}</span>}
                         <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.isPrivate ? '🔒 ' : ''}{e.title}</div>
+                        {isCheckedRecently(e.linksCheckedAt)
+                          ? <span title="Проверено" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                          : <span title="Не проверено" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
                       </div>
                       <div style={{ fontSize: 12, color: A.textSec }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
                     </div>
@@ -2634,6 +2665,7 @@ export const AdminPanel = () => {
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
                     <button disabled={idx === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === 0 ? 0.3 : 1 }} onClick={() => moveItem('events', events, setEvents, e, -1)}>↑</button>
                     <button disabled={idx === arr.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === arr.length - 1 ? 0.3 : 1 }} onClick={() => moveItem('events', events, setEvents, e, 1)}>↓</button>
+                    <button title="Отметить ссылки как проверенные" style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12, color: isCheckedRecently(e.linksCheckedAt) ? '#4ade80' : A.textSec }} onClick={() => markLinksChecked('events', e.id, setEvents)}>✓</button>
                     <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditEvent(e)}>✏️</button>
                     <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteEvent(e.id)}>🗑️</button>
                   </div>
@@ -2710,13 +2742,29 @@ export const AdminPanel = () => {
           )}
 
           <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 style={{ ...s.h2, margin: 0 }}>Все новости <span style={{ fontSize: 12, color: A.textSec, fontWeight: 400 }}>({news.length})</span></h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все новости</h2>
+                <span style={{ fontSize: 12, color: A.textSec }}>
+                  {news.length} · <span style={{ color: news.filter(n => !isCheckedRecently(n.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{news.filter(n => !isCheckedRecently(n.linksCheckedAt)).length} не проверено</span>
+                </span>
+              </div>
               <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetNewsForm(); setShowNewsModal(true); }}>➕ Добавить</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {[['all', 'Все'], ['unverified', '⚠ Непроверенные']].map(([val, label]) => (
+                <button key={val} onClick={() => setNewsLinksFilter(val)}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${newsLinksFilter === val ? A.gold : A.border}`, background: newsLinksFilter === val ? A.goldDim : 'transparent', color: newsLinksFilter === val ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : news.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет новостей</p>
-              : [...news].sort(byPriorityDate).map((item, idx, arr) => {
+              : [...news]
+                .filter(n => newsLinksFilter === 'all' || !isCheckedRecently(n.linksCheckedAt))
+                .sort(byPriorityDate)
+                .map((item, idx, arr) => {
                 const dateStr = item.createdAt?.toDate
                   ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
                   : '';
@@ -2733,6 +2781,9 @@ export const AdminPanel = () => {
                           {pri >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: A.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>📌 {pri}</span>}
                           {pri > 0 && pri < 8 && <span style={{ fontSize: 9, fontWeight: 700, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>↑ {pri}</span>}
                           <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                          {isCheckedRecently(item.linksCheckedAt)
+                            ? <span title="Проверено" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                            : <span title="Не проверено" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
                         </div>
                         <div style={{ fontSize: 12, color: A.textSec }}>
                           {dateStr && `📅 ${dateStr} · `}
@@ -2743,6 +2794,7 @@ export const AdminPanel = () => {
                     <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
                       <button disabled={idx === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === 0 ? 0.3 : 1 }} onClick={() => moveItem('news', news, setNews, item, -1)}>↑</button>
                       <button disabled={idx === arr.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === arr.length - 1 ? 0.3 : 1 }} onClick={() => moveItem('news', news, setNews, item, 1)}>↓</button>
+                      <button title="Отметить ссылки как проверенные" style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12, color: isCheckedRecently(item.linksCheckedAt) ? '#4ade80' : A.textSec }} onClick={() => markLinksChecked('news', item.id, setNews)}>✓</button>
                       <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditNews(item)}>✏️</button>
                       <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteNews(item.id)}>🗑️</button>
                     </div>
