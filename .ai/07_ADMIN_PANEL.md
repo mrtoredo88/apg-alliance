@@ -1,0 +1,320 @@
+# 07 ADMIN PANEL
+
+## Обзор
+
+**URL:** `/#/admin`  
+**Файл:** `src/AdminPanel.jsx` (~3500+ строк, единый компонент)  
+**Авторизация:** любой Firebase-авторизованный пользователь (нет серверной проверки прав)  
+**UI:** 100% inline styles, темизация через объект `A` (локальные токены для dark theme)
+
+## Навигация
+
+Левый сайдбар с вкладками:
+
+```
+📍 Партнёры      (с счётчиком кол-ва)
+🧑‍💼 Эксперты      (с счётчиком)
+🎉 События       (с счётчиком)
+📢 Новости       (с счётчиком)
+📣 Реклама       (активных баннеров)
+🔔 Рассылка
+✅ Задания       (с счётчиком)
+🎁 Призы         (с счётчиком)
+🔄 Ротация
+📊 Активность
+📈 Аналитика
+⚠️ Ошибки       (с счётчиком)
+🔬 Диагностика
+```
+
+## Sticky Toolbar (глобальная)
+
+Прилипает к верху при скролле. Содержит:
+
+- **Глобальный поиск** — ищет одновременно по партнёрам, экспертам, событиям, новостям. Dropdown с результатами; click → переключает вкладку + раскрывает/подсвечивает элемент
+- **⚠ Не проверены** — toggle фильтрации по флагу `linksCheckedAt` (< 30 дней)
+- **Счётчики** — активные у каждой вкладки (обновляются в реальном времени)
+- **➕ Добавить ▾** — dropdown: открывает модалку партнёра, эксперта, события, новости
+- **🔧 ▾** — dropdown: Migrate categories, Геокодировать
+
+## Вкладка «Партнёры»
+
+### Функционал
+- CRUD партнёров через Firestore
+- Модальная форма (position: fixed, fullscreen overlay)
+- Аккордеон-список (клик по строке разворачивает детали)
+- В раскрытой карточке: QR-коды и материалы для печати (`PartnerQRSection`)
+- Поиск по имени/категории внутри вкладки
+- Фильтр «Все» / «⚠ Непроверенные» (по linksCheckedAt)
+- Сортировка: сначала не проверенные (linksCheckedAt null/старый), затем по дате
+- Кнопка «✓ Проверено» — обновляет `linksCheckedAt: serverTimestamp()`
+- Кнопки ↑↓ для изменения порядка (swap priorities)
+- Геокодирование: отдельный раздел с кнопкой «Геокодировать всех»
+
+### Форма партнёра (поля)
+Название, категория (select), описание (MdEditor), логотип (PhotoUpload round), галерея (GalleryUpload, до 6 фото), адрес, телефон, сайт, VK/соцсеть, часы работы, stampTarget (кол-во сканов для бонуса), ключей за скан, активен (toggle), featured (toggle), ownerId (привязка кабинета).
+
+## Вкладка «Эксперты»
+
+### Функционал
+- CRUD экспертов
+- Модальная форма
+- Аккордеон-список
+- В раскрытой карточке: QR-коды и материалы для печати (`ExpertQRSection`)
+- Поиск внутри вкладки (по имени, специализации)
+- Фильтр непроверенных
+- Сортировка по linksCheckedAt
+- Кнопка «✓ Проверено»
+- Тир (member/ambassador): влияет на ротацию
+
+### Форма эксперта (поля)
+Имя, категория (select из 15 EXPERT_CATEGORIES), специализация, описание (MdEditor), фото (PhotoUpload round), галерея (GalleryUpload), видео (текстовые URL), форматы (online/offline/group чекбоксы), ключей за скан, stampTarget, тир, активен, ownerId, ambassadorSince (date для ротации).
+
+## Вкладка «События»
+
+### Функционал
+- CRUD событий
+- Модальная форма
+- Список с фильтром и сортировкой по priority
+- Фильтр непроверенных ссылок
+- Кнопка «✓ Проверено» для ссылок
+
+### Форма события (поля)
+Название, дата (текстовая, legacy), начало/конец (datetime-local, новые поля), партнёр (текст), привязка к партнёру АПГ (select), описание (MdEditor), ссылка регистрации, кнопка-ссылка (label + url), адрес (legacy), место проведения (новое поле), дедлайн, категория (CONTENT_CATEGORIES пилюли), обложка (PhotoUpload cover), эмодзи (EmojiPicker), приоритет (number + slider), «Закрытое мероприятие» (toggle):
+- Минимум ключей
+- Лимит участников
+- Дата мероприятия для таймера
+
+«Событие эксперта» (toggle):
+- Цена для клуба
+- Цена для всех
+
+## Вкладка «Новости»
+
+### Функционал
+- CRUD новостей (только Firestore — не VK посты)
+- Модальная форма
+- Фильтр непроверенных
+
+### Форма новости (поля)
+Заголовок, текст (textarea), эмодзи, URL картинки + preview, название ссылки, URL ссылки, приоритет (0–10, number + slider), категория (CONTENT_CATEGORIES пилюли), обложка (PhotoUpload cover), дата публикации (date input).
+
+### Список новостей
+Иконка (imageUrl или эмодзи), заголовок, категорийный бейдж, дата публикации (из publishedAt или createdAt), кнопки: ↑↓, ✓, ✏️, 🗑️.
+
+## Вкладка «Реклама»
+
+### Функционал
+- CRUD баннеров
+- Модальная форма
+- Максимум 5 активных баннеров (проверка в saveBanner)
+- Статусы: active (активен + дата не истекла), inactive, expired
+
+### Форма баннера (поля)
+- Внутреннее название
+- Изображение (PhotoUpload cover + URL input)
+- Рекламодатель: Партнёр / Эксперт / Внешний (переключатель)
+  - Партнёр: select из списка партнёров
+  - Эксперт: select из списка экспертов
+  - Внешний: текстовое поле названия
+- Тип ссылки: internal_partner / internal_expert / external_url
+- Значение ссылки: ID или URL
+- Дата начала / Дата конца (date inputs)
+- Приоритет (1–5)
+- Активен (toggle)
+
+### Список баннеров
+Превью изображения, название, рекламодатель, статус (цветной бейдж), приоритет, даты, кнопки: ✏️, 🗑️.
+
+## Вкладка «Рассылка»
+
+### Функционал
+- Форма отправки push-уведомления
+- Одному пользователю (по userId) или broadcast всем
+- Поля: заголовок, тело, URL, тег
+- Кнопка → `POST /api/send-push` с `x-push-secret`
+
+## Вкладка «Задания»
+
+### Функционал
+- CRUD кастомных заданий (`customTasks` коллекция)
+- Список с кнопками редактирования/удаления
+
+### Форма
+Название, описание, эмодзи, количество ключей, условие выполнения, активно.
+
+## Вкладка «Призы»
+
+### Функционал
+- CRUD призов
+- Разделение: фиксированные (за ключи) и раффл (розыгрыш)
+- Для раффл: дата розыгрыша, кол-во билетов за ключ
+- Кнопка «Провести розыгрыш» → `POST /api/raffle-draw` с `RAFFLE_SECRET`
+
+### Форма
+Название, описание, эмодзи, тип (fixed/raffle), стоимость в ключах, остаток (для fixed), дата розыгрыша (для raffle), billets per key, партнёр, активен.
+
+## Вкладка «Ротация»
+
+### Функционал
+- Отображение текущей ротации по категориям экспертов
+- Читает `expertRotation/{category}` и показывает имя эксперта
+- Кнопка «Сменить ротацию» → `POST /api/expert-rotation`
+- Информация о дате последнего обновления
+
+## Вкладка «Активность»
+
+### Функционал
+- Текущий индекс активности по всем партнёрам
+- Таблица: партнёр, score, компоненты score
+- Текущий «партнёр месяца»
+- История победителей (`monthlyWinners`)
+- Кнопка «Пересчитать» → `POST /api/activity-index` с `ACTIVITY_SECRET`
+- Кнопка «Назначить победителя» → `forceAward: true`
+
+## Вкладка «Аналитика»
+
+### Функционал
+- Читает `users` коллекцию (все) — тяжёлый запрос
+- Статистика: всего пользователей, распределение по providers (VK/email/TG)
+- Топ пользователей по ключам
+- Читает `guestSessions` — анализ гостевого трафика
+- `stats/global` — общие счётчики
+
+### Данные
+- Всего пользователей
+- Активных (keys > 0)
+- По провайдеру авторизации
+- Кол-во гостевых сессий
+
+## Вкладка «Ошибки»
+
+### Функционал
+- Читает `errorLogs` коллекцию
+- Список ошибок: сообщение, источник, стек, userId, время
+- Кнопка «Очистить» — удаляет все логи
+
+## Вкладка «Диагностика»
+
+### Функционал
+- Кнопка «Запустить проверку»
+- Параллельные checks:
+  - Firebase Auth (анонимный вход)
+  - Firestore (чтение `config/health`)
+  - Backend health (`/health` endpoint)
+- Результат: ✅/❌ для каждого сервиса с временем ответа
+- Читает последние `diagnostics` документы от пользователей
+
+## Помощники AdminPanel
+
+### EmojiPicker
+Кастомный компонент — горизонтальный скролл с набором эмодзи. Отдельные наборы для `NEWS_EMOJIS` и `EVENT_EMOJIS`.
+
+### PhotoUpload / GalleryUpload
+Из `src/PhotoUpload.jsx` — те же компоненты, что и в кабинетах.
+
+### MdEditor
+Из `src/components/MdEditor.jsx` — textarea с кнопками форматирования.
+
+### markLinksChecked helper
+```js
+const markLinksChecked = async (col, id, setList) => {
+  await updateDoc(doc(db, col, id), { linksCheckedAt: serverTimestamp() });
+  const now = { toDate: () => new Date() };
+  setList(prev => prev.map(x => x.id === id ? { ...x, linksCheckedAt: now } : x));
+};
+```
+Оптимистичное обновление state + Firestore запись.
+
+### isCheckedRecently helper
+```js
+const isCheckedRecently = ts => {
+  if (!ts) return false;
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return Date.now() - d.getTime() < 30 * 24 * 60 * 60 * 1000; // 30 дней
+};
+```
+
+### bulkGeocode
+Геокодирование всех партнёров без координат через Nominatim API. Задержка 1100ms между запросами.
+
+### navigateToResult
+При выборе результата глобального поиска:
+```js
+const navigateToResult = r => {
+  setActiveTab(r.tab);
+  if (r.tab === 'partners') { setPartnerSearch(r.label); setExpandedPartnerId(r.id); }
+  if (r.tab === 'experts')  { setExpandedExpertId(r.id); }
+};
+```
+
+## State AdminPanel
+
+Все состояния через `useState`. Основные:
+
+```js
+// Данные
+const [partners, setPartners] = useState([]);
+const [experts, setExperts] = useState([]);
+const [events, setEvents] = useState([]);
+const [news, setNews] = useState([]);
+const [banners, setBanners] = useState([]);
+const [prizes, setPrizes] = useState([]);
+const [customTasks, setCustomTasks] = useState([]);
+
+// Навигация
+const [activeTab, setActiveTab] = useState('partners');
+
+// Модалки
+const [showPartnerModal, setShowPartnerModal] = useState(false);
+const [showExpertModal, setShowExpertModal] = useState(false);
+const [showEventModal, setShowEventModal] = useState(false);
+const [showNewsModal, setShowNewsModal] = useState(false);
+const [showBannerModal, setShowBannerModal] = useState(false);
+
+// Аккордеон
+const [expandedPartnerId, setExpandedPartnerId] = useState(null);
+const [expandedExpertId, setExpandedExpertId] = useState(null);
+
+// Фильтры
+const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
+const [expertLinksFilter, setExpertLinksFilter] = useState('unverified');
+const [eventLinksFilter, setEventLinksFilter] = useState('all');
+const [newsLinksFilter, setNewsLinksFilter] = useState('all');
+const [expertSearch, setExpertSearch] = useState('');
+
+// Toolbar
+const [globalSearch, setGlobalSearch] = useState('');
+const [showSearchDrop, setShowSearchDrop] = useState(false);
+const [showAddDrop, setShowAddDrop] = useState(false);
+const [showToolsDrop, setShowToolsDrop] = useState(false);
+
+// Editing (каждая форма имеет свой editingXxx state)
+const [editingPartner, setEditingPartner] = useState(null);
+const [editingExpert, setEditingExpert] = useState(null);
+// ... и т.д.
+```
+
+## CONTENT_CATEGORIES
+
+Определены в начале файла (~строка 33):
+
+```js
+const CONTENT_CATEGORIES = [
+  { id: 'economy',   label: 'Экономика',   color: '#6AABEC' },
+  { id: 'society',   label: 'Общество',    color: '#A78BFA' },
+  { id: 'sport',     label: 'Спорт',       color: '#4ade80' },
+  { id: 'culture',   label: 'Культура',    color: '#f59e0b' },
+  { id: 'education', label: 'Образование', color: '#38bdf8' },
+  { id: 'transport', label: 'Транспорт',   color: '#fb923c' },
+];
+```
+
+## Безопасность AdminPanel
+
+**Нет серверной авторизации.** Любой Firebase-авторизованный пользователь технически может открыть `/admin` и использовать форму. Защита:
+1. URL `/admin` не опубликован публично (security by obscurity)
+2. Firestore Rules разрешают запись только auth пользователям
+3. Планируется: проверка `isAdmin` поля в `users/{uid}` документе
+
+**TODO:** Добавить проверку `isAdmin: true` в `users` документе и блокировать доступ для всех остальных.

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
-import { QRCodeSVG } from 'qrcode.react';
-import { PartnerQRSection } from './PartnerQRSection.jsx';
+import { PartnerQRSection, ExpertQRSection } from './PartnerQRSection.jsx';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
@@ -152,6 +151,34 @@ function MiniBarChart({ data, labelKey, valueKey, color = A.gold, shortDate = fa
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function AdminQRMaterialsSection({ entity, type }) {
+  const isExpert = type === 'expert';
+  const entityName = entity?.name || (isExpert ? 'Эксперт' : 'Партнёр');
+  const hasId = !!entity?.id;
+
+  return (
+    <div style={{ marginBottom: 14, padding: 14, borderRadius: 16, background: 'rgba(255,255,255,0.035)', border: `1px solid ${A.border}` }} onClick={e => e.stopPropagation()}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: A.text }}>QR-коды и материалы для печати</div>
+          <div style={{ fontSize: 11, color: A.textSec, marginTop: 3 }}>{entityName}</div>
+        </div>
+        <div style={{ fontSize: 18, flexShrink: 0 }}>📲</div>
+      </div>
+
+      {!hasId ? (
+        <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.24)', color: '#f59e0b', fontSize: 12, lineHeight: '18px' }}>
+          QR-коды появятся после сохранения записи: нужен Firestore ID.
+        </div>
+      ) : isExpert ? (
+        <ExpertQRSection expert={entity} />
+      ) : (
+        <PartnerQRSection partner={entity} />
+      )}
     </div>
   );
 }
@@ -2273,6 +2300,8 @@ export const AdminPanel = () => {
                         {ex.formats?.length > 0 && <span>🗂 {ex.formats.join(', ')}</span>}
                       </div>
 
+                      <AdminQRMaterialsSection entity={ex} type="expert" />
+
                       {/* проверка ссылок */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: isCheckedRecently(ex.linksCheckedAt) ? 'rgba(74,222,128,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${isCheckedRecently(ex.linksCheckedAt) ? 'rgba(74,222,128,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
                         <span style={{ fontSize: 12, color: isCheckedRecently(ex.linksCheckedAt) ? '#4ade80' : '#f59e0b', flex: 1 }}>
@@ -2577,15 +2606,7 @@ export const AdminPanel = () => {
                           {p.ownerEmail && <span>📧 {p.ownerEmail}</span>}
                         </div>
 
-                        {/* QR */}
-                        {p.publicQRUrl && (
-                          <div style={{ marginBottom: 14 }}>
-                            <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>QR для стойки</div>
-                            <div style={{ display: 'inline-block', background: '#fff', padding: 8, borderRadius: 10 }}>
-                              <QRCodeSVG value={p.publicQRUrl} size={100} />
-                            </div>
-                          </div>
-                        )}
+                        <AdminQRMaterialsSection entity={p} type="partner" />
 
                         {/* проверка ссылок */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: isCheckedRecently(p.linksCheckedAt) ? 'rgba(74,222,128,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${isCheckedRecently(p.linksCheckedAt) ? 'rgba(74,222,128,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
