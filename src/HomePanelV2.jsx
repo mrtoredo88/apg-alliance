@@ -31,26 +31,27 @@ const V2 = {
   textSoft: 'rgba(247,244,234,0.7)',
   textMuted: 'rgba(247,244,234,0.46)',
   gold: '#D6B766',
+  goldMetal: 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 67%, #F4D98C 100%)',
   glass: {
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))',
-    backdropFilter: 'blur(58px) saturate(1.82)',
-    WebkitBackdropFilter: 'blur(58px) saturate(1.82)',
-    border: '1px solid rgba(255,255,255,0.17)',
-    boxShadow: '0 20px 58px rgba(0,0,0,0.26), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -18px 42px rgba(255,255,255,0.03)',
+    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.09), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.105), rgba(255,255,255,0.032))',
+    backdropFilter: 'blur(62px) saturate(1.72)',
+    WebkitBackdropFilter: 'blur(62px) saturate(1.72)',
+    border: '1px solid rgba(255,255,255,0.16)',
+    boxShadow: '0 20px 58px rgba(0,0,0,0.27), inset 0 1.5px 0 rgba(255,255,255,0.24), inset 0 -18px 42px rgba(255,255,255,0.035)',
   },
   glowGlass: {
-    background: 'radial-gradient(circle at 18% 0%, rgba(214,183,102,0.38), transparent 40%), radial-gradient(circle at 86% 14%, rgba(255,255,255,0.16), transparent 32%), linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04))',
-    backdropFilter: 'blur(72px) saturate(1.92)',
-    WebkitBackdropFilter: 'blur(72px) saturate(1.92)',
-    border: '1px solid rgba(255,255,255,0.26)',
-    boxShadow: '0 38px 96px rgba(0,0,0,0.36), 0 0 72px rgba(214,183,102,0.14), inset 0 2px 0 rgba(255,255,255,0.34), inset 0 -40px 82px rgba(255,255,255,0.06)',
+    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.18), transparent 38%), radial-gradient(circle at 84% 12%, rgba(255,255,255,0.13), transparent 30%), linear-gradient(145deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04))',
+    backdropFilter: 'blur(76px) saturate(1.82)',
+    WebkitBackdropFilter: 'blur(76px) saturate(1.82)',
+    border: '1px solid rgba(255,255,255,0.24)',
+    boxShadow: '0 42px 104px rgba(0,0,0,0.38), 0 0 74px rgba(216,184,103,0.13), inset 0 2px 0 rgba(255,255,255,0.32), inset 0 -42px 86px rgba(255,255,255,0.055)',
   },
   goldGlass: {
-    background: 'linear-gradient(145deg, rgba(214,183,102,0.28), rgba(214,183,102,0.08))',
-    backdropFilter: 'blur(42px) saturate(1.9)',
-    WebkitBackdropFilter: 'blur(42px) saturate(1.9)',
-    border: '1px solid rgba(214,183,102,0.32)',
-    boxShadow: '0 18px 52px rgba(214,183,102,0.12), inset 0 1.5px 0 rgba(255,255,255,0.28)',
+    background: 'radial-gradient(circle at 32% 0%, rgba(255,240,184,0.36), transparent 44%), linear-gradient(135deg, rgba(244,217,140,0.32), rgba(159,121,50,0.11))',
+    backdropFilter: 'blur(46px) saturate(1.8)',
+    WebkitBackdropFilter: 'blur(46px) saturate(1.8)',
+    border: '1px solid rgba(244,217,140,0.36)',
+    boxShadow: '0 18px 52px rgba(216,184,103,0.13), inset 0 1.5px 0 rgba(255,255,255,0.28), inset 0 -12px 30px rgba(159,121,50,0.12)',
   },
   sectionGap: 20,
 };
@@ -90,12 +91,13 @@ function V2FirstScreen({
       minHeight: 'calc(100vh - 106px)',
       padding: '38px 22px 62px',
       overflow: 'hidden',
-      background: 'radial-gradient(circle at 50% -12%, rgba(214,183,102,0.18), transparent 34%), radial-gradient(circle at 96% 20%, rgba(22,28,55,0.24), transparent 38%), radial-gradient(circle at -8% 92%, rgba(82,54,102,0.14), transparent 34%), linear-gradient(180deg, #171717 0%, #121318 48%, #101011 100%)',
+      background: 'radial-gradient(circle at 50% -16%, rgba(244,217,140,0.15), transparent 32%), radial-gradient(circle at 96% 24%, rgba(24,29,48,0.22), transparent 38%), radial-gradient(circle at -10% 88%, rgba(82,54,102,0.10), transparent 34%), linear-gradient(180deg, #181816 0%, #121316 48%, #0F1011 100%)',
     }}>
+      <div style={{ position: 'absolute', left: -80, right: -80, top: 128, height: 230, background: 'linear-gradient(110deg, transparent 8%, rgba(244,217,140,0.055) 35%, rgba(255,255,255,0.04) 48%, transparent 74%)', transform: 'rotate(-8deg)', filter: 'blur(1px)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, animation: 'fadeInUp 0.72s ease both' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, marginBottom: 38 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: V2.gold, letterSpacing: 1.35, marginBottom: 11, textTransform: 'uppercase', textShadow: '0 0 24px rgba(214,183,102,0.22)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'transparent', letterSpacing: 1.45, marginBottom: 11, textTransform: 'uppercase', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 24px rgba(244,217,140,0.18)' }}>
               АПГ 2.0
             </div>
             <h1 style={{ margin: 0, color: V2.text, fontSize: 41, lineHeight: '46px', fontWeight: 800, letterSpacing: 0 }}>
@@ -110,9 +112,9 @@ function V2FirstScreen({
             onClick={onOpenNotifications}
             aria-label="Уведомления"
             style={{
-              width: 50, height: 50, flexShrink: 0, borderRadius: 20, cursor: 'pointer',
+              width: 50, height: 50, flexShrink: 0, borderRadius: 22, cursor: 'pointer',
               ...V2.glass,
-              color: V2.text, fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: V2.text, fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center',
               position: 'relative',
             }}
           >
@@ -126,7 +128,7 @@ function V2FirstScreen({
         <button
           onClick={heroAction}
           style={{
-            width: '100%', minHeight: 292, border: 'none', borderRadius: 46, padding: 0,
+            width: '100%', minHeight: 304, border: 'none', borderRadius: 48, padding: 0,
             cursor: 'pointer', textAlign: 'left', overflow: 'hidden', position: 'relative',
             ...V2.glowGlass,
             animation: 'fadeInUp 0.8s 0.08s ease both',
@@ -139,27 +141,34 @@ function V2FirstScreen({
                 alt=""
                 loading="lazy"
                 onError={e => { e.currentTarget.style.display = 'none'; }}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.43, filter: 'saturate(1.08) contrast(1.04)', display: 'block' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.48, filter: 'saturate(1.08) contrast(1.04)', display: 'block' }}
               />
             ) : (
-              <div style={{ width: '100%', height: '100%', background: 'radial-gradient(circle at 28% 18%, rgba(214,183,102,0.34), transparent 42%), linear-gradient(135deg, rgba(24,29,48,0.75), rgba(255,255,255,0.08) 46%, rgba(14,12,18,0.32))' }} />
+              <div style={{ width: '100%', height: '100%', background: 'radial-gradient(circle at 28% 18%, rgba(244,217,140,0.28), transparent 42%), linear-gradient(135deg, rgba(24,29,48,0.70), rgba(255,255,255,0.08) 46%, rgba(14,12,18,0.32))' }} />
             )}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.29) 46%, rgba(12,12,14,0.72))' }} />
-            <div style={{ position: 'absolute', inset: '1px', borderRadius: 45, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.13), inset 0 36px 92px rgba(255,255,255,0.075), inset 0 -42px 90px rgba(214,183,102,0.04)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 18% 12%, rgba(255,240,184,0.20), transparent 34%), linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.24) 42%, rgba(12,12,14,0.74))' }} />
+            <div style={{ position: 'absolute', left: -42, right: -24, top: 62, height: 96, background: 'linear-gradient(105deg, transparent 0%, rgba(244,217,140,0.18) 36%, rgba(255,255,255,0.10) 48%, transparent 72%)', transform: 'rotate(-9deg)', filter: 'blur(10px)', opacity: 0.8, pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', inset: '1px', borderRadius: 47, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 0 0 2px rgba(244,217,140,0.08), inset 0 38px 96px rgba(255,255,255,0.07), inset 0 -46px 94px rgba(216,184,103,0.055)', pointerEvents: 'none' }} />
           </div>
 
-          <div style={{ position: 'relative', zIndex: 1, minHeight: 292, padding: 26, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div style={{ alignSelf: 'flex-start', padding: '8px 13px', borderRadius: 999, color: V2.text, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.105)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(32px) saturate(1.65)', WebkitBackdropFilter: 'blur(32px) saturate(1.65)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.23), 0 10px 24px rgba(0,0,0,0.14)' }}>
-              Рекомендуем сегодня
+          <div style={{ position: 'relative', zIndex: 1, minHeight: 304, padding: 26, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+              <div style={{ alignSelf: 'flex-start', padding: '8px 13px', borderRadius: 999, color: V2.text, fontSize: 11, fontWeight: 700, background: 'radial-gradient(circle at 35% 0%, rgba(255,255,255,0.22), transparent 58%), rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(32px) saturate(1.65)', WebkitBackdropFilter: 'blur(32px) saturate(1.65)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.23), 0 10px 24px rgba(0,0,0,0.14)' }}>
+                Рекомендуем сегодня
+              </div>
+              <div aria-hidden="true" style={{ width: 46, height: 46, borderRadius: 18, background: V2.goldMetal, boxShadow: '0 12px 32px rgba(216,184,103,0.18), inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -10px 20px rgba(83,58,18,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#18130A', fontSize: 13, fontWeight: 900, letterSpacing: 0 }}>
+                APG
+              </div>
             </div>
             <div>
               <div style={{ color: V2.text, fontSize: 30, lineHeight: '35px', fontWeight: 800, letterSpacing: 0, marginBottom: 14, textShadow: '0 2px 8px rgba(0,0,0,0.46), 0 18px 42px rgba(0,0,0,0.38)' }}>
                 {heroTitle}
               </div>
-              <div style={{ color: 'rgba(247,244,234,0.76)', fontSize: 14, lineHeight: '22px', fontWeight: 400, maxWidth: 310, marginBottom: 22, textShadow: '0 2px 8px rgba(0,0,0,0.36)' }}>
-                {heroMeta}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(247,244,234,0.78)', fontSize: 14, lineHeight: '22px', fontWeight: 400, maxWidth: 310, marginBottom: 22, textShadow: '0 2px 8px rgba(0,0,0,0.36)' }}>
+                <span aria-hidden="true" style={{ width: 32, height: 1, flexShrink: 0, background: V2.goldMetal, opacity: 0.78, boxShadow: '0 0 18px rgba(244,217,140,0.22)' }} />
+                <span>{heroMeta}</span>
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 48, padding: '0 23px', borderRadius: 999, background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.28), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.065))', border: '1px solid rgba(255,255,255,0.25)', color: V2.text, fontSize: 14, fontWeight: 700, backdropFilter: 'blur(34px) saturate(1.85)', WebkitBackdropFilter: 'blur(34px) saturate(1.85)', boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.28), inset 0 -14px 28px rgba(255,255,255,0.04), 0 14px 34px rgba(0,0,0,0.18)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 48, padding: '0 23px', borderRadius: 999, background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.25), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.055))', border: '1px solid rgba(255,255,255,0.23)', color: V2.text, fontSize: 14, fontWeight: 700, backdropFilter: 'blur(34px) saturate(1.72)', WebkitBackdropFilter: 'blur(34px) saturate(1.72)', boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.26), inset 0 -14px 28px rgba(255,255,255,0.035), 0 14px 34px rgba(0,0,0,0.18)' }}>
                 Подробнее
               </span>
             </div>
@@ -173,11 +182,7 @@ function V2FirstScreen({
           <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
             padding: 10, borderRadius: 38,
-            background: 'linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.028))',
-            border: '1px solid rgba(255,255,255,0.14)',
-            backdropFilter: 'blur(48px) saturate(1.75)',
-            WebkitBackdropFilter: 'blur(48px) saturate(1.75)',
-            boxShadow: '0 18px 56px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.18)',
+            ...V2.glass,
           }}>
             {todayCards.map(card => (
               <button
@@ -187,13 +192,13 @@ function V2FirstScreen({
                   minHeight: 106, borderRadius: 28, padding: 16, cursor: 'pointer', textAlign: 'left',
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                   color: V2.text,
-                  background: 'linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026))',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+                  background: 'radial-gradient(circle at 28% 0%, rgba(244,217,140,0.06), transparent 42%), linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026))',
+                  border: '1px solid rgba(255,255,255,0.115)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -12px 28px rgba(255,255,255,0.02)',
                   transition: 'transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease',
                 }}
               >
-                <span style={{ width: 38, height: 38, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, lineHeight: '26px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.13)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>{card.icon}</span>
+                <span style={{ width: 38, height: 38, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, lineHeight: '26px', background: 'radial-gradient(circle at 40% 0%, rgba(255,255,255,0.20), transparent 58%), rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), 0 10px 24px rgba(0,0,0,0.12)' }}>{card.icon}</span>
                 <span>
                   <span style={{ display: 'block', fontSize: 17, lineHeight: '21px', fontWeight: 900, marginBottom: 5 }}>{card.title}</span>
                   <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', fontWeight: 600, color: V2.textMuted }}>{card.sub}</span>
