@@ -56,6 +56,60 @@ const V2 = {
   sectionGap: 20,
 };
 
+const GlassCard = {
+  ...V2.glass,
+  borderRadius: 32,
+  transition: 'transform 0.36s cubic-bezier(0.22,1,0.36,1), box-shadow 0.36s ease, border-color 0.36s ease',
+  touchAction: 'manipulation',
+};
+
+const GlassButton = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 48,
+  padding: '0 23px',
+  borderRadius: 999,
+  background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.25), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.055))',
+  border: '1px solid rgba(255,255,255,0.23)',
+  color: V2.text,
+  fontSize: 14,
+  fontWeight: 760,
+  backdropFilter: 'blur(34px) saturate(1.72)',
+  WebkitBackdropFilter: 'blur(34px) saturate(1.72)',
+  boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.26), inset 0 -14px 28px rgba(255,255,255,0.035), 0 14px 34px rgba(0,0,0,0.18)',
+  transition: 'transform 0.28s ease, box-shadow 0.28s ease',
+};
+
+const GlassIsland = {
+  ...V2.glass,
+  borderRadius: 42,
+  boxShadow: '0 28px 76px rgba(0,0,0,0.34), 0 0 58px rgba(216,184,103,0.10), inset 0 2px 0 rgba(255,255,255,0.25), inset 0 -26px 52px rgba(255,255,255,0.045)',
+};
+
+const GlassBadge = {
+  padding: '8px 13px',
+  borderRadius: 999,
+  color: V2.text,
+  fontSize: 11,
+  fontWeight: 720,
+  background: 'radial-gradient(circle at 35% 0%, rgba(255,255,255,0.22), transparent 58%), rgba(255,255,255,0.10)',
+  border: '1px solid rgba(255,255,255,0.20)',
+  backdropFilter: 'blur(32px) saturate(1.65)',
+  WebkitBackdropFilter: 'blur(32px) saturate(1.65)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.23), 0 10px 24px rgba(0,0,0,0.14)',
+};
+
+const GlassPanel = {
+  ...V2.glass,
+  borderRadius: 38,
+};
+
+const GlassHero = {
+  ...V2.glowGlass,
+  borderRadius: 48,
+};
+
 function V2FirstScreen({
   user,
   userKeys,
@@ -89,7 +143,7 @@ function V2FirstScreen({
     <section style={{
       position: 'relative',
       minHeight: 'calc(100vh - 106px)',
-      padding: '38px 22px 62px',
+      padding: '38px 22px 88px',
       overflow: 'hidden',
       background: 'radial-gradient(circle at 50% -16%, rgba(244,217,140,0.15), transparent 32%), radial-gradient(circle at 96% 24%, rgba(24,29,48,0.22), transparent 38%), radial-gradient(circle at -10% 88%, rgba(82,54,102,0.10), transparent 34%), linear-gradient(180deg, #181816 0%, #121316 48%, #0F1011 100%)',
     }}>
@@ -100,7 +154,7 @@ function V2FirstScreen({
             <div style={{ fontSize: 11, fontWeight: 800, color: 'transparent', letterSpacing: 1.45, marginBottom: 11, textTransform: 'uppercase', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 24px rgba(244,217,140,0.18)' }}>
               АПГ 2.0
             </div>
-            <h1 style={{ margin: 0, color: V2.text, fontSize: 41, lineHeight: '46px', fontWeight: 800, letterSpacing: 0 }}>
+            <h1 style={{ margin: 0, color: V2.text, fontSize: 42, lineHeight: '46px', fontWeight: 780, letterSpacing: 0 }}>
               {firstName === 'привет' ? 'Добро пожаловать' : `Привет, ${firstName}`}
             </h1>
             <p style={{ margin: '22px 0 0', color: V2.textSoft, fontSize: 17, lineHeight: '29px', fontWeight: 400, maxWidth: 334 }}>
@@ -130,7 +184,7 @@ function V2FirstScreen({
           style={{
             width: '100%', minHeight: 304, border: 'none', borderRadius: 48, padding: 0,
             cursor: 'pointer', textAlign: 'left', overflow: 'hidden', position: 'relative',
-            ...V2.glowGlass,
+            ...GlassHero,
             animation: 'fadeInUp 0.8s 0.08s ease both',
           }}
         >
@@ -153,7 +207,7 @@ function V2FirstScreen({
 
           <div style={{ position: 'relative', zIndex: 1, minHeight: 304, padding: 26, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
-              <div style={{ alignSelf: 'flex-start', padding: '8px 13px', borderRadius: 999, color: V2.text, fontSize: 11, fontWeight: 700, background: 'radial-gradient(circle at 35% 0%, rgba(255,255,255,0.22), transparent 58%), rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(32px) saturate(1.65)', WebkitBackdropFilter: 'blur(32px) saturate(1.65)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.23), 0 10px 24px rgba(0,0,0,0.14)' }}>
+              <div style={{ alignSelf: 'flex-start', ...GlassBadge }}>
                 Рекомендуем сегодня
               </div>
               <div aria-hidden="true" style={{ width: 46, height: 46, borderRadius: 18, background: V2.goldMetal, boxShadow: '0 12px 32px rgba(216,184,103,0.18), inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -10px 20px rgba(83,58,18,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#18130A', fontSize: 13, fontWeight: 900, letterSpacing: 0 }}>
@@ -168,7 +222,7 @@ function V2FirstScreen({
                 <span aria-hidden="true" style={{ width: 32, height: 1, flexShrink: 0, background: V2.goldMetal, opacity: 0.78, boxShadow: '0 0 18px rgba(244,217,140,0.22)' }} />
                 <span>{heroMeta}</span>
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 48, padding: '0 23px', borderRadius: 999, background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.25), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.055))', border: '1px solid rgba(255,255,255,0.23)', color: V2.text, fontSize: 14, fontWeight: 700, backdropFilter: 'blur(34px) saturate(1.72)', WebkitBackdropFilter: 'blur(34px) saturate(1.72)', boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.26), inset 0 -14px 28px rgba(255,255,255,0.035), 0 14px 34px rgba(0,0,0,0.18)' }}>
+              <span style={GlassButton}>
                 Подробнее
               </span>
             </div>
@@ -182,7 +236,7 @@ function V2FirstScreen({
           <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
             padding: 10, borderRadius: 38,
-            ...V2.glass,
+            ...GlassIsland,
           }}>
             {todayCards.map(card => (
               <button
@@ -192,6 +246,7 @@ function V2FirstScreen({
                   minHeight: 106, borderRadius: 28, padding: 16, cursor: 'pointer', textAlign: 'left',
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                   color: V2.text,
+                  touchAction: 'manipulation',
                   background: 'radial-gradient(circle at 28% 0%, rgba(244,217,140,0.06), transparent 42%), linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026))',
                   border: '1px solid rgba(255,255,255,0.115)',
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -12px 28px rgba(255,255,255,0.02)',
@@ -214,12 +269,14 @@ function V2FirstScreen({
 
 function V2SecondScreen({
   partners,
+  experts = [],
   events,
   news,
   featuredPartner,
   partnerOfMonth,
   onOpenPartner,
   onOpenEvents,
+  onOpenExperts,
   onOpenRewards,
 }) {
   const imageOf = (item) => item?.imageUrl || item?.coverPhoto || item?.logoUrl || item?.photoUrl || item?.photo || '';
@@ -227,6 +284,7 @@ function V2SecondScreen({
   const promoPartner = partners.find(p => p.offer && p.id !== primaryPartner?.id) ?? partners[1] ?? primaryPartner;
   const eventItem = events[0] ?? null;
   const secondEvent = events.find(e => e.id !== eventItem?.id) ?? null;
+  const expertItem = experts[0] ?? null;
   const firstNews = news[0] ?? null;
   const smallNews = news.slice(1, 3);
   const raffleImage = imageOf(partners[2]) || imageOf(primaryPartner);
@@ -245,19 +303,19 @@ function V2SecondScreen({
       onClick: onOpenEvents,
     },
     {
+      label: 'Эксперт',
+      title: expertItem?.name ?? expertItem?.specialization ?? 'Эксперт недели',
+      image: imageOf(expertItem) || imageOf(primaryPartner),
+      onClick: onOpenExperts,
+    },
+    {
       label: 'Акция',
       title: promoPartner?.offer ?? promoPartner?.name ?? 'Предложение партнёра',
       image: imageOf(promoPartner),
       onClick: promoPartner ? () => onOpenPartner?.(promoPartner) : undefined,
     },
     {
-      label: 'Новый эксперт',
-      title: 'Свежий взгляд на город',
-      image: imageOf(partners[3]) || imageOf(primaryPartner),
-      onClick: onOpenEvents,
-    },
-    {
-      label: 'Розыгрыш',
+      label: 'Подарок',
       title: 'Подарки этой недели',
       image: raffleImage,
       onClick: onOpenRewards,
@@ -270,15 +328,15 @@ function V2SecondScreen({
 
   return (
     <section style={{
-      padding: '40px 0 38px',
-      background: 'radial-gradient(circle at 8% 10%, rgba(214,183,102,0.10), transparent 32%), radial-gradient(circle at 94% 72%, rgba(82,54,102,0.12), transparent 34%), linear-gradient(180deg, #101011 0%, #121217 56%, #101011 100%)',
+      padding: '50px 0 170px',
+      background: 'radial-gradient(circle at 12% 8%, rgba(244,217,140,0.085), transparent 30%), radial-gradient(circle at 92% 68%, rgba(82,54,102,0.10), transparent 34%), linear-gradient(180deg, #0F1011 0%, #121217 56%, #0F1011 100%)',
       overflow: 'hidden',
     }}>
       <div style={{ padding: '0 22px 18px' }}>
-        <div style={{ color: V2.text, fontSize: 28, lineHeight: '33px', fontWeight: 800, letterSpacing: 0, marginBottom: 8 }}>
+        <div style={{ color: V2.text, fontSize: 29, lineHeight: '34px', fontWeight: 780, letterSpacing: 0, marginBottom: 9 }}>
           Сегодня для вас
         </div>
-        <div style={{ color: V2.textMuted, fontSize: 14, lineHeight: '22px', fontWeight: 400 }}>
+        <div style={{ color: V2.textMuted, fontSize: 14, lineHeight: '22px', fontWeight: 420 }}>
           Несколько поводов выйти в город
         </div>
       </div>
@@ -291,22 +349,25 @@ function V2SecondScreen({
                 key={`${card.label}-${index}`}
                 onClick={card.onClick}
                 style={{
-                  width: 238, height: 286, flexShrink: 0, border: 'none', borderRadius: 34,
+                  width: 246, height: 292, flexShrink: 0, border: 'none', borderRadius: 36,
                   overflow: 'hidden', padding: 0, position: 'relative', textAlign: 'left', cursor: 'pointer',
+                  ...GlassCard,
                   background: fallbackCardBg,
-                  boxShadow: '0 24px 64px rgba(0,0,0,0.28), inset 0 1.5px 0 rgba(255,255,255,0.22)',
+                  boxShadow: '0 26px 68px rgba(0,0,0,0.30), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -24px 48px rgba(255,255,255,0.035)',
+                  animation: 'fadeInUp 0.54s ease both',
+                  animationDelay: `${index * 0.05}s`,
                 }}
               >
                 {card.image && (
                   <img src={card.image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, filter: 'saturate(1.04) contrast(1.04)' }} />
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.54, filter: 'saturate(1.08) contrast(1.03)' }} />
                 )}
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,14,16,0.04), rgba(14,14,16,0.38) 50%, rgba(14,14,16,0.84))' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 22% 10%, rgba(244,217,140,0.12), transparent 32%), linear-gradient(180deg, rgba(14,14,16,0.03), rgba(14,14,16,0.32) 48%, rgba(14,14,16,0.86))' }} />
                 <div style={{ position: 'relative', zIndex: 1, height: '100%', padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ alignSelf: 'flex-start', padding: '7px 11px', borderRadius: 999, color: V2.text, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.105)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)' }}>
+                  <span style={{ alignSelf: 'flex-start', ...GlassBadge, padding: '7px 11px' }}>
                     {card.label}
                   </span>
-                  <span style={{ color: V2.text, fontSize: 24, lineHeight: '28px', fontWeight: 800, textShadow: '0 10px 28px rgba(0,0,0,0.46)' }}>
+                  <span style={{ color: V2.text, fontSize: 24, lineHeight: '28px', fontWeight: 790, textShadow: '0 10px 28px rgba(0,0,0,0.48)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
                     {card.title}
                   </span>
                 </div>
@@ -317,23 +378,24 @@ function V2SecondScreen({
       </div>
 
       <div style={{ padding: '0 22px' }}>
-        <div style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 800, marginBottom: 16 }}>
-          Что нового
+        <div style={{ color: V2.text, fontSize: 25, lineHeight: '30px', fontWeight: 780, marginBottom: 16 }}>
+          Новости
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.08fr 0.92fr', gap: 12, marginBottom: 34 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 12, marginBottom: 36 }}>
           <button
             onClick={onOpenEvents}
             style={{
-              minHeight: 248, border: 'none', borderRadius: 32, overflow: 'hidden', position: 'relative',
+              minHeight: 258, border: 'none', borderRadius: 34, overflow: 'hidden', position: 'relative',
               padding: 0, textAlign: 'left', cursor: 'pointer', background: fallbackCardBg,
-              boxShadow: '0 22px 58px rgba(0,0,0,0.24), inset 0 1.5px 0 rgba(255,255,255,0.2)',
+              ...GlassCard,
+              boxShadow: '0 24px 62px rgba(0,0,0,0.27), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -24px 48px rgba(255,255,255,0.032)',
             }}
           >
-            {imageOf(firstNews) && <img src={imageOf(firstNews)} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.48 }} />}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,14,16,0.08), rgba(14,14,16,0.84))' }} />
-            <div style={{ position: 'relative', zIndex: 1, minHeight: 248, padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-              <div style={{ color: V2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 800, marginBottom: 8 }}>Главное</div>
-              <div style={{ color: V2.text, fontSize: 21, lineHeight: '25px', fontWeight: 800 }}>
+            {imageOf(firstNews) && <img src={imageOf(firstNews)} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.50, filter: 'saturate(1.05)' }} />}
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 28% 6%, rgba(244,217,140,0.13), transparent 34%), linear-gradient(180deg, rgba(14,14,16,0.06), rgba(14,14,16,0.84))' }} />
+            <div style={{ position: 'relative', zIndex: 1, minHeight: 258, padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <div style={{ color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 11, lineHeight: '15px', fontWeight: 820, marginBottom: 9 }}>Главное</div>
+              <div style={{ color: V2.text, fontSize: 22, lineHeight: '27px', fontWeight: 790 }}>
                 {firstNews?.title ?? 'Город становится ближе'}
               </div>
             </div>
@@ -346,18 +408,18 @@ function V2SecondScreen({
                 onClick={onOpenEvents}
                 style={{
                   flex: 1, border: 'none', borderRadius: 28, padding: 15, textAlign: 'left', cursor: 'pointer',
-                  ...V2.glass,
+                  ...GlassCard,
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                 }}
               >
-                <span style={{ color: V2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 800 }}>{index === 0 ? 'Новость' : 'Коротко'}</span>
-                <span style={{ color: V2.text, fontSize: 15, lineHeight: '20px', fontWeight: 750 }}>{item.title}</span>
+                <span style={{ color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 11, lineHeight: '15px', fontWeight: 820 }}>{index === 0 ? 'Новость' : 'Коротко'}</span>
+                <span style={{ color: V2.text, fontSize: 15, lineHeight: '20px', fontWeight: 740, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{item.title}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 800, marginBottom: 16 }}>
+        <div style={{ color: V2.text, fontSize: 25, lineHeight: '30px', fontWeight: 780, marginBottom: 16 }}>
           Ближайшие события
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -366,12 +428,14 @@ function V2SecondScreen({
               key={`${event.id ?? event.title}-${index}`}
               onClick={onOpenEvents}
               style={{
-                border: 'none', borderRadius: 30, padding: '18px 18px 17px', cursor: 'pointer', textAlign: 'left',
-                ...V2.glass,
-                display: 'grid', gridTemplateColumns: '74px 1fr auto', alignItems: 'center', gap: 14,
+                border: 'none', borderRadius: 32, padding: '18px 18px 17px', cursor: 'pointer', textAlign: 'left',
+                ...GlassCard,
+                display: 'grid', gridTemplateColumns: '82px 1fr auto', alignItems: 'center', gap: 14,
+                animation: 'fadeInUp 0.5s ease both',
+                animationDelay: `${index * 0.05}s`,
               }}
             >
-              <span style={{ color: V2.gold, fontSize: 22, lineHeight: '26px', fontWeight: 850 }}>
+              <span style={{ color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 24, lineHeight: '28px', fontWeight: 840 }}>
                 {event.date?.split(' ')?.slice(0, 2).join(' ') || 'Скоро'}
               </span>
               <span style={{ minWidth: 0 }}>
@@ -382,7 +446,7 @@ function V2SecondScreen({
                   {event.partner || event.address || 'Зеленоград'}
                 </span>
               </span>
-              <span style={{ width: 38, height: 38, borderRadius: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', color: V2.text, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.16)', fontSize: 18 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', color: V2.text, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.16)', fontSize: 18, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>
                 →
               </span>
             </button>
@@ -1506,7 +1570,7 @@ function openVKApp() {
 }
 
 export function HomePanelV2({
-  user, userKeys = 0, favorites = [], partners = [], events = [], news = [], recentReviews = [],
+  user, userKeys = 0, favorites = [], partners = [], experts = [], events = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
   registeredEventIds = [], onEventRegister, userRank = null, customTasks = [],
@@ -1514,7 +1578,7 @@ export function HomePanelV2({
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
   counterPulse = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -1703,12 +1767,14 @@ export function HomePanelV2({
           <>
             <V2SecondScreen
               partners={partners}
+              experts={experts}
               events={events}
               news={news}
               featuredPartner={featuredPartner}
               partnerOfMonth={partnerOfMonth}
               onOpenPartner={onOpenPartner}
               onOpenEvents={onOpenEvents}
+              onOpenExperts={onOpenExperts}
               onOpenRewards={onOpenRewards}
             />
 

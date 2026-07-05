@@ -1245,6 +1245,7 @@ export function UserApp() {
   // 5 regular tabs + center scan button (index 2)
   const TAB_PANELS = ['home', 'experts', null, 'tasks', 'profile'];
   const pillIdx    = isScannerOpen ? -1 : TAB_PANELS.indexOf(activePanel);
+  const V2GoldMetal = 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 68%, #F4D98C 100%)';
 
   const TABS = [
     { id: 'home',    label: 'Главная',  icon: TabHomeIcon },
@@ -1255,17 +1256,18 @@ export function UserApp() {
   ];
 
   const tabBarShellStyle = useHomeV2 ? {
-    position: 'fixed', bottom: 34,
+    position: 'fixed', bottom: 28,
     left: '50%', transform: 'translateX(-50%)',
-    width: 'calc(100% - 76px)', maxWidth: 382, minHeight: 84,
-    padding: 11,
-    background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22), transparent 48%), linear-gradient(145deg, rgba(58,58,58,0.46), rgba(20,20,22,0.34))',
-    backdropFilter: 'blur(96px) saturate(1.85)', WebkitBackdropFilter: 'blur(96px) saturate(1.85)',
-    border: '1px solid rgba(255,255,255,0.21)',
-    borderRadius: 46,
-    boxShadow: '0 36px 88px rgba(0,0,0,0.44), 0 0 74px rgba(214,183,102,0.10), inset 0 2px 0 rgba(255,255,255,0.34), inset 0 -32px 62px rgba(255,255,255,0.055), inset 0 -1px 0 rgba(214,183,102,0.08)',
+    width: 'calc(100% - 64px)', maxWidth: 390, minHeight: 86,
+    padding: 10,
+    background: 'radial-gradient(circle at 50% 0%, rgba(255,240,184,0.16), transparent 48%), radial-gradient(circle at 50% 100%, rgba(255,255,255,0.075), transparent 58%), linear-gradient(145deg, rgba(68,68,64,0.42), rgba(16,16,18,0.37))',
+    backdropFilter: 'blur(108px) saturate(1.78)', WebkitBackdropFilter: 'blur(108px) saturate(1.78)',
+    border: '1px solid rgba(255,255,255,0.22)',
+    borderRadius: 48,
+    boxShadow: '0 38px 92px rgba(0,0,0,0.46), 0 0 82px rgba(216,184,103,0.12), inset 0 2px 0 rgba(255,255,255,0.32), inset 0 -32px 66px rgba(255,255,255,0.055), inset 0 -1px 0 rgba(244,217,140,0.12)',
     display: 'flex', alignItems: 'stretch', gap: 6,
     zIndex: 100, overflow: 'visible',
+    transition: 'transform 0.45s cubic-bezier(0.22,1,0.36,1), box-shadow 0.45s ease',
   } : {
     position: 'fixed', bottom: 16,
     left: '50%', transform: 'translateX(-50%)',
@@ -1285,15 +1287,15 @@ export function UserApp() {
       {pillIdx >= 0 && pillIdx !== 2 && (
         <div style={{
           position: 'absolute', top: useHomeV2 ? 11 : 7, height: useHomeV2 ? 62 : 44,
-          left: useHomeV2 ? `calc(${pillIdx * 20}% + 11px)` : `calc(${pillIdx * 20}% + 6px)`,
-          width: useHomeV2 ? 'calc(20% - 22px)' : 'calc(20% - 12px)',
-          background: useHomeV2 ? 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.34), transparent 58%), radial-gradient(circle at 50% 100%, rgba(214,183,102,0.2), transparent 70%), linear-gradient(145deg, rgba(255,255,255,0.2), rgba(80,80,82,0.18))' : 'rgba(201,168,76,0.1)',
-          backdropFilter: useHomeV2 ? 'blur(60px) saturate(1.85)' : 'none',
-          WebkitBackdropFilter: useHomeV2 ? 'blur(60px) saturate(1.85)' : 'none',
-          border: useHomeV2 ? '1px solid rgba(255,255,255,0.27)' : '1px solid rgba(201,168,76,0.2)',
+          left: useHomeV2 ? `calc(${pillIdx * 20}% + 10px)` : `calc(${pillIdx * 20}% + 6px)`,
+          width: useHomeV2 ? 'calc(20% - 20px)' : 'calc(20% - 12px)',
+          background: useHomeV2 ? 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.32), transparent 56%), radial-gradient(circle at 50% 100%, rgba(244,217,140,0.18), transparent 72%), linear-gradient(145deg, rgba(255,255,255,0.18), rgba(78,78,78,0.16))' : 'rgba(201,168,76,0.1)',
+          backdropFilter: useHomeV2 ? 'blur(68px) saturate(1.78)' : 'none',
+          WebkitBackdropFilter: useHomeV2 ? 'blur(68px) saturate(1.78)' : 'none',
+          border: useHomeV2 ? '1px solid rgba(255,255,255,0.29)' : '1px solid rgba(201,168,76,0.2)',
           borderRadius: useHomeV2 ? 32 : 14,
-          boxShadow: useHomeV2 ? '0 18px 44px rgba(0,0,0,0.20), 0 0 28px rgba(214,183,102,0.10), inset 0 1.5px 0 rgba(255,255,255,0.34), inset 0 -18px 38px rgba(255,255,255,0.055), inset 0 -1px 0 rgba(214,183,102,0.13)' : 'none',
-          transition: 'left 0.5s cubic-bezier(0.22, 1, 0.36, 1), width 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
+          boxShadow: useHomeV2 ? '0 18px 46px rgba(0,0,0,0.23), 0 0 32px rgba(216,184,103,0.12), inset 0 1.5px 0 rgba(255,255,255,0.34), inset 0 -18px 38px rgba(255,255,255,0.052), inset 0 -1px 0 rgba(244,217,140,0.16)' : 'none',
+          transition: 'left 0.55s cubic-bezier(0.22, 1, 0.36, 1), width 0.55s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease',
           pointerEvents: 'none',
         }} />
       )}
@@ -1303,9 +1305,9 @@ export function UserApp() {
           <button key="scan" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
             style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: useHomeV2 ? 'center' : 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
             <div style={{
-              width: useHomeV2 ? 54 : 50, height: useHomeV2 ? 54 : 50, marginTop: useHomeV2 ? -22 : -14, borderRadius: useHomeV2 ? 22 : '50%',
-              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-              boxShadow: isScannerOpen ? 'none' : useHomeV2 ? '0 18px 42px rgba(214,183,102,0.24), 0 0 24px rgba(214,183,102,0.18), inset 0 1px 0 rgba(255,255,255,0.38)' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
+              width: useHomeV2 ? 56 : 50, height: useHomeV2 ? 56 : 50, marginTop: useHomeV2 ? -24 : -14, borderRadius: useHomeV2 ? 23 : '50%',
+              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : (useHomeV2 ? V2GoldMetal : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`),
+              boxShadow: isScannerOpen ? 'none' : useHomeV2 ? '0 20px 46px rgba(216,184,103,0.25), 0 0 28px rgba(244,217,140,0.18), inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -13px 26px rgba(83,58,18,0.26)' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: useHomeV2 ? 21 : 20, color: '#0F0F1A',
               transition: 'transform 0.35s ease, box-shadow 0.35s ease',
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
@@ -1427,6 +1429,7 @@ export function UserApp() {
     registeredEventIds,
     userRank,
     customTasks,
+    experts,
     appearance,
     onEventRegister: handleEventRegister,
     onOpenPartner: openPartner,
@@ -1435,6 +1438,7 @@ export function UserApp() {
     onRetry: () => loadData(mountedRef),
     onRefresh: handleRefresh,
     onOpenEvents: () => goPanel('events'),
+    onOpenExperts: () => goPanel('experts'),
     onOpenTasks: () => goPanel('tasks'),
     onOpenLeaderboard: () => goPanel('leaderboard'),
     onOpenRewards: () => goPanel('rewards'),
