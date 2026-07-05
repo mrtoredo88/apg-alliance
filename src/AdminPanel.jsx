@@ -805,6 +805,10 @@ export const AdminPanel = () => {
   const [expandedExpertId, setExpandedExpertId] = useState(null);
   const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
   const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
+  const [globalSearch, setGlobalSearch]     = useState('');
+  const [showSearchDrop, setShowSearchDrop] = useState(false);
+  const [showAddDrop, setShowAddDrop]       = useState(false);
+  const [showToolsDrop, setShowToolsDrop]   = useState(false);
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -1119,6 +1123,31 @@ export const AdminPanel = () => {
     await updateDoc(doc(db, col, id), { linksCheckedAt: ts });
     const now = { toDate: () => new Date() };
     setList(prev => prev.map(x => x.id === id ? { ...x, linksCheckedAt: now } : x));
+  };
+
+  const bulkGeocode = async () => {
+    const toGeo = partners.filter(p => !p.latitude && p.address?.trim());
+    if (!toGeo.length) { setBulkGeoResult('Все партнёры уже имеют координаты ✓'); return; }
+    setBulkGeoRunning(true);
+    setBulkGeoResult(`Обрабатываем 0 / ${toGeo.length}...`);
+    let ok = 0, fail = 0;
+    for (let i = 0; i < toGeo.length; i++) {
+      const p = toGeo[i];
+      setBulkGeoResult(`Обрабатываем ${i + 1} / ${toGeo.length}: ${p.name}`);
+      const r = await geocodeAddress(p.address).catch(() => null);
+      if (r) { await updateDoc(doc(db, 'partners', p.id), { latitude: r.lat, longitude: r.lon }).catch(() => {}); ok++; }
+      else { fail++; }
+      if (i < toGeo.length - 1) await new Promise(res => setTimeout(res, 1100));
+    }
+    setBulkGeoRunning(false);
+    setBulkGeoResult(`Готово: ${ok} успешно, ${fail} не найдено`);
+    fetchData();
+  };
+
+  const navigateToResult = r => {
+    setActiveTab(r.tab);
+    if (r.tab === 'partners') { setPartnerSearch(r.label); setExpandedPartnerId(r.id); setPartnerLinksFilter('all'); }
+    if (r.tab === 'experts') { setExpandedExpertId(r.id); setExpertLinksFilter('all'); }
   };
 
   // ─── Сортировка (shared) ────────────────────────────────────────────────────
@@ -1646,6 +1675,14 @@ export const AdminPanel = () => {
 
   console.log('[ADMIN] render state:', { loading, partners: partners.length, experts: experts.length, events: events.length, activeTab });
 
+  const q = globalSearch.toLowerCase();
+  const searchResults = globalSearch.length > 1 ? [
+    ...partners.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 4).map(p => ({ tab: 'partners', id: p.id, label: p.name, sub: CATEGORIES.find(c => c.id === p.category)?.label, emoji: '🤝', typeName: 'Партнёр' })),
+    ...experts.filter(ex => ex.name?.toLowerCase().includes(q)).slice(0, 4).map(ex => ({ tab: 'experts', id: ex.id, label: ex.name, sub: ex.specialization, emoji: '🧑‍💼', typeName: 'Эксперт' })),
+    ...events.filter(e => e.title?.toLowerCase().includes(q)).slice(0, 3).map(e => ({ tab: 'events', id: e.id, label: e.title, emoji: '🎉', typeName: 'Событие' })),
+    ...news.filter(n => n.title?.toLowerCase().includes(q)).slice(0, 3).map(n => ({ tab: 'news', id: n.id, label: n.title, emoji: '📢', typeName: 'Новость' })),
+  ] : [];
+
   return (
     <div style={s.page}>
       {/* Боковое меню */}
@@ -1701,6 +1738,118 @@ export const AdminPanel = () => {
 
       {/* Основной контент */}
       <div style={s.content}>
+
+      {/* ── Тулбар ── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)', borderBottom: `1px solid ${A.border}`, margin: '-24px -28px 20px', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+
+        {/* Глобальный поиск */}
+        <div style={{ position: 'relative', flex: 1 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowSearchDrop(false); }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${globalSearch ? A.gold : A.inputBrd}`, borderRadius: 12, padding: '8px 12px', transition: 'border-color 0.15s' }}>
+            <span style={{ fontSize: 14, color: A.textSec, flexShrink: 0 }}>🔍</span>
+            <input
+              type="search"
+              placeholder="Поиск партнёров, экспертов, событий..."
+              value={globalSearch}
+              onChange={e => { setGlobalSearch(e.target.value); setShowSearchDrop(true); }}
+              onFocus={() => setShowSearchDrop(true)}
+              style={{ background: 'none', border: 'none', outline: 'none', fontSize: 13, flex: 1, color: A.text, minWidth: 0 }}
+            />
+            {globalSearch && <button onClick={() => { setGlobalSearch(''); setShowSearchDrop(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: A.textSec, fontSize: 15, padding: 0, flexShrink: 0 }}>✕</button>}
+          </div>
+          {showSearchDrop && globalSearch.length > 1 && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#1A1A2E', border: `1px solid ${A.border}`, borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', zIndex: 300, overflow: 'hidden', maxHeight: 320, overflowY: 'auto' }}>
+              {searchResults.length === 0
+                ? <div style={{ padding: '14px 16px', fontSize: 13, color: A.textSec, textAlign: 'center' }}>Ничего не найдено</div>
+                : searchResults.map((r, i) => (
+                  <button key={i} onMouseDown={() => { navigateToResult(r); setGlobalSearch(''); setShowSearchDrop(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', width: '100%', border: 'none', borderBottom: i < searchResults.length - 1 ? `1px solid ${A.border}` : 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{r.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</div>
+                      {r.sub && <div style={{ fontSize: 11, color: A.textSec }}>{r.sub}</div>}
+                    </div>
+                    <span style={{ fontSize: 10, color: A.textSec, flexShrink: 0, padding: '2px 8px', background: A.chip, borderRadius: 6 }}>{r.typeName}</span>
+                  </button>
+                ))
+              }
+            </div>
+          )}
+        </div>
+
+        {/* Тоггл "только непроверенные" */}
+        {(activeTab === 'partners' || activeTab === 'experts') && (() => {
+          const curFilter = activeTab === 'partners' ? partnerLinksFilter : expertLinksFilter;
+          const setCurFilter = activeTab === 'partners' ? setPartnerLinksFilter : setExpertLinksFilter;
+          return (
+            <button onClick={() => setCurFilter(v => v === 'unverified' ? 'all' : 'unverified')}
+              style={{ padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${curFilter === 'unverified' ? '#f59e0b' : A.border}`, background: curFilter === 'unverified' ? 'rgba(245,158,11,0.12)' : 'transparent', color: curFilter === 'unverified' ? '#f59e0b' : A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              ⚠ Не проверены
+            </button>
+          );
+        })()}
+
+        {/* Счётчики */}
+        {activeTab === 'partners' && (
+          <span style={{ fontSize: 12, color: A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {partners.length} партн. · <span style={{ color: partners.filter(p => !isCheckedRecently(p.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{partners.filter(p => !isCheckedRecently(p.linksCheckedAt)).length} непров.</span>
+          </span>
+        )}
+        {activeTab === 'experts' && (
+          <span style={{ fontSize: 12, color: A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {experts.length} эксп. · <span style={{ color: experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length} непров.</span>
+          </span>
+        )}
+
+        {/* ➕ Добавить */}
+        <div style={{ position: 'relative', flexShrink: 0 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowAddDrop(false); }}>
+          <button onClick={() => { setShowAddDrop(v => !v); setShowToolsDrop(false); }}
+            style={{ ...s.btn, ...s.btnPri, padding: '8px 14px', fontSize: 13, whiteSpace: 'nowrap' }}>
+            ➕ Добавить ▾
+          </button>
+          {showAddDrop && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#1A1A2E', border: `1px solid ${A.border}`, borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', zIndex: 200, overflow: 'hidden', minWidth: 185 }}>
+              {[
+                ['🤝', 'Партнёра',  () => { resetPartnerForm(); setShowPartnerModal(true); setActiveTab('partners'); setShowAddDrop(false); }],
+                ['🧑‍💼', 'Эксперта', () => { resetExpertForm(); setShowExpertModal(true); setActiveTab('experts'); setShowAddDrop(false); }],
+                ['🎉', 'Событие',   () => { resetEventForm(); setActiveTab('events'); setShowAddDrop(false); }],
+                ['📢', 'Новость',   () => { resetNewsForm(); setActiveTab('news'); setShowAddDrop(false); }],
+              ].map(([emoji, label, action], i, arr) => (
+                <button key={label} onClick={action}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', width: '100%', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${A.border}` : 'none', background: 'none', cursor: 'pointer', color: A.text, fontSize: 13, textAlign: 'left' }}>
+                  <span style={{ fontSize: 15 }}>{emoji}</span>{label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 🔧 Инструменты */}
+        <div style={{ position: 'relative', flexShrink: 0 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowToolsDrop(false); }}>
+          <button onClick={() => { setShowToolsDrop(v => !v); setShowAddDrop(false); }}
+            style={{ ...s.btn, ...s.btnGray, padding: '8px 14px', fontSize: 13, whiteSpace: 'nowrap' }}>
+            🔧 ▾
+          </button>
+          {showToolsDrop && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#1A1A2E', border: `1px solid ${A.border}`, borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', zIndex: 200, overflow: 'hidden', minWidth: 270 }}>
+              <div style={{ padding: '8px 14px 4px', fontSize: 10, color: A.textSec, fontWeight: 800, letterSpacing: 0.8 }}>ПАРТНЁРЫ</div>
+              <div style={{ padding: '4px 14px 12px', borderBottom: `1px solid ${A.border}` }}>
+                {migrateResult && <div style={{ fontSize: 11, color: A.gold, marginBottom: 6 }}>{migrateResult}</div>}
+                <button style={{ ...s.btn, ...s.btnPri, width: '100%', fontSize: 12, padding: '7px 12px', textAlign: 'left' }} onClick={migrateCategories} disabled={migrating}>
+                  {migrating ? '⏳ Мигрируем...' : '🔄 Мигрировать категории'}
+                </button>
+              </div>
+              <div style={{ padding: '8px 14px 12px' }}>
+                {bulkGeoResult
+                  ? <div style={{ fontSize: 11, color: '#6AABEC', marginBottom: 6 }}>{bulkGeoResult}</div>
+                  : <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>{partners.filter(p => !p.latitude && p.address?.trim()).length} адресов без координат</div>}
+                <button style={{ ...s.btn, width: '100%', fontSize: 12, padding: '7px 12px', background: 'rgba(74,144,217,0.2)', color: '#6AABEC', border: '1px solid rgba(74,144,217,0.3)', textAlign: 'left' }} onClick={bulkGeocode} disabled={bulkGeoRunning}>
+                  {bulkGeoRunning ? '⏳ Геокодируем...' : '🌍 Геокодировать адреса'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── ЭКСПЕРТЫ ── */}
       {activeTab === 'experts' && (
@@ -2161,49 +2310,6 @@ export const AdminPanel = () => {
                   {label}
                 </button>
               ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '10px 12px', background: 'rgba(201,168,76,0.08)', borderRadius: 12, border: `1px solid ${A.goldBrd}` }}>
-              <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
-                {migrateResult ?? 'Обновить старые категории (edu→education, fun→entertainment, service→services и др.)'}
-              </div>
-              <button
-                style={{ ...s.btn, ...s.btnPri, padding: '6px 14px', fontSize: 12, flexShrink: 0 }}
-                onClick={migrateCategories}
-                disabled={migrating}
-              >
-                {migrating ? '...' : '🔄 Мигрировать'}
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 12px', background: 'rgba(74,144,217,0.08)', borderRadius: 12, border: 'rgba(74,144,217,0.25) 1px solid' }}>
-              <div style={{ flex: 1, fontSize: 12, color: A.textSec }}>
-                {bulkGeoResult ?? `Геокодировать адреса партнёров без координат (${partners.filter(p => !p.latitude && p.address?.trim()).length} шт.)`}
-              </div>
-              <button
-                style={{ ...s.btn, padding: '6px 14px', fontSize: 12, flexShrink: 0, background: 'rgba(74,144,217,0.2)', color: '#6AABEC', border: '1px solid rgba(74,144,217,0.3)' }}
-                disabled={bulkGeoRunning}
-                onClick={async () => {
-                  const toGeo = partners.filter(p => !p.latitude && p.address?.trim());
-                  if (!toGeo.length) { setBulkGeoResult('Все партнёры уже имеют координаты ✓'); return; }
-                  setBulkGeoRunning(true);
-                  setBulkGeoResult(`Обрабатываем 0 / ${toGeo.length}...`);
-                  let ok = 0, fail = 0;
-                  for (let i = 0; i < toGeo.length; i++) {
-                    const p = toGeo[i];
-                    setBulkGeoResult(`Обрабатываем ${i + 1} / ${toGeo.length}: ${p.name}`);
-                    const r = await geocodeAddress(p.address).catch(() => null);
-                    if (r) {
-                      await updateDoc(doc(db, 'partners', p.id), { latitude: r.lat, longitude: r.lon }).catch(() => {});
-                      ok++;
-                    } else { fail++; }
-                    if (i < toGeo.length - 1) await new Promise(res => setTimeout(res, 1100));
-                  }
-                  setBulkGeoRunning(false);
-                  setBulkGeoResult(`Готово: ${ok} успешно, ${fail} не найдено`);
-                  fetchData();
-                }}
-              >
-                {bulkGeoRunning ? '⏳...' : '🌍 Геокодировать'}
-              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${A.inputBrd}`, borderRadius: 12, padding: '9px 12px', marginBottom: 14 }}>
               <span style={{ fontSize: 14, color: A.textSec, flexShrink: 0 }}>🔍</span>
