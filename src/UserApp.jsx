@@ -1217,26 +1217,26 @@ export function UserApp() {
   // ─── TabBar ─────────────────────────────────────────────────────────────────
 
   const TabHomeIcon    = ({ active }) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
       <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z"
         fill={active ? T.gold : 'none'} stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   );
   const TabExpertsIcon = ({ active }) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
       <circle cx="12" cy="7" r="3.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M5 20C5 16.5 8 14 12 14C16 14 19 16.5 19 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
       <path d="M16 10L17.5 11.5L20 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabTasksIcon   = ({ active }) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
       <rect x="3" y="3" width="18" height="18" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M8 12L11 15L16 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabProfileIcon = ({ active }) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
       <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
@@ -1255,16 +1255,16 @@ export function UserApp() {
   ];
 
   const tabBarShellStyle = useHomeV2 ? {
-    position: 'fixed', bottom: 18,
+    position: 'fixed', bottom: 28,
     left: '50%', transform: 'translateX(-50%)',
-    width: 'calc(100% - 40px)', maxWidth: 424, minHeight: 76,
-    padding: 8,
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.055))',
-    backdropFilter: 'blur(42px) saturate(1.9)', WebkitBackdropFilter: 'blur(42px) saturate(1.9)',
-    border: '1px solid rgba(255,255,255,0.18)',
-    borderRadius: 32,
-    boxShadow: '0 22px 58px rgba(0,0,0,0.42), 0 0 36px rgba(201,168,76,0.10), inset 0 1.5px 0 rgba(255,255,255,0.24)',
-    display: 'flex', alignItems: 'stretch', gap: 4,
+    width: 'calc(100% - 68px)', maxWidth: 394, minHeight: 82,
+    padding: 10,
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.13), rgba(255,255,255,0.035))',
+    backdropFilter: 'blur(64px) saturate(1.9)', WebkitBackdropFilter: 'blur(64px) saturate(1.9)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: 42,
+    boxShadow: '0 26px 70px rgba(0,0,0,0.42), 0 0 54px rgba(214,183,102,0.10), inset 0 1.5px 0 rgba(255,255,255,0.28), inset 0 -24px 48px rgba(255,255,255,0.035)',
+    display: 'flex', alignItems: 'stretch', gap: 6,
     zIndex: 100, overflow: 'visible',
   } : {
     position: 'fixed', bottom: 16,
@@ -1284,14 +1284,16 @@ export function UserApp() {
       {/* Скользящий pill */}
       {pillIdx >= 0 && pillIdx !== 2 && (
         <div style={{
-          position: 'absolute', top: useHomeV2 ? 8 : 7, height: useHomeV2 ? 60 : 44,
-          left: useHomeV2 ? `calc(${pillIdx * 20}% + 8px)` : `calc(${pillIdx * 20}% + 6px)`,
-          width: useHomeV2 ? 'calc(20% - 16px)' : 'calc(20% - 12px)',
-          background: useHomeV2 ? 'linear-gradient(145deg, rgba(255,255,255,0.2), rgba(201,168,76,0.12))' : 'rgba(201,168,76,0.1)',
-          border: useHomeV2 ? '1px solid rgba(255,255,255,0.24)' : '1px solid rgba(201,168,76,0.2)',
-          borderRadius: useHomeV2 ? 24 : 14,
-          boxShadow: useHomeV2 ? '0 12px 30px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.26)' : 'none',
-          transition: 'left 0.35s cubic-bezier(0.34, 1.4, 0.64, 1)',
+          position: 'absolute', top: useHomeV2 ? 10 : 7, height: useHomeV2 ? 62 : 44,
+          left: useHomeV2 ? `calc(${pillIdx * 20}% + 10px)` : `calc(${pillIdx * 20}% + 6px)`,
+          width: useHomeV2 ? 'calc(20% - 20px)' : 'calc(20% - 12px)',
+          background: useHomeV2 ? 'linear-gradient(145deg, rgba(255,255,255,0.2), rgba(214,183,102,0.095))' : 'rgba(201,168,76,0.1)',
+          backdropFilter: useHomeV2 ? 'blur(34px) saturate(1.8)' : 'none',
+          WebkitBackdropFilter: useHomeV2 ? 'blur(34px) saturate(1.8)' : 'none',
+          border: useHomeV2 ? '1px solid rgba(255,255,255,0.25)' : '1px solid rgba(201,168,76,0.2)',
+          borderRadius: useHomeV2 ? 30 : 14,
+          boxShadow: useHomeV2 ? '0 16px 38px rgba(0,0,0,0.22), inset 0 1.5px 0 rgba(255,255,255,0.3), inset 0 -14px 32px rgba(255,255,255,0.04)' : 'none',
+          transition: 'left 0.5s cubic-bezier(0.22, 1, 0.36, 1), width 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
           pointerEvents: 'none',
         }} />
       )}
@@ -1301,14 +1303,14 @@ export function UserApp() {
           <button key="scan" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
             style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: useHomeV2 ? 'center' : 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
             <div style={{
-              width: useHomeV2 ? 52 : 50, height: useHomeV2 ? 52 : 50, marginTop: useHomeV2 ? -18 : -14, borderRadius: useHomeV2 ? 20 : '50%',
+              width: useHomeV2 ? 54 : 50, height: useHomeV2 ? 54 : 50, marginTop: useHomeV2 ? -22 : -14, borderRadius: useHomeV2 ? 22 : '50%',
               background: isScannerOpen ? 'rgba(201,168,76,0.25)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-              boxShadow: isScannerOpen ? 'none' : useHomeV2 ? '0 16px 34px rgba(201,168,76,0.28), inset 0 1px 0 rgba(255,255,255,0.35)' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#0F0F1A',
-              transition: 'transform 0.2s, box-shadow 0.2s',
+              boxShadow: isScannerOpen ? 'none' : useHomeV2 ? '0 18px 42px rgba(214,183,102,0.24), 0 0 24px rgba(214,183,102,0.18), inset 0 1px 0 rgba(255,255,255,0.38)' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: useHomeV2 ? 21 : 20, color: '#0F0F1A',
+              transition: 'transform 0.35s ease, box-shadow 0.35s ease',
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
-            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: useHomeV2 ? 5 : 3 }}>Скан</span>
+            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, color: isScannerOpen ? T.gold : T.textSec, opacity: useHomeV2 && !isScannerOpen ? 0.62 : 1, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: useHomeV2 ? 7 : 3 }}>Скан</span>
           </button>
         );
 
@@ -1326,7 +1328,7 @@ export function UserApp() {
                 <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
               )}
             </div>
-            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, transition: 'color 0.2s', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, opacity: useHomeV2 && !isActive ? 0.58 : 1, transition: 'color 0.3s ease, opacity 0.3s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {tab.label}
             </span>
           </button>
@@ -1450,7 +1452,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <div
-            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: useHomeV2 ? 126 : 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: useHomeV2 ? 148 : 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
             onTouchStart={handleSwipeStart}
             onTouchEnd={handleSwipeEnd}
           >
