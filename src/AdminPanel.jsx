@@ -807,6 +807,24 @@ export const AdminPanel = () => {
   const [showNewsModal, setShowNewsModal]       = useState(false);
   const [eventLinksFilter, setEventLinksFilter] = useState('all');
   const [newsLinksFilter, setNewsLinksFilter]   = useState('all');
+
+  // Баннеры
+  const [banners, setBanners]                   = useState([]);
+  const [showBannerModal, setShowBannerModal]   = useState(false);
+  const [editingBanner, setEditingBanner]       = useState(null);
+  const [bnTitle, setBnTitle]                   = useState('');
+  const [bnImageUrl, setBnImageUrl]             = useState('');
+  const [bnAdvertiserType, setBnAdvertiserType] = useState('partner');
+  const [bnAdvertiserId, setBnAdvertiserId]     = useState('');
+  const [bnAdvertiserName, setBnAdvertiserName] = useState('');
+  const [bnLinkType, setBnLinkType]             = useState('internal_partner');
+  const [bnLinkValue, setBnLinkValue]           = useState('');
+  const [bnStartDate, setBnStartDate]           = useState('');
+  const [bnEndDate, setBnEndDate]               = useState('');
+  const [bnPriority, setBnPriority]             = useState(1);
+  const [bnActive, setBnActive]                 = useState(true);
+  const [bnSaving, setBnSaving]                 = useState(false);
+  const [bnError, setBnError]                   = useState('');
   const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
   const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
   const [expertSearch, setExpertSearch]             = useState('');
@@ -909,7 +927,7 @@ export const AdminPanel = () => {
     setLoading(true);
     console.log('[ADMIN] fetchData start, auth.currentUser:', auth.currentUser?.uid ?? 'null');
     try {
-      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] = await Promise.all([
         getDocs(collection(db, 'partners')).catch(err => { console.error('[ADMIN] partners failed:', err); return { docs: [] }; }),
         getDocs(collection(db, 'events')).catch(err => { console.error('[ADMIN] events failed:', err); return { docs: [] }; }),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(err => { console.error('[ADMIN] news failed:', err); return { docs: [] }; }),
@@ -918,6 +936,7 @@ export const AdminPanel = () => {
         getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(err => { console.error('[ADMIN] customTasks failed:', err); return { docs: [] }; }),
         getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(err => { console.error('[ADMIN] prizeClaims failed:', err); return { docs: [] }; }),
         getDocs(collection(db, 'experts')).catch(err => { console.error('[ADMIN] experts failed:', err); return { docs: [] }; }),
+        getDocs(query(collection(db, 'banners'), orderBy('priority', 'asc'))).catch(err => { console.error('[ADMIN] banners failed:', err); return { docs: [] }; }),
       ]);
       console.log('[ADMIN] загружено:', {
         partners: pSnap.docs.length,
@@ -928,6 +947,7 @@ export const AdminPanel = () => {
         customTasks: ctSnap.docs.length,
         prizeClaims: clSnap.docs.length,
         experts: exSnap.docs.length,
+        banners: bnSnap.docs.length,
       });
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -937,6 +957,7 @@ export const AdminPanel = () => {
       setPrizes(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setBanners(bnSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error('[ADMIN] fetchData outer catch:', e); }
     setLoading(false);
   };
@@ -1114,6 +1135,80 @@ export const AdminPanel = () => {
   const deletePartner = async (id) => {
     if (!window.confirm('Удалить партнёра?')) return;
     await deleteDoc(doc(db, 'partners', id));
+    fetchData();
+  };
+
+  // ─── Баннеры ────────────────────────────────────────────────────────────────
+
+  const getBannerStatus = b => {
+    const now = Date.now();
+    const end = b.endDate?.toDate ? b.endDate.toDate().getTime() : (b.endDate ? new Date(b.endDate).getTime() : Infinity);
+    if (end < now) return 'expired';
+    return b.active ? 'active' : 'inactive';
+  };
+
+  const resetBannerForm = () => {
+    setBnTitle(''); setBnImageUrl(''); setBnAdvertiserType('partner');
+    setBnAdvertiserId(''); setBnAdvertiserName(''); setBnLinkType('internal_partner');
+    setBnLinkValue(''); setBnStartDate(''); setBnEndDate('');
+    setBnPriority(1); setBnActive(true); setBnSaving(false); setBnError('');
+    setEditingBanner(null); setShowBannerModal(false);
+  };
+
+  const handleBnAdvertiserType = type => {
+    setBnAdvertiserType(type);
+    setBnAdvertiserId(''); setBnAdvertiserName(''); setBnLinkValue('');
+    setBnLinkType(type === 'partner' ? 'internal_partner' : type === 'expert' ? 'internal_expert' : 'external_url');
+  };
+
+  const startEditBanner = b => {
+    setEditingBanner(b);
+    setBnTitle(b.title ?? '');
+    setBnImageUrl(b.imageUrl ?? '');
+    setBnAdvertiserType(b.advertiserType ?? 'partner');
+    setBnAdvertiserId(b.advertiserId ?? '');
+    setBnAdvertiserName(b.advertiserName ?? '');
+    setBnLinkType(b.linkType ?? 'internal_partner');
+    setBnLinkValue(b.linkValue ?? '');
+    setBnStartDate(b.startDate?.toDate ? b.startDate.toDate().toISOString().slice(0, 10) : (b.startDate ?? ''));
+    setBnEndDate(b.endDate?.toDate ? b.endDate.toDate().toISOString().slice(0, 10) : (b.endDate ?? ''));
+    setBnPriority(b.priority ?? 1);
+    setBnActive(b.active ?? true);
+    setBnSaving(false); setBnError('');
+    setShowBannerModal(true);
+  };
+
+  const saveBanner = async () => {
+    if (!bnTitle.trim()) { setBnError('Введите внутреннее название баннера'); return; }
+    if (!bnImageUrl.trim()) { setBnError('Добавьте изображение баннера'); return; }
+    setBnSaving(true); setBnError('');
+    try {
+      const data = {
+        title: bnTitle.trim(),
+        imageUrl: bnImageUrl.trim(),
+        advertiserType: bnAdvertiserType,
+        advertiserId: bnAdvertiserType !== 'external' ? bnAdvertiserId : '',
+        advertiserName: bnAdvertiserType === 'external' ? bnAdvertiserName.trim() : '',
+        linkType: bnLinkType,
+        linkValue: bnLinkValue.trim(),
+        startDate: bnStartDate ? new Date(bnStartDate) : null,
+        endDate: bnEndDate ? new Date(bnEndDate) : null,
+        priority: Math.max(1, Math.min(5, Number(bnPriority) || 1)),
+        active: bnActive,
+      };
+      if (editingBanner) {
+        await updateDoc(doc(db, 'banners', editingBanner.id), data);
+      } else {
+        await addDoc(collection(db, 'banners'), { ...data, createdAt: serverTimestamp() });
+      }
+      resetBannerForm();
+      fetchData();
+    } catch (e) { setBnError(e.message); setBnSaving(false); }
+  };
+
+  const deleteBanner = async id => {
+    if (!window.confirm('Удалить баннер?')) return;
+    await deleteDoc(doc(db, 'banners', id));
     fetchData();
   };
 
@@ -1705,6 +1800,7 @@ export const AdminPanel = () => {
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
             { id: 'news',      emoji: '📢', label: 'Новости',   count: news.length },
+            { id: 'banners',   emoji: '📣', label: 'Реклама',   count: banners.filter(b => b.active && getBannerStatus(b) === 'active').length || undefined },
             { id: 'notifs',    emoji: '🔔', label: 'Рассылка' },
             { id: 'tasks',     emoji: '✅', label: 'Задания',   count: customTasks.length },
             { id: 'prizes',    emoji: '🎁', label: 'Призы',     count: prizes.length },
@@ -2802,6 +2898,182 @@ export const AdminPanel = () => {
                 );
               })
             }
+          </div>
+        </>
+      )}
+
+      {/* ── РЕКЛАМА (БАННЕРЫ) ── */}
+      {activeTab === 'banners' && (
+        <>
+          {/* Модалка */}
+          {showBannerModal && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
+              onClick={e => { if (e.target === e.currentTarget) resetBannerForm(); }}>
+              <div style={{ ...s.card, width: '100%', maxWidth: 620, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>{editingBanner ? '✏️ Редактировать баннер' : '➕ Новый баннер'}</h2>
+                  <button onClick={resetBannerForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+                </div>
+
+                <label style={s.label}>Внутреннее название *</label>
+                <input style={s.input} placeholder="Баннер «Студия AspireMod» — лето 2025" value={bnTitle} onChange={e => setBnTitle(e.target.value)} />
+
+                <label style={s.label}>Изображение баннера *</label>
+                <PhotoUpload value={bnImageUrl} onChange={setBnImageUrl} folder="banners" label="Загрузить изображение" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+                {bnImageUrl && (
+                  <>
+                    <img src={bnImageUrl} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 8, marginTop: 4 }} onError={e => e.target.style.display = 'none'} />
+                    <input style={{ ...s.input, marginBottom: 12 }} placeholder="или вставьте URL" value={bnImageUrl} onChange={e => setBnImageUrl(e.target.value)} />
+                  </>
+                )}
+
+                <label style={s.label}>Рекламодатель</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {[['partner', '🤝 Партнёр'], ['expert', '🧑‍💼 Эксперт'], ['external', '🌐 Внешний']].map(([val, label]) => (
+                    <button key={val} onClick={() => handleBnAdvertiserType(val)}
+                      style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${bnAdvertiserType === val ? A.gold : A.border}`, background: bnAdvertiserType === val ? A.goldDim : 'transparent', color: bnAdvertiserType === val ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {bnAdvertiserType === 'partner' && (
+                  <>
+                    <label style={s.label}>Партнёр</label>
+                    <select style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }} value={bnAdvertiserId} onChange={e => { setBnAdvertiserId(e.target.value); setBnLinkValue(e.target.value); }}>
+                      <option value="">— Выбрать партнёра —</option>
+                      {[...partners].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {bnAdvertiserType === 'expert' && (
+                  <>
+                    <label style={s.label}>Эксперт</label>
+                    <select style={{ ...s.input, appearance: 'none', WebkitAppearance: 'none' }} value={bnAdvertiserId} onChange={e => { setBnAdvertiserId(e.target.value); setBnLinkValue(e.target.value); }}>
+                      <option value="">— Выбрать эксперта —</option>
+                      {[...experts].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ru')).map(ex => (
+                        <option key={ex.id} value={ex.id}>{ex.name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {bnAdvertiserType === 'external' && (
+                  <>
+                    <label style={s.label}>Имя рекламодателя *</label>
+                    <input style={s.input} placeholder="ООО «Ромашка»" value={bnAdvertiserName} onChange={e => setBnAdvertiserName(e.target.value)} />
+                    <label style={s.label}>Ссылка при клике</label>
+                    <input style={s.input} placeholder="https://..." value={bnLinkValue} onChange={e => setBnLinkValue(e.target.value)} />
+                  </>
+                )}
+                {bnAdvertiserType !== 'external' && bnAdvertiserId && (
+                  <div style={{ fontSize: 12, color: A.textSec, marginBottom: 14 }}>
+                    🔗 Клик откроет карточку {bnAdvertiserType === 'partner' ? 'партнёра' : 'эксперта'} в приложении
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={s.label}>Начало показа</label>
+                    <input type="date" style={{ ...s.input, marginBottom: 0 }} value={bnStartDate} onChange={e => setBnStartDate(e.target.value)} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={s.label}>Конец показа</label>
+                    <input type="date" style={{ ...s.input, marginBottom: 0 }} value={bnEndDate} onChange={e => setBnEndDate(e.target.value)} />
+                  </div>
+                </div>
+
+                <label style={s.label}>Порядок в карусели (1–5)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                  <input type="number" min="1" max="5" style={{ ...s.input, width: 80, marginBottom: 0, textAlign: 'center' }}
+                    value={bnPriority} onChange={e => setBnPriority(Math.max(1, Math.min(5, Number(e.target.value) || 1)))} />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} onClick={() => setBnPriority(n)}
+                        style={{ width: 32, height: 32, borderRadius: 8, border: `2px solid ${bnPriority === n ? A.gold : A.border}`, background: bnPriority === n ? A.goldDim : 'transparent', color: bnPriority === n ? A.gold : A.textSec, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: A.text, marginBottom: 16 }}>
+                  <input type="checkbox" checked={bnActive} onChange={e => setBnActive(e.target.checked)} />
+                  Активен (показывается в карусели)
+                </label>
+
+                {bnError && (
+                  <div style={{ background: A.redDim, border: `1px solid ${A.redBrd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#f87171' }}>
+                    ❌ {bnError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveBanner} disabled={bnSaving} style={{ ...s.btn, ...s.btnPri, flex: 1, opacity: bnSaving ? 0.7 : 1 }}>
+                    {bnSaving ? 'Сохранение...' : editingBanner ? '💾 Сохранить' : '➕ Создать баннер'}
+                  </button>
+                  {editingBanner && <button onClick={resetBannerForm} disabled={bnSaving} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Список баннеров */}
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Рекламные баннеры</h2>
+                <span style={{ fontSize: 12, color: A.textSec }}>
+                  {banners.length} всего · <span style={{ color: '#4ade80' }}>{banners.filter(b => getBannerStatus(b) === 'active').length} активных</span>
+                  {banners.filter(b => getBannerStatus(b) === 'expired').length > 0 && <> · <span style={{ color: A.textSec }}>{banners.filter(b => getBannerStatus(b) === 'expired').length} истёкших</span></>}
+                </span>
+              </div>
+              <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetBannerForm(); setShowBannerModal(true); }}>➕ Добавить баннер</button>
+            </div>
+
+            {banners.length === 0 ? (
+              <p style={{ color: A.textSec, fontSize: 14, margin: 0 }}>Баннеров пока нет.</p>
+            ) : [...banners].sort((a, b) => (a.priority ?? 1) - (b.priority ?? 1)).map(b => {
+              const status = getBannerStatus(b);
+              const startStr = b.startDate?.toDate ? b.startDate.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : (b.startDate ? new Date(b.startDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '');
+              const endStr   = b.endDate?.toDate   ? b.endDate.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })   : (b.endDate ? new Date(b.endDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '');
+              const advertiserLabel = b.advertiserType === 'partner'
+                ? (partners.find(p => p.id === b.advertiserId)?.name ?? b.advertiserId)
+                : b.advertiserType === 'expert'
+                  ? (experts.find(e => e.id === b.advertiserId)?.name ?? b.advertiserId)
+                  : (b.advertiserName ?? 'Внешний');
+              const statusStyle = {
+                active:   { color: '#4ade80', bg: 'rgba(74,222,128,0.12)', label: '● Активен' },
+                inactive: { color: A.textSec,  bg: A.chip,                 label: '○ Неактивен' },
+                expired:  { color: '#f87171',  bg: 'rgba(248,113,113,0.1)',label: '✕ Истёк' },
+              }[status];
+              return (
+                <div key={b.id} style={{ ...s.row, alignItems: 'flex-start', gap: 12 }}>
+                  {/* Превью */}
+                  {b.imageUrl
+                    ? <img src={b.imageUrl} alt="" loading="lazy" style={{ width: 72, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                    : <div style={{ width: 72, height: 44, borderRadius: 8, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📣</div>
+                  }
+                  {/* Инфо */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: statusStyle.color, background: statusStyle.bg, borderRadius: 6, padding: '2px 7px', flexShrink: 0 }}>{statusStyle.label}</span>
+                      <span style={{ fontSize: 10, color: A.textSec, background: A.chip, borderRadius: 6, padding: '2px 7px', flexShrink: 0 }}>#{b.priority ?? 1}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: A.textSec }}>
+                      {b.advertiserType === 'partner' ? '🤝' : b.advertiserType === 'expert' ? '🧑‍💼' : '🌐'} {advertiserLabel}
+                      {(startStr || endStr) && ` · ${startStr}${startStr && endStr ? ' — ' : ''}${endStr}`}
+                    </div>
+                  </div>
+                  {/* Действия */}
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditBanner(b)}>✏️</button>
+                    <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteBanner(b.id)}>🗑️</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
