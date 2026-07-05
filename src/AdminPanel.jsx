@@ -894,8 +894,8 @@ export const AdminPanel = () => {
     setLoading(true);
     try {
       const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap] = await Promise.all([
-        getDocs(collection(db, 'partners')),
-        getDocs(collection(db, 'events')),
+        getDocs(collection(db, 'partners')).catch(() => ({ docs: [] })),
+        getDocs(collection(db, 'events')).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(() => ({ docs: [] })),

@@ -407,11 +407,12 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
     setLoadError(false);
     setLoading(true);
     (async () => {
+      let allPrizes = [];
       try {
         const prizesSnap = await getDocs(collection(db, 'prizes'));
         if (!alive) return;
-        const loaded = prizesSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
+        allPrizes = prizesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const loaded = allPrizes
           .filter(p => p.active !== false)
           .sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0));
         setPrizes(loaded);
@@ -437,10 +438,7 @@ export function RewardsPage({ nav = 'rewards', user, userKeys, onBack, onClaim, 
         } catch (e) { console.error('user claims/entries fetch error:', e); }
 
         try {
-          const prizesSnap2 = await getDocs(collection(db, 'prizes'));
-          if (!alive) return;
-          const rafflePrizes = prizesSnap2.docs
-            .map(d => ({ id: d.id, ...d.data() }))
+          const rafflePrizes = allPrizes
             .filter(p => p.active !== false && p.type === 'raffle');
           if (rafflePrizes.length > 0) {
             const counts = {};

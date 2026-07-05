@@ -247,22 +247,7 @@ export function UserApp() {
     }
     setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
 
-    // Анонимный вход в Firebase (нужен для Firestore Security Rules)
     const _diagT0 = performance.now();
-    if (!auth.currentUser) {
-      await signInAnonymously(auth).then(() => {
-        console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
-      }).catch((e) => {
-        console.warn(`[APG-DIAG] auth=fail ${e.code} ${Math.round(performance.now() - _diagT0)}ms`);
-      });
-    } else {
-      console.log('[APG-DIAG] auth=cached');
-    }
-    fetch('/manifest.json').then(() => {
-      console.log(`[APG-DIAG] static=ok ${Math.round(performance.now() - _diagT0)}ms`);
-    }).catch(() => {
-      console.warn(`[APG-DIAG] static=fail ${Math.round(performance.now() - _diagT0)}ms`);
-    });
 
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
     try {
@@ -282,11 +267,26 @@ export function UserApp() {
       if (cachedNt) setNotifications(JSON.parse(cachedNt));
     } catch {}
 
+    fetch('/manifest.json').then(() => {
+      console.log(`[APG-DIAG] static=ok ${Math.round(performance.now() - _diagT0)}ms`);
+    }).catch(() => {
+      console.warn(`[APG-DIAG] static=fail ${Math.round(performance.now() - _diagT0)}ms`);
+    });
+
     try {
-      vkBridge.send('VKWebAppInit');
-      const userData = await Promise.race([
+    // Firebase Auth и vkBridge — параллельно
+    vkBridge.send('VKWebAppInit');
+    const [, userData] = await Promise.all([
+      auth.currentUser
+        ? Promise.resolve().then(() => console.log('[APG-DIAG] auth=cached'))
+        : signInAnonymously(auth).then(() => {
+            console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
+          }).catch((e) => {
+            console.warn(`[APG-DIAG] auth=fail ${e.code} ${Math.round(performance.now() - _diagT0)}ms`);
+          }),
+      Promise.race([
         vkBridge.send('VKWebAppGetUserInfo'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 800)),
       ]).catch(() => {
         // Email-пользователь (авторизован ранее)
         try {
@@ -305,7 +305,8 @@ export function UserApp() {
           localStorage.setItem('apg_guest_id', guestId);
         }
         return { id: guestId, first_name: 'Участник', last_name: 'АПГ', photo_200: null };
-      });
+      }),
+    ]);
 
       if (!isMounted.current) return;
       setUser(userData);
@@ -339,7 +340,7 @@ export function UserApp() {
 
       // auth_map нужно создать ДО getDoc(userRef) — isOwner() проверяет его наличие
       if (!isGuest && auth.currentUser) {
-        await setDoc(
+        setDoc(
           doc(db, 'auth_map', auth.currentUser.uid),
           { vkId: String(userData.id) },
           { merge: true },
@@ -347,14 +348,14 @@ export function UserApp() {
       }
 
       const _buildAll = () => Promise.all([
-        getDocs(collection(db, 'partners')),
-        getDocs(collection(db, 'events')),
+        getDocs(query(collection(db, 'partners'), limit(100))),
+        getDocs(query(collection(db, 'events'),   limit(100))),
         getDocs(query(collection(db, 'news'),          orderBy('createdAt', 'desc'), limit(30))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'reviews'),       orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'customTasks'),   orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'customTasks'),   orderBy('createdAt', 'asc'), limit(50))).catch(() => ({ docs: [] })),
         fetch(`${API_BASE_URL}/api/vk-news`).then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
-        getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'experts'), limit(100))).catch(() => ({ docs: [] })),
         getDoc(doc(db, 'stats', 'global')).catch(() => null),
       ]);
 
