@@ -28,8 +28,8 @@ const CATEGORIES = [
 const V2 = {
   pageBg: '#101012',
   text: '#F7F4EA',
-  textSoft: 'rgba(247,244,234,0.72)',
-  textMuted: 'rgba(247,244,234,0.5)',
+  textSoft: 'rgba(247,244,234,0.7)',
+  textMuted: 'rgba(247,244,234,0.46)',
   gold: '#D6B766',
   glass: {
     background: 'linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))',
@@ -88,20 +88,20 @@ function V2FirstScreen({
     <section style={{
       position: 'relative',
       minHeight: 'calc(100vh - 106px)',
-      padding: '34px 22px 58px',
+      padding: '38px 22px 62px',
       overflow: 'hidden',
-      background: 'radial-gradient(circle at 50% -10%, rgba(214,183,102,0.16), transparent 34%), radial-gradient(circle at 96% 18%, rgba(26,36,78,0.38), transparent 37%), radial-gradient(circle at -8% 92%, rgba(86,58,112,0.18), transparent 34%), linear-gradient(180deg, #151517 0%, #101421 48%, #0F1014 100%)',
+      background: 'radial-gradient(circle at 50% -12%, rgba(214,183,102,0.18), transparent 34%), radial-gradient(circle at 96% 20%, rgba(22,28,55,0.24), transparent 38%), radial-gradient(circle at -8% 92%, rgba(82,54,102,0.14), transparent 34%), linear-gradient(180deg, #171717 0%, #121318 48%, #101011 100%)',
     }}>
       <div style={{ position: 'relative', zIndex: 1, animation: 'fadeInUp 0.72s ease both' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, marginBottom: 38 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: V2.gold, letterSpacing: 1.35, marginBottom: 11, textTransform: 'uppercase', textShadow: '0 0 24px rgba(214,183,102,0.22)' }}>
               АПГ 2.0
             </div>
-            <h1 style={{ margin: 0, color: V2.text, fontSize: 35, lineHeight: '38px', fontWeight: 900, letterSpacing: 0 }}>
+            <h1 style={{ margin: 0, color: V2.text, fontSize: 41, lineHeight: '46px', fontWeight: 800, letterSpacing: 0 }}>
               {firstName === 'привет' ? 'Добро пожаловать' : `Привет, ${firstName}`}
             </h1>
-            <p style={{ margin: '14px 0 0', color: V2.textSoft, fontSize: 16, lineHeight: '25px', fontWeight: 500, maxWidth: 326 }}>
+            <p style={{ margin: '22px 0 0', color: V2.textSoft, fontSize: 17, lineHeight: '29px', fontWeight: 400, maxWidth: 334 }}>
               Сегодня в Зеленограде происходит много интересного.
             </p>
           </div>
@@ -126,7 +126,7 @@ function V2FirstScreen({
         <button
           onClick={heroAction}
           style={{
-            width: '100%', minHeight: 338, border: 'none', borderRadius: 48, padding: 0,
+            width: '100%', minHeight: 292, border: 'none', borderRadius: 46, padding: 0,
             cursor: 'pointer', textAlign: 'left', overflow: 'hidden', position: 'relative',
             ...V2.glowGlass,
             animation: 'fadeInUp 0.8s 0.08s ease both',
@@ -139,27 +139,27 @@ function V2FirstScreen({
                 alt=""
                 loading="lazy"
                 onError={e => { e.currentTarget.style.display = 'none'; }}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.34, filter: 'saturate(0.9) contrast(1.08)', display: 'block' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.43, filter: 'saturate(1.08) contrast(1.04)', display: 'block' }}
               />
             ) : (
               <div style={{ width: '100%', height: '100%', background: 'radial-gradient(circle at 28% 18%, rgba(214,183,102,0.34), transparent 42%), linear-gradient(135deg, rgba(24,29,48,0.75), rgba(255,255,255,0.08) 46%, rgba(14,12,18,0.32))' }} />
             )}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,16,23,0.06), rgba(14,16,23,0.42) 49%, rgba(12,12,15,0.86))' }} />
-            <div style={{ position: 'absolute', inset: '1px', borderRadius: 47, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.13), inset 0 36px 92px rgba(255,255,255,0.07), inset 0 -42px 90px rgba(214,183,102,0.035)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.29) 46%, rgba(12,12,14,0.72))' }} />
+            <div style={{ position: 'absolute', inset: '1px', borderRadius: 45, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.13), inset 0 36px 92px rgba(255,255,255,0.075), inset 0 -42px 90px rgba(214,183,102,0.04)', pointerEvents: 'none' }} />
           </div>
 
-          <div style={{ position: 'relative', zIndex: 1, minHeight: 338, padding: 30, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div style={{ alignSelf: 'flex-start', padding: '10px 16px', borderRadius: 999, color: V2.text, fontSize: 12, fontWeight: 800, background: 'rgba(255,255,255,0.11)', border: '1px solid rgba(255,255,255,0.22)', backdropFilter: 'blur(30px) saturate(1.7)', WebkitBackdropFilter: 'blur(30px) saturate(1.7)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.24), 0 12px 30px rgba(0,0,0,0.16)' }}>
+          <div style={{ position: 'relative', zIndex: 1, minHeight: 292, padding: 26, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ alignSelf: 'flex-start', padding: '8px 13px', borderRadius: 999, color: V2.text, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.105)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(32px) saturate(1.65)', WebkitBackdropFilter: 'blur(32px) saturate(1.65)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.23), 0 10px 24px rgba(0,0,0,0.14)' }}>
               Рекомендуем сегодня
             </div>
             <div>
-              <div style={{ color: V2.text, fontSize: 32, lineHeight: '36px', fontWeight: 900, letterSpacing: 0, marginBottom: 14, textShadow: '0 12px 30px rgba(0,0,0,0.34)' }}>
+              <div style={{ color: V2.text, fontSize: 30, lineHeight: '35px', fontWeight: 800, letterSpacing: 0, marginBottom: 14, textShadow: '0 2px 8px rgba(0,0,0,0.46), 0 18px 42px rgba(0,0,0,0.38)' }}>
                 {heroTitle}
               </div>
-              <div style={{ color: V2.textSoft, fontSize: 14, lineHeight: '21px', fontWeight: 600, maxWidth: 310, marginBottom: 26 }}>
+              <div style={{ color: 'rgba(247,244,234,0.76)', fontSize: 14, lineHeight: '22px', fontWeight: 400, maxWidth: 310, marginBottom: 22, textShadow: '0 2px 8px rgba(0,0,0,0.36)' }}>
                 {heroMeta}
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 48, padding: '0 22px', borderRadius: 999, background: 'linear-gradient(145deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08))', border: '1px solid rgba(255,255,255,0.24)', color: V2.text, fontSize: 14, fontWeight: 800, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.24), 0 12px 28px rgba(0,0,0,0.16)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 48, padding: '0 23px', borderRadius: 999, background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.28), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.065))', border: '1px solid rgba(255,255,255,0.25)', color: V2.text, fontSize: 14, fontWeight: 700, backdropFilter: 'blur(34px) saturate(1.85)', WebkitBackdropFilter: 'blur(34px) saturate(1.85)', boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.28), inset 0 -14px 28px rgba(255,255,255,0.04), 0 14px 34px rgba(0,0,0,0.18)' }}>
                 Подробнее
               </span>
             </div>
@@ -184,7 +184,7 @@ function V2FirstScreen({
                 key={card.title}
                 onClick={card.onClick}
                 style={{
-                  minHeight: 124, borderRadius: 30, padding: 17, cursor: 'pointer', textAlign: 'left',
+                  minHeight: 106, borderRadius: 28, padding: 16, cursor: 'pointer', textAlign: 'left',
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                   color: V2.text,
                   background: 'linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026))',
@@ -193,7 +193,7 @@ function V2FirstScreen({
                   transition: 'transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease',
                 }}
               >
-                <span style={{ width: 42, height: 42, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, lineHeight: '28px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.13)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>{card.icon}</span>
+                <span style={{ width: 38, height: 38, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, lineHeight: '26px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.13)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>{card.icon}</span>
                 <span>
                   <span style={{ display: 'block', fontSize: 17, lineHeight: '21px', fontWeight: 900, marginBottom: 5 }}>{card.title}</span>
                   <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', fontWeight: 600, color: V2.textMuted }}>{card.sub}</span>
