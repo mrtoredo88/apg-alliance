@@ -30,6 +30,14 @@ const CATEGORIES = [
 
 const EVENT_EMOJIS   = ['🎉','🎓','🍕','💆','🏋️','🎨','🎤','🤝','🎁','🌟','🎭','☕'];
 const NEWS_EMOJIS    = ['📢','🔥','🌟','🎁','📅','💡','🤝','🏆','🎉','📸','🗞️','✨'];
+const CONTENT_CATEGORIES = [
+  { id: 'economy',   label: 'Экономика',   color: '#6AABEC' },
+  { id: 'society',   label: 'Общество',    color: '#A78BFA' },
+  { id: 'sport',     label: 'Спорт',       color: '#4ade80' },
+  { id: 'culture',   label: 'Культура',    color: '#f59e0b' },
+  { id: 'education', label: 'Образование', color: '#38bdf8' },
+  { id: 'transport', label: 'Транспорт',   color: '#fb923c' },
+];
 const PARTNER_EMOJIS = ['🏪','💆','💄','🍽️','☕','🎓','🏋️','💅','🎉','🛍️','🎭','🌿'];
 
 // Admin panel always uses dark theme
@@ -834,13 +842,16 @@ export const AdminPanel = () => {
   const [showToolsDrop, setShowToolsDrop]   = useState(false);
 
   // Форма новости
-  const [nTitle, setNTitle]         = useState('');
-  const [nText, setNText]           = useState('');
-  const [nEmoji, setNEmoji]         = useState('📢');
-  const [nImage, setNImage]         = useState('');
-  const [nLinkUrl, setNLinkUrl]     = useState('');
-  const [nLinkLabel, setNLinkLabel] = useState('');
-  const [nPriority, setNPriority]   = useState(0);
+  const [nTitle, setNTitle]               = useState('');
+  const [nText, setNText]                 = useState('');
+  const [nEmoji, setNEmoji]               = useState('📢');
+  const [nImage, setNImage]               = useState('');
+  const [nLinkUrl, setNLinkUrl]           = useState('');
+  const [nLinkLabel, setNLinkLabel]       = useState('');
+  const [nPriority, setNPriority]         = useState(0);
+  const [nCategory, setNCategory]         = useState('');
+  const [nCoverPhoto, setNCoverPhoto]     = useState('');
+  const [nPublishedAt, setNPublishedAt]   = useState(() => new Date().toISOString().slice(0, 10));
 
   // Форма уведомления
   const [ntTitle, setNtTitle]       = useState('');
@@ -879,6 +890,11 @@ export const AdminPanel = () => {
   const [eLinkLabel, setELinkLabel] = useState('');
   const [eLinkUrl, setELinkUrl]     = useState('');
   const [ePriority, setEPriority]   = useState(0);
+  const [eCategory, setECategory]   = useState('');
+  const [eCoverPhoto, setECoverPhoto] = useState('');
+  const [eStartAt, setEStartAt]     = useState('');
+  const [eEndAt, setEEndAt]         = useState('');
+  const [eLocation, setELocation]   = useState('');
 
   // Ошибки
   const [errorLogs, setErrorLogs]           = useState([]);
@@ -1181,6 +1197,16 @@ export const AdminPanel = () => {
   const saveBanner = async () => {
     if (!bnTitle.trim()) { setBnError('Введите внутреннее название баннера'); return; }
     if (!bnImageUrl.trim()) { setBnError('Добавьте изображение баннера'); return; }
+    if (bnActive) {
+      const now = Date.now();
+      const activeCount = banners.filter(b => {
+        if (editingBanner && b.id === editingBanner.id) return false;
+        if (!b.active) return false;
+        const end = b.endDate?.toDate ? b.endDate.toDate().getTime() : (b.endDate ? new Date(b.endDate).getTime() : Infinity);
+        return end >= now;
+      }).length;
+      if (activeCount >= 5) { setBnError('Максимум 5 активных баннеров. Деактивируйте один из текущих.'); return; }
+    }
     setBnSaving(true); setBnError('');
     try {
       const data = {
@@ -1287,6 +1313,7 @@ export const AdminPanel = () => {
   const resetNewsForm = () => {
     setNTitle(''); setNText(''); setNEmoji('📢'); setNImage('');
     setNLinkUrl(''); setNLinkLabel(''); setNPriority(0);
+    setNCategory(''); setNCoverPhoto(''); setNPublishedAt(new Date().toISOString().slice(0, 10));
     setEditingNews(null); setShowNewsModal(false);
   };
 
@@ -1296,6 +1323,9 @@ export const AdminPanel = () => {
     setNEmoji(item.emoji ?? '📢'); setNImage(item.imageUrl ?? '');
     setNLinkUrl(item.linkUrl ?? ''); setNLinkLabel(item.linkLabel ?? '');
     setNPriority(item.priority ?? 0);
+    setNCategory(item.category ?? '');
+    setNCoverPhoto(item.coverPhoto ?? '');
+    setNPublishedAt(item.publishedAt?.toDate ? item.publishedAt.toDate().toISOString().slice(0, 10) : (item.publishedAt ? new Date(item.publishedAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)));
     setShowNewsModal(true);
   };
 
@@ -1306,9 +1336,12 @@ export const AdminPanel = () => {
       text: nText.trim(),
       emoji: nEmoji,
       imageUrl: nImage.trim(),
+      coverPhoto: nCoverPhoto.trim(),
       linkUrl: nLinkUrl.trim(),
       linkLabel: nLinkLabel.trim(),
       priority: Number(nPriority) || 0,
+      category: nCategory || null,
+      publishedAt: nPublishedAt ? new Date(nPublishedAt) : new Date(),
       ...(editingNews ? {} : { createdAt: serverTimestamp() }),
     };
     if (editingNews) {
@@ -1398,6 +1431,7 @@ export const AdminPanel = () => {
     setEIsExpert(false); setEPriceClub(''); setEPricePublic('');
     setEPartnerId('');
     setELinkLabel(''); setELinkUrl(''); setEPriority(0);
+    setECategory(''); setECoverPhoto(''); setEStartAt(''); setEEndAt(''); setELocation('');
     setEditingEvent(null); setShowEventModal(false);
   };
 
@@ -1417,6 +1451,12 @@ export const AdminPanel = () => {
     setEPartnerId(e.partnerId ?? '');
     setELinkLabel(e.linkLabel ?? ''); setELinkUrl(e.linkUrl ?? '');
     setEPriority(e.priority ?? 0);
+    setECategory(e.category ?? '');
+    setECoverPhoto(e.coverPhoto ?? '');
+    const toDateStr = ts => ts?.toDate ? ts.toDate().toISOString().slice(0, 16) : (ts ? new Date(ts).toISOString().slice(0, 16) : '');
+    setEStartAt(toDateStr(e.startAt));
+    setEEndAt(toDateStr(e.endAt));
+    setELocation(e.location ?? '');
     setShowEventModal(true);
   };
 
@@ -1438,6 +1478,11 @@ export const AdminPanel = () => {
       linkLabel: eLinkLabel.trim(),
       linkUrl:   eLinkUrl.trim(),
       priority:  Number(ePriority) || 0,
+      category:  eCategory || null,
+      coverPhoto: eCoverPhoto.trim(),
+      startAt:   eStartAt ? new Date(eStartAt) : null,
+      endAt:     eEndAt ? new Date(eEndAt) : null,
+      location:  eLocation.trim(),
     };
     if (editingEvent) {
       await updateDoc(doc(db, 'events', editingEvent.id), data);
@@ -2707,6 +2752,29 @@ export const AdminPanel = () => {
             <label style={s.label}>Эмодзи события</label>
             <EmojiPicker emojis={EVENT_EMOJIS} value={eEmoji} onChange={setEEmoji} />
 
+            <label style={s.label}>Категория</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {CONTENT_CATEGORIES.map(cat => (
+                <button key={cat.id} onClick={() => setECategory(eCategory === cat.id ? '' : cat.id)}
+                  style={{ padding: '6px 14px', borderRadius: 20, border: `2px solid ${eCategory === cat.id ? cat.color : A.border}`, background: eCategory === cat.id ? cat.color + '22' : 'transparent', color: eCategory === cat.id ? cat.color : A.textSec, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            <label style={s.label}>Обложка события</label>
+            <PhotoUpload value={eCoverPhoto} onChange={setECoverPhoto} folder="events" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {eCoverPhoto && <img src={eCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12, marginTop: 4 }} onError={e => e.target.style.display = 'none'} />}
+
+            <label style={s.label}>Начало события</label>
+            <input style={s.input} type="datetime-local" value={eStartAt} onChange={e => setEStartAt(e.target.value)} />
+
+            <label style={s.label}>Конец события</label>
+            <input style={s.input} type="datetime-local" value={eEndAt} onChange={e => setEEndAt(e.target.value)} />
+
+            <label style={s.label}>Место проведения</label>
+            <input style={s.input} placeholder="Зеленоград, корп. 1234" value={eLocation} onChange={e => setELocation(e.target.value)} />
+
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveEvent}>
                     {editingEvent ? '💾 Сохранить' : '➕ Добавить'}
@@ -2755,7 +2823,14 @@ export const AdminPanel = () => {
                           ? <span title="Проверено" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓</span>
                           : <span title="Не проверено" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: A.textSec }}>{e.date && `📅 ${e.date}`}{e.partner && ` · ${e.partner}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                        {e.category && (() => { const cat = CONTENT_CATEGORIES.find(c => c.id === e.category); return cat ? <span style={{ fontSize: 10, fontWeight: 700, color: cat.color, background: cat.color + '22', border: `1px solid ${cat.color}55`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{cat.label}</span> : null; })()}
+                      </div>
+                      <div style={{ fontSize: 12, color: A.textSec }}>
+                        {e.startAt && (() => { const d = e.startAt?.toDate ? e.startAt.toDate() : new Date(e.startAt); return `📅 ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · `; })()}
+                        {!e.startAt && e.date && `📅 ${e.date} · `}
+                        {e.partner && `${e.partner}`}{e.location && ` · ${e.location}`}{e.isPrivate && e.minKeys > 0 && ` · мин. ${e.minKeys} 🗝️`}
+                      </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
@@ -2827,6 +2902,23 @@ export const AdminPanel = () => {
               Чем выше число — тем выше материал в списке. По умолчанию — 0. При 8+ показывается метка 📌.
             </div>
 
+            <label style={s.label}>Категория</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {CONTENT_CATEGORIES.map(cat => (
+                <button key={cat.id} onClick={() => setNCategory(nCategory === cat.id ? '' : cat.id)}
+                  style={{ padding: '6px 14px', borderRadius: 20, border: `2px solid ${nCategory === cat.id ? cat.color : A.border}`, background: nCategory === cat.id ? cat.color + '22' : 'transparent', color: nCategory === cat.id ? cat.color : A.textSec, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            <label style={s.label}>Обложка (для карточки на главной)</label>
+            <PhotoUpload value={nCoverPhoto} onChange={setNCoverPhoto} folder="news" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {nCoverPhoto && <img src={nCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12, marginTop: 4 }} onError={e => e.target.style.display = 'none'} />}
+
+            <label style={s.label}>Дата публикации</label>
+            <input style={s.input} type="date" value={nPublishedAt} onChange={e => setNPublishedAt(e.target.value)} />
+
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>
                     {editingNews ? '💾 Сохранить' : '➕ Опубликовать'}
@@ -2876,13 +2968,16 @@ export const AdminPanel = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                           {pri >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: A.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>📌 {pri}</span>}
                           {pri > 0 && pri < 8 && <span style={{ fontSize: 9, fontWeight: 700, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>↑ {pri}</span>}
-                          <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                            <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
                           {isCheckedRecently(item.linksCheckedAt)
                             ? <span title="Проверено" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓</span>
                             : <span title="Не проверено" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                          {item.category && (() => { const cat = CONTENT_CATEGORIES.find(c => c.id === item.category); return cat ? <span style={{ fontSize: 10, fontWeight: 700, color: cat.color, background: cat.color + '22', border: `1px solid ${cat.color}55`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{cat.label}</span> : null; })()}
+                        </div>
                         <div style={{ fontSize: 12, color: A.textSec }}>
-                          {dateStr && `📅 ${dateStr} · `}
+                          {(() => { const d = item.publishedAt?.toDate ? item.publishedAt.toDate() : (item.publishedAt ? new Date(item.publishedAt) : null); return d ? `📅 ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })} · ` : (dateStr ? `📅 ${dateStr} · ` : ''); })()}
                           {item.text.length > 50 ? item.text.slice(0, 50) + '…' : item.text}
                         </div>
                       </div>
