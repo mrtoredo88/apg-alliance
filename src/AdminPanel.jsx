@@ -801,6 +801,8 @@ export const AdminPanel = () => {
   const [bulkGeoResult, setBulkGeoResult]   = useState(null);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
   const [expandedPartnerId, setExpandedPartnerId] = useState(null);
+  const [showExpertModal, setShowExpertModal]   = useState(false);
+  const [expandedExpertId, setExpandedExpertId] = useState(null);
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -939,6 +941,7 @@ export const AdminPanel = () => {
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     setExOffer(''); setExStampTarget('');
     setExError(''); setExSaving(false);
+    setShowExpertModal(false);
   };
 
   const startEditExpert = (ex) => {
@@ -957,7 +960,7 @@ export const AdminPanel = () => {
     setExVideos(ex.videos ?? []);
     setExOffer(ex.offer ?? ''); setExStampTarget(ex.stampTarget ? String(ex.stampTarget) : '');
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
-    window.scrollTo(0, 0);
+    setShowExpertModal(true);
   };
 
   const saveExpert = async () => {
@@ -1687,169 +1690,245 @@ export const AdminPanel = () => {
       {/* ── ЭКСПЕРТЫ ── */}
       {activeTab === 'experts' && (
         <>
+          {/* ── Модалка добавления / редактирования эксперта ── */}
+          {showExpertModal && (
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
+              onClick={e => { if (e.target === e.currentTarget) resetExpertForm(); }}
+            >
+              <div style={{ ...s.card, width: '100%', maxWidth: 620, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>{editingExpert ? `✏️ ${editingExpert.name}` : '➕ Новый эксперт'}</h2>
+                  <button onClick={resetExpertForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+                </div>
+
+                <label style={s.label}>Имя *</label>
+                <input style={s.input} placeholder="Анна Смирнова" value={exName} onChange={e => setExName(e.target.value)} />
+
+                <label style={s.label}>Специализация *</label>
+                <input style={s.input} placeholder="Психолог, коуч, нутрициолог..." value={exSpec} onChange={e => setExSpec(e.target.value)} />
+
+                <label style={s.label}>Тариф</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {[{ id: 'practice', label: '📋 Практика' }, { id: 'ambassador', label: '🌟 Амбассадор' }].map(t => (
+                    <button key={t.id} onClick={() => setExTier(t.id)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${exTier === t.id ? A.gold : A.border}`, background: exTier === t.id ? A.goldDim : 'transparent', color: exTier === t.id ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label style={s.label}>Категория</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                  {EXPERT_CATEGORIES.map(c => (
+                    <button key={c.id} onClick={() => setExCategory(c.id)} style={{ padding: '6px 12px', borderRadius: 12, border: `2px solid ${exCategory === c.id ? A.gold : A.border}`, background: exCategory === c.id ? A.goldDim : 'transparent', color: exCategory === c.id ? A.gold : A.textSec, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      {c.emoji} {c.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label style={s.label}>Описание</label>
+                <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
+
+                <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
+                <input style={s.input} placeholder="Скидка 15% на первую консультацию" value={exOffer} onChange={e => setExOffer(e.target.value)} />
+
+                <label style={s.label}>Штамп-карта: визитов до награды (0 = выключено) 🎟️</label>
+                <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={exStampTarget} onChange={e => setExStampTarget(e.target.value)} />
+
+                <label style={s.label}>Фото</label>
+                <PhotoUpload value={exPhoto} onChange={setExPhoto} folder="experts" label="Загрузить фото" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+                {exPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exPhoto} onChange={e => setExPhoto(e.target.value)} />}
+
+                <label style={s.label}>Фото-шапка (обложка)</label>
+                <PhotoUpload value={exCoverPhoto} onChange={setExCoverPhoto} folder="experts/covers" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+                {exCoverPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exCoverPhoto} onChange={e => setExCoverPhoto(e.target.value)} />}
+
+                <label style={s.label}>Галерея (до 6 фото)</label>
+                <GalleryUpload value={exGallery} onChange={setExGallery} folder="experts/gallery" max={6} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+
+                <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {exVideos.length}/5</label>
+                {exVideos.length < 5 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video... или rutube.ru/video/..." value={exVideoUrl} onChange={e => { setExVideoUrl(e.target.value); setExVideoError(''); }} />
+                    <input style={{ ...s.input, marginTop: 6 }} placeholder="Название (необязательно)" value={exVideoTitle} onChange={e => setExVideoTitle(e.target.value)} />
+                    {exVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{exVideoError}</div>}
+                    <button style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
+                      const parsed = parseVideoUrl(exVideoUrl);
+                      if (!parsed) { setExVideoError('Не удалось распознать ссылку, проверь формат'); return; }
+                      setExVideos(v => [...v, { url: exVideoUrl.trim(), title: exVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
+                      setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
+                    }}>+ Добавить видео</button>
+                  </div>
+                )}
+                {exVideos.map((v, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
+                    <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111' }}>
+                      <img src={v.thumbnailUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || v.url}</div>
+                      <div style={{ fontSize: 11, color: A.gold }}>{v.platform === 'youtube' ? 'YouTube' : v.platform === 'vk' ? 'VK Видео' : 'Rutube'}</div>
+                    </div>
+                    <button onClick={() => setExVideos(vs => { const a = [...vs]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a; })} disabled={i === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                    <button onClick={() => setExVideos(vs => { const a = [...vs]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a; })} disabled={i === exVideos.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === exVideos.length - 1 ? 0.3 : 1 }}>↓</button>
+                    <button onClick={() => setExVideos(vs => vs.filter((_, j) => j !== i))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px', fontSize: 12 }}>✕</button>
+                  </div>
+                ))}
+
+                <label style={s.label}>Телефон</label>
+                <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
+
+                <label style={s.label}>ВКонтакте (URL)</label>
+                <input style={s.input} placeholder="https://vk.com/..." value={exVkUrl} onChange={e => setExVkUrl(e.target.value)} />
+
+                <label style={s.label}>Ссылка для записи</label>
+                <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
+
+                <label style={s.label}>Telegram эксперта</label>
+                <input style={s.input} placeholder="https://t.me/..." value={exTelegram} onChange={e => setExTelegram(e.target.value)} />
+
+                <label style={s.label}>Личный сайт / портфолио</label>
+                <input style={s.input} placeholder="https://..." value={exWebsite} onChange={e => setExWebsite(e.target.value)} />
+
+                <label style={s.label}>Профиль в Max</label>
+                <input style={s.input} placeholder="https://..." value={exMax} onChange={e => setExMax(e.target.value)} />
+
+                <label style={s.label}>Ключей за QR-скан</label>
+                <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />
+
+                <label style={s.label}>Email владельца (для доступа к кабинету)</label>
+                <input style={s.input} type="email" placeholder="expert@example.com" value={exOwnerEmail} onChange={e => setExOwnerEmail(e.target.value)} />
+
+                <label style={s.label}>Форматы работы</label>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+                  {[['online','💻 Онлайн', exOnline, setExOnline], ['offline','📍 Офлайн', exOffline, setExOffline], ['group','👥 Группа', exGroup, setExGroup]].map(([key, lbl, val, setter]) => (
+                    <button key={key} onClick={() => setter(v => !v)} style={{ padding: '8px 14px', borderRadius: 12, border: `2px solid ${val ? A.gold : A.border}`, background: val ? A.goldDim : 'transparent', color: val ? A.gold : A.textSec, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: A.text }}>
+                    <input type="checkbox" checked={exVerified} onChange={e => setExVerified(e.target.checked)} />
+                    ✓ Верифицирован АПГ
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: A.text }}>
+                    <input type="checkbox" checked={exActive} onChange={e => setExActive(e.target.checked)} />
+                    Активен
+                  </label>
+                </div>
+
+                {exError && (
+                  <div style={{ background: 'rgba(230,70,70,0.15)', border: '1px solid rgba(230,70,70,0.4)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#f87171' }}>
+                    ❌ {exError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveExpert} disabled={exSaving} style={{ ...s.btn, ...s.btnPri, flex: 1, opacity: exSaving ? 0.7 : 1 }}>
+                    {exSaving ? 'Сохранение...' : (editingExpert ? 'Сохранить' : 'Добавить')}
+                  </button>
+                  {editingExpert && (
+                    <button onClick={resetExpertForm} disabled={exSaving} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Список экспертов ── */}
           <div style={s.card}>
-            <h2 style={s.h2}>{editingExpert ? `✏️ ${editingExpert.name}` : '➕ Новый эксперт'}</h2>
-
-            <label style={s.label}>Имя *</label>
-            <input style={s.input} placeholder="Анна Смирнова" value={exName} onChange={e => setExName(e.target.value)} />
-
-            <label style={s.label}>Специализация *</label>
-            <input style={s.input} placeholder="Психолог, коуч, нутрициолог..." value={exSpec} onChange={e => setExSpec(e.target.value)} />
-
-            <label style={s.label}>Тариф</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {[{ id: 'practice', label: '📋 Практика' }, { id: 'ambassador', label: '🌟 Амбассадор' }].map(t => (
-                <button key={t.id} onClick={() => setExTier(t.id)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: `2px solid ${exTier === t.id ? A.gold : A.border}`, background: exTier === t.id ? A.goldDim : 'transparent', color: exTier === t.id ? A.gold : A.textSec, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <label style={s.label}>Категория</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {EXPERT_CATEGORIES.map(c => (
-                <button key={c.id} onClick={() => setExCategory(c.id)} style={{ padding: '6px 12px', borderRadius: 12, border: `2px solid ${exCategory === c.id ? A.gold : A.border}`, background: exCategory === c.id ? A.goldDim : 'transparent', color: exCategory === c.id ? A.gold : A.textSec, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  {c.emoji} {c.label}
-                </button>
-              ))}
-            </div>
-
-            <label style={s.label}>Описание</label>
-            <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
-
-            <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
-            <input style={s.input} placeholder="Скидка 15% на первую консультацию" value={exOffer} onChange={e => setExOffer(e.target.value)} />
-
-            <label style={s.label}>Штамп-карта: визитов до награды (0 = выключено) 🎟️</label>
-            <input style={s.input} type="number" min="0" max="20" placeholder="Например: 5" value={exStampTarget} onChange={e => setExStampTarget(e.target.value)} />
-
-            <label style={s.label}>Фото</label>
-            <PhotoUpload value={exPhoto} onChange={setExPhoto} folder="experts" label="Загрузить фото" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
-            {exPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exPhoto} onChange={e => setExPhoto(e.target.value)} />}
-
-            <label style={s.label}>Фото-шапка (обложка)</label>
-            <PhotoUpload value={exCoverPhoto} onChange={setExCoverPhoto} folder="experts/covers" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
-            {exCoverPhoto && <input style={{ ...s.input, marginTop: 6 }} placeholder="или вставьте URL" value={exCoverPhoto} onChange={e => setExCoverPhoto(e.target.value)} />}
-
-            <label style={s.label}>Галерея (до 6 фото)</label>
-            <GalleryUpload value={exGallery} onChange={setExGallery} folder="experts/gallery" max={6} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
-
-            <label style={s.label}>Видео (YouTube · VK Видео · Rutube) — {exVideos.length}/5</label>
-            {exVideos.length < 5 && (
-              <div style={{ marginBottom: 8 }}>
-                <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video... или rutube.ru/video/..." value={exVideoUrl} onChange={e => { setExVideoUrl(e.target.value); setExVideoError(''); }} />
-                <input style={{ ...s.input, marginTop: 6 }} placeholder="Название (необязательно)" value={exVideoTitle} onChange={e => setExVideoTitle(e.target.value)} />
-                {exVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{exVideoError}</div>}
-                <button style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
-                  const parsed = parseVideoUrl(exVideoUrl);
-                  if (!parsed) { setExVideoError('Не удалось распознать ссылку, проверь формат'); return; }
-                  setExVideos(v => [...v, { url: exVideoUrl.trim(), title: exVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
-                  setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
-                }}>+ Добавить видео</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Список экспертов</h2>
+                <span style={{ fontSize: 12, color: A.textSec }}>{experts.length} экспертов</span>
               </div>
-            )}
-            {exVideos.map((v, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
-                <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111' }}>
-                  <img src={v.thumbnailUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || v.url}</div>
-                  <div style={{ fontSize: 11, color: A.gold }}>{v.platform === 'youtube' ? 'YouTube' : v.platform === 'vk' ? 'VK Видео' : 'Rutube'}</div>
-                </div>
-                <button onClick={() => setExVideos(vs => { const a = [...vs]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a; })} disabled={i === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
-                <button onClick={() => setExVideos(vs => { const a = [...vs]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a; })} disabled={i === exVideos.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 12, opacity: i === exVideos.length - 1 ? 0.3 : 1 }}>↓</button>
-                <button onClick={() => setExVideos(vs => vs.filter((_, j) => j !== i))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px', fontSize: 12 }}>✕</button>
-              </div>
-            ))}
-
-            <label style={s.label}>Телефон</label>
-            <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
-
-            <label style={s.label}>ВКонтакте (URL)</label>
-            <input style={s.input} placeholder="https://vk.com/..." value={exVkUrl} onChange={e => setExVkUrl(e.target.value)} />
-
-            <label style={s.label}>Ссылка для записи</label>
-            <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
-
-            <label style={s.label}>Telegram эксперта</label>
-            <input style={s.input} placeholder="https://t.me/..." value={exTelegram} onChange={e => setExTelegram(e.target.value)} />
-
-            <label style={s.label}>Личный сайт / портфолио</label>
-            <input style={s.input} placeholder="https://..." value={exWebsite} onChange={e => setExWebsite(e.target.value)} />
-
-            <label style={s.label}>Профиль в Max</label>
-            <input style={s.input} placeholder="https://..." value={exMax} onChange={e => setExMax(e.target.value)} />
-
-            <label style={s.label}>Ключей за QR-скан</label>
-            <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />
-
-            <label style={s.label}>Email владельца (для доступа к кабинету)</label>
-            <input style={s.input} type="email" placeholder="expert@example.com" value={exOwnerEmail} onChange={e => setExOwnerEmail(e.target.value)} />
-
-            <label style={s.label}>Форматы работы</label>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-              {[['online','💻 Онлайн', exOnline, setExOnline], ['offline','📍 Офлайн', exOffline, setExOffline], ['group','👥 Группа', exGroup, setExGroup]].map(([key, lbl, val, setter]) => (
-                <button key={key} onClick={() => setter(v => !v)} style={{ padding: '8px 14px', borderRadius: 12, border: `2px solid ${val ? A.gold : A.border}`, background: val ? A.goldDim : 'transparent', color: val ? A.gold : A.textSec, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: A.text }}>
-                <input type="checkbox" checked={exVerified} onChange={e => setExVerified(e.target.checked)} />
-                ✓ Верифицирован АПГ
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: A.text }}>
-                <input type="checkbox" checked={exActive} onChange={e => setExActive(e.target.checked)} />
-                Активен
-              </label>
-            </div>
-
-            {exError && (
-              <div style={{ background: 'rgba(230,70,70,0.15)', border: '1px solid rgba(230,70,70,0.4)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#f87171' }}>
-                ❌ {exError}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={saveExpert} disabled={exSaving} style={{ ...s.btn, ...s.btnPri, flex: 1, opacity: exSaving ? 0.7 : 1 }}>
-                {exSaving ? 'Сохранение...' : (editingExpert ? 'Сохранить' : 'Добавить')}
+              <button
+                style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }}
+                onClick={() => { resetExpertForm(); setShowExpertModal(true); }}
+              >
+                ➕ Добавить эксперта
               </button>
-              {editingExpert && (
-                <button onClick={resetExpertForm} disabled={exSaving} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
-              )}
             </div>
-          </div>
-
-          {/* Список экспертов */}
-          <div style={s.card}>
-            <h2 style={s.h2}>Список экспертов ({experts.length})</h2>
             {experts.length === 0 ? (
               <p style={{ color: A.textSec, fontSize: 14, margin: 0 }}>Экспертов пока нет.</p>
-            ) : experts.map(ex => (
-              <div key={ex.id} style={s.row}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                  {ex.photo
-                    ? <img src={ex.photo} alt="" loading="lazy" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
-                    : <div style={{ width: 36, height: 36, borderRadius: '50%', background: A.goldDim, border: `1px solid ${A.goldBrd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🧑‍💼</div>
-                  }
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: A.text, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {ex.name}
-                      {ex.verified && <span style={{ fontSize: 10, color: A.blue, fontWeight: 800 }}>✓</span>}
-                      {!ex.active && <span style={{ fontSize: 10, color: A.textSec }}>(неактивен)</span>}
+            ) : experts.map(ex => {
+              const isOpen = expandedExpertId === ex.id;
+              const toggle = () => setExpandedExpertId(isOpen ? null : ex.id);
+              const exLinks = [
+                [ex.vkUrl,      '💙', 'VK'],
+                [ex.bookingUrl, '📅', 'Запись'],
+                [ex.telegramUrl,'✈️', 'Telegram'],
+                [ex.websiteUrl, '🌐', 'Сайт'],
+                [ex.maxUrl,     '⚡', 'Max'],
+              ];
+              const cat = EXPERT_CATEGORIES.find(c => c.id === ex.category);
+              return (
+                <div key={ex.id} style={{ borderBottom: `1px solid ${A.rowBrd}` }}>
+                  {/* ── строка ── */}
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={toggle}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 10, color: A.textSec, flexShrink: 0, display: 'inline-block', transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'none' }}>▶</span>
+                      {ex.photo
+                        ? <img src={ex.photo} alt="" loading="lazy" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: A.goldDim, border: `1px solid ${A.goldBrd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🧑‍💼</div>
+                      }
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: A.text, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {ex.name}
+                          {ex.verified && <span style={{ fontSize: 10, color: A.blue, fontWeight: 800 }}>✓</span>}
+                          {!ex.active && <span style={{ fontSize: 10, color: A.textSec }}>(неактивен)</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: A.textSec }}>
+                          {cat ? `${cat.emoji} ${cat.label}` : ex.specialization}
+                          {ex.tier === 'ambassador' && ' · 🌟'}
+                          {(ex.avgRating ?? 0) > 0 && ` · ★ ${ex.avgRating?.toFixed(1)}`}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: A.textSec }}>{ex.specialization}</div>
-                    {(ex.avgRating ?? 0) > 0 && <div style={{ fontSize: 10, color: '#FFD700' }}>{'★'.repeat(Math.round(ex.avgRating ?? 0))} {ex.avgRating?.toFixed(1)} ({ex.reviewCount ?? 0})</div>}
                   </div>
+
+                  {/* ── развёрнутая панель ── */}
+                  {isOpen && (
+                    <div style={{ padding: '12px 0 16px 20px', borderTop: `1px solid ${A.border}` }}>
+                      <div style={{ fontSize: 12, color: A.textSec, marginBottom: 8 }}>{ex.specialization}</div>
+
+                      {/* ссылки */}
+                      {exLinks.some(([url]) => url) && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          {exLinks.map(([url, icon, label]) => url ? (
+                            <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: A.chip, border: `1px solid ${A.border}`, color: A.text, fontSize: 12, textDecoration: 'none', fontWeight: 500 }}>
+                              {icon} {label}
+                            </a>
+                          ) : (
+                            <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${A.border}`, color: A.textSec, fontSize: 12, opacity: 0.45 }}>
+                              {icon} {label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* контакты */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10, fontSize: 12, color: A.textSec }}>
+                        {ex.phone      && <span>📞 {ex.phone}</span>}
+                        {ex.ownerEmail && <span>📧 {ex.ownerEmail}</span>}
+                        {ex.formats?.length > 0 && <span>🗂 {ex.formats.join(', ')}</span>}
+                      </div>
+
+                      {/* действия */}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button style={{ ...s.btn, ...s.btnGray, fontSize: 13 }} onClick={() => startEditExpert(ex)}>✏️ Редактировать</button>
+                        <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => deleteExpert(ex.id)}>🗑️ Удалить</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => startEditExpert(ex)} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>✏️</button>
-                  <button onClick={() => deleteExpert(ex.id)} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>🗑</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
