@@ -26,11 +26,172 @@ const CATEGORIES = [
 ];
 
 const V2 = {
-  glass: { ...GLASS },
-  glassStrong: { ...GLASS_STRONG },
-  goldGlass: { ...GLASS_GOLD },
+  pageBg: '#101012',
+  text: '#F7F4EA',
+  textSoft: 'rgba(247,244,234,0.68)',
+  textMuted: 'rgba(247,244,234,0.46)',
+  gold: '#C9A84C',
+  glass: {
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))',
+    backdropFilter: 'blur(38px) saturate(1.8)',
+    WebkitBackdropFilter: 'blur(38px) saturate(1.8)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    boxShadow: '0 24px 70px rgba(0,0,0,0.38), inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(255,255,255,0.06)',
+  },
+  glowGlass: {
+    background: 'radial-gradient(circle at 20% 0%, rgba(232,201,122,0.28), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.055))',
+    backdropFilter: 'blur(44px) saturate(1.9)',
+    WebkitBackdropFilter: 'blur(44px) saturate(1.9)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    boxShadow: '0 30px 80px rgba(0,0,0,0.44), 0 0 46px rgba(201,168,76,0.14), inset 0 2px 0 rgba(255,255,255,0.26)',
+  },
+  goldGlass: {
+    background: 'linear-gradient(145deg, rgba(201,168,76,0.24), rgba(201,168,76,0.08))',
+    backdropFilter: 'blur(30px) saturate(1.9)',
+    WebkitBackdropFilter: 'blur(30px) saturate(1.9)',
+    border: '1px solid rgba(201,168,76,0.3)',
+    boxShadow: '0 18px 46px rgba(201,168,76,0.12), inset 0 1.5px 0 rgba(255,255,255,0.25)',
+  },
   sectionGap: 20,
 };
+
+function V2FirstScreen({
+  user,
+  userKeys,
+  events,
+  featuredPartner,
+  partnerOfMonth,
+  unreadCount,
+  onOpenNotifications,
+  onOpenPartner,
+  onOpenNearby,
+  onOpenEvents,
+  onOpenRewards,
+  onOpenTasks,
+}) {
+  const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
+  const heroEvent = events.find(e => e.imageUrl) ?? events[0] ?? null;
+  const heroImage = heroEvent?.imageUrl ?? heroPartner?.logoUrl ?? '';
+  const heroTitle = heroEvent?.title ?? heroPartner?.name ?? 'Пульс города рядом';
+  const heroMeta = heroEvent?.date ?? heroPartner?.offer ?? 'События, места и подарки от партнёров АПГ';
+  const heroAction = heroEvent ? onOpenEvents : heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenEvents;
+  const firstName = user?.first_name || user?.firstName || user?.name?.split(' ')?.[0] || 'привет';
+
+  const todayCards = [
+    { icon: '⭐', title: 'Ключи', sub: `${userKeys} сейчас`, onClick: onOpenTasks },
+    { icon: '🎁', title: 'Подарки', sub: 'Розыгрыши и призы', onClick: onOpenRewards },
+    { icon: '📍', title: 'Рядом', sub: 'Места поблизости', onClick: onOpenNearby },
+    { icon: '🎉', title: 'События', sub: events.length ? `${events.length} в афише` : 'Афиша города', onClick: onOpenEvents },
+  ];
+
+  return (
+    <section style={{
+      position: 'relative',
+      minHeight: 'calc(100vh - 96px)',
+      padding: '26px 18px 28px',
+      overflow: 'hidden',
+      background: 'radial-gradient(circle at 12% 8%, rgba(201,168,76,0.16), transparent 32%), radial-gradient(circle at 86% 24%, rgba(255,255,255,0.08), transparent 28%), #101012',
+    }}>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, marginBottom: 22 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: V2.gold, letterSpacing: 0.3, marginBottom: 8 }}>
+              АПГ 2.0
+            </div>
+            <h1 style={{ margin: 0, color: V2.text, fontSize: 36, lineHeight: '38px', fontWeight: 900, letterSpacing: 0 }}>
+              {firstName === 'привет' ? 'Добро пожаловать' : `Привет, ${firstName}`}
+            </h1>
+            <p style={{ margin: '12px 0 0', color: V2.textSoft, fontSize: 17, lineHeight: '24px', fontWeight: 500 }}>
+              Сегодня в Зеленограде происходит много интересного.
+            </p>
+          </div>
+
+          <button
+            onClick={onOpenNotifications}
+            aria-label="Уведомления"
+            style={{
+              width: 48, height: 48, flexShrink: 0, borderRadius: 18, cursor: 'pointer',
+              ...V2.glass,
+              color: V2.text, fontSize: 21, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'relative',
+            }}
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />
+            )}
+          </button>
+        </div>
+
+        <button
+          onClick={heroAction}
+          style={{
+            width: '100%', minHeight: 274, border: 'none', borderRadius: 34, padding: 0,
+            cursor: 'pointer', textAlign: 'left', overflow: 'hidden', position: 'relative',
+            ...V2.glowGlass,
+          }}
+        >
+          <div style={{ position: 'absolute', inset: 0 }}>
+            {heroImage ? (
+              <img
+                src={heroImage}
+                alt=""
+                loading="lazy"
+                onError={e => { e.currentTarget.style.display = 'none'; }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.48, filter: 'saturate(1.08) contrast(1.02)', display: 'block' }}
+              />
+            ) : (
+              <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(255,255,255,0.08) 45%, rgba(10,10,12,0.28))' }} />
+            )}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(16,16,18,0.08), rgba(16,16,18,0.45) 52%, rgba(16,16,18,0.78))' }} />
+          </div>
+
+          <div style={{ position: 'relative', zIndex: 1, minHeight: 274, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ alignSelf: 'flex-start', padding: '9px 13px', borderRadius: 999, color: V2.text, fontSize: 12, fontWeight: 800, background: 'rgba(16,16,18,0.34)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+              Сегодня в городе
+            </div>
+            <div>
+              <div style={{ color: V2.text, fontSize: 28, lineHeight: '31px', fontWeight: 900, letterSpacing: 0, marginBottom: 10 }}>
+                {heroTitle}
+              </div>
+              <div style={{ color: V2.textSoft, fontSize: 14, lineHeight: '20px', fontWeight: 600, maxWidth: 310, marginBottom: 18 }}>
+                {heroMeta}
+              </div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 44, padding: '0 18px', borderRadius: 999, background: 'rgba(247,244,234,0.16)', border: '1px solid rgba(255,255,255,0.2)', color: V2.text, fontSize: 14, fontWeight: 800, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+                Подробнее
+              </span>
+            </div>
+          </div>
+        </button>
+
+        <div style={{ marginTop: 26 }}>
+          <div style={{ color: V2.text, fontSize: 20, lineHeight: '24px', fontWeight: 900, marginBottom: 14 }}>
+            Сегодня можно
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {todayCards.map(card => (
+              <button
+                key={card.title}
+                onClick={card.onClick}
+                style={{
+                  minHeight: 118, borderRadius: 28, padding: 16, cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                  color: V2.text, ...V2.glass,
+                }}
+              >
+                <span style={{ fontSize: 28, lineHeight: '30px' }}>{card.icon}</span>
+                <span>
+                  <span style={{ display: 'block', fontSize: 17, lineHeight: '21px', fontWeight: 900, marginBottom: 4 }}>{card.title}</span>
+                  <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', fontWeight: 600, color: V2.textMuted }}>{card.sub}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // ─── Модальное окно события ───────────────────────────────────────────────────
 
@@ -1265,17 +1426,20 @@ export function HomePanelV2({
     <Panel id="home" data-home-version="v2">
       <span data-home-version="v2" style={{ display: 'none' }} />
       {/* GreetingSection */}
-      <div style={{ position:'sticky', top:0, zIndex:50, background:T.headerBg, backdropFilter:'blur(36px) saturate(2)', WebkitBackdropFilter:'blur(36px) saturate(2)', borderBottom:'1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow:'inset 0 -1px 0 rgba(0,0,0,0.2)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52 }}>
-        <ApgLogo />
-        <button onClick={onOpenNotifications} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, position: 'relative', color: T.textSec, fontSize: 22, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          🔔
-          {unreadCount > 0 && (
-            <div style={{ position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8, background: '#E64646', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#fff', padding: '0 3px', border: '2px solid rgba(15,15,26,0.92)' }}>
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </div>
-          )}
-        </button>
-      </div>
+      <V2FirstScreen
+        user={user}
+        userKeys={userKeys}
+        events={events}
+        featuredPartner={featuredPartner}
+        partnerOfMonth={partnerOfMonth}
+        unreadCount={unreadCount}
+        onOpenNotifications={onOpenNotifications}
+        onOpenPartner={onOpenPartner}
+        onOpenNearby={onOpenNearby}
+        onOpenEvents={onOpenEvents}
+        onOpenRewards={onOpenRewards}
+        onOpenTasks={onOpenTasks}
+      />
 
       {/* Pull-to-refresh indicator */}
       <div style={{

@@ -1254,28 +1254,43 @@ export function UserApp() {
     { id: 'profile', label: 'Профиль',  icon: TabProfileIcon },
   ];
 
+  const tabBarShellStyle = useHomeV2 ? {
+    position: 'fixed', bottom: 18,
+    left: '50%', transform: 'translateX(-50%)',
+    width: 'calc(100% - 40px)', maxWidth: 424, minHeight: 76,
+    padding: 8,
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.055))',
+    backdropFilter: 'blur(42px) saturate(1.9)', WebkitBackdropFilter: 'blur(42px) saturate(1.9)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    borderRadius: 32,
+    boxShadow: '0 22px 58px rgba(0,0,0,0.42), 0 0 36px rgba(201,168,76,0.10), inset 0 1.5px 0 rgba(255,255,255,0.24)',
+    display: 'flex', alignItems: 'stretch', gap: 4,
+    zIndex: 100, overflow: 'visible',
+  } : {
+    position: 'fixed', bottom: 16,
+    left: '50%', transform: 'translateX(-50%)',
+    width: 'calc(100% - 32px)', maxWidth: 448, height: 62,
+    background: T.tabbarBg,
+    backdropFilter: 'blur(28px) saturate(2)', WebkitBackdropFilter: 'blur(28px) saturate(2)',
+    border: `1px solid ${T.tabbarBorder}`,
+    borderRadius: 36,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1)',
+    display: 'flex', alignItems: 'stretch',
+    zIndex: 100, overflow: 'visible',
+  };
+
   const tabBarEl = (
-    <div style={{
-      position: 'fixed', bottom: 16,
-      left: '50%', transform: 'translateX(-50%)',
-      width: 'calc(100% - 32px)', maxWidth: 448, height: 62,
-      background: T.tabbarBg,
-      backdropFilter: 'blur(28px) saturate(2)', WebkitBackdropFilter: 'blur(28px) saturate(2)',
-      border: `1px solid ${T.tabbarBorder}`,
-      borderRadius: 36,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1)',
-      display: 'flex', alignItems: 'stretch',
-      zIndex: 100, overflow: 'visible',
-    }}>
+    <div style={tabBarShellStyle}>
       {/* Скользящий pill */}
       {pillIdx >= 0 && pillIdx !== 2 && (
         <div style={{
-          position: 'absolute', top: 7, height: 44,
-          left: `calc(${pillIdx * 20}% + 6px)`,
-          width: 'calc(20% - 12px)',
-          background: 'rgba(201,168,76,0.1)',
-          border: '1px solid rgba(201,168,76,0.2)',
-          borderRadius: 14,
+          position: 'absolute', top: useHomeV2 ? 8 : 7, height: useHomeV2 ? 60 : 44,
+          left: useHomeV2 ? `calc(${pillIdx * 20}% + 8px)` : `calc(${pillIdx * 20}% + 6px)`,
+          width: useHomeV2 ? 'calc(20% - 16px)' : 'calc(20% - 12px)',
+          background: useHomeV2 ? 'linear-gradient(145deg, rgba(255,255,255,0.2), rgba(201,168,76,0.12))' : 'rgba(201,168,76,0.1)',
+          border: useHomeV2 ? '1px solid rgba(255,255,255,0.24)' : '1px solid rgba(201,168,76,0.2)',
+          borderRadius: useHomeV2 ? 24 : 14,
+          boxShadow: useHomeV2 ? '0 12px 30px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.26)' : 'none',
           transition: 'left 0.35s cubic-bezier(0.34, 1.4, 0.64, 1)',
           pointerEvents: 'none',
         }} />
@@ -1284,16 +1299,16 @@ export function UserApp() {
       {TABS.map((tab, i) => {
         if (i === 2) return (
           <button key="scan" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
-            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: useHomeV2 ? 'center' : 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
             <div style={{
-              width: 50, height: 50, marginTop: -14, borderRadius: '50%',
+              width: useHomeV2 ? 52 : 50, height: useHomeV2 ? 52 : 50, marginTop: useHomeV2 ? -18 : -14, borderRadius: useHomeV2 ? 20 : '50%',
               background: isScannerOpen ? 'rgba(201,168,76,0.25)' : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-              boxShadow: isScannerOpen ? 'none' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
+              boxShadow: isScannerOpen ? 'none' : useHomeV2 ? '0 16px 34px rgba(201,168,76,0.28), inset 0 1px 0 rgba(255,255,255,0.35)' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#0F0F1A',
               transition: 'transform 0.2s, box-shadow 0.2s',
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
-            <span style={{ fontSize: 9, fontWeight: 700, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 3 }}>Скан</span>
+            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, color: isScannerOpen ? T.gold : T.textSec, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: useHomeV2 ? 5 : 3 }}>Скан</span>
           </button>
         );
 
@@ -1304,14 +1319,14 @@ export function UserApp() {
         return (
           <button key={tab.id}
             onClick={() => { haptic('light'); goPanel(tab.id); }}
-            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 0, position: 'relative', zIndex: 1 }}>
+            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: useHomeV2 ? 5 : 3, padding: 0, position: 'relative', zIndex: 1, minWidth: 0 }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
               {hasNotif && (
                 <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
               )}
             </div>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, transition: 'color 0.2s' }}>
+            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, transition: 'color 0.2s', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {tab.label}
             </span>
           </button>
@@ -1435,7 +1450,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <div
-            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: useHomeV2 ? 126 : 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
             onTouchStart={handleSwipeStart}
             onTouchEnd={handleSwipeEnd}
           >
