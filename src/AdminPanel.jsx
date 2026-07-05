@@ -892,17 +892,28 @@ export const AdminPanel = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    console.log('[ADMIN] fetchData start, auth.currentUser:', auth.currentUser?.uid ?? 'null');
     try {
       const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap] = await Promise.all([
-        getDocs(collection(db, 'partners')).catch(() => ({ docs: [] })),
-        getDocs(collection(db, 'events')).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(() => ({ docs: [] })),
-        getDocs(collection(db, 'experts')).catch(() => ({ docs: [] })),
+        getDocs(collection(db, 'partners')).catch(err => { console.error('[ADMIN] partners failed:', err); return { docs: [] }; }),
+        getDocs(collection(db, 'events')).catch(err => { console.error('[ADMIN] events failed:', err); return { docs: [] }; }),
+        getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(err => { console.error('[ADMIN] news failed:', err); return { docs: [] }; }),
+        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(err => { console.error('[ADMIN] notifications failed:', err); return { docs: [] }; }),
+        getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(err => { console.error('[ADMIN] prizes failed:', err); return { docs: [] }; }),
+        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(err => { console.error('[ADMIN] customTasks failed:', err); return { docs: [] }; }),
+        getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(err => { console.error('[ADMIN] prizeClaims failed:', err); return { docs: [] }; }),
+        getDocs(collection(db, 'experts')).catch(err => { console.error('[ADMIN] experts failed:', err); return { docs: [] }; }),
       ]);
+      console.log('[ADMIN] загружено:', {
+        partners: pSnap.docs.length,
+        events: eSnap.docs.length,
+        news: nSnap.docs.length,
+        notifications: ntSnap.docs.length,
+        prizes: prSnap.docs.length,
+        customTasks: ctSnap.docs.length,
+        prizeClaims: clSnap.docs.length,
+        experts: exSnap.docs.length,
+      });
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -911,7 +922,7 @@ export const AdminPanel = () => {
       setPrizes(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('[ADMIN] fetchData outer catch:', e); }
     setLoading(false);
   };
 
@@ -1611,6 +1622,8 @@ export const AdminPanel = () => {
   }, [partners, analyticsLoading]);
 
   if (!authed) return <PasswordGate onAllow={() => setAuthed(true)} />;
+
+  console.log('[ADMIN] render state:', { loading, partners: partners.length, experts: experts.length, events: events.length, activeTab });
 
   return (
     <div style={s.page}>
@@ -2410,7 +2423,7 @@ export const AdminPanel = () => {
               : notifs.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет уведомлений</p>
               : notifs.map(n => {
                 const dateStr = n.createdAt?.toDate
-                  ? n.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  ? n.createdAt.toDate().toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                   : '';
                 return (
                   <div key={n.id} style={s.row}>
@@ -2653,7 +2666,7 @@ export const AdminPanel = () => {
               : prizeClaims.map((c) => {
                 const given = c.status === 'given';
                 const dateStr = c.claimedAt?.toDate
-                  ? c.claimedAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  ? c.claimedAt.toDate().toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                   : '';
                 return (
                   <div key={c.id} style={{ ...s.row, flexWrap: 'wrap', gap: 6, opacity: given ? 0.45 : 1 }}>
