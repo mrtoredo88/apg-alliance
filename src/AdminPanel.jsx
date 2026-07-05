@@ -800,6 +800,7 @@ export const AdminPanel = () => {
   const [bulkGeoRunning, setBulkGeoRunning] = useState(false);
   const [bulkGeoResult, setBulkGeoResult]   = useState(null);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [expandedPartnerId, setExpandedPartnerId] = useState(null);
 
   // Форма новости
   const [nTitle, setNTitle]         = useState('');
@@ -2083,33 +2084,95 @@ export const AdminPanel = () => {
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
               : partners.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет партнёров</p>
-              : partners.filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).map(p => (
-                <div key={p.id} style={s.row}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    {p.logoUrl
-                      ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
-                      : <div style={{ width: 40, height: 40, borderRadius: '50%', background: A.chip, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, border: `1px solid ${A.border}` }}>{p.emoji ?? '🏪'}</div>
-                    }
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: A.textSec }}>
-                        {CATEGORIES.find(c => c.id === p.category)?.emoji} {CATEGORIES.find(c => c.id === p.category)?.label ?? 'Другое'}
-                        {p.offer && ' · 🎁'}
+              : partners.filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase())).map(p => {
+                const isOpen = expandedPartnerId === p.id;
+                const toggle = () => setExpandedPartnerId(isOpen ? null : p.id);
+                const pLinks = [
+                  [p.websiteUrl,            '🌐', 'Сайт'],
+                  [p.bookingUrl,            '📅', 'Запись'],
+                  [p.vkGroupUrl,            '💙', 'VK'],
+                  [p.socialUrl,             '🔗', 'Соцсеть'],
+                  [p.telegramCommunityUrl,  '✈️', 'Telegram'],
+                  [p.maxCommunityUrl,       '⚡', 'Max'],
+                ];
+                return (
+                  <div key={p.id} style={{ borderBottom: `1px solid ${A.rowBrd}` }}>
+                    {/* ── строка ── */}
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={toggle}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 10, color: A.textSec, flexShrink: 0, transition: 'transform 0.15s', display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none' }}>▶</span>
+                        {p.logoUrl
+                          ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                          : <div style={{ width: 38, height: 38, borderRadius: '50%', background: A.chip, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0, border: `1px solid ${A.border}` }}>{p.emoji ?? '🏪'}</div>
+                        }
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                          <div style={{ fontSize: 12, color: A.textSec }}>
+                            {CATEGORIES.find(c => c.id === p.category)?.emoji} {CATEGORIES.find(c => c.id === p.category)?.label ?? 'Другое'}
+                            {p.offer && ' · 🎁'}
+                            {p.tier !== 'start' && ` · ${p.tier === 'alliance' ? '🤝' : '⭐'}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
+                        <button
+                          title={p.featured ? 'Партнёр дня (снять)' : 'Сделать партнёром дня'}
+                          style={{ ...s.btn, padding: '6px 10px', fontSize: 14, background: p.featured ? A.goldDim : A.chip, border: p.featured ? `1.5px solid ${A.gold}` : `1px solid ${A.border}` }}
+                          onClick={() => setFeaturedPartner(p.featured ? null : p.id)}
+                        >⭐</button>
                       </div>
                     </div>
+
+                    {/* ── развёрнутая панель ── */}
+                    {isOpen && (
+                      <div style={{ padding: '12px 0 16px 20px', borderTop: `1px solid ${A.border}` }}>
+                        {/* ссылки */}
+                        {pLinks.some(([url]) => url) && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                            {pLinks.map(([url, icon, label]) => url ? (
+                              <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: A.chip, border: `1px solid ${A.border}`, color: A.text, fontSize: 12, textDecoration: 'none', fontWeight: 500 }}>
+                                {icon} {label}
+                              </a>
+                            ) : (
+                              <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${A.border}`, color: A.textSec, fontSize: 12, opacity: 0.45 }}>
+                                {icon} {label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* контакты */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12, fontSize: 12, color: A.textSec }}>
+                          {p.phone    && <span>📞 {p.phone}</span>}
+                          {p.hours    && <span>🕐 {p.hours}</span>}
+                          {p.address  && <span>📍 {p.address}</span>}
+                          {p.ownerEmail && <span>📧 {p.ownerEmail}</span>}
+                        </div>
+
+                        {/* QR */}
+                        {p.publicQRUrl && (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>QR для стойки</div>
+                            <div style={{ display: 'inline-block', background: '#fff', padding: 8, borderRadius: 10 }}>
+                              <QRCodeSVG value={p.publicQRUrl} size={100} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* действия */}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button style={{ ...s.btn, ...s.btnGray, fontSize: 13 }} onClick={() => startEditPartner(p)}>✏️ Редактировать</button>
+                          <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => deletePartner(p.id)}>🗑️ Удалить</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                    <button
-                      title={p.featured ? 'Партнёр дня (снять)' : 'Сделать партнёром дня'}
-                      style={{ ...s.btn, padding: '6px 10px', fontSize: 14, background: p.featured ? A.goldDim : A.chip, border: p.featured ? `1.5px solid ${A.gold}` : `1px solid ${A.border}` }}
-                      onClick={() => setFeaturedPartner(p.featured ? null : p.id)}
-                    >⭐</button>
-                    <button style={{ ...s.btn, padding: '6px 10px', fontSize: 11, fontWeight: 700, background: A.blueDim, color: A.blue, border: `1px solid rgba(74,144,217,0.3)` }} onClick={() => setQrPartner(p)}>QR</button>
-                    <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditPartner(p)}>✏️</button>
-                    <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deletePartner(p.id)}>🗑️</button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             }
           </div>
         </>
