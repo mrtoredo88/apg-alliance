@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
-import { QRCodeSVG } from 'qrcode.react';
 import vkBridge, { openUrl, isVK } from './vk.js';
 
 function sanitizeForVK(text) {
@@ -17,7 +16,6 @@ import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTime
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
-import { createVisitQrToken } from './rewardApi.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
@@ -150,7 +148,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate }) {
+export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, reviewPrompt, onReviewPromptHandled }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -162,10 +160,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const [reviewError, setReviewError]     = useState('');
   const [phoneCopied, setPhoneCopied]     = useState(false);
   const [shareToast, setShareToast]       = useState('');
-  const [visitQr, setVisitQr]             = useState(null);
-  const [visitQrLoading, setVisitQrLoading] = useState(false);
-  const [visitQrError, setVisitQrError]   = useState('');
-  const [visitQrNow, setVisitQrNow]       = useState(Date.now());
   const phoneCopyTimerRef                 = useRef(null);
   const shareToastRef                     = useRef(null);
   const mountedRef                        = useRef(true);
@@ -174,7 +168,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
   const myReview = userId ? reviews.find(r => r.id === userId) : null;
-  const visitQrSecondsLeft = visitQr?.expiresAt ? Math.max(0, Math.ceil((visitQr.expiresAt - visitQrNow) / 1000)) : 0;
 
   // Считаем просмотр карточки (один раз при открытии каждого партнёра)
   useEffect(() => {
@@ -186,16 +179,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     if (variant !== 'v2' || !partner?.id) return;
     window.scrollTo(0, 0);
   }, [variant, partner?.id]);
-
-  useEffect(() => {
-    if (!visitQr) return undefined;
-    const timer = setInterval(() => setVisitQrNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [visitQr]);
-
-  useEffect(() => {
-    if (visitQr && visitQrSecondsLeft <= 0) setVisitQr(null);
-  }, [visitQr, visitQrSecondsLeft]);
 
   useEffect(() => {
     if (!partner) return;
@@ -221,6 +204,16 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
     return () => { cancelled = true; };
   }, [partner?.id]);
+
+  useEffect(() => {
+    if (!reviewPrompt) return;
+    if (canReview) {
+      setShowForm(true);
+      setFormStars(myReview?.stars ?? 0);
+      setFormText(myReview?.text ?? '');
+    }
+    onReviewPromptHandled?.();
+  }, [reviewPrompt, canReview, myReview?.stars, myReview?.text, onReviewPromptHandled]);
 
   const submitReview = useCallback(async () => {
     if (!partner || !userId || formStars === 0 || submitting) return;
@@ -344,23 +337,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     }
   };
 
-  const requestVisitQr = useCallback(async () => {
-    if (!partner?.id || !userId || visitQrLoading) return;
-    setVisitQrLoading(true);
-    setVisitQrError('');
-    try {
-      const token = await createVisitQrToken({ userId, subjectType: 'partner', subjectId: partner.id });
-      if (!mountedRef.current) return;
-      setVisitQr(token);
-      setVisitQrNow(Date.now());
-    } catch (e) {
-      logError(e, 'PartnerPage.requestVisitQr');
-      if (mountedRef.current) setVisitQrError(e.message || 'Не удалось создать QR');
-    } finally {
-      if (mountedRef.current) setVisitQrLoading(false);
-    }
-  }, [partner?.id, userId, visitQrLoading]);
-
   const infoRows = [
     partner.hours   && { icon:'🕐', label:'Часы работы', value:partner.hours },
     partner.address && { icon:'📍', label:'Адрес',       value:partner.address, onClick:handleMap },
@@ -427,30 +403,20 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               </div>
             </GlassSection>
 
-            <GlassSection title="QR для начисления">
-              <div style={{ ...APG2.glass, borderRadius: 30, padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }}>
+            <GlassSection title="Получить ключ">
+              <div style={{ ...APG2.glass, borderRadius: 30, padding: 18, display: 'grid', gap: 16, border: '1px solid rgba(215,184,106,0.24)' }}>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div style={{ width: 50, height: 50, borderRadius: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: APG2.gold, background: APG2.goldSoft, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 14px 32px rgba(215,184,106,0.14)' }}>🎁</div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780 }}>Одноразовый QR визита</div>
-                    <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
-                      Покажите сотруднику после услуги. QR живёт 60 секунд и не работает повторно.
+                    <div style={{ color: APG2.text, fontSize: 17, lineHeight: '22px', fontWeight: 840 }}>Получите ключ за посещение</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 13, marginTop: 6, lineHeight: '19px' }}>
+                      После получения товара или услуги попросите сотрудника показать QR-код АПГ. Отсканируйте его через приложение, и ключ автоматически поступит на ваш аккаунт.
                     </div>
                   </div>
-                  <GlassButton onClick={requestVisitQr} tone="gold" style={{ minHeight: 42, borderRadius: 18, padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap', opacity: !userId || visitQrLoading ? 0.58 : 1 }}>
-                    {visitQrLoading ? '...' : 'Получить QR'}
-                  </GlassButton>
                 </div>
-                {visitQrError && (
-                  <div style={{ marginTop: 12, color: '#ff9aa8', fontSize: 12, lineHeight: '17px' }}>{visitQrError}</div>
-                )}
-                {visitQr?.qrValue && visitQrSecondsLeft > 0 && (
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                    <div style={{ background: '#fff', borderRadius: 24, padding: 14, boxShadow: '0 18px 44px rgba(0,0,0,0.28)' }}>
-                      <QRCodeSVG value={visitQr.qrValue} size={176} />
-                    </div>
-                    <div style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>Действует ещё {visitQrSecondsLeft} сек.</div>
-                  </div>
-                )}
+                <GlassButton onClick={onScan} tone="gold" style={{ width: '100%', minHeight: 50, borderRadius: 21, fontSize: 15, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>
+                  📷 Сканировать QR
+                </GlassButton>
               </div>
             </GlassSection>
 

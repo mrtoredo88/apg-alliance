@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import { EXPERT_CATEGORIES } from './constants.js';
-import { QRCodeSVG } from 'qrcode.react';
 import { db } from './firebase';
 import {
   collection, getDocs, query, where,
@@ -23,7 +22,6 @@ import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
-import { createVisitQrToken } from './rewardApi.js';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 
 function sanitizeForVK(text) {
@@ -167,14 +165,9 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   );
 }
 
-function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2' }) {
-  const [showQR, setShowQR] = useState(false);
+function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan }) {
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
-  const [visitQr, setVisitQr] = useState(null);
-  const [visitQrLoading, setVisitQrLoading] = useState(false);
-  const [visitQrError, setVisitQrError] = useState('');
-  const [visitQrNow, setVisitQrNow] = useState(Date.now());
   const shareToastRef = useRef(null);
 
   useEffect(() => {
@@ -288,37 +281,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2' }) 
 
   const hasScanned = scannedExperts?.[expert.id];
   const canBook = expert.bookingUrl || expert.vkUrl || expert.phone;
-  const qrValue = `expert_${expert.id}`;
-  const userId = user?.id ? String(user.id) : null;
-  const visitQrSecondsLeft = visitQr?.expiresAt ? Math.max(0, Math.ceil((visitQr.expiresAt - visitQrNow) / 1000)) : 0;
   const category = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other'));
-
-  useEffect(() => {
-    if (!visitQr) return undefined;
-    const timer = setInterval(() => setVisitQrNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [visitQr]);
-
-  useEffect(() => {
-    if (visitQr && visitQrSecondsLeft <= 0) setVisitQr(null);
-  }, [visitQr, visitQrSecondsLeft]);
-
-  const requestVisitQr = async () => {
-    if (!expert?.id || !userId || visitQrLoading) return;
-    setVisitQrLoading(true);
-    setVisitQrError('');
-    try {
-      const token = await createVisitQrToken({ userId, subjectType: 'expert', subjectId: expert.id });
-      if (!mountedRef.current) return;
-      setVisitQr(token);
-      setVisitQrNow(Date.now());
-    } catch (e) {
-      logError(e, 'ExpertsPage.requestVisitQr');
-      if (mountedRef.current) setVisitQrError(e.message || 'Не удалось создать QR');
-    } finally {
-      if (mountedRef.current) setVisitQrLoading(false);
-    }
-  };
 
   if (variant === 'v2') {
     const heroImage = getProfileImage(expert);
@@ -411,26 +374,20 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2' }) 
               </GlassSection>
             )}
 
-            <GlassSection title="QR для посещения">
-              <div style={{ ...APG2.glass, borderRadius: 30, padding: 16, border: hasScanned ? '1px solid rgba(75,179,75,0.34)' : APG2.glass.border }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }}>
-                  <div>
-                    <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780 }}>Одноразовый QR консультации</div>
-                    <div style={{ color: hasScanned ? '#7fe18b' : APG2.textMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>{hasScanned ? 'Посещение уже отмечалось' : `+${expert.keys ?? 1} ключ после подтверждения экспертом`}</div>
-                  </div>
-                  <GlassButton onClick={requestVisitQr} tone="gold" style={{ minHeight: 40, borderRadius: 17, padding: '9px 12px', fontSize: 12, opacity: !userId || visitQrLoading ? 0.58 : 1 }}>{visitQrLoading ? '...' : 'Получить QR'}</GlassButton>
-                </div>
-                {visitQrError && (
-                  <div style={{ marginTop: 12, color: '#ff9aa8', fontSize: 12, lineHeight: '17px' }}>{visitQrError}</div>
-                )}
-                {visitQr?.qrValue && visitQrSecondsLeft > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 16 }}>
-                    <div style={{ background: '#fff', borderRadius: 22, padding: 13, boxShadow: '0 18px 44px rgba(0,0,0,0.28)' }}>
-                      <QRCodeSVG value={visitQr.qrValue} size={172} />
+            <GlassSection title="Получить ключ">
+              <div style={{ ...APG2.glass, borderRadius: 30, padding: 18, display: 'grid', gap: 16, border: hasScanned ? '1px solid rgba(75,179,75,0.34)' : '1px solid rgba(215,184,106,0.24)' }}>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div style={{ width: 50, height: 50, borderRadius: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: APG2.gold, background: hasScanned ? 'rgba(75,179,75,0.14)' : APG2.goldSoft, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 14px 32px rgba(215,184,106,0.14)' }}>{hasScanned ? '✓' : '🎁'}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: APG2.text, fontSize: 17, lineHeight: '22px', fontWeight: 840 }}>{hasScanned ? 'Консультация уже отмечена' : 'Получите ключ за консультацию'}</div>
+                    <div style={{ color: hasScanned ? '#7fe18b' : APG2.textMuted, fontSize: 13, marginTop: 6, lineHeight: '19px' }}>
+                      {hasScanned ? 'Повторный скан не создаёт дубль, но визит остаётся в истории.' : 'После консультации попросите эксперта показать QR-код АПГ. Отсканируйте его через приложение, и ключ поступит на ваш аккаунт.'}
                     </div>
-                    <div style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>Действует ещё {visitQrSecondsLeft} сек.</div>
                   </div>
-                )}
+                </div>
+                <GlassButton onClick={() => { onClose(); onScan?.(); }} tone="gold" style={{ width: '100%', minHeight: 50, borderRadius: 21, fontSize: 15, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>
+                  📷 Сканировать QR
+                </GlassButton>
               </div>
             </GlassSection>
 
@@ -635,32 +592,17 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2' }) 
           </div>
         )}
 
-        {/* QR code section */}
         <div style={{ ...GLASS, borderRadius: 20, padding: '16px', marginBottom: 16, border: hasScanned ? '1px solid rgba(75,179,75,0.3)' : '1px solid rgba(201,168,76,0.18)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showQR ? 14 : 0 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 16, background: hasScanned ? 'rgba(75,179,75,0.12)' : T.gold + '18', color: hasScanned ? '#4BB34B' : T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{hasScanned ? '✓' : '🎁'}</div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, marginBottom: 2 }}>🔑 QR для посещения</div>
-              <div style={{ fontSize: 12, color: hasScanned ? '#4BB34B' : T.textSec }}>
-                {hasScanned ? '✓ Посещение отмечено' : `+${expert.keys ?? 1} ключ за консультацию`}
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: T.textPri, marginBottom: 3 }}>{hasScanned ? 'Консультация отмечена' : 'Получите ключ за консультацию'}</div>
+              <div style={{ fontSize: 12, color: hasScanned ? '#4BB34B' : T.textSec, lineHeight: '17px' }}>{hasScanned ? 'Повторный скан не создаёт дубль.' : 'Попросите эксперта показать QR-код АПГ и отсканируйте его.'}</div>
             </div>
-            <button
-              onClick={() => setShowQR(v => !v)}
-              style={{ background: showQR ? 'rgba(201,168,76,0.15)' : T.chipBg, border: `1px solid ${showQR ? 'rgba(201,168,76,0.4)' : T.border}`, borderRadius: 12, padding: '7px 12px', color: showQR ? T.gold : T.textSec, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-            >
-              {showQR ? 'Скрыть' : 'Показать QR'}
-            </button>
           </div>
-          {showQR && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-              <div style={{ background: '#fff', borderRadius: 16, padding: 12 }}>
-                <QRCodeSVG value={qrValue} size={160} />
-              </div>
-              <div style={{ fontSize: 11, color: T.textSec, textAlign: 'center', lineHeight: '16px' }}>
-                Покажи QR-код эксперту — он отсканирует и начислит ключ
-              </div>
-            </div>
-          )}
+          <button onClick={() => { onClose(); onScan?.(); }} style={{ width: '100%', padding: '13px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#17120a', fontSize: 14, fontWeight: 850, cursor: 'pointer', opacity: onScan ? 1 : 0.55 }}>
+            📷 Сканировать QR
+          </button>
         </div>
 
         {/* Reviews */}
@@ -801,7 +743,7 @@ const FILTERS = [
 
 const CATEGORY_FILTERS = [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES];
 
-export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null }) {
+export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -930,6 +872,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             scannedExperts={scannedExperts}
             onClose={() => setSelected(null)}
             variant={variant}
+            onScan={onScan}
           />
         )}
       </>
@@ -1027,6 +970,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           scannedExperts={scannedExperts}
           onClose={() => setSelected(null)}
           variant={variant}
+          onScan={onScan}
         />
       )}
     </>

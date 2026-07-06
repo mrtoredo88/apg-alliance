@@ -40,6 +40,52 @@ const ExpertCabinetPage    = lazy(() => import('./ExpertCabinetPage.jsx').then(m
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
 
+function getQrErrorMessage(error) {
+  const code = String(error?.code ?? '');
+  if (code === 'TOKEN_USED') return 'Этот QR уже использован. Попросите сотрудника показать актуальный QR-код.';
+  if (code === 'TOKEN_EXPIRED') return 'QR истёк. Попросите сотрудника показать новый QR-код.';
+  if (code === 'UNKNOWN_QR' || code === 'BAD_TOKEN' || code === 'BAD_SIGNATURE') return 'QR недействителен. Попросите сотрудника показать QR-код АПГ.';
+  if (code === 'NO_SCANNER' || code === 'USER_NOT_FOUND') return 'Не удалось определить ваш аккаунт. Войдите в приложение и попробуйте снова.';
+  if (code === 'SCANNER_NOT_ALLOWED') return 'Этот QR должен подтвердить сотрудник партнёра или эксперт.';
+  if (code === 'SUBJECT_NOT_FOUND') return 'Партнёр или эксперт не найден. Обратитесь к сотруднику.';
+  return 'Не удалось начислить ключ. Обратитесь к сотруднику и попробуйте ещё раз.';
+}
+
+function ScanSuccessModal({ result, onClose, onReview }) {
+  if (!result) return null;
+  const keys = Number(result.awardedKeys ?? 1) || 1;
+  const keyWord = keys === 1 ? 'ключ' : keys < 5 ? 'ключа' : 'ключей';
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 13000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'calc(20px + var(--safe-top, 0px)) 18px calc(24px + env(safe-area-inset-bottom, 0px))',
+        background: 'rgba(7,7,9,0.58)',
+        backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <GlassCard style={{ width: '100%', maxWidth: 390, borderRadius: 34, padding: 24, textAlign: 'center', border: '1px solid rgba(215,184,106,0.30)' }}>
+        <div style={{ width: 76, height: 76, margin: '0 auto 16px', borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28), 0 20px 46px rgba(215,184,106,0.20)' }}>🎉</div>
+        <GlassBadge tone="gold" style={{ marginBottom: 12 }}>Спасибо за посещение</GlassBadge>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 27, lineHeight: '31px', fontWeight: 920, marginBottom: 8 }}>Ключ успешно получен!</div>
+        <div style={{ color: APG2_PROFILE.gold, fontSize: 38, lineHeight: '42px', fontWeight: 940, marginBottom: 8 }}>+{keys} {keyWord}</div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', marginBottom: 18 }}>
+          {result.subjectName ? `Визит в «${result.subjectName}» отмечен в вашем аккаунте.` : 'Визит отмечен в вашем аккаунте.'}
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {result.partner && (
+            <GlassButton onClick={onReview} tone="gold" style={{ minHeight: 48, borderRadius: 20, color: '#17120a' }}>⭐ Оставить отзыв</GlassButton>
+          )}
+          <GlassButton onClick={onClose} style={{ minHeight: 46, borderRadius: 20 }}>Готово</GlassButton>
+        </div>
+      </GlassCard>
+    </div>,
+    document.body,
+  );
+}
+
 function formatCacheAge(ts) {
   const mins = Math.round((Date.now() - ts) / 60000);
   if (mins < 1)  return 'только что';
@@ -108,6 +154,8 @@ export function UserApp() {
   const tabBarRef                               = useRef(null);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
+  const [scanSuccess, setScanSuccess]           = useState(null);
+  const [reviewPromptPartnerId, setReviewPromptPartnerId] = useState(null);
   const [scanDates, setScanDates]               = useState([]);
 
   const [activePanel, setActivePanel]           = useState('home');
@@ -759,159 +807,46 @@ export function UserApp() {
     }
     isScanningRef.current = true;
 
-    // Public expert QR: value = "https://myapg.ru/?expert=<id>"
-    if (typeof placeIdentifier === 'string' && placeIdentifier.includes('?expert=')) {
-      try {
-        const expertId = new URL(placeIdentifier).searchParams.get('expert');
-        const e = experts.find(ep => ep.id === expertId);
-        setIsScannerOpen(false); isScanningRef.current = false;
-        if (e) {
-          updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
-          showToast('📲 Это публичный QR — ключи не начисляются', 'info');
+    let rawQrValue = typeof placeIdentifier === 'string' ? placeIdentifier.trim() : String(placeIdentifier ?? '').trim();
+    try {
+      const parsed = new URL(rawQrValue, APP_URL);
+      const scanValue = parsed.searchParams.get('scan');
+      const partnerId = parsed.searchParams.get('partner');
+      const expertId = parsed.searchParams.get('expert');
+      if (scanValue) {
+        rawQrValue = scanValue;
+      } else if (partnerId) {
+        const partner = enrichedPartners.find(p => p.id === partnerId);
+        if (partner) {
+          openPartner(partner);
+          updateDoc(doc(db, 'partners', partner.id), { publicQRScans: increment(1) }).catch(() => {});
+          showToast('Это информационный QR. Для ключа попросите служебный QR у сотрудника.', 'info');
         } else {
-          showToast('🔍 Эксперт не найден');
+          showToast('Партнёр не найден');
         }
-      } catch (e) {
-        logError(e, 'UserApp.handleConfirmScan.publicExpert');
-        setIsScannerOpen(false); isScanningRef.current = false;
+        setIsScannerOpen(false);
+        isScanningRef.current = false;
+        return;
+      } else if (expertId) {
+        const expert = experts.find(e => e.id === expertId);
+        if (expert) {
+          updateDoc(doc(db, 'experts', expert.id), { publicQRScans: increment(1) }).catch(() => {});
+          showToast('Это информационный QR. Для ключа попросите служебный QR у эксперта.', 'info');
+        } else {
+          showToast('Эксперт не найден');
+        }
+        setIsScannerOpen(false);
+        isScanningRef.current = false;
+        return;
       }
-      return;
+    } catch (e) {
+      if (rawQrValue.includes('?partner=') || rawQrValue.includes('?expert=')) {
+        logError(e, 'UserApp.handleConfirmScan.parsePublicQr');
+      }
     }
 
-    // Public partner QR: value = "https://myapg.ru/?partner=<id>"
-    if (typeof placeIdentifier === 'string' && placeIdentifier.includes('?partner=')) {
-      const partnerId = new URL(placeIdentifier).searchParams.get('partner');
-      const p = enrichedPartners.find(ep => ep.id === partnerId);
-      setIsScannerOpen(false); isScanningRef.current = false;
-      if (p) {
-        openPartner(p);
-        showToast('📲 Это публичный QR — ключи не начисляются', 'info');
-        updateDoc(doc(db, 'partners', p.id), { publicQRScans: increment(1) }).catch(() => {});
-      } else {
-        showToast('🔍 Партнёр не найден');
-      }
-      return;
-    }
-
-    const rawQrValue = typeof placeIdentifier === 'string' ? placeIdentifier.trim() : String(placeIdentifier ?? '').trim();
     const partnerByName = enrichedPartners.find(p => p.name === rawQrValue);
     const qrValue = partnerByName?.id ?? rawQrValue;
-
-    if (qrValue.startsWith('expert_')) {
-      const expertId = qrValue.slice(7);
-      const expert = experts.find(e => e.id === expertId);
-      if (!expert) {
-        setIsScannerOpen(false); isScanningRef.current = false;
-        showToast('QR-код эксперта не распознан');
-        return;
-      }
-      const prevCount = Number(scannedExperts[expertId]) || (scannedExperts[expertId] ? 1 : 0);
-      const stampTarget = expert.stampTarget ?? 0;
-      const isFirstScan = prevCount === 0;
-      const keyBonus = isFirstScan ? (expert.keys ?? 1) : 0;
-      const newCount = prevCount + 1;
-      const updateData = { [`scannedExperts.${expertId}`]: increment(1) };
-      if (keyBonus > 0) updateData.keys = increment(keyBonus);
-      try {
-        await updateDoc(doc(db, 'users', String(user.id)), updateData);
-        if (keyBonus > 0) setUserKeys(prev => prev + keyBonus);
-        setScannedExperts(prev => ({ ...prev, [expertId]: newCount }));
-        haptic('medium');
-        if (keyBonus > 0) setKeyBurst({ amount: keyBonus, id: Date.now() });
-        const stampMsg = stampTarget > 0 ? ` (${newCount}/${stampTarget})` : '';
-        if (keyBonus > 0) {
-          showToast(`+${keyBonus} ключ — консультация с ${expert.name}!${stampMsg} 🔑`, 'success');
-        } else if (stampTarget > 0 && newCount >= stampTarget) {
-          showToast(`🎟️ Штамп-карта заполнена! Попросите награду у ${expert.name}`, 'success');
-        } else {
-          showToast(`Визит отмечен${stampMsg} 👋`, 'success');
-        }
-        updateDoc(doc(db, 'experts', expertId), { totalVisits: increment(1) }).catch(() => {});
-        addDoc(collection(db, 'users', String(user.id), 'activity'), {
-          type: 'expert_scan', icon: '🧑‍💼',
-          text: `Посещение эксперта: ${expert.name}`,
-          ts: serverTimestamp(),
-        }).catch(() => {});
-      } catch (e) {
-        logError(e, 'UserApp.handleConfirmScan.legacyExpert');
-        showToast('Ошибка при сохранении. Попробуйте ещё раз.');
-      } finally {
-        setIsScannerOpen(false); isScanningRef.current = false;
-      }
-      return;
-    }
-
-    const legacyPartner = enrichedPartners.find(p => p.id === qrValue || p.name === qrValue);
-    if (legacyPartner) {
-      const alreadyHasKey = !!scannedPartnerIds[legacyPartner.id];
-      const todayKey = new Date().toLocaleDateString('sv');
-      const alreadyToday = lastScanDate === todayKey;
-
-      if (alreadyHasKey && alreadyToday) {
-        setIsScannerOpen(false);
-        isScanningRef.current = false;
-        showToast('Уже отмечено сегодня 👋');
-        return;
-      }
-
-      const yesterdayKey = new Date(Date.now() - 86400000).toLocaleDateString('sv');
-      const newStreak = alreadyToday ? streak : (lastScanDate === yesterdayKey ? streak + 1 : 1);
-      const keyBonus = (!alreadyHasKey && legacyPartner.featured) ? 2 : 1;
-      const newScanDates = scanDates.includes(todayKey) ? scanDates : [...scanDates.slice(-89), todayKey];
-      const newVisitCount = (visitCounts[legacyPartner.id] ?? 0) + 1;
-      const updateData = {
-        lastScanDate: todayKey,
-        streak: newStreak,
-        scanDates: newScanDates,
-        [`visitCounts.${legacyPartner.id}`]: increment(1),
-      };
-      if (!alreadyHasKey) {
-        updateData.keys = increment(keyBonus);
-        updateData[`scannedPartners.${legacyPartner.id}`] = true;
-      }
-
-      try {
-        await updateDoc(doc(db, 'users', String(user.id)), updateData);
-        updateDoc(doc(db, 'partners', legacyPartner.id), { totalVisits: increment(1) }).catch(() => {});
-        setDoc(doc(db, 'stats', 'global'), { totalScans: increment(1) }, { merge: true }).catch(() => {});
-        addDoc(collection(db, 'scans'), {
-          partnerId: legacyPartner.id,
-          userId: String(user.id),
-          isNew: !alreadyHasKey,
-          monthKey: todayKey.slice(0, 7),
-          scannedAt: serverTimestamp(),
-        }).catch(() => {});
-        setLastScanDate(todayKey);
-        setStreak(newStreak);
-        setScanDates(newScanDates);
-        setVisitCounts(prev => ({ ...prev, [legacyPartner.id]: newVisitCount }));
-        haptic('medium');
-        if (!alreadyHasKey) {
-          setKeyBurst({ amount: keyBonus, id: Date.now() });
-          setUserKeys(prev => prev + keyBonus);
-          setScannedPartnerIds(prev => ({ ...prev, [legacyPartner.id]: true }));
-          const bonusText = keyBonus > 1 ? ' x2 (партнёр дня!)' : '';
-          setToast({ msg: `+${keyBonus} ключ${bonusText} — ${legacyPartner.name}! 🔑`, type: 'success', sharePartner: legacyPartner });
-          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-          toastTimerRef.current = setTimeout(() => setToast(null), 4500);
-          addDoc(collection(db, 'users', String(user.id), 'activity'), {
-            type: 'scan', icon: keyBonus > 1 ? '⭐' : '🔑',
-            text: `Посещён: ${legacyPartner.name}${keyBonus > 1 ? ' (партнёр дня × 2)' : ''}`,
-            ts: serverTimestamp(),
-          }).catch(() => {});
-        } else {
-          const label = newStreak === 1 ? 'день' : newStreak < 5 ? 'дня' : 'дней';
-          showToast(`Серия продолжается — ${newStreak} ${label}! 🔥`, 'success');
-        }
-      } catch (e) {
-        logError(e, 'UserApp.handleConfirmScan.legacyPartner');
-        showToast('Ошибка при сохранении. Попробуйте ещё раз.');
-      } finally {
-        setIsScannerOpen(false);
-        isScanningRef.current = false;
-      }
-      return;
-    }
 
     try {
       const result = await confirmQrScan({ qrValue, scannerUserId: String(user.id) });
@@ -937,22 +872,22 @@ export function UserApp() {
         const partner = result.subjectType === 'partner'
           ? enrichedPartners.find(p => p.id === result.subjectId)
           : null;
-        setToast({ msg: `${result.message} 🔑`, type: 'success', sharePartner: partner });
+        setScanSuccess({ ...result, partner });
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setToast(null), 4500);
+        setToast(null);
       } else {
         const days = Number(result.streak ?? streak) || 1;
         const label = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
-        showToast(result.alreadyAwarded ? `Визит отмечен. Серия — ${days} ${label}!` : result.message, 'success');
+        showToast(result.alreadyAwarded ? `Ключ уже был начислен. Визит отмечен, серия — ${days} ${label}.` : result.message, 'success');
       }
     } catch (e) {
       logError(e, 'UserApp.handleConfirmScan.reward');
-      showToast(e.code === 'TOKEN_EXPIRED' ? 'QR истёк. Попросите создать новый.' : (e.message || 'Ошибка при сохранении. Попробуйте ещё раз.'));
+      showToast(getQrErrorMessage(e), 'error');
     } finally {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, experts, lastScanDate, streak, scannedPartnerIds, scannedExperts, scanDates, visitCounts, haptic, showToast]);
+  }, [user, enrichedPartners, experts, streak, haptic, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -1809,6 +1744,9 @@ export function UserApp() {
                     scannedPartnerIds={scannedPartnerIds}
                     visitCounts={visitCounts}
                     onPartnerUpdate={handlePartnerUpdate}
+                    onScan={() => setIsScannerOpen(true)}
+                    reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
+                    onReviewPromptHandled={() => setReviewPromptPartnerId(null)}
                   />
                 </Suspense>
               </Panel>
@@ -1960,6 +1898,7 @@ export function UserApp() {
                     onBack={() => goPanel('home')}
                     isActive={activePanel === 'experts'}
                     initialExpertId={pendingExpertId}
+                    onScan={() => setIsScannerOpen(true)}
                   />
                 </Suspense>
               </Panel>
@@ -2016,6 +1955,18 @@ export function UserApp() {
               onConfirm={handleConfirmScan}
             />
           </Suspense>
+
+          <ScanSuccessModal
+            result={scanSuccess}
+            onClose={() => setScanSuccess(null)}
+            onReview={() => {
+              const partner = scanSuccess?.partner;
+              setScanSuccess(null);
+              if (!partner) return;
+              setReviewPromptPartnerId(partner.id);
+              openPartner(partner);
+            }}
+          />
 
           {showOnboarding && (
             <Suspense fallback={null}>

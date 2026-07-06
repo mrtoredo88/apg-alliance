@@ -16,21 +16,6 @@ async function postQrToken(body) {
   return data;
 }
 
-export function createVisitQrToken({ userId, subjectType, subjectId }) {
-  return postQrToken({ action: 'create', userId, subjectType, subjectId, requestedBy: userId })
-    .catch((e) => {
-      if (e.status && e.status !== 404) throw e;
-      const type = subjectType === 'expert' ? 'expert' : 'partner';
-      return {
-        ok: true,
-        legacy: true,
-        qrValue: type === 'expert' ? `expert_${subjectId}` : String(subjectId),
-        expiresAt: Date.now() + 60_000,
-        ttlMs: 60_000,
-      };
-    });
-}
-
 export function confirmQrScan({ qrValue, scannerUserId }) {
   return postQrToken({ action: 'scan', qrValue, scannerUserId });
 }
