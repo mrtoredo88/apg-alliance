@@ -1,0 +1,57 @@
+[
+  {
+    "id": "start",
+    "guideId": "start",
+    "label": "Начать пользоваться АПГ",
+    "emoji": "📱",
+    "primary": true
+  },
+  {
+    "id": "keys",
+    "guideId": "keys",
+    "label": "Как получать ключи",
+    "emoji": "🎁"
+  },
+  {
+    "id": "events",
+    "guideId": "events",
+    "label": "Мероприятия",
+    "emoji": "📅"
+  },
+  {
+    "id": "news",
+    "guideId": "news",
+    "label": "Новости",
+    "emoji": "📰"
+  },
+  {
+    "id": "partners",
+    "guideId": "partners",
+    "label": "Партнёры",
+    "emoji": "🏪"
+  },
+  {
+    "id": "experts",
+    "guideId": "experts",
+    "label": "Эксперты",
+    "emoji": "🎓"
+  },
+  {
+    "id": "raffles",
+    "guideId": "raffles",
+    "label": "Розыгрыши",
+    "emoji": "🎉"
+  },
+  {
+    "id": "faq",
+    "action": "search",
+    "label": "Частые вопросы",
+    "emoji": "❓"
+  },
+  {
+    "id": "support",
+    "guideId": "support",
+    "label": "Поддержка",
+    "emoji": "💬"
+  }
+]

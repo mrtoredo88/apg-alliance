@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V5.4 интеграция Помощника АПГ в Telegram-бота
+**Коммит:** N/A
+**Файлы:** `index.html`, `src/App.jsx`, `src/assistant/AssistantMiniApp.jsx`, `src/assistant/categories.json`, `src/assistant/guides.json`, `src/assistant/faq.json`, `api/telegram-webhook.js`, `server/src/routes/telegram-webhook.js`
+**Тип:** feat
+**Что изменено:** Помощник получил маршруты `/#/telegram-helper` и `/#/miniapp/help`, главное меню теперь строится из `categories.json`, подключён официальный Telegram WebApp API, а существующий Telegram-бот получил WebApp-кнопки «Помощник АПГ» и «Как пользоваться АПГ».
+**Почему:** Telegram Mini App должен быть частью текущего бота АПГ и использовать одну базу знаний с будущей встроенной помощью в приложении.
+
+---
+
 ## [2026-07-07] V5.3 Telegram Mini App «Помощник АПГ»
 **Коммит:** N/A
 **Файлы:** `src/App.jsx`, `src/assistant/AssistantMiniApp.jsx`, `src/assistant/guides.json`, `src/assistant/faq.json`

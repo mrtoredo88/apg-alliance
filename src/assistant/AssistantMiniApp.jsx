@@ -1,18 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import guides from './guides.json';
 import faq from './faq.json';
+import categories from './categories.json';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel } from '../components/Apg2ProfileGlass.jsx';
 import { MOTION, motionDelay, motionTransition } from '../motion.js';
-
-const QUICK_ACTIONS = [
-  { guideId: 'start', label: 'Как пользоваться АПГ' },
-  { guideId: 'keys', label: 'Как получать ключи' },
-  { guideId: 'events', label: 'Как работают мероприятия' },
-  { guideId: 'partners', label: 'Как стать партнёром' },
-  { guideId: 'experts', label: 'Как стать экспертом' },
-  { guideId: 'raffles', label: 'Розыгрыши и призы' },
-  { guideId: 'support', label: 'Связаться с нами' },
-];
 
 const VISUALS = {
   account: { icon: '👤', label: 'Профиль' },
@@ -33,6 +24,8 @@ const VISUALS = {
   message: { icon: '💬', label: 'Сообщение' },
   gift: { icon: '✦', label: 'Приз' },
   support: { icon: '?', label: 'Помощь' },
+  news: { icon: '📰', label: 'Новости' },
+  media: { icon: '◫', label: 'Медиа' },
 };
 
 function normalize(value) {
@@ -78,6 +71,7 @@ function useTelegramShell() {
     tg.expand?.();
     tg.setHeaderColor?.('#111113');
     tg.setBackgroundColor?.('#111113');
+    if (tg.colorScheme) document.documentElement.setAttribute('data-theme', tg.colorScheme === 'dark' ? 'dark' : 'light');
   }, []);
 }
 
@@ -148,16 +142,17 @@ function HomeScreen({ onOpenGuide, onAsk }) {
       <MascotCard onAsk={onAsk} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {QUICK_ACTIONS.map((action, index) => {
-          const guide = guides.find(item => item.id === action.guideId);
+        {categories.map((category, index) => {
+          const guide = category.guideId ? guides.find(item => item.id === category.guideId) : null;
+          const onClick = category.action === 'search' ? onAsk : () => onOpenGuide(category.guideId);
           return (
             <GlassCard
-              key={action.guideId}
-              onClick={() => onOpenGuide(action.guideId)}
-              style={{ minHeight: index === 0 ? 132 : 112, padding: 15, borderRadius: 28, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', animation: `fadeInUp var(--motion-panel, 280ms) var(--motion-ease-standard, ${MOTION.ease.standard}) both`, animationDelay: motionDelay(index) }}
+              key={category.id}
+              onClick={onClick}
+              style={{ minHeight: category.primary ? 132 : 112, padding: 15, borderRadius: 28, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', animation: `fadeInUp var(--motion-panel, 280ms) var(--motion-ease-standard, ${MOTION.ease.standard}) both`, animationDelay: motionDelay(index) }}
             >
-              <span style={{ width: 42, height: 42, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: index === 0 ? APG2_PROFILE.goldGlass.background : APG2_PROFILE.goldSoft, color: index === 0 ? '#17120a' : APG2_PROFILE.gold, fontSize: 20, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)' }}>{guide?.emoji}</span>
-              <span style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '18px', fontWeight: 820 }}>{action.label}</span>
+              <span style={{ width: 42, height: 42, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: category.primary ? APG2_PROFILE.goldGlass.background : APG2_PROFILE.goldSoft, color: category.primary ? '#17120a' : APG2_PROFILE.gold, fontSize: 20, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)' }}>{category.emoji || guide?.emoji}</span>
+              <span style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '18px', fontWeight: 820 }}>{category.label || guide?.title}</span>
             </GlassCard>
           );
         })}

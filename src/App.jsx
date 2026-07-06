@@ -52,6 +52,16 @@ export function App() {
               <AssistantMiniApp />
             </Suspense>
           } />
+          <Route path="/telegram-helper" element={
+            <Suspense fallback={<AppFallback label="Загрузка помощника..." />}>
+              <AssistantMiniApp />
+            </Suspense>
+          } />
+          <Route path="/miniapp/help" element={
+            <Suspense fallback={<AppFallback label="Загрузка помощника..." />}>
+              <AssistantMiniApp />
+            </Suspense>
+          } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>

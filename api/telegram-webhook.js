@@ -13,9 +13,12 @@ function getAdminApp() {
 }
 
 const TOKEN = () => process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_HELPER_URL = `${APP_URL}/#/telegram-helper`;
 
 const SOCIAL_KEYBOARD = {
   inline_keyboard: [
+    [{ text: '📖 Помощник АПГ', web_app: { url: TELEGRAM_HELPER_URL } }],
+    [{ text: '🚀 Как пользоваться АПГ', web_app: { url: TELEGRAM_HELPER_URL } }],
     [{ text: '🔗 Приложение АПГ', url: APP_URL }],
     [{ text: '📱 ВКонтакте',      url: 'https://vk.com/apgzelenograd'   },
      { text: '📢 Telegram-канал', url: 'https://t.me/apgzel'            }],
@@ -28,7 +31,7 @@ const SOCIAL_KEYBOARD = {
 const WELCOME_TEXT =
 `Привет! Это бот АПГ — Альянса Партнёров Города 🏙️
 
-Здесь можно авторизоваться в приложении, а ещё — узнать где нас найти 👇`;
+Здесь можно авторизоваться, открыть интерактивный помощник и найти площадки АПГ 👇`;
 
 const LINKS_TEXT = '📌 Все наши площадки:';
 
@@ -233,7 +236,9 @@ export default async function handler(req, res) {
       '/start — приветствие и ссылки\n' +
       '/links — наши соцсети\n' +
       '/help — эта справка\n\n' +
-      `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».`
+      '📖 Кнопка «Помощник АПГ» открывает короткие инструкции прямо внутри Telegram.\n\n' +
+      `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».`,
+      { reply_markup: SOCIAL_KEYBOARD },
     );
     return res.status(200).json({ ok: true });
   }
@@ -241,7 +246,8 @@ export default async function handler(req, res) {
   // ── Любое другое сообщение ───────────────────────────────────────────────────
   await tgSend(from.id,
     `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».\n\n` +
-    'Чтобы увидеть наши соцсети — напиши /links',
+    'Чтобы быстро разобраться с АПГ — нажми «Помощник АПГ».',
+    { reply_markup: SOCIAL_KEYBOARD },
   );
   return res.status(200).json({ ok: true });
 }
