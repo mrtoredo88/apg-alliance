@@ -9,6 +9,8 @@ import { LOKI_ACTIONS, TAP_ACTIONS, getBehaviorForEvent, getNextMicroDelay, getR
 import { DEFAULT_LOKI_MEMORY, loadLokiMemory, saveLokiMemory } from './lokiMemory.js';
 import { getLokiSuggestion } from './lokiSuggestions.js';
 import { LOKI_MESSAGE_PRIORITY, normalizeLokiActionRequest } from './lokiActionTypes.js';
+import { evaluateLokiObserver } from './LokiObserver.js';
+import { addLokiHistoryItem, loadLokiHistory, markLokiHistoryItem, saveLokiHistory } from './lokiHistory.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -26,9 +28,10 @@ function getUserId(user) {
   return user?.id ? String(user.id) : 'guest';
 }
 
-export function LokiProvider({ children, user, activePanel, appActions }) {
+export function LokiProvider({ children, user, activePanel, appActions, appState }) {
   const [settings, setSettings] = useState(() => loadLokiSettings());
   const [memory, setMemory] = useState(() => loadLokiMemory());
+  const [history, setHistory] = useState(() => loadLokiHistory());
   const [visible, setVisible] = useState(false);
   const [emotion, setEmotion] = useState('idle');
   const [message, setMessage] = useState('');
@@ -38,12 +41,17 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
   const [dismissed, setDismissed] = useState(false);
   const [lastEvent, setLastEvent] = useState(null);
   const queueRef = useRef([]);
+  const activeHistoryIdRef = useRef(null);
   const currentPriorityRef = useRef(LOKI_MESSAGE_PRIORITY.LOW);
+  const lastUserActionAtRef = useRef(Date.now());
+  const lastPanelChangeAtRef = useRef(Date.now());
+  const observerTimerRef = useRef(null);
   const hideTimerRef = useRef(null);
   const idleTimerRef = useRef(null);
   const microTimerRef = useRef(null);
   const actionTimerRef = useRef(null);
   const presenceTimerRef = useRef(null);
+  const farewellTimerRef = useRef(null);
   const settingsHydratedRef = useRef(false);
   const settingsDirtyRef = useRef(false);
   const userId = getUserId(user);
@@ -65,6 +73,14 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
     });
   }, []);
 
+  const updateHistory = useCallback((updater) => {
+    setHistory(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      saveLokiHistory(next);
+      return next;
+    });
+  }, []);
+
   const displayMessage = useCallback((eventType, payload = {}) => {
     const config = getBehaviorForEvent(eventType);
     const priority = payload.priority ?? config.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL;
@@ -75,15 +91,32 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
     setEmotion(config.emotion);
     setDismissed(false);
     setVisible(true);
-    setCard(getLokiSuggestion({ eventType, activePanel, payload }));
+    const nextCard = payload.card ?? getLokiSuggestion({ eventType, activePanel, payload });
+    setCard(nextCard);
+    activeHistoryIdRef.current = null;
     if (settings.enabled && settings.bubbleEnabled) {
       const nextMessage = getLokiPhrase(eventType, payload);
       setMessage(nextMessage);
       updateMemory({ lastMessage: { eventType, text: nextMessage, payload }, lastPanel: activePanel, inDialog: true });
+      updateHistory(prev => {
+        const item = {
+          kind: payload.kind ?? 'message',
+          adviceId: payload.adviceId ?? null,
+          eventType,
+          text: nextMessage,
+          card: nextCard,
+          priority,
+          panel: activePanel,
+        };
+        const next = addLokiHistoryItem(prev, item);
+        activeHistoryIdRef.current = next[0]?.id ?? null;
+        return next;
+      });
     }
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
+    if (farewellTimerRef.current) clearTimeout(farewellTimerRef.current);
     actionTimerRef.current = setTimeout(() => {
       setAction(LOKI_ACTIONS.IDLE);
       setEmotion(eventType === LOKI_EVENTS.USER_IDLE ? 'sleep' : 'idle');
@@ -93,6 +126,12 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
       setCard(null);
       setEmotion(eventType === LOKI_EVENTS.USER_IDLE ? 'sleep' : 'idle');
     }, config.duration);
+    if (eventType === LOKI_EVENTS.PROACTIVE_SUGGESTION) {
+      farewellTimerRef.current = setTimeout(() => {
+        setAction(LOKI_ACTIONS.WAVE);
+        setEmotion('happy');
+      }, config.duration + 520);
+    }
     presenceTimerRef.current = setTimeout(() => {
       setVisible(false);
       setAnchor('home');
@@ -102,7 +141,7 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
       const next = queueRef.current.shift();
       if (next) setTimeout(() => displayMessage(next.eventType, next.payload), 420);
     }, config.duration + 1900);
-  }, [activePanel, settings.bubbleEnabled, settings.enabled, updateMemory]);
+  }, [activePanel, settings.bubbleEnabled, settings.enabled, updateHistory, updateMemory]);
 
   const showMessage = useCallback((eventType, payload = {}) => {
     if (!settings.enabled) return;
@@ -180,6 +219,18 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
   }, [settings.enabled, showMessage]);
 
   useEffect(() => {
+    const markUserAction = () => { lastUserActionAtRef.current = Date.now(); };
+    window.addEventListener('pointerdown', markUserAction, { passive: true });
+    window.addEventListener('keydown', markUserAction);
+    window.addEventListener('scroll', markUserAction, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', markUserAction);
+      window.removeEventListener('keydown', markUserAction);
+      window.removeEventListener('scroll', markUserAction);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!settings.enabled) return;
     const scheduleMicroAction = () => {
       if (microTimerRef.current) clearTimeout(microTimerRef.current);
@@ -211,11 +262,37 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
     if (microTimerRef.current) clearTimeout(microTimerRef.current);
     if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
+    if (farewellTimerRef.current) clearTimeout(farewellTimerRef.current);
+    if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
   }, []);
 
   useEffect(() => {
-    updateMemory({ lastPanel: activePanel });
-  }, [activePanel, updateMemory]);
+    lastPanelChangeAtRef.current = Date.now();
+    setMemory(prev => {
+      const panelVisits = { ...(prev.panelVisits ?? {}), [activePanel]: ((prev.panelVisits ?? {})[activePanel] ?? 0) + 1 };
+      const next = { ...prev, lastPanel: activePanel, panelVisits, updatedAt: new Date().toISOString() };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, [activePanel]);
+
+  useEffect(() => {
+    if (!settings.enabled || !user || !appState) return;
+    if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
+    observerTimerRef.current = setTimeout(() => {
+      const recommendation = evaluateLokiObserver({
+        appState: { ...appState, activePanel },
+        memory,
+        history,
+        lastUserActionAt: lastUserActionAtRef.current,
+        lastPanelChangeAt: lastPanelChangeAtRef.current,
+      });
+      if (recommendation) showMessage(recommendation.eventType, recommendation.payload);
+    }, 9000);
+    return () => {
+      if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
+    };
+  }, [activePanel, appState, history, memory, settings.enabled, showMessage, user]);
 
   const handleCharacterTap = useCallback(() => {
     const tapAction = getRandomLokiAction(TAP_ACTIONS);
@@ -233,6 +310,10 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
       return false;
     }
     updateMemory({ lastAction: { ...normalized, ts: new Date().toISOString() }, inDialog: false });
+    if (activeHistoryIdRef.current) {
+      const id = activeHistoryIdRef.current;
+      updateHistory(prev => markLokiHistoryItem(prev, id, 'opened'));
+    }
     try {
       await handler(normalized.payload ?? {});
       setCard(null);
@@ -257,19 +338,26 @@ export function LokiProvider({ children, user, activePanel, appActions }) {
     executeAction,
     isHiddenOnPanel,
     lastEvent,
+    history,
     memory: memory ?? DEFAULT_LOKI_MEMORY,
     message,
     settings,
     handleCharacterTap,
     showMessage,
     visible,
-    hide: () => { setDismissed(true); setVisible(false); },
+    hide: () => {
+      if (activeHistoryIdRef.current) {
+        const id = activeHistoryIdRef.current;
+        updateHistory(prev => markLokiHistoryItem(prev, id, 'ignored'));
+      }
+      setDismissed(true); setVisible(false);
+    },
     show: () => { setDismissed(false); setVisible(true); },
     hideCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: [...new Set([...settings.hiddenPanels, activePanel])] }),
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
-  }), [action, activePanel, anchor, canTalk, card, dismissed, emotion, executeAction, handleCharacterTap, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, visible]);
+  }), [action, activePanel, anchor, canTalk, card, dismissed, emotion, executeAction, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, updateHistory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

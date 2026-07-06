@@ -21,12 +21,14 @@ function getActionName(action) {
   if (action === LOKI_ACTIONS.LISTEN) return 'lokiListen';
   if (action === LOKI_ACTIONS.YAWN) return 'lokiYawn';
   if (action === LOKI_ACTIONS.LOOK_AROUND) return 'lokiLookAround';
+  if (action === LOKI_ACTIONS.PEEK) return 'lokiPeek';
   return 'none';
 }
 
 export function LokiAssistant() {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [look, setLook] = useState({ x: 0, y: 0 });
   const rafRef = useRef(null);
   const shouldShowRestore = loki.dismissed || !loki.settings.enabled || loki.isHiddenOnPanel;
@@ -185,8 +187,30 @@ export function LokiAssistant() {
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
         {menuOpen && (
           <div style={{ ...APG2_PROFILE.glass, position: 'absolute', right: 0, bottom: 86, width: 178, borderRadius: 22, padding: 8, display: 'grid', gap: 6, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+            <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
             <button type="button" onClick={() => { loki.hideCurrentPanel(); setMenuOpen(false); }} style={menuButtonStyle}>Скрыть на экране</button>
             <button type="button" onClick={() => { loki.setHintsEnabled(false); setMenuOpen(false); }} style={menuButtonStyle}>Выключить подсказки</button>
+          </div>
+        )}
+        {historyOpen && (
+          <div style={{ ...APG2_PROFILE.glass, position: 'absolute', right: 0, bottom: 86, width: 252, maxHeight: 310, overflowY: 'auto', borderRadius: 24, padding: 10, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880 }}>История Локи</div>
+              <button type="button" onClick={() => setHistoryOpen(false)} style={{ width: 26, height: 26, borderRadius: 11, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 16 }}>×</button>
+            </div>
+            {loki.history.length ? loki.history.slice(0, 8).map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => item.card?.action && loki.executeAction(item.card.action)}
+                style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)', borderRadius: 17, padding: 10, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, textAlign: 'left', fontFamily: 'inherit', display: 'grid', gap: 4 }}
+              >
+                <span style={{ fontSize: 12, lineHeight: '16px', fontWeight: 780, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.text}</span>
+                <span style={{ fontSize: 10.5, color: APG2_PROFILE.textMuted }}>{item.status === 'opened' ? 'Открыто' : item.status === 'ignored' ? 'Пропущено' : 'Показано'}</span>
+              </button>
+            )) : (
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', padding: 8 }}>Здесь появятся советы, поздравления и рекомендации.</div>
+            )}
           </div>
         )}
         <button

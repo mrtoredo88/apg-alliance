@@ -10,6 +10,7 @@ export const LOKI_ACTIONS = {
   CATCH_KEY: 'catchKey',
   LISTEN: 'listen',
   YAWN: 'yawn',
+  PEEK: 'peek',
 };
 
 export const LOKI_ANCHORS = {

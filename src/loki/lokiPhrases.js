@@ -58,6 +58,7 @@ const phrases = {
 };
 
 export function getLokiPhrase(eventType, payload = {}) {
+  if (payload.message) return payload.message;
   if (eventType === LOKI_EVENTS.KEY_RECEIVED && Number(payload.keysCount) > 1) {
     return `Ух ты! +${payload.keysCount} ключа у тебя. Город становится ближе ✨`;
   }

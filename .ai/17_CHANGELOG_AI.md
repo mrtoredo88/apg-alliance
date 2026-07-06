@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Инициативное поведение Локи
+**Коммит:** N/A
+**Файлы:** `src/loki/LokiObserver.js`, `src/loki/lokiRecommendations.js`, `src/loki/lokiPriority.js`, `src/loki/lokiHistory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/lokiEvents.js`, `src/loki/lokiBehavior.js`, `src/loki/lokiMemory.js`, `src/loki/lokiPhrases.js`, `src/UserApp.jsx`, `src/index.css`
+**Тип:** feat
+**Что изменено:** Добавлена система наблюдения за состоянием приложения, инициативные рекомендации с режимом тишины, история советов Локи, антиспам-приоритеты и центр сообщений внутри меню персонажа.
+**Почему:** Локи должен становиться внимательным спутником пользователя и появляться редко, но в полезный момент.
+
+---
+
 ## [2026-07-07] Loki Actions как агентный слой приложения
 **Коммит:** `b0ccf92f`
 **Файлы:** `src/loki/lokiActionTypes.js`, `src/loki/lokiSuggestions.js`, `src/loki/lokiMemory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/UserApp.jsx`

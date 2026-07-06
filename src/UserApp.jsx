@@ -1848,6 +1848,20 @@ export function UserApp() {
     onOpenNearby: () => goPanel('nearby'),
   };
 
+  const lokiAppState = useMemo(() => ({
+    activePanel,
+    partners: enrichedPartners,
+    events,
+    news,
+    notifications,
+    userKeys,
+    favorites,
+    lastScanDate,
+    unreadCount,
+    registeredEventIds,
+    completedTasks,
+  }), [activePanel, completedTasks, enrichedPartners, events, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, userKeys]);
+
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
       const targetId = partnerId ?? id;
@@ -1872,7 +1886,7 @@ export function UserApp() {
     <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
         <AppRoot>
-          <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions}>
+          <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
           <div
             style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}

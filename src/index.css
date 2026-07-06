@@ -492,6 +492,12 @@ input::placeholder {
   78%      { transform: translate3d(0, -3px, 0) rotate(0deg); }
 }
 
+@keyframes lokiPeek {
+  0%   { transform: translate3d(18px, 10px, 0) scale(0.88) rotate(5deg); opacity: 0.45; }
+  42%  { transform: translate3d(3px, -2px, 0) scale(1.02) rotate(-2deg); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); opacity: 1; }
+}
+
 @keyframes lokiBlink {
   0%, 18%, 100% { opacity: 0; transform: scaleY(0.1); }
   42%, 60%      { opacity: 0.86; transform: scaleY(1); }
