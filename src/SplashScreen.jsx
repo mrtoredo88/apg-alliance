@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { MOTION } from './motion.js';
 
 const SPLASH_RATIO = 1009 / 1558;
 const MIN_SHOW_MS = 1900;
@@ -8,6 +9,11 @@ const CSS = `
 @keyframes apg-splash-art-in {
   0% { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(10px) saturate(0.92); }
   100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0) saturate(1.02); }
+}
+@keyframes apg-splash-glow {
+  0% { opacity: 0.34; transform: translate3d(-50%, -50%, 0) scale(0.92); }
+  50% { opacity: 0.62; transform: translate3d(-50%, -50%, 0) scale(1.02); }
+  100% { opacity: 0.34; transform: translate3d(-50%, -50%, 0) scale(0.92); }
 }
 @keyframes apg-splash-out {
   0% { opacity: 1; transform: scale(1); filter: blur(0); }
@@ -49,7 +55,7 @@ export function SplashScreen({ isReady, onDone, startTime }) {
 
   useEffect(() => {
     if (phase !== 'exit') return undefined;
-    const timer = setTimeout(() => onDone?.(), 620);
+    const timer = setTimeout(() => onDone?.(), MOTION.duration.modal + 220);
     return () => clearTimeout(timer);
   }, [phase, onDone]);
 
@@ -71,7 +77,7 @@ export function SplashScreen({ isReady, onDone, startTime }) {
           boxSizing: 'border-box',
           background: 'radial-gradient(circle at 50% 86%, rgba(201,148,46,0.22), transparent 34%), linear-gradient(180deg, #05080B 0%, #090B0E 52%, #030405 100%)',
           pointerEvents: exiting ? 'none' : 'auto',
-          animation: exiting ? 'apg-splash-out 520ms cubic-bezier(0.4,0,0.2,1) forwards' : 'none',
+          animation: exiting ? 'apg-splash-out calc(var(--motion-modal, 320ms) + 200ms) var(--motion-ease-in-out, cubic-bezier(0.4,0,0.2,1)) forwards' : 'none',
         }}
         onAnimationEnd={e => {
           if (exiting && e.animationName === 'apg-splash-out') onDone?.();
@@ -90,9 +96,10 @@ export function SplashScreen({ isReady, onDone, startTime }) {
             border: '1px solid rgba(232,201,122,0.30)',
             boxShadow: '0 28px 90px rgba(0,0,0,0.58), 0 0 54px rgba(201,148,46,0.12)',
             opacity: 0,
-            animation: 'apg-splash-art-in 760ms cubic-bezier(0.2,0,0,1) 80ms forwards',
+            animation: 'apg-splash-art-in var(--motion-splash, 760ms) var(--motion-ease-soft, cubic-bezier(0.2,0,0,1)) 80ms forwards',
           }}
         >
+          <div style={{ position: 'absolute', left: '50%', top: '54%', width: '72%', aspectRatio: '1 / 1', borderRadius: '50%', transform: 'translate3d(-50%, -50%, 0)', background: 'radial-gradient(circle, rgba(232,201,122,0.24), rgba(232,201,122,0.08) 36%, transparent 68%)', filter: 'blur(18px)', pointerEvents: 'none', animation: 'apg-splash-glow 2200ms var(--motion-ease-in-out, cubic-bezier(0.4,0,0.2,1)) infinite' }} />
           <img
             data-apg-splash-art
             src="/splash-v43.png"

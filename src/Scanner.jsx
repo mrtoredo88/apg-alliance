@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
+import { motionTransition } from './motion.js';
 
 const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
 
@@ -110,8 +111,8 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
       display: 'flex', flexDirection: 'column',
       transform: `translate3d(0, ${dragY}px, 0)`,
       opacity: dragY ? Math.max(0.68, 1 - dragY / 420) : 1,
-      transition: dragY ? 'none' : 'transform 240ms cubic-bezier(0.22,1,0.36,1), opacity 220ms ease',
-      animation: 'scannerEnter 260ms cubic-bezier(0.22,1,0.36,1) both',
+      transition: dragY ? 'none' : motionTransition(['transform', 'opacity'], 'base'),
+      animation: 'scannerEnter var(--motion-panel, 280ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
       touchAction: 'pan-y',
     }}>
       {/* Camera feed */}

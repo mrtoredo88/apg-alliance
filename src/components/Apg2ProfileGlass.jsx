@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { MOTION, motionTransition } from '../motion.js';
 
 export const APG2_PROFILE = {
   bg: 'var(--apg2-bg, radial-gradient(circle at 50% -8%, rgba(219,187,111,0.15), transparent 28%), radial-gradient(circle at 100% 8%, rgba(73,61,118,0.18), transparent 34%), linear-gradient(180deg,#111113 0%,#17181b 44%,#0f1013 100%))',
@@ -64,7 +65,7 @@ export function GlassCard({ children, tone = 'glass', style, onClick, onPointerD
       onPointerUp={(e) => { setPressed(false); onPointerUp?.(e); }}
       onPointerLeave={(e) => { setPressed(false); onPointerLeave?.(e); }}
       onPointerCancel={(e) => { setPressed(false); onPointerCancel?.(e); }}
-      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), borderRadius: APG2_PROFILE.radius.card, padding: 16, color: APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', WebkitTapHighlightColor: 'transparent', touchAction: onClick ? 'manipulation' : undefined, transition: 'transform 180ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms ease, opacity 180ms ease', ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(0.985)` : baseTransform }}
+      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), borderRadius: APG2_PROFILE.radius.card, padding: 16, color: APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', WebkitTapHighlightColor: 'transparent', touchAction: onClick ? 'manipulation' : undefined, transition: `${motionTransition(['transform', 'opacity'], 'fast')}, box-shadow var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))`, ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(${MOTION.press.card})` : baseTransform }}
       {...rest}
     >
       {children}
@@ -93,7 +94,7 @@ export function GlassButton({ children, onClick, tone = 'glass', style, disabled
       onPointerUp={(e) => { setPressed(false); onPointerUp?.(e); }}
       onPointerLeave={(e) => { setPressed(false); onPointerLeave?.(e); }}
       onPointerCancel={(e) => { setPressed(false); onPointerCancel?.(e); }}
-      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), minHeight: 46, borderRadius: APG2_PROFILE.radius.button, padding: '11px 14px', color: gold ? '#17120a' : APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', cursor: disabled ? 'default' : onClick ? 'pointer' : 'default', opacity: disabled ? 0.48 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'transform 180ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms ease, opacity 180ms ease, background 220ms ease', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(0.97)` : baseTransform }}
+      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), minHeight: 46, borderRadius: APG2_PROFILE.radius.button, padding: '11px 14px', color: gold ? '#17120a' : APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', cursor: disabled ? 'default' : onClick ? 'pointer' : 'default', opacity: disabled ? 0.48 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: `${motionTransition(['transform', 'opacity'], 'fast')}, box-shadow var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), background var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(${MOTION.press.button})` : baseTransform }}
       {...rest}
     >
       {children}
@@ -208,7 +209,7 @@ export function GlassToast({ toast, onClose, onShare }) {
   const error = toast.type === 'error';
   return (
     <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 12px)', left: 16, right: 16, zIndex: 12000, pointerEvents: toast.sharePartner ? 'auto' : 'none', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ ...APG2_PROFILE.glass, width: '100%', maxWidth: 430, borderRadius: 24, padding: 13, color: APG2_PROFILE.text, display: 'grid', gap: toast.sharePartner ? 10 : 0, border: success ? '1px solid rgba(75,179,75,0.34)' : error ? '1px solid rgba(230,70,70,0.34)' : APG2_PROFILE.glass.border, animation: 'toastIn 0.24s ease both' }}>
+      <div style={{ ...APG2_PROFILE.glass, width: '100%', maxWidth: 430, borderRadius: 24, padding: 13, color: APG2_PROFILE.text, display: 'grid', gap: toast.sharePartner ? 10 : 0, border: success ? '1px solid rgba(75,179,75,0.34)' : error ? '1px solid rgba(230,70,70,0.34)' : APG2_PROFILE.glass.border, animation: 'toastIn var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           <span style={{ width: 34, height: 34, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: success ? 'rgba(75,179,75,0.16)' : error ? 'rgba(230,70,70,0.16)' : APG2_PROFILE.goldSoft, color: success ? '#4BB34B' : error ? '#E64646' : APG2_PROFILE.gold, fontWeight: 860 }}>{success ? '✓' : error ? '!' : '✦'}</span>
           <span style={{ flex: 1, minWidth: 0, color: APG2_PROFILE.text, fontSize: 14, lineHeight: '19px', fontWeight: 760, overflowWrap: 'anywhere' }}>{toast.msg}</span>
@@ -279,7 +280,7 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
         WebkitBackdropFilter: 'blur(22px) saturate(1.35)',
         overscrollBehavior: 'contain',
         WebkitOverflowScrolling: 'touch',
-        animation: 'fadeIn 180ms ease both',
+        animation: 'fadeIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
       }}
     >
       <div
@@ -298,9 +299,9 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
           ...APG2_PROFILE.glass,
           background: 'radial-gradient(circle at 22% 0%,rgba(215,184,106,0.18),transparent 36%), linear-gradient(145deg,rgba(var(--apg2-glass-a,255,255,255),0.18),rgba(var(--apg2-glass-a,255,255,255),0.075))',
           boxShadow: '0 28px 90px rgba(0,0,0,0.36), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.30), inset 0 -24px 46px rgba(var(--apg2-glass-a,255,255,255),0.045)',
-          animation: 'fadeInUp 220ms ease both',
+          animation: 'fadeInUp var(--motion-modal, 320ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
           transform: `translate3d(0, ${dragY}px, 0) scale(${dragY ? Math.max(0.965, 1 - dragY / 2200) : 1})`,
-          transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.22,1,0.36,1)',
+          transition: dragY ? 'none' : motionTransition(['transform'], 'base'),
         }}
         onClick={e => e.stopPropagation()}
       >

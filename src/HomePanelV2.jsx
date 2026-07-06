@@ -7,6 +7,7 @@ import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge from './vk.js';
 import { APP_URL } from './constants.js';
+import { MOTION, motionDelay, motionTransition } from './motion.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -65,12 +66,12 @@ const V2 = {
 const GlassCard = {
   ...V2.glass,
   borderRadius: 32,
-  transition: 'transform 0.36s cubic-bezier(0.22,1,0.36,1), box-shadow 0.36s ease, border-color 0.36s ease',
+  transition: `${motionTransition(['transform', 'box-shadow', 'border-color'], 'base')}, background var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))`,
   touchAction: 'manipulation',
 };
 
 const pressMotion = {
-  onPointerDown: e => { e.currentTarget.style.transform = 'scale(0.985)'; },
+  onPointerDown: e => { e.currentTarget.style.transform = `scale(${MOTION.press.card})`; },
   onPointerUp: e => { e.currentTarget.style.transform = ''; },
   onPointerCancel: e => { e.currentTarget.style.transform = ''; },
   onPointerLeave: e => { e.currentTarget.style.transform = ''; },
@@ -95,8 +96,13 @@ const GlassButton = {
   backdropFilter: V2.glass.backdropFilter,
   WebkitBackdropFilter: V2.glass.WebkitBackdropFilter,
   boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.26), inset 0 -14px 28px rgba(255,255,255,0.035), 0 14px 34px var(--apg2-elev-shadow, rgba(0,0,0,0.18))',
-  transition: 'transform 0.28s ease, box-shadow 0.28s ease',
+  transition: motionTransition(['transform', 'box-shadow'], 'base'),
 };
+
+const revealMotion = (index = 0, duration = 'panel') => ({
+  animation: `fadeInUp var(--motion-${duration}, ${MOTION.duration[duration] ?? MOTION.duration.panel}ms) var(--motion-ease-standard, ${MOTION.ease.standard}) both`,
+  animationDelay: motionDelay(index),
+});
 
 const GlassIsland = {
   ...V2.glass,
@@ -223,7 +229,7 @@ function V2FirstScreen({
       background: V2.pageBg,
     }}>
       <div style={{ position: 'absolute', left: -80, right: -80, top: 128, height: 230, background: 'linear-gradient(110deg, transparent 8%, rgba(244,217,140,0.055) 35%, rgba(255,255,255,0.04) 48%, transparent 74%)', transform: 'rotate(-8deg)', filter: 'blur(1px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 1, animation: 'fadeInUp 0.72s ease both' }}>
+      <div style={{ position: 'relative', zIndex: 1, ...revealMotion(0, 'splash') }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 'clamp(16px, 2.4svh, 22px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <picture>
@@ -277,7 +283,7 @@ function V2FirstScreen({
             width: '100%', minHeight: 'clamp(176px, 26svh, 236px)', border: 'none', borderRadius: 34, padding: 0,
             cursor: 'pointer', textAlign: 'left', overflow: 'hidden', position: 'relative',
             ...GlassHero,
-            animation: 'fadeInUp 0.8s 0.08s ease both',
+            ...revealMotion(1, 'splash'),
           }}
         >
           <div ref={heroMediaRef} style={{ position: 'absolute', inset: '-18px 0 0', willChange: 'transform, opacity', transformOrigin: 'center top' }}>
@@ -321,7 +327,7 @@ function V2FirstScreen({
           </div>
         </button>
 
-        <div style={{ marginTop: 'clamp(10px, 1.9svh, 16px)', animation: 'fadeInUp 0.86s 0.16s ease both' }}>
+        <div style={{ marginTop: 'clamp(10px, 1.9svh, 16px)', ...revealMotion(2, 'splash') }}>
           <div style={{ color: V2.text, fontSize: 'clamp(15px, 2.5svh, 17px)', lineHeight: 'clamp(18px, 3svh, 21px)', fontWeight: 850, marginBottom: 'clamp(7px, 1.4svh, 10px)', opacity: 0.92 }}>
             Сегодня можно
           </div>
@@ -343,7 +349,7 @@ function V2FirstScreen({
                   background: 'radial-gradient(circle at 28% 0%, rgba(244,217,140,0.06), transparent 42%), linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026))',
                   border: '1px solid rgba(255,255,255,0.115)',
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -12px 28px rgba(255,255,255,0.02)',
-                  transition: 'transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease',
+                  transition: motionTransition(['transform', 'border-color', 'box-shadow'], 'base'),
                 }}
               >
                 <span style={{ width: 'clamp(30px, 5.1svh, 34px)', height: 'clamp(30px, 5.1svh, 34px)', borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(15px, 2.5svh, 17px)', lineHeight: '22px', color: '#221807', background: V2.goldMetal, border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 10px 24px rgba(216,184,103,0.12), inset 0 1px 0 rgba(255,255,255,0.28)' }}>{card.icon}</span>
@@ -1154,7 +1160,7 @@ function NewsModal({ item, onClose }) {
           width: '100%', maxHeight: '88vh',
           border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderBottom: 'none',
           transform: `translateY(${dragY}px)`,
-          transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.2,0,0,1)',
+          transition: isDragging ? 'none' : motionTransition(['transform'], 'modal', 'soft'),
           willChange: 'transform',
           display: 'flex', flexDirection: 'column',
         }}
@@ -1259,7 +1265,7 @@ function NewsWidget({ news }) {
 
   return (
     <>
-      <div style={{ margin: '8px 16px 0', ...GLASS_STRONG, borderRadius: 24, overflow: 'hidden', position: 'relative', animation: 'fadeInUp 0.4s ease both' }}>
+      <div style={{ margin: '8px 16px 0', ...GLASS_STRONG, borderRadius: 24, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
 
         {/* Шапка виджета */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
@@ -1276,7 +1282,7 @@ function NewsWidget({ news }) {
         >
           <div style={{
             transform: `translateY(${-idx * ITEM_H + offset}px)`,
-            transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.2,0,0,1)',
+            transition: isDragging ? 'none' : motionTransition(['transform'], 'modal', 'soft'),
           }}>
             {news.map((n) => {
               const newsImage = contentImageOf(n);

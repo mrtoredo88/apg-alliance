@@ -23,6 +23,7 @@ import vkBridge, { openUrl, isVK } from './vk.js';
 import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
+import { motionTransition } from './motion.js';
 
 function sanitizeForVK(text) {
   if (!text) return '';
@@ -449,7 +450,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
           if (shouldClose) onClose();
         }}
         onTouchCancel={() => { setDragY(0); dragReadyRef.current = false; }}
-        style={{ ...GLASS_STRONG, borderRadius: '28px 28px 0 0', width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '20px 20px 52px', transform: `translate3d(0, ${dragY}px, 0)`, transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.22,1,0.36,1)' }}
+        style={{ ...GLASS_STRONG, borderRadius: '28px 28px 0 0', width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '20px 20px 52px', transform: `translate3d(0, ${dragY}px, 0)`, transition: dragY ? 'none' : motionTransition(['transform'], 'base') }}
         onClick={e => e.stopPropagation()}
       >
         {/* Handle */}

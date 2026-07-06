@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V5.2 Motion Design System
+**Коммит:** N/A
+**Файлы:** `src/motion.js`, `src/index.css`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/Scanner.jsx`, `src/SplashScreen.jsx`, `src/ExpertsPage.jsx`, `src/components/Apg2ProfileGlass.jsx`
+**Тип:** feat
+**Что изменено:** Добавлена единая motion-система с токенами длительности/easing, унифицированы page transitions, press-scale, modal/sheet drag reset, Floating Island, Scanner, success-анимация QR и Splash reveal.
+**Почему:** АПГ должен ощущаться как цельное нативное приложение, где анимации не случайные, а собраны в один спокойный премиальный motion-язык.
+
+---
+
 ## [2026-07-07] Web/PWA haptic fallback
 **Коммит:** N/A
 **Файлы:** `src/UserApp.jsx`, `src/vk.js`

@@ -18,6 +18,7 @@ import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassLoader, GlassToast } from './components/Apg2ProfileGlass.jsx';
+import { MOTION, motionTransition } from './motion.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -78,12 +79,13 @@ function ScanSuccessModal({ result, onClose, onReview }) {
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
+      <div style={{ position: 'absolute', left: '50%', top: '50%', width: 260, height: 260, borderRadius: '50%', transform: 'translate(-50%, -50%)', background: 'radial-gradient(circle, rgba(215,184,106,0.36), rgba(215,184,106,0.10) 42%, transparent 70%)', pointerEvents: 'none', animation: 'apgSuccessFlash 760ms var(--motion-ease-out, cubic-bezier(0.16,1,0.3,1)) both' }} />
       <GlassCard
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => setDragY(0)}
-        style={{ width: '100%', maxWidth: 390, borderRadius: 34, padding: 24, textAlign: 'center', border: '1px solid rgba(215,184,106,0.30)', transform: `translate3d(0, ${dragY}px, 0) scale(${dragY ? Math.max(0.965, 1 - dragY / 2200) : 1})`, transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.22,1,0.36,1)' }}
+        style={{ width: '100%', maxWidth: 390, borderRadius: 34, padding: 24, textAlign: 'center', border: '1px solid rgba(215,184,106,0.30)', transform: `translate3d(0, ${dragY}px, 0) scale(${dragY ? Math.max(0.965, 1 - dragY / 2200) : 1})`, transition: dragY ? 'none' : motionTransition(['transform'], 'base') }}
       >
         <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', margin: '0 auto 15px' }} />
         <div style={{ width: 76, height: 76, margin: '0 auto 16px', borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28), 0 20px 46px rgba(215,184,106,0.20)' }}>🎉</div>
@@ -965,7 +967,7 @@ export function UserApp() {
       if (result.subjectType === 'expert' && result.subjectId) {
         setScannedExperts(prev => ({ ...prev, [result.subjectId]: result.visitCount ?? ((Number(prev[result.subjectId]) || 0) + 1) }));
       }
-      haptic('medium');
+      haptic(awardedKeys > 0 ? 'success' : 'medium');
       if (awardedKeys > 0) {
         setUserKeys(prev => prev + awardedKeys);
         setKeyBurst({ amount: awardedKeys, id: Date.now() });
@@ -1651,7 +1653,7 @@ export function UserApp() {
     boxShadow: '0 var(--apg-island-shadow-y, 22px) 52px var(--apg2-elev-shadow, rgba(0,0,0,0.34)), 0 0 34px rgba(216,184,103,0.08), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -18px 34px rgba(255,255,255,0.035)',
     display: 'flex', alignItems: 'stretch', gap: 4,
     zIndex: 10000, overflow: 'visible',
-    transition: 'transform 220ms cubic-bezier(0.22,1,0.36,1), min-height 220ms ease, padding 220ms ease, box-shadow 220ms ease, backdrop-filter 220ms ease, -webkit-backdrop-filter 220ms ease',
+    transition: `transform ${MOTION.duration.base}ms ${MOTION.ease.standard}, min-height ${MOTION.duration.base}ms ${MOTION.ease.standard}, padding ${MOTION.duration.base}ms ${MOTION.ease.standard}, box-shadow ${MOTION.duration.base}ms ${MOTION.ease.standard}, backdrop-filter ${MOTION.duration.base}ms ${MOTION.ease.standard}, -webkit-backdrop-filter ${MOTION.duration.base}ms ${MOTION.ease.standard}`,
     willChange: 'transform, min-height, padding, backdrop-filter',
     contain: 'layout paint style',
     isolation: 'isolate',
@@ -1673,7 +1675,7 @@ export function UserApp() {
             border: '1px solid rgba(244,217,140,0.24)',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.24), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.16))',
             transform: 'translate3d(0,0,0)',
-            transition: 'left 230ms cubic-bezier(0.22,1,0.36,1), width 230ms cubic-bezier(0.22,1,0.36,1), opacity 180ms ease',
+            transition: `left ${MOTION.duration.base}ms ${MOTION.ease.standard}, width ${MOTION.duration.base}ms ${MOTION.ease.standard}, opacity ${MOTION.duration.fast}ms ${MOTION.ease.standard}`,
             zIndex: 0,
           }}
         />
@@ -1687,7 +1689,7 @@ export function UserApp() {
               background: isScannerOpen ? 'rgba(201,168,76,0.25)' : V2GoldMetal,
               boxShadow: isScannerOpen ? 'none' : '0 12px 26px rgba(216,184,103,0.18), inset 0 1px 0 rgba(255,255,255,0.36), inset 0 -8px 18px rgba(83,58,18,0.20)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#0F0F1A',
-              transition: 'transform 0.35s ease, box-shadow 0.35s ease',
+              transition: `transform ${MOTION.duration.modal}ms ${MOTION.ease.standard}, box-shadow ${MOTION.duration.modal}ms ${MOTION.ease.standard}`,
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
             <span style={{ fontSize: 8.5, fontWeight: 780, color: isScannerOpen ? T.gold : T.textSec, opacity: isScannerOpen ? 1 : 0.62, letterSpacing: 0, textTransform: 'none', marginTop: 2 }}>Скан</span>
@@ -1702,7 +1704,7 @@ export function UserApp() {
           <button key={tab.id}
             aria-label={`Открыть раздел ${tab.label}`}
             onClick={() => { haptic('light'); goPanel(tab.id); }}
-            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: 'transform 0.22s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
+            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? `translateY(-0.5px) scale(${MOTION.press.tab})` : 'translateY(0) scale(1)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
               {hasNotif && (
@@ -1895,7 +1897,7 @@ export function UserApp() {
               </div>
             )}
 
-            <div key={activePanel} style={{ minHeight: '100%', animation: `${panelTransition === 'back' ? 'pageSlideBackIn' : 'pageSlideForwardIn'} 0.28s cubic-bezier(0.22,1,0.36,1) both` }}>
+            <div key={activePanel} style={{ minHeight: '100%', animation: `${panelTransition === 'back' ? 'pageSlideBackIn' : 'pageSlideForwardIn'} var(--motion-panel, 280ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both` }}>
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
