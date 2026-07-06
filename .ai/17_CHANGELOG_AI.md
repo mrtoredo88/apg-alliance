@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Loki Actions как агентный слой приложения
-**Коммит:** N/A
+**Коммит:** `b0ccf92f`
 **Файлы:** `src/loki/lokiActionTypes.js`, `src/loki/lokiSuggestions.js`, `src/loki/lokiMemory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/UserApp.jsx`
 **Тип:** feat
 **Что изменено:** Добавлен единый слой действий Локи, очередь сообщений с приоритетами, интерактивные карточки с CTA, локальная память последнего сообщения/действия/экрана и JSON-интерфейс для будущего AI.
