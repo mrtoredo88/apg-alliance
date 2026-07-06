@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
-import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION } from './ConsentScreen.jsx';
+import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassLoader, GlassToast } from './components/Apg2ProfileGlass.jsx';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -86,6 +86,12 @@ async function safeLoad(label, promiseFactory, fallback, timeoutMs = 6500) {
   }
 }
 
+function hasAcceptedCurrentLegal(data) {
+  return !!data?.consents?.termsAccepted
+    && !!data?.consents?.privacyAccepted
+    && Number(data?.consents?.legalVersion ?? data?.legalVersion ?? data?.consentLegalVersion ?? 0) >= LEGAL_VERSION;
+}
+
 function LazyFallback() {
   return (
     <div style={{ minHeight: '100svh', padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: APG2_PROFILE.bg }}>
@@ -137,8 +143,9 @@ export function UserApp() {
   const [reportSent, setReportSent]             = useState(false);
   const [reportSending, setReportSending]       = useState(false);
   const [loggedOut, setLoggedOut]               = useState(false);
-  const [pendingConsentUser, setPendingConsentUser] = useState(null);
+  const [consentRequest, setConsentRequest]         = useState(null);
   const [consentSaving, setConsentSaving]       = useState(false);
+  const [pendingNotificationPrompt, setPendingNotificationPrompt] = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
@@ -518,6 +525,18 @@ export function UserApp() {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        const needsLegalConsent = !hasAcceptedCurrentLegal(data);
+        if (needsLegalConsent && isMounted.current) {
+          setConsentRequest({
+            user: userData,
+            mode: 'gate',
+            title: 'Добро пожаловать в обновлённый АПГ!',
+            subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
+            badge: `Документы v${LEGAL_VERSION}`,
+            notificationsDefault: data.notificationConsent ?? data.notificationsEnabled ?? true,
+            needsOnboarding: !data.onboardingDone,
+          });
+        }
 
         // Если в localStorage фото нет, но в Firestore есть — используем Firestore и не перезаписываем его null
         if (data.photo && !userData.photo_200) {
@@ -564,7 +583,7 @@ export function UserApp() {
           localStorage.setItem('apg_notif_enabled', '1');
           setNotifEnabled(true);
         }
-        if (!data.onboardingDone) setShowOnboarding(true);
+        if (!data.onboardingDone && !needsLegalConsent) setShowOnboarding(true);
 
         // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
         getCountFromServer(query(collection(db, 'users'), where('keys', '>', keys)))
@@ -575,7 +594,7 @@ export function UserApp() {
         if (data.lastBonusDate !== todayKey) {
           updateDoc(userRef, { keys: increment(1), lastBonusDate: todayKey, ...profilePatch }).catch(() => {});
           setUserKeys(keys + 1);
-          setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+          if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
         } else {
           updateDoc(userRef, profilePatch).catch(() => {});
         }
@@ -604,6 +623,8 @@ export function UserApp() {
             consents: { ...pendingConsents.consents, acceptedAt: serverTimestamp() },
             consentAcceptedAt: serverTimestamp(),
             consentDocsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
+            consentLegalVersion: pendingConsents.consentLegalVersion ?? LEGAL_VERSION,
+            legalVersion: pendingConsents.consentLegalVersion ?? LEGAL_VERSION,
             notificationConsent: !!pendingConsents.notificationConsent,
             ...(pendingConsents.notificationConsent ? { notificationsRequestedAt: serverTimestamp() } : {}),
           } : {}),
@@ -631,7 +652,21 @@ export function UserApp() {
         }
 
         if (isValidRef) setUserKeys(2);
-        setShowOnboarding(true);
+        if (pendingConsents) {
+          setShowOnboarding(true);
+        } else if (isRealUser && isMounted.current) {
+          setConsentRequest({
+            user: userData,
+            mode: 'gate',
+            title: 'Добро пожаловать в обновлённый АПГ!',
+            subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
+            badge: `Документы v${LEGAL_VERSION}`,
+            notificationsDefault: true,
+            needsOnboarding: true,
+          });
+        } else {
+          setShowOnboarding(true);
+        }
       }
 
       } catch (e) {
@@ -1137,30 +1172,41 @@ export function UserApp() {
     try {
       const snap = await getDoc(doc(db, 'users', String(emailUser.id)));
       const data = snap.exists() ? snap.data() : null;
-      if (data?.consents?.termsAccepted && data?.consents?.privacyAccepted) {
+      if (hasAcceptedCurrentLegal(data)) {
         completeEmailLogin({
           ...emailUser,
           consents: data.consents,
           consentDocsVersion: data.consentDocsVersion ?? data.consents.docsVersion,
+          legalVersion: data.legalVersion ?? data.consents.legalVersion,
         });
         return;
       }
     } catch (e) {
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
     }
-    setPendingConsentUser(emailUser);
+    setConsentRequest({
+      user: emailUser,
+      mode: 'email',
+      title: 'Добро пожаловать в обновлённый АПГ!',
+      subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
+      badge: 'Первый вход',
+      notificationsDefault: true,
+    });
   }, [completeEmailLogin]);
 
   const handleConsentAccept = useCallback(async ({ termsAccepted, privacyAccepted, notificationsAccepted }) => {
-    if (!pendingConsentUser?.id || !termsAccepted || !privacyAccepted || consentSaving) return;
+    const targetUser = consentRequest?.user;
+    if (!targetUser?.id || !termsAccepted || !privacyAccepted || consentSaving) return;
     setConsentSaving(true);
     try {
-      const userRef = doc(db, 'users', String(pendingConsentUser.id));
+      const userRef = doc(db, 'users', String(targetUser.id));
       const existingSnap = await getDoc(userRef);
       const consentPayload = {
+        userId: String(targetUser.id),
         termsAccepted: true,
         privacyAccepted: true,
         notificationsAccepted: !!notificationsAccepted,
+        legalVersion: LEGAL_VERSION,
         docsVersion: CONSENT_DOCS_VERSION,
         userAgreementUrl: CONSENT_DOCS.userAgreementUrl,
         privacyPolicyUrl: CONSENT_DOCS.privacyPolicyUrl,
@@ -1170,30 +1216,47 @@ export function UserApp() {
           consents: { ...consentPayload, acceptedAt: serverTimestamp() },
           consentAcceptedAt: serverTimestamp(),
           consentDocsVersion: CONSENT_DOCS_VERSION,
+          consentLegalVersion: LEGAL_VERSION,
+          legalVersion: LEGAL_VERSION,
           notificationConsent: !!notificationsAccepted,
           ...(notificationsAccepted ? { notificationsRequestedAt: serverTimestamp() } : {}),
         }, { merge: true });
       } else {
         localStorage.setItem('apg_pending_consents', JSON.stringify({
-          userId: String(pendingConsentUser.id),
+          userId: String(targetUser.id),
           consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
           consentDocsVersion: CONSENT_DOCS_VERSION,
+          consentLegalVersion: LEGAL_VERSION,
           notificationConsent: !!notificationsAccepted,
         }));
       }
       if (notificationsAccepted) localStorage.setItem('apg_notif_consent', '1');
-      completeEmailLogin({
-        ...pendingConsentUser,
+      if (consentRequest.mode === 'email') {
+        if (notificationsAccepted) localStorage.setItem('apg_request_notification_after_login', '1');
+        completeEmailLogin({
+          ...targetUser,
+          consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
+          consentDocsVersion: CONSENT_DOCS_VERSION,
+          legalVersion: LEGAL_VERSION,
+        });
+        return;
+      }
+      setUser(u => u ? ({
+        ...u,
         consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
         consentDocsVersion: CONSENT_DOCS_VERSION,
-      });
+        legalVersion: LEGAL_VERSION,
+      }) : u);
+      setConsentRequest(null);
+      if (consentRequest.needsOnboarding) setShowOnboarding(true);
+      if (notificationsAccepted) setPendingNotificationPrompt(true);
     } catch (e) {
       logError(e, 'UserApp.handleConsentAccept');
       showToast('Не удалось сохранить согласия. Проверьте интернет и попробуйте снова.', 'error');
     } finally {
       if (mountedRef.current) setConsentSaving(false);
     }
-  }, [pendingConsentUser, consentSaving, completeEmailLogin, showToast]);
+  }, [consentRequest, consentSaving, completeEmailLogin, showToast]);
 
   const handleLogout = useCallback(async () => {
     localStorage.setItem('manualLogout', 'true');
@@ -1202,6 +1265,7 @@ export function UserApp() {
     localStorage.removeItem('apg_guest_id');
     localStorage.removeItem('apg_web_user');
     localStorage.removeItem('apg_notif_enabled');
+    localStorage.removeItem('apg_request_notification_after_login');
     try { await signOut(auth); } catch {}
     window.location.reload();
   }, []);
@@ -1330,6 +1394,18 @@ export function UserApp() {
     // Web / PWA — FCM Web Push (включая Telegram-пользователей)
     requestWebPushPermission();
   }, [user, showToast, requestWebPushPermission]);
+
+  useEffect(() => {
+    if (!pendingNotificationPrompt || !user) return;
+    setPendingNotificationPrompt(false);
+    handleEnableNotifications();
+  }, [pendingNotificationPrompt, user, handleEnableNotifications]);
+
+  useEffect(() => {
+    if (!user || localStorage.getItem('apg_request_notification_after_login') !== '1') return;
+    localStorage.removeItem('apg_request_notification_after_login');
+    handleEnableNotifications();
+  }, [user, handleEnableNotifications]);
 
   const VK_GROUP_ID = 229980067;
   const handleJoinGroup = useCallback(async () => {
@@ -2019,12 +2095,16 @@ export function UserApp() {
             />
           )}
 
-          {pendingConsentUser && (
+          {consentRequest && (
             <ConsentScreen
-              user={pendingConsentUser}
+              user={consentRequest.user}
               loading={consentSaving}
+              title={consentRequest.title}
+              subtitle={consentRequest.subtitle}
+              badge={consentRequest.badge}
+              notificationsDefault={consentRequest.notificationsDefault}
               onAccept={handleConsentAccept}
-              onCancel={() => !consentSaving && setPendingConsentUser(null)}
+              onCancel={consentRequest.mode === 'email' ? () => !consentSaving && setConsentRequest(null) : undefined}
             />
           )}
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 
 export const CONSENT_DOCS_VERSION = '2026-07-06';
+export const LEGAL_VERSION = 1;
 export const CONSENT_DOCS = {
   userAgreementUrl: '/user-agreement.html',
   privacyPolicyUrl: '/privacy-policy.html',
@@ -86,10 +87,19 @@ function DocLink({ href, children }) {
   );
 }
 
-export function ConsentScreen({ user, onAccept, onCancel, loading = false }) {
+export function ConsentScreen({
+  user,
+  onAccept,
+  onCancel,
+  loading = false,
+  title = 'Добро пожаловать в обновлённый АПГ!',
+  subtitle = 'Перед продолжением использования приложения подтвердите необходимые согласия.',
+  badge = 'Обновление документов',
+  notificationsDefault = true,
+}) {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [notificationsAccepted, setNotificationsAccepted] = useState(false);
+  const [notificationsAccepted, setNotificationsAccepted] = useState(notificationsDefault);
   const canContinue = termsAccepted && privacyAccepted && !loading;
   const firstName = user?.first_name || user?.firstName || user?.name?.split(' ')?.[0] || '';
 
@@ -120,15 +130,15 @@ export function ConsentScreen({ user, onAccept, onCancel, loading = false }) {
             А
           </div>
           <div style={{ minWidth: 0 }}>
-            <GlassBadge tone="gold" style={{ marginBottom: 8 }}>Первый вход</GlassBadge>
+            <GlassBadge tone="gold" style={{ marginBottom: 8 }}>{badge}</GlassBadge>
             <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '30px', fontWeight: 900 }}>
-              Добро пожаловать в АПГ!
+              {title}
             </div>
           </div>
         </div>
 
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', marginBottom: 18 }}>
-          {firstName ? `${firstName}, перед началом использования приложения подтвердите необходимые согласия.` : 'Перед началом использования приложения подтвердите необходимые согласия.'}
+          {firstName ? `${firstName}, ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}` : subtitle}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -141,7 +151,10 @@ export function ConsentScreen({ user, onAccept, onCancel, loading = false }) {
           </ConsentCheckbox>
 
           <ConsentCheckbox checked={notificationsAccepted} onChange={setNotificationsAccepted}>
-            Хочу получать уведомления о новостях, мероприятиях, акциях и новых возможностях АПГ.
+            Хочу получать уведомления о:
+            <span style={{ display: 'block', marginTop: 7, color: APG2_PROFILE.textMuted, fontWeight: 560 }}>
+              новых мероприятиях; городских новостях; розыгрышах; специальных предложениях партнёров.
+            </span>
           </ConsentCheckbox>
         </div>
 
