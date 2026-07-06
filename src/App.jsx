@@ -22,14 +22,15 @@ async function checkForUpdate() {
 }
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
+const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C' };
 
-function AdminFallback() {
+function AppFallback({ label = 'Загрузка...' }) {
   return (
     <div style={{ background: T.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
       <div style={{ fontSize: 28 }}>⚙️</div>
-      <div style={{ color: T.gold, fontSize: 14, fontWeight: 600 }}>Загрузка панели...</div>
+      <div style={{ color: T.gold, fontSize: 14, fontWeight: 600 }}>{label}</div>
     </div>
   );
 }
@@ -42,8 +43,13 @@ export function App() {
         <Routes>
           <Route path="/" element={<UserApp />} />
           <Route path="/admin" element={
-            <Suspense fallback={<AdminFallback />}>
+            <Suspense fallback={<AppFallback label="Загрузка панели..." />}>
               <AdminPanel />
+            </Suspense>
+          } />
+          <Route path="/assistant" element={
+            <Suspense fallback={<AppFallback label="Загрузка помощника..." />}>
+              <AssistantMiniApp />
             </Suspense>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />

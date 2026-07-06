@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V5.3 Telegram Mini App «Помощник АПГ»
+**Коммит:** N/A
+**Файлы:** `src/App.jsx`, `src/assistant/AssistantMiniApp.jsx`, `src/assistant/guides.json`, `src/assistant/faq.json`
+**Тип:** feat
+**Что изменено:** Добавлен отдельный маршрут `/#/assistant` для Telegram Mini App: главный экран помощника, guided-инструкции по карточкам, локальная JSON-база знаний, поиск по ключевым словам и режим «Задать вопрос».
+**Почему:** АПГ нужен не обычный чат-бот, а управляемый интерактивный помощник, который можно позже подключить к AI без переписывания интерфейса.
+
+---
+
 ## [2026-07-07] V5.2 Motion Design System
 **Коммит:** N/A
 **Файлы:** `src/motion.js`, `src/index.css`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/Scanner.jsx`, `src/SplashScreen.jsx`, `src/ExpertsPage.jsx`, `src/components/Apg2ProfileGlass.jsx`
