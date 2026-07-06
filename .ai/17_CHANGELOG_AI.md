@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Loki Brain V1
-**Коммит:** N/A
+**Коммит:** `c3ac0937`
 **Файлы:** `src/loki/LokiBrain.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/lokiEvents.js`, `src/UserApp.jsx`
 **Тип:** feat
 **Что изменено:** Добавлен первый Loki Brain: data-grounded обработка естественных запросов по данным АПГ, контекст пользователя/экрана/партнёров/событий/новостей, безопасные action-ответы и мини-ввод «Спросить Локи».
