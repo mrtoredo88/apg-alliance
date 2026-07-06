@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Web/PWA haptic fallback
+**Коммит:** N/A
+**Файлы:** `src/UserApp.jsx`, `src/vk.js`
+**Тип:** feat
+**Что изменено:** Для web/PWA добавлен прямой fallback через `navigator.vibrate` с паттернами `light`, `medium`, `heavy`, `success` и защитой от слишком частых срабатываний.
+**Почему:** В web app версии важные действия должны ощущаться нативнее там, где браузер поддерживает Vibration API.
+
+---
+
 ## [2026-07-07] V5.1 Native UX gestures
 **Коммит:** N/A
 **Файлы:** `src/UserApp.jsx`, `src/Scanner.jsx`, `src/ExpertsPage.jsx`, `src/components/Apg2ProfileGlass.jsx`, `src/index.css`

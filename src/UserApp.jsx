@@ -168,6 +168,7 @@ function LazyFallback() {
 
 export function UserApp() {
   const appStartTime                            = useRef(Date.now());
+  const lastHapticAtRef                         = useRef(0);
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
   const claimingPrizeRef                        = useRef(false);
@@ -294,7 +295,24 @@ export function UserApp() {
   }, [verifyEmailToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const haptic = useCallback((style = 'light') => {
-    vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
+    const now = Date.now();
+    if (now - lastHapticAtRef.current < 70) return;
+    lastHapticAtRef.current = now;
+
+    if (isVK()) {
+      vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
+      return;
+    }
+
+    const patterns = {
+      light: 8,
+      medium: [12, 18, 10],
+      heavy: [18, 22, 16],
+      success: [10, 20, 24],
+    };
+    try {
+      navigator.vibrate?.(patterns[style] ?? patterns.light);
+    } catch {}
   }, []);
 
   const navigatePanel = useCallback((id, { replace = false, direction = 'forward' } = {}) => {

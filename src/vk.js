@@ -35,7 +35,12 @@ const send = async (method, params = {}) => {
       }
 
       case 'VKWebAppTapticImpactOccurred':
-        navigator.vibrate?.(5);
+        navigator.vibrate?.({
+          light: 8,
+          medium: [12, 18, 10],
+          heavy: [18, 22, 16],
+          success: [10, 20, 24],
+        }[params.style] ?? 8);
         return {};
 
       case 'VKWebAppAllowNotifications':
