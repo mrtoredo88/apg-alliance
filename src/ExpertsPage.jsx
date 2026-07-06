@@ -168,6 +168,9 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
 function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan }) {
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
+  const [dragY, setDragY] = useState(0);
+  const dragStartYRef = useRef(0);
+  const dragReadyRef = useRef(false);
   const shareToastRef = useRef(null);
 
   useEffect(() => {
@@ -430,7 +433,23 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       onClick={onClose}
     >
       <div
-        style={{ ...GLASS_STRONG, borderRadius: '28px 28px 0 0', width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '20px 20px 52px' }}
+        onTouchStart={(e) => {
+          dragStartYRef.current = e.touches[0].clientY;
+          dragReadyRef.current = e.currentTarget.scrollTop <= 2;
+        }}
+        onTouchMove={(e) => {
+          if (!dragReadyRef.current) return;
+          const dy = e.touches[0].clientY - dragStartYRef.current;
+          if (dy > 0) setDragY(Math.min(dy, 190));
+        }}
+        onTouchEnd={() => {
+          const shouldClose = dragY > 92;
+          setDragY(0);
+          dragReadyRef.current = false;
+          if (shouldClose) onClose();
+        }}
+        onTouchCancel={() => { setDragY(0); dragReadyRef.current = false; }}
+        style={{ ...GLASS_STRONG, borderRadius: '28px 28px 0 0', width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '20px 20px 52px', transform: `translate3d(0, ${dragY}px, 0)`, transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.22,1,0.36,1)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Handle */}

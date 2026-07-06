@@ -8,9 +8,11 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
   const scannerRef     = useRef(null);
   const doneRef        = useRef(false);
   const onConfirmRef   = useRef(onConfirm);
+  const dragStartYRef   = useRef(0);
   const [err, setErr]           = useState(null);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn]   = useState(false);
+  const [dragY, setDragY]       = useState(0);
 
   useEffect(() => { onConfirmRef.current = onConfirm; }, [onConfirm]);
 
@@ -73,6 +75,7 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
 
   const handleClose = useCallback(() => {
     stopScanner();
+    setDragY(0);
     onClose?.();
   }, [stopScanner, onClose]);
 
@@ -86,11 +89,30 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{
+    <div
+      onTouchStart={(e) => { dragStartYRef.current = e.touches[0].clientY; }}
+      onTouchMove={(e) => {
+        const dy = e.touches[0].clientY - dragStartYRef.current;
+        if (dy > 0) setDragY(Math.min(dy, 190));
+      }}
+      onTouchEnd={() => {
+        if (dragY > 96) {
+          handleClose();
+          return;
+        }
+        setDragY(0);
+      }}
+      onTouchCancel={() => setDragY(0)}
+      style={{
       position: 'fixed', inset: 0,
       background: '#000',
       zIndex: 12000,
       display: 'flex', flexDirection: 'column',
+      transform: `translate3d(0, ${dragY}px, 0)`,
+      opacity: dragY ? Math.max(0.68, 1 - dragY / 420) : 1,
+      transition: dragY ? 'none' : 'transform 240ms cubic-bezier(0.22,1,0.36,1), opacity 220ms ease',
+      animation: 'scannerEnter 260ms cubic-bezier(0.22,1,0.36,1) both',
+      touchAction: 'pan-y',
     }}>
       {/* Camera feed */}
       <video
@@ -142,6 +164,7 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
         alignItems: 'center', justifyContent: 'center',
         gap: 24,
       }}>
+        <div style={{ position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)', width: 46, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.32)', boxShadow: '0 0 20px rgba(201,168,76,0.18)' }} />
         {err ? (
           <div style={{
             background: 'rgba(230,70,70,0.15)',

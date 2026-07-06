@@ -52,9 +52,21 @@ function getQrErrorMessage(error) {
 }
 
 function ScanSuccessModal({ result, onClose, onReview }) {
+  const startYRef = useRef(0);
+  const [dragY, setDragY] = useState(0);
   if (!result) return null;
   const keys = Number(result.awardedKeys ?? 1) || 1;
   const keyWord = keys === 1 ? 'ключ' : keys < 5 ? 'ключа' : 'ключей';
+  const handleTouchStart = (e) => { startYRef.current = e.touches[0].clientY; };
+  const handleTouchMove = (e) => {
+    const dy = e.touches[0].clientY - startYRef.current;
+    if (dy > 0) setDragY(Math.min(dy, 170));
+  };
+  const handleTouchEnd = () => {
+    const shouldClose = dragY > 86;
+    setDragY(0);
+    if (shouldClose) onClose();
+  };
   return createPortal(
     <div
       style={{
@@ -66,7 +78,14 @@ function ScanSuccessModal({ result, onClose, onReview }) {
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <GlassCard style={{ width: '100%', maxWidth: 390, borderRadius: 34, padding: 24, textAlign: 'center', border: '1px solid rgba(215,184,106,0.30)' }}>
+      <GlassCard
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => setDragY(0)}
+        style={{ width: '100%', maxWidth: 390, borderRadius: 34, padding: 24, textAlign: 'center', border: '1px solid rgba(215,184,106,0.30)', transform: `translate3d(0, ${dragY}px, 0) scale(${dragY ? Math.max(0.965, 1 - dragY / 2200) : 1})`, transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.22,1,0.36,1)' }}
+      >
+        <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', margin: '0 auto 15px' }} />
         <div style={{ width: 76, height: 76, margin: '0 auto 16px', borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28), 0 20px 46px rgba(215,184,106,0.20)' }}>🎉</div>
         <GlassBadge tone="gold" style={{ marginBottom: 12 }}>Спасибо за посещение</GlassBadge>
         <div style={{ color: APG2_PROFILE.text, fontSize: 27, lineHeight: '31px', fontWeight: 920, marginBottom: 8 }}>Ключ успешно получен!</div>
@@ -97,7 +116,8 @@ function formatCacheAge(ts) {
 
 initErrorLogger();
 
-const SWIPE_TABS = ['home', 'experts', 'tasks', 'profile'];
+const SWIPE_TABS = ['home', 'offers', 'experts', 'profile'];
+const PULL_REFRESH_PANELS = new Set(['home', 'offers', 'experts', 'events']);
 
 function isLocalHost() {
   const h = window.location.hostname;
@@ -159,6 +179,10 @@ export function UserApp() {
   const [scanDates, setScanDates]               = useState([]);
 
   const [activePanel, setActivePanel]           = useState('home');
+  const panelHistoryRef                         = useRef(['home']);
+  const [panelTransition, setPanelTransition]   = useState('forward');
+  const [pullDistance, setPullDistance]         = useState(0);
+  const [pullRefreshing, setPullRefreshing]     = useState(false);
   const [activePartner, setActivePartner]       = useState(null);
 
   const [user, setUser]                         = useState(null);
@@ -272,6 +296,51 @@ export function UserApp() {
   const haptic = useCallback((style = 'light') => {
     vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
   }, []);
+
+  const navigatePanel = useCallback((id, { replace = false, direction = 'forward' } = {}) => {
+    if (!id) return;
+    setIsScannerOpen(false);
+    setShowScannerHint(false);
+    setPanelTransition(direction);
+    const history = panelHistoryRef.current;
+    if (replace) {
+      history[history.length - 1] = id;
+    } else if (history[history.length - 1] !== id) {
+      history.push(id);
+      if (history.length > 24) history.shift();
+    }
+    setActivePanel(id);
+  }, []);
+
+  const getFallbackBackPanel = useCallback((panel) => {
+    if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet') return 'profile';
+    return 'home';
+  }, []);
+
+  const goBackPanel = useCallback(() => {
+    if (isScannerOpen) {
+      setIsScannerOpen(false);
+      return true;
+    }
+    const history = panelHistoryRef.current;
+    let target = null;
+    if (history.length > 1) {
+      history.pop();
+      target = history[history.length - 1];
+    } else if (activePanel !== 'home') {
+      target = getFallbackBackPanel(activePanel);
+      history[0] = target;
+    }
+    if (!target || target === activePanel) return false;
+    setPanelTransition('back');
+    setShowScannerHint(false);
+    setActivePanel(target);
+    return true;
+  }, [activePanel, getFallbackBackPanel, isScannerOpen]);
+
+  const goPanel = useCallback((id) => {
+    navigatePanel(id);
+  }, [navigatePanel]);
 
   // Offline/online detection
   useEffect(() => {
@@ -738,6 +807,19 @@ export function UserApp() {
     await loadData(mountedRef);
   }, [loadData]);
 
+  const triggerPullRefresh = useCallback(async () => {
+    if (pullRefreshing || !PULL_REFRESH_PANELS.has(activePanel)) return;
+    setPullRefreshing(true);
+    try {
+      await handleRefresh();
+    } finally {
+      if (mountedRef.current) {
+        setPullRefreshing(false);
+        setPullDistance(0);
+      }
+    }
+  }, [activePanel, handleRefresh, pullRefreshing]);
+
   // ─── Onboarding ─────────────────────────────────────────────────────────────
 
   const handleOnboardingComplete = async () => {
@@ -898,8 +980,8 @@ export function UserApp() {
 
   const openPartner = useCallback((partner) => {
     setActivePartner(partner);
-    setActivePanel('partner');
-  }, []);
+    navigatePanel('partner');
+  }, [navigatePanel]);
 
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
@@ -927,10 +1009,10 @@ export function UserApp() {
     expertDeepLinkOpened.current = true;
     const e = experts.find(e => e.id === pendingExpertId);
     if (e) {
-      setActivePanel('experts');
+      navigatePanel('experts');
       updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
     }
-  }, [pendingExpertId, experts]);
+  }, [pendingExpertId, experts, navigatePanel]);
 
   // ─── Задания ────────────────────────────────────────────────────────────────
 
@@ -1229,33 +1311,73 @@ export function UserApp() {
 
   const swipeTouchX  = useRef(null);
   const swipeTouchY  = useRef(null);
+  const edgeSwipeRef = useRef(false);
+  const pullTouchRef = useRef({ active: false, startY: 0, startX: 0 });
 
   const handleSwipeStart = useCallback((e) => {
-    swipeTouchX.current = e.touches[0].clientX;
-    swipeTouchY.current = e.touches[0].clientY;
-  }, []);
+    const touch = e.touches[0];
+    swipeTouchX.current = touch.clientX;
+    swipeTouchY.current = touch.clientY;
+    edgeSwipeRef.current = touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);
+    pullTouchRef.current = {
+      active: window.scrollY <= 2 && PULL_REFRESH_PANELS.has(activePanel) && !pullRefreshing,
+      startY: touch.clientY,
+      startX: touch.clientX,
+    };
+  }, [activePanel, pullRefreshing]);
+
+  const handleSwipeMove = useCallback((e) => {
+    const pull = pullTouchRef.current;
+    if (!pull.active || pullRefreshing) return;
+    const touch = e.touches[0];
+    const dy = touch.clientY - pull.startY;
+    const dx = touch.clientX - pull.startX;
+    if (Math.abs(dx) > 46 || dy < 0) {
+      setPullDistance(0);
+      return;
+    }
+    setPullDistance(Math.min(86, Math.round(dy * 0.42)));
+  }, [pullRefreshing]);
 
   const handleSwipeEnd = useCallback((e) => {
     if (swipeTouchX.current === null) return;
     const dx = e.changedTouches[0].clientX - swipeTouchX.current;
     const dy = e.changedTouches[0].clientY - swipeTouchY.current;
+    const wasEdgeSwipe = edgeSwipeRef.current;
+    const pull = pullTouchRef.current;
     swipeTouchX.current = null;
     swipeTouchY.current = null;
+    edgeSwipeRef.current = false;
+    pullTouchRef.current = { active: false, startY: 0, startX: 0 };
+
+    if (wasEdgeSwipe && dx > 72 && Math.abs(dy) < 76) {
+      haptic('light');
+      goBackPanel();
+      setPullDistance(0);
+      return;
+    }
+
+    if (pull.active && dy > 118 && Math.abs(dx) < 54) {
+      triggerPullRefresh();
+      return;
+    }
+    setPullDistance(0);
+
     // Только горизонтальные свайпы > 90px при вертикальном сдвиге < 60px
-    if (Math.abs(dx) < 90 || Math.abs(dy) > 60) return;
+    if (wasEdgeSwipe || Math.abs(dx) < 90 || Math.abs(dy) > 60) return;
     const idx = SWIPE_TABS.indexOf(activePanel);
     if (idx === -1) return;          // не на основном табе
     if (dx < 0 && idx < SWIPE_TABS.length - 1) { haptic('light'); goPanel(SWIPE_TABS[idx + 1]); }
     if (dx > 0 && idx > 0)                      { haptic('light'); goPanel(SWIPE_TABS[idx - 1]); }
-  }, [activePanel, haptic]);
+  }, [activePanel, goBackPanel, goPanel, haptic, triggerPullRefresh]);
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
   const openNotifications = useCallback(() => {
     localStorage.setItem('apg_notif_seen', String(Date.now()));
     setUnreadCount(0);
-    setActivePanel('notifications');
-  }, []);
+    navigatePanel('notifications');
+  }, [navigatePanel]);
 
   const VAPID_KEY = 'BAWMFhQ-O6D25-j9s7I_y4kcNDfUMcnqHAdvDoFn-wY4GrMGrgB0I0tU_aPz_7jcr6X0vbkSs0Q1T6UsuyHR8r0';
 
@@ -1364,14 +1486,6 @@ export function UserApp() {
     }
   }, [user, joinedGroup, showToast]);
 
-  // ─── Навигация ──────────────────────────────────────────────────────────────
-
-  const goPanel = useCallback((id) => {
-    setIsScannerOpen(false);
-    setShowScannerHint(false);
-    setActivePanel(id);
-  }, []);
-
   const lastSeenTs = (() => {
     const v = localStorage.getItem('apg_notif_seen');
     return v ? { toDate: () => new Date(Number(v)) } : null;
@@ -1431,6 +1545,7 @@ export function UserApp() {
     { id: 'experts', label: 'Эксперты', icon: TabExpertsIcon },
     { id: 'profile', label: 'Профиль',  icon: TabProfileIcon },
   ];
+  const activeTabIndex = TABS.findIndex(tab => tab.id === activePanel);
 
   useEffect(() => {
     const el = tabBarRef.current;
@@ -1526,6 +1641,25 @@ export function UserApp() {
 
   const tabBarEl = (
     <div ref={tabBarRef} style={tabBarShellStyle}>
+      {activeTabIndex >= 0 && !isScannerOpen && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 'var(--apg-island-pad, 8px)',
+            bottom: 'var(--apg-island-pad, 8px)',
+            left: `calc(${activeTabIndex * 20}% + 6px)`,
+            width: 'calc(20% - 8px)',
+            borderRadius: 23,
+            background: 'radial-gradient(circle at 50% 0%, rgba(255,245,203,0.26), transparent 56%), linear-gradient(145deg, rgba(244,217,140,0.19), rgba(255,255,255,0.07))',
+            border: '1px solid rgba(244,217,140,0.24)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.24), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.16))',
+            transform: 'translate3d(0,0,0)',
+            transition: 'left 230ms cubic-bezier(0.22,1,0.36,1), width 230ms cubic-bezier(0.22,1,0.36,1), opacity 180ms ease',
+            zIndex: 0,
+          }}
+        />
+      )}
       {TABS.map((tab, i) => {
         if (i === 2) return (
           <button key="scan" aria-label="Открыть сканер" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
@@ -1550,7 +1684,7 @@ export function UserApp() {
           <button key={tab.id}
             aria-label={`Открыть раздел ${tab.label}`}
             onClick={() => { haptic('light'); goPanel(tab.id); }}
-            style={{ flex: 1, background: isActive ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isActive ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: 'transform 0.22s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
+            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: 'transform 0.22s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
               {hasNotif && (
@@ -1686,8 +1820,27 @@ export function UserApp() {
           <div
             style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}
+            onTouchMove={handleSwipeMove}
             onTouchEnd={handleSwipeEnd}
           >
+
+            {(pullDistance > 0 || pullRefreshing) && (
+              <div style={{
+                position: 'fixed',
+                top: 'calc(var(--safe-top, 0px) + 10px)',
+                left: '50%',
+                zIndex: 11000,
+                transform: `translate3d(-50%, ${pullRefreshing ? 18 : Math.min(34, pullDistance * 0.36)}px, 0) scale(${pullRefreshing ? 1 : Math.min(1, 0.82 + pullDistance / 260)})`,
+                opacity: pullRefreshing ? 1 : Math.min(1, pullDistance / 56),
+                pointerEvents: 'none',
+                transition: pullRefreshing ? 'transform 180ms ease, opacity 180ms ease' : 'none',
+              }}>
+                <div style={{ ...APG2_PROFILE.glass, height: 44, minWidth: 128, borderRadius: 999, padding: '0 15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, color: APG2_PROFILE.text, boxShadow: '0 16px 42px var(--apg2-elev-shadow, rgba(0,0,0,0.24)), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.30)' }}>
+                  <span style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(215,184,106,0.22)', borderTopColor: APG2_PROFILE.gold, animation: pullRefreshing ? 'spin 0.82s linear infinite' : 'none', transform: pullRefreshing ? 'none' : `rotate(${pullDistance * 4}deg)` }} />
+                  <span style={{ fontSize: 12, fontWeight: 780, color: APG2_PROFILE.textSoft }}>{pullRefreshing ? 'Обновляем' : 'Потяните ещё'}</span>
+                </div>
+              </div>
+            )}
 
             {/* Анимация получения ключа */}
             {keyBurst && (
@@ -1724,7 +1877,7 @@ export function UserApp() {
               </div>
             )}
 
-            <div key={activePanel} style={{ minHeight: '100%', animation: 'fadeInUp 0.26s cubic-bezier(0.22,1,0.36,1) both' }}>
+            <div key={activePanel} style={{ minHeight: '100%', animation: `${panelTransition === 'back' ? 'pageSlideBackIn' : 'pageSlideForwardIn'} 0.28s cubic-bezier(0.22,1,0.36,1) both` }}>
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
@@ -1736,7 +1889,7 @@ export function UserApp() {
                     partner={activePartner ? (enrichedPartners.find(p => p.id === activePartner.id) ?? activePartner) : null}
                     variant="v2"
                     isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                     onToggleFavorite={toggleFavorite}
                     onOpenPartner={openPartner}
                     partners={enrichedPartners}
@@ -1788,7 +1941,7 @@ export function UserApp() {
               {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
               <Panel id="events">
                 <Suspense fallback={<LazyFallback />}>
-                  <EventsPage nav="events" variant="v2" events={events} onBack={() => goPanel('home')} appearance={appearance} />
+                  <EventsPage nav="events" variant="v2" events={events} onBack={goBackPanel} appearance={appearance} />
                 </Suspense>
               </Panel>
 
@@ -1801,7 +1954,7 @@ export function UserApp() {
                     scannedCount={Object.keys(scannedPartnerIds).length}
                     completedTasks={completedTasks}
                     customTasks={customTasks}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                     onClaim={handleClaim}
                   />
                 </Suspense>
@@ -1814,20 +1967,20 @@ export function UserApp() {
                     variant="v2"
                     userKeys={userKeys}
                     currentUserId={user?.id ? String(user.id) : null}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                   />
                 </Suspense>
               </Panel>
 
               <Panel id="offers">
                 <Suspense fallback={<LazyFallback />}>
-                  <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                  <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onBack={goBackPanel} />
                 </Suspense>
               </Panel>
 
               <Panel id="activity">
                 <Suspense fallback={<LazyFallback />}>
-                  <ActivityPage nav="activity" variant="v2" userId={user?.id ? String(user.id) : null} onBack={() => goPanel('profile')} />
+                  <ActivityPage nav="activity" variant="v2" userId={user?.id ? String(user.id) : null} onBack={goBackPanel} />
                 </Suspense>
               </Panel>
 
@@ -1837,7 +1990,7 @@ export function UserApp() {
                     variant="v2"
                     user={user} referralCount={referralCount}
                     completedTasks={completedTasks}
-                    onBack={() => goPanel('profile')}
+                    onBack={goBackPanel}
                     onShare={handleShare}
                   />
                 </Suspense>
@@ -1849,7 +2002,7 @@ export function UserApp() {
                     variant="v2"
                     partner={ownedPartner}
                     expert={ownedExpert}
-                    onBack={() => goPanel('profile')}
+                    onBack={goBackPanel}
                     onPartnerUpdate={(updated) => {
                       setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
                       setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
@@ -1863,7 +2016,7 @@ export function UserApp() {
                   <ExpertCabinetPage
                     variant="v2"
                     expert={ownedExpert}
-                    onBack={() => goPanel('profile')}
+                    onBack={goBackPanel}
                     onExpertUpdate={(updated) => {
                       setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
                       setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
@@ -1878,7 +2031,7 @@ export function UserApp() {
                     nav="rewards"
                     variant="v2"
                     user={user} userKeys={userKeys}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                     onClaim={handlePrizeClaim}
                     onRaffleEnter={handleRaffleEnter}
                     partners={partners}
@@ -1895,7 +2048,7 @@ export function UserApp() {
                     experts={experts}
                     user={user}
                     scannedExperts={scannedExperts}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                     isActive={activePanel === 'experts'}
                     initialExpertId={pendingExpertId}
                     onScan={() => setIsScannerOpen(true)}
@@ -1905,13 +2058,13 @@ export function UserApp() {
 
               <Panel id="map">
                 <Suspense fallback={<LazyFallback />}>
-                  <MapPage variant="v2" partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                  <MapPage variant="v2" partners={partners} onOpenPartner={openPartner} onBack={goBackPanel} />
                 </Suspense>
               </Panel>
 
               <Panel id="nearby">
                 <Suspense fallback={<LazyFallback />}>
-                  <NearbyPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onOpenMap={() => goPanel('map')} onBack={() => goPanel('home')} />
+                  <NearbyPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onOpenMap={() => goPanel('map')} onBack={goBackPanel} />
                 </Suspense>
               </Panel>
 
@@ -1925,7 +2078,7 @@ export function UserApp() {
                     lastSeenTs={lastSeenTs}
                     userKeys={userKeys}
                     lastScanDate={lastScanDate}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                   />
                 </Suspense>
               </Panel>
@@ -1936,7 +2089,7 @@ export function UserApp() {
                     userCount={platformStats.userCount}
                     partnerCount={partners.length}
                     totalScans={platformStats.totalScans}
-                    onBack={() => goPanel('home')}
+                    onBack={goBackPanel}
                   />
                 </Suspense>
               </Panel>

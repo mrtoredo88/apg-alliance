@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V5.1 Native UX gestures
+**Коммит:** N/A
+**Файлы:** `src/UserApp.jsx`, `src/Scanner.jsx`, `src/ExpertsPage.jsx`, `src/components/Apg2ProfileGlass.jsx`, `src/index.css`
+**Тип:** feat
+**Что изменено:** Добавлена единая история экранов и edge swipe back, pull-to-refresh для главных разделов, press-scale для glass-карточек и кнопок, drag-to-dismiss для модалок/сканера/success-modal, плавные slide-переходы и движущийся индикатор Floating Island.
+**Почему:** Пользовательское приложение должно ощущаться ближе к нативному iOS-приложению за счёт привычных жестов и единого motion-поведения.
+
+---
+
 ## [2026-07-06] Production deploy version.json без долгого кэша
 **Коммит:** `6bc380d4`
 **Файлы:** `deploy-frontend.sh`

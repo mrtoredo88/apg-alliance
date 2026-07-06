@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 
 export const APG2_PROFILE = {
   bg: 'var(--apg2-bg, radial-gradient(circle at 50% -8%, rgba(219,187,111,0.15), transparent 28%), radial-gradient(circle at 100% 8%, rgba(73,61,118,0.18), transparent 34%), linear-gradient(180deg,#111113 0%,#17181b 44%,#0f1013 100%))',
@@ -51,11 +51,22 @@ export function GlassBadge({ children, tone = 'glass', style }) {
   );
 }
 
-export function GlassCard({ children, tone = 'glass', style, onClick, ...rest }) {
+export function GlassCard({ children, tone = 'glass', style, onClick, onPointerDown, onPointerUp, onPointerLeave, onPointerCancel, ...rest }) {
+  const [pressed, setPressed] = useState(false);
   const gold = tone === 'gold';
   const Tag = onClick ? 'button' : 'div';
+  const baseTransform = style?.transform;
   return (
-    <Tag {...(onClick ? { type: 'button' } : {})} onClick={onClick} style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), borderRadius: APG2_PROFILE.radius.card, padding: 16, color: APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', WebkitTapHighlightColor: 'transparent', transition: 'transform 180ms ease, box-shadow 220ms ease, opacity 180ms ease', ...style }} {...rest}>
+    <Tag
+      {...(onClick ? { type: 'button' } : {})}
+      onClick={onClick}
+      onPointerDown={(e) => { if (onClick) setPressed(true); onPointerDown?.(e); }}
+      onPointerUp={(e) => { setPressed(false); onPointerUp?.(e); }}
+      onPointerLeave={(e) => { setPressed(false); onPointerLeave?.(e); }}
+      onPointerCancel={(e) => { setPressed(false); onPointerCancel?.(e); }}
+      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), borderRadius: APG2_PROFILE.radius.card, padding: 16, color: APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', WebkitTapHighlightColor: 'transparent', touchAction: onClick ? 'manipulation' : undefined, transition: 'transform 180ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms ease, opacity 180ms ease', ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(0.985)` : baseTransform }}
+      {...rest}
+    >
       {children}
     </Tag>
   );
@@ -69,10 +80,22 @@ export function GlassPanel({ children, style }) {
   );
 }
 
-export function GlassButton({ children, onClick, tone = 'glass', style, disabled = false, type = 'button', ...rest }) {
+export function GlassButton({ children, onClick, tone = 'glass', style, disabled = false, type = 'button', onPointerDown, onPointerUp, onPointerLeave, onPointerCancel, ...rest }) {
+  const [pressed, setPressed] = useState(false);
   const gold = tone === 'gold';
+  const baseTransform = style?.transform;
   return (
-    <button type={type} disabled={disabled} onClick={onClick} style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), minHeight: 46, borderRadius: APG2_PROFILE.radius.button, padding: '11px 14px', color: gold ? '#17120a' : APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', cursor: disabled ? 'default' : onClick ? 'pointer' : 'default', opacity: disabled ? 0.48 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'transform 180ms ease, box-shadow 220ms ease, opacity 180ms ease, background 220ms ease', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...style }} {...rest}>
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      onPointerDown={(e) => { if (!disabled && onClick) setPressed(true); onPointerDown?.(e); }}
+      onPointerUp={(e) => { setPressed(false); onPointerUp?.(e); }}
+      onPointerLeave={(e) => { setPressed(false); onPointerLeave?.(e); }}
+      onPointerCancel={(e) => { setPressed(false); onPointerCancel?.(e); }}
+      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), minHeight: 46, borderRadius: APG2_PROFILE.radius.button, padding: '11px 14px', color: gold ? '#17120a' : APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', cursor: disabled ? 'default' : onClick ? 'pointer' : 'default', opacity: disabled ? 0.48 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'transform 180ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms ease, opacity 180ms ease, background 220ms ease', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(0.97)` : baseTransform }}
+      {...rest}
+    >
       {children}
     </button>
   );
@@ -214,6 +237,26 @@ export function GlassSection({ title, action, children, style }) {
 }
 
 export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 }) {
+  const startYRef = useRef(0);
+  const dragReadyRef = useRef(false);
+  const [dragY, setDragY] = useState(0);
+
+  const handleTouchStart = (e) => {
+    startYRef.current = e.touches[0].clientY;
+    dragReadyRef.current = e.currentTarget.scrollTop <= 2;
+  };
+  const handleTouchMove = (e) => {
+    if (!dragReadyRef.current) return;
+    const dy = e.touches[0].clientY - startYRef.current;
+    if (dy > 0) setDragY(Math.min(dy, 180));
+  };
+  const handleTouchEnd = () => {
+    const shouldClose = dragY > 88;
+    setDragY(0);
+    dragReadyRef.current = false;
+    if (shouldClose) onClose?.();
+  };
+
   return (
     <div
       role="dialog"
@@ -240,6 +283,10 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
       }}
     >
       <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => { setDragY(0); dragReadyRef.current = false; }}
         style={{
           width: '100%',
           maxWidth,
@@ -252,9 +299,12 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
           background: 'radial-gradient(circle at 22% 0%,rgba(215,184,106,0.18),transparent 36%), linear-gradient(145deg,rgba(var(--apg2-glass-a,255,255,255),0.18),rgba(var(--apg2-glass-a,255,255,255),0.075))',
           boxShadow: '0 28px 90px rgba(0,0,0,0.36), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.30), inset 0 -24px 46px rgba(var(--apg2-glass-a,255,255,255),0.045)',
           animation: 'fadeInUp 220ms ease both',
+          transform: `translate3d(0, ${dragY}px, 0) scale(${dragY ? Math.max(0.965, 1 - dragY / 2200) : 1})`,
+          transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.22,1,0.36,1)',
         }}
         onClick={e => e.stopPropagation()}
       >
+        <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', margin: '0 auto 14px' }} />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, marginBottom: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {title && <div style={{ color: APG2_PROFILE.text, fontSize: 21, lineHeight: '25px', fontWeight: 850 }}>{title}</div>}
