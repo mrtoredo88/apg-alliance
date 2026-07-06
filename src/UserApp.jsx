@@ -19,6 +19,10 @@ import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassLoader, GlassToast } from './components/Apg2ProfileGlass.jsx';
 import { MOTION, motionTransition } from './motion.js';
+import { LokiProvider } from './loki/LokiProvider.jsx';
+import { LokiAssistant } from './loki/LokiAssistant.jsx';
+import { LOKI_EVENTS } from './loki/lokiEvents.js';
+import { showLokiMessage } from './loki/lokiBus.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -360,6 +364,10 @@ export function UserApp() {
 
   const goPanel = useCallback((id) => {
     navigatePanel(id);
+    if (id === 'offers') showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { source: 'bottom_nav' });
+    if (id === 'events') showLokiMessage(LOKI_EVENTS.EVENT_OPENED, { source: 'bottom_nav' });
+    if (id === 'rewards') showLokiMessage(LOKI_EVENTS.PRIZE_OPENED, { source: 'home' });
+    if (id === 'profile') showLokiMessage(LOKI_EVENTS.PROFILE_OPENED, { source: 'bottom_nav' });
   }, [navigatePanel]);
 
   // Offline/online detection
@@ -971,6 +979,7 @@ export function UserApp() {
       if (awardedKeys > 0) {
         setUserKeys(prev => prev + awardedKeys);
         setKeyBurst({ amount: awardedKeys, id: Date.now() });
+        showLokiMessage(LOKI_EVENTS.KEY_RECEIVED, { keysCount: awardedKeys, source: result.subjectType, id: result.subjectId });
         const partner = result.subjectType === 'partner'
           ? enrichedPartners.find(p => p.id === result.subjectId)
           : null;
@@ -984,6 +993,7 @@ export function UserApp() {
       }
     } catch (e) {
       logError(e, 'UserApp.handleConfirmScan.reward');
+      showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'qr_scan' });
       showToast(getQrErrorMessage(e), 'error');
     } finally {
       setIsScannerOpen(false);
@@ -1000,6 +1010,7 @@ export function UserApp() {
 
   const openPartner = useCallback((partner) => {
     setActivePartner(partner);
+    showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { id: partner?.id, partnerName: partner?.name });
     navigatePanel('partner');
   }, [navigatePanel]);
 
@@ -1044,6 +1055,7 @@ export function UserApp() {
     try {
       const uid = String(user.id);
       await updateDoc(doc(db, 'users', uid), { completedTasks: captured, keys: increment(reward) });
+      showLokiMessage(LOKI_EVENTS.ACHIEVEMENT_UNLOCKED, { taskId, reward });
       addDoc(collection(db, 'users', uid, 'activity'), {
         type: 'task', icon: '✅',
         text: `Задание выполнено: +${reward} ключей`,
@@ -1051,6 +1063,7 @@ export function UserApp() {
       }).catch(() => {});
     } catch (e) {
       logError(e, 'UserApp.handleClaim');
+      showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'task_claim' });
       setCompletedTasks(prev => prev.filter(id => id !== taskId));
       setUserKeys(prev => prev - reward);
       showToast('Ошибка при сохранении. Попробуйте ещё раз.');
@@ -1837,6 +1850,7 @@ export function UserApp() {
     <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
         <AppRoot>
+          <LokiProvider user={user} activePanel={activePanel}>
           <div
             style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}
@@ -2245,6 +2259,8 @@ export function UserApp() {
               setToast(null);
             }}
           />
+          {splashDone && !isScannerOpen && !consentRequest && <LokiAssistant />}
+          </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>

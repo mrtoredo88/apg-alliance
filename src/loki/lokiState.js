@@ -1,0 +1,64 @@
+export const LOKI_STORAGE_KEY = 'apg_loki_settings_v1';
+export const LOKI_GREETING_KEY = 'apg_loki_greeting_seen_v1';
+export const LOKI_DAILY_KEY = 'apg_loki_daily_visit_v1';
+
+export const DEFAULT_LOKI_SETTINGS = {
+  enabled: true,
+  hiddenPanels: [],
+  bubbleEnabled: true,
+};
+
+export function normalizeLokiSettings(value) {
+  const settings = value && typeof value === 'object' ? value : {};
+  return {
+    ...DEFAULT_LOKI_SETTINGS,
+    ...settings,
+    hiddenPanels: Array.isArray(settings.hiddenPanels) ? settings.hiddenPanels.filter(Boolean) : [],
+  };
+}
+
+export function loadLokiSettings() {
+  try {
+    return normalizeLokiSettings(JSON.parse(localStorage.getItem(LOKI_STORAGE_KEY) || '{}'));
+  } catch {
+    return DEFAULT_LOKI_SETTINGS;
+  }
+}
+
+export function saveLokiSettings(settings) {
+  try {
+    localStorage.setItem(LOKI_STORAGE_KEY, JSON.stringify(normalizeLokiSettings(settings)));
+  } catch {}
+}
+
+export function getLokiUserKey(baseKey, userId) {
+  return `${baseKey}:${userId || 'guest'}`;
+}
+
+export function hasSeenLokiGreeting(userId) {
+  try {
+    return localStorage.getItem(getLokiUserKey(LOKI_GREETING_KEY, userId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markLokiGreetingSeen(userId) {
+  try {
+    localStorage.setItem(getLokiUserKey(LOKI_GREETING_KEY, userId), '1');
+  } catch {}
+}
+
+export function hasLokiDailyVisit(userId, dayKey) {
+  try {
+    return localStorage.getItem(getLokiUserKey(LOKI_DAILY_KEY, userId)) === dayKey;
+  } catch {
+    return false;
+  }
+}
+
+export function markLokiDailyVisit(userId, dayKey) {
+  try {
+    localStorage.setItem(getLokiUserKey(LOKI_DAILY_KEY, userId), dayKey);
+  } catch {}
+}

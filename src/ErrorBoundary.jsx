@@ -1,5 +1,7 @@
 import React from 'react';
 import { logError } from './errorLogger.js';
+import { LOKI_EVENTS } from './loki/lokiEvents.js';
+import { showLokiMessage } from './loki/lokiBus.js';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -13,6 +15,7 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     logError(error, 'ErrorBoundary:' + (info.componentStack ?? '').slice(0, 200));
+    showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'error_boundary' });
   }
 
   render() {

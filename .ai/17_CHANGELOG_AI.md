@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V1 персонажа Локи в приложении
+**Коммит:** `fea775be`
+**Файлы:** `public/loki.png`, `src/loki/LokiAssistant.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/lokiBus.js`, `src/loki/lokiEvents.js`, `src/loki/lokiPhrases.js`, `src/loki/lokiState.js`, `src/UserApp.jsx`, `src/ErrorBoundary.jsx`, `src/index.css`
+**Тип:** feat
+**Что изменено:** Добавлен плавающий талисман Локи с состояниями, репликами, event bus, локальными настройками, синхронизацией пользовательских настроек и интеграцией в ключевые события приложения.
+**Почему:** АПГ нужен живой персонаж-помощник без сложного AI на первом этапе, с архитектурой для будущего AI-помощника.
+
+---
+
 ## [2026-07-07] V5.4 интеграция Помощника АПГ в Telegram-бота
 **Коммит:** N/A
 **Файлы:** `index.html`, `src/App.jsx`, `src/assistant/AssistantMiniApp.jsx`, `src/assistant/categories.json`, `src/assistant/guides.json`, `src/assistant/faq.json`, `api/telegram-webhook.js`, `server/src/routes/telegram-webhook.js`
