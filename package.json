@@ -8,6 +8,7 @@
     "build": "vite build",
     "local:pwa": "npm run build && node scripts/serve-local-prod.mjs",
     "local:pwa:http": "npm run build && node scripts/serve-local-prod.mjs --http",
+    "knowledge:update": "node scripts/update-apg-chronicles.mjs",
     "demo:emulator": "firebase emulators:start --only firestore --project project-apg-bbfc8",
     "demo:seed": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/demo-content.mjs",
     "demo:clear": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/demo-content.mjs --clear",

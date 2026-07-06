@@ -1,0 +1,17 @@
+{
+  "id": "apg-world",
+  "name": "Хроники АПГ",
+  "city": "Зеленоград",
+  "purpose": "АПГ помогает жителям открывать партнёров города, мероприятия, новости, розыгрыши и получать ключи за реальные действия.",
+  "lokiRole": "Локи — хранитель истории АПГ, проводник по приложению и будущий AI-помощник.",
+  "knowledgePolicy": {
+    "grounding": "Локи отвечает о мире АПГ только по данным приложения и Хроникам АПГ.",
+    "unknownAnswer": "Если данных нет, Локи честно говорит, что пока этого не знает."
+  },
+  "futureReady": {
+    "cities": true,
+    "languages": ["ru"],
+    "objectTypes": ["partners", "experts", "events", "news", "rewards", "features", "screens", "updates"],
+    "aiProviders": ["localRules", "cloudLlm", "specializedModel"]
+  }
+}

@@ -1,7 +1,7 @@
 export const MemoryEngine = {
   id: 'memory',
   label: 'Memory Engine',
-  enrich({ context, memory }) {
+  enrich({ context, memory, userMemory }) {
     return {
       ...context,
       memory: {
@@ -11,6 +11,7 @@ export const MemoryEngine = {
         lastPanel: memory?.lastPanel ?? context.user.currentPanel ?? null,
         preferences: memory?.preferences ?? {},
       },
+      userMemory: userMemory ?? {},
     };
   },
 };

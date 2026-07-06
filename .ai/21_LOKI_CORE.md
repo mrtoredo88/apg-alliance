@@ -13,6 +13,8 @@ Loki Core
   ↓
 Memory Engine enriches context
   ↓
+APG Knowledge Base adds world knowledge
+  ↓
 Capability modules are checked in order
   ↓
 Selected module returns a grounded result
@@ -29,6 +31,7 @@ Loki Actions execute navigation or app action
 | Module | Responsibility |
 |---|---|
 | `Navigator` | Navigation intents, follow-up actions, scanner, profile, nearby, notifications |
+| `KnowledgeExpert` | Screens, features and release history from Хроники АПГ |
 | `PartnerExpert` | Partners, categories, cafes, food, massage, offers, places |
 | `EventExpert` | Events, city agenda, upcoming activities |
 | `RewardsExpert` | Keys, achievements, tasks, prizes, raffles |

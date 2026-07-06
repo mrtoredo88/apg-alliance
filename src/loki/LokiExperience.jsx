@@ -16,12 +16,14 @@ function getShortTitle(value) {
   return String(value || 'АПГ').trim().slice(0, 48);
 }
 
-function LokiAvatar({ thinking }) {
+function LokiAvatar({ thinking, listening, speaking }) {
+  const animation = speaking ? 'lokiWave 1.15s' : listening ? 'lokiListen 1.6s' : thinking ? 'lokiThinking 1.45s' : 'lokiIdle 4.8s';
   return (
     <div style={{ position: 'relative', width: 178, height: 178, margin: '0 auto', display: 'grid', placeItems: 'center' }}>
-      <span style={{ position: 'absolute', inset: 16, borderRadius: 56, background: 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(8px)', opacity: thinking ? 1 : 0.72, animation: thinking ? 'lokiSparkle 1.3s ease-in-out infinite' : 'none' }} />
-      <span style={{ width: 148, height: 148, borderRadius: 48, overflow: 'hidden', position: 'relative', border: '1px solid rgba(215,184,106,0.34)', backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', boxShadow: '0 30px 80px rgba(0,0,0,0.34), 0 0 44px rgba(215,184,106,0.22)', animation: `${thinking ? 'lokiThinking' : 'lokiIdle'} ${thinking ? '1.45s' : '4.8s'} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
+      <span style={{ position: 'absolute', inset: 16, borderRadius: 56, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.24), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(8px)', opacity: thinking || listening || speaking ? 1 : 0.72, animation: thinking || speaking ? 'lokiSparkle 1.3s ease-in-out infinite' : 'none' }} />
+      <span style={{ width: 148, height: 148, borderRadius: 48, overflow: 'hidden', position: 'relative', border: '1px solid rgba(215,184,106,0.34)', backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', boxShadow: '0 30px 80px rgba(0,0,0,0.34), 0 0 44px rgba(215,184,106,0.22)', animation: `${animation} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
         <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 24%, rgba(255,255,255,0.16), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.10))' }} />
+        {speaking && <span style={{ position: 'absolute', left: 58, bottom: 36, width: 34, height: 8, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiBlink 740ms ease-in-out infinite' }} />}
       </span>
     </div>
   );
@@ -46,10 +48,12 @@ function ResultCard({ card, onOpen }) {
 
 export function LokiExperience({ loki }) {
   const [input, setInput] = useState('');
+  const [voiceState, setVoiceState] = useState('idle');
   const [conversation, setConversation] = useState(() => ([
     { id: 'welcome', from: 'loki', text: 'Я рядом. Скажи, что хочешь сделать в АПГ.', cards: [] },
   ]));
   const scrollerRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   const visibleCards = useMemo(() => conversation.flatMap(item => item.cards || []).slice(-6), [conversation]);
 
@@ -57,7 +61,27 @@ export function LokiExperience({ loki }) {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
   }, [conversation, loki.brainThinking]);
 
-  const ask = async (text, quickAction = null) => {
+  useEffect(() => () => {
+    try {
+      recognitionRef.current?.stop();
+      window.speechSynthesis?.cancel();
+    } catch {}
+  }, []);
+
+  const speak = (text) => {
+    if (!('speechSynthesis' in window) || !text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ru-RU';
+    utterance.rate = 1;
+    utterance.pitch = 1.05;
+    utterance.onstart = () => setVoiceState('speaking');
+    utterance.onend = () => setVoiceState('idle');
+    utterance.onerror = () => setVoiceState('idle');
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const ask = async (text, quickAction = null, options = {}) => {
     const question = text.trim();
     if (!question || loki.brainThinking) return;
     setInput('');
@@ -74,7 +98,38 @@ export function LokiExperience({ loki }) {
       debug: result.debug ?? null,
     }]);
     const action = result.executeAction || quickAction || (question.toLowerCase().includes('покажи') ? result.autoAction : null);
+    if (options.speak) speak(result.text);
     if (action) setTimeout(() => loki.executeAction(action), 520);
+  };
+
+  const startVoiceMode = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setConversation(prev => [...prev, { id: `voice-${Date.now()}`, from: 'loki', text: 'Голосовой режим пока недоступен в этом браузере. Напиши мне текстом.', cards: [] }]);
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => setVoiceState('listening');
+      recognition.onerror = () => {
+        setVoiceState('idle');
+        setConversation(prev => [...prev, { id: `voice-error-${Date.now()}`, from: 'loki', text: 'Я не расслышал. Попробуем ещё раз или напиши текстом.', cards: [] }]);
+      };
+      recognition.onend = () => setVoiceState(prev => prev === 'listening' ? 'idle' : prev);
+      recognition.onresult = (event) => {
+        const transcript = event.results?.[0]?.[0]?.transcript ?? '';
+        setVoiceState('thinking');
+        ask(transcript, null, { speak: true });
+      };
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setVoiceState('idle');
+      setConversation(prev => [...prev, { id: `voice-fallback-${Date.now()}`, from: 'loki', text: 'Голосовой режим не запустился. Напиши мне запрос текстом.', cards: [] }]);
+    }
   };
 
   return (
@@ -100,14 +155,27 @@ export function LokiExperience({ loki }) {
             <div style={{ color: APG2_PROFILE.gold, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>Пространство Локи</div>
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 680 }}>Главный проводник по АПГ</div>
           </div>
-          <button type="button" onClick={loki.closeExperience} aria-label="Закрыть Локи" style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 24, lineHeight: '36px', fontFamily: 'inherit' }}>×</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                loki.resetUserMemory();
+                setConversation(prev => [...prev, { id: `memory-clear-${Date.now()}`, from: 'loki', text: 'Я очистил личную память. Буду заново учиться тому, что тебе интересно.', cards: [] }]);
+              }}
+              aria-label="Очистить память Локи"
+              style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 17, fontFamily: 'inherit' }}
+            >
+              ♻
+            </button>
+            <button type="button" onClick={loki.closeExperience} aria-label="Закрыть Локи" style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 24, lineHeight: '36px', fontFamily: 'inherit' }}>×</button>
+          </div>
         </div>
 
         <div ref={scrollerRef} style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'grid', alignContent: 'start', gap: 12, paddingBottom: 4 }}>
-          <LokiAvatar thinking={loki.brainThinking || loki.action === LOKI_ACTIONS.LOOK_AROUND} />
+          <LokiAvatar thinking={loki.brainThinking || voiceState === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND} listening={voiceState === 'listening'} speaking={voiceState === 'speaking'} />
           <div style={{ textAlign: 'center', display: 'grid', gap: 5 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 900 }}>Что сделаем?</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>Можно написать обычными словами. Я покажу результат, а не длинную инструкцию.</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>{voiceState === 'listening' ? 'Слушаю внимательно...' : voiceState === 'speaking' ? 'Отвечаю голосом и показываю результат.' : 'Можно написать или сказать обычными словами. Я покажу результат, а не длинную инструкцию.'}</div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 4px', scrollbarWidth: 'none' }}>
@@ -165,7 +233,7 @@ export function LokiExperience({ loki }) {
           }}
           style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 9, display: 'grid', gridTemplateColumns: '44px 1fr 48px', gap: 8, alignItems: 'center', border: '1px solid rgba(215,184,106,0.22)' }}
         >
-          <button type="button" aria-label="Голосовой режим" title="Голосовой режим появится позже" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.gold, fontSize: 19, fontFamily: 'inherit' }}>🎙</button>
+          <button type="button" onClick={startVoiceMode} aria-label="Голосовой режим" title="Сказать Локи" style={{ width: 44, height: 44, borderRadius: 18, border: voiceState === 'listening' ? '1px solid rgba(120,214,255,0.38)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: voiceState === 'listening' ? 'rgba(120,214,255,0.12)' : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: voiceState === 'listening' ? '#78D6FF' : APG2_PROFILE.gold, fontSize: 19, fontFamily: 'inherit' }}>🎙</button>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}

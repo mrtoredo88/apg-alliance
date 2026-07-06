@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Хроники АПГ и Voice Mode Локи
+**Коммит:** `pending`
+**Файлы:** `src/loki/knowledge/*`, `src/loki/core/modules/KnowledgeExpert.js`, `src/loki/core/lokiUserMemory.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `scripts/update-apg-chronicles.mjs`, `.ai/22_APG_KNOWLEDGE.md`
+**Тип:** feat
+**Что изменено:** Создана структурированная база знаний «Хроники АПГ», генератор хроник из AI changelog, Knowledge Expert для Loki Core, долгосрочная пользовательская память с очисткой и Voice Mode V1 через Web Speech API.
+**Почему:** Локи должен использовать память мира АПГ, личную память пользователя и голосовой режим как фундамент будущих интеллектуальных возможностей.
+
+---
+
 ## [2026-07-07] Модульная архитектура Loki Core
 **Коммит:** `6ffb14d2`
 **Файлы:** `src/loki/LokiBrain.js`, `src/loki/core/*`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `.ai/21_LOKI_CORE.md`

@@ -4,15 +4,18 @@ import { EventExpert } from './modules/EventExpert.js';
 import { RewardsExpert } from './modules/RewardsExpert.js';
 import { NewsExpert } from './modules/NewsExpert.js';
 import { ProfileExpert } from './modules/ProfileExpert.js';
+import { KnowledgeExpert } from './modules/KnowledgeExpert.js';
 import { MemoryEngine } from './modules/MemoryEngine.js';
 import { RecommendationEngine } from './modules/RecommendationEngine.js';
 import { ObserverModule } from './modules/ObserverModule.js';
 import { PersonalityEngine } from './modules/PersonalityEngine.js';
 import { getActiveLokiAiProvider } from './lokiAiProviders.js';
 import { emptyResult, normalizeText } from './lokiCoreUtils.js';
+import { APG_KNOWLEDGE_BASE, validateApgKnowledgeBase } from '../knowledge/index.js';
 
 const LOKI_MODULES = [
   Navigator,
+  KnowledgeExpert,
   PartnerExpert,
   EventExpert,
   RewardsExpert,
@@ -33,7 +36,7 @@ function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
-export function buildLokiBrainContext(appState = {}, memory = {}) {
+export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {}) {
   const base = {
     user: {
       name: appState.user?.first_name || appState.user?.name || null,
@@ -53,17 +56,19 @@ export function buildLokiBrainContext(appState = {}, memory = {}) {
       notifications: appState.notifications ?? [],
       prizesKnown: false,
     },
+    knowledge: APG_KNOWLEDGE_BASE,
+    knowledgeHealth: validateApgKnowledgeBase(APG_KNOWLEDGE_BASE),
   };
-  return MemoryEngine.enrich({ context: base, memory });
+  return MemoryEngine.enrich({ context: base, memory, userMemory });
 }
 
-export async function askLokiCore({ text, appState, memory, debug = false }) {
+export async function askLokiCore({ text, appState, memory, userMemory, debug = false }) {
   const start = nowMs();
   const query = normalizeText(text);
   const trace = [];
   const provider = getActiveLokiAiProvider();
   const contextStart = nowMs();
-  const context = buildLokiBrainContext(appState, memory);
+  const context = buildLokiBrainContext(appState, memory, userMemory);
   trace.push({ module: MemoryEngine.id, ms: Math.round(nowMs() - contextStart), decision: 'context_enriched' });
 
   if (!query) {
