@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-06] Production deploy version.json без долгого кэша
+**Коммит:** `6bc380d4`
+**Файлы:** `deploy-frontend.sh`
+**Тип:** fix
+**Что изменено:** `version.json` теперь загружается отдельным no-cache объектом и исключается из общего static sync с `max-age=86400`.
+**Почему:** PWA и CDN могли видеть старый `version.json`, из-за чего проверка актуальности сборки показывала устаревший hash после production deploy.
+
+---
+
 ## [2026-07-06] V5.0 Admin Pro dashboard
 **Коммит:** N/A
 **Файлы:** `src/AdminPanel.jsx`
