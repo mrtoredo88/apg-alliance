@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Loki Actions как агентный слой приложения
+**Коммит:** N/A
+**Файлы:** `src/loki/lokiActionTypes.js`, `src/loki/lokiSuggestions.js`, `src/loki/lokiMemory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/UserApp.jsx`
+**Тип:** feat
+**Что изменено:** Добавлен единый слой действий Локи, очередь сообщений с приоритетами, интерактивные карточки с CTA, локальная память последнего сообщения/действия/экрана и JSON-интерфейс для будущего AI.
+**Почему:** Локи должен стать центральным помощником АПГ, который управляет приложением через безопасные actions, не зная роутинг и компоненты.
+
+---
+
 ## [2026-07-07] Локи как живой персонаж приложения
 **Коммит:** `02e10828`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/lokiBehavior.js`, `src/loki/lokiPosition.js`, `src/loki/lokiEvents.js`, `src/loki/lokiPhrases.js`, `src/UserApp.jsx`, `src/index.css`

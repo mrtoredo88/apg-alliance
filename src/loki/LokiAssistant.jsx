@@ -149,6 +149,32 @@ export function LokiAssistant() {
               ×
             </button>
           </div>
+          {loki.card && (
+            <div style={{ marginTop: 10, borderRadius: 18, padding: 10, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: '1px solid rgba(215,184,106,0.18)', display: 'grid', gap: 8 }}>
+              <div>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '16px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loki.card.title}</div>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{loki.card.text}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => loki.executeAction(loki.card.action)}
+                style={{
+                  minHeight: 34,
+                  borderRadius: 14,
+                  border: '1px solid rgba(215,184,106,0.32)',
+                  background: 'linear-gradient(135deg, rgba(215,184,106,0.28), rgba(255,255,255,0.08))',
+                  color: APG2_PROFILE.gold,
+                  fontSize: 12,
+                  fontWeight: 860,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {loki.card.label}
+              </button>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button type="button" onClick={() => loki.hideCurrentPanel()} style={{ flex: 1, minHeight: 30, borderRadius: 13, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 760, fontFamily: 'inherit' }}>Скрыть тут</button>
             <button type="button" onClick={() => loki.setHintsEnabled(false)} style={{ flex: 1, minHeight: 30, borderRadius: 13, border: '1px solid rgba(215,184,106,0.22)', background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 800, fontFamily: 'inherit' }}>Выключить</button>

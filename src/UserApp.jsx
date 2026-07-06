@@ -23,6 +23,7 @@ import { LokiProvider } from './loki/LokiProvider.jsx';
 import { LokiAssistant } from './loki/LokiAssistant.jsx';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
+import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -1847,11 +1848,31 @@ export function UserApp() {
     onOpenNearby: () => goPanel('nearby'),
   };
 
+  const lokiAppActions = useMemo(() => ({
+    [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
+      const targetId = partnerId ?? id;
+      const partner = targetId ? enrichedPartners.find(p => p.id === targetId) : enrichedPartners[0];
+      if (partner) openPartner(partner);
+      else goPanel('offers');
+    },
+    [LOKI_APP_ACTIONS.OPEN_EVENT]: () => goPanel('events'),
+    [LOKI_APP_ACTIONS.OPEN_NEWS]: () => goPanel('home'),
+    [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
+    [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
+    [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
+    [LOKI_APP_ACTIONS.SHOW_PROFILE]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS]: () => goPanel('tasks'),
+    [LOKI_APP_ACTIONS.SHOW_FAVORITES]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),
+    [LOKI_APP_ACTIONS.START_QR_SCANNER]: () => setIsScannerOpen(true),
+    [LOKI_APP_ACTIONS.OPEN_SETTINGS]: () => goPanel('profile'),
+  }), [enrichedPartners, goPanel, openNotifications, openPartner]);
+
   return (
     <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
         <AppRoot>
-          <LokiProvider user={user} activePanel={activePanel}>
+          <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions}>
           <div
             style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}

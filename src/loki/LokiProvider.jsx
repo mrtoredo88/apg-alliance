@@ -6,6 +6,9 @@ import { LOKI_EVENTS } from './lokiEvents.js';
 import { getLokiPhrase } from './lokiPhrases.js';
 import { subscribeLoki } from './lokiBus.js';
 import { LOKI_ACTIONS, TAP_ACTIONS, getBehaviorForEvent, getNextMicroDelay, getRandomLokiAction, shouldUseNightAction } from './lokiBehavior.js';
+import { DEFAULT_LOKI_MEMORY, loadLokiMemory, saveLokiMemory } from './lokiMemory.js';
+import { getLokiSuggestion } from './lokiSuggestions.js';
+import { LOKI_MESSAGE_PRIORITY, normalizeLokiActionRequest } from './lokiActionTypes.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -23,15 +26,19 @@ function getUserId(user) {
   return user?.id ? String(user.id) : 'guest';
 }
 
-export function LokiProvider({ children, user, activePanel }) {
+export function LokiProvider({ children, user, activePanel, appActions }) {
   const [settings, setSettings] = useState(() => loadLokiSettings());
+  const [memory, setMemory] = useState(() => loadLokiMemory());
   const [visible, setVisible] = useState(false);
   const [emotion, setEmotion] = useState('idle');
   const [message, setMessage] = useState('');
+  const [card, setCard] = useState(null);
   const [anchor, setAnchor] = useState('home');
   const [action, setAction] = useState(LOKI_ACTIONS.IDLE);
   const [dismissed, setDismissed] = useState(false);
   const [lastEvent, setLastEvent] = useState(null);
+  const queueRef = useRef([]);
+  const currentPriorityRef = useRef(LOKI_MESSAGE_PRIORITY.LOW);
   const hideTimerRef = useRef(null);
   const idleTimerRef = useRef(null);
   const microTimerRef = useRef(null);
@@ -50,16 +57,29 @@ export function LokiProvider({ children, user, activePanel }) {
     setSettings(normalized);
   }, []);
 
-  const showMessage = useCallback((eventType, payload = {}) => {
+  const updateMemory = useCallback((patch) => {
+    setMemory(prev => {
+      const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, []);
+
+  const displayMessage = useCallback((eventType, payload = {}) => {
     const config = getBehaviorForEvent(eventType);
+    const priority = payload.priority ?? config.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL;
+    currentPriorityRef.current = priority;
     setLastEvent({ eventType, payload, ts: Date.now() });
     setAnchor(config.anchor ?? 'home');
     setAction(payload.action ?? config.action ?? LOKI_ACTIONS.IDLE);
     setEmotion(config.emotion);
     setDismissed(false);
     setVisible(true);
+    setCard(getLokiSuggestion({ eventType, activePanel, payload }));
     if (settings.enabled && settings.bubbleEnabled) {
-      setMessage(getLokiPhrase(eventType, payload));
+      const nextMessage = getLokiPhrase(eventType, payload);
+      setMessage(nextMessage);
+      updateMemory({ lastMessage: { eventType, text: nextMessage, payload }, lastPanel: activePanel, inDialog: true });
     }
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
@@ -70,14 +90,34 @@ export function LokiProvider({ children, user, activePanel }) {
     }, Math.min(3600, Math.max(1600, config.duration - 2200)));
     hideTimerRef.current = setTimeout(() => {
       setMessage('');
+      setCard(null);
       setEmotion(eventType === LOKI_EVENTS.USER_IDLE ? 'sleep' : 'idle');
     }, config.duration);
     presenceTimerRef.current = setTimeout(() => {
       setVisible(false);
       setAnchor('home');
       setAction(LOKI_ACTIONS.IDLE);
+      currentPriorityRef.current = LOKI_MESSAGE_PRIORITY.LOW;
+      updateMemory({ inDialog: false, lastPanel: activePanel });
+      const next = queueRef.current.shift();
+      if (next) setTimeout(() => displayMessage(next.eventType, next.payload), 420);
     }, config.duration + 1900);
-  }, [settings.bubbleEnabled, settings.enabled]);
+  }, [activePanel, settings.bubbleEnabled, settings.enabled, updateMemory]);
+
+  const showMessage = useCallback((eventType, payload = {}) => {
+    if (!settings.enabled) return;
+    const config = getBehaviorForEvent(eventType);
+    const priority = payload.priority ?? config.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL;
+    const item = { eventType, payload: { ...payload, priority } };
+    const hasActiveMessage = visible && (message || card);
+    if (hasActiveMessage && priority <= currentPriorityRef.current) {
+      queueRef.current = [...queueRef.current, item]
+        .sort((a, b) => (b.payload.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL) - (a.payload.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL))
+        .slice(0, 8);
+      return;
+    }
+    displayMessage(eventType, item.payload);
+  }, [card, displayMessage, message, visible]);
 
   useEffect(() => subscribeLoki(showMessage), [showMessage]);
 
@@ -173,22 +213,51 @@ export function LokiProvider({ children, user, activePanel }) {
     if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    updateMemory({ lastPanel: activePanel });
+  }, [activePanel, updateMemory]);
+
   const handleCharacterTap = useCallback(() => {
     const tapAction = getRandomLokiAction(TAP_ACTIONS);
     setAnchor('home');
     setAction(tapAction);
-    showMessage(LOKI_EVENTS.CHARACTER_TAP, { source: 'tap', action: tapAction });
+    showMessage(LOKI_EVENTS.CHARACTER_TAP, { source: 'tap', action: tapAction, priority: LOKI_MESSAGE_PRIORITY.NORMAL });
   }, [showMessage]);
+
+  const executeAction = useCallback(async (request) => {
+    const normalized = normalizeLokiActionRequest(request);
+    if (!normalized?.type) return false;
+    const handler = appActions?.[normalized.type];
+    if (typeof handler !== 'function') {
+      showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_missing', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
+      return false;
+    }
+    updateMemory({ lastAction: { ...normalized, ts: new Date().toISOString() }, inDialog: false });
+    try {
+      await handler(normalized.payload ?? {});
+      setCard(null);
+      setMessage('');
+      setVisible(false);
+      return true;
+    } catch (e) {
+      logError(e, 'LokiProvider.executeAction');
+      showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
+      return false;
+    }
+  }, [appActions, showMessage, updateMemory]);
 
   const value = useMemo(() => ({
     action,
     activePanel,
     anchor,
     canTalk,
+    card,
     dismissed,
     emotion,
+    executeAction,
     isHiddenOnPanel,
     lastEvent,
+    memory: memory ?? DEFAULT_LOKI_MEMORY,
     message,
     settings,
     handleCharacterTap,
@@ -200,7 +269,7 @@ export function LokiProvider({ children, user, activePanel }) {
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
-  }), [action, activePanel, anchor, canTalk, dismissed, emotion, handleCharacterTap, isHiddenOnPanel, lastEvent, message, persistSettings, settings, showMessage, visible]);
+  }), [action, activePanel, anchor, canTalk, card, dismissed, emotion, executeAction, handleCharacterTap, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }
