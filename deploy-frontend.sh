@@ -38,6 +38,10 @@ aws s3 cp dist/manifest.json "s3://$BUCKET/manifest.json" $S3 \
   --content-type "application/manifest+json" \
   --cache-control "no-cache, no-store, must-revalidate"
 
+aws s3 cp dist/version.json "s3://$BUCKET/version.json" $S3 \
+  --content-type "application/json" \
+  --cache-control "no-cache, no-store, must-revalidate"
+
 # Other static files (images, fonts, etc.) — 1 day cache
 echo "Uploading static files..."
 aws s3 sync dist/ "s3://$BUCKET/" $S3 \
@@ -45,6 +49,7 @@ aws s3 sync dist/ "s3://$BUCKET/" $S3 \
   --exclude "index.html" \
   --exclude "sw.js" \
   --exclude "manifest.json" \
+  --exclude "version.json" \
   --cache-control "public, max-age=86400" \
   --delete
 
