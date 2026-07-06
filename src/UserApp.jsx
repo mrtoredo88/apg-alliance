@@ -742,6 +742,123 @@ export function UserApp() {
     const rawQrValue = typeof placeIdentifier === 'string' ? placeIdentifier.trim() : String(placeIdentifier ?? '').trim();
     const partnerByName = enrichedPartners.find(p => p.name === rawQrValue);
     const qrValue = partnerByName?.id ?? rawQrValue;
+
+    if (qrValue.startsWith('expert_')) {
+      const expertId = qrValue.slice(7);
+      const expert = experts.find(e => e.id === expertId);
+      if (!expert) {
+        setIsScannerOpen(false); isScanningRef.current = false;
+        showToast('QR-код эксперта не распознан');
+        return;
+      }
+      const prevCount = Number(scannedExperts[expertId]) || (scannedExperts[expertId] ? 1 : 0);
+      const stampTarget = expert.stampTarget ?? 0;
+      const isFirstScan = prevCount === 0;
+      const keyBonus = isFirstScan ? (expert.keys ?? 1) : 0;
+      const newCount = prevCount + 1;
+      const updateData = { [`scannedExperts.${expertId}`]: increment(1) };
+      if (keyBonus > 0) updateData.keys = increment(keyBonus);
+      try {
+        await updateDoc(doc(db, 'users', String(user.id)), updateData);
+        if (keyBonus > 0) setUserKeys(prev => prev + keyBonus);
+        setScannedExperts(prev => ({ ...prev, [expertId]: newCount }));
+        haptic('medium');
+        if (keyBonus > 0) setKeyBurst({ amount: keyBonus, id: Date.now() });
+        const stampMsg = stampTarget > 0 ? ` (${newCount}/${stampTarget})` : '';
+        if (keyBonus > 0) {
+          showToast(`+${keyBonus} ключ — консультация с ${expert.name}!${stampMsg} 🔑`, 'success');
+        } else if (stampTarget > 0 && newCount >= stampTarget) {
+          showToast(`🎟️ Штамп-карта заполнена! Попросите награду у ${expert.name}`, 'success');
+        } else {
+          showToast(`Визит отмечен${stampMsg} 👋`, 'success');
+        }
+        updateDoc(doc(db, 'experts', expertId), { totalVisits: increment(1) }).catch(() => {});
+        addDoc(collection(db, 'users', String(user.id), 'activity'), {
+          type: 'expert_scan', icon: '🧑‍💼',
+          text: `Посещение эксперта: ${expert.name}`,
+          ts: serverTimestamp(),
+        }).catch(() => {});
+      } catch (e) {
+        logError(e, 'UserApp.handleConfirmScan.legacyExpert');
+        showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+      } finally {
+        setIsScannerOpen(false); isScanningRef.current = false;
+      }
+      return;
+    }
+
+    const legacyPartner = enrichedPartners.find(p => p.id === qrValue || p.name === qrValue);
+    if (legacyPartner) {
+      const alreadyHasKey = !!scannedPartnerIds[legacyPartner.id];
+      const todayKey = new Date().toLocaleDateString('sv');
+      const alreadyToday = lastScanDate === todayKey;
+
+      if (alreadyHasKey && alreadyToday) {
+        setIsScannerOpen(false);
+        isScanningRef.current = false;
+        showToast('Уже отмечено сегодня 👋');
+        return;
+      }
+
+      const yesterdayKey = new Date(Date.now() - 86400000).toLocaleDateString('sv');
+      const newStreak = alreadyToday ? streak : (lastScanDate === yesterdayKey ? streak + 1 : 1);
+      const keyBonus = (!alreadyHasKey && legacyPartner.featured) ? 2 : 1;
+      const newScanDates = scanDates.includes(todayKey) ? scanDates : [...scanDates.slice(-89), todayKey];
+      const newVisitCount = (visitCounts[legacyPartner.id] ?? 0) + 1;
+      const updateData = {
+        lastScanDate: todayKey,
+        streak: newStreak,
+        scanDates: newScanDates,
+        [`visitCounts.${legacyPartner.id}`]: increment(1),
+      };
+      if (!alreadyHasKey) {
+        updateData.keys = increment(keyBonus);
+        updateData[`scannedPartners.${legacyPartner.id}`] = true;
+      }
+
+      try {
+        await updateDoc(doc(db, 'users', String(user.id)), updateData);
+        updateDoc(doc(db, 'partners', legacyPartner.id), { totalVisits: increment(1) }).catch(() => {});
+        setDoc(doc(db, 'stats', 'global'), { totalScans: increment(1) }, { merge: true }).catch(() => {});
+        addDoc(collection(db, 'scans'), {
+          partnerId: legacyPartner.id,
+          userId: String(user.id),
+          isNew: !alreadyHasKey,
+          monthKey: todayKey.slice(0, 7),
+          scannedAt: serverTimestamp(),
+        }).catch(() => {});
+        setLastScanDate(todayKey);
+        setStreak(newStreak);
+        setScanDates(newScanDates);
+        setVisitCounts(prev => ({ ...prev, [legacyPartner.id]: newVisitCount }));
+        haptic('medium');
+        if (!alreadyHasKey) {
+          setKeyBurst({ amount: keyBonus, id: Date.now() });
+          setUserKeys(prev => prev + keyBonus);
+          setScannedPartnerIds(prev => ({ ...prev, [legacyPartner.id]: true }));
+          const bonusText = keyBonus > 1 ? ' x2 (партнёр дня!)' : '';
+          setToast({ msg: `+${keyBonus} ключ${bonusText} — ${legacyPartner.name}! 🔑`, type: 'success', sharePartner: legacyPartner });
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setToast(null), 4500);
+          addDoc(collection(db, 'users', String(user.id), 'activity'), {
+            type: 'scan', icon: keyBonus > 1 ? '⭐' : '🔑',
+            text: `Посещён: ${legacyPartner.name}${keyBonus > 1 ? ' (партнёр дня × 2)' : ''}`,
+            ts: serverTimestamp(),
+          }).catch(() => {});
+        } else {
+          const label = newStreak === 1 ? 'день' : newStreak < 5 ? 'дня' : 'дней';
+          showToast(`Серия продолжается — ${newStreak} ${label}! 🔥`, 'success');
+        }
+      } catch (e) {
+        logError(e, 'UserApp.handleConfirmScan.legacyPartner');
+        showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+      } finally {
+        setIsScannerOpen(false);
+        isScanningRef.current = false;
+      }
+      return;
+    }
+
     try {
       const result = await confirmQrScan({ qrValue, scannerUserId: String(user.id) });
       const awardedKeys = Number(result.awardedKeys ?? 0);
@@ -781,7 +898,7 @@ export function UserApp() {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, experts, streak, haptic, showToast]);
+  }, [user, enrichedPartners, experts, lastScanDate, streak, scannedPartnerIds, scannedExperts, scanDates, visitCounts, haptic, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 

@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-06] Production QR fallback before backend deploy
+**Коммит:** N/A
+**Файлы:** `src/rewardApi.js`, `src/UserApp.jsx`
+**Тип:** fix
+**Что изменено:** Добавлен fallback на legacy QR (`partnerId` / `expert_<id>`) при недоступном `/api/qr-token`; сканер снова умеет начислять ключи по legacy QR без нового backend endpoint.
+**Почему:** Production API в Yandex Container ещё не содержит `/api/qr-token`, поэтому frontend не должен зависеть от отсутствующего endpoint во время публичного выката.
+
+---
+
 ## [2026-07-06] V4.3 urgent startup fallback and Splash
 **Коммит:** N/A
 **Файлы:** `src/UserApp.jsx`, `src/SplashScreen.jsx`, `public/splash-v43.png`
