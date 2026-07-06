@@ -186,6 +186,252 @@ function AdminQRMaterialsSection({ entity, type }) {
   );
 }
 
+function toJsDate(value) {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function dateKey(value) {
+  const d = toJsDate(value);
+  return d ? d.toISOString().slice(0, 10) : '';
+}
+
+function withinDays(value, days) {
+  const d = toJsDate(value);
+  return d ? Date.now() - d.getTime() <= days * 24 * 60 * 60 * 1000 : false;
+}
+
+function userDisplayName(user) {
+  return [user?.firstName ?? user?.first_name, user?.lastName ?? user?.last_name].filter(Boolean).join(' ')
+    || user?.displayName
+    || user?.email
+    || `#${String(user?.id ?? '').slice(0, 6)}`;
+}
+
+function providerLabel(user) {
+  const raw = String(user?.authProvider || user?.provider || user?.source || '').toLowerCase();
+  if (user?.referredBy) return 'Реферальная ссылка';
+  if (raw.includes('telegram') || user?.telegramId || user?.tgId) return 'Telegram';
+  if (raw.includes('email') || user?.email) return 'Email';
+  if (raw.includes('vk') || user?.vkId) return 'VK';
+  if (raw.includes('partner')) return 'QR партнёра';
+  if (raw.includes('expert')) return 'QR эксперта';
+  if (raw.includes('web') || raw.includes('site')) return 'Сайт';
+  return 'Прямая регистрация';
+}
+
+function StatTile({ label, value, icon, color = A.gold, sub }) {
+  return (
+    <div style={{ ...s.card, marginBottom: 0, minHeight: 102, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: `1px solid ${color}26` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: '15px' }}>{label}</div>
+        <div style={{ fontSize: 20 }}>{icon}</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 30, lineHeight: '34px', color, fontWeight: 950 }}>{value}</div>
+        {sub && <div style={{ marginTop: 4, fontSize: 11, color: A.textSec, lineHeight: '15px' }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function AdminDashboard({ partners, experts, events, news, banners, customTasks, prizes, metrics, onOpenTab, onOpenPartner, onOpenExpert }) {
+  const users = metrics?.users ?? [];
+  const scans = metrics?.scans ?? [];
+  const expertScans = metrics?.expertScans ?? [];
+  const reviews = metrics?.reviews ?? [];
+  const expertReviews = metrics?.expertReviews ?? [];
+  const raffleEntries = metrics?.raffleEntries ?? [];
+  const guestSessions = metrics?.guestSessions ?? [];
+  const allScans = [...scans, ...expertScans];
+  const today = new Date().toISOString().slice(0, 10);
+  const newToday = users.filter(u => dateKey(u.registeredAt || u.createdAt) === today).length;
+  const newWeek = users.filter(u => withinDays(u.registeredAt || u.createdAt, 7)).length;
+  const newMonth = users.filter(u => withinDays(u.registeredAt || u.createdAt, 30)).length;
+  const eventRegistrations = users.reduce((sum, u) => sum + (Array.isArray(u.registeredEvents) ? u.registeredEvents.length : 0), 0);
+  const keysFromScans = allScans.reduce((sum, scan) => sum + (Number(scan.keysAwarded) || 0), 0);
+  const keysFromUsers = users.reduce((sum, u) => sum + (Number(u.keys) || 0), 0);
+  const issuedKeys = keysFromScans || keysFromUsers;
+  const activeEvents = events.filter(e => e.active !== false).length;
+  const activeNews = news.filter(n => n.active !== false).length;
+  const activeOffers = partners.filter(p => p.offer).length + experts.filter(e => e.offer).length;
+  const reviewTotal = reviews.length + expertReviews.length;
+  const sourceRows = Object.entries(users.reduce((acc, u) => {
+    const label = providerLabel(u);
+    acc[label] = (acc[label] ?? 0) + 1;
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]);
+  const partnerRows = partners.map(p => {
+    const ownScans = scans.filter(scan => scan.partnerId === p.id);
+    return {
+      ...p,
+      newUsers: ownScans.filter(scan => scan.isNew).length,
+      scans: ownScans.length,
+      keys: ownScans.reduce((sum, scan) => sum + (Number(scan.keysAwarded) || 0), 0),
+      views: p.viewCount ?? 0,
+      favorites: p.favoriteCount ?? 0,
+      eventRegs: events.filter(e => e.partnerId === p.id).reduce((sum, e) => sum + (Number(e.registrationsCount) || 0), 0),
+    };
+  }).sort((a, b) => (b.scans + b.views) - (a.scans + a.views)).slice(0, 8);
+  const expertRows = experts.map(e => {
+    const ownScans = expertScans.filter(scan => scan.expertId === e.id);
+    return {
+      ...e,
+      newUsers: ownScans.filter(scan => scan.isNew).length,
+      scans: ownScans.length,
+      keys: ownScans.reduce((sum, scan) => sum + (Number(scan.keysAwarded) || 0), 0),
+      views: e.viewCount ?? 0,
+      reviews: e.reviewCount ?? 0,
+    };
+  }).sort((a, b) => (b.scans + b.views) - (a.scans + a.views)).slice(0, 8);
+  const last14 = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (13 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  const regData = last14.map(date => ({ date, count: users.filter(u => dateKey(u.registeredAt || u.createdAt) === date).length }));
+  const scanData = last14.map(date => ({ date, count: allScans.filter(scan => dateKey(scan.scannedAt || scan.createdAt) === date).length }));
+  const funnel = [
+    { label: 'Увидели / открыли ссылку', value: guestSessions.length + users.length, icon: '👀' },
+    { label: 'Установили / открыли приложение', value: users.length + guestSessions.filter(s => s.converted).length, icon: '📲' },
+    { label: 'Зарегистрировались', value: users.length, icon: '👤' },
+    { label: 'Подтвердили почту', value: users.filter(u => u.emailVerified || u.email).length, icon: '📧' },
+    { label: 'Привязали Telegram', value: users.filter(u => u.telegramId || u.tgId || u.authProvider === 'telegram').length, icon: '💬' },
+    { label: 'Получили первый ключ', value: users.filter(u => (Number(u.keys) || 0) > 0).length, icon: '🗝' },
+    { label: 'Посетили партнёра', value: users.filter(u => Object.keys(u.scannedPartners ?? {}).length || Object.keys(u.visitCounts ?? {}).length).length, icon: '🏪' },
+    { label: 'Участвовали в розыгрыше', value: new Set(raffleEntries.map(e => e.userId).filter(Boolean)).size, icon: '🎁' },
+  ];
+  const maxFunnel = Math.max(funnel[0]?.value || 1, 1);
+  const activity = [
+    ...users.map(u => ({ ts: toJsDate(u.registeredAt || u.createdAt), icon: '👤', text: `${userDisplayName(u)} зарегистрировался`, sub: providerLabel(u) })),
+    ...scans.map(scan => ({ ts: toJsDate(scan.scannedAt || scan.createdAt), icon: '🗝', text: `Пользователь получил ключ у партнёра`, sub: scan.partnerId || scan.userId })),
+    ...expertScans.map(scan => ({ ts: toJsDate(scan.scannedAt || scan.createdAt), icon: '🧑‍💼', text: `Посещение эксперта отмечено`, sub: scan.expertId || scan.userId })),
+    ...reviews.map(r => ({ ts: toJsDate(r.createdAt), icon: '⭐', text: `Оставлен отзыв`, sub: r.partnerName || r.partnerId || r.userName })),
+    ...raffleEntries.map(r => ({ ts: toJsDate(r.createdAt || r.enteredAt), icon: '🎁', text: `Участие в розыгрыше`, sub: r.prizeId || r.userId })),
+  ].filter(item => item.ts).sort((a, b) => b.ts - a.ts).slice(0, 12);
+
+  return (
+    <div>
+      <div style={{ ...s.card, padding: 22, marginBottom: 18, background: 'linear-gradient(135deg, rgba(201,168,76,0.14), rgba(255,255,255,0.045))' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 12, color: A.gold, fontWeight: 900, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>Admin Pro V5.0</div>
+            <h1 style={{ ...s.h1, fontSize: 30, lineHeight: '34px', marginBottom: 8 }}>Что сейчас происходит в АПГ?</h1>
+            <div style={{ fontSize: 14, color: A.textSec, lineHeight: '21px', maxWidth: 620 }}>Главный центр управления проектом: аудитория, QR, ключи, партнёры, эксперты, контент и воронка роста в одном месте.</div>
+          </div>
+          <button onClick={() => onOpenTab('analytics')} style={{ ...s.btn, ...s.btnPri, whiteSpace: 'nowrap' }}>Открыть аналитику</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <StatTile label="Всего пользователей" value={users.length} icon="👥" color={A.blue} sub={`+${newToday} сегодня`} />
+        <StatTile label="Новых за неделю" value={newWeek} icon="🆕" color="#4BB34B" sub={`+${newMonth} за месяц`} />
+        <StatTile label="Партнёров" value={partners.length} icon="🤝" color={A.gold} />
+        <StatTile label="Экспертов" value={experts.length} icon="🧑‍💼" color="#A78BFA" />
+        <StatTile label="Мероприятий" value={activeEvents} icon="🎉" color="#f59e0b" />
+        <StatTile label="Новостей" value={activeNews} icon="📢" color="#38bdf8" />
+        <StatTile label="Акций" value={activeOffers} icon="🏷️" color={A.gold} />
+        <StatTile label="Выдано ключей" value={issuedKeys} icon="🗝" color={A.gold} />
+        <StatTile label="QR использовано" value={allScans.length} icon="📲" color={A.blue} />
+        <StatTile label="Отзывы" value={reviewTotal} icon="⭐" color="#f59e0b" />
+        <StatTile label="Регистрации на события" value={eventRegistrations} icon="📝" color="#4BB34B" />
+        <StatTile label="Призы" value={prizes.length} icon="🎁" color="#A78BFA" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, marginBottom: 16 }}>
+        <div style={s.card}>
+          <h2 style={s.h2}>📈 Рост пользователей</h2>
+          <MiniBarChart data={regData} labelKey="date" valueKey="count" color="#4BB34B" shortDate />
+        </div>
+        <div style={s.card}>
+          <h2 style={s.h2}>🗝 Начисления и QR</h2>
+          <MiniBarChart data={scanData} labelKey="date" valueKey="count" color={A.gold} shortDate />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)', gap: 16, marginBottom: 16 }}>
+        <div style={s.card}>
+          <h2 style={s.h2}>🚀 Воронка роста АПГ</h2>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {funnel.map((step, i) => {
+              const width = Math.max(4, Math.round((step.value / maxFunnel) * 100));
+              const prev = funnel[i - 1]?.value || step.value || 1;
+              const conversion = i === 0 ? '100%' : `${Math.round((step.value / Math.max(prev, 1)) * 100)}%`;
+              return (
+                <div key={step.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, marginBottom: 5 }}>
+                    <span style={{ color: A.text, fontWeight: 750 }}>{step.icon} {step.label}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{step.value} <span style={{ color: A.textSec, fontWeight: 600 }}>· {conversion}</span></span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 999, background: A.chip, overflow: 'hidden', border: `1px solid ${A.border}` }}>
+                    <div style={{ height: '100%', width: `${width}%`, background: i < 3 ? A.gold : i < 6 ? '#4BB34B' : A.blue, borderRadius: 999 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={s.card}>
+          <h2 style={s.h2}>🧭 Источники пользователей</h2>
+          {sourceRows.length === 0 ? <div style={{ color: A.textSec, fontSize: 13 }}>Пока нет данных по источникам.</div> : sourceRows.map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
+              <span style={{ color: A.text, fontSize: 13 }}>{label}</span>
+              <span style={{ color: A.gold, fontWeight: 900 }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, marginBottom: 16 }}>
+        <div style={s.card}>
+          <h2 style={s.h2}>🤝 Партнёры: вклад в рост</h2>
+          {partnerRows.length === 0 ? <div style={{ color: A.textSec, fontSize: 13 }}>Нет данных по партнёрам.</div> : partnerRows.map(p => (
+            <button key={p.id} onClick={() => onOpenPartner(p.id)} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 0', borderBottom: `1px solid ${A.rowBrd}`, textAlign: 'left', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                <span style={{ color: A.text, fontSize: 13, fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                <span style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>{p.scans} QR</span>
+              </div>
+              <div style={{ color: A.textSec, fontSize: 11 }}>новых: {p.newUsers} · ключей: {p.keys} · просмотров: {p.views} · избранное: {p.favorites}</div>
+            </button>
+          ))}
+        </div>
+
+        <div style={s.card}>
+          <h2 style={s.h2}>🧑‍💼 Эксперты: активность</h2>
+          {expertRows.length === 0 ? <div style={{ color: A.textSec, fontSize: 13 }}>Нет данных по экспертам.</div> : expertRows.map(e => (
+            <button key={e.id} onClick={() => onOpenExpert(e.id)} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 0', borderBottom: `1px solid ${A.rowBrd}`, textAlign: 'left', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                <span style={{ color: A.text, fontSize: 13, fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                <span style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>{e.scans} QR</span>
+              </div>
+              <div style={{ color: A.textSec, fontSize: 11 }}>ключей: {e.keys} · просмотров: {e.views} · отзывов: {e.reviews}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>🕒 Журнал событий</h2>
+        {activity.length === 0 ? (
+          <div style={{ color: A.textSec, fontSize: 13 }}>Пока нет событий для журнала.</div>
+        ) : activity.map((item, i) => (
+          <div key={`${item.text}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < activity.length - 1 ? `1px solid ${A.rowBrd}` : 'none' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 14, background: A.chip, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: A.text, fontSize: 13, fontWeight: 700 }}>{item.text}</div>
+              <div style={{ color: A.textSec, fontSize: 11, marginTop: 2 }}>{item.sub}</div>
+            </div>
+            <div style={{ color: A.textSec, fontSize: 11, flexShrink: 0 }}>{item.ts.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EmojiPicker({ emojis, value, onChange }) {
   return (
     <div style={s.emojiGrid}>
@@ -743,8 +989,11 @@ export const AdminPanel = () => {
   const [notifs, setNotifs]         = useState([]);
   const [customTasks, setCustomTasks] = useState([]);
   const [prizeClaims, setPrizeClaims] = useState([]);
+  const [adminMetrics, setAdminMetrics] = useState({
+    users: [], scans: [], expertScans: [], reviews: [], expertReviews: [], raffleEntries: [], guestSessions: [],
+  });
   const [loading, setLoading]       = useState(true);
-  const [activeTab, setActiveTab]   = useState('partners');
+  const [activeTab, setActiveTab]   = useState('dashboard');
 
   // Форма эксперта
   const [editingExpert, setEditingExpert] = useState(null);
@@ -975,7 +1224,7 @@ export const AdminPanel = () => {
     setLoading(true);
     console.log('[ADMIN] fetchData start, auth.currentUser:', auth.currentUser?.uid ?? 'null');
     try {
-      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] = await Promise.all([
+      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap, uSnap, scSnap, escSnap, rvSnap, ervSnap, reSnap, gsSnap] = await Promise.all([
         getDocs(collection(db, 'partners')).catch(err => { logError(err, 'AdminPanel.fetchData.partners'); return { docs: [] }; }),
         getDocs(collection(db, 'events')).catch(err => { logError(err, 'AdminPanel.fetchData.events'); return { docs: [] }; }),
         getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(err => { logError(err, 'AdminPanel.fetchData.news'); return { docs: [] }; }),
@@ -985,6 +1234,13 @@ export const AdminPanel = () => {
         getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(err => { logError(err, 'AdminPanel.fetchData.prizeClaims'); return { docs: [] }; }),
         getDocs(collection(db, 'experts')).catch(err => { logError(err, 'AdminPanel.fetchData.experts'); return { docs: [] }; }),
         getDocs(query(collection(db, 'banners'), orderBy('priority', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.banners'); return { docs: [] }; }),
+        getDocs(collection(db, 'users')).catch(err => { logError(err, 'AdminPanel.fetchData.users'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'scans'), orderBy('scannedAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.scans'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'expertScans'), orderBy('scannedAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.expertScans'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(200))).catch(err => { logError(err, 'AdminPanel.fetchData.reviews'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'expertReviews'), orderBy('createdAt', 'desc'), limit(200))).catch(err => { logError(err, 'AdminPanel.fetchData.expertReviews'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'raffleEntries'), orderBy('createdAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.raffleEntries'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'guestSessions'), orderBy('createdAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.guestSessions'); return { docs: [] }; }),
       ]);
       console.log('[ADMIN] загружено:', {
         partners: pSnap.docs.length,
@@ -996,6 +1252,8 @@ export const AdminPanel = () => {
         prizeClaims: clSnap.docs.length,
         experts: exSnap.docs.length,
         banners: bnSnap.docs.length,
+        users: uSnap.docs.length,
+        scans: scSnap.docs.length + escSnap.docs.length,
       });
       setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -1006,6 +1264,15 @@ export const AdminPanel = () => {
       setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setBanners(bnSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setAdminMetrics({
+        users: uSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        scans: scSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        expertScans: escSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        reviews: rvSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        expertReviews: ervSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        raffleEntries: reSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        guestSessions: gsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      });
     } catch (e) { logError(e, 'AdminPanel.fetchData.outer'); }
     setLoading(false);
   };
@@ -1392,7 +1659,7 @@ export const AdminPanel = () => {
     setNLinkUrl(item.linkUrl ?? ''); setNLinkLabel(item.linkLabel ?? '');
     setNPriority(item.priority ?? 0);
     setNCategory(item.category ?? '');
-    setNCoverPhoto(item.coverPhoto ?? '');
+    setNCoverPhoto(item.coverPhoto ?? item.imageUrl ?? '');
     setNPublishedAt(item.publishedAt?.toDate ? item.publishedAt.toDate().toISOString().slice(0, 10) : (item.publishedAt ? new Date(item.publishedAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)));
     setShowNewsModal(true);
   };
@@ -1403,8 +1670,8 @@ export const AdminPanel = () => {
       title: nTitle.trim(),
       text: nText.trim(),
       emoji: nEmoji,
-      imageUrl: nImage.trim(),
-      coverPhoto: nCoverPhoto.trim(),
+      imageUrl: (nCoverPhoto || nImage).trim(),
+      coverPhoto: (nCoverPhoto || nImage).trim(),
       linkUrl: nLinkUrl.trim(),
       linkLabel: nLinkLabel.trim(),
       priority: Number(nPriority) || 0,
@@ -1890,10 +2157,13 @@ export const AdminPanel = () => {
 
   const q = globalSearch.toLowerCase();
   const searchResults = globalSearch.length > 1 ? [
+    ...adminMetrics.users.filter(u => userDisplayName(u).toLowerCase().includes(q) || String(u.email ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase().includes(q)).slice(0, 4).map(u => ({ tab: 'dashboard', id: u.id, label: userDisplayName(u), sub: providerLabel(u), emoji: '👤', typeName: 'Пользователь' })),
     ...partners.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 4).map(p => ({ tab: 'partners', id: p.id, label: p.name, sub: CATEGORIES.find(c => c.id === p.category)?.label, emoji: '🤝', typeName: 'Партнёр' })),
+    ...partners.filter(p => p.offer?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'partners', id: p.id, label: p.offer, sub: p.name, emoji: '🏷️', typeName: 'Акция' })),
     ...experts.filter(ex => ex.name?.toLowerCase().includes(q)).slice(0, 4).map(ex => ({ tab: 'experts', id: ex.id, label: ex.name, sub: ex.specialization, emoji: '🧑‍💼', typeName: 'Эксперт' })),
     ...events.filter(e => e.title?.toLowerCase().includes(q)).slice(0, 3).map(e => ({ tab: 'events', id: e.id, label: e.title, emoji: '🎉', typeName: 'Событие' })),
     ...news.filter(n => n.title?.toLowerCase().includes(q)).slice(0, 3).map(n => ({ tab: 'news', id: n.id, label: n.title, emoji: '📢', typeName: 'Новость' })),
+    ...prizes.filter(p => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'prizes', id: p.id, label: p.name || p.title, emoji: '🎁', typeName: 'Приз' })),
   ] : [];
 
   return (
@@ -1909,6 +2179,7 @@ export const AdminPanel = () => {
         </div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {[
+            { id: 'dashboard', emoji: '📊', label: 'Dashboard' },
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
@@ -2081,6 +2352,22 @@ export const AdminPanel = () => {
           )}
         </div>
       </div>
+
+      {activeTab === 'dashboard' && (
+        <AdminDashboard
+          partners={partners}
+          experts={experts}
+          events={events}
+          news={news}
+          banners={banners}
+          customTasks={customTasks}
+          prizes={prizes}
+          metrics={adminMetrics}
+          onOpenTab={setActiveTab}
+          onOpenPartner={(id) => { setActiveTab('partners'); setExpandedPartnerId(id); setPartnerLinksFilter('all'); }}
+          onOpenExpert={(id) => { setActiveTab('experts'); setExpandedExpertId(id); setExpertLinksFilter('all'); }}
+        />
+      )}
 
       {/* ── ЭКСПЕРТЫ ── */}
       {activeTab === 'experts' && (
@@ -2942,12 +3229,6 @@ export const AdminPanel = () => {
             <label style={s.label}>Эмодзи</label>
             <EmojiPicker emojis={NEWS_EMOJIS} value={nEmoji} onChange={setNEmoji} />
 
-            <label style={s.label}>URL картинки (необязательно)</label>
-            <input style={s.input} placeholder="https://storage.yandexcloud.net/..." value={nImage} onChange={e => setNImage(e.target.value)} />
-            {nImage && (
-              <img src={nImage} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} onError={e => e.target.style.display = 'none'} />
-            )}
-
             <label style={s.label}>Название ссылки (необязательно)</label>
             <input style={s.input} placeholder="Подробнее на сайте" value={nLinkLabel} onChange={e => setNLinkLabel(e.target.value)} />
 
@@ -2985,7 +3266,7 @@ export const AdminPanel = () => {
               ))}
             </div>
 
-            <label style={s.label}>Обложка (для карточки на главной)</label>
+            <label style={s.label}>Изображение новости</label>
             <PhotoUpload value={nCoverPhoto} onChange={setNCoverPhoto} folder="news" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
             {nCoverPhoto && <img src={nCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12, marginTop: 4 }} onError={e => e.target.style.display = 'none'} />}
 
