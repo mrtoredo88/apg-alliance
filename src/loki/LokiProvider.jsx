@@ -2,9 +2,10 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { logError } from '../errorLogger.js';
-import { LOKI_EVENTS, LOKI_EVENT_CONFIG } from './lokiEvents.js';
+import { LOKI_EVENTS } from './lokiEvents.js';
 import { getLokiPhrase } from './lokiPhrases.js';
 import { subscribeLoki } from './lokiBus.js';
+import { LOKI_ACTIONS, TAP_ACTIONS, getBehaviorForEvent, getNextMicroDelay, getRandomLokiAction, shouldUseNightAction } from './lokiBehavior.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -24,12 +25,18 @@ function getUserId(user) {
 
 export function LokiProvider({ children, user, activePanel }) {
   const [settings, setSettings] = useState(() => loadLokiSettings());
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
   const [emotion, setEmotion] = useState('idle');
   const [message, setMessage] = useState('');
+  const [anchor, setAnchor] = useState('home');
+  const [action, setAction] = useState(LOKI_ACTIONS.IDLE);
+  const [dismissed, setDismissed] = useState(false);
   const [lastEvent, setLastEvent] = useState(null);
   const hideTimerRef = useRef(null);
   const idleTimerRef = useRef(null);
+  const microTimerRef = useRef(null);
+  const actionTimerRef = useRef(null);
+  const presenceTimerRef = useRef(null);
   const settingsHydratedRef = useRef(false);
   const settingsDirtyRef = useRef(false);
   const userId = getUserId(user);
@@ -44,18 +51,32 @@ export function LokiProvider({ children, user, activePanel }) {
   }, []);
 
   const showMessage = useCallback((eventType, payload = {}) => {
-    const config = LOKI_EVENT_CONFIG[eventType] ?? LOKI_EVENT_CONFIG[LOKI_EVENTS.DAILY_VISIT];
+    const config = getBehaviorForEvent(eventType);
     setLastEvent({ eventType, payload, ts: Date.now() });
+    setAnchor(config.anchor ?? 'home');
+    setAction(payload.action ?? config.action ?? LOKI_ACTIONS.IDLE);
     setEmotion(config.emotion);
+    setDismissed(false);
     setVisible(true);
     if (settings.enabled && settings.bubbleEnabled) {
       setMessage(getLokiPhrase(eventType, payload));
     }
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
+    actionTimerRef.current = setTimeout(() => {
+      setAction(LOKI_ACTIONS.IDLE);
+      setEmotion(eventType === LOKI_EVENTS.USER_IDLE ? 'sleep' : 'idle');
+    }, Math.min(3600, Math.max(1600, config.duration - 2200)));
     hideTimerRef.current = setTimeout(() => {
       setMessage('');
       setEmotion(eventType === LOKI_EVENTS.USER_IDLE ? 'sleep' : 'idle');
     }, config.duration);
+    presenceTimerRef.current = setTimeout(() => {
+      setVisible(false);
+      setAnchor('home');
+      setAction(LOKI_ACTIONS.IDLE);
+    }, config.duration + 1900);
   }, [settings.bubbleEnabled, settings.enabled]);
 
   useEffect(() => subscribeLoki(showMessage), [showMessage]);
@@ -92,8 +113,9 @@ export function LokiProvider({ children, user, activePanel }) {
     if (!settings.enabled || !user) return;
     const dayKey = new Date().toLocaleDateString('sv');
     if (hasLokiDailyVisit(userId, dayKey)) return;
+    if (!hasSeenLokiGreeting(userId)) return;
     markLokiDailyVisit(userId, dayKey);
-    const t = setTimeout(() => showMessage(LOKI_EVENTS.DAILY_VISIT, { dayKey }), 4200);
+    const t = setTimeout(() => showMessage(LOKI_EVENTS.RETURN_VISIT, { dayKey }), 4200);
     return () => clearTimeout(t);
   }, [settings.enabled, showMessage, user, userId]);
 
@@ -117,28 +139,68 @@ export function LokiProvider({ children, user, activePanel }) {
     };
   }, [settings.enabled, showMessage]);
 
+  useEffect(() => {
+    if (!settings.enabled) return;
+    const scheduleMicroAction = () => {
+      if (microTimerRef.current) clearTimeout(microTimerRef.current);
+      microTimerRef.current = setTimeout(() => {
+        if (document.visibilityState === 'visible' && visible && !message) {
+          const nextAction = shouldUseNightAction() ? LOKI_ACTIONS.YAWN : getRandomLokiAction();
+          setAction(nextAction);
+          setEmotion(nextAction === LOKI_ACTIONS.YAWN ? 'sleep' : 'idle');
+          if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+          actionTimerRef.current = setTimeout(() => {
+            setAction(LOKI_ACTIONS.IDLE);
+            setEmotion('idle');
+            scheduleMicroAction();
+          }, 2400);
+        } else {
+          scheduleMicroAction();
+        }
+      }, getNextMicroDelay());
+    };
+    scheduleMicroAction();
+    return () => {
+      if (microTimerRef.current) clearTimeout(microTimerRef.current);
+    };
+  }, [message, settings.enabled, visible]);
+
   useEffect(() => () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (microTimerRef.current) clearTimeout(microTimerRef.current);
+    if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
   }, []);
 
+  const handleCharacterTap = useCallback(() => {
+    const tapAction = getRandomLokiAction(TAP_ACTIONS);
+    setAnchor('home');
+    setAction(tapAction);
+    showMessage(LOKI_EVENTS.CHARACTER_TAP, { source: 'tap', action: tapAction });
+  }, [showMessage]);
+
   const value = useMemo(() => ({
+    action,
     activePanel,
+    anchor,
     canTalk,
+    dismissed,
     emotion,
     isHiddenOnPanel,
     lastEvent,
     message,
     settings,
+    handleCharacterTap,
     showMessage,
     visible,
-    hide: () => setVisible(false),
-    show: () => setVisible(true),
+    hide: () => { setDismissed(true); setVisible(false); },
+    show: () => { setDismissed(false); setVisible(true); },
     hideCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: [...new Set([...settings.hiddenPanels, activePanel])] }),
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
-  }), [activePanel, canTalk, emotion, isHiddenOnPanel, lastEvent, message, persistSettings, settings, showMessage, visible]);
+  }), [action, activePanel, anchor, canTalk, dismissed, emotion, handleCharacterTap, isHiddenOnPanel, lastEvent, message, persistSettings, settings, showMessage, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

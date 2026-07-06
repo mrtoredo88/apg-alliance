@@ -448,3 +448,56 @@ input::placeholder {
   0%, 100% { transform: translate3d(0, 2px, 0) scale(0.98); opacity: 0.82; }
   50%      { transform: translate3d(0, 5px, 0) scale(0.965); opacity: 0.72; }
 }
+
+@keyframes lokiWave {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  24%      { transform: translate3d(-2px, -4px, 0) rotate(-5deg); }
+  48%      { transform: translate3d(2px, -3px, 0) rotate(5deg); }
+  72%      { transform: translate3d(-1px, -2px, 0) rotate(-3deg); }
+}
+
+@keyframes lokiPoint {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  36%      { transform: translate3d(-8px, -4px, 0) scale(1.03) rotate(-4deg); }
+  70%      { transform: translate3d(-5px, -2px, 0) scale(1.01) rotate(-2deg); }
+}
+
+@keyframes lokiSpark {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  30%      { transform: translate3d(0, -8px, 0) scale(1.06) rotate(-4deg); }
+  62%      { transform: translate3d(0, 1px, 0) scale(0.99) rotate(3deg); }
+}
+
+@keyframes lokiCatchKey {
+  0%   { transform: translate3d(20px, -32px, 0) scale(0.88) rotate(8deg); }
+  42%  { transform: translate3d(-6px, -8px, 0) scale(1.08) rotate(-6deg); }
+  72%  { transform: translate3d(0, 1px, 0) scale(1.02) rotate(2deg); }
+  100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+}
+
+@keyframes lokiListen {
+  0%, 100% { transform: translate3d(0, 2px, 0) rotate(0deg); }
+  45%      { transform: translate3d(-4px, 2px, 0) rotate(-6deg); }
+}
+
+@keyframes lokiYawn {
+  0%, 100% { transform: translate3d(0, 2px, 0) scale(0.98); filter: saturate(0.92); }
+  50%      { transform: translate3d(0, 6px, 0) scale(0.94); filter: saturate(0.82); }
+}
+
+@keyframes lokiLookAround {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  25%      { transform: translate3d(-4px, -2px, 0) rotate(-3deg); }
+  52%      { transform: translate3d(4px, -2px, 0) rotate(3deg); }
+  78%      { transform: translate3d(0, -3px, 0) rotate(0deg); }
+}
+
+@keyframes lokiBlink {
+  0%, 18%, 100% { opacity: 0; transform: scaleY(0.1); }
+  42%, 60%      { opacity: 0.86; transform: scaleY(1); }
+}
+
+@keyframes lokiSparkle {
+  0%, 100% { opacity: 0.48; transform: scale(0.82); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}

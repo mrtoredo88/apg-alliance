@@ -6,22 +6,28 @@ export const LOKI_EVENTS = {
   EVENT_OPENED: 'event_opened',
   PRIZE_OPENED: 'prize_opened',
   PROFILE_OPENED: 'profile_opened',
+  MAP_OPENED: 'map_opened',
+  CHARACTER_TAP: 'character_tap',
+  RETURN_VISIT: 'return_visit',
   APP_ERROR: 'app_error',
   USER_IDLE: 'user_idle',
   DAILY_VISIT: 'daily_visit',
 };
 
 export const LOKI_EVENT_CONFIG = {
-  [LOKI_EVENTS.USER_LOGIN]: { emotion: 'happy', duration: 7200 },
-  [LOKI_EVENTS.KEY_RECEIVED]: { emotion: 'excited', duration: 7600 },
-  [LOKI_EVENTS.ACHIEVEMENT_UNLOCKED]: { emotion: 'happy', duration: 6800 },
-  [LOKI_EVENTS.PARTNER_OPENED]: { emotion: 'helper', duration: 6200 },
-  [LOKI_EVENTS.EVENT_OPENED]: { emotion: 'thinking', duration: 6200 },
-  [LOKI_EVENTS.PRIZE_OPENED]: { emotion: 'excited', duration: 6200 },
-  [LOKI_EVENTS.PROFILE_OPENED]: { emotion: 'helper', duration: 5600 },
-  [LOKI_EVENTS.APP_ERROR]: { emotion: 'sad', duration: 7600 },
-  [LOKI_EVENTS.USER_IDLE]: { emotion: 'sleep', duration: 6200 },
-  [LOKI_EVENTS.DAILY_VISIT]: { emotion: 'idle', duration: 5600 },
+  [LOKI_EVENTS.USER_LOGIN]: { emotion: 'happy', anchor: 'home', action: 'wave', duration: 7200 },
+  [LOKI_EVENTS.KEY_RECEIVED]: { emotion: 'excited', anchor: 'celebrate', action: 'catchKey', duration: 7600 },
+  [LOKI_EVENTS.ACHIEVEMENT_UNLOCKED]: { emotion: 'happy', anchor: 'center', action: 'spark', duration: 6800 },
+  [LOKI_EVENTS.PARTNER_OPENED]: { emotion: 'helper', anchor: 'firstCard', action: 'point', duration: 6200 },
+  [LOKI_EVENTS.EVENT_OPENED]: { emotion: 'thinking', anchor: 'eventCard', action: 'point', duration: 6200 },
+  [LOKI_EVENTS.PRIZE_OPENED]: { emotion: 'excited', anchor: 'rewardShelf', action: 'spark', duration: 6200 },
+  [LOKI_EVENTS.PROFILE_OPENED]: { emotion: 'helper', anchor: 'profile', action: 'wave', duration: 5600 },
+  [LOKI_EVENTS.MAP_OPENED]: { emotion: 'thinking', anchor: 'map', action: 'lookAround', duration: 5600 },
+  [LOKI_EVENTS.CHARACTER_TAP]: { emotion: 'happy', anchor: 'home', action: 'wave', duration: 5200 },
+  [LOKI_EVENTS.RETURN_VISIT]: { emotion: 'happy', anchor: 'home', action: 'wave', duration: 6200 },
+  [LOKI_EVENTS.APP_ERROR]: { emotion: 'sad', anchor: 'notice', action: 'listen', duration: 7600 },
+  [LOKI_EVENTS.USER_IDLE]: { emotion: 'sleep', anchor: 'home', action: 'yawn', duration: 6200 },
+  [LOKI_EVENTS.DAILY_VISIT]: { emotion: 'idle', anchor: 'home', action: 'lookAround', duration: 5600 },
 };
 
 export const LOKI_EMOTIONS = ['idle', 'happy', 'thinking', 'excited', 'sad', 'helper', 'sleep'];

@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { APG2_PROFILE } from '../components/Apg2ProfileGlass.jsx';
 import { useLoki } from './LokiProvider.jsx';
+import { LOKI_ACTIONS } from './lokiBehavior.js';
+import { getLokiPosition } from './lokiPosition.js';
 
 function getMotionName(emotion) {
   if (emotion === 'happy') return 'lokiHappy';
@@ -11,11 +13,47 @@ function getMotionName(emotion) {
   return 'lokiIdle';
 }
 
+function getActionName(action) {
+  if (action === LOKI_ACTIONS.WAVE) return 'lokiWave';
+  if (action === LOKI_ACTIONS.POINT) return 'lokiPoint';
+  if (action === LOKI_ACTIONS.SPARK) return 'lokiSpark';
+  if (action === LOKI_ACTIONS.CATCH_KEY) return 'lokiCatchKey';
+  if (action === LOKI_ACTIONS.LISTEN) return 'lokiListen';
+  if (action === LOKI_ACTIONS.YAWN) return 'lokiYawn';
+  if (action === LOKI_ACTIONS.LOOK_AROUND) return 'lokiLookAround';
+  return 'none';
+}
+
 export function LokiAssistant() {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
-  const shouldShowRestore = !loki.visible || !loki.settings.enabled || loki.isHiddenOnPanel;
+  const [look, setLook] = useState({ x: 0, y: 0 });
+  const rafRef = useRef(null);
+  const shouldShowRestore = loki.dismissed || !loki.settings.enabled || loki.isHiddenOnPanel;
   const motionName = getMotionName(loki.emotion);
+  const actionName = getActionName(loki.action);
+  const position = getLokiPosition(loki.anchor);
+
+  useEffect(() => {
+    if (!loki.visible) return undefined;
+    const handlePointerMove = (event) => {
+      if (rafRef.current) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const centerX = window.innerWidth - 54;
+        const centerY = window.innerHeight - 134;
+        const dx = Math.max(-1, Math.min(1, (event.clientX - centerX) / 260));
+        const dy = Math.max(-1, Math.min(1, (event.clientY - centerY) / 320));
+        setLook({ x: Number((dx * 4).toFixed(2)), y: Number((dy * 3).toFixed(2)) });
+      });
+    };
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      window.removeEventListener('pointermove', handlePointerMove);
+    };
+  }, [loki.visible]);
 
   const spriteStyle = useMemo(() => ({
     width: 76,
@@ -68,18 +106,18 @@ export function LokiAssistant() {
     );
   }
 
+  if (!loki.visible) return null;
+
   return (
     <div
       style={{
         position: 'fixed',
-        right: 'max(12px, env(safe-area-inset-right, 0px))',
-        bottom: 'calc(92px + env(safe-area-inset-bottom, 0px))',
+        ...position,
         zIndex: 9997,
-        width: 'min(292px, calc(100vw - 24px))',
         display: 'grid',
-        justifyItems: 'end',
         gap: 10,
         pointerEvents: 'none',
+        transition: 'right 520ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), bottom 520ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 260ms ease, transform 520ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))',
         animation: 'lokiAppear var(--motion-modal, 320ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
       }}
     >
@@ -127,7 +165,7 @@ export function LokiAssistant() {
         )}
         <button
           type="button"
-          onClick={() => setMenuOpen(v => !v)}
+          onClick={loki.handleCharacterTap}
           aria-label="Локи"
           style={{
             width: 84,
@@ -143,9 +181,23 @@ export function LokiAssistant() {
             animation: `${motionName} ${loki.emotion === 'excited' ? '860ms' : '4.6s'} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite`,
           }}
         >
-          <span style={spriteStyle}>
-            <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 30%, rgba(255,255,255,0.14), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.08))' }} />
+          <span style={{ display: 'block', transform: `translate3d(${look.x}px, ${look.y}px, 0) rotate(${look.x * 0.6}deg)`, transition: 'transform 260ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))', animation: actionName === 'none' ? 'none' : `${actionName} 1500ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both` }}>
+            <span style={spriteStyle}>
+              <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 30%, rgba(255,255,255,0.14), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.08))' }} />
+              <span style={{ position: 'absolute', left: 18 + look.x, top: 19 + look.y, width: 28, height: 10, borderRadius: 999, background: 'rgba(20,14,24,0.42)', opacity: loki.action === LOKI_ACTIONS.BLINK ? 1 : 0, transform: 'scaleY(0.35)', animation: loki.action === LOKI_ACTIONS.BLINK ? 'lokiBlink 900ms ease both' : 'none', pointerEvents: 'none' }} />
+              {(loki.action === LOKI_ACTIONS.POINT || loki.action === LOKI_ACTIONS.SPARK || loki.action === LOKI_ACTIONS.CATCH_KEY) && (
+                <span style={{ position: 'absolute', right: -7, top: 16, width: 20, height: 20, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,240,184,0.95), rgba(215,184,106,0.58) 44%, transparent 70%)', boxShadow: '0 0 18px rgba(215,184,106,0.62)', animation: 'lokiSparkle 960ms ease-in-out infinite', pointerEvents: 'none' }} />
+              )}
+            </span>
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
+          aria-label="Настройки Локи"
+          style={{ position: 'absolute', right: -3, top: -4, width: 28, height: 28, borderRadius: 12, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(16,14,10,0.44)', color: '#F7F1E6', fontSize: 16, lineHeight: '24px', fontWeight: 800, fontFamily: 'inherit', boxShadow: '0 10px 22px rgba(0,0,0,0.24)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer' }}
+        >
+          ···
         </button>
       </div>
     </div>
