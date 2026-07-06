@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Локи как живой персонаж приложения
-**Коммит:** N/A
+**Коммит:** `02e10828`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/lokiBehavior.js`, `src/loki/lokiPosition.js`, `src/loki/lokiEvents.js`, `src/loki/lokiPhrases.js`, `src/UserApp.jsx`, `src/index.css`
 **Тип:** feat
 **Что изменено:** Локи получил сценическое поведение: появляется только на смысловые события, перемещается к контекстным зонам, реагирует на касание, выполняет редкие микродействия, плавно завершает сцену и исчезает.
