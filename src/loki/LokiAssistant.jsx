@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { APG2_PROFILE } from '../components/Apg2ProfileGlass.jsx';
 import { useLoki } from './LokiProvider.jsx';
+import { LokiExperience } from './LokiExperience.jsx';
 import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { getLokiPosition } from './lokiPosition.js';
 
@@ -73,6 +74,10 @@ export function LokiAssistant() {
     position: 'relative',
     overflow: 'hidden',
   }), []);
+
+  if (loki.experienceOpen) {
+    return <LokiExperience loki={loki} />;
+  }
 
   if (shouldShowRestore) {
     return (
@@ -189,8 +194,10 @@ export function LokiAssistant() {
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
         {menuOpen && (
           <div style={{ ...APG2_PROFILE.glass, position: 'absolute', right: 0, bottom: 86, width: 178, borderRadius: 22, padding: 8, display: 'grid', gap: 6, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+            <button type="button" onClick={() => { loki.openExperience(); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
             <button type="button" onClick={() => { setBrainOpen(v => !v); setHistoryOpen(false); setMenuOpen(false); }} style={menuButtonStyle}>Спросить Локи</button>
             <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
+            <button type="button" onClick={() => { loki.handleCharacterTap(); setMenuOpen(false); }} style={menuButtonStyle}>Поздороваться</button>
             <button type="button" onClick={() => { loki.hideCurrentPanel(); setMenuOpen(false); }} style={menuButtonStyle}>Скрыть на экране</button>
             <button type="button" onClick={() => { loki.setHintsEnabled(false); setMenuOpen(false); }} style={menuButtonStyle}>Выключить подсказки</button>
           </div>
@@ -251,7 +258,7 @@ export function LokiAssistant() {
         )}
         <button
           type="button"
-          onClick={loki.handleCharacterTap}
+          onClick={loki.openExperience}
           aria-label="Локи"
           style={{
             width: 84,

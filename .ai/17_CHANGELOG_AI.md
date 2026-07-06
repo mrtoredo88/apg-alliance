@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Loki Experience
+**Коммит:** `pending`
+**Файлы:** `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/LokiBrain.js`, `src/UserApp.jsx`
+**Тип:** feat
+**Что изменено:** Добавлен полноэкранный режим «Пространство Локи»: крупный персонаж, быстрые действия, поле запроса, голосовая заглушка, история текущего разговора и кликабельные карточки результатов. Loki Brain теперь возвращает набор карточек, а Experience выполняет действия только через Loki Actions.
+**Почему:** Локи должен становиться вторым способом управления АПГ: пользователь формулирует намерение словами, а приложение показывает результаты и открывает нужные разделы без ручного поиска.
+
+---
+
 ## [2026-07-07] Loki Brain V1
 **Коммит:** `c3ac0937`
 **Файлы:** `src/loki/LokiBrain.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/lokiEvents.js`, `src/UserApp.jsx`

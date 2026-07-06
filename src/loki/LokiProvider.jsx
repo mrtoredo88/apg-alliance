@@ -38,6 +38,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const [message, setMessage] = useState('');
   const [card, setCard] = useState(null);
   const [brainThinking, setBrainThinking] = useState(false);
+  const [experienceOpen, setExperienceOpen] = useState(false);
   const [anchor, setAnchor] = useState('home');
   const [action, setAction] = useState(LOKI_ACTIONS.IDLE);
   const [dismissed, setDismissed] = useState(false);
@@ -365,17 +366,59 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     }
   }, [activePanel, appState, executeAction, memory, settings.enabled, showMessage, user]);
 
+  const askExperience = useCallback(async (text, options = {}) => {
+    if (!settings.enabled) return null;
+    setBrainThinking(true);
+    setEmotion('thinking');
+    setAction(LOKI_ACTIONS.LOOK_AROUND);
+    updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text });
+    try {
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory });
+      setBrainThinking(false);
+      setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
+      setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
+      updateMemory({
+        lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: result.text, payload: { card: result.card, cards: result.cards } },
+        lastConversation: { userText: text, answer: result.text, action: result.executeAction ?? result.autoAction ?? result.card?.action ?? null },
+        lastPanel: activePanel,
+        inDialog: true,
+      });
+      updateHistory(prev => addLokiHistoryItem(prev, {
+        kind: 'brain',
+        eventType: LOKI_EVENTS.BRAIN_RESPONSE,
+        text: result.text,
+        card: result.card,
+        priority: LOKI_MESSAGE_PRIORITY.HIGH,
+        panel: activePanel,
+      }));
+      const actionToRun = result.executeAction ?? (options.autoExecute ? result.autoAction : null);
+      if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
+      return result;
+    } catch (e) {
+      setBrainThinking(false);
+      logError(e, 'LokiProvider.askExperience');
+      showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_experience', priority: LOKI_MESSAGE_PRIORITY.HIGH });
+      return {
+        text: 'Что-то пошло не так. Сейчас попробуем разобраться.',
+        card: null,
+        cards: [],
+      };
+    }
+  }, [activePanel, appState, executeAction, memory, settings.enabled, showMessage, updateHistory, updateMemory, user]);
+
   const value = useMemo(() => ({
     action,
     activePanel,
     anchor,
     askBrain,
+    askExperience,
     brainThinking,
     canTalk,
     card,
     dismissed,
     emotion,
     executeAction,
+    experienceOpen,
     isHiddenOnPanel,
     lastEvent,
     history,
@@ -385,6 +428,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     handleCharacterTap,
     showMessage,
     visible,
+    openExperience: () => {
+      setExperienceOpen(true);
+      setVisible(false);
+      setDismissed(false);
+      updateMemory({ inDialog: true, lastPanel: activePanel });
+    },
+    closeExperience: () => {
+      setExperienceOpen(false);
+      setAction(LOKI_ACTIONS.WAVE);
+      setEmotion('happy');
+      updateMemory({ inDialog: false, lastPanel: activePanel });
+    },
     hide: () => {
       if (activeHistoryIdRef.current) {
         const id = activeHistoryIdRef.current;
@@ -397,7 +452,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
-  }), [action, activePanel, anchor, askBrain, brainThinking, canTalk, card, dismissed, emotion, executeAction, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, updateHistory, visible]);
+  }), [action, activePanel, anchor, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, updateHistory, updateMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

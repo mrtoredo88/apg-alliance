@@ -23,6 +23,22 @@ function titleOf(item, fallback) {
   return item?.name ?? item?.title ?? item?.headline ?? fallback;
 }
 
+function imageOf(item) {
+  return item?.coverPhoto || item?.imageUrl || item?.photo || item?.logoUrl || item?.photos?.[0] || item?.gallery?.[0] || '';
+}
+
+function makeResultCard(item, type, action) {
+  return {
+    id: item?.id ?? `${type}-${titleOf(item, 'item')}`,
+    type,
+    title: titleOf(item, type === 'event' ? 'Мероприятие' : type === 'news' ? 'Новость' : 'Партнёр АПГ'),
+    text: item?.category || item?.address || item?.location || item?.place || item?.description || item?.text || 'Открою детали.',
+    image: imageOf(item),
+    action,
+    label: type === 'news' ? 'Читать' : 'Открыть',
+  };
+}
+
 function findPartners(query, partners = []) {
   const text = normalizeText(query);
   const categoryHints = [
@@ -83,6 +99,7 @@ function makePartnerAnswer(partners, query) {
         action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS),
         label: 'Показать рядом',
       },
+      cards: [],
     };
   }
   const first = partners[0];
@@ -91,14 +108,22 @@ function makePartnerAnswer(partners, query) {
     : first.featured
       ? 'это заметный партнёр АПГ'
       : 'он подходит под твой запрос';
+  const cards = partners.map(partner => makeResultCard(
+    partner,
+    'partner',
+    createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: partner.id }),
+  ));
   return {
-    text: `Я бы начал с «${titleOf(first, 'партнёра')}»: ${reason}.`,
+    text: cards.length > 1
+      ? `Нашёл ${cards.length} варианта. Я бы начал с «${titleOf(first, 'партнёра')}»: ${reason}.`
+      : `Я бы начал с «${titleOf(first, 'партнёра')}»: ${reason}.`,
     card: {
       title: titleOf(first, 'Партнёр АПГ'),
       text: first.category || first.address || 'Открою карточку с деталями.',
       action: createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: first.id }),
       label: 'Открыть карточку',
     },
+    cards,
   };
 }
 
@@ -112,33 +137,50 @@ function makeEventsAnswer(events) {
         action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT),
         label: 'Открыть афишу',
       },
+      cards: [],
     };
   }
   const first = events[0];
+  const cards = events.map(event => makeResultCard(
+    event,
+    'event',
+    createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: event.id }),
+  ));
   return {
-    text: `Я нашёл мероприятие «${titleOf(first, 'мероприятие')}». Оно выглядит хорошим вариантом для ближайшего времени.`,
+    text: cards.length > 1
+      ? `Нашёл ${cards.length} ближайших события. Первым посмотрел бы «${titleOf(first, 'мероприятие')}».`
+      : `Я нашёл мероприятие «${titleOf(first, 'мероприятие')}». Оно выглядит хорошим вариантом для ближайшего времени.`,
     card: {
       title: titleOf(first, 'Мероприятие'),
       text: first.location || first.place || 'Открою афишу с подробностями.',
       action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: first.id }),
       label: 'Открыть',
     },
+    cards,
   };
 }
 
 function makeNewsAnswer(news) {
   if (!news.length) {
-    return { text: 'В АПГ пока нет свежих новостей.', card: null };
+    return { text: 'В АПГ пока нет свежих новостей.', card: null, cards: [] };
   }
   const first = news[0];
+  const cards = news.map(item => makeResultCard(
+    item,
+    'news',
+    createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: item.id }),
+  ));
   return {
-    text: `Из нового: «${titleOf(first, 'новость')}». Могу открыть главную, там это будет видно в ленте АПГ.`,
+    text: cards.length > 1
+      ? `Нашёл ${cards.length} свежих новости. Начал бы с «${titleOf(first, 'новость')}».`
+      : `Из нового: «${titleOf(first, 'новость')}». Могу открыть главную, там это будет видно в ленте АПГ.`,
     card: {
       title: titleOf(first, 'Новости АПГ'),
       text: first.description || first.text || 'Свежая новость проекта.',
       action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS),
       label: 'Читать',
     },
+    cards,
   };
 }
 
@@ -157,6 +199,7 @@ export function buildLokiBrainContext(appState = {}, memory = {}) {
     },
     apg: {
       partners: appState.partners ?? [],
+      experts: appState.experts ?? [],
       events: appState.events ?? [],
       news: appState.news ?? [],
       tasks: appState.customTasks ?? [],
@@ -179,6 +222,7 @@ export async function askLokiBrain({ text, appState, memory }) {
     return {
       text: 'Показываю.',
       card: null,
+      cards: [],
       executeAction: lastAction,
     };
   }
@@ -199,6 +243,8 @@ export async function askLokiBrain({ text, appState, memory }) {
         action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS),
         label: 'Показать рядом',
       },
+      cards: [],
+      autoAction: includesAny(query, ['покажи', 'открой']) ? createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS) : null,
     };
   }
 
@@ -219,6 +265,7 @@ export async function askLokiBrain({ text, appState, memory }) {
         action: createLokiAction(LOKI_APP_ACTIONS.START_QR_SCANNER),
         label: 'Сканировать QR',
       },
+      cards: [],
     };
   }
 
@@ -233,6 +280,7 @@ export async function askLokiBrain({ text, appState, memory }) {
         action: createLokiAction(LOKI_APP_ACTIONS.OPEN_PRIZE),
         label: 'Открыть',
       },
+      cards: [],
     };
   }
 
@@ -245,11 +293,13 @@ export async function askLokiBrain({ text, appState, memory }) {
         action: createLokiAction(LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS),
         label: 'Открыть',
       },
+      cards: [],
     };
   }
 
   return {
     text: 'Пока я этого не знаю. В АПГ пока нет информации об этом.',
     card: null,
+    cards: [],
   };
 }

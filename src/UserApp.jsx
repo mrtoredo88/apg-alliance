@@ -1856,13 +1856,14 @@ export function UserApp() {
     news,
     notifications,
     customTasks,
+    experts,
     userKeys,
     favorites,
     lastScanDate,
     unreadCount,
     registeredEventIds,
     completedTasks,
-  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
+  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
