@@ -6,7 +6,7 @@ const SPINNER = (
   <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', verticalAlign: 'middle' }} />
 );
 
-export function EmailAuth({ onCancel }) {
+export function EmailAuth({ onCancel, onSuccess }) {
   const [email, setEmail]   = useState('');
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,8 +29,12 @@ export function EmailAuth({ onCancel }) {
         setError(data.message || 'Ошибка входа. Попробуйте снова.');
       } else {
         if (ref) localStorage.removeItem('apg_pending_ref');
-        localStorage.setItem('apg_email_user', JSON.stringify(data.user));
-        window.location.reload();
+        if (onSuccess) {
+          onSuccess(data.user);
+        } else {
+          localStorage.setItem('apg_email_user', JSON.stringify(data.user));
+          window.location.reload();
+        }
       }
     } catch {
       setError('Ошибка сети. Попробуйте снова.');

@@ -355,7 +355,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {} }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -586,6 +586,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       setShowDeleteConfirm(false);
     }
   }, [onDeleteProfile]);
+
+  const handleEmailAuthSuccess = useCallback((emailUser) => {
+    setShowEmailAuth(false);
+    onEmailAuthSuccess?.(emailUser);
+  }, [onEmailAuthSuccess]);
 
   const dismissToast = useCallback(() => {
     setToastExiting(true);
@@ -872,7 +877,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             subtitle="Введите email, чтобы сохранить ключи, избранное и прогресс."
             onClose={() => setShowEmailAuth(false)}
           >
-            <EmailAuth onCancel={() => setShowEmailAuth(false)} />
+            <EmailAuth onCancel={() => setShowEmailAuth(false)} onSuccess={handleEmailAuthSuccess} />
           </ApgModal>,
           document.body
         )}
@@ -1637,7 +1642,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           subtitle="Введите email, чтобы сохранить ключи, избранное и прогресс."
           onClose={() => setShowEmailAuth(false)}
         >
-          <EmailAuth onCancel={() => setShowEmailAuth(false)} />
+          <EmailAuth onCancel={() => setShowEmailAuth(false)} onSuccess={handleEmailAuthSuccess} />
         </ApgModal>,
         document.body
       )}

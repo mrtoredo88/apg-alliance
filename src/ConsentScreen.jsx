@@ -1,147 +1,170 @@
 import React, { useState } from 'react';
+import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 
-const T = {
-  bg:      '#0F0F1A',
-  surface: '#1A1A2E',
-  border:  'rgba(255,255,255,0.07)',
-  gold:    '#C9A84C',
-  goldL:   '#E8C97A',
-  textPri: '#F0F0F0',
-  textSec: 'rgba(240,240,240,0.5)',
+export const CONSENT_DOCS_VERSION = '2026-07-06';
+export const CONSENT_DOCS = {
+  userAgreementUrl: '/user-agreement.html',
+  privacyPolicyUrl: '/privacy-policy.html',
 };
 
-const ITEMS = [
-  { icon: '👤', text: 'Имя и фото профиля ВКонтакте — для отображения в приложении' },
-  { icon: '🗝️', text: 'История посещений партнёров — для начисления ключей и достижений' },
-  { icon: '⭐', text: 'Список избранных заведений — для персональных рекомендаций' },
-  { icon: '📊', text: 'Статистика активности — для участия в рейтинге' },
-];
+function ConsentCheckbox({ checked, onChange, required = false, children }) {
+  return (
+    <div
+      role="checkbox"
+      aria-checked={checked}
+      tabIndex={0}
+      onClick={() => onChange(!checked)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onChange(!checked);
+        }
+      }}
+      style={{
+        width: '100%',
+        display: 'grid',
+        gridTemplateColumns: '28px 1fr',
+        gap: 12,
+        alignItems: 'flex-start',
+        padding: 13,
+        borderRadius: 22,
+        border: checked ? '1px solid rgba(215,184,106,0.46)' : APG2_PROFILE.glass.border,
+        background: checked
+          ? 'linear-gradient(145deg,rgba(215,184,106,0.15),rgba(var(--apg2-glass-a,255,255,255),0.07))'
+          : 'rgba(var(--apg2-glass-a,255,255,255),0.075)',
+        color: APG2_PROFILE.textSoft,
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        cursor: 'pointer',
+        boxSizing: 'border-box',
+        WebkitTapHighlightColor: 'transparent',
+        transition: 'border-color 180ms ease, background 180ms ease, transform 180ms ease',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 10,
+          boxSizing: 'border-box',
+          border: checked ? '1px solid rgba(255,240,184,0.58)' : '1px solid var(--apg2-glass-border, rgba(255,255,255,0.18))',
+          background: checked ? APG2_PROFILE.goldGlass.background : 'rgba(var(--apg2-glass-a,255,255,255),0.06)',
+          boxShadow: checked ? '0 10px 24px rgba(215,184,106,0.18), inset 0 1px 0 rgba(255,255,255,0.34)' : 'inset 0 1px 0 rgba(255,255,255,0.10)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {checked && <span style={{ color: '#17120a', fontSize: 16, fontWeight: 950, lineHeight: 1 }}>✓</span>}
+      </span>
+      <span style={{ minWidth: 0, fontSize: 13.5, lineHeight: '20px', fontWeight: 600 }}>
+        {children}
+        {required && <span style={{ color: APG2_PROFILE.gold }}> *</span>}
+      </span>
+    </div>
+  );
+}
 
-export function ConsentScreen({ onAccept }) {
-  const [checked, setChecked] = useState(false);
+function DocLink({ href, children }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      style={{
+        color: APG2_PROFILE.gold,
+        textDecoration: 'none',
+        borderBottom: '1px solid rgba(215,184,106,0.34)',
+        fontWeight: 820,
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+export function ConsentScreen({ user, onAccept, onCancel, loading = false }) {
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [notificationsAccepted, setNotificationsAccepted] = useState(false);
+  const canContinue = termsAccepted && privacyAccepted && !loading;
+  const firstName = user?.first_name || user?.firstName || user?.name?.split(' ')?.[0] || '';
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: T.bg, zIndex: 500,
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '24px 20px',
-      overflowY: 'auto',
-    }}>
-      {/* Фоновая сетка */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: 'radial-gradient(rgba(201,168,76,0.05) 1px, transparent 1px)',
-        backgroundSize: '22px 22px',
-      }} />
-      {/* Свечение */}
-      <div style={{
-        position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)',
-        width: 300, height: 300, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(201,168,76,0.08), transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      <div style={{ position: 'relative', width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-        {/* Логотип */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: 20,
-            background: 'rgba(201,168,76,0.1)', border: `1.5px solid rgba(201,168,76,0.4)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <rect x="1" y="1" width="38" height="38" rx="10" fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.4)" strokeWidth="1.5"/>
-              <polygon points="20,5 31,20 20,35 9,20" fill="rgba(201,168,76,0.08)" stroke="#C9A84C" strokeWidth="1.5"/>
-              <line x1="20" y1="5" x2="20" y2="35" stroke="rgba(201,168,76,0.25)" strokeWidth="1"/>
-              <line x1="9" y1="20" x2="31" y2="20" stroke="rgba(201,168,76,0.25)" strokeWidth="1"/>
-              <circle cx="20" cy="20" r="3.5" fill="#C9A84C"/>
-            </svg>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Согласия АПГ"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 13000,
+        minHeight: '100dvh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'calc(18px + env(safe-area-inset-top, 0px)) 16px calc(18px + env(safe-area-inset-bottom, 0px))',
+        boxSizing: 'border-box',
+        overflowY: 'auto',
+        background: APG2_PROFILE.bg,
+        color: APG2_PROFILE.text,
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 50% -8%,rgba(215,184,106,0.19),transparent 34%), radial-gradient(circle at 92% 22%,rgba(73,61,118,0.13),transparent 32%)' }} />
+      <GlassCard style={{ width: '100%', maxWidth: 430, borderRadius: 38, padding: 20, position: 'relative', zIndex: 1, animation: 'fadeInUp 240ms ease both' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+          <div style={{ width: 58, height: 58, borderRadius: 24, background: APG2_PROFILE.goldGlass.background, border: '1px solid rgba(255,232,165,0.46)', boxShadow: '0 18px 42px rgba(215,184,106,0.16), inset 0 1px 0 rgba(255,255,255,0.36)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#17120a', fontSize: 25, fontWeight: 950, flexShrink: 0 }}>
+            А
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: T.textPri, letterSpacing: 1 }}>АПГ</div>
-            <div style={{ fontSize: 11, color: T.textSec, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 }}>Альянс Партнёров Города</div>
-          </div>
-        </div>
-
-        {/* Карточка согласия */}
-        <div style={{
-          background: T.surface, borderRadius: 24, padding: '22px 18px',
-          border: `1px solid ${T.border}`,
-        }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri, marginBottom: 4 }}>
-            Обработка персональных данных
-          </div>
-          <div style={{ fontSize: 13, color: T.textSec, lineHeight: '19px', marginBottom: 16 }}>
-            Для участия в программе лояльности АПГ приложению необходим доступ к следующим данным:
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {ITEMS.map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                  background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
-                }}>
-                  {item.icon}
-                </div>
-                <div style={{ fontSize: 13, color: T.textSec, lineHeight: '19px', paddingTop: 6 }}>{item.text}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 14, border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 12, color: T.textSec, lineHeight: '18px' }}>
-              Данные хранятся в защищённой базе и не передаются третьим лицам. Вы можете удалить свои данные, обратившись к администратору АПГ.
+          <div style={{ minWidth: 0 }}>
+            <GlassBadge tone="gold" style={{ marginBottom: 8 }}>Первый вход</GlassBadge>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '30px', fontWeight: 900 }}>
+              Добро пожаловать в АПГ!
             </div>
           </div>
         </div>
 
-        {/* Чекбокс */}
-        <button
-          onClick={() => setChecked(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'flex-start', gap: 12,
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left',
-          }}
-        >
-          <div style={{
-            width: 22, height: 22, borderRadius: 7, flexShrink: 0, marginTop: 1,
-            border: `2px solid ${checked ? T.gold : 'rgba(255,255,255,0.2)'}`,
-            background: checked ? T.gold : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 0.2s ease',
-          }}>
-            {checked && <span style={{ color: '#0F0F1A', fontSize: 13, fontWeight: 900, lineHeight: 1 }}>✓</span>}
-          </div>
-          <span style={{ fontSize: 13, color: T.textSec, lineHeight: '19px' }}>
-            Я ознакомился с условиями и даю согласие на обработку персональных данных
-          </span>
-        </button>
-
-        {/* Кнопка */}
-        <button
-          onClick={onAccept}
-          disabled={!checked}
-          style={{
-            width: '100%', padding: '16px 0', borderRadius: 16, border: 'none',
-            background: checked
-              ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
-              : 'rgba(255,255,255,0.08)',
-            color: checked ? '#0F0F1A' : 'rgba(255,255,255,0.25)',
-            fontSize: 16, fontWeight: 800, cursor: checked ? 'pointer' : 'default',
-            transition: 'all 0.25s ease',
-            letterSpacing: 0.3,
-          }}
-        >
-          Принять и продолжить
-        </button>
-
-        <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.2)', lineHeight: '16px' }}>
-          Продолжая, вы подтверждаете, что вам исполнилось 14 лет
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', marginBottom: 18 }}>
+          {firstName ? `${firstName}, перед началом использования приложения подтвердите необходимые согласия.` : 'Перед началом использования приложения подтвердите необходимые согласия.'}
         </div>
-      </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <ConsentCheckbox checked={termsAccepted} onChange={setTermsAccepted} required>
+            Я принимаю <DocLink href={CONSENT_DOCS.userAgreementUrl}>Пользовательское соглашение</DocLink>.
+          </ConsentCheckbox>
+
+          <ConsentCheckbox checked={privacyAccepted} onChange={setPrivacyAccepted} required>
+            Я ознакомился(ась) с <DocLink href={CONSENT_DOCS.privacyPolicyUrl}>Политикой обработки персональных данных</DocLink> и даю согласие на обработку моих персональных данных.
+          </ConsentCheckbox>
+
+          <ConsentCheckbox checked={notificationsAccepted} onChange={setNotificationsAccepted}>
+            Хочу получать уведомления о новостях, мероприятиях, акциях и новых возможностях АПГ.
+          </ConsentCheckbox>
+        </div>
+
+        <div style={{ marginTop: 14, color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px' }}>
+          Обязательные согласия отмечены звёздочкой. Уведомления можно включить сейчас или позже в профиле.
+        </div>
+
+        <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+          <GlassButton
+            onClick={() => canContinue && onAccept?.({ termsAccepted, privacyAccepted, notificationsAccepted })}
+            disabled={!canContinue}
+            tone="gold"
+            style={{ width: '100%', minHeight: 54, color: '#17120a', fontSize: 15, fontWeight: 880 }}
+          >
+            {loading ? 'Сохраняем...' : 'Продолжить'}
+          </GlassButton>
+          {onCancel && (
+            <GlassButton onClick={onCancel} disabled={loading} style={{ width: '100%', minHeight: 46, color: APG2_PROFILE.textSoft }}>
+              Вернуться назад
+            </GlassButton>
+          )}
+        </div>
+      </GlassCard>
     </div>
   );
 }

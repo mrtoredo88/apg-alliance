@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
+import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassLoader, GlassToast } from './components/Apg2ProfileGlass.jsx';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -136,6 +137,8 @@ export function UserApp() {
   const [reportSent, setReportSent]             = useState(false);
   const [reportSending, setReportSending]       = useState(false);
   const [loggedOut, setLoggedOut]               = useState(false);
+  const [pendingConsentUser, setPendingConsentUser] = useState(null);
+  const [consentSaving, setConsentSaving]       = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
@@ -582,6 +585,14 @@ export function UserApp() {
         const refId = isRealUser ? pendingRefId : null;
 
         const isValidRef = refId && refId !== String(userData.id);
+        let pendingConsents = null;
+        try {
+          const raw = localStorage.getItem('apg_pending_consents');
+          const parsed = raw ? JSON.parse(raw) : null;
+          if (parsed?.userId === String(userData.id) && parsed?.consents?.termsAccepted && parsed?.consents?.privacyAccepted) {
+            pendingConsents = parsed;
+          }
+        } catch {}
         await setDoc(userRef, {
           keys: isValidRef ? 2 : 0,          // +2 за переход по реферальной ссылке
           favorites: [], scannedPartners: {},
@@ -589,8 +600,16 @@ export function UserApp() {
           scanDates: [], lastBonusDate: todayKey,
           referredBy: refId ?? null,
           registeredAt: serverTimestamp(),
+          ...(pendingConsents ? {
+            consents: { ...pendingConsents.consents, acceptedAt: serverTimestamp() },
+            consentAcceptedAt: serverTimestamp(),
+            consentDocsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
+            notificationConsent: !!pendingConsents.notificationConsent,
+            ...(pendingConsents.notificationConsent ? { notificationsRequestedAt: serverTimestamp() } : {}),
+          } : {}),
           ...profilePatch,
         });
+        if (pendingConsents) localStorage.removeItem('apg_pending_consents');
 
         if (isRealUser) {
           setDoc(doc(db, 'stats', 'global'), { userCount: increment(1) }, { merge: true }).catch(() => {});
@@ -1106,6 +1125,75 @@ export function UserApp() {
   }, [user, userKeys, registeredEventIds, setEvents, showToast]);
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
+
+  const completeEmailLogin = useCallback((emailUser) => {
+    localStorage.removeItem('manualLogout');
+    localStorage.setItem('apg_email_user', JSON.stringify(emailUser));
+    window.location.reload();
+  }, []);
+
+  const handleEmailAuthSuccess = useCallback(async (emailUser) => {
+    if (!emailUser?.id) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', String(emailUser.id)));
+      const data = snap.exists() ? snap.data() : null;
+      if (data?.consents?.termsAccepted && data?.consents?.privacyAccepted) {
+        completeEmailLogin({
+          ...emailUser,
+          consents: data.consents,
+          consentDocsVersion: data.consentDocsVersion ?? data.consents.docsVersion,
+        });
+        return;
+      }
+    } catch (e) {
+      logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
+    }
+    setPendingConsentUser(emailUser);
+  }, [completeEmailLogin]);
+
+  const handleConsentAccept = useCallback(async ({ termsAccepted, privacyAccepted, notificationsAccepted }) => {
+    if (!pendingConsentUser?.id || !termsAccepted || !privacyAccepted || consentSaving) return;
+    setConsentSaving(true);
+    try {
+      const userRef = doc(db, 'users', String(pendingConsentUser.id));
+      const existingSnap = await getDoc(userRef);
+      const consentPayload = {
+        termsAccepted: true,
+        privacyAccepted: true,
+        notificationsAccepted: !!notificationsAccepted,
+        docsVersion: CONSENT_DOCS_VERSION,
+        userAgreementUrl: CONSENT_DOCS.userAgreementUrl,
+        privacyPolicyUrl: CONSENT_DOCS.privacyPolicyUrl,
+      };
+      if (existingSnap.exists()) {
+        await setDoc(userRef, {
+          consents: { ...consentPayload, acceptedAt: serverTimestamp() },
+          consentAcceptedAt: serverTimestamp(),
+          consentDocsVersion: CONSENT_DOCS_VERSION,
+          notificationConsent: !!notificationsAccepted,
+          ...(notificationsAccepted ? { notificationsRequestedAt: serverTimestamp() } : {}),
+        }, { merge: true });
+      } else {
+        localStorage.setItem('apg_pending_consents', JSON.stringify({
+          userId: String(pendingConsentUser.id),
+          consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
+          consentDocsVersion: CONSENT_DOCS_VERSION,
+          notificationConsent: !!notificationsAccepted,
+        }));
+      }
+      if (notificationsAccepted) localStorage.setItem('apg_notif_consent', '1');
+      completeEmailLogin({
+        ...pendingConsentUser,
+        consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
+        consentDocsVersion: CONSENT_DOCS_VERSION,
+      });
+    } catch (e) {
+      logError(e, 'UserApp.handleConsentAccept');
+      showToast('Не удалось сохранить согласия. Проверьте интернет и попробуйте снова.', 'error');
+    } finally {
+      if (mountedRef.current) setConsentSaving(false);
+    }
+  }, [pendingConsentUser, consentSaving, completeEmailLogin, showToast]);
 
   const handleLogout = useCallback(async () => {
     localStorage.setItem('manualLogout', 'true');
@@ -1678,6 +1766,7 @@ export function UserApp() {
                     ownedExpert={ownedExpert}
                     onOpenExpertCabinet={() => goPanel('expert-cabinet')}
                     onUserUpdate={(patch) => setUser(u => ({ ...u, ...patch }))}
+                    onEmailAuthSuccess={handleEmailAuthSuccess}
                   />
                 </Suspense>
               </Panel>
@@ -1927,6 +2016,15 @@ export function UserApp() {
               isReady={!loading}
               onDone={() => setSplashDone(true)}
               startTime={appStartTime.current}
+            />
+          )}
+
+          {pendingConsentUser && (
+            <ConsentScreen
+              user={pendingConsentUser}
+              loading={consentSaving}
+              onAccept={handleConsentAccept}
+              onCancel={() => !consentSaving && setPendingConsentUser(null)}
             />
           )}
 
