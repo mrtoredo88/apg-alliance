@@ -39,6 +39,8 @@ const CONTENT_CATEGORIES = [
   { id: 'transport', label: 'Транспорт',   color: '#fb923c' },
 ];
 const PARTNER_EMOJIS = ['🏪','💆','💄','🍽️','☕','🎓','🏋️','💅','🎉','🛍️','🎭','🌿'];
+const contentImageOf = (item) =>
+  item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
 
 // Admin panel always uses dark theme
 const A = {
@@ -2877,10 +2879,14 @@ export const AdminPanel = () => {
                 .sort(byPriorityDate)
                 .map((e, idx, arr) => {
                 const pri = e.priority ?? 0;
+                const previewImage = contentImageOf(e);
                 return (
                 <div key={e.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{e.emoji ?? '🎉'}</div>
+                    {previewImage
+                      ? <img src={previewImage} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={err => err.target.style.display = 'none'} />
+                      : <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{e.emoji ?? '🎉'}</div>
+                    }
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                         {pri >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: A.gold, background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>📌 {pri}</span>}
@@ -3024,11 +3030,12 @@ export const AdminPanel = () => {
                   ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
                   : '';
                 const pri = item.priority ?? 0;
+                const previewImage = contentImageOf(item);
                 return (
                   <div key={item.id} style={s.row}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                      {item.imageUrl
-                        ? <img src={item.imageUrl} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
+                      {previewImage
+                        ? <img src={previewImage} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${A.border}` }} onError={e => e.target.style.display = 'none'} />
                         : <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{item.emoji ?? '📢'}</div>
                       }
                       <div style={{ minWidth: 0 }}>

@@ -25,6 +25,12 @@ const CATEGORIES = [
   { id: 'other',         label: 'Другое',        emoji: '📦' },
 ];
 
+const contentImageOf = (item) =>
+  item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
+
+const profileImageOf = (item) =>
+  item?.coverPhoto || item?.imageUrl || item?.logoUrl || item?.photoUrl || item?.photo || item?.image || '';
+
 const V2 = {
   pageBg: 'var(--apg2-bg, #101012)',
   text: 'var(--apg2-text, #F7F4EA)',
@@ -153,8 +159,8 @@ function V2FirstScreen({
   onOpenTasks,
 }) {
   const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
-  const heroEvent = events.find(e => e.imageUrl) ?? events[0] ?? null;
-  const heroImage = heroEvent?.imageUrl ?? heroPartner?.logoUrl ?? '';
+  const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
+  const heroImage = heroEvent ? contentImageOf(heroEvent) : profileImageOf(heroPartner);
   const heroTitle = heroEvent?.title ?? heroPartner?.name ?? 'Пульс города рядом';
   const heroMeta = heroEvent?.date ?? heroPartner?.offer ?? 'Главный повод выйти в город сегодня';
   const heroAction = heroEvent ? onOpenEvents : heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenEvents;
@@ -367,7 +373,6 @@ function V2SecondScreen({
   onOpenExperts,
   onOpenRewards,
 }) {
-  const imageOf = (item) => item?.imageUrl || item?.coverPhoto || item?.logoUrl || item?.photoUrl || item?.photo || item?.image || '';
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
     const parts = String(event?.date || 'Скоро').split(/[,\s]+/).filter(Boolean);
@@ -400,31 +405,31 @@ function V2SecondScreen({
   const expertItem = experts[0] ?? null;
   const firstNews = news[0] ?? null;
   const smallNews = news.slice(1, 3);
-  const raffleImage = imageOf(partners[2]) || imageOf(primaryPartner);
+  const raffleImage = profileImageOf(partners[2]) || profileImageOf(primaryPartner);
 
   const forYouCards = [
     {
       label: 'Новое место',
       title: primaryPartner?.name ?? 'Откройте место дня',
-      image: imageOf(primaryPartner),
+      image: profileImageOf(primaryPartner),
       onClick: primaryPartner ? () => onOpenPartner?.(primaryPartner) : undefined,
     },
     {
       label: 'Событие',
       title: eventItem?.title ?? 'Городская встреча',
-      image: imageOf(eventItem),
+      image: contentImageOf(eventItem),
       onClick: onOpenEvents,
     },
     {
       label: 'Эксперт',
       title: expertItem?.name ?? expertItem?.specialization ?? 'Эксперт недели',
-      image: imageOf(expertItem) || imageOf(primaryPartner),
+      image: profileImageOf(expertItem) || profileImageOf(primaryPartner),
       onClick: onOpenExperts,
     },
     {
       label: 'Акция',
       title: promoPartner?.offer ?? promoPartner?.name ?? 'Предложение партнёра',
-      image: imageOf(promoPartner),
+      image: profileImageOf(promoPartner),
       onClick: promoPartner ? () => onOpenPartner?.(promoPartner) : undefined,
     },
     {
@@ -533,7 +538,7 @@ function V2SecondScreen({
               animation: 'fadeInUp 0.56s ease both',
             }}
           >
-            {renderImageLayer(imageOf(newsItems[0]), 0.56)}
+            {renderImageLayer(contentImageOf(newsItems[0]), 0.56)}
             <div style={{ position: 'absolute', inset: 0, background: layerShade }} />
             <div style={{ position: 'relative', zIndex: 1, minHeight: 238, padding: 17, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <span style={{ alignSelf: 'flex-start', ...GlassBadge }}>Главное</span>
@@ -561,7 +566,7 @@ function V2SecondScreen({
                   animationDelay: `${0.06 + index * 0.05}s`,
                 }}
               >
-                {renderImageLayer(imageOf(item), 0.34)}
+                {renderImageLayer(contentImageOf(item), 0.34)}
                 <div style={{ position: 'absolute', inset: 0, background: 'var(--apg2-image-shade-soft, linear-gradient(180deg, rgba(14,14,16,0.28), rgba(14,14,16,0.84)))' }} />
                 <span style={{ position: 'relative', zIndex: 1, minHeight: index === 0 ? 112 : 116, padding: 13, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <span style={{ color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 11, lineHeight: '15px', fontWeight: 820 }}>{index === 0 ? 'Новость' : 'Коротко'}</span>
@@ -598,7 +603,7 @@ function V2SecondScreen({
                 animation: 'fadeInUp 0.5s ease both',
               }}
             >
-              {renderImageLayer(imageOf(visibleEvents[0]), 0.42)}
+              {renderImageLayer(contentImageOf(visibleEvents[0]), 0.42)}
               <div style={{ position: 'absolute', inset: 0, background: 'var(--apg2-ticket-shade, radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(14,14,16,0.90), rgba(14,14,16,0.52) 58%, rgba(14,14,16,0.26)))' }} />
               <div style={{ position: 'absolute', left: 126, top: 0, bottom: 0, width: 1, background: 'linear-gradient(180deg, transparent, rgba(255,255,255,0.22), transparent)' }} />
               <div style={{ position: 'absolute', left: 114, top: -13, width: 26, height: 26, borderRadius: '50%', background: 'var(--apg2-ticket-cut, #0F1011)' }} />
@@ -665,6 +670,7 @@ function V2SecondScreen({
 
 function EventModal({ event, onClose }) {
   if (!event) return null;
+  const eventImage = contentImageOf(event);
 
   const modal = (
     <div style={{
@@ -687,9 +693,9 @@ function EventModal({ event, onClose }) {
         <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '0 auto 20px' }} />
 
         {/* Обложка события */}
-        {event.imageUrl && (
+        {eventImage && (
           <div style={{ margin: '-24px -20px 20px', overflow: 'hidden', borderRadius: '0' }}>
-            <img src={event.imageUrl} alt="" loading="lazy" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display='none'} />
+            <img src={eventImage} alt="" loading="lazy" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display='none'} />
           </div>
         )}
 
@@ -1121,6 +1127,7 @@ function NewsModal({ item, onClose }) {
     : item.createdAt
     ? new Date(item.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
     : '';
+  const newsImage = contentImageOf(item);
 
   const pct = Math.max(0, 1 - dragY / 280);
 
@@ -1157,12 +1164,12 @@ function NewsModal({ item, onClose }) {
 
         {/* Скроллируемый контент */}
         <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
-          {item.imageUrl && (
-            <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
+          {newsImage && (
+            <img src={newsImage} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
               style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', marginTop: 8 }} />
           )}
           <div style={{ padding: '20px 20px 48px' }}>
-            {!item.imageUrl && item.emoji && <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{item.emoji}</div>}
+            {!newsImage && item.emoji && <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{item.emoji}</div>}
             <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
             {dateStr && <div style={{ fontSize: 11, color: T.textSec, marginBottom: 14 }}>{dateStr}</div>}
             <div style={{ fontSize: 15, color: T.textSec, lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
@@ -1272,6 +1279,7 @@ function NewsWidget({ news }) {
             transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.2,0,0,1)',
           }}>
             {news.map((n) => {
+              const newsImage = contentImageOf(n);
               const ds = n.createdAt?.toDate
                 ? n.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
                 : n.createdAt
@@ -1279,9 +1287,9 @@ function NewsWidget({ news }) {
                 : '';
               return (
                 <div key={n.id} style={{ height: ITEM_H, display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
-                  {n.imageUrl ? (
+                  {newsImage ? (
                     <div style={{ margin: '0 -16px 12px', position: 'relative', flexShrink: 0 }}>
-                      <img src={n.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
+                      <img src={newsImage} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
                         style={{ width: '100%', height: 132, objectFit: 'cover', display: 'block' }} />
                       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(8,8,26,0.55) 0%, transparent 55%)', pointerEvents: 'none' }} />
                     </div>
@@ -1290,10 +1298,10 @@ function NewsWidget({ news }) {
                   )}
                   <div style={{ fontSize: 17, fontWeight: 900, color: T.textPri, lineHeight: 1.35, marginBottom: 8, letterSpacing: -0.3, flexShrink: 0 }}>
                     {(n.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
-                    {n.imageUrl && n.emoji && <span style={{ marginRight: 6 }}>{n.emoji}</span>}
+                    {newsImage && n.emoji && <span style={{ marginRight: 6 }}>{n.emoji}</span>}
                     {n.title}
                   </div>
-                  <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px', flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: n.imageUrl ? 3 : 4, WebkitBoxOrient: 'vertical' }}>
+                  <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px', flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: newsImage ? 3 : 4, WebkitBoxOrient: 'vertical' }}>
                     {n.text}
                   </div>
                   {ds && <div style={{ fontSize: 11, color: T.textSec, marginTop: 8, flexShrink: 0 }}>{ds}</div>}

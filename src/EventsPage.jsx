@@ -19,6 +19,9 @@ const GRADIENTS_LIGHT = [
   'linear-gradient(135deg, rgba(26,188,156,0.12), rgba(26,188,156,0.06))',
 ];
 
+const eventImageOf = (event) =>
+  event?.coverPhoto || event?.imageUrl || event?.thumbnail || event?.banner || event?.image || '';
+
 function useCountdown(deadline) {
   const getRemaining = (dl) => {
     if (!dl) return null;
@@ -59,8 +62,14 @@ function CountdownChip({ deadline }) {
 
 function EventModal({ event, onClose }) {
   if (!event) return null;
+  const eventImage = eventImageOf(event);
   return (
     <ApgModal title={event.title || 'Мероприятие АПГ'} subtitle={event.partner || event.address || 'Подробности мероприятия'} onClose={onClose} maxWidth={460}>
+        {eventImage && (
+          <div style={{ margin: '-6px -4px 18px', borderRadius: 28, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 18px 48px rgba(0,0,0,0.22)' }}>
+            <img src={eventImage} alt="" loading="lazy" style={{ width: '100%', height: 190, objectFit: 'cover', display: 'block' }} onError={e => { e.currentTarget.parentElement.style.display = 'none'; }} />
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <div style={{ ...APG2_PROFILE.glass, width: 72, height: 72, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event.emoji ?? '🎉'}</div>
         </div>
@@ -145,6 +154,7 @@ function EventCardV2({ event, index, onClick }) {
   const date = event.date || event.eventDate || event.deadline || 'Скоро';
   const day = String(date).slice(0, 2).replace(/\D/g, '') || '✦';
   const month = String(date).replace(/^\d+\.?\s*/, '').slice(0, 6) || 'АПГ';
+  const eventImage = eventImageOf(event);
   return (
     <GlassCard
       onClick={() => onClick(event)}
@@ -157,14 +167,20 @@ function EventCardV2({ event, index, onClick }) {
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, lineHeight: '14px', fontWeight: 760, textTransform: 'uppercase' }}>{month}</div>
         </div>
       </div>
-      <div style={{ padding: index === 0 ? 18 : 15, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12 }}>
-        <div>
+      <div style={{ padding: index === 0 ? 18 : 15, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12, position: 'relative', overflow: 'hidden' }}>
+        {eventImage && (
+          <>
+            <img src={eventImage} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: index === 0 ? 0.24 : 0.16, filter: 'saturate(1.05) contrast(1.03)' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(12,12,14,0.86), rgba(12,12,14,0.54))' }} />
+          </>
+        )}
+        <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: index === 0 ? 20 : 16, lineHeight: index === 0 ? '24px' : '20px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Событие АПГ'}</div>
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {event.partner || event.address || event.description || 'Подробности появятся скоро'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
           {event.deadline && <GlassBadge>до регистрации</GlassBadge>}
           {event.priceClub && <GlassBadge tone="gold">{event.priceClub}</GlassBadge>}
           <span style={{ marginLeft: 'auto', color: APG2_PROFILE.gold, fontSize: 22, lineHeight: 1 }}>›</span>
