@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Модульная архитектура Loki Core
+**Коммит:** `pending`
+**Файлы:** `src/loki/LokiBrain.js`, `src/loki/core/*`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `.ai/21_LOKI_CORE.md`
+**Тип:** refactor
+**Что изменено:** Loki Brain превращён в фасад над `LokiCore`; добавлены независимые модули Navigator, Partner Expert, Event Expert, Rewards Expert, News Expert, Profile Expert, Memory Engine, Recommendation Engine, Observer adapter и Personality Engine. Добавлен debug trace через `localStorage.apg_loki_debug`.
+**Почему:** Локи должен развиваться как платформа интеллектуальных сервисов, где новые способности подключаются через Core без переписывания UI и существующих actions.
+
+---
+
 ## [2026-07-07] Loki Experience
 **Коммит:** `b21fad04`
 **Файлы:** `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/LokiBrain.js`, `src/UserApp.jsx`

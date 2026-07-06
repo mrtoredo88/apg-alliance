@@ -1,0 +1,95 @@
+import { Navigator } from './modules/Navigator.js';
+import { PartnerExpert } from './modules/PartnerExpert.js';
+import { EventExpert } from './modules/EventExpert.js';
+import { RewardsExpert } from './modules/RewardsExpert.js';
+import { NewsExpert } from './modules/NewsExpert.js';
+import { ProfileExpert } from './modules/ProfileExpert.js';
+import { MemoryEngine } from './modules/MemoryEngine.js';
+import { RecommendationEngine } from './modules/RecommendationEngine.js';
+import { ObserverModule } from './modules/ObserverModule.js';
+import { PersonalityEngine } from './modules/PersonalityEngine.js';
+import { getActiveLokiAiProvider } from './lokiAiProviders.js';
+import { emptyResult, normalizeText } from './lokiCoreUtils.js';
+
+const LOKI_MODULES = [
+  Navigator,
+  PartnerExpert,
+  EventExpert,
+  RewardsExpert,
+  NewsExpert,
+  ProfileExpert,
+  RecommendationEngine,
+];
+
+export const LOKI_CORE_REGISTRY = {
+  core: 'Loki Core',
+  memory: MemoryEngine,
+  personality: PersonalityEngine,
+  observer: ObserverModule,
+  modules: LOKI_MODULES,
+};
+
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+export function buildLokiBrainContext(appState = {}, memory = {}) {
+  const base = {
+    user: {
+      name: appState.user?.first_name || appState.user?.name || null,
+      keys: Number(appState.userKeys ?? 0),
+      completedTasks: appState.completedTasks ?? [],
+      favorites: appState.favorites ?? [],
+      city: 'Зеленоград',
+      currentPanel: appState.activePanel,
+      lastScanDate: appState.lastScanDate ?? null,
+    },
+    apg: {
+      partners: appState.partners ?? [],
+      experts: appState.experts ?? [],
+      events: appState.events ?? [],
+      news: appState.news ?? [],
+      tasks: appState.customTasks ?? [],
+      notifications: appState.notifications ?? [],
+      prizesKnown: false,
+    },
+  };
+  return MemoryEngine.enrich({ context: base, memory });
+}
+
+export async function askLokiCore({ text, appState, memory, debug = false }) {
+  const start = nowMs();
+  const query = normalizeText(text);
+  const trace = [];
+  const provider = getActiveLokiAiProvider();
+  const contextStart = nowMs();
+  const context = buildLokiBrainContext(appState, memory);
+  trace.push({ module: MemoryEngine.id, ms: Math.round(nowMs() - contextStart), decision: 'context_enriched' });
+
+  if (!query) {
+    const result = PersonalityEngine.shape({
+      result: { text: 'Спроси меня про места, мероприятия, акции, ключи или новости АПГ.', card: null, cards: [] },
+      context,
+    });
+    return debug ? { ...result, debug: { provider, totalMs: Math.round(nowMs() - start), trace } } : result;
+  }
+
+  let selected = null;
+  let rawResult = null;
+  for (const module of LOKI_MODULES) {
+    const moduleStart = nowMs();
+    const accepted = module.canHandle({ query, context, text });
+    trace.push({ module: module.id, ms: Math.round(nowMs() - moduleStart), decision: accepted ? 'accepted' : 'skipped' });
+    if (!accepted) continue;
+    selected = module;
+    const handleStart = nowMs();
+    rawResult = await module.handle({ query, context, text });
+    trace.push({ module: `${module.id}.handle`, ms: Math.round(nowMs() - handleStart), decision: rawResult?.intent ?? 'handled' });
+    break;
+  }
+
+  const personalityStart = nowMs();
+  const result = PersonalityEngine.shape({ result: rawResult ?? emptyResult(), context, selectedModule: selected });
+  trace.push({ module: PersonalityEngine.id, ms: Math.round(nowMs() - personalityStart), decision: result.tone });
+  return debug ? { ...result, debug: { provider, selectedModule: selected?.id ?? null, totalMs: Math.round(nowMs() - start), trace } } : result;
+}

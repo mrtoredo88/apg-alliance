@@ -29,6 +29,14 @@ function getUserId(user) {
   return user?.id ? String(user.id) : 'guest';
 }
 
+function isLokiDebugEnabled() {
+  try {
+    return localStorage.getItem('apg_loki_debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function LokiProvider({ children, user, activePanel, appActions, appState }) {
   const [settings, setSettings] = useState(() => loadLokiSettings());
   const [memory, setMemory] = useState(() => loadLokiMemory());
@@ -342,7 +350,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setBrainThinking(true);
     }, 1000);
     try {
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory });
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, debug: isLokiDebugEnabled() });
       clearTimeout(thinkingTimer);
       setBrainThinking(false);
       if (result.executeAction) {
@@ -373,7 +381,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setAction(LOKI_ACTIONS.LOOK_AROUND);
     updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text });
     try {
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory });
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, debug: isLokiDebugEnabled() });
       setBrainThinking(false);
       setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
       setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);

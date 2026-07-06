@@ -71,6 +71,7 @@ export function LokiExperience({ loki }) {
       from: 'loki',
       text: result.text || 'Готово.',
       cards,
+      debug: result.debug ?? null,
     }]);
     const action = result.executeAction || quickAction || (question.toLowerCase().includes('покажи') ? result.autoAction : null);
     if (action) setTimeout(() => loki.executeAction(action), 520);
@@ -131,6 +132,14 @@ export function LokiExperience({ loki }) {
                 <div style={{ width: '100%', display: 'grid', gap: 8 }}>
                   {item.cards.slice(0, 3).map(card => (
                     <ResultCard key={`${item.id}-${card.id}`} card={card} onOpen={() => loki.executeAction(card.action)} />
+                  ))}
+                </div>
+              )}
+              {item.debug && (
+                <div style={{ ...APG2_PROFILE.glass, width: '100%', borderRadius: 18, padding: 10, border: '1px solid rgba(215,184,106,0.14)', color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '15px', display: 'grid', gap: 4 }}>
+                  <span style={{ color: APG2_PROFILE.gold, fontWeight: 850 }}>Loki Core debug · {item.debug.provider} · {item.debug.totalMs}ms</span>
+                  {item.debug.trace?.slice(0, 8).map(step => (
+                    <span key={`${item.id}-${step.module}-${step.decision}`}>{step.module}: {step.decision} · {step.ms}ms</span>
                   ))}
                 </div>
               )}
