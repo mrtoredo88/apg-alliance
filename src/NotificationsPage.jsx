@@ -5,6 +5,7 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 import { T, GLASS } from './design.js';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 function timeAgo(ts) {
   if (!ts) return '';
@@ -34,7 +35,7 @@ function matchesTarget(notif, userKeys, lastScanDate) {
   return true;
 }
 
-export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
+export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
   const [allNotifications, setAllNotifications] = useState(propNotifications ?? []);
   const [loading, setLoading] = useState(!propNotifications);
   const [loadError, setLoadError] = useState(false);
@@ -70,6 +71,56 @@ export function NotificationsPage({ onBack, notificationsEnabled, onEnableNotifi
     const notifDate = notif.createdAt.toDate ? notif.createdAt.toDate() : new Date(notif.createdAt);
     return notifDate > seenDate;
   };
+
+  if (variant === 'v2') {
+    const unreadCount = notifications.filter(isUnread).length;
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Уведомления" subtitle={`${notifications.length} сообщений · ${unreadCount} новых`} kicker="АПГ сообщает" onBack={onBack} />
+        {!notificationsEnabled && (
+          <GlassCard tone="gold" style={{ borderRadius: 34, padding: 18, marginBottom: 18 }}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+              <div style={{ width: 58, height: 58, borderRadius: 24, background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>📲</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#17120a', fontSize: 17, fontWeight: 880 }}>Включить push</div>
+                <div style={{ color: 'rgba(20,15,8,0.66)', fontSize: 13, lineHeight: '18px', marginTop: 4 }}>Новые акции, события и розыгрыши будут приходить вовремя.</div>
+              </div>
+            </div>
+            <GlassButton onClick={handleEnable} tone="glass" style={{ marginTop: 14, width: '100%', color: '#17120a', background: 'rgba(255,255,255,0.3)' }}>{enabling ? 'Включаем...' : 'Включить уведомления'}</GlassButton>
+          </GlassCard>
+        )}
+        {notificationsEnabled && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+            <StatPill label="всего" value={notifications.length} tone="gold" />
+            <StatPill label="новых" value={unreadCount} />
+          </div>
+        )}
+        {loadError && <EmptyStateV2 icon="⚠️" title="Не удалось загрузить" text="Проверьте соединение и попробуйте снова." />}
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{[1, 2, 3].map(i => <GlassCard key={i} style={{ height: 86, animation: 'shimmer 1.5s ease-in-out infinite' }} />)}</div>
+        ) : notifications.length === 0 ? (
+          <EmptyStateV2 icon="🔔" title="Пока тихо" text="Здесь появятся важные новости АПГ, акции партнеров и приглашения на события." />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+            {notifications.map((n, i) => {
+              const unread = isUnread(n);
+              return (
+                <GlassListItem
+                  key={n.id ?? i}
+                  icon={n.emoji ?? '🔔'}
+                  title={n.title ?? 'Уведомление АПГ'}
+                  subtitle={n.body ?? timeAgo(n.createdAt)}
+                  meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : timeAgo(n.createdAt)}
+                  accent={unread ? APG2_PROFILE.gold : undefined}
+                  style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }}
+                />
+              );
+            })}
+          </div>
+        )}
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

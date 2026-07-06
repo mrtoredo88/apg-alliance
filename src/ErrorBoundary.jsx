@@ -12,7 +12,6 @@ export class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('[APG] Uncaught error:', error, info.componentStack);
     logError(error, 'ErrorBoundary:' + (info.componentStack ?? '').slice(0, 200));
   }
 

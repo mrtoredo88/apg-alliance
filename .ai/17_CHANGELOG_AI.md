@@ -15,6 +15,42 @@
 
 ---
 
+## [2026-07-06] V4.3 urgent startup fallback and Splash
+**Коммит:** N/A
+**Файлы:** `src/UserApp.jsx`, `src/SplashScreen.jsx`, `public/splash-v43.png`
+**Тип:** fix
+**Что изменено:** Добавлены таймауты и fallback для auth/data initialization, каждый источник данных главной теперь грузится независимо через `safeLoad`; Splash Screen получил max-timeout и пересобран вокруг единого арта `splash-v43.png` без старого логотипа/дублирующих надписей поверх.
+**Почему:** Убрать зависание приложения на логотипе и не позволять ошибкам Firestore/VK News/experts блокировать открытие главной.
+
+---
+
+## [2026-07-06] V4.1 release checks polish
+**Коммит:** N/A
+**Файлы:** `src/SplashScreen.jsx`, `src/index.css`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `src/TasksPage.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/ActivityPage.jsx`, `src/LeaderboardPage.jsx`, `src/ErrorBoundary.jsx`, `api/email-auth.js`, `server/src/routes/email-auth.js`, `scripts/demo-content.mjs`, `scripts/geocode-partners.js`, `scripts/serve-local-prod.mjs`
+**Тип:** fix
+**Что изменено:** Убран фиолетовый ореол Splash Screen, обновлены централизованные фоны светлой и тёмной темы, фронтенд `console.error` переведён на `logError`, снят Vite warning по смешанному импорту `firebase.js`.
+**Почему:** Довести локального релиз-кандидата до более чистого визуального и технического состояния перед финальным ручным QA.
+
+---
+
+## [2026-07-06] V3.3 release blockers QA
+**Коммит:** N/A
+**Файлы:** `firestore.rules`, `api/vk-news.js`, `server/src/routes/vk-news.js`, `src/UserApp.jsx`, `src/RewardsPage.jsx`, `src/ProfilePanel.jsx`, `src/ExpertsPage.jsx`, `src/Scanner.jsx`, `scripts/serve-local-prod.mjs`
+**Тип:** fix
+**Что изменено:** Локально исправлены блокеры rewards/write-сценариев, безопасный fallback VK News, поведение QR-сканера, конфликт оверлеев с Floating Island и перекрытие кнопки темы в профиле.
+**Почему:** Подготовить локальную V3 к функциональному QA без deploy и без изменения production.
+
+---
+
+## [2026-07-06] V3.1 architecture cleanup
+**Коммит:** N/A
+**Файлы:** `src/UserApp.jsx`, `src/HomePanel.jsx`, `src/routes.js`, `src/components/Layout.js`, `src/components/MainScreen.js`, `src/components/MapScreen.js`, `src/components/ProfileScreen.js`, `public/manifest.json`, `public/sw.js`, `index.html`, `.ai/*`, `AGENTS.md`, `AGENTS2.md`, `CLAUDE.md`
+**Тип:** refactor
+**Что изменено:** Удалены старая `HomePanel.jsx`, legacy роутер и пустые VK template-заглушки; `UserApp.jsx` очищен от `useHomeV2` runtime-веток; PWA стартует с `/#/`.
+**Почему:** Завершить локальный переход пользовательского приложения на единую V3/V2 glass-архитектуру перед функциональным QA.
+
+---
+
 ## [2026-07-06] Большой спринт Home V2
 **Коммит:** N/A
 **Файлы:** `src/HomePanelV2.jsx`, `src/UserApp.jsx`

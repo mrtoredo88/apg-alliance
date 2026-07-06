@@ -22,6 +22,9 @@ import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { APP_URL } from './constants.js';
+import { logError } from './errorLogger.js';
+import { createVisitQrToken } from './rewardApi.js';
+import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 
 function sanitizeForVK(text) {
   if (!text) return '';
@@ -164,10 +167,14 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   );
 }
 
-function ExpertModal({ expert, user, scannedExperts, onClose }) {
+function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2' }) {
   const [showQR, setShowQR] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
+  const [visitQr, setVisitQr] = useState(null);
+  const [visitQrLoading, setVisitQrLoading] = useState(false);
+  const [visitQrError, setVisitQrError] = useState('');
+  const [visitQrNow, setVisitQrNow] = useState(Date.now());
   const shareToastRef = useRef(null);
 
   useEffect(() => {
@@ -275,13 +282,189 @@ function ExpertModal({ expert, user, scannedExperts, onClose }) {
         setMyRating(0);
         setMyText('');
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { logError(e, 'ExpertsPage.submitReview'); }
     finally { if (mountedRef.current) setSubmitting(false); }
   };
 
   const hasScanned = scannedExperts?.[expert.id];
   const canBook = expert.bookingUrl || expert.vkUrl || expert.phone;
   const qrValue = `expert_${expert.id}`;
+  const userId = user?.id ? String(user.id) : null;
+  const visitQrSecondsLeft = visitQr?.expiresAt ? Math.max(0, Math.ceil((visitQr.expiresAt - visitQrNow) / 1000)) : 0;
+  const category = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other'));
+
+  useEffect(() => {
+    if (!visitQr) return undefined;
+    const timer = setInterval(() => setVisitQrNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [visitQr]);
+
+  useEffect(() => {
+    if (visitQr && visitQrSecondsLeft <= 0) setVisitQr(null);
+  }, [visitQr, visitQrSecondsLeft]);
+
+  const requestVisitQr = async () => {
+    if (!expert?.id || !userId || visitQrLoading) return;
+    setVisitQrLoading(true);
+    setVisitQrError('');
+    try {
+      const token = await createVisitQrToken({ userId, subjectType: 'expert', subjectId: expert.id });
+      if (!mountedRef.current) return;
+      setVisitQr(token);
+      setVisitQrNow(Date.now());
+    } catch (e) {
+      logError(e, 'ExpertsPage.requestVisitQr');
+      if (mountedRef.current) setVisitQrError(e.message || 'Не удалось создать QR');
+    } finally {
+      if (mountedRef.current) setVisitQrLoading(false);
+    }
+  };
+
+  if (variant === 'v2') {
+    const heroImage = getProfileImage(expert);
+    const galleryItems = expert.gallery?.length ? expert.gallery : [heroImage].filter(Boolean);
+    const status = expert.verified ? 'Проверенный эксперт' : expert.premium ? 'Premium' : 'Эксперт АПГ';
+    const heroBadges = [
+      category ? `${category.emoji} ${category.label}` : null,
+      (expert.avgRating ?? 0) > 0 ? `★ ${expert.avgRating.toFixed(1)} · ${expert.reviewCount ?? reviews.length}` : null,
+    ].filter(Boolean);
+    const cta = [
+      expert.phone && { label: 'Позвонить', icon: '📞', onClick: () => openUrl(`tel:${expert.phone}`), tone: 'gold' },
+      expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openUrl(expert.bookingUrl), tone: 'gold' },
+      !isVK() && expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openUrl(expert.websiteUrl) },
+      !isVK() && expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openUrl(expert.vkUrl) },
+      !isVK() && expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openUrl(expert.telegramUrl) },
+      { label: 'Поделиться', icon: '↗', onClick: handleShare },
+    ].filter(Boolean);
+
+    return createPortal(
+      <>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 12000, display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} onClick={onClose}>
+          <div style={{ width: '100%', maxHeight: '96vh', overflowY: 'auto', background: APG2.bg, borderRadius: '34px 34px 0 0', padding: '10px 16px calc(96px + env(safe-area-inset-bottom, 0px))', color: APG2.text, boxShadow: '0 -28px 80px var(--apg2-elev-shadow, rgba(0,0,0,0.52))' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(247,241,230,0.22)', margin: '0 auto 14px' }} />
+            {shareToast && (
+              <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 60px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20000, ...APG2.glass, borderRadius: 18, padding: '11px 18px', fontSize: 13, fontWeight: 760, color: APG2.text, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                {shareToast}
+              </div>
+            )}
+
+            <ProfileHero
+              image={heroImage}
+              title={expert.name}
+              subtitle={expert.specialization || 'Эксперт города'}
+              status={status}
+              avatar={<ExpertAvatar expert={expert} size={66} />}
+              badges={heroBadges}
+              description={expert.offer || expert.description || 'Проверенный специалист в экосистеме АПГ.'}
+            />
+
+            <GlassSection title="Действия">
+              {cta.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {cta.map(item => (
+                    <GlassButton key={item.label} onClick={item.onClick} tone={item.tone}>
+                      <span>{item.icon}</span><span>{item.label}</span>
+                    </GlassButton>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ ...APG2.glass, borderRadius: 30, padding: 22, color: APG2.textSoft, textAlign: 'center' }}>Контакты скоро появятся.</div>
+              )}
+            </GlassSection>
+
+            {expert.offer && (
+              <GlassSection title="Акция">
+                <div style={{ ...APG2.goldGlass, borderRadius: 34, padding: 18, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
+                  <div style={{ width: 54, height: 54, borderRadius: 20, background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎁</div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
+                    <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{expert.offer}</div>
+                  </div>
+                </div>
+              </GlassSection>
+            )}
+
+            <GlassSection title="Описание">
+              <div style={{ ...APG2.glass, borderRadius: 34, padding: 18 }}>
+                {expert.description ? (
+                  <RichText color={APG2.textSoft} fontSize={15}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
+                ) : (
+                  <div style={{ color: APG2.textSoft, fontSize: 15, lineHeight: '22px' }}>Описание эксперта пока готовится.</div>
+                )}
+                {expert.formats?.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+                    {expert.formats.map(f => <FormatChip key={f} format={f} />)}
+                  </div>
+                )}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Фото">
+              <ProfileGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
+            </GlassSection>
+
+            {expert.videos?.length > 0 && (
+              <GlassSection title="Видео">
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 14, overflow: 'hidden' }}>
+                  <VideoSection videos={expert.videos} />
+                </div>
+              </GlassSection>
+            )}
+
+            <GlassSection title="QR для посещения">
+              <div style={{ ...APG2.glass, borderRadius: 30, padding: 16, border: hasScanned ? '1px solid rgba(75,179,75,0.34)' : APG2.glass.border }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }}>
+                  <div>
+                    <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780 }}>Одноразовый QR консультации</div>
+                    <div style={{ color: hasScanned ? '#7fe18b' : APG2.textMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>{hasScanned ? 'Посещение уже отмечалось' : `+${expert.keys ?? 1} ключ после подтверждения экспертом`}</div>
+                  </div>
+                  <GlassButton onClick={requestVisitQr} tone="gold" style={{ minHeight: 40, borderRadius: 17, padding: '9px 12px', fontSize: 12, opacity: !userId || visitQrLoading ? 0.58 : 1 }}>{visitQrLoading ? '...' : 'Получить QR'}</GlassButton>
+                </div>
+                {visitQrError && (
+                  <div style={{ marginTop: 12, color: '#ff9aa8', fontSize: 12, lineHeight: '17px' }}>{visitQrError}</div>
+                )}
+                {visitQr?.qrValue && visitQrSecondsLeft > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 16 }}>
+                    <div style={{ background: '#fff', borderRadius: 22, padding: 13, boxShadow: '0 18px 44px rgba(0,0,0,0.28)' }}>
+                      <QRCodeSVG value={visitQr.qrValue} size={172} />
+                    </div>
+                    <div style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>Действует ещё {visitQrSecondsLeft} сек.</div>
+                  </div>
+                )}
+              </div>
+            </GlassSection>
+
+            <GlassSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`}>
+              {user && !String(user.id).startsWith('guest_') && !submitDone && (
+                <div style={{ ...APG2.glass, borderRadius: 30, padding: 16, marginBottom: 12 }}>
+                  <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780, marginBottom: 10 }}>Оставить отзыв</div>
+                  <StarPicker value={myRating} onChange={setMyRating} />
+                  <textarea value={myText} onChange={e => setMyText(e.target.value)} placeholder="Расскажите о своём опыте..." style={{ width: '100%', marginTop: 12, padding: '12px 13px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: APG2.text, fontSize: 16, resize: 'vertical', minHeight: 78, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+                  <GlassButton onClick={handleSubmitReview} tone="gold" style={{ marginTop: 10, opacity: !myRating || submitting ? 0.55 : 1 }}>{submitting ? '...' : 'Опубликовать'}</GlassButton>
+                </div>
+              )}
+              {reviewsLoading ? (
+                <div style={{ ...APG2.glass, borderRadius: 28, padding: 22, color: APG2.textMuted, textAlign: 'center' }}>Загружаем отзывы...</div>
+              ) : reviews.length === 0 ? (
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 28, textAlign: 'center' }}>
+                  <div style={{ color: APG2.text, fontSize: 18, fontWeight: 780, marginBottom: 6 }}>Отзывов пока нет</div>
+                  <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Первый отзыв появится здесь красиво.</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollSnapType: 'x mandatory' }} onTouchStart={e => e.stopPropagation()}>
+                  {reviews.map(r => <ProfileReviewCard key={r.id} review={r} textFallback="Гость оценил консультацию без комментария." />)}
+                </div>
+              )}
+            </GlassSection>
+          </div>
+        </div>
+        {lightboxIdx !== null && expert.gallery?.length > 0 && (
+          <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+        )}
+      </>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <>
@@ -584,6 +767,31 @@ function ExpertCard({ expert, index, onClick, isTop }) {
   );
 }
 
+function ExpertCardV2({ expert, onClick, isTop }) {
+  const image = getProfileImage(expert);
+  const cat = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other'));
+  return (
+    <GlassCard onClick={() => onClick(expert)} style={{ minHeight: 132, padding: 0, overflow: 'hidden', position: 'relative', borderRadius: 26 }}>
+      {image && <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.38, filter: 'saturate(1.05) contrast(1.02)' }} onError={e => { e.currentTarget.style.display = 'none'; }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(125deg,rgba(12,12,14,0.86),rgba(12,12,14,0.42) 58%,rgba(12,12,14,0.86))' }} />
+      <div style={{ position: 'relative', zIndex: 1, padding: 14, minHeight: 132, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <ExpertAvatar expert={expert} size={48} />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {isTop && <GlassBadge tone="gold">В топе</GlassBadge>}
+            {cat && <GlassBadge>{cat.emoji} {cat.label}</GlassBadge>}
+          </div>
+        </div>
+        <div>
+          <div style={{ color: APG2.text, fontSize: 17, lineHeight: '21px', fontWeight: 830, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{expert.name || 'Эксперт АПГ'}</div>
+          <div style={{ marginTop: 4, color: APG2.gold, fontSize: 12, lineHeight: '16px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expert.specialization || 'Консультации и услуги'}</div>
+          {(expert.avgRating ?? 0) > 0 && <div style={{ marginTop: 5, color: APG2.textSoft, fontSize: 11 }}>★ {expert.avgRating.toFixed(1)} · {expert.reviewCount ?? 0}</div>}
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
 const FILTERS = [
   { id: 'all',     label: 'Все',     emoji: '✦' },
   { id: 'online',  label: 'Онлайн', emoji: '💻' },
@@ -593,7 +801,7 @@ const FILTERS = [
 
 const CATEGORY_FILTERS = [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES];
 
-export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null }) {
+export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -660,10 +868,78 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
     }
   }, [selected]);
 
+  if (variant === 'v2') {
+    return (
+      <>
+        <GlassPanel>
+          <div style={{ position: 'sticky', top: 0, zIndex: 40, margin: 'calc(-14px - var(--safe-top, 0px)) -16px 14px', padding: 'calc(14px + var(--safe-top, 0px)) 16px 12px', background: 'linear-gradient(180deg,var(--apg2-header-bg-strong, rgba(17,17,19,0.96)),var(--apg2-header-bg-soft, rgba(17,17,19,0.78)),transparent)', backdropFilter: 'blur(26px) saturate(1.45)', WebkitBackdropFilter: 'blur(26px) saturate(1.45)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <GlassButton onClick={onBack} style={{ width: 40, height: 40, minHeight: 40, borderRadius: 16, padding: 0, fontSize: 20 }}>‹</GlassButton>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: APG2.text, fontSize: 22, lineHeight: '26px', fontWeight: 840 }}>Эксперты</div>
+                <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 2 }}>Проверенные специалисты города</div>
+              </div>
+            </div>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Поиск по имени или специализации..."
+              style={{ width: '100%', boxSizing: 'border-box', ...APG2.glass, borderRadius: 20, padding: '11px 13px', color: APG2.text, fontSize: 14, outline: 'none', fontFamily: 'inherit' }}
+            />
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 0 2px', WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()}>
+              {FILTERS.map(opt => (
+                <GlassButton key={opt.id} onClick={() => setFilter(opt.id)} tone={filter === opt.id ? 'gold' : 'glass'} style={{ minHeight: 34, borderRadius: 999, padding: '7px 11px', fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {opt.emoji} {opt.label}
+                </GlassButton>
+              ))}
+            </div>
+          </div>
+
+          {topExperts.length > 0 && (
+            <GlassSection title="В топе недели">
+              <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()}>
+                {topExperts.map(e => (
+                  <button key={e.id} onClick={() => setSelected(e)} style={{ ...APG2.glass, width: 144, minHeight: 132, flexShrink: 0, borderRadius: 26, padding: 12, color: APG2.text, textAlign: 'left', cursor: 'pointer' }}>
+                    <ExpertAvatar expert={e} size={48} />
+                    <div style={{ marginTop: 10, fontSize: 14, lineHeight: '18px', fontWeight: 800, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{e.name}</div>
+                    <div style={{ marginTop: 5, color: APG2.gold, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.specialization}</div>
+                  </button>
+                ))}
+              </div>
+            </GlassSection>
+          )}
+
+          <GlassSection title={filtered.length ? `${filtered.length} специалистов` : 'Ничего не найдено'}>
+            {filtered.length === 0 ? (
+              <GlassCard style={{ padding: 28, textAlign: 'center' }}>
+                <div style={{ color: APG2.text, fontSize: 18, fontWeight: 820, marginBottom: 7 }}>{experts.length === 0 ? 'Эксперты скоро появятся' : 'Нет совпадений'}</div>
+                <div style={{ color: APG2.textMuted, fontSize: 14, lineHeight: '20px' }}>{experts.length === 0 ? 'Мы добавляем проверенных специалистов для участников АПГ.' : 'Попробуйте другой фильтр или поисковый запрос.'}</div>
+              </GlassCard>
+            ) : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {filtered.map(expert => <ExpertCardV2 key={expert.id} expert={expert} onClick={setSelected} isTop={topIds.has(expert.id)} />)}
+              </div>
+            )}
+          </GlassSection>
+        </GlassPanel>
+
+        {selected && (
+          <ExpertModal
+            expert={selected}
+            user={user}
+            scannedExperts={scannedExperts}
+            onClose={() => setSelected(null)}
+            variant={variant}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       {/* Header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)', padding: '0 16px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)', borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', boxShadow: 'inset 0 -1px 0 var(--c-border, rgba(0,0,0,0.12))', padding: '0 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>
           <button onClick={onBack} style={{ background: T.chipBg, border: `1px solid ${T.headerBorder}`, borderRadius: 12, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: T.textPri, flexShrink: 0 }}>‹</button>
           <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>🧑‍💼 Эксперты</div>
@@ -750,6 +1026,7 @@ export function ExpertsPage({ nav, experts = [], user, scannedExperts = {}, onBa
           user={user}
           scannedExperts={scannedExperts}
           onClose={() => setSelected(null)}
+          variant={variant}
         />
       )}
     </>

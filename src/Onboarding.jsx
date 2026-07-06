@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 
 const T = {
   bg:      '#0F0F1A',
@@ -177,17 +178,16 @@ export function Onboarding({ onComplete }) {
     <div
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      style={{ position: 'fixed', inset: 0, background: T.bg, zIndex: 2000, display: 'flex', flexDirection: 'column', overflow: 'hidden', userSelect: 'none' }}
+      style={{ position: 'fixed', inset: 0, background: APG2_PROFILE.bg, zIndex: 2000, display: 'flex', flexDirection: 'column', overflow: 'hidden', userSelect: 'none', color: APG2_PROFILE.text }}
     >
       {/* Фоновый орб */}
-      <div style={{ position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)', width: 480, height: 480, borderRadius: '50%', background: `radial-gradient(circle, ${slide.orb}, transparent 70%)`, transition: 'background 0.5s ease', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '24px 24px', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 50% -8%, ${slide.orb}, transparent 36%), radial-gradient(circle at 100% 12%, rgba(73,61,118,0.22), transparent 34%)`, transition: 'background 0.5s ease', pointerEvents: 'none' }} />
 
       {/* Верхняя строка: лого + кнопка пропуска */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', position: 'relative', zIndex: 1 }}>
-        <div style={{ fontSize: 11, color: T.gold, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase' }}>✦ АПГ</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'calc(16px + env(safe-area-inset-top, 0px)) 20px 16px', position: 'relative', zIndex: 1 }}>
+        <GlassBadge tone="gold">АПГ</GlassBadge>
         {!isLast && (
-          <button onClick={onComplete} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '6px 14px', fontSize: 12, color: T.textSec, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onComplete} style={{ ...APG2_PROFILE.glass, borderRadius: 999, padding: '8px 14px', fontSize: 12, color: APG2_PROFILE.textSoft, fontWeight: 720, cursor: 'pointer' }}>
             Пропустить
           </button>
         )}
@@ -197,22 +197,22 @@ export function Onboarding({ onComplete }) {
       <div key={animKey} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 28, position: 'relative', zIndex: 1, animation: slideAnim }}>
 
         {/* Визуальный блок */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+        <GlassCard style={{ width: '100%', minHeight: 230, borderRadius: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
           {slide.visual === 'welcome'  && <WelcomeVisual />}
           {slide.visual === 'scan'     && <ScanVisual />}
           {slide.visual === 'levels'   && <LevelsVisual />}
           {slide.visual === 'partners' && <PartnersVisual />}
-        </div>
+        </GlassCard>
 
         {/* Текстовый блок */}
         <div style={{ textAlign: 'center', width: '100%' }}>
-          <div style={{ fontSize: 10, color: slide.accent, fontWeight: 800, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10 }}>
+          <div style={{ fontSize: 10, color: APG2_PROFILE.gold, fontWeight: 850, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10 }}>
             {slide.tag}
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: T.textPri, lineHeight: '32px', marginBottom: 12, whiteSpace: 'pre-line' }}>
+          <div style={{ fontSize: 31, fontWeight: 900, color: APG2_PROFILE.text, lineHeight: '35px', marginBottom: 12, whiteSpace: 'pre-line' }}>
             {slide.title}
           </div>
-          <div style={{ fontSize: 14, color: T.textSec, lineHeight: '22px' }}>
+          <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '22px' }}>
             {slide.desc}
           </div>
 
@@ -220,9 +220,9 @@ export function Onboarding({ onComplete }) {
           {slide.chips && (
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 16 }}>
               {slide.chips.map((chip, i) => (
-                <div key={i} style={{ background: 'rgba(74,144,217,0.1)', border: '1px solid rgba(74,144,217,0.25)', borderRadius: 20, padding: '7px 14px', fontSize: 12, fontWeight: 700, color: T.textPri, animation: 'fadeInUp 0.4s ease both', animationDelay: `${0.1 + i * 0.08}s` }}>
+                <GlassBadge key={i} style={{ animation: 'fadeInUp 0.4s ease both', animationDelay: `${0.1 + i * 0.08}s` }}>
                   {chip}
-                </div>
+                </GlassBadge>
               ))}
             </div>
           )}
@@ -230,7 +230,7 @@ export function Onboarding({ onComplete }) {
       </div>
 
       {/* Нижняя панель: точки + кнопка */}
-      <div style={{ padding: '20px 24px 40px', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+      <div style={{ padding: '20px 24px calc(34px + env(safe-area-inset-bottom, 0px))', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
 
         {/* Прогресс-точки */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -246,16 +246,17 @@ export function Onboarding({ onComplete }) {
         {/* Кнопка */}
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           {step > 0 && (
-            <button onClick={() => goTo(step - 1)} style={{ width: 52, height: 52, borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: T.textSec, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <button onClick={() => goTo(step - 1)} style={{ ...APG2_PROFILE.glass, width: 54, height: 54, borderRadius: 22, color: APG2_PROFILE.textSoft, fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               ‹
             </button>
           )}
-          <button
+          <GlassButton
             onClick={() => isLast ? onComplete() : goTo(step + 1)}
-            style={{ flex: 1, height: 52, borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: `0 4px 24px ${slide.accent}40`, transition: 'box-shadow 0.3s, background 0.3s' }}
+            tone="gold"
+            style={{ flex: 1, minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15, fontWeight: 880 }}
           >
             {isLast ? 'Начать' : 'Далее →'}
-          </button>
+          </GlassButton>
         </div>
       </div>
     </div>

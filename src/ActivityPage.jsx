@@ -3,6 +3,8 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
 import { T, GLASS } from './design.js';
+import { logError } from './errorLogger.js';
+import { APG2_PROFILE, EmptyStateV2, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const TYPE_COLORS = {
   scan:           '#C9A84C',
@@ -88,7 +90,7 @@ function ActivityItem({ item, index }) {
   );
 }
 
-export function ActivityPage({ nav, userId, onBack }) {
+export function ActivityPage({ nav, variant = 'v2', userId, onBack }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -105,7 +107,7 @@ export function ActivityPage({ nav, userId, onBack }) {
         const snap = await getDocs(q);
         setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
-        console.error(e);
+        logError(e, 'ActivityPage.fetchActivity');
         setLoadError(true);
       } finally {
         setLoading(false);
@@ -115,6 +117,41 @@ export function ActivityPage({ nav, userId, onBack }) {
   }, [userId]);
 
   const groups = groupByDay(items);
+
+  if (variant === 'v2') {
+    const scanCount = items.filter(i => i.type === 'scan' || i.type === 'expert_scan').length;
+    const favoriteCount = items.filter(i => i.type === 'favorite_add').length;
+    const rewardCount = items.filter(i => i.type === 'task' || i.type === 'prize' || i.type === 'raffle_enter').length;
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Активность" subtitle={!loading && items.length > 0 ? `${items.length} записей` : 'Личная история АПГ'} kicker="Таймлайн" onBack={onBack} />
+        {loading ? (
+          <EmptyStateV2 icon="✦" title="Загружаем историю" text="Собираем последние действия в вашем профиле." />
+        ) : loadError ? (
+          <EmptyStateV2 icon="⚠️" title="Ошибка загрузки" text="Не удалось загрузить историю. Проверьте соединение." />
+        ) : items.length === 0 ? (
+          <EmptyStateV2 icon="📍" title="История пока пустая" text="Сканируйте QR у партнеров, добавляйте избранное и выполняйте задания." />
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+              <StatPill label="визитов" value={scanCount} tone="gold" />
+              <StatPill label="избранное" value={favoriteCount} />
+              <StatPill label="награды" value={rewardCount} />
+            </div>
+            {groups.map(group => (
+              <GlassSection key={group.label} title={group.label}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {group.items.map((item, i) => (
+                    <GlassListItem key={item.id} icon={item.icon ?? '✦'} title={item.text ?? 'Действие АПГ'} subtitle={relativeTime(item.ts)} accent={TYPE_COLORS[item.type] ?? APG2_PROFILE.gold} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />
+                  ))}
+                </div>
+              </GlassSection>
+            ))}
+          </>
+        )}
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

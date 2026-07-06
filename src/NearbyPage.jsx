@@ -3,6 +3,7 @@ import { HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge, { isVK } from './vk.js';
 import { T, GLASS } from './design.js';
 import { haversine, formatDistance } from './utils/geo.js';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const RADII = [
   { label: '500 м', km: 0.5 },
@@ -75,7 +76,7 @@ function NearbyCard({ partner, distance, onOpen, index }) {
   );
 }
 
-export function NearbyPage({ partners = [], onBack, onOpenPartner }) {
+export function NearbyPage({ variant = 'v2', partners = [], onBack, onOpenPartner, onOpenMap }) {
   const [geoState, setGeoState]   = useState('idle'); // idle | loading | ok | denied | error
   const [userPos, setUserPos]     = useState(null);   // { lat, lon }
   const [radiusKm, setRadiusKm]   = useState(3);
@@ -116,6 +117,65 @@ export function NearbyPage({ partners = [], onBack, onOpenPartner }) {
       .filter(p => p._dist <= radiusKm && (category === 'all' || p.category === category))
       .sort((a, b) => a._dist - b._dist);
   }, [withCoords, userPos, radiusKm, category]);
+
+  if (variant === 'v2') {
+    return (
+      <GlassPanel>
+        <ScreenHeader
+          title="Рядом"
+          subtitle={geoState === 'ok' ? `${nearby.length} партнеров в радиусе` : 'Поиск рядом с вами'}
+          kicker="Геолокация"
+          onBack={onBack}
+          action={onOpenMap ? <GlassButton onClick={onOpenMap} tone="gold" style={{ minHeight: 42, borderRadius: 18, padding: '9px 12px', color: '#17120a' }}>Карта</GlassButton> : null}
+        />
+        {geoState === 'ok' && (
+          <>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+              <StatPill label="найдено" value={nearby.length} tone="gold" />
+              <StatPill label="с координатами" value={withCoords.length} />
+            </div>
+            <div style={{ overflowX: 'auto', display: 'flex', gap: 8, margin: '0 -16px 10px', padding: '0 16px', WebkitOverflowScrolling: 'touch' }}>
+              {RADII.map(r => (
+                <GlassButton key={r.km} onClick={() => setRadiusKm(r.km)} tone={radiusKm === r.km ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', whiteSpace: 'nowrap', color: radiusKm === r.km ? '#17120a' : APG2_PROFILE.text }}>{r.label}</GlassButton>
+              ))}
+            </div>
+            <div style={{ overflowX: 'auto', display: 'flex', gap: 8, margin: '0 -16px 16px', padding: '0 16px', WebkitOverflowScrolling: 'touch' }}>
+              {CATEGORIES.map(c => (
+                <GlassButton key={c.id} onClick={() => setCategory(c.id)} tone={category === c.id ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', whiteSpace: 'nowrap', color: category === c.id ? '#17120a' : APG2_PROFILE.text }}>{c.emoji} {c.label}</GlassButton>
+              ))}
+            </div>
+          </>
+        )}
+        {geoState === 'loading' && <EmptyStateV2 icon="📡" title="Определяем местоположение" text="Разрешите доступ к геолокации, чтобы показать ближайших партнеров." />}
+        {(geoState === 'denied' || geoState === 'error') && (
+          <EmptyStateV2 icon={geoState === 'denied' ? '📍' : '⚠️'} title={geoState === 'denied' ? 'Геолокация закрыта' : 'Не удалось определить место'} text={geoState === 'denied' ? 'Разрешите доступ в настройках браузера или телефона.' : 'Проверьте соединение и попробуйте снова.'} action={<GlassButton onClick={requestGeo} tone="gold" style={{ color: '#17120a' }}>Попробовать снова</GlassButton>} />
+        )}
+        {geoState === 'ok' && withCoords.length === 0 && <EmptyStateV2 icon="🗺️" title="Координаты скоро появятся" text="Партнеры без координат не попадают в подборку рядом." />}
+        {geoState === 'ok' && withCoords.length > 0 && nearby.length === 0 && (
+          <EmptyStateV2 icon="🔍" title="Рядом ничего нет" text="Попробуйте увеличить радиус или выбрать другую категорию." action={<GlassButton onClick={() => { setRadiusKm(999); setCategory('all'); }} tone="gold" style={{ color: '#17120a' }}>Показать весь город</GlassButton>} />
+        )}
+        {geoState === 'ok' && nearby.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {nearby.map((p, i) => {
+              const cat = CATEGORIES.find(c => c.id === p.category);
+              return (
+                <GlassListItem
+                  key={p.id}
+                  icon={<PartnerLogo partner={p} size={42} />}
+                  title={p.name}
+                  subtitle={`${cat ? `${cat.emoji} ${cat.label} · ` : ''}${p.offer || p.address || 'Партнер АПГ'}`}
+                  meta={<GlassBadge tone="gold">{formatDistance(p._dist)}</GlassBadge>}
+                  onClick={() => onOpenPartner(p)}
+                  style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }}
+                />
+              );
+            })}
+            {withCoords.length < partners.length && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, textAlign: 'center', paddingTop: 4 }}>{partners.length - withCoords.length} партнеров пока без координат</div>}
+          </div>
+        )}
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

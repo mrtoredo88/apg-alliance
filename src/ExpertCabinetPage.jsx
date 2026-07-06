@@ -6,10 +6,11 @@ import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
 
-export function ExpertCabinetPage({ nav = 'expert-cabinet', expert: initialExpert, onBack, onExpertUpdate }) {
+export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, onBack, onExpertUpdate }) {
   const [expert, setExpert]       = useState(initialExpert);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -116,6 +117,90 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', expert: initialExper
     fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
   };
   const labelStyle = { fontSize: 12, color: T.textSec, marginBottom: 5, display: 'block', fontWeight: 600 };
+
+  const v2InputStyle = {
+    width: '100%', padding: '13px 14px', borderRadius: 18,
+    border: '1px solid rgba(255,255,255,0.16)',
+    background: 'rgba(255,255,255,0.07)', color: APG2_PROFILE.text,
+    fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
+  };
+
+  if (variant === 'v2') {
+    return (
+      <Panel id={nav}>
+        <GlassPanel>
+          <ScreenHeader title="Кабинет" subtitle={expert.name} kicker="Эксперт АПГ" onBack={onBack} />
+          <ProfileHero
+            image={fPhoto}
+            title={expert.name}
+            subtitle={expert.specialization}
+            status="Эксперт"
+            description={expert.offer || expert.description}
+            avatar={fPhoto ? <img src={fPhoto} alt="" style={{ width: 64, height: 64, borderRadius: 24, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.24)' }} /> : <GlassBadge tone="gold">🧑‍💼</GlassBadge>}
+            badges={[expert.premium ? 'Premium' : 'Проверенный', avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : `${ratingCount} отзывов`].filter(Boolean)}
+          />
+          <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 16 }}>
+            {[['stats', 'Статистика'], ['qr', 'QR'], ['edit', 'Карточка']].map(([id, label]) => (
+              <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
+            ))}
+          </GlassCard>
+
+          {activeTab === 'stats' && (
+            <GlassSection title="Метрики">
+              {loading ? <EmptyStateV2 icon="📊" title="Загружаем статистику" text="Собираем данные карточки эксперта." /> : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <StatPill label="служебный QR" value={totalVisits} tone="gold" />
+                    <StatPill label="публичный QR" value={publicQRScans} />
+                    <StatPill label="просмотров" value={viewCount} />
+                    <StatPill label="конверсия" value={viewCount > 0 ? `${conversionPct}%` : '—'} />
+                  </div>
+                  {(avgRating > 0 || ratingCount > 0) && (
+                    <GlassCard style={{ marginTop: 12, borderRadius: 30 }}>
+                      <div style={{ color: APG2_PROFILE.gold, fontSize: 34, fontWeight: 930 }}>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</div>
+                      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>{ratingCount} отзывов</div>
+                    </GlassCard>
+                  )}
+                </>
+              )}
+            </GlassSection>
+          )}
+
+          {activeTab === 'qr' && (
+            <GlassSection title="QR-коды и материалы">
+              <GlassCard style={{ borderRadius: 32 }}>
+                <ExpertQRSection expert={expert} />
+              </GlassCard>
+            </GlassSection>
+          )}
+
+          {activeTab === 'edit' && (
+            <GlassSection title="Карточка эксперта">
+              <GlassCard style={{ borderRadius: 32 }}>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Фото</label>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '8px 0 14px' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 24, background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{fPhoto ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🧑‍💼'}</div>
+                  <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+                  <GlassButton onClick={() => photoInputRef.current?.click()}>{uploading ? 'Загрузка...' : 'Загрузить'}</GlassButton>
+                </div>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Описание</label>
+                <textarea value={fDesc} onChange={e => setFDesc(e.target.value)} rows={4} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} />
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Акция / предложение</label>
+                <textarea value={fOffer} onChange={e => setFOffer(e.target.value)} rows={3} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} />
+                {[['Телефон', fPhone, setFPhone], ['Запись', fBooking, setFBooking], ['Сайт', fWebsite, setFWebsite], ['VK', fVk, setFVk], ['Telegram', fTelegram, setFTelegram], ['MAX', fMax, setFMax]].map(([label, value, setter]) => (
+                  <React.Fragment key={label}>
+                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
+                    <input value={value} onChange={e => setter(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} />
+                  </React.Fragment>
+                ))}
+                <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a' }}>{saving ? 'Сохраняем...' : saved ? 'Сохранено' : 'Сохранить изменения'}</GlassButton>
+              </GlassCard>
+            </GlassSection>
+          )}
+        </GlassPanel>
+      </Panel>
+    );
+  }
 
   return (
     <Panel id={nav}>

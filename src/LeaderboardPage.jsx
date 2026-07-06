@@ -5,6 +5,8 @@ import { collection, getDocs, query, orderBy, where, limit } from 'firebase/fire
 import { getLevel } from './levels.js';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
+import { logError } from './errorLogger.js';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
@@ -172,7 +174,22 @@ function UserRow({ user, rank, isCurrentUser, index, onSelect }) {
   );
 }
 
-export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
+function LeaderRowV2({ user, rank, isCurrentUser, onSelect, index }) {
+  const medal = rank < 3 ? MEDALS[rank] : `#${rank + 1}`;
+  return (
+    <GlassListItem
+      icon={<Avatar photo={user.photo} name={user.firstName} size={42} />}
+      title={`${user.firstName ?? 'Участник'} ${user.lastName ?? ''}`.trim()}
+      subtitle={isCurrentUser ? 'Это вы' : getLevel(user.keys ?? 0).label}
+      meta={<span style={{ color: rank < 3 ? MEDAL_COLORS[rank] : APG2_PROFILE.gold }}>{medal} · {user.keys ?? 0} 🗝️</span>}
+      onClick={() => onSelect(user, rank)}
+      accent={rank < 3 ? MEDAL_COLORS[rank] : undefined}
+      style={{ animation: `fadeInUp 0.32s ease ${index * 0.035}s both`, borderColor: isCurrentUser ? 'rgba(215,184,106,0.42)' : undefined }}
+    />
+  );
+}
+
+export function LeaderboardPage({ nav, variant = 'v2', currentUserId, userKeys, onBack }) {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -189,7 +206,7 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
         const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setLeaders(users);
       } catch (e) {
-        console.error(e);
+        logError(e, 'LeaderboardPage.fetchLeaders');
       } finally {
         setLoading(false);
       }
@@ -203,6 +220,57 @@ export function LeaderboardPage({ nav, currentUserId, userKeys, onBack }) {
 
   // Если текущий пользователь ниже 50 места — покажем его отдельно (top3 + rest.slice(0,47) = 50)
   const showCurrentUserSeparately = currentUserIndex >= 50;
+
+  if (variant === 'v2') {
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Рейтинг" subtitle={!loading && leaders.length ? `${leaders.length} участников` : 'Лидеры по ключам'} kicker="Лига АПГ" onBack={onBack} />
+        {loading ? (
+          <EmptyStateV2 icon="🏆" title="Загружаем рейтинг" text="Собираем лидеров АПГ." />
+        ) : leaders.length === 0 ? (
+          <EmptyStateV2 icon="🏆" title="Рейтинг пока пуст" text="Станьте первым: сканируйте QR-коды партнеров." />
+        ) : (
+          <>
+            <GlassCard tone="gold" style={{ borderRadius: 38, padding: 18, marginBottom: 18, overflow: 'hidden' }}>
+              <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 780, marginBottom: 10 }}>Ваш баланс</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ color: '#17120a', fontSize: 44, lineHeight: '44px', fontWeight: 940 }}>{userKeys ?? 0} <span style={{ fontSize: 24 }}>🗝️</span></div>
+                <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{currentUserIndex >= 0 ? `#${currentUserIndex + 1}` : 'вне рейтинга'}</GlassBadge>
+              </div>
+            </GlassCard>
+            {top3.length > 0 && (
+              <GlassSection title="Лидеры">
+                <div style={{ display: 'grid', gridTemplateColumns: '1.02fr 1.18fr 1.02fr', gap: 9, alignItems: 'end' }}>
+                  {[top3[1], top3[0], top3[2]].filter(Boolean).map((u) => {
+                    const rank = leaders.findIndex(x => x.id === u.id);
+                    return (
+                      <GlassCard key={u.id} onClick={() => handleSelect(u, rank)} tone={rank === 0 ? 'gold' : 'glass'} style={{ borderRadius: 28, padding: '14px 8px', minHeight: rank === 0 ? 176 : 148, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <div style={{ fontSize: rank === 0 ? 28 : 22 }}>{MEDALS[rank]}</div>
+                        <Avatar photo={u.photo} name={u.firstName} size={rank === 0 ? 58 : 48} />
+                        <div style={{ color: rank === 0 ? '#17120a' : APG2_PROFILE.text, fontSize: 13, fontWeight: 820, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.firstName ?? 'Участник'}</div>
+                        <div style={{ color: rank === 0 ? 'rgba(20,15,8,0.7)' : APG2_PROFILE.gold, fontSize: 12, fontWeight: 850 }}>{u.keys ?? 0} 🗝️</div>
+                      </GlassCard>
+                    );
+                  })}
+                </div>
+              </GlassSection>
+            )}
+            <GlassSection title="Участники">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {leaders.slice(3, 50).map((user, i) => <LeaderRowV2 key={user.id} user={user} rank={i + 3} isCurrentUser={user.id === String(currentUserId)} onSelect={handleSelect} index={i} />)}
+              </div>
+            </GlassSection>
+            {showCurrentUserSeparately && currentUserIndex !== -1 && (
+              <GlassSection title="Ваша позиция">
+                <LeaderRowV2 user={leaders[currentUserIndex]} rank={currentUserIndex} isCurrentUser onSelect={handleSelect} index={0} />
+              </GlassSection>
+            )}
+          </>
+        )}
+        {selectedUser && <UserProfileModal user={selectedUser} rank={selectedRank} onClose={() => setSelectedUser(null)} />}
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

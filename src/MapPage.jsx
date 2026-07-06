@@ -3,6 +3,7 @@ import { HorizontalScroll } from '@vkontakte/vkui';
 import vkBridge from './vk.js';
 
 import { T, GLASS } from './design.js';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -43,7 +44,7 @@ function openRoute(address) {
   vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => window.open(url, '_blank'));
 }
 
-export function MapPage({ partners = [], onBack, onOpenPartner }) {
+export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }) {
   const [selected, setSelected]       = useState(null);
   const [activeCategory, setCategory] = useState('all');
   const [search, setSearch]           = useState('');
@@ -74,6 +75,66 @@ export function MapPage({ partners = [], onBack, onOpenPartner }) {
     setSelected(prev => prev?.id === p.id ? null : p);
     setMapLoaded(false);
   };
+
+  if (variant === 'v2') {
+    return (
+      <GlassPanel style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 'calc(10px + var(--safe-top, 0px))' }}>
+        <div style={{ padding: '0 16px' }}>
+          <ScreenHeader title="Карта" subtitle={`${partnersWithAddress.length} адресов партнеров`} kicker="Город АПГ" onBack={onBack} style={{ marginLeft: -16, marginRight: -16 }} />
+        </div>
+        <div style={{ margin: '0 16px 14px', borderRadius: 34, overflow: 'hidden', minHeight: 320, position: 'relative', ...APG2_PROFILE.glass }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 22% 26%,rgba(215,184,106,0.18),transparent 22%), radial-gradient(circle at 78% 72%,rgba(73,61,118,0.22),transparent 28%), linear-gradient(145deg,rgba(35,36,40,0.92),rgba(19,20,23,0.94))', zIndex: 0 }} />
+          <div style={{ position: 'absolute', inset: 0, opacity: 0.24, backgroundImage: 'linear-gradient(rgba(255,255,255,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.16) 1px, transparent 1px)', backgroundSize: '44px 44px', zIndex: 1, pointerEvents: 'none' }} />
+          {[
+            ['18%', '30%'], ['68%', '24%'], ['42%', '58%'], ['76%', '70%'], ['26%', '78%'],
+          ].map(([left, top], i) => (
+            <div key={`${left}_${top}`} style={{ position: 'absolute', left, top, width: i === 0 ? 18 : 12, height: i === 0 ? 18 : 12, borderRadius: '50%', background: i === 0 ? APG2_PROFILE.gold : 'rgba(255,255,255,0.72)', boxShadow: i === 0 ? '0 0 0 8px rgba(215,184,106,0.16), 0 0 30px rgba(215,184,106,0.32)' : '0 0 0 6px rgba(255,255,255,0.08)', zIndex: 1, pointerEvents: 'none' }} />
+          ))}
+          <div style={{ position: 'absolute', left: 18, bottom: 18, zIndex: 1, color: APG2_PROFILE.textSoft, fontSize: 13, fontWeight: 760, pointerEvents: 'none' }}>Зеленоград · партнеры АПГ</div>
+          {!mapLoaded && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: APG2_PROFILE.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <div style={{ fontSize: 42 }}>🗺️</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>Загрузка карты...</div>
+            </div>
+          )}
+          <iframe key={selected?.id ?? 'default-v2'} src={mapSrc} title="Яндекс.Карты" onLoad={() => setMapLoaded(true)} style={{ position: 'relative', zIndex: 1, width: '100%', height: 320, border: 'none', display: 'block', opacity: mapLoaded ? 0.42 : 0, filter: 'saturate(0.72) contrast(0.98)', mixBlendMode: 'screen', transition: 'opacity 0.3s' }} allow="geolocation" />
+          {selected && (
+            <GlassCard style={{ position: 'absolute', left: 12, right: 12, bottom: 12, borderRadius: 28, padding: 13, display: 'flex', gap: 12, alignItems: 'center' }}>
+              <PartnerLogo partner={selected} size={44} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.name}</div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.address}</div>
+              </div>
+              <GlassButton onClick={() => openRoute(selected.address)} tone="gold" style={{ minHeight: 42, borderRadius: 17, padding: '9px 11px', color: '#17120a' }}>Маршрут</GlassButton>
+            </GlassCard>
+          )}
+        </div>
+        <div style={{ padding: '0 16px' }}>
+          <GlassCard style={{ borderRadius: 26, padding: '11px 13px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <span style={{ color: APG2_PROFILE.textMuted }}>🔍</span>
+            <input type="search" placeholder="Найти партнера или адрес" value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'transparent', border: 0, outline: 0, color: APG2_PROFILE.text, fontSize: 14, flex: 1, minWidth: 0 }} />
+            {search && <button onClick={() => setSearch('')} style={{ background: 'transparent', border: 0, color: APG2_PROFILE.textSoft, fontSize: 16 }}>✕</button>}
+          </GlassCard>
+        </div>
+        <div style={{ overflowX: 'auto', padding: '0 16px 12px', display: 'flex', gap: 8, WebkitOverflowScrolling: 'touch' }}>
+          {CATEGORIES.map(cat => (
+            <GlassButton key={cat.id} onClick={() => setCategory(cat.id)} tone={activeCategory === cat.id ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', whiteSpace: 'nowrap', color: activeCategory === cat.id ? '#17120a' : APG2_PROFILE.text }}>{cat.emoji} {cat.label}</GlassButton>
+          ))}
+        </div>
+        <div style={{ padding: '0 16px' }}>
+          {filtered.length === 0 ? (
+            <EmptyStateV2 icon={search.trim() ? '🔍' : '📍'} title={search.trim() ? 'Ничего не найдено' : 'Адресов пока нет'} text={search.trim() ? `По запросу «${search.trim()}» партнеры не найдены.` : 'Как только у партнеров появятся адреса, они будут здесь.'} action={(search.trim() || activeCategory !== 'all') ? <GlassButton onClick={() => { setSearch(''); setCategory('all'); }} tone="gold" style={{ color: '#17120a' }}>Сбросить фильтр</GlassButton> : null} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {filtered.map((p, i) => (
+                <GlassListItem key={p.id} icon={<PartnerLogo partner={p} size={42} />} title={p.name} subtitle={p.address} meta={selected?.id === p.id ? <GlassBadge tone="gold">на карте</GlassBadge> : '›'} onClick={() => handleSelect(p)} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />
+              ))}
+            </div>
+          )}
+        </div>
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

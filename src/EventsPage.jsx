@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-import { T, GLASS, GLASS_STRONG } from './design.js';
+import { T, GLASS } from './design.js';
 import { RichText } from './components/RichText.jsx';
+import { APG2_PROFILE, ApgModal, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const GRADIENTS_DARK = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
@@ -59,21 +60,9 @@ function CountdownChip({ deadline }) {
 function EventModal({ event, onClose }) {
   if (!event) return null;
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.6)', zIndex: 1000,
-      display: 'flex', alignItems: 'flex-end',
-      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-    }} onClick={onClose}>
-      <div style={{
-        ...GLASS_STRONG, borderRadius: '28px 28px 0 0',
-        width: '100%', padding: '24px 20px 48px',
-        maxHeight: '85vh', overflowY: 'auto',
-      }} onClick={e => e.stopPropagation()}>
-        <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '0 auto 20px' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <div style={{ fontSize: 52 }}>{event.emoji ?? '🎉'}</div>
-          <button onClick={onClose} style={{ background: T.chipBg, border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec }}>✕</button>
+    <ApgModal title={event.title || 'Мероприятие АПГ'} subtitle={event.partner || event.address || 'Подробности мероприятия'} onClose={onClose} maxWidth={460}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <div style={{ ...APG2_PROFILE.glass, width: 72, height: 72, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event.emoji ?? '🎉'}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, lineHeight: '26px', flex: 1 }}>
@@ -138,26 +127,50 @@ function EventModal({ event, onClose }) {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {event.address && (
-            <button onClick={() => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`, '_blank')} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #FF6600, #FF8C00)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-              🗺️ Проложить маршрут
-            </button>
+            <GlassButton onClick={() => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`, '_blank')} tone="gold" style={{ width: '100%', color: '#17120a' }}>Проложить маршрут</GlassButton>
           )}
           {event.socialUrl && (
-            <button onClick={() => window.open(event.socialUrl, '_blank')} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${T.blue}, #2D6FBC)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-              📲 Перейти к событию
-            </button>
+            <GlassButton onClick={() => window.open(event.socialUrl, '_blank')} tone="gold" style={{ width: '100%', color: '#17120a' }}>Перейти к событию</GlassButton>
           )}
           {event.linkUrl && event.linkLabel && (
-            <button onClick={() => window.open(event.linkUrl, '_blank')} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textPri, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-              {event.linkLabel} →
-            </button>
+            <GlassButton onClick={() => window.open(event.linkUrl, '_blank')} style={{ width: '100%' }}>{event.linkLabel} →</GlassButton>
           )}
-          <button onClick={onClose} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textSec, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-            Закрыть
-          </button>
+          <GlassButton onClick={onClose} style={{ width: '100%' }}>Закрыть</GlassButton>
+        </div>
+    </ApgModal>
+  );
+}
+
+function EventCardV2({ event, index, onClick }) {
+  const date = event.date || event.eventDate || event.deadline || 'Скоро';
+  const day = String(date).slice(0, 2).replace(/\D/g, '') || '✦';
+  const month = String(date).replace(/^\d+\.?\s*/, '').slice(0, 6) || 'АПГ';
+  return (
+    <GlassCard
+      onClick={() => onClick(event)}
+      style={{ minHeight: index === 0 ? 176 : 132, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: index === 0 ? '112px 1fr' : '88px 1fr', animation: `fadeInUp 0.38s ease ${index * 0.04}s both` }}
+    >
+      <div style={{ position: 'relative', background: 'radial-gradient(circle at 40% 18%,rgba(255,247,214,0.34),transparent 34%), linear-gradient(160deg,rgba(215,184,106,0.28),rgba(255,255,255,0.055))', borderRight: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 15 }}>
+        <GlassBadge tone="gold" style={{ alignSelf: 'flex-start', fontSize: 10, padding: '5px 8px' }}>{event.isExpertEvent ? 'Эксперт' : 'Событие'}</GlassBadge>
+        <div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: index === 0 ? 38 : 30, lineHeight: '34px', fontWeight: 900 }}>{day}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, lineHeight: '14px', fontWeight: 760, textTransform: 'uppercase' }}>{month}</div>
         </div>
       </div>
-    </div>
+      <div style={{ padding: index === 0 ? 18 : 15, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: index === 0 ? 20 : 16, lineHeight: index === 0 ? '24px' : '20px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Событие АПГ'}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {event.partner || event.address || event.description || 'Подробности появятся скоро'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {event.deadline && <GlassBadge>до регистрации</GlassBadge>}
+          {event.priceClub && <GlassBadge tone="gold">{event.priceClub}</GlassBadge>}
+          <span style={{ marginLeft: 'auto', color: APG2_PROFILE.gold, fontSize: 22, lineHeight: 1 }}>›</span>
+        </div>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -263,7 +276,7 @@ function EmptyState({ tab }) {
   );
 }
 
-export function EventsPage({ nav, events = [], onBack, appearance = 'dark' }) {
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark' }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
@@ -278,6 +291,31 @@ export function EventsPage({ nav, events = [], onBack, appearance = 'dark' }) {
   const upcoming = events.filter(e => !isEventPast(e));
   const past     = events.filter(e => isEventPast(e)).reverse();
   const list     = tab === 'upcoming' ? upcoming : past;
+
+  if (variant === 'v2') {
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Афиша мероприятий" subtitle={`${upcoming.length} предстоящих · ${past.length} прошедших`} kicker="События города" onBack={onBack} />
+        <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+          <StatPill label="предстоящих" value={upcoming.length} tone="gold" />
+          <StatPill label="в архиве" value={past.length} />
+        </div>
+        <GlassCard style={{ borderRadius: 26, padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 18 }}>
+          {[['upcoming', 'Скоро'], ['past', 'Архив']].map(([id, label]) => (
+            <GlassButton key={id} onClick={() => setTab(id)} tone={tab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: tab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
+          ))}
+        </GlassCard>
+        {list.length === 0 ? (
+          <EmptyStateV2 icon={tab === 'upcoming' ? '🗓️' : '✦'} title={tab === 'upcoming' ? 'Скоро будут мероприятия' : 'Архив пока пуст'} text={tab === 'upcoming' ? 'Партнеры АПГ готовят новые события и поводы выйти в город.' : 'После мероприятий здесь появится история.'} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {list.map((event, i) => <EventCardV2 key={event.id ?? i} event={event} index={i} onClick={setSelectedEvent} />)}
+          </div>
+        )}
+        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

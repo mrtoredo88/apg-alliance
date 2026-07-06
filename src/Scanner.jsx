@@ -1,8 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
-import qrWorkerSrc from 'qr-scanner/qr-scanner-worker.min.js?url';
-
-QrScanner.WORKER_PATH = qrWorkerSrc;
 
 const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
 
@@ -92,7 +89,7 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
     <div style={{
       position: 'fixed', inset: 0,
       background: '#000',
-      zIndex: 2000,
+      zIndex: 12000,
       display: 'flex', flexDirection: 'column',
     }}>
       {/* Camera feed */}

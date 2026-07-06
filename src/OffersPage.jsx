@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 function OfferCard({ partner, onOpenPartner, index }) {
   return (
@@ -113,7 +114,34 @@ const CATEGORY_LABELS = {
   other:         '📦 Другое',
 };
 
-export function OffersPage({ partners = [], onBack, onOpenPartner }) {
+function OfferCardV2({ partner, onOpenPartner, index }) {
+  const featuredTone = partner.featured;
+  return (
+    <GlassCard onClick={() => onOpenPartner(partner)} style={{ borderRadius: 28, padding: 0, overflow: 'hidden', animation: `fadeInUp 0.34s ease ${index * 0.04}s both`, border: featuredTone ? '1px solid rgba(215,184,106,0.28)' : APG2_PROFILE.glass.border }}>
+      <div style={{ minHeight: 126, padding: 14, position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, background: featuredTone ? 'radial-gradient(circle at 82% 12%,rgba(255,247,214,0.15),transparent 34%), radial-gradient(circle at 8% 90%,rgba(215,184,106,0.10),transparent 34%)' : 'radial-gradient(circle at 82% 12%,rgba(255,247,214,0.13),transparent 34%), radial-gradient(circle at 8% 90%,rgba(73,61,118,0.14),transparent 34%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          {partner.logoUrl
+            ? <img src={partner.logoUrl} alt="" loading="lazy" style={{ width: 54, height: 54, borderRadius: 20, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.18)', flexShrink: 0 }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+            : <div style={{ width: 54, height: 54, borderRadius: 20, background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
+          }
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 7 }}>
+              {partner.featured && <GlassBadge tone="gold">Партнер дня</GlassBadge>}
+              {partner.categoryLabel && <GlassBadge>{partner.categoryLabel}</GlassBadge>}
+            </div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '21px', fontWeight: 830, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{partner.name}</div>
+          </div>
+        </div>
+        <div style={{ position: 'relative', marginTop: 10, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {partner.offer}
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch]                 = useState('');
   const inputRef                            = useRef(null);
@@ -161,6 +189,42 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
     [withOffers, activeCategory]
   );
 
+  if (variant === 'v2') {
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Акции" subtitle={`${withOffers.length} предложений · ${partners.length} партнеров`} kicker="Выгода АПГ" onBack={onBack} />
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          <StatPill label="акций" value={withOffers.length} tone="gold" />
+          <StatPill label="партнеров" value={partners.length} />
+        </div>
+        <GlassCard style={{ borderRadius: 28, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <span style={{ color: APG2_PROFILE.textMuted }}>🔍</span>
+          <input ref={inputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Найти партнера или акцию" style={{ flex: 1, minWidth: 0, background: 'transparent', border: 0, outline: 0, color: APG2_PROFILE.text, fontSize: 14 }} />
+          {isSearching && <button onClick={() => setSearch('')} style={{ border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, fontSize: 16 }}>✕</button>}
+        </GlassCard>
+        {!isSearching && categories.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px 14px', padding: '0 16px', WebkitOverflowScrolling: 'touch' }}>
+            <GlassButton onClick={() => setActiveCategory('all')} tone={activeCategory === 'all' ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', color: activeCategory === 'all' ? '#17120a' : APG2_PROFILE.text }}>Все · {withOffers.length}</GlassButton>
+            {categories.map(cat => <GlassButton key={cat.id} onClick={() => setActiveCategory(cat.id)} tone={activeCategory === cat.id ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', whiteSpace: 'nowrap', color: activeCategory === cat.id ? '#17120a' : APG2_PROFILE.text }}>{cat.label} · {cat.count}</GlassButton>)}
+          </div>
+        )}
+        {isSearching ? (
+          searchResults.length === 0 ? <EmptyStateV2 icon="🔍" title="Ничего не найдено" text="Попробуйте другой запрос или сбросьте поиск." action={<GlassButton onClick={() => setSearch('')} tone="gold" style={{ color: '#17120a' }}>Сбросить</GlassButton>} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {searchResults.map((p, i) => <GlassListItem key={p.id} icon={p.logoUrl ? <img src={p.logoUrl} alt="" style={{ width: 42, height: 42, borderRadius: 16, objectFit: 'cover' }} /> : (p.emoji ?? '🏪')} title={p.name} subtitle={p.offer || p.categoryLabel || 'Партнер АПГ'} meta="›" onClick={() => onOpenPartner(p)} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />)}
+            </div>
+          )
+        ) : withOffers.length === 0 ? (
+          <EmptyStateV2 icon="🎁" title="Акции скоро появятся" text="Партнеры АПГ готовят специальные предложения." />
+        ) : filtered.length === 0 ? (
+          <EmptyStateV2 icon="🔍" title="В категории пока пусто" text="Можно вернуться ко всем предложениям." action={<GlassButton onClick={() => setActiveCategory('all')} tone="gold" style={{ color: '#17120a' }}>Показать все</GlassButton>} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{filtered.map((p, i) => <OfferCardV2 key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />)}</div>
+        )}
+      </GlassPanel>
+    );
+  }
+
   return (
     <>
       {/* Кастомный хедер */}
@@ -168,7 +232,7 @@ export function OffersPage({ partners = [], onBack, onOpenPartner }) {
         position: 'sticky', top: 0, zIndex: 50,
         background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
         borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
-        boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
+        boxShadow: 'inset 0 -1px 0 var(--c-border, rgba(0,0,0,0.12))',
         padding: '0 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52 }}>

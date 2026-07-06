@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       });
     } catch (e) {
       await codeRef.delete().catch(() => {});
-      console.error('[email-auth] SMTP error:', e.message);
+      console.warn('[email-auth] SMTP error:', e.message);
       return res.status(500).json({ ok: false, error: 'smtp_error', message: 'Не удалось отправить письмо. Проверьте адрес или попробуйте позже.' });
     }
 

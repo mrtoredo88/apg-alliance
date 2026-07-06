@@ -1,23 +1,50 @@
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
 
-  /* Theme colors — dark by default */
-  --c-bg:            #08081A;
-  --c-text:          #F0F0F0;
-  --c-text-sec:      rgba(240,240,240,0.45);
-  --c-border:        rgba(255,255,255,0.08);
-  --c-surface:       rgba(255,255,255,0.05);
-  --c-card:          #1A1A2E;
-  --c-card2:         #16213E;
-  --c-tabbar-bg:     rgba(12,12,30,0.55);
-  --c-tabbar-border: rgba(255,255,255,0.14);
-  --c-orb-top:       rgba(80,60,200,0.5);
-  --c-orb-bot:       rgba(30,50,210,0.45);
+  color-scheme: light;
+
+  /* Theme colors — light by default */
+  --c-bg:            #F4EFE4;
+  --c-text:          #0D0D14;
+  --c-text-sec:      rgba(13,13,20,0.6);
+  --c-border:        rgba(0,0,0,0.13);
+  --c-surface:       rgba(255,255,255,0.92);
+  --c-card:          rgba(255,255,255,0.96);
+  --c-card2:         rgba(255,255,255,0.88);
+  --c-tabbar-bg:     rgba(240,242,248,0.95);
+  --c-tabbar-border: rgba(0,0,0,0.14);
+  --c-orb-top:       rgba(214,183,102,0.10);
+  --c-orb-bot:       rgba(166,139,84,0.06);
+  --c-header-bg:     rgba(244,245,252,0.97);
+  --c-header-border: rgba(0,0,0,0.13);
+  --c-chip-bg:       rgba(0,0,0,0.07);
+  --c-chip-border:   rgba(0,0,0,0.14);
+  --c-chip-text:     rgba(13,13,20,0.78);
+  --apg2-bg:         radial-gradient(circle at 50% -10%, rgba(230,199,127,0.18), transparent 32%), radial-gradient(circle at 100% 12%, rgba(255,249,235,0.58), transparent 36%), radial-gradient(circle at 0% 72%, rgba(210,181,112,0.10), transparent 30%), linear-gradient(180deg,#F7F0E3 0%,#EFE7D8 48%,#FBF6EC 100%);
+  --apg2-text:       #16140F;
+  --apg2-text-soft:  rgba(22,20,15,0.68);
+  --apg2-text-muted: rgba(22,20,15,0.46);
+  --apg2-glass-a:    255,255,255;
+  --apg2-glass-border: rgba(35,32,24,0.14);
+  --apg2-gold:       #B89235;
+  --apg2-bg-color:   #F4EFE4;
+  --apg2-elev-shadow: rgba(56,46,28,0.16);
+  --apg2-island-bg1: rgba(255,255,255,0.76);
+  --apg2-island-bg2: rgba(246,243,235,0.86);
+  --apg2-header-bg-strong: rgba(246,244,238,0.92);
+  --apg2-header-bg-soft: rgba(246,244,238,0.62);
+  --apg2-image-shade: radial-gradient(circle at 22% 8%, rgba(244,217,140,0.14), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.42) 42%, rgba(255,255,255,0.88));
+  --apg2-image-shade-soft: linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.84));
+  --apg2-ticket-shade: radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,0.68) 58%, rgba(255,255,255,0.38));
+  --apg2-ticket-cut: #F4EFE4;
+  --apg2-hero-overlay: radial-gradient(circle at 18% 12%, rgba(255,240,184,0.26), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.46) 42%, rgba(255,255,255,0.86));
+  --apg2-hero-text: #16140F;
+  --apg2-hero-muted: rgba(22,20,15,0.68);
 
   --vkui--color_background_app:     transparent;
   --vkui--color_background:         transparent;
   --vkui--color_background_content: transparent;
-  --vkui--color_text_primary:       #f0f0f0;
+  --vkui--color_text_primary:       #0D0D14;
   --vkui--color_text_accent:        #C9A84C;
   --vkui--color_background_accent:  #1e2a44;
   --vkui--font_family_base:         'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -27,7 +54,7 @@
 }
 
 [data-theme="light"] {
-  --c-bg:            #ECEEF2;
+  --c-bg:            #F4EFE4;
   --c-text:          #0D0D14;
   --c-text-sec:      rgba(13,13,20,0.6);
   --c-border:        rgba(0,0,0,0.13);
@@ -36,16 +63,81 @@
   --c-card2:         rgba(255,255,255,0.88);
   --c-tabbar-bg:     rgba(240,242,248,0.95);
   --c-tabbar-border: rgba(0,0,0,0.14);
-  --c-orb-top:       rgba(100,80,200,0.09);
-  --c-orb-bot:       rgba(80,110,200,0.06);
+  --c-orb-top:       rgba(214,183,102,0.10);
+  --c-orb-bot:       rgba(166,139,84,0.06);
 
   --c-header-bg:     rgba(244,245,252,0.97);
   --c-header-border: rgba(0,0,0,0.13);
   --c-chip-bg:       rgba(0,0,0,0.07);
   --c-chip-border:   rgba(0,0,0,0.14);
   --c-chip-text:     rgba(13,13,20,0.78);
+  --apg2-bg:         radial-gradient(circle at 50% -10%, rgba(230,199,127,0.18), transparent 32%), radial-gradient(circle at 100% 12%, rgba(255,249,235,0.58), transparent 36%), radial-gradient(circle at 0% 72%, rgba(210,181,112,0.10), transparent 30%), linear-gradient(180deg,#F7F0E3 0%,#EFE7D8 48%,#FBF6EC 100%);
+  --apg2-text:       #16140F;
+  --apg2-text-soft:  rgba(22,20,15,0.68);
+  --apg2-text-muted: rgba(22,20,15,0.46);
+  --apg2-glass-a:    255,255,255;
+  --apg2-glass-border: rgba(35,32,24,0.14);
+  --apg2-gold:       #B89235;
+  --apg2-bg-color:   #F4EFE4;
+  --apg2-elev-shadow: rgba(56,46,28,0.16);
+  --apg2-island-bg1: rgba(255,255,255,0.76);
+  --apg2-island-bg2: rgba(246,243,235,0.86);
+  --apg2-header-bg-strong: rgba(246,244,238,0.92);
+  --apg2-header-bg-soft: rgba(246,244,238,0.62);
+  --apg2-image-shade: radial-gradient(circle at 22% 8%, rgba(244,217,140,0.14), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.42) 42%, rgba(255,255,255,0.88));
+  --apg2-image-shade-soft: linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.84));
+  --apg2-ticket-shade: radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,0.68) 58%, rgba(255,255,255,0.38));
+  --apg2-ticket-cut: #F4EFE4;
+  --apg2-hero-overlay: radial-gradient(circle at 18% 12%, rgba(255,240,184,0.26), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.46) 42%, rgba(255,255,255,0.86));
+  --apg2-hero-text: #16140F;
+  --apg2-hero-muted: rgba(22,20,15,0.68);
 
   --vkui--color_text_primary:       #0D0D14;
+  --vkui--color_background:         transparent;
+  --vkui--color_background_content: transparent;
+  --vkui--color_background_app:     transparent;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --c-bg:            #101010;
+  --c-text:          #F0F0F0;
+  --c-text-sec:      rgba(240,240,240,0.45);
+  --c-border:        rgba(255,255,255,0.08);
+  --c-surface:       rgba(255,255,255,0.05);
+  --c-card:          #1A1917;
+  --c-card2:         #22201C;
+  --c-tabbar-bg:     rgba(12,12,30,0.55);
+  --c-tabbar-border: rgba(255,255,255,0.14);
+  --c-orb-top:       rgba(214,183,102,0.14);
+  --c-orb-bot:       rgba(255,255,255,0.035);
+  --c-header-bg:     rgba(12,12,30,0.55);
+  --c-header-border: rgba(255,255,255,0.1);
+  --c-chip-bg:       rgba(255,255,255,0.08);
+  --c-chip-border:   rgba(255,255,255,0.12);
+  --c-chip-text:     rgba(240,240,240,0.78);
+  --apg2-bg:         radial-gradient(circle at 50% -8%, rgba(219,187,111,0.16), transparent 30%), radial-gradient(circle at 100% 10%, rgba(255,244,214,0.045), transparent 34%), radial-gradient(circle at 0% 66%, rgba(255,255,255,0.032), transparent 28%), linear-gradient(180deg,#151412 0%,#111111 46%,#0B0B0B 100%);
+  --apg2-text:       #F7F1E6;
+  --apg2-text-soft:  rgba(247,241,230,0.72);
+  --apg2-text-muted: rgba(247,241,230,0.48);
+  --apg2-glass-a:    255,255,255;
+  --apg2-glass-border: rgba(255,255,255,0.19);
+  --apg2-gold:       #D7B86A;
+  --apg2-bg-color:   #101010;
+  --apg2-elev-shadow: rgba(0,0,0,0.34);
+  --apg2-island-bg1: rgba(42,42,38,0.34);
+  --apg2-island-bg2: rgba(15,15,16,0.46);
+  --apg2-header-bg-strong: rgba(18,17,15,0.96);
+  --apg2-header-bg-soft: rgba(18,17,15,0.80);
+  --apg2-image-shade: radial-gradient(circle at 22% 8%, rgba(244,217,140,0.14), transparent 34%), linear-gradient(180deg, rgba(14,14,16,0.04), rgba(14,14,16,0.28) 42%, rgba(14,14,16,0.88));
+  --apg2-image-shade-soft: linear-gradient(180deg, rgba(14,14,16,0.28), rgba(14,14,16,0.84));
+  --apg2-ticket-shade: radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(14,14,16,0.90), rgba(14,14,16,0.52) 58%, rgba(14,14,16,0.26));
+  --apg2-ticket-cut: #0F1011;
+  --apg2-hero-overlay: radial-gradient(circle at 18% 12%, rgba(255,240,184,0.20), transparent 34%), linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.24) 42%, rgba(12,12,14,0.74));
+  --apg2-hero-text: #F7F1E6;
+  --apg2-hero-muted: rgba(247,244,234,0.78);
+
+  --vkui--color_text_primary:       #f0f0f0;
   --vkui--color_background:         transparent;
   --vkui--color_background_content: transparent;
   --vkui--color_background_app:     transparent;
@@ -55,29 +147,29 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  min-height: 100svh;
   overscroll-behavior: none;
   font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Градиент на body с fixed-attachment: позиция всегда относительно вьюпорта.
-   body — не overflow:scroll, поэтому background-attachment:fixed работает во всех браузерах.
-   Все прозрачные дочерние элементы (VK UI, page wrappers) пропускают этот градиент. */
 body {
-  background:
-    radial-gradient(ellipse at 50% 0%,   var(--c-orb-top) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 100%, var(--c-orb-bot) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 40%),
-    var(--c-bg, #08081A);
+  background: var(--apg2-bg, var(--c-bg, #ECEEF2));
+  background-color: var(--apg2-bg-color, var(--c-bg, #ECEEF2));
   background-attachment: fixed;
+  overflow-x: hidden;
 }
 
 html {
-  background: var(--c-bg, #08081A);
+  background: var(--apg2-bg, var(--c-bg, #ECEEF2));
+  background-color: var(--apg2-bg-color, var(--c-bg, #ECEEF2));
 }
 
 #root {
   min-height: 100vh;
-  background: transparent;
+  min-height: 100svh;
+  background: var(--apg2-bg, var(--c-bg, #ECEEF2));
+  background-color: var(--apg2-bg-color, var(--c-bg, #ECEEF2));
+  overflow-x: clip;
 }
 
 /* VK UI — весь стек прозрачный, чтобы body-градиент просвечивал */

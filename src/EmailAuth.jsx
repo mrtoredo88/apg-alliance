@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { T } from './design.js';
 import { API_BASE_URL } from './constants.js';
+import { APG2_PROFILE, GlassButton, GlassInput } from './components/Apg2ProfileGlass.jsx';
 
 const SPINNER = (
   <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', verticalAlign: 'middle' }} />
@@ -39,18 +39,9 @@ export function EmailAuth({ onCancel }) {
     }
   };
 
-  const inputBase = {
-    background: T.chipBg,
-    border: `1px solid ${T.border}`,
-    borderRadius: 12,
-    color: T.textPri,
-    outline: 'none',
-    fontFamily: 'inherit',
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
-      <input
+      <GlassInput
         type="email"
         inputMode="email"
         autoComplete="email"
@@ -58,22 +49,23 @@ export function EmailAuth({ onCancel }) {
         onChange={e => { setEmail(e.target.value); setError(''); }}
         onKeyDown={e => e.key === 'Enter' && handleLogin()}
         placeholder="Ваш email"
-        style={{ ...inputBase, width: '100%', padding: '12px 14px', fontSize: 16, boxSizing: 'border-box' }}
+        style={{ border: `1px solid ${isValid ? 'rgba(215,184,106,0.48)' : 'var(--apg2-glass-border, rgba(255,255,255,0.16))'}` }}
       />
       {error && <div style={{ fontSize: 12, color: '#E64646', textAlign: 'center' }}>{error}</div>}
-      <button
+      <GlassButton
         onClick={handleLogin}
         disabled={loading || !isValid}
-        style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: 'none', cursor: loading || !isValid ? 'default' : 'pointer', background: loading || !isValid ? 'rgba(74,144,217,0.3)' : 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        tone="gold"
+        style={{ width: '100%', opacity: loading || !isValid ? 0.5 : 1, color: '#17120a' }}
       >
         {loading ? SPINNER : '✉️ Войти'}
-      </button>
-      <button
+      </GlassButton>
+      <GlassButton
         onClick={onCancel}
-        style={{ width: '100%', padding: '10px 0', borderRadius: 12, background: 'none', border: `1px solid ${T.border}`, color: T.textSec, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+        style={{ width: '100%', minHeight: 46, color: APG2_PROFILE.textSoft }}
       >
         Отмена
-      </button>
+      </GlassButton>
     </div>
   );
 }

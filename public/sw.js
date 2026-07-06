@@ -1,15 +1,17 @@
-// APG Service Worker — cache-first for static, pass-through for Firebase
-const CACHE = 'apg-v2';
+// APG Service Worker — local-production friendly cache strategy.
+const CACHE_VERSION = 'apg-v3-1-local-20260706';
+const STATIC_CACHE = `${CACHE_VERSION}-static`;
+const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
 const PRECACHE = [
   '/',
   '/manifest.json',
+  '/version.json',
   '/192.png',
   '/512.png',
   '/180.png',
 ];
 
-// Hosts to never cache — always fetch live
 const BYPASS_HOSTS = [
   'firestore.googleapis.com',
   'firebase.googleapis.com',
@@ -22,107 +24,123 @@ const BYPASS_HOSTS = [
   'api.vk.com',
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((cache) =>
-      cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' })))
+const NO_STORE_PATHS = new Set([
+  '/sw.js',
+  '/manifest.json',
+  '/version.json',
+]);
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE).then((cache) =>
+      cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' }))).catch(() => null)
     )
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((key) => !key.startsWith(CACHE_VERSION)).map((key) => caches.delete(key)))
     )
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
-  const { request } = e;
-
-  // Only handle GET
-  if (request.method !== 'GET') return;
-
-  const url = new URL(request.url);
-
-  // Pass through cross-origin or bypass hosts
-  if (url.origin !== self.location.origin) {
-    if (BYPASS_HOSTS.some((h) => url.hostname.includes(h))) return;
-    // Other cross-origin (CDN, etc.) — also skip
-    return;
-  }
-
-  // Navigation requests — browser handles natively (avoids redirect overhead in Lighthouse)
-  if (request.mode === 'navigate') return;
-
-  // Pass through Vite HMR / dev server events
-  if (url.pathname.startsWith('/@')) return;
-
-  e.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const hit = await cache.match(request);
-      if (hit) return hit;
-
-      try {
-        const res = await fetch(request);
-        // Cache successful same-origin responses (assets, pages)
-        if (res.ok && res.status < 400) {
-          cache.put(request, res.clone());
-        }
-        return res;
-      } catch {
-        // Offline fallback for navigation requests
-        if (request.mode === 'navigate') {
-          const fallback = await cache.match('/');
-          if (fallback) return fallback;
-        }
-        return new Response('Нет соединения', { status: 503 });
-      }
-    })
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'APG_CLEAR_SW_CACHE') return;
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => event.source?.postMessage?.({ type: 'APG_SW_CACHE_CLEARED' }))
   );
 });
 
-// ─── Web Push (FCM) ───────────────────────────────────────────────────────────
+async function networkFirst(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response.ok) cache.put(request, response.clone()).catch(() => {});
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    const shell = await cache.match('/');
+    if (shell) return shell;
+    return new Response('Нет соединения', { status: 503 });
+  }
+}
 
-self.addEventListener('push', e => {
-  if (!e.data) return;
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request);
+  const refresh = fetch(request).then((response) => {
+    if (response.ok) cache.put(request, response.clone()).catch(() => {});
+    return response;
+  }).catch(() => null);
+  return cached || refresh || new Response('Нет соединения', { status: 503 });
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    if (BYPASS_HOSTS.some((host) => url.hostname.includes(host))) return;
+    return;
+  }
+
+  if (url.pathname.startsWith('/@')) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  if (NO_STORE_PATHS.has(url.pathname)) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
+
+  event.respondWith(staleWhileRevalidate(request));
+});
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
   let payload = {};
-  try { payload = e.data.json(); } catch { return; }
+  try { payload = event.data.json(); } catch { return; }
 
-  const n     = payload.notification ?? {};
-  const data  = payload.data ?? {};
-  const title = n.title ?? 'АПГ';
-  const body  = n.body  ?? '';
+  const notification = payload.notification ?? {};
+  const data = payload.data ?? {};
+  const title = notification.title ?? 'АПГ';
+  const body = notification.body ?? '';
 
-  e.waitUntil(
+  event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon:              '/192.png',
-      badge:             '/32.png',
-      image:             '/logo.webp',
+      icon: '/192.png',
+      badge: '/32.png',
+      image: '/logo.webp',
       data,
-      tag:               data.tag ?? 'apg-push',
-      renotify:          true,
+      tag: data.tag ?? 'apg-push',
+      renotify: true,
       requireInteraction: false,
       actions: [
-        { action: 'open', title: '🏙️ Открыть приложение' },
+        { action: 'open', title: 'Открыть приложение' },
       ],
     })
   );
 });
 
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  const url = e.notification.data?.url ?? '/';
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) {
-        if (new URL(c.url).origin === self.location.origin && 'focus' in c) {
-          return c.focus();
-        }
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? '/#/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (new URL(client.url).origin === self.location.origin && 'focus' in client) return client.focus();
       }
       return self.clients.openWindow(url);
     })

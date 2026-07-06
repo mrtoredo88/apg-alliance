@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { T, GLASS } from './design.js';
 import vkBridge from './vk.js';
 import { APP_URL } from './constants.js';
+import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const MILESTONES = [
   { count: 1, reward: 3,  label: '1 друг',   taskId: 'referral_1' },
@@ -17,7 +18,7 @@ const STEPS = [
   { emoji: '🗝️', title: 'Оба получают ключи', desc: 'Ты и твой друг каждый получаете +2 ключа сразу' },
 ];
 
-export function ReferralPage({ user, referralCount = 0, completedTasks = [], onBack, onShare }) {
+export function ReferralPage({ variant = 'v2', user, referralCount = 0, completedTasks = [], onBack, onShare }) {
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef(null);
   useEffect(() => () => clearTimeout(copyTimerRef.current), []);
@@ -56,6 +57,55 @@ export function ReferralPage({ user, referralCount = 0, completedTasks = [], onB
     .filter(m => completedTasks.includes(m.taskId))
     .reduce((s, m) => s + m.reward, 0);
   const earnedKeys = referralCount * 2 + milestoneKeys;
+
+  if (variant === 'v2') {
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Друзья" subtitle="Реферальная программа" kicker="Приглашения" onBack={onBack} />
+        <GlassCard tone="gold" style={{ borderRadius: 38, padding: 22, marginBottom: 18, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 82% 14%,rgba(255,255,255,0.26),transparent 34%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative' }}>
+            <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>+2 ключа каждому</GlassBadge>
+            <div style={{ color: '#17120a', fontSize: 31, lineHeight: '34px', fontWeight: 930, marginTop: 16 }}>Позови друга в АПГ</div>
+            <div style={{ color: 'rgba(20,15,8,0.68)', fontSize: 14, lineHeight: '20px', marginTop: 10 }}>Покажи QR-код или отправь ссылку. Когда друг присоединится, ключи получите вы оба.</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <StatPill label="друзей пришло" value={referralCount} />
+              <StatPill label="ключей заработано" value={earnedKeys} />
+            </div>
+          </div>
+        </GlassCard>
+        <GlassCard style={{ borderRadius: 34, padding: 20, marginBottom: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>Ваш персональный QR</div>
+          {user?.id ? (
+            <div style={{ background: '#fff', borderRadius: 24, padding: 15, boxShadow: '0 22px 50px rgba(0,0,0,0.28)' }}>
+              <QRCodeSVG value={refLink} size={184} bgColor="#ffffff" fgColor="#101114" level="M" />
+            </div>
+          ) : (
+            <div style={{ width: 214, height: 214, borderRadius: 28, background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🔗</div>
+          )}
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>ID: {user?.id ?? '—'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, width: '100%' }}>
+            <GlassButton onClick={handleShare} tone="gold" style={{ color: '#17120a' }}>Поделиться</GlassButton>
+            <GlassButton onClick={handleCopy}>{copied ? 'Скопировано' : 'Ссылка'}</GlassButton>
+          </div>
+        </GlassCard>
+        <GlassSection title="Награды">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {MILESTONES.map(m => {
+              const done = completedTasks.includes(m.taskId);
+              const reached = referralCount >= m.count;
+              return <GlassListItem key={m.taskId} icon={done ? '✓' : '👥'} title={m.label} subtitle={done ? 'Награда получена' : `${Math.min(referralCount, m.count)} / ${m.count}`} meta={`+${m.reward}`} accent={reached ? APG2_PROFILE.gold : undefined} />;
+            })}
+          </div>
+        </GlassSection>
+        <GlassSection title="Как это работает">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {STEPS.map((step, i) => <GlassListItem key={step.title} icon={step.emoji} title={step.title} subtitle={step.desc} meta={`0${i + 1}`} />)}
+          </div>
+        </GlassSection>
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

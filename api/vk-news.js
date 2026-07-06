@@ -41,8 +41,8 @@ export default async function handler(req, res) {
 
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
 
-  const token = process.env.VK_GROUP_TOKEN;
-  if (!token) return res.status(500).json({ error: 'token_missing' });
+  const token = process.env.VK_SERVICE_TOKEN || process.env.VK_USER_TOKEN || process.env.VK_GROUP_TOKEN;
+  if (!token) return res.status(200).json({ posts: [], unavailable: true, reason: 'token_missing' });
 
   try {
     const apiUrl = new URL('https://api.vk.com/method/wall.get');
@@ -56,7 +56,12 @@ export default async function handler(req, res) {
     const data = await r.json();
 
     if (data.error) {
-      return res.status(500).json({ error: data.error.error_msg });
+      return res.status(200).json({
+        posts: [],
+        unavailable: true,
+        reason: data.error.error_msg,
+        code: data.error.error_code,
+      });
     }
 
     const posts = (data.response?.items ?? [])
@@ -65,6 +70,6 @@ export default async function handler(req, res) {
 
     res.json({ posts });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(200).json({ posts: [], unavailable: true, reason: e.message });
   }
 }

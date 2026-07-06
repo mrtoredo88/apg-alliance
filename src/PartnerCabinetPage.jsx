@@ -5,6 +5,7 @@ import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, ser
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { PartnerQRSection } from './PartnerQRSection.jsx';
+import { APG2_PROFILE, ContactCard, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
 
@@ -28,7 +29,7 @@ export function StatCard({ icon, label, value, sub, color }) {
   );
 }
 
-export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPartner, expert, onBack, onPartnerUpdate }) {
+export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, onBack, onPartnerUpdate }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -132,6 +133,100 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', partner: initialPa
     fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
   };
   const labelStyle = { fontSize: 12, color: T.textSec, marginBottom: 5, display: 'block', fontWeight: 600 };
+
+  const v2InputStyle = {
+    width: '100%', padding: '13px 14px', borderRadius: 18,
+    border: '1px solid rgba(255,255,255,0.16)',
+    background: 'rgba(255,255,255,0.07)', color: APG2_PROFILE.text,
+    fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
+  };
+
+  if (variant === 'v2') {
+    return (
+      <Panel id={nav}>
+        <GlassPanel>
+          <ScreenHeader title="Кабинет" subtitle={partner.name} kicker="Партнер АПГ" onBack={onBack} />
+          <ProfileHero
+            image={partner.coverPhoto || fLogo}
+            title={partner.name}
+            subtitle={partner.categoryLabel || partner.address}
+            status="Партнер"
+            description={partner.offer || partner.description}
+            avatar={fLogo ? <img src={fLogo} alt="" style={{ width: 64, height: 64, borderRadius: 24, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.24)' }} /> : <GlassBadge tone="gold">{partner.emoji ?? '🏪'}</GlassBadge>}
+            badges={[partner.featured ? 'Партнер дня' : 'Проверенный', avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : `${ratingCount} отзывов`].filter(Boolean)}
+          />
+          <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 16 }}>
+            {[['stats', 'Статистика'], ['qr', 'QR'], ['edit', 'Карточка']].map(([id, label]) => (
+              <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
+            ))}
+          </GlassCard>
+
+          {expert && (
+            <GlassSection title="Ссылка эксперта">
+              <GlassCard tone="gold" style={{ borderRadius: 30 }}>
+                <div style={{ color: '#17120a', fontSize: 14, lineHeight: '20px', fontWeight: 780, marginBottom: 10 }}>Отправьте клиенту ссылку для автоматического начисления ключа.</div>
+                <div style={{ color: 'rgba(20,15,8,0.72)', fontSize: 12, lineHeight: '17px', overflowWrap: 'anywhere' }}>{`${APP_URL}/?scan=expert_${expert.id}`}</div>
+                <GlassButton onClick={() => navigator.clipboard.writeText(`${APP_URL}/?scan=expert_${expert.id}`).catch(() => {})} style={{ marginTop: 12, color: '#17120a', background: 'rgba(255,255,255,0.32)' }}>Скопировать</GlassButton>
+              </GlassCard>
+            </GlassSection>
+          )}
+
+          {activeTab === 'stats' && (
+            <GlassSection title="Метрики">
+              {loading ? <EmptyStateV2 icon="📊" title="Загружаем статистику" text="Собираем данные карточки." /> : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <StatPill label="служебный QR" value={totalVisits} tone="gold" />
+                    <StatPill label="публичный QR" value={publicQRScans} />
+                    <StatPill label="просмотров" value={viewCount} />
+                    <StatPill label="в избранном" value={favoritesCount} />
+                  </div>
+                  {(avgRating > 0 || ratingCount > 0) && (
+                    <GlassCard style={{ marginTop: 12, borderRadius: 30 }}>
+                      <div style={{ color: APG2_PROFILE.gold, fontSize: 34, fontWeight: 930 }}>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</div>
+                      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>{ratingCount} отзывов · конверсия {viewCount > 0 ? `${conversionPct}%` : '—'}</div>
+                    </GlassCard>
+                  )}
+                </>
+              )}
+            </GlassSection>
+          )}
+
+          {activeTab === 'qr' && (
+            <GlassSection title="QR-коды и материалы">
+              <GlassCard style={{ borderRadius: 32 }}>
+                <PartnerQRSection partner={partner} />
+              </GlassCard>
+            </GlassSection>
+          )}
+
+          {activeTab === 'edit' && (
+            <GlassSection title="Карточка партнера">
+              <GlassCard style={{ borderRadius: 32 }}>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Логотип</label>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '8px 0 14px' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 24, background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{fLogo ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (partner.emoji ?? '🏪')}</div>
+                  <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                  <GlassButton onClick={() => logoInputRef.current?.click()}>{uploading ? 'Загрузка...' : 'Загрузить'}</GlassButton>
+                </div>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Описание</label>
+                <textarea value={fDesc} onChange={e => setFDesc(e.target.value)} rows={4} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} />
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Акция</label>
+                <textarea value={fOffer} onChange={e => setFOffer(e.target.value)} rows={3} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} />
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Телефон</label>
+                <input value={fPhone} onChange={e => setFPhone(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} />
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Часы работы</label>
+                <input value={fHours} onChange={e => setFHours(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} />
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Соцсеть / сайт</label>
+                <input value={fSocial} onChange={e => setFSocial(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} />
+                <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a' }}>{saving ? 'Сохраняем...' : saved ? 'Сохранено' : 'Сохранить изменения'}</GlassButton>
+              </GlassCard>
+            </GlassSection>
+          )}
+        </GlassPanel>
+      </Panel>
+    );
+  }
 
   return (
     <Panel id={nav}>

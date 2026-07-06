@@ -8,8 +8,9 @@ import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
+import { logError } from './errorLogger.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -785,6 +786,8 @@ export const AdminPanel = () => {
   const [partnerSearch, setPartnerSearch]   = useState('');
   const [migrating, setMigrating]           = useState(false);
   const [migrateResult, setMigrateResult]   = useState(null);
+  const [demoClearing, setDemoClearing]     = useState(false);
+  const [demoClearResult, setDemoClearResult] = useState(null);
 
   // Призы
   const [prizes, setPrizes]               = useState([]);
@@ -935,7 +938,7 @@ export const AdminPanel = () => {
       const snap = await getDocs(query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)));
       setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
-      console.error('loadErrors', e);
+      logError(e, 'AdminPanel.loadErrors');
     } finally {
       setErrorsLoading(false);
     }
@@ -971,15 +974,15 @@ export const AdminPanel = () => {
     console.log('[ADMIN] fetchData start, auth.currentUser:', auth.currentUser?.uid ?? 'null');
     try {
       const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] = await Promise.all([
-        getDocs(collection(db, 'partners')).catch(err => { console.error('[ADMIN] partners failed:', err); return { docs: [] }; }),
-        getDocs(collection(db, 'events')).catch(err => { console.error('[ADMIN] events failed:', err); return { docs: [] }; }),
-        getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(err => { console.error('[ADMIN] news failed:', err); return { docs: [] }; }),
-        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(err => { console.error('[ADMIN] notifications failed:', err); return { docs: [] }; }),
-        getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(err => { console.error('[ADMIN] prizes failed:', err); return { docs: [] }; }),
-        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(err => { console.error('[ADMIN] customTasks failed:', err); return { docs: [] }; }),
-        getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(err => { console.error('[ADMIN] prizeClaims failed:', err); return { docs: [] }; }),
-        getDocs(collection(db, 'experts')).catch(err => { console.error('[ADMIN] experts failed:', err); return { docs: [] }; }),
-        getDocs(query(collection(db, 'banners'), orderBy('priority', 'asc'))).catch(err => { console.error('[ADMIN] banners failed:', err); return { docs: [] }; }),
+        getDocs(collection(db, 'partners')).catch(err => { logError(err, 'AdminPanel.fetchData.partners'); return { docs: [] }; }),
+        getDocs(collection(db, 'events')).catch(err => { logError(err, 'AdminPanel.fetchData.events'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(err => { logError(err, 'AdminPanel.fetchData.news'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(err => { logError(err, 'AdminPanel.fetchData.notifications'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.prizes'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.customTasks'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(err => { logError(err, 'AdminPanel.fetchData.prizeClaims'); return { docs: [] }; }),
+        getDocs(collection(db, 'experts')).catch(err => { logError(err, 'AdminPanel.fetchData.experts'); return { docs: [] }; }),
+        getDocs(query(collection(db, 'banners'), orderBy('priority', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.banners'); return { docs: [] }; }),
       ]);
       console.log('[ADMIN] загружено:', {
         partners: pSnap.docs.length,
@@ -1001,7 +1004,7 @@ export const AdminPanel = () => {
       setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setBanners(bnSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error('[ADMIN] fetchData outer catch:', e); }
+    } catch (e) { logError(e, 'AdminPanel.fetchData.outer'); }
     setLoading(false);
   };
 
@@ -1295,6 +1298,42 @@ export const AdminPanel = () => {
     setBulkGeoRunning(false);
     setBulkGeoResult(`Готово: ${ok} успешно, ${fail} не найдено`);
     fetchData();
+  };
+
+  const deleteDemoQuery = async (q) => {
+    const snap = await getDocs(q);
+    let count = 0;
+    for (let i = 0; i < snap.docs.length; i += 450) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      count += snap.docs.slice(i, i + 450).length;
+    }
+    return count;
+  };
+
+  const clearDemoContent = async () => {
+    if (demoClearing) return;
+    if (!window.confirm('Удалить весь Demo Content? Реальные данные без isDemo=true не будут затронуты.')) return;
+    setDemoClearing(true);
+    setDemoClearResult('Удаляем demo-записи...');
+    try {
+      const cols = ['partners', 'experts', 'events', 'news', 'banners', 'prizes', 'customTasks', 'notifications', 'users', 'expertReviews', 'raffleEntries', 'prizeClaims', 'scans'];
+      const counts = {};
+      for (const col of cols) {
+        counts[col] = await deleteDemoQuery(query(collection(db, col), where('isDemo', '==', true)));
+      }
+      counts.reviews = await deleteDemoQuery(query(collectionGroup(db, 'reviews'), where('isDemo', '==', true)));
+      counts.activity = await deleteDemoQuery(query(collectionGroup(db, 'activity'), where('isDemo', '==', true)));
+      counts.claims = await deleteDemoQuery(query(collectionGroup(db, 'claims'), where('isDemo', '==', true)));
+      const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+      setDemoClearResult(`Удалено demo-документов: ${total}`);
+      fetchData();
+    } catch (e) {
+      setDemoClearResult(`Ошибка очистки: ${e.message}`);
+    } finally {
+      setDemoClearing(false);
+    }
   };
 
   const navigateToResult = r => {
@@ -1685,7 +1724,7 @@ export const AdminPanel = () => {
       await setDoc(doc(db, 'stats', 'global'), { userCount, totalScans }, { merge: true });
       setRecalcMsg(`✅ Обновлено: ${userCount} пользователей, ${totalScans} визитов`);
     } catch (e) {
-      console.error(e);
+      logError(e, 'AdminPanel.recalcStats');
       setRecalcMsg('❌ Ошибка при пересчёте');
     }
     setRecalcLoading(false);
@@ -1839,7 +1878,7 @@ export const AdminPanel = () => {
         newUsers7d, newUsers30d, regGrowthData, activeUsers7d,
         guestTotal, guestConverted, guestRate, guestGrowthData,
       });
-    } catch (e) { console.error(e); }
+    } catch (e) { logError(e, 'AdminPanel.loadAnalytics'); }
     setAnalyticsLoading(false);
   }, [partners, analyticsLoading]);
 
@@ -2027,6 +2066,13 @@ export const AdminPanel = () => {
                   : <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>{partners.filter(p => !p.latitude && p.address?.trim()).length} адресов без координат</div>}
                 <button style={{ ...s.btn, width: '100%', fontSize: 12, padding: '7px 12px', background: 'rgba(74,144,217,0.2)', color: '#6AABEC', border: '1px solid rgba(74,144,217,0.3)', textAlign: 'left' }} onClick={bulkGeocode} disabled={bulkGeoRunning}>
                   {bulkGeoRunning ? '⏳ Геокодируем...' : '🌍 Геокодировать адреса'}
+                </button>
+              </div>
+              <div style={{ padding: '8px 14px 12px', borderTop: `1px solid ${A.border}` }}>
+                <div style={{ padding: '0 0 6px', fontSize: 10, color: A.textSec, fontWeight: 800, letterSpacing: 0.8 }}>DEMO CONTENT</div>
+                {demoClearResult && <div style={{ fontSize: 11, color: demoClearResult.startsWith('Ошибка') ? '#ff6b6b' : A.gold, marginBottom: 6 }}>{demoClearResult}</div>}
+                <button style={{ ...s.btn, width: '100%', fontSize: 12, padding: '7px 12px', background: 'rgba(239,68,68,0.15)', color: '#ff8b8b', border: '1px solid rgba(239,68,68,0.32)', textAlign: 'left' }} onClick={clearDemoContent} disabled={demoClearing}>
+                  {demoClearing ? '⏳ Удаляем...' : '🧹 Очистить Demo Content'}
                 </button>
               </div>
             </div>

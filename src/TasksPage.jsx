@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { TASKS } from './tasks.js';
 import { T, GLASS } from './design.js';
+import { logError } from './errorLogger.js';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 function TaskCard({ task, status, onClaim, claiming }) {
   const pct = task.total
@@ -116,6 +118,39 @@ function TaskCard({ task, status, onClaim, claiming }) {
   );
 }
 
+function TaskCardV2({ task, status, onClaim, claiming, index }) {
+  const pct = task.total ? Math.min(100, Math.round((status.prog / task.total) * 100)) : (status.ready || status.done ? 100 : 0);
+  return (
+    <GlassCard tone={status.ready ? 'gold' : 'glass'} style={{ borderRadius: 30, padding: 16, opacity: status.done ? 0.58 : 1, animation: `fadeInUp 0.36s ease ${index * 0.04}s both` }}>
+      <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
+        <div style={{ width: 54, height: 54, borderRadius: 22, flexShrink: 0, background: status.done ? 'rgba(75,179,75,0.16)' : APG2_PROFILE.goldSoft, border: `1px solid ${status.done ? 'rgba(75,179,75,0.3)' : 'rgba(215,184,106,0.28)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25 }}>
+          {status.done ? '✓' : task.emoji}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ color: status.ready ? '#17120a' : APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 850 }}>{task.title}</div>
+            <GlassBadge tone={status.ready ? 'glass' : 'gold'} style={{ flexShrink: 0 }}>+{task.reward}</GlassBadge>
+          </div>
+          <div style={{ color: status.ready ? 'rgba(20,15,8,0.68)' : APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 6 }}>{task.desc}</div>
+          {task.total && !status.done && (
+            <div style={{ marginTop: 13 }}>
+              <div style={{ height: 6, borderRadius: 999, background: status.ready ? 'rgba(20,15,8,0.16)' : 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: status.ready ? 'linear-gradient(90deg,#19140b,#6a4e1f)' : 'linear-gradient(90deg,#D7B86A,#FFF0B8)', transition: 'width 0.5s ease' }} />
+              </div>
+              <div style={{ color: status.ready ? 'rgba(20,15,8,0.62)' : APG2_PROFILE.textMuted, fontSize: 11, marginTop: 5 }}>{status.prog} / {task.total}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      {status.ready && (
+        <GlassButton onClick={() => onClaim(task.id, task.reward)} tone="glass" style={{ marginTop: 14, width: '100%', color: '#17120a', background: 'rgba(255,255,255,0.34)' }}>
+          {claiming === task.id ? 'Получаем...' : `Забрать +${task.reward} ключей`}
+        </GlassButton>
+      )}
+    </GlassCard>
+  );
+}
+
 function checkCustom(task, keys, favs, refs, streak, scanned) {
   const v = task.target ?? 0;
   switch (task.type) {
@@ -142,7 +177,7 @@ function progressCustom(task, keys, favs, refs, streak, scanned) {
   }
 }
 
-export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], customTasks = [], onClaim, onBack }) {
+export function TasksPage({ variant = 'v2', userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], customTasks = [], onClaim, onBack }) {
   const [claiming, setClaiming] = useState(null);
 
   const handleClaim = async (taskId, reward) => {
@@ -158,7 +193,7 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
         disableForReducedMotion: true,
       });
     } catch (e) {
-      console.error('Claim failed', e);
+      logError(e, 'TasksPage.handleClaim');
     } finally {
       setClaiming(null);
     }
@@ -188,6 +223,53 @@ export function TasksPage({ userKeys = 0, favCount = 0, referralCount = 0, strea
   const totalTasks  = allStatuses.length;
   const totalKeys   = allStatuses.reduce((s, t) => s + (t.reward ?? 0), 0);
   const earnedKeys  = done.reduce((s, t) => s + (t.reward ?? 0), 0);
+
+  if (variant === 'v2') {
+    const pct = totalTasks ? Math.round((done.length / totalTasks) * 100) : 0;
+    return (
+      <GlassPanel>
+        <ScreenHeader title="Задания" subtitle={`${done.length} / ${totalTasks} выполнено · ${earnedKeys} из ${totalKeys} ключей`} kicker="Личный прогресс" onBack={onBack} />
+        <GlassCard tone="gold" style={{ borderRadius: 34, padding: 18, marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-end', marginBottom: 14 }}>
+            <div>
+              <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 760, marginBottom: 4 }}>Прогресс заданий</div>
+              <div style={{ color: '#17120a', fontSize: 34, lineHeight: '36px', fontWeight: 930 }}>{pct}%</div>
+            </div>
+            <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{userKeys} ключей</GlassBadge>
+          </div>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(20,15,8,0.15)', overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#19140b,#745829,#FFF0B8)', transition: 'width 0.6s ease' }} />
+          </div>
+        </GlassCard>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+          <StatPill label="готово" value={claimable.length} tone={claimable.length ? 'gold' : 'glass'} />
+          <StatPill label="в работе" value={inProgress.length} />
+          <StatPill label="выполнено" value={done.length} />
+        </div>
+        {totalTasks === 0 ? (
+          <EmptyStateV2 icon="✅" title="Заданий пока нет" text="Когда появятся новые задания, они будут выглядеть здесь как личный маршрут." />
+        ) : (
+          <>
+            {claimable.length > 0 && (
+              <GlassSection title="Готово к получению">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{claimable.map((s, i) => <TaskCardV2 key={s.id} task={s} status={s} onClaim={handleClaim} claiming={claiming} index={i} />)}</div>
+              </GlassSection>
+            )}
+            {inProgress.length > 0 && (
+              <GlassSection title="В процессе">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{inProgress.map((s, i) => <TaskCardV2 key={s.id} task={s} status={s} onClaim={handleClaim} claiming={claiming} index={i} />)}</div>
+              </GlassSection>
+            )}
+            {done.length > 0 && (
+              <GlassSection title="Выполнено">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{done.map((s, i) => <TaskCardV2 key={s.id} task={s} status={s} onClaim={handleClaim} claiming={claiming} index={i} />)}</div>
+              </GlassSection>
+            )}
+          </>
+        )}
+      </GlassPanel>
+    );
+  }
 
   return (
     <>

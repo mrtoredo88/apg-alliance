@@ -8,6 +8,8 @@ import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from 
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL, API_BASE_URL } from './constants.js';
+import { logError } from './errorLogger.js';
+import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
 
 function EmailVerifyBanner({ userId }) {
   const [sent, setSent]       = useState(false);
@@ -140,6 +142,29 @@ function ThemeToggle({ isDark, onToggle }) {
   );
 }
 
+function TelegramIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#26A8EA" aria-hidden="true">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z" />
+    </svg>
+  );
+}
+
+function AccountMethodRow({ icon, title, subtitle, status, accent = APG2.gold }) {
+  return (
+    <div style={{ ...APG2.glass, borderRadius: 24, padding: 13, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+      <div style={{ width: 42, height: 42, borderRadius: 17, background: `${accent}1f`, border: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: accent, fontSize: 18 }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: APG2.text, fontSize: 15, lineHeight: '19px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>
+      </div>
+      {status && <GlassBadge style={{ padding: '5px 9px', color: accent, flexShrink: 0 }}>{status}</GlassBadge>}
+    </div>
+  );
+}
+
 const FAQ_ITEMS = [
   {
     q: 'Что такое АПГ?',
@@ -230,53 +255,49 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
     ? (user.displayName || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Участник АПГ')
     : 'Участник АПГ';
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 32px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, padding: '0 16px', animation: 'slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1)' }}>
-        {/* Превью карточки */}
-        <div style={{ borderRadius: 28, padding: '24px 20px', marginBottom: 12, background: 'linear-gradient(145deg, #120c32, #16123e)', border: '1px solid rgba(201,168,76,0.35)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
+    <ApgModal title="Поделиться АПГ" subtitle="Покажите свой прогресс друзьям." onClose={onClose} maxWidth={440}>
+      <div style={{ borderRadius: 28, padding: '24px 20px', marginBottom: 12, background: 'linear-gradient(145deg, rgba(255,255,255,0.16), rgba(201,168,76,0.10)), var(--apg2-bg, linear-gradient(145deg, #120c32, #16123e))', border: '1px solid rgba(201,168,76,0.35)', boxShadow: '0 24px 60px var(--apg2-elev-shadow, rgba(0,0,0,0.34))', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
 
-          <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16, opacity: 0.8 }}>✦ АПГ — Альянс Партнёров Зеленограда</div>
+        <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16, opacity: 0.8 }}>✦ АПГ — Альянс Партнёров Зеленограда</div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-            {user?.photo_200
-              ? <img src={user.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.gold}88`, objectFit: 'cover', flexShrink: 0 }} />
-              : <div style={{ width: 56, height: 56, borderRadius: '50%', background: T.gold + '20', border: `2px solid ${T.gold}60`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>👤</div>
-            }
-            <div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{name}</div>
-              <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.label}</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-            {[
-              { emoji: '🗝️', value: userKeys,         label: 'ключей' },
-              { emoji: '🔥', value: streak,            label: 'дней стрик' },
-              { emoji: '🏪', value: scannedCount,      label: 'партнёров' },
-              { emoji: '🏆', value: unlockedAchievements, label: 'наград' },
-            ].map(s => (
-              <div key={s.label} style={{ background: T.chipBg, borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 18 }}>{s.emoji}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: T.gold, lineHeight: 1.2 }}>{s.value}</div>
-                <div style={{ fontSize: 9, color: T.textSec, lineHeight: '12px', marginTop: 2 }}>{s.label}</div>
-              </div>
-            ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+          {user?.photo_200
+            ? <img src={user.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.gold}88`, objectFit: 'cover', flexShrink: 0 }} />
+            : <div style={{ width: 56, height: 56, borderRadius: '50%', background: T.gold + '20', border: `2px solid ${T.gold}60`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>👤</div>
+          }
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>{name}</div>
+            <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.label}</div>
           </div>
         </div>
 
-        {/* Кнопки */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onShareVK} style={{ flex: 1, padding: '14px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-            📤 Поделиться
-          </button>
-          <button onClick={onClose} style={{ padding: '14px 20px', borderRadius: 16, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textPri, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            Закрыть
-          </button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {[
+            { emoji: '🗝️', value: userKeys,         label: 'ключей' },
+            { emoji: '🔥', value: streak,            label: 'дней стрик' },
+            { emoji: '🏪', value: scannedCount,      label: 'партнёров' },
+            { emoji: '🏆', value: unlockedAchievements, label: 'наград' },
+          ].map(s => (
+            <div key={s.label} style={{ background: T.chipBg, borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 18 }}>{s.emoji}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: T.gold, lineHeight: 1.2 }}>{s.value}</div>
+              <div style={{ fontSize: 9, color: T.textSec, lineHeight: '12px', marginTop: 2 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <GlassButton onClick={onShareVK} tone="gold" style={{ flex: 1 }}>
+          Поделиться
+        </GlassButton>
+        <GlassButton onClick={onClose} style={{ flex: '0 0 auto', minWidth: 112 }}>
+          Закрыть
+        </GlassButton>
+      </div>
+    </ApgModal>
   );
 }
 
@@ -334,7 +355,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {} }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {} }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -352,9 +373,11 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
   const tgPollRef = useRef(null);
   const tgStateRef = useRef(null);
   const tgLinkingRef = useRef(false);
+  const tgActionRef = useRef(0);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
 
   const stopPolling = useCallback(() => {
+    if (tgPollRef.current) clearTimeout(tgPollRef.current);
     tgStateRef.current = null;
     tgPollRef.current = null;
   }, []);
@@ -377,12 +400,15 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
             // Режим привязки — записываем tgLinks, не перезагружаем
             tgLinkingRef.current = false;
             const tgPayload = { tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name ?? null, photo: data.user.photo_200 ?? null };
-            fetch(`${API_BASE_URL}/api/email-auth`, {
+            const linkRes = await fetch(`${API_BASE_URL}/api/email-auth`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
-            }).catch(() => {});
-            // Обновляем user в UserApp и в localStorage — имя и аватар из Telegram
+            });
+            const linkData = await linkRes.json().catch(() => ({}));
+            if (!linkRes.ok || linkData.ok === false) {
+              throw new Error(linkData.message || 'telegram_link_failed');
+            }
             const tgName = [tgPayload.firstName, tgPayload.lastName].filter(Boolean).join(' ') || null;
             const userPatch = {
               linkedTelegram: tgPayload,
@@ -409,10 +435,18 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           setTgError('Сессия истекла. Попробуйте снова.');
           setTgStep('idle');
         } else {
-          poll(); // 'pending' — сервер вернул timeout после 25 с, сразу повторяем
+          tgPollRef.current = setTimeout(poll, 900);
         }
-      } catch {
+      } catch (e) {
+        logError(e, 'ProfilePanel.telegram.poll');
         if (tgStateRef.current !== state) return;
+        if (tgLinkingRef.current) {
+          tgStateRef.current = null;
+          tgLinkingRef.current = false;
+          setTgError(e?.message && e.message !== 'telegram_link_failed' ? e.message : 'Не удалось привязать Telegram. Попробуйте ещё раз.');
+          setTgStep('idle');
+          return;
+        }
         await new Promise(r => setTimeout(r, 2000));
         poll();
       }
@@ -427,17 +461,27 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     setTgError('');
     stopPolling();
     try {
-      const { state, url } = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST' }).then(r => r.json());
+      const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST' });
+      const { state, url, message } = await res.json().catch(() => ({}));
+      if (!res.ok || !state || !url) throw new Error(message || 'telegram_start_failed');
       localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));
       setTgBotUrl(url);
       setTgLoading(false);
       setTgStep('waiting');
       startWaiting(state);
-    } catch {
+    } catch (e) {
+      logError(e, 'ProfilePanel.telegram.start');
       setTgError('Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
     }
   }, [stopPolling, startWaiting]);
+
+  const runTelegramAuth = useCallback((isLinking = false) => {
+    const now = Date.now();
+    if (now - tgActionRef.current < 700) return;
+    tgActionRef.current = now;
+    handleTelegramAuth(isLinking);
+  }, [handleTelegramAuth]);
 
   const handleVkLogin = async () => {
     setVkLoginLoading(true);
@@ -599,6 +643,260 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
     }
   };
 
+  if (variant === 'v2') {
+    const displayName = safeUser.displayName || [safeUser.first_name, safeUser.last_name].filter(Boolean).join(' ') || 'Участник АПГ';
+    const toNext = getKeysToNext(userKeys);
+    const pct = getLevelProgress(userKeys);
+    const nextLabel = nextLevel ? `До ${nextLevel.label}: ${toNext} ключей` : 'Максимальный уровень';
+    const isEmailUser = !!user && String(user.id).startsWith('email:');
+    const isTelegramUser = !!user && String(user.id).startsWith('tg_');
+    const userEmail = user?.email || user?.linkedEmail || (isEmailUser ? String(user.id).replace('email:', '') : '');
+    const linkedTelegram = user?.linkedTelegram;
+    const linkedTelegramName = linkedTelegram
+      ? [linkedTelegram.firstName, linkedTelegram.lastName].filter(Boolean).join(' ') || 'Telegram привязан'
+      : '';
+    const telegramDisplayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.displayName || 'Telegram';
+    const primaryActions = [
+      { label: 'Активность', icon: '◷', onClick: onOpenActivity },
+      { label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+      ownedPartner && { label: 'Кабинет партнера', icon: '◆', onClick: onOpenPartnerCabinet },
+      ownedExpert && { label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
+    ].filter(Boolean);
+
+    return (
+      <GlassPanel>
+        {achievementToast && (
+          <div style={{ position: 'fixed', top: 60, left: 16, right: 16, zIndex: 700, ...APG2.glass, borderRadius: 24, padding: 15, display: 'flex', gap: 13, alignItems: 'center', animation: toastExiting ? 'achievementOut 0.3s ease both' : 'achievementPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+            <div style={{ width: 50, height: 50, borderRadius: 18, background: achievementToast.color + '24', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{achievementToast.emoji}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: APG2.gold, fontSize: 11, fontWeight: 820, textTransform: 'uppercase', letterSpacing: 1 }}>Новое достижение</div>
+              <div style={{ color: APG2.text, fontSize: 16, fontWeight: 840 }}>{achievementToast.title}</div>
+            </div>
+            <button type="button" onClick={dismissToast} style={{ ...APG2.glass, width: 38, height: 38, borderRadius: 16, color: APG2.text }}>✕</button>
+          </div>
+        )}
+
+        <section style={{ position: 'relative', minHeight: 216, borderRadius: 32, overflow: 'hidden', ...APG2.glass, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 72% 12%, ${level.color}33, transparent 34%), radial-gradient(circle at 20% 0%, rgba(215,184,106,0.2), transparent 28%)` }} />
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
+            <GlassBadge tone="gold">{level.emoji} {level.label}</GlassBadge>
+            <GlassButton onClick={() => setShowShareModal(true)} style={{ minHeight: 38, borderRadius: 17, padding: '8px 12px' }}>↗</GlassButton>
+          </div>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              {safeUser.photo_200
+                ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: 21, objectFit: 'cover', border: '2px solid rgba(215,184,106,0.48)', boxShadow: '0 14px 34px rgba(0,0,0,0.30)' }} />
+                : <div style={{ width: 56, height: 56, borderRadius: 21, background: 'linear-gradient(145deg,rgba(215,184,106,0.3),rgba(255,255,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: APG2.text, fontSize: 23, fontWeight: 850 }}>{displayName[0]}</div>
+              }
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: APG2.text, fontSize: 21, lineHeight: '25px', fontWeight: 850, overflowWrap: 'anywhere' }}>{displayName}</div>
+                <div style={{ color: APG2.textSoft, fontSize: 13, marginTop: 5 }}>Ваш прогресс в городе</div>
+              </div>
+            </div>
+            <div style={{ ...APG2.glass, borderRadius: 22, padding: 11 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: APG2.textSoft, fontSize: 12, marginBottom: 8 }}>
+                <span>{userKeys} ключей</span>
+                <span>{nextLabel}</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: 'linear-gradient(135deg,#FFF0B8,#D9B965,#9F7932,#F4D98C)', boxShadow: '0 0 26px rgba(215,184,106,0.34)', transition: 'width 0.5s ease' }} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {isGuest && !isVK() && (
+          <GlassSection title="Вход">
+            <GlassCard style={{ display: 'grid', gap: 12 }}>
+              <div style={{ color: APG2.text, fontSize: 17, fontWeight: 820, marginBottom: 6 }}>Войдите в АПГ</div>
+              <div style={{ color: APG2.textMuted, fontSize: 14, lineHeight: '20px', marginBottom: 14 }}>Сохраните ключи, избранное и прогресс.</div>
+              {!showEmailAuth && tgStep === 'idle' && !tgLoading && <GlassButton onClick={() => setShowEmailAuth(true)} tone="gold">Войти по email</GlassButton>}
+              {!showEmailAuth && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--apg2-glass-border, rgba(255,255,255,0.14))' }} />
+                    <span style={{ color: APG2.textMuted, fontSize: 12, fontWeight: 720 }}>или</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--apg2-glass-border, rgba(255,255,255,0.14))' }} />
+                  </div>
+                  {tgLoading ? (
+                    <GlassButton disabled><span style={{ color: '#26A8EA' }}>●</span>Создаём сессию...</GlassButton>
+                  ) : tgStep === 'waiting' ? (
+                    <div style={{ display: 'grid', gap: 9 }}>
+                      <div style={{ color: '#26A8EA', fontSize: 13, lineHeight: '18px', fontWeight: 760, textAlign: 'center' }}>Ждём подтверждения в Telegram...</div>
+                      <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ ...APG2.glass, minHeight: 46, borderRadius: APG2.radius.button, padding: '11px 14px', color: '#26A8EA', border: APG2.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', boxSizing: 'border-box' }}>
+                        <TelegramIcon />Открыть Telegram
+                      </a>
+                    </div>
+                  ) : (
+                    <GlassButton onPointerUp={() => runTelegramAuth(false)} onClick={() => runTelegramAuth(false)} style={{ color: '#26A8EA' }}><TelegramIcon />Войти через Telegram</GlassButton>
+                  )}
+                  {tgError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px', textAlign: 'center' }}>{tgError}</div>}
+                </>
+              )}
+            </GlassCard>
+          </GlassSection>
+        )}
+
+        {!isGuest && !isVK() && (isEmailUser || isTelegramUser) && (
+          <GlassSection title="Способы входа">
+            <GlassCard style={{ display: 'grid', gap: 11 }}>
+              {isEmailUser && (
+                <>
+                  <AccountMethodRow icon="✉️" title="Email" subtitle={userEmail} status="подключён" accent={APG2.gold} />
+                  {user?.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
+                  {linkedTelegram ? (
+                    <AccountMethodRow icon={<TelegramIcon />} title="Telegram" subtitle={linkedTelegramName} status="привязан" accent="#26A8EA" />
+                  ) : tgStep === 'linked' ? (
+                    <AccountMethodRow icon={<TelegramIcon />} title="Telegram привязан" subtitle="Используется для быстрого входа" status="готово" accent="#26A8EA" />
+                  ) : (
+                    <div style={{ display: 'grid', gap: 9 }}>
+                      <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Telegram можно использовать для быстрого входа в АПГ без потери ключей и избранного.</div>
+                      {tgLoading ? (
+                        <GlassButton disabled><span style={{ color: '#26A8EA' }}>●</span>Создаём сессию...</GlassButton>
+                      ) : tgStep === 'waiting' ? (
+                        <>
+                          <div style={{ color: '#26A8EA', fontSize: 13, lineHeight: '18px', fontWeight: 760, textAlign: 'center' }}>Ждём подтверждения в Telegram...</div>
+                          <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ ...APG2.glass, minHeight: 46, borderRadius: APG2.radius.button, padding: '11px 14px', color: '#26A8EA', border: APG2.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', boxSizing: 'border-box' }}>
+                            <TelegramIcon />Открыть Telegram
+                          </a>
+                        </>
+                      ) : (
+                        <GlassButton onPointerUp={() => runTelegramAuth(true)} onClick={() => runTelegramAuth(true)} style={{ color: '#26A8EA' }}><TelegramIcon />Привязать Telegram</GlassButton>
+                      )}
+                      {tgError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px', textAlign: 'center' }}>{tgError}</div>}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {isTelegramUser && (
+                <>
+                  <AccountMethodRow icon={<TelegramIcon />} title="Telegram" subtitle={telegramDisplayName} status="основной" accent="#26A8EA" />
+                  {(user?.linkedEmail || linkEmailDone) ? (
+                    <AccountMethodRow icon="✉️" title="Email" subtitle={user?.linkedEmail ?? linkEmailValue} status="дополнительно" accent={APG2.gold} />
+                  ) : showLinkEmail ? (
+                    <div style={{ display: 'grid', gap: 9 }}>
+                      <GlassInput
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        value={linkEmailValue}
+                        onChange={e => { setLinkEmailValue(e.target.value); setLinkEmailError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && handleLinkEmail()}
+                        placeholder="Ваш email"
+                        invalid={!!linkEmailError}
+                        style={{ minHeight: 46, borderRadius: 20 }}
+                      />
+                      {linkEmailError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px' }}>{linkEmailError}</div>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '0.9fr 1.1fr', gap: 9 }}>
+                        <GlassButton onClick={() => { setShowLinkEmail(false); setLinkEmailError(''); }}>Отмена</GlassButton>
+                        <GlassButton onClick={handleLinkEmail} disabled={linkEmailLoading || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkEmailValue)} tone="gold">{linkEmailLoading ? 'Привязка...' : 'Привязать'}</GlassButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 9 }}>
+                      <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Email можно добавить как дополнительный способ входа.</div>
+                      <GlassButton onClick={() => setShowLinkEmail(true)}>✉️ Привязать почту</GlassButton>
+                    </div>
+                  )}
+                </>
+              )}
+            </GlassCard>
+          </GlassSection>
+        )}
+
+        <GlassSection title="Быстрые действия">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <GlassButton onClick={onToggleTheme}><span>{isDark ? '☀️' : '🌙'}</span>{isDark ? 'Светлая тема' : 'Темная тема'}</GlassButton>
+            <GlassButton onClick={onEnableNotifications} tone={notificationsEnabled ? 'gold' : 'glass'}><span>{notificationsEnabled ? '✓' : '🔔'}</span>{notificationsEnabled ? 'Уведомления включены' : 'Уведомления'}</GlassButton>
+            {primaryActions.map(a => <GlassButton key={a.label} onClick={a.onClick}><span>{a.icon}</span>{a.label}</GlassButton>)}
+          </div>
+        </GlassSection>
+
+        <GlassSection title="Показатели">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {stats.map(s => (
+              <GlassCard key={s.label} style={{ minHeight: 72, padding: 10, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: 18, marginBottom: 5 }}>{s.emoji}</div>
+                <div style={{ color: APG2.text, fontSize: 19, lineHeight: '22px', fontWeight: 860 }}>{s.value}</div>
+                <div style={{ color: APG2.textMuted, fontSize: 11, marginTop: 4 }}>{s.label}</div>
+              </GlassCard>
+            ))}
+          </div>
+        </GlassSection>
+
+        <GlassSection title="Избранное">
+          {favoritePartners.length === 0 ? (
+            <GlassCard style={{ padding: 26, textAlign: 'center' }}>
+              <div style={{ color: APG2.text, fontSize: 18, fontWeight: 820, marginBottom: 7 }}>Пока пусто</div>
+              <div style={{ color: APG2.textMuted, fontSize: 14, lineHeight: '20px' }}>Добавляйте места сердцем, чтобы быстро возвращаться к ним.</div>
+            </GlassCard>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {favoritePartners.slice(0, 6).map(p => (
+                <GlassCard key={p.id} onClick={() => onOpenPartner(p)} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {p.logoUrl ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 48, height: 48, borderRadius: 18, objectFit: 'cover' }} /> : <div style={{ width: 48, height: 48, borderRadius: 18, background: APG2.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>◆</div>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: APG2.text, fontSize: 15, fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 3 }}>{p.categoryLabel || 'Партнер АПГ'}</div>
+                  </div>
+                  <span style={{ color: APG2.gold }}>›</span>
+                </GlassCard>
+              ))}
+            </div>
+          )}
+        </GlassSection>
+
+        <GlassSection title="Достижения">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {achievements.slice(0, 9).map(a => (
+              <GlassCard key={a.id} style={{ padding: 11, minHeight: 84, opacity: a.unlocked ? 1 : 0.58, textAlign: 'center' }}>
+                <div style={{ fontSize: 24, marginBottom: 8, filter: a.unlocked ? 'none' : 'grayscale(1)' }}>{a.emoji}</div>
+                <div style={{ color: APG2.text, fontSize: 12, lineHeight: '15px', fontWeight: 760 }}>{a.title}</div>
+              </GlassCard>
+            ))}
+          </div>
+        </GlassSection>
+
+        <GlassSection title="Аккаунт">
+          <div style={{ display: 'grid', gap: 10 }}>
+            <GlassButton onClick={onShare}>Поделиться АПГ</GlassButton>
+            <GlassButton onClick={handleWriteAdmin}>Написать в поддержку</GlassButton>
+            <GlassButton onClick={onLogout}>Выйти</GlassButton>
+          </div>
+        </GlassSection>
+
+        {showEmailAuth && createPortal(
+          <ApgModal
+            title="Войти по почте"
+            subtitle="Введите email, чтобы сохранить ключи, избранное и прогресс."
+            onClose={() => setShowEmailAuth(false)}
+          >
+            <EmailAuth onCancel={() => setShowEmailAuth(false)} />
+          </ApgModal>,
+          document.body
+        )}
+
+        {showShareModal && (
+          <ShareModal
+            user={user}
+            userKeys={userKeys}
+            streak={streak}
+            scannedCount={scannedCount}
+            completedTasks={completedTasks}
+            unlockedAchievements={achievements.filter(a => a.unlocked).length}
+            level={level}
+            onClose={() => setShowShareModal(false)}
+            onShareVK={() => {
+              setShowShareModal(false);
+              onShare?.();
+            }}
+          />
+        )}
+      </GlassPanel>
+    );
+  }
+
   return (
     <div style={{ background: 'transparent', minHeight: '100%' }}>
 
@@ -612,7 +910,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
           border: `1px solid ${achievementToast.color}60`,
           borderRadius: 20, padding: '14px 16px',
           display: 'flex', alignItems: 'center', gap: 14,
-          boxShadow: `0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px ${achievementToast.color}25`,
+          boxShadow: `0 8px 40px var(--apg2-elev-shadow, rgba(0,0,0,0.34)), 0 0 0 1px ${achievementToast.color}25`,
           animation: toastExiting ? 'achievementOut 0.3s ease both' : 'achievementPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both',
         }}>
           <div style={{
@@ -636,7 +934,7 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
         position: 'sticky', top: 0, zIndex: 50,
         background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
         borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
-        boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
+        boxShadow: 'inset 0 -1px 0 var(--c-border, rgba(0,0,0,0.12))',
         padding: '0 16px',
         display: 'flex', alignItems: 'center', height: 52,
       }}>
@@ -661,8 +959,6 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
                 ✉️ Войти по email
               </button>
             )}
-            {showEmailAuth && <EmailAuth onCancel={() => setShowEmailAuth(false)} />}
-
             {/* Telegram — дополнительный способ */}
             {!showEmailAuth && (
               <>
@@ -1335,84 +1631,74 @@ export function ProfilePanel({ user, userKeys = 0, favorites = [], partners = []
 
       <div style={{ height: 90 }} />
 
+      {showEmailAuth && createPortal(
+        <ApgModal
+          title="Войти по почте"
+          subtitle="Введите email, чтобы сохранить ключи, избранное и прогресс."
+          onClose={() => setShowEmailAuth(false)}
+        >
+          <EmailAuth onCancel={() => setShowEmailAuth(false)} />
+        </ApgModal>,
+        document.body
+      )}
+
       {/* ── Модалка подтверждения удаления ── */}
       {showDeleteConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 600,
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          padding: '0 16px 32px',
-        }}
-          onClick={e => { if (e.target === e.currentTarget && !isDeleting) setShowDeleteConfirm(false); }}
+        <ApgModal
+          title="Удалить профиль?"
+          subtitle="Все ваши ключи, достижения и история активности будут безвозвратно удалены."
+          onClose={() => { if (!isDeleting) setShowDeleteConfirm(false); }}
+          maxWidth={420}
         >
-          <div style={{
-            width: '100%', maxWidth: 420,
-            ...GLASS_STRONG, borderRadius: '28px 28px 0 0',
-            padding: '28px 22px 22px',
-            animation: 'fadeInUp 0.25s ease',
-          }}>
-            {/* Иконка */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: 20,
-                background: T.red + '18', border: `1px solid ${T.red}44`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-              }}>🗑️</div>
-            </div>
-
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri, marginBottom: 8 }}>
-                Удалить профиль?
-              </div>
-              <div style={{ fontSize: 13, color: T.textSec, lineHeight: '19px' }}>
-                Все ваши ключи, достижения и история активности будут безвозвратно удалены. Это действие нельзя отменить.
-              </div>
-            </div>
-
-            {/* Список что удалится */}
-            <div style={{ background: 'rgba(230,70,70,0.07)', border: `1px solid ${T.red}30`, borderRadius: 14, padding: '12px 14px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {[
-                { emoji: '🗝️', text: `${userKeys} ключей` },
-                { emoji: '⭐', text: `${favorites.length} избранных заведений` },
-                { emoji: '📋', text: 'История активности' },
-              ].map(item => (
-                <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 15 }}>{item.emoji}</span>
-                  <span style={{ fontSize: 13, color: T.textSec }}>{item.text}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isDeleting}
-                style={{
-                  flex: 1, padding: '14px 0', borderRadius: 14,
-                  background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`,
-                  color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleDeleteConfirmed}
-                disabled={isDeleting}
-                style={{
-                  flex: 1, padding: '14px 0', borderRadius: 14,
-                  border: 'none', background: T.red,
-                  color: '#fff', fontSize: 15, fontWeight: 700,
-                  cursor: isDeleting ? 'default' : 'pointer',
-                  opacity: isDeleting ? 0.6 : 1,
-                  transition: 'opacity 0.2s',
-                }}
-              >
-                {isDeleting ? 'Удаляем...' : 'Удалить'}
-              </button>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 22,
+              background: T.red + '18', border: `1px solid ${T.red}44`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+            }}>🗑️</div>
           </div>
-        </div>
+
+          <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', marginBottom: 18 }}>
+            Это действие нельзя отменить.
+          </div>
+
+          <div style={{ background: 'rgba(230,70,70,0.07)', border: `1px solid ${T.red}30`, borderRadius: 18, padding: '12px 14px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[
+              { emoji: '🗝️', text: `${userKeys} ключей` },
+              { emoji: '⭐', text: `${favorites.length} избранных заведений` },
+              { emoji: '📋', text: 'История активности' },
+            ].map(item => (
+              <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 15 }}>{item.emoji}</span>
+                <span style={{ fontSize: 13, color: APG2.textSoft }}>{item.text}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <GlassButton
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting}
+              style={{ flex: 1 }}
+            >
+              Отмена
+            </GlassButton>
+            <button
+              onClick={handleDeleteConfirmed}
+              disabled={isDeleting}
+              style={{
+                flex: 1, minHeight: 46, padding: '11px 14px', borderRadius: APG2.radius.button,
+                border: `1px solid ${T.red}55`, background: T.red,
+                color: '#fff', fontSize: 13.5, lineHeight: '18px', fontWeight: 760,
+                fontFamily: 'inherit', cursor: isDeleting ? 'default' : 'pointer',
+                opacity: isDeleting ? 0.58 : 1,
+                transition: 'opacity 0.2s',
+              }}
+            >
+              {isDeleting ? 'Удаляем...' : 'Удалить'}
+            </button>
+          </div>
+        </ApgModal>
       )}
 
       {showShareModal && createPortal(

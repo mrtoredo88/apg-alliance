@@ -4,18 +4,19 @@ import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
-import { initErrorLogger, setErrorLoggerUser } from './errorLogger.js';
+import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js';
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
-import { db, auth } from './firebase';
+import { confirmQrScan } from './rewardApi.js';
+import { db, auth, getMessagingIfSupported } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, increment, arrayUnion,
   collection, getDocs, query, orderBy, addDoc, serverTimestamp,
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
-import { HomePanel }         from './HomePanel.jsx';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
+import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassLoader, GlassToast } from './components/Apg2ProfileGlass.jsx';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -51,21 +52,43 @@ initErrorLogger();
 
 const SWIPE_TABS = ['home', 'experts', 'tasks', 'profile'];
 
-function isHomeV2Enabled() {
-  const fromSearch = new URLSearchParams(window.location.search).get('home');
-  if (fromSearch === 'v2') return true;
+function isLocalHost() {
+  const h = window.location.hostname;
+  return h === 'localhost'
+    || h === '127.0.0.1'
+    || h.startsWith('192.168.')
+    || h.startsWith('10.')
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+}
 
-  const hash = window.location.hash ?? '';
-  const queryStart = hash.indexOf('?');
-  if (queryStart === -1) return false;
+async function fetchVkNewsPosts() {
+  if (API_BASE_URL.includes('containers.yandexcloud.net')) return [];
+  const response = await fetch(`${API_BASE_URL}/api/vk-news`);
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray(data.posts) ? data.posts : [];
+}
 
-  return new URLSearchParams(hash.slice(queryStart + 1)).get('home') === 'v2';
+async function safeLoad(label, promiseFactory, fallback, timeoutMs = 6500) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(promiseFactory),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}_timeout`)), timeoutMs);
+      }),
+    ]);
+  } catch (e) {
+    logError(e, `UserApp.loadData.${label}`);
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function LazyFallback() {
   return (
-    <div style={{ background: 'var(--c-bg, #0F0F1A)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontSize: 13, color: 'var(--c-text-sec, rgba(240,240,240,0.35))' }}>Загрузка...</div>
+    <div style={{ minHeight: '100svh', padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: APG2_PROFILE.bg }}>
+      <GlassLoader title="Загружаем" text="Подготавливаем экран АПГ." style={{ width: '100%', maxWidth: 340 }} />
     </div>
   );
 }
@@ -75,6 +98,7 @@ export function UserApp() {
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
   const claimingPrizeRef                        = useRef(false);
+  const tabBarRef                               = useRef(null);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
   const [scanDates, setScanDates]               = useState([]);
@@ -125,8 +149,7 @@ export function UserApp() {
   const [ownedExpert, setOwnedExpert]             = useState(null);
   const [joinedGroup, setJoinedGroup]             = useState(false);
   const [lastBonusDate, setLastBonusDate]         = useState(null);
-  const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'dark');
-  const useHomeV2                                = useMemo(() => isHomeV2Enabled(), []);
+  const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'light');
   const [cacheTs, setCacheTs]                   = useState(() => {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;
@@ -289,14 +312,19 @@ export function UserApp() {
     try {
     // Firebase Auth и vkBridge — параллельно
     vkBridge.send('VKWebAppInit');
+    const authReady = auth.currentUser
+      ? Promise.resolve().then(() => console.log('[APG-DIAG] auth=cached'))
+      : Promise.race([
+          signInAnonymously(auth),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), 1800)),
+        ]).then(() => {
+          console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
+        }).catch((e) => {
+          console.warn(`[APG-DIAG] auth=fail ${e.code ?? e.message} ${Math.round(performance.now() - _diagT0)}ms`);
+        });
+
     const [, userData] = await Promise.all([
-      auth.currentUser
-        ? Promise.resolve().then(() => console.log('[APG-DIAG] auth=cached'))
-        : signInAnonymously(auth).then(() => {
-            console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
-          }).catch((e) => {
-            console.warn(`[APG-DIAG] auth=fail ${e.code} ${Math.round(performance.now() - _diagT0)}ms`);
-          }),
+      authReady,
       Promise.race([
         vkBridge.send('VKWebAppGetUserInfo'),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 800)),
@@ -360,16 +388,17 @@ export function UserApp() {
         ).catch(() => {});
       }
 
+      const emptySnap = { docs: [] };
       const _buildAll = () => Promise.all([
-        getDocs(query(collection(db, 'partners'), limit(100))),
-        getDocs(query(collection(db, 'events'),   limit(100))),
-        getDocs(query(collection(db, 'news'),          orderBy('createdAt', 'desc'), limit(30))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'reviews'),       orderBy('createdAt', 'desc'), limit(50))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'customTasks'),   orderBy('createdAt', 'asc'), limit(50))).catch(() => ({ docs: [] })),
-        fetch(`${API_BASE_URL}/api/vk-news`).then(r => r.json()).then(d => d.posts ?? []).catch(() => []),
-        getDocs(query(collection(db, 'experts'), limit(100))).catch(() => ({ docs: [] })),
-        getDoc(doc(db, 'stats', 'global')).catch(() => null),
+        safeLoad('partners', () => getDocs(query(collection(db, 'partners'), limit(100))), emptySnap),
+        safeLoad('events', () => getDocs(query(collection(db, 'events'), limit(100))), emptySnap),
+        safeLoad('news', () => getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30))), emptySnap),
+        safeLoad('notifications', () => getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))), emptySnap),
+        safeLoad('reviews', () => getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(50))), emptySnap),
+        safeLoad('customTasks', () => getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'), limit(50))), emptySnap),
+        safeLoad('vkNews', fetchVkNewsPosts, []),
+        safeLoad('experts', () => getDocs(query(collection(db, 'experts'), limit(100))), emptySnap),
+        safeLoad('stats', () => getDoc(doc(db, 'stats', 'global')), null),
       ]);
 
       let _loadResult = null;
@@ -378,7 +407,7 @@ export function UserApp() {
           console.time('apg:load-all');
           _loadResult = await Promise.race([
             _buildAll(),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('load_timeout')), 10000)),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('load_timeout')), 9000)),
           ]);
           console.timeEnd('apg:load-all');
           console.log(`[APG-DIAG] firestore=ok attempt=${_attempt + 1} ${Math.round(performance.now() - _diagT0)}ms`);
@@ -496,7 +525,14 @@ export function UserApp() {
           }
         }
         const keys = data.keys ?? 0;
-        if (data.displayName) setUser(u => ({ ...u, displayName: data.displayName }));
+        setUser(u => u ? ({
+          ...u,
+          ...(data.displayName ? { displayName: data.displayName } : {}),
+          ...(data.email ? { email: data.email } : {}),
+          ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
+          ...(data.linkedTelegram ? { linkedTelegram: data.linkedTelegram } : {}),
+          ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
+        }) : u);
         setUserKeys(keys);
         setFavorites(data.favorites ?? []);
         setScannedPartnerIds(data.scannedPartners ?? {});
@@ -583,7 +619,7 @@ export function UserApp() {
         console.warn('[APG] User data load failed:', e.code, e.message);
       }} // end if (!isGuest)
     } catch (e) {
-      console.error('[APG] loadData fatal error:', e.code, e.message);
+      logError(e, 'UserApp.loadData.fatal');
       if (isMounted.current) setError('Не удалось загрузить данные.');
     } finally {
       if (isMounted.current) setLoading(false);
@@ -607,7 +643,7 @@ export function UserApp() {
     setShowScannerHint(true);
     if (user) {
       try { await updateDoc(doc(db, 'users', String(user.id)), { onboardingDone: true }); }
-      catch (e) { console.error(e); }
+      catch (e) { logError(e, 'UserApp.handleOnboardingComplete'); }
     }
   };
 
@@ -681,7 +717,10 @@ export function UserApp() {
         } else {
           showToast('🔍 Эксперт не найден');
         }
-      } catch { setIsScannerOpen(false); isScanningRef.current = false; }
+      } catch (e) {
+        logError(e, 'UserApp.handleConfirmScan.publicExpert');
+        setIsScannerOpen(false); isScanningRef.current = false;
+      }
       return;
     }
 
@@ -700,142 +739,49 @@ export function UserApp() {
       return;
     }
 
-    // Expert QR: value = "expert_<id>"
-    if (typeof placeIdentifier === 'string' && placeIdentifier.startsWith('expert_')) {
-      const expertId = placeIdentifier.slice(7);
-      const expert = experts.find(e => e.id === expertId);
-      if (!expert) {
-        setIsScannerOpen(false); isScanningRef.current = false;
-        showToast('QR-код эксперта не распознан');
-        return;
-      }
-      const prevCount = Number(scannedExperts[expertId]) || (scannedExperts[expertId] ? 1 : 0);
-      const stampTarget = expert.stampTarget ?? 0;
-      const isFirstScan = prevCount === 0;
-      const keyBonus = isFirstScan ? (expert.keys ?? 1) : 0;
-      const newCount = prevCount + 1;
-      const updateData = { [`scannedExperts.${expertId}`]: increment(1) };
-      if (keyBonus > 0) updateData.keys = increment(keyBonus);
-      try {
-        await updateDoc(doc(db, 'users', String(user.id)), updateData);
-        if (keyBonus > 0) setUserKeys(prev => prev + keyBonus);
-        setScannedExperts(prev => ({ ...prev, [expertId]: newCount }));
-        haptic('medium');
-        if (keyBonus > 0) setKeyBurst({ amount: keyBonus, id: Date.now() });
-        const stampMsg = stampTarget > 0 ? ` (${newCount}/${stampTarget})` : '';
-        if (keyBonus > 0) {
-          showToast(`+${keyBonus} ключ — консультация с ${expert.name}!${stampMsg} 🔑`, 'success');
-        } else if (stampTarget > 0 && newCount >= stampTarget) {
-          showToast(`🎟️ Штамп-карта заполнена! Попросите награду у ${expert.name}`, 'success');
-        } else {
-          showToast(`Визит отмечен${stampMsg} 👋`, 'success');
-        }
-        updateDoc(doc(db, 'experts', expertId), { totalVisits: increment(1) }).catch(() => {});
-        addDoc(collection(db, 'users', String(user.id), 'activity'), {
-          type: 'expert_scan', icon: '🧑‍💼',
-          text: `Посещение эксперта: ${expert.name}`,
-          ts: serverTimestamp(),
-        }).catch(() => {});
-      } catch (e) {
-        console.error(e);
-        showToast('Ошибка при сохранении. Попробуйте ещё раз.');
-      } finally {
-        setIsScannerOpen(false); isScanningRef.current = false;
-      }
-      return;
-    }
-
-    const partner = enrichedPartners.find(p => p.id === placeIdentifier || p.name === placeIdentifier);
-    if (!partner) {
-      setIsScannerOpen(false);
-      isScanningRef.current = false;
-      showToast('QR-код не распознан. Попробуйте ещё раз.');
-      return;
-    }
-
-    const alreadyHasKey   = !!scannedPartnerIds[partner.id];
-    const todayKey        = new Date().toLocaleDateString('sv');
-    const alreadyToday    = lastScanDate === todayKey;
-
-    // Ключ за этого партнёра уже получен И сегодня уже отмечались — ничего не делаем
-    if (alreadyHasKey && alreadyToday) {
-      setIsScannerOpen(false);
-      isScanningRef.current = false;
-      showToast('Уже отмечено сегодня 👋');
-      return;
-    }
-
-    const yesterdayKey = new Date(Date.now() - 86400000).toLocaleDateString('sv');
-    const newStreak  = alreadyToday ? streak : (lastScanDate === yesterdayKey ? streak + 1 : 1);
-    const keyBonus   = (!alreadyHasKey && partner.featured) ? 2 : 1;
-    const newScanDates = scanDates.includes(todayKey)
-      ? scanDates
-      : [...scanDates.slice(-89), todayKey]; // храним последние 90 дат
-    const newVisitCount = (visitCounts[partner.id] ?? 0) + 1;
-    const updateData = {
-      lastScanDate: todayKey, streak: newStreak, scanDates: newScanDates,
-      [`visitCounts.${partner.id}`]: increment(1),
-    };
-
-    if (!alreadyHasKey) {
-      updateData.keys = increment(keyBonus);
-      updateData[`scannedPartners.${partner.id}`] = true;
-    }
-
+    const rawQrValue = typeof placeIdentifier === 'string' ? placeIdentifier.trim() : String(placeIdentifier ?? '').trim();
+    const partnerByName = enrichedPartners.find(p => p.name === rawQrValue);
+    const qrValue = partnerByName?.id ?? rawQrValue;
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), updateData);
-      updateDoc(doc(db, 'partners', partner.id), { totalVisits: increment(1) }).catch(() => {});
-      setDoc(doc(db, 'stats', 'global'), { totalScans: increment(1) }, { merge: true }).catch(() => {});
-      // Пишем событие скана для расчёта activityIndex
-      addDoc(collection(db, 'scans'), {
-        partnerId: partner.id,
-        userId:    String(user.id),
-        isNew:     !alreadyHasKey,
-        monthKey:  todayKey.slice(0, 7),
-        scannedAt: serverTimestamp(),
-      }).catch(() => {});
+      const result = await confirmQrScan({ qrValue, scannerUserId: String(user.id) });
+      const awardedKeys = Number(result.awardedKeys ?? 0);
+      const todayKey = new Date().toLocaleDateString('sv');
+
       setLastScanDate(todayKey);
-      setStreak(newStreak);
-      setScanDates(newScanDates);
-      setVisitCounts(prev => ({ ...prev, [partner.id]: newVisitCount }));
+      if (Number.isFinite(result.streak)) setStreak(result.streak);
+      if (Array.isArray(result.scanDates)) setScanDates(result.scanDates);
+      if (result.subjectId && Number.isFinite(result.visitCount)) {
+        setVisitCounts(prev => ({ ...prev, [result.subjectId]: result.visitCount }));
+      }
+      if (result.subjectType === 'partner' && result.subjectId && awardedKeys > 0) {
+        setScannedPartnerIds(prev => ({ ...prev, [result.subjectId]: true }));
+      }
+      if (result.subjectType === 'expert' && result.subjectId) {
+        setScannedExperts(prev => ({ ...prev, [result.subjectId]: result.visitCount ?? ((Number(prev[result.subjectId]) || 0) + 1) }));
+      }
       haptic('medium');
-      if (!alreadyHasKey) {
-        setKeyBurst({ amount: keyBonus, id: Date.now() });
-      }
-      // Штамп-карта завершена
-      if (partner.stampTarget > 0 && newVisitCount === partner.stampTarget) {
-        setTimeout(() => showToast(`🎟️ Штамп-карта заполнена! Покажи это сотруднику ${partner.name}`, 'success'), 800);
-      }
-      if (!alreadyHasKey) {
-        setUserKeys(prev => prev + keyBonus);
-        setScannedPartnerIds(prev => ({ ...prev, [partner.id]: true }));
-        const bonusText = keyBonus > 1 ? ` x${keyBonus} (партнёр дня!)` : '';
-        setToast({ msg: `+${keyBonus} ключ${bonusText} — ${partner.name}! 🔑`, type: 'success', sharePartner: partner });
+      if (awardedKeys > 0) {
+        setUserKeys(prev => prev + awardedKeys);
+        setKeyBurst({ amount: awardedKeys, id: Date.now() });
+        const partner = result.subjectType === 'partner'
+          ? enrichedPartners.find(p => p.id === result.subjectId)
+          : null;
+        setToast({ msg: `${result.message} 🔑`, type: 'success', sharePartner: partner });
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setToast(null), 4500);
-        addDoc(collection(db, 'users', String(user.id), 'activity'), {
-          type: 'scan', icon: keyBonus > 1 ? '⭐' : '🔑',
-          text: `Посещён: ${partner.name}${keyBonus > 1 ? ' (партнёр дня × 2)' : ''}`,
-          ts: serverTimestamp(),
-        }).catch(() => {});
       } else {
-        const days = newStreak;
+        const days = Number(result.streak ?? streak) || 1;
         const label = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
-        showToast(`Серия продолжается — ${days} ${label}! 🔥`, 'success');
-        addDoc(collection(db, 'users', String(user.id), 'activity'), {
-          type: 'scan', icon: '🔥',
-          text: `Стрик продолжается (${partner.name}) — ${days} ${label}`,
-          ts: serverTimestamp(),
-        }).catch(() => {});
+        showToast(result.alreadyAwarded ? `Визит отмечен. Серия — ${days} ${label}!` : result.message, 'success');
       }
     } catch (e) {
-      console.error(e);
-      showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+      logError(e, 'UserApp.handleConfirmScan.reward');
+      showToast(e.code === 'TOKEN_EXPIRED' ? 'QR истёк. Попросите создать новый.' : (e.message || 'Ошибка при сохранении. Попробуйте ещё раз.'));
     } finally {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, experts, lastScanDate, streak, scannedPartnerIds, scannedExperts, scanDates, haptic, showToast]);
+  }, [user, enrichedPartners, experts, streak, haptic, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -862,13 +808,12 @@ export function UserApp() {
     }
   }, [pendingPartnerId, partners, openPartner, showToast]);
 
-  // Авто-скан эксперта из deep link ?scan=expert_ID
+  // Авто-скан служебного QR из deep link ?scan=...
   useEffect(() => {
-    if (!pendingScanId || !user || !experts.length || scanDeepLinkTriggered.current) return;
-    if (!pendingScanId.startsWith('expert_')) return;
+    if (!pendingScanId || !user || scanDeepLinkTriggered.current) return;
     scanDeepLinkTriggered.current = true;
     handleConfirmScan(pendingScanId);
-  }, [pendingScanId, user, experts, handleConfirmScan]);
+  }, [pendingScanId, user, handleConfirmScan]);
 
   // Открываем эксперта из публичного deep link ?expert=ID
   useEffect(() => {
@@ -897,7 +842,7 @@ export function UserApp() {
         ts: serverTimestamp(),
       }).catch(() => {});
     } catch (e) {
-      console.error(e);
+      logError(e, 'UserApp.handleClaim');
       setCompletedTasks(prev => prev.filter(id => id !== taskId));
       setUserKeys(prev => prev - reward);
       showToast('Ошибка при сохранении. Попробуйте ещё раз.');
@@ -946,7 +891,7 @@ export function UserApp() {
       }).catch(() => {});
       return true;
     } catch (e) {
-      console.error(e);
+      logError(e, 'UserApp.handlePrizeClaim');
       setUserKeys(prev => prev + prize.cost); // откат при ошибке
       return false;
     } finally {
@@ -980,7 +925,7 @@ export function UserApp() {
       }).catch(() => {});
       return true;
     } catch (e) {
-      console.error(e);
+      logError(e, 'UserApp.handleRaffleEnter');
       setUserKeys(prev => prev + cost);
       return false;
     } finally {
@@ -1007,7 +952,7 @@ export function UserApp() {
           updateDoc(doc(db, 'events', eventId), { registeredCount: increment(-1) }),
         ]);
       } catch (e) {
-        console.error(e);
+        logError(e, 'UserApp.handleEventUnregister');
         setRegisteredEventIds(prev => [...prev, eventId]);
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       }
@@ -1036,7 +981,7 @@ export function UserApp() {
         ]);
         showToast(`✓ Вы записаны: ${event.title}!`, 'success');
       } catch (e) {
-        console.error(e);
+        logError(e, 'UserApp.handleEventRegister');
         setRegisteredEventIds(prev => prev.filter(id => id !== eventId));
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount ?? 1) - 1) } : e));
       }
@@ -1066,7 +1011,7 @@ export function UserApp() {
     try {
       await deleteDoc(doc(db, 'users', String(user.id)));
       handleLogout();
-    } catch (e) { console.error(e); }
+    } catch (e) { logError(e, 'UserApp.handleDeleteProfile'); }
   }, [user, handleLogout]);
 
   const handleShare = useCallback(() => {
@@ -1122,7 +1067,6 @@ export function UserApp() {
         return;
       }
       const { getToken }              = await import('firebase/messaging');
-      const { getMessagingIfSupported } = await import('./firebase');
       const msg = await getMessagingIfSupported();
       if (!msg) { showToast('❌ Push не поддерживается', 'error'); return; }
 
@@ -1140,7 +1084,7 @@ export function UserApp() {
       setNotifEnabled(true);
       showToast('🔔 Уведомления включены!', 'success');
     } catch (e) {
-      console.error('WebPush error:', e);
+      logError(e, 'UserApp.requestWebPushPermission');
       showToast('❌ Не удалось включить уведомления', 'error');
     }
   }, [user, showToast]);
@@ -1152,7 +1096,6 @@ export function UserApp() {
     (async () => {
       try {
         const { onMessage }             = await import('firebase/messaging');
-        const { getMessagingIfSupported } = await import('./firebase');
         const msg = await getMessagingIfSupported();
         if (!msg) return;
         unsub = onMessage(msg, payload => {
@@ -1207,7 +1150,11 @@ export function UserApp() {
 
   // ─── Навигация ──────────────────────────────────────────────────────────────
 
-  const goPanel = useCallback((id) => setActivePanel(id), []);
+  const goPanel = useCallback((id) => {
+    setIsScannerOpen(false);
+    setShowScannerHint(false);
+    setActivePanel(id);
+  }, []);
 
   const lastSeenTs = (() => {
     const v = localStorage.getItem('apg_notif_seen');
@@ -1216,103 +1163,166 @@ export function UserApp() {
 
   // ─── TabBar ─────────────────────────────────────────────────────────────────
 
+  const tabIconStyle = (active) => ({
+    opacity: active ? 1 : 0.58,
+    filter: active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none',
+    transition: 'opacity 0.3s ease, filter 0.3s ease',
+  });
+
   const TabHomeIcon    = ({ active }) => (
-    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
       <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z"
         fill={active ? T.gold : 'none'} stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   );
   const TabExpertsIcon = ({ active }) => (
-    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
       <circle cx="12" cy="7" r="3.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M5 20C5 16.5 8 14 12 14C16 14 19 16.5 19 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
       <path d="M16 10L17.5 11.5L20 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
+  const TabPartnersIcon = ({ active }) => (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
+      <path d="M4 10.5L5.2 5.5C5.4 4.6 6.2 4 7.1 4H17C18 4 18.8 4.6 19 5.5L20 10.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M5 10.5V20H19V10.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round"/>
+      <path d="M9 20V15H15V20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round"/>
+      <path d="M4 10.5C5 12.2 7.1 12.2 8 10.5C9 12.2 11.1 12.2 12 10.5C13 12.2 15.1 12.2 16 10.5C17 12.2 19 12.2 20 10.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
   const TabTasksIcon   = ({ active }) => (
-    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
       <rect x="3" y="3" width="18" height="18" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M8 12L11 15L16 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabProfileIcon = ({ active }) => (
-    <svg width={useHomeV2 ? 22 : 20} height={useHomeV2 ? 22 : 20} viewBox="0 0 24 24" fill="none" style={{ opacity: useHomeV2 && !active ? 0.58 : 1, filter: useHomeV2 && active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none', transition: 'opacity 0.3s ease, filter 0.3s ease' }}>
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
       <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
       <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
 
-  // 5 regular tabs + center scan button (index 2)
-  const TAB_PANELS = ['home', 'experts', null, 'tasks', 'profile'];
-  const pillIdx    = isScannerOpen ? -1 : TAB_PANELS.indexOf(activePanel);
+  // 5 tabs + center scan button (index 2). Tasks stay available inside V2 screens.
+  const TAB_PANELS = ['home', 'offers', null, 'experts', 'profile'];
+  const showTabBar = !isScannerOpen && TAB_PANELS.includes(activePanel);
   const V2GoldMetal = 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 68%, #F4D98C 100%)';
 
   const TABS = [
     { id: 'home',    label: 'Главная',  icon: TabHomeIcon },
-    { id: 'experts', label: 'Эксперты', icon: TabExpertsIcon },
+    { id: 'offers',  label: 'Партнёры', icon: TabPartnersIcon },
     { id: null,      label: 'Скан',     icon: null },
-    { id: 'tasks',   label: 'Задания',  icon: TabTasksIcon },
+    { id: 'experts', label: 'Эксперты', icon: TabExpertsIcon },
     { id: 'profile', label: 'Профиль',  icon: TabProfileIcon },
   ];
 
-  const tabBarShellStyle = useHomeV2 ? {
-    position: 'fixed', bottom: 28,
-    left: '50%', transform: 'translateX(-50%)',
-    width: 'calc(100% - 64px)', maxWidth: 390, minHeight: 86,
-    padding: 10,
-    background: 'radial-gradient(circle at 50% 0%, rgba(255,240,184,0.16), transparent 48%), radial-gradient(circle at 50% 100%, rgba(255,255,255,0.075), transparent 58%), linear-gradient(145deg, rgba(68,68,64,0.42), rgba(16,16,18,0.37))',
-    backdropFilter: 'blur(108px) saturate(1.78)', WebkitBackdropFilter: 'blur(108px) saturate(1.78)',
-    border: '1px solid rgba(255,255,255,0.22)',
-    borderRadius: 48,
-    boxShadow: '0 38px 92px rgba(0,0,0,0.46), 0 0 82px rgba(216,184,103,0.12), inset 0 2px 0 rgba(255,255,255,0.32), inset 0 -32px 66px rgba(255,255,255,0.055), inset 0 -1px 0 rgba(244,217,140,0.12)',
-    display: 'flex', alignItems: 'stretch', gap: 6,
-    zIndex: 100, overflow: 'visible',
-    transition: 'transform 0.45s cubic-bezier(0.22,1,0.36,1), box-shadow 0.45s ease',
-  } : {
-    position: 'fixed', bottom: 16,
-    left: '50%', transform: 'translateX(-50%)',
-    width: 'calc(100% - 32px)', maxWidth: 448, height: 62,
-    background: T.tabbarBg,
-    backdropFilter: 'blur(28px) saturate(2)', WebkitBackdropFilter: 'blur(28px) saturate(2)',
-    border: `1px solid ${T.tabbarBorder}`,
-    borderRadius: 36,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1)',
-    display: 'flex', alignItems: 'stretch',
-    zIndex: 100, overflow: 'visible',
+  useEffect(() => {
+    const el = tabBarRef.current;
+    if (!el) return;
+
+    let rafId = 0;
+    let lastY = window.scrollY;
+    let settleTimer = 0;
+    const vars = {};
+
+    const setVar = (name, value) => {
+      if (vars[name] === value) return;
+      vars[name] = value;
+      el.style.setProperty(name, value);
+    };
+    const apply = (forceVisible = false) => {
+      rafId = 0;
+      const y = window.scrollY;
+      const delta = y - lastY;
+      const p = Math.min(Math.max(y / 260, 0), 1);
+
+      lastY = y;
+
+      setVar('--apg-island-y', '0px');
+      setVar('--apg-island-height', `${Math.round(64 - p * 3)}px`);
+      setVar('--apg-island-pad', '6px');
+      setVar('--apg-island-blur', `${Math.round(58 + p * 10)}px`);
+      setVar('--apg-island-bg-alpha', String(0.34 - p * 0.02));
+      setVar('--apg-island-shadow-y', `${Math.round(22 + p * 3)}px`);
+      setVar('--apg-island-shadow-alpha', String(0.34 + p * 0.03));
+    };
+
+    const onScroll = () => {
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        if (!rafId) rafId = requestAnimationFrame(() => apply(true));
+      }, 190);
+      if (!rafId) rafId = requestAnimationFrame(() => apply(false));
+    };
+
+    apply(true);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.clearTimeout(settleTimer);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  useEffect(() => {
+    const applyVisualViewport = () => {
+      const viewport = window.visualViewport;
+      const bottomInset = viewport
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+      document.documentElement.style.setProperty('--apg-vv-bottom', `${Math.round(bottomInset)}px`);
+    };
+    applyVisualViewport();
+    window.visualViewport?.addEventListener('resize', applyVisualViewport, { passive: true });
+    window.visualViewport?.addEventListener('scroll', applyVisualViewport, { passive: true });
+    window.addEventListener('orientationchange', applyVisualViewport);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', applyVisualViewport);
+      window.visualViewport?.removeEventListener('scroll', applyVisualViewport);
+      window.removeEventListener('orientationchange', applyVisualViewport);
+      document.documentElement.style.removeProperty('--apg-vv-bottom');
+    };
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activePanel]);
+
+  const tabBarShellStyle = {
+    position: 'fixed',
+    bottom: 'calc(6px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
+    left: 0, right: 0, margin: '0 auto',
+    transform: 'translate3d(0, var(--apg-island-y, 0px), 0)',
+    width: 'calc(100% - 32px)', maxWidth: 360, height: 'var(--apg-island-height, 64px)', minHeight: 'var(--apg-island-height, 64px)',
+    padding: 'var(--apg-island-pad, 8px)',
+    background: 'radial-gradient(circle at 50% 0%, rgba(244,217,140,0.10), transparent 50%), linear-gradient(145deg, var(--apg2-island-bg1, rgba(42,42,38,var(--apg-island-bg-alpha, 0.34))), var(--apg2-island-bg2, rgba(15,15,16,0.46)))',
+    backdropFilter: 'blur(var(--apg-island-blur, 58px)) saturate(1.55)', WebkitBackdropFilter: 'blur(var(--apg-island-blur, 58px)) saturate(1.55)',
+    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.17))',
+    borderRadius: 30,
+    boxShadow: '0 var(--apg-island-shadow-y, 22px) 52px var(--apg2-elev-shadow, rgba(0,0,0,0.34)), 0 0 34px rgba(216,184,103,0.08), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -18px 34px rgba(255,255,255,0.035)',
+    display: 'flex', alignItems: 'stretch', gap: 4,
+    zIndex: 10000, overflow: 'visible',
+    transition: 'transform 220ms cubic-bezier(0.22,1,0.36,1), min-height 220ms ease, padding 220ms ease, box-shadow 220ms ease, backdrop-filter 220ms ease, -webkit-backdrop-filter 220ms ease',
+    willChange: 'transform, min-height, padding, backdrop-filter',
+    contain: 'layout paint style',
+    isolation: 'isolate',
   };
 
   const tabBarEl = (
-    <div style={tabBarShellStyle}>
-      {/* Скользящий pill */}
-      {pillIdx >= 0 && pillIdx !== 2 && (
-        <div style={{
-          position: 'absolute', top: useHomeV2 ? 11 : 7, height: useHomeV2 ? 62 : 44,
-          left: useHomeV2 ? `calc(${pillIdx * 20}% + 10px)` : `calc(${pillIdx * 20}% + 6px)`,
-          width: useHomeV2 ? 'calc(20% - 20px)' : 'calc(20% - 12px)',
-          background: useHomeV2 ? 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.32), transparent 56%), radial-gradient(circle at 50% 100%, rgba(244,217,140,0.18), transparent 72%), linear-gradient(145deg, rgba(255,255,255,0.18), rgba(78,78,78,0.16))' : 'rgba(201,168,76,0.1)',
-          backdropFilter: useHomeV2 ? 'blur(68px) saturate(1.78)' : 'none',
-          WebkitBackdropFilter: useHomeV2 ? 'blur(68px) saturate(1.78)' : 'none',
-          border: useHomeV2 ? '1px solid rgba(255,255,255,0.29)' : '1px solid rgba(201,168,76,0.2)',
-          borderRadius: useHomeV2 ? 32 : 14,
-          boxShadow: useHomeV2 ? '0 18px 46px rgba(0,0,0,0.23), 0 0 32px rgba(216,184,103,0.12), inset 0 1.5px 0 rgba(255,255,255,0.34), inset 0 -18px 38px rgba(255,255,255,0.052), inset 0 -1px 0 rgba(244,217,140,0.16)' : 'none',
-          transition: 'left 0.55s cubic-bezier(0.22, 1, 0.36, 1), width 0.55s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease',
-          pointerEvents: 'none',
-        }} />
-      )}
-
+    <div ref={tabBarRef} style={tabBarShellStyle}>
       {TABS.map((tab, i) => {
         if (i === 2) return (
-          <button key="scan" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
-            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: useHomeV2 ? 'center' : 'flex-start', padding: 0, position: 'relative', zIndex: 2 }}>
+          <button key="scan" aria-label="Открыть сканер" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
+            style={{ flex: 1, background: isScannerOpen ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isScannerOpen ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isScannerOpen ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 0, position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
-              width: useHomeV2 ? 56 : 50, height: useHomeV2 ? 56 : 50, marginTop: useHomeV2 ? -24 : -14, borderRadius: useHomeV2 ? 23 : '50%',
-              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : (useHomeV2 ? V2GoldMetal : `linear-gradient(135deg, ${T.gold}, ${T.goldL})`),
-              boxShadow: isScannerOpen ? 'none' : useHomeV2 ? '0 20px 46px rgba(216,184,103,0.25), 0 0 28px rgba(244,217,140,0.18), inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -13px 26px rgba(83,58,18,0.26)' : `0 4px 18px rgba(201,168,76,0.5), 0 0 0 3.5px ${T.tabbarBg}, 0 0 0 5px rgba(201,168,76,0.25)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: useHomeV2 ? 21 : 20, color: '#0F0F1A',
+              width: 42, height: 42, marginTop: 0, borderRadius: 18,
+              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : V2GoldMetal,
+              boxShadow: isScannerOpen ? 'none' : '0 12px 26px rgba(216,184,103,0.18), inset 0 1px 0 rgba(255,255,255,0.36), inset 0 -8px 18px rgba(83,58,18,0.20)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#0F0F1A',
               transition: 'transform 0.35s ease, box-shadow 0.35s ease',
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
-            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, color: isScannerOpen ? T.gold : T.textSec, opacity: useHomeV2 && !isScannerOpen ? 0.62 : 1, letterSpacing: 0.3, textTransform: 'uppercase', marginTop: useHomeV2 ? 7 : 3 }}>Скан</span>
+            <span style={{ fontSize: 8.5, fontWeight: 780, color: isScannerOpen ? T.gold : T.textSec, opacity: isScannerOpen ? 1 : 0.62, letterSpacing: 0, textTransform: 'none', marginTop: 2 }}>Скан</span>
           </button>
         );
 
@@ -1322,15 +1332,16 @@ export function UserApp() {
 
         return (
           <button key={tab.id}
+            aria-label={`Открыть раздел ${tab.label}`}
             onClick={() => { haptic('light'); goPanel(tab.id); }}
-            style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: useHomeV2 ? 5 : 3, padding: 0, position: 'relative', zIndex: 1, minWidth: 0 }}>
+            style={{ flex: 1, background: isActive ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isActive ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: 'transform 0.22s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
               {hasNotif && (
                 <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
               )}
             </div>
-            <span style={{ fontSize: useHomeV2 ? 10 : 9, fontWeight: 800, letterSpacing: 0.3, textTransform: 'uppercase', color: isActive ? T.gold : T.textSec, opacity: useHomeV2 && !isActive ? 0.58 : 1, transition: 'color 0.3s ease, opacity 0.3s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontSize: 8.5, fontWeight: 780, letterSpacing: 0, textTransform: 'none', color: isActive ? T.gold : T.textSec, opacity: isActive ? 1 : 0.58, transition: 'color 0.25s ease, opacity 0.25s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {tab.label}
             </span>
           </button>
@@ -1346,39 +1357,42 @@ export function UserApp() {
       <ConfigProvider appearance={appearance}>
         <AdaptivityProvider>
           <AppRoot>
-            <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20, background: T.bg }}>
-              <div style={{ fontSize: 52 }}>📡</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: T.textPri, textAlign: 'center' }}>Не удаётся загрузить данные</div>
-              <div style={{ fontSize: 14, color: T.textSec, textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
-                Похоже, ваш интернет-провайдер ограничивает доступ к нашим серверам.<br /><br />
-                Что можно попробовать:<br />
-                · Переключиться с Wi-Fi на мобильный интернет (или наоборот)<br />
-                · Попробовать позже
-              </div>
-              <button
-                onClick={() => {
-                  setReportSent(false); setReportSending(false);
-                  const im = { current: true };
-                  loadData(im);
-                }}
-                style={{ width: '100%', maxWidth: 320, padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
-              >
-                Попробовать снова
-              </button>
-              <button
-                disabled={reportSent || reportSending}
-                onClick={async () => {
-                  if (reportSent || reportSending) return;
-                  setReportSending(true);
-                  const checks = await runServiceChecks();
-                  await sendDiagReport({ checks, errorText: 'Ручной отчёт', manual: true, userId: user?.id });
-                  setReportSending(false);
-                  setReportSent(true);
-                }}
-                style={{ width: '100%', maxWidth: 320, padding: '13px 0', borderRadius: 16, border: `1px solid rgba(255,255,255,0.12)`, background: 'transparent', color: reportSent ? '#4BB34B' : T.textSec, fontSize: 14, fontWeight: 600, cursor: reportSent ? 'default' : 'pointer', opacity: reportSending ? 0.6 : 1 }}
-              >
-                {reportSent ? '✓ Отчёт отправлен' : reportSending ? 'Отправляем...' : 'Отправить отчёт разработчику'}
-              </button>
+            <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: APG2_PROFILE.bg, color: APG2_PROFILE.text }}>
+              <GlassCard style={{ width: '100%', maxWidth: 380, borderRadius: 38, padding: 24, textAlign: 'center' }}>
+                <div style={{ width: 86, height: 86, borderRadius: 32, margin: '0 auto 18px', background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42 }}>📡</div>
+                <GlassBadge tone="gold" style={{ marginBottom: 14 }}>Нет соединения</GlassBadge>
+                <div style={{ fontSize: 25, lineHeight: '30px', fontWeight: 900, color: APG2_PROFILE.text, marginBottom: 10 }}>Не удаётся загрузить данные</div>
+                <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, textAlign: 'center', lineHeight: '21px', marginBottom: 20 }}>
+                  Попробуйте переключить Wi-Fi/мобильный интернет или повторить попытку позже.
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <GlassButton
+                    tone="gold"
+                    onClick={() => {
+                      setReportSent(false); setReportSending(false);
+                      const im = { current: true };
+                      loadData(im);
+                    }}
+                    style={{ width: '100%', color: '#17120a' }}
+                  >
+                    Попробовать снова
+                  </GlassButton>
+                  <GlassButton
+                    disabled={reportSent || reportSending}
+                    onClick={async () => {
+                      if (reportSent || reportSending) return;
+                      setReportSending(true);
+                      const checks = await runServiceChecks();
+                      await sendDiagReport({ checks, errorText: 'Ручной отчёт', manual: true, userId: user?.id });
+                      setReportSending(false);
+                      setReportSent(true);
+                    }}
+                    style={{ width: '100%', color: reportSent ? '#4BB34B' : APG2_PROFILE.textSoft }}
+                  >
+                    {reportSent ? 'Отчёт отправлен' : reportSending ? 'Отправляем...' : 'Отправить отчёт'}
+                  </GlassButton>
+                </div>
+              </GlassCard>
             </div>
           </AppRoot>
         </AdaptivityProvider>
@@ -1391,16 +1405,14 @@ export function UserApp() {
       <ConfigProvider appearance={appearance}>
         <AdaptivityProvider>
           <AppRoot>
-            <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24, background: T.bg }}>
-              <div style={{ fontSize: 56 }}>👋</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: T.textPri, textAlign: 'center' }}>Вы вышли из аккаунта</div>
-              <div style={{ fontSize: 14, color: T.textSec, textAlign: 'center', lineHeight: 1.5 }}>Нажмите кнопку ниже, чтобы войти снова</div>
-              <button
-                onClick={handleLoginAfterLogout}
-                style={{ width: '100%', maxWidth: 320, padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
-              >
-                Войти
-              </button>
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: APG2_PROFILE.bg, color: APG2_PROFILE.text }}>
+              <GlassCard style={{ width: '100%', maxWidth: 360, borderRadius: 38, padding: 24, textAlign: 'center' }}>
+                <div style={{ width: 86, height: 86, borderRadius: 32, margin: '0 auto 18px', background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42 }}>👋</div>
+                <GlassBadge tone="gold" style={{ marginBottom: 14 }}>Сессия завершена</GlassBadge>
+                <div style={{ fontSize: 27, lineHeight: '31px', fontWeight: 900, color: APG2_PROFILE.text, marginBottom: 10 }}>Вы вышли из аккаунта</div>
+                <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '21px', marginBottom: 20 }}>Нажмите кнопку ниже, чтобы вернуться в АПГ.</div>
+                <GlassButton onClick={handleLoginAfterLogout} tone="gold" style={{ width: '100%', color: '#17120a' }}>Войти</GlassButton>
+              </GlassCard>
             </div>
           </AppRoot>
         </AdaptivityProvider>
@@ -1456,7 +1468,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <div
-            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: useHomeV2 ? 160 : 94, minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'hidden' }}
+            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}
             onTouchEnd={handleSwipeEnd}
           >
@@ -1496,19 +1508,17 @@ export function UserApp() {
               </div>
             )}
 
+            <div key={activePanel} style={{ minHeight: '100%', animation: 'fadeInUp 0.26s cubic-bezier(0.22,1,0.36,1) both' }}>
             <View activePanel={activePanel}>
 
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
-              {useHomeV2 ? (
-                <HomePanelV2 {...homePanelProps} />
-              ) : (
-                <HomePanel {...homePanelProps} />
-              )}
+              <HomePanelV2 {...homePanelProps} />
 
               <Panel id="partner">
                 <Suspense fallback={<LazyFallback />}>
                   <PartnerPage
                     partner={activePartner ? (enrichedPartners.find(p => p.id === activePartner.id) ?? activePartner) : null}
+                    variant="v2"
                     isFavorite={activePartner ? favorites.includes(activePartner.id) : false}
                     onBack={() => goPanel('home')}
                     onToggleFavorite={toggleFavorite}
@@ -1525,8 +1535,9 @@ export function UserApp() {
               {/* ProfilePanel не рендерит Panel — оборачиваем */}
               <Panel id="profile">
                 <Suspense fallback={<LazyFallback />}>
-                  <ProfilePanel
-                    user={user} userKeys={userKeys} favorites={favorites}
+	                  <ProfilePanel
+	                    variant="v2"
+	                    user={user} userKeys={userKeys} favorites={favorites}
                     partners={enrichedPartners} events={events}
                     registeredEventIds={registeredEventIds}
                     referralCount={referralCount}
@@ -1557,13 +1568,14 @@ export function UserApp() {
               {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
               <Panel id="events">
                 <Suspense fallback={<LazyFallback />}>
-                  <EventsPage nav="events" events={events} onBack={() => goPanel('home')} appearance={appearance} />
+                  <EventsPage nav="events" variant="v2" events={events} onBack={() => goPanel('home')} appearance={appearance} />
                 </Suspense>
               </Panel>
 
               <Panel id="tasks">
                 <Suspense fallback={<LazyFallback />}>
                   <TasksPage
+                    variant="v2"
                     userKeys={userKeys} favCount={favorites.length}
                     streak={streak} referralCount={referralCount}
                     scannedCount={Object.keys(scannedPartnerIds).length}
@@ -1579,6 +1591,7 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <LeaderboardPage
                     nav="leaderboard"
+                    variant="v2"
                     userKeys={userKeys}
                     currentUserId={user?.id ? String(user.id) : null}
                     onBack={() => goPanel('home')}
@@ -1588,19 +1601,20 @@ export function UserApp() {
 
               <Panel id="offers">
                 <Suspense fallback={<LazyFallback />}>
-                  <OffersPage partners={enrichedPartners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                  <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
                 </Suspense>
               </Panel>
 
               <Panel id="activity">
                 <Suspense fallback={<LazyFallback />}>
-                  <ActivityPage nav="activity" userId={user?.id ? String(user.id) : null} onBack={() => goPanel('profile')} />
+                  <ActivityPage nav="activity" variant="v2" userId={user?.id ? String(user.id) : null} onBack={() => goPanel('profile')} />
                 </Suspense>
               </Panel>
 
               <Panel id="referral">
                 <Suspense fallback={<LazyFallback />}>
                   <ReferralPage
+                    variant="v2"
                     user={user} referralCount={referralCount}
                     completedTasks={completedTasks}
                     onBack={() => goPanel('profile')}
@@ -1612,6 +1626,7 @@ export function UserApp() {
               <Panel id="partner-cabinet">
                 <Suspense fallback={<LazyFallback />}>
                   <PartnerCabinetPage
+                    variant="v2"
                     partner={ownedPartner}
                     expert={ownedExpert}
                     onBack={() => goPanel('profile')}
@@ -1626,6 +1641,7 @@ export function UserApp() {
               <Panel id="expert-cabinet">
                 <Suspense fallback={<LazyFallback />}>
                   <ExpertCabinetPage
+                    variant="v2"
                     expert={ownedExpert}
                     onBack={() => goPanel('profile')}
                     onExpertUpdate={(updated) => {
@@ -1640,6 +1656,7 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <RewardsPage
                     nav="rewards"
+                    variant="v2"
                     user={user} userKeys={userKeys}
                     onBack={() => goPanel('home')}
                     onClaim={handlePrizeClaim}
@@ -1654,6 +1671,7 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <ExpertsPage
                     nav="experts"
+                    variant="v2"
                     experts={experts}
                     user={user}
                     scannedExperts={scannedExperts}
@@ -1666,19 +1684,20 @@ export function UserApp() {
 
               <Panel id="map">
                 <Suspense fallback={<LazyFallback />}>
-                  <MapPage partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                  <MapPage variant="v2" partners={partners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
                 </Suspense>
               </Panel>
 
               <Panel id="nearby">
                 <Suspense fallback={<LazyFallback />}>
-                  <NearbyPage partners={enrichedPartners} onOpenPartner={openPartner} onBack={() => goPanel('home')} />
+                  <NearbyPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onOpenMap={() => goPanel('map')} onBack={() => goPanel('home')} />
                 </Suspense>
               </Panel>
 
               <Panel id="notifications">
                 <Suspense fallback={<LazyFallback />}>
                   <NotificationsPage
+                    variant="v2"
                     notifications={notifications}
                     notificationsEnabled={notifEnabled}
                     onEnableNotifications={handleEnableNotifications}
@@ -1702,9 +1721,10 @@ export function UserApp() {
               </Panel>
 
             </View>
+            </div>
           </div>
 
-          {createPortal(tabBarEl, document.body)}
+          {showTabBar && createPortal(tabBarEl, document.body)}
 
           <Suspense fallback={null}>
             <ScannerComponent
@@ -1793,55 +1813,19 @@ export function UserApp() {
             />
           )}
 
-          {/* Toast-уведомления */}
-          {toast && (
-            <div style={{
-              position: 'fixed', top: 'calc(var(--safe-top, 0px) + 12px)', left: '50%', transform: 'translateX(-50%)',
-              zIndex: 10000, pointerEvents: toast.sharePartner ? 'auto' : 'none',
-              background: toast.type === 'success' ? 'rgba(75,179,75,0.88)' : 'rgba(20,20,50,0.85)',
-              border: `1px solid ${toast.type === 'success' ? 'rgba(75,179,75,0.35)' : 'rgba(255,255,255,0.12)'}`,
-              backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-              borderRadius: 14, padding: '10px 16px',
-              color: '#F0F0F0', fontSize: 14, fontWeight: 600,
-              maxWidth: 'calc(100vw - 48px)',
-              animation: 'toastIn 0.25s ease',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-              display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
-              <span style={{ whiteSpace: 'nowrap' }}>{toast.msg}</span>
-              {toast.sharePartner && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={() => {
-                      const msg = `Только что посетил ${toast.sharePartner.name} — участника Альянса Партнёров Зеленограда! Получил ${toast.sharePartner.featured ? '2' : '1'} 🗝️\n\nПрисоединяйся: vk.com/app54601851\n#АПГ #Зеленоград`;
-                      vkBridge.send('VKWebAppShowWallPostBox', {
-                        message: msg,
-                        attachments: 'https://vk.com/app54601851',
-                      }).catch(() => {});
-                      setToast(null);
-                    }}
-                    style={{
-                      background: 'rgba(74,144,217,0.18)', border: '1px solid rgba(74,144,217,0.4)',
-                      borderRadius: 10, padding: '6px 12px', color: '#6AABEC',
-                      fontSize: 12, fontWeight: 700, cursor: 'pointer', flex: 1,
-                    }}
-                  >
-                    📝 Поделиться
-                  </button>
-                  <button
-                    onClick={() => setToast(null)}
-                    style={{
-                      background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 10, padding: '6px 10px', color: 'rgba(240,240,240,0.6)',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    Позже
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <GlassToast
+            toast={toast}
+            onClose={() => setToast(null)}
+            onShare={() => {
+              if (!toast?.sharePartner) return;
+              const msg = `Только что посетил ${toast.sharePartner.name} — участника Альянса Партнёров Зеленограда! Получил ${toast.sharePartner.featured ? '2' : '1'} 🗝️\n\nПрисоединяйся: vk.com/app54601851\n#АПГ #Зеленоград`;
+              vkBridge.send('VKWebAppShowWallPostBox', {
+                message: msg,
+                attachments: 'https://vk.com/app54601851',
+              }).catch(() => {});
+              setToast(null);
+            }}
+          />
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>

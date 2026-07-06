@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
+import { QRCodeSVG } from 'qrcode.react';
 import vkBridge, { openUrl, isVK } from './vk.js';
 
 function sanitizeForVK(text) {
@@ -15,8 +16,11 @@ import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTime
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
+import { logError } from './errorLogger.js';
+import { createVisitQrToken } from './rewardApi.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
+import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
 
@@ -146,7 +150,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate }) {
+export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -158,6 +162,10 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const [reviewError, setReviewError]     = useState('');
   const [phoneCopied, setPhoneCopied]     = useState(false);
   const [shareToast, setShareToast]       = useState('');
+  const [visitQr, setVisitQr]             = useState(null);
+  const [visitQrLoading, setVisitQrLoading] = useState(false);
+  const [visitQrError, setVisitQrError]   = useState('');
+  const [visitQrNow, setVisitQrNow]       = useState(Date.now());
   const phoneCopyTimerRef                 = useRef(null);
   const shareToastRef                     = useRef(null);
   const mountedRef                        = useRef(true);
@@ -166,12 +174,28 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
   const myReview = userId ? reviews.find(r => r.id === userId) : null;
+  const visitQrSecondsLeft = visitQr?.expiresAt ? Math.max(0, Math.ceil((visitQr.expiresAt - visitQrNow) / 1000)) : 0;
 
   // Считаем просмотр карточки (один раз при открытии каждого партнёра)
   useEffect(() => {
     if (!partner?.id) return;
     updateDoc(doc(db, 'partners', partner.id), { viewCount: increment(1) }).catch(() => {});
   }, [partner?.id]);
+
+  useEffect(() => {
+    if (variant !== 'v2' || !partner?.id) return;
+    window.scrollTo(0, 0);
+  }, [variant, partner?.id]);
+
+  useEffect(() => {
+    if (!visitQr) return undefined;
+    const timer = setInterval(() => setVisitQrNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [visitQr]);
+
+  useEffect(() => {
+    if (visitQr && visitQrSecondsLeft <= 0) setVisitQr(null);
+  }, [visitQr, visitQrSecondsLeft]);
 
   useEffect(() => {
     if (!partner) return;
@@ -191,7 +215,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
           orderBy('createdAt', 'desc'),
         ));
         if (!cancelled) setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) { console.error(e); }
+      } catch (e) { logError(e, 'PartnerPage.fetchReviews'); }
       if (!cancelled) setReviewsLoading(false);
     })();
 
@@ -242,7 +266,7 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
       const stars = '⭐'.repeat(formStars);
       const msg = `Побывал у партнёра АПГ «${partner.name}» — ${stars}\n${formText.trim() ? formText.trim() + '\n' : ''}\n#АПГ_Зеленоград`;
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
-    } catch (e) { console.error(e); setReviewError('Ошибка отправки. Проверьте соединение.'); }
+    } catch (e) { logError(e, 'PartnerPage.submitReview'); setReviewError('Ошибка отправки. Проверьте соединение.'); }
     if (mountedRef.current) setSubmitting(false);
   }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate]);
 
@@ -320,6 +344,23 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
     }
   };
 
+  const requestVisitQr = useCallback(async () => {
+    if (!partner?.id || !userId || visitQrLoading) return;
+    setVisitQrLoading(true);
+    setVisitQrError('');
+    try {
+      const token = await createVisitQrToken({ userId, subjectType: 'partner', subjectId: partner.id });
+      if (!mountedRef.current) return;
+      setVisitQr(token);
+      setVisitQrNow(Date.now());
+    } catch (e) {
+      logError(e, 'PartnerPage.requestVisitQr');
+      if (mountedRef.current) setVisitQrError(e.message || 'Не удалось создать QR');
+    } finally {
+      if (mountedRef.current) setVisitQrLoading(false);
+    }
+  }, [partner?.id, userId, visitQrLoading]);
+
   const infoRows = [
     partner.hours   && { icon:'🕐', label:'Часы работы', value:partner.hours },
     partner.address && { icon:'📍', label:'Адрес',       value:partner.address, onClick:handleMap },
@@ -327,6 +368,189 @@ export function PartnerPage({ partner, isFavorite, onBack, onToggleFavorite, onO
   ].filter(Boolean);
 
   const ratingLabel = avg => avg >= 4.7 ? 'Отлично' : avg >= 4.0 ? 'Хорошо' : avg >= 3.0 ? 'Неплохо' : avg >= 2.0 ? 'Так себе' : 'Плохо';
+
+  if (variant === 'v2') {
+    const heroImage = getProfileImage(partner);
+    const status = partner.partnerOfMonth ? 'Партнер дня' : partner.premium ? 'Premium' : partner.verified ? 'Проверенный' : 'Партнер АПГ';
+    const galleryItems = gallery.length ? gallery : [heroImage].filter(Boolean);
+    const heroBadges = [
+      partner.categoryLabel,
+      avgRating > 0 ? `★ ${avgRating.toFixed(1)} · ${reviewCount}` : null,
+      partner.distance,
+    ].filter(Boolean);
+    const cta = [
+      partner.phone && { label: phoneCopied ? 'Номер скопирован' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', onClick: handlePhone, tone: 'gold' },
+      partner.address && { label: 'Маршрут', icon: '📍', onClick: handleMap },
+      !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openUrl(partner.bookingUrl), tone: 'gold' },
+      !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openUrl(partner.websiteUrl) },
+      partner.vkGroupUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
+      { label: 'Поделиться', icon: '↗', onClick: handleShare },
+    ].filter(Boolean);
+
+    return (
+      <>
+        {shareToast && createPortal(
+          <div style={{ position:'fixed', top:'calc(var(--safe-top, 0px) + 60px)', left:'50%', transform:'translateX(-50%)', zIndex:20000, ...APG2.glass, borderRadius:18, padding:'11px 18px', fontSize:13, fontWeight:760, color:APG2.text, whiteSpace:'nowrap', pointerEvents:'none' }}>
+            {shareToast}
+          </div>,
+          document.body
+        )}
+        <div style={{ minHeight: '100%', background: APG2.bg, color: APG2.text, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 50, padding: 'calc(8px + var(--safe-top, 0px)) 16px 8px', background: 'linear-gradient(180deg,var(--apg2-header-bg-strong, rgba(17,17,19,0.92)),var(--apg2-header-bg-soft, rgba(17,17,19,0.56)),transparent)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button onClick={onBack} style={{ ...APG2.glass, width: 42, height: 42, borderRadius: 18, color: APG2.text, fontSize: 20, cursor: 'pointer' }}>‹</button>
+              <div style={{ flex: 1, minWidth: 0, color: APG2.textSoft, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.name}</div>
+              <button onClick={() => onToggleFavorite(partner.id)} style={{ ...APG2.glass, width: 42, height: 42, borderRadius: 18, color: isFavorite ? '#ff7d91' : APG2.textSoft, fontSize: 20, cursor: 'pointer' }}>{isFavorite ? '♥' : '♡'}</button>
+            </div>
+          </div>
+
+          <main style={{ padding: '0 16px 0', maxWidth: 520, margin: '0 auto' }}>
+            <ProfileHero
+              image={heroImage}
+              title={partner.name}
+              status={status}
+              avatar={<PartnerLogo partner={partner} size={64} />}
+              badges={heroBadges}
+              description={partner.offer || partner.description || partner.address || 'Проверенное место в экосистеме АПГ.'}
+            />
+
+            <GlassSection title="Действия">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {cta.map(item => (
+                  <GlassButton key={item.label} onClick={item.onClick} tone={item.tone}>
+                    <span>{item.icon}</span><span>{item.label}</span>
+                  </GlassButton>
+                ))}
+                <GlassButton onClick={() => onToggleFavorite(partner.id)} style={{ gridColumn: cta.length % 2 === 0 ? 'auto' : '1 / -1' }}>
+                  {isFavorite ? '♥ В избранном' : '♡ В избранное'}
+                </GlassButton>
+              </div>
+            </GlassSection>
+
+            <GlassSection title="QR для начисления">
+              <div style={{ ...APG2.glass, borderRadius: 30, padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780 }}>Одноразовый QR визита</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
+                      Покажите сотруднику после услуги. QR живёт 60 секунд и не работает повторно.
+                    </div>
+                  </div>
+                  <GlassButton onClick={requestVisitQr} tone="gold" style={{ minHeight: 42, borderRadius: 18, padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap', opacity: !userId || visitQrLoading ? 0.58 : 1 }}>
+                    {visitQrLoading ? '...' : 'Получить QR'}
+                  </GlassButton>
+                </div>
+                {visitQrError && (
+                  <div style={{ marginTop: 12, color: '#ff9aa8', fontSize: 12, lineHeight: '17px' }}>{visitQrError}</div>
+                )}
+                {visitQr?.qrValue && visitQrSecondsLeft > 0 && (
+                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                    <div style={{ background: '#fff', borderRadius: 24, padding: 14, boxShadow: '0 18px 44px rgba(0,0,0,0.28)' }}>
+                      <QRCodeSVG value={visitQr.qrValue} size={176} />
+                    </div>
+                    <div style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>Действует ещё {visitQrSecondsLeft} сек.</div>
+                  </div>
+                )}
+              </div>
+            </GlassSection>
+
+            {partner.offer && (
+              <GlassSection title="Акция">
+                <div style={{ ...APG2.goldGlass, borderRadius: 34, padding: 18, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
+                  <div style={{ width: 54, height: 54, borderRadius: 20, background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎁</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
+                    <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{partner.offer}</div>
+                  </div>
+                </div>
+              </GlassSection>
+            )}
+
+            <GlassSection title="О месте">
+              <div style={{ ...APG2.glass, borderRadius: 34, padding: 18 }}>
+                {partner.description ? (
+                  <RichText color={APG2.textSoft} fontSize={15}>{isVK() ? sanitizeForVK(partner.description) : partner.description}</RichText>
+                ) : (
+                  <div style={{ color: APG2.textSoft, fontSize: 15, lineHeight: '22px' }}>Описание пока готовится, но карточка уже доступна для посещений и избранного.</div>
+                )}
+                {infoRows.length > 0 && (
+                  <div style={{ marginTop: 16, display: 'grid', gap: 9 }}>
+                    {infoRows.map(row => (
+                      <ContactCard key={row.label} icon={row.icon} label={row.label} value={row.value} onClick={row.onClick} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Фото">
+              <ProfileGallery items={galleryItems} onOpen={gallery.length ? setLightboxIdx : null} />
+            </GlassSection>
+
+            {partner.videos?.length > 0 && (
+              <GlassSection title="Видео">
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 14, overflow: 'hidden' }}>
+                  <VideoSection videos={partner.videos} />
+                </div>
+              </GlassSection>
+            )}
+
+            <GlassSection
+              title={`Отзывы${reviewCount > 0 ? ` · ${reviewCount}` : ''}`}
+              action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
+            >
+              {!canReview && !reviewsLoading && (
+                <div style={{ ...APG2.glass, borderRadius: 24, padding: 13, color: APG2.textMuted, fontSize: 13, lineHeight: '18px', marginBottom: 10 }}>
+                  Оставить отзыв можно после посещения и скана QR-кода.
+                </div>
+              )}
+              {showForm && (
+                <div style={{ ...APG2.glass, borderRadius: 30, padding: 16, marginBottom: 12 }}>
+                  <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780, marginBottom: 10 }}>Ваш отзыв</div>
+                  <StarPicker value={formStars} onChange={setFormStars} size={30} />
+                  <textarea value={formText} onChange={e => setFormText(e.target.value)} placeholder="Расскажите о визите..." maxLength={400} style={{ width:'100%', marginTop: 12, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.14)', borderRadius:20, padding:'12px 13px', color:APG2.text, fontSize:16, resize:'none', minHeight:82, outline:'none', boxSizing:'border-box', fontFamily:'inherit', lineHeight:'22px' }} />
+                  <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                    <GlassButton onClick={() => setShowForm(false)} style={{ flex: 1 }}>Отмена</GlassButton>
+                    <GlassButton onClick={submitReview} tone="gold" style={{ flex: 1, opacity: formStars === 0 || submitting ? 0.5 : 1 }}>{submitting ? '...' : 'Опубликовать'}</GlassButton>
+                  </div>
+                  {reviewError && <div style={{ marginTop: 9, color: '#ff9aa8', fontSize: 12 }}>{reviewError}</div>}
+                </div>
+              )}
+              {reviewsLoading ? (
+                <div style={{ ...APG2.glass, borderRadius: 28, padding: 22, color: APG2.textMuted, textAlign: 'center' }}>Загружаем отзывы...</div>
+              ) : reviews.length === 0 ? (
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 28, textAlign: 'center' }}>
+                  <div style={{ color: APG2.text, fontSize: 18, fontWeight: 780, marginBottom: 6 }}>Отзывов пока нет</div>
+                  <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Карточка выглядит законченно даже до первых отзывов.</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollSnapType: 'x mandatory' }} onTouchStart={e => e.stopPropagation()}>
+                  {reviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
+                </div>
+              )}
+            </GlassSection>
+
+            {similar.length > 0 && (
+              <GlassSection title="Похожие места">
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }} onTouchStart={e => e.stopPropagation()}>
+                  {similar.map(p => (
+                    <button key={p.id} onClick={() => onOpenPartner(p)} style={{ ...APG2.glass, flex: '0 0 160px', minHeight: 132, borderRadius: 28, padding: 14, color: APG2.text, cursor: 'pointer', textAlign: 'left' }}>
+                      <div style={{ color: APG2.textMuted, fontSize: 11, marginBottom: 18 }}>{p.categoryLabel || 'АПГ'}</div>
+                      <div style={{ fontSize: 15, lineHeight: '19px', fontWeight: 800, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.name || 'Партнер'}</div>
+                    </button>
+                  ))}
+                </div>
+              </GlassSection>
+            )}
+          </main>
+        </div>
+
+        {lightboxIdx !== null && gallery.length > 0 && (
+          <PhotoLightbox photos={gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+        )}
+      </>
+    );
+  }
 
   return (
     <>
