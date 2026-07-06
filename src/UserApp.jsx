@@ -1850,17 +1850,19 @@ export function UserApp() {
 
   const lokiAppState = useMemo(() => ({
     activePanel,
+    user,
     partners: enrichedPartners,
     events,
     news,
     notifications,
+    customTasks,
     userKeys,
     favorites,
     lastScanDate,
     unreadCount,
     registeredEventIds,
     completedTasks,
-  }), [activePanel, completedTasks, enrichedPartners, events, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, userKeys]);
+  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {

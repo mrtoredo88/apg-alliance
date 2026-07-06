@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Loki Brain V1
+**Коммит:** N/A
+**Файлы:** `src/loki/LokiBrain.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/lokiEvents.js`, `src/UserApp.jsx`
+**Тип:** feat
+**Что изменено:** Добавлен первый Loki Brain: data-grounded обработка естественных запросов по данным АПГ, контекст пользователя/экрана/партнёров/событий/новостей, безопасные action-ответы и мини-ввод «Спросить Локи».
+**Почему:** Локи должен становиться персональным городским помощником, который отвечает только на основе данных АПГ и готов к замене локального brain-провайдера на LLM через backend.
+
+---
+
 ## [2026-07-07] Инициативное поведение Локи
 **Коммит:** `22d924c2`
 **Файлы:** `src/loki/LokiObserver.js`, `src/loki/lokiRecommendations.js`, `src/loki/lokiPriority.js`, `src/loki/lokiHistory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`, `src/loki/lokiEvents.js`, `src/loki/lokiBehavior.js`, `src/loki/lokiMemory.js`, `src/loki/lokiPhrases.js`, `src/UserApp.jsx`, `src/index.css`

@@ -29,6 +29,8 @@ export function LokiAssistant() {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [brainOpen, setBrainOpen] = useState(false);
+  const [brainText, setBrainText] = useState('');
   const [look, setLook] = useState({ x: 0, y: 0 });
   const rafRef = useRef(null);
   const shouldShowRestore = loki.dismissed || !loki.settings.enabled || loki.isHiddenOnPanel;
@@ -187,10 +189,44 @@ export function LokiAssistant() {
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
         {menuOpen && (
           <div style={{ ...APG2_PROFILE.glass, position: 'absolute', right: 0, bottom: 86, width: 178, borderRadius: 22, padding: 8, display: 'grid', gap: 6, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+            <button type="button" onClick={() => { setBrainOpen(v => !v); setHistoryOpen(false); setMenuOpen(false); }} style={menuButtonStyle}>Спросить Локи</button>
             <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
             <button type="button" onClick={() => { loki.hideCurrentPanel(); setMenuOpen(false); }} style={menuButtonStyle}>Скрыть на экране</button>
             <button type="button" onClick={() => { loki.setHintsEnabled(false); setMenuOpen(false); }} style={menuButtonStyle}>Выключить подсказки</button>
           </div>
+        )}
+        {brainOpen && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const text = brainText.trim();
+              if (!text || loki.brainThinking) return;
+              setBrainText('');
+              await loki.askBrain(text);
+            }}
+            style={{ ...APG2_PROFILE.glass, position: 'absolute', right: 0, bottom: 86, width: 270, borderRadius: 24, padding: 11, display: 'grid', gap: 9, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div>
+                <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880 }}>Спросить Локи</div>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, marginTop: 2 }}>Только по данным АПГ</div>
+              </div>
+              <button type="button" onClick={() => setBrainOpen(false)} style={{ width: 26, height: 26, borderRadius: 11, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 16 }}>×</button>
+            </div>
+            <input
+              value={brainText}
+              onChange={e => setBrainText(e.target.value)}
+              placeholder="Например: где выпить кофе?"
+              style={{ minHeight: 40, borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '0 12px' }}
+            />
+            <button
+              type="submit"
+              disabled={!brainText.trim() || loki.brainThinking}
+              style={{ minHeight: 38, borderRadius: 16, border: '1px solid rgba(215,184,106,0.32)', background: 'linear-gradient(135deg, rgba(215,184,106,0.30), rgba(255,255,255,0.08))', color: APG2_PROFILE.gold, fontSize: 12.5, fontWeight: 880, fontFamily: 'inherit', opacity: !brainText.trim() || loki.brainThinking ? 0.52 : 1 }}
+            >
+              {loki.brainThinking ? 'Думаю...' : 'Спросить'}
+            </button>
+          </form>
         )}
         {historyOpen && (
           <div style={{ ...APG2_PROFILE.glass, position: 'absolute', right: 0, bottom: 86, width: 252, maxHeight: 310, overflowY: 'auto', borderRadius: 24, padding: 10, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>

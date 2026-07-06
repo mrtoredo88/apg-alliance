@@ -11,6 +11,7 @@ import { getLokiSuggestion } from './lokiSuggestions.js';
 import { LOKI_MESSAGE_PRIORITY, normalizeLokiActionRequest } from './lokiActionTypes.js';
 import { evaluateLokiObserver } from './LokiObserver.js';
 import { addLokiHistoryItem, loadLokiHistory, markLokiHistoryItem, saveLokiHistory } from './lokiHistory.js';
+import { askLokiBrain } from './LokiBrain.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -36,6 +37,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const [emotion, setEmotion] = useState('idle');
   const [message, setMessage] = useState('');
   const [card, setCard] = useState(null);
+  const [brainThinking, setBrainThinking] = useState(false);
   const [anchor, setAnchor] = useState('home');
   const [action, setAction] = useState(LOKI_ACTIONS.IDLE);
   const [dismissed, setDismissed] = useState(false);
@@ -325,12 +327,50 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [appActions, showMessage, updateMemory]);
+  }, [appActions, showMessage, updateHistory, updateMemory]);
+
+  const askBrain = useCallback(async (text) => {
+    if (!settings.enabled) return false;
+    const thinkingTimer = setTimeout(() => {
+      setVisible(true);
+      setDismissed(false);
+      setEmotion('thinking');
+      setAction(LOKI_ACTIONS.LOOK_AROUND);
+      setMessage('Думаю...');
+      setCard(null);
+      setBrainThinking(true);
+    }, 1000);
+    try {
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory });
+      clearTimeout(thinkingTimer);
+      setBrainThinking(false);
+      if (result.executeAction) {
+        setMessage('Показываю.');
+        await executeAction(result.executeAction);
+        return true;
+      }
+      showMessage(LOKI_EVENTS.BRAIN_RESPONSE, {
+        source: 'loki_brain',
+        message: result.text,
+        card: result.card,
+        priority: LOKI_MESSAGE_PRIORITY.HIGH,
+      });
+      return true;
+    } catch (e) {
+      clearTimeout(thinkingTimer);
+      setBrainThinking(false);
+      logError(e, 'LokiProvider.askBrain');
+      showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
+      return false;
+    }
+  }, [activePanel, appState, executeAction, memory, settings.enabled, showMessage, user]);
 
   const value = useMemo(() => ({
     action,
     activePanel,
     anchor,
+    askBrain,
+    brainThinking,
     canTalk,
     card,
     dismissed,
@@ -357,7 +397,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
-  }), [action, activePanel, anchor, canTalk, card, dismissed, emotion, executeAction, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, updateHistory, visible]);
+  }), [action, activePanel, anchor, askBrain, brainThinking, canTalk, card, dismissed, emotion, executeAction, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, settings, showMessage, updateHistory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }
