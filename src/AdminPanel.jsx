@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
 import { PartnerQRSection, ExpertQRSection } from './PartnerQRSection.jsx';
@@ -313,6 +313,7 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   const guestSessions = metrics?.guestSessions ?? [];
   const comments = metrics?.newsComments ?? [];
   const errors = metrics?.errorLogs ?? [];
+  const adminActivity = metrics?.adminActivity ?? [];
   const allScans = [...scans, ...expertScans];
   const today = new Date().toISOString().slice(0, 10);
   const newToday = users.filter(u => dateKey(u.registeredAt || u.createdAt) === today).length;
@@ -377,12 +378,18 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   ];
   const maxFunnel = Math.max(funnel[0]?.value || 1, 1);
   const activity = [
+    ...adminActivity.map(a => ({ ts: toJsDate(a.createdAt), icon: '🛠', text: a.label || `${a.action || 'Действие'}: ${a.targetType || 'объект'}`, sub: a.actorName || a.actorId || 'Админка' })),
     ...users.map(u => ({ ts: toJsDate(u.registeredAt || u.createdAt), icon: '👤', text: `${userDisplayName(u)} зарегистрировался`, sub: providerLabel(u) })),
     ...scans.map(scan => ({ ts: toJsDate(scan.scannedAt || scan.createdAt), icon: '🗝', text: `Пользователь получил ключ у партнёра`, sub: scan.partnerId || scan.userId })),
     ...expertScans.map(scan => ({ ts: toJsDate(scan.scannedAt || scan.createdAt), icon: '🧑‍💼', text: `Посещение эксперта отмечено`, sub: scan.expertId || scan.userId })),
     ...reviews.map(r => ({ ts: toJsDate(r.createdAt), icon: '⭐', text: `Оставлен отзыв`, sub: r.partnerName || r.partnerId || r.userName })),
     ...raffleEntries.map(r => ({ ts: toJsDate(r.createdAt || r.enteredAt), icon: '🎁', text: `Участие в розыгрыше`, sub: r.prizeId || r.userId })),
   ].filter(item => item.ts).sort((a, b) => b.ts - a.ts).slice(0, 12);
+  const mostReadNews = [...news]
+    .sort((a, b) => Number(b.stats?.views ?? b.views ?? 0) - Number(a.stats?.views ?? a.views ?? 0))[0];
+  const latestComment = [...comments].sort((a, b) => Number(toJsDate(b.createdAt) || 0) - Number(toJsDate(a.createdAt) || 0))[0];
+  const latestError = [...errors].sort((a, b) => Number(toJsDate(b.timestamp || b.createdAt) || 0) - Number(toJsDate(a.timestamp || a.createdAt) || 0))[0];
+  const newestPartner = [...partners].sort((a, b) => Number(toJsDate(b.createdAt) || 0) - Number(toJsDate(a.createdAt) || 0))[0];
 
   return (
     <div>
@@ -413,6 +420,13 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
         <StatTile label="Отзывы" value={reviewTotal} icon="⭐" color="#f59e0b" />
         <StatTile label="Регистрации на события" value={eventRegistrations} icon="📝" color="#4BB34B" />
         <StatTile label="Призы" value={prizes.length} icon="🎁" color="#A78BFA" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <QuickInsightCard icon="🔥" title="Самая читаемая новость" text={mostReadNews?.title || 'Пока нет данных'} sub={mostReadNews ? `${Number(mostReadNews.stats?.views ?? mostReadNews.views ?? 0)} просмотров` : 'Появится после первых просмотров'} onClick={() => onOpenTab('news')} />
+        <QuickInsightCard icon="💬" title="Последний комментарий" text={latestComment?.text || 'Комментариев пока нет'} sub={latestComment?.userName || 'Модерация чистая'} onClick={() => onOpenTab('comments')} />
+        <QuickInsightCard icon="🐞" title="Последняя ошибка" text={latestError?.message || latestError?.error || 'Критичных ошибок нет'} sub={latestError ? (latestError.source || latestError.screen || 'errorLogs') : 'Система спокойна'} onClick={() => onOpenTab('errors')} />
+        <QuickInsightCard icon="🤝" title="Новый партнёр" text={newestPartner?.name || 'Новых партнёров нет'} sub={newestPartner?.category || 'CRM готова к добавлению'} onClick={() => onOpenTab('partners')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, marginBottom: 16 }}>
@@ -507,6 +521,19 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   );
 }
 
+function QuickInsightCard({ icon, title, text, sub, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{ ...s.card, marginBottom: 0, textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 8, borderColor: A.goldBrd, minHeight: 118 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ color: A.gold, fontSize: 12, fontWeight: 900, letterSpacing: 0.7, textTransform: 'uppercase' }}>{title}</div>
+        <div style={{ fontSize: 22 }}>{icon}</div>
+      </div>
+      <div style={{ color: A.text, fontSize: 14, fontWeight: 850, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text}</div>
+      <div style={{ color: A.textSec, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+    </button>
+  );
+}
+
 function AdminQuickActions({ setActiveTab, openNews, openPartner, openEvent, openPrize, openPush, openComments }) {
   const actions = [
     ['📢', 'Новость', openNews],
@@ -529,15 +556,51 @@ function AdminQuickActions({ setActiveTab, openNews, openPartner, openEvent, ope
   );
 }
 
-function AdminNewsCard({ item, onEdit, onPublish, onPin, onDelete, onCheck }) {
+function AdminNewsCard({ item, selected, dragging, onEdit, onPublish, onPin, onDelete, onCheck, onSelect, onContextMenu, onPreview, onSwipe, onDragStart, onDragOver, onDrop }) {
+  const touchRef = useRef({ x: 0, y: 0, t: 0 });
+  const longPressRef = useRef(null);
+  const lastTapRef = useRef(0);
   const image = contentImageOf(item);
   const published = item.publishedAt?.toDate ? item.publishedAt.toDate() : item.publishedAt ? new Date(item.publishedAt) : item.createdAt?.toDate ? item.createdAt.toDate() : null;
   const stats = item.stats || {};
   const reactions = Object.values(item.reactions || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
   const status = item.active === false ? 'Черновик' : String(item.status || '').toLowerCase() === 'scheduled' ? 'Отложено' : 'Опубликовано';
   const statusColor = status === 'Опубликовано' ? '#4BB34B' : status === 'Отложено' ? '#f59e0b' : A.textSec;
+  const clearLongPress = () => {
+    if (longPressRef.current) clearTimeout(longPressRef.current);
+    longPressRef.current = null;
+  };
   return (
-    <div style={{ ...s.card, marginBottom: 0, padding: 0, overflow: 'hidden', minHeight: 320 }}>
+    <div
+      draggable
+      onDragStart={e => onDragStart?.(item, e)}
+      onDragOver={e => onDragOver?.(item, e)}
+      onDrop={e => onDrop?.(item, e)}
+      onContextMenu={e => { e.preventDefault(); onContextMenu?.(item, e.clientX, e.clientY); }}
+      onDoubleClick={onPreview}
+      onTouchStart={e => {
+        const touch = e.touches?.[0];
+        touchRef.current = { x: touch?.clientX || 0, y: touch?.clientY || 0, t: Date.now() };
+        clearLongPress();
+        longPressRef.current = setTimeout(() => {
+          onContextMenu?.(item, touchRef.current.x, touchRef.current.y);
+        }, 560);
+      }}
+      onTouchMove={e => {
+        const touch = e.touches?.[0];
+        if (Math.abs((touch?.clientX || 0) - touchRef.current.x) > 12 || Math.abs((touch?.clientY || 0) - touchRef.current.y) > 12) clearLongPress();
+      }}
+      onTouchEnd={e => {
+        clearLongPress();
+        const touch = e.changedTouches?.[0];
+        const dx = (touch?.clientX || 0) - touchRef.current.x;
+        const dy = Math.abs((touch?.clientY || 0) - touchRef.current.y);
+        const now = Date.now();
+        if (Math.abs(dx) > 76 && dy < 44) onSwipe?.(item, dx > 0 ? 'publish' : 'delete');
+        else if (now - lastTapRef.current < 310) onPreview?.();
+        lastTapRef.current = now;
+      }}
+      style={{ ...s.card, marginBottom: 0, padding: 0, overflow: 'hidden', minHeight: 320, borderColor: selected ? A.gold : dragging ? '#38bdf8' : s.card.border.split(' ').pop(), boxShadow: selected ? '0 0 0 1px rgba(201,168,76,0.35), 0 18px 50px rgba(201,168,76,0.12)' : dragging ? '0 18px 50px rgba(56,189,248,0.14)' : s.card.boxShadow, transform: selected ? 'translateY(-1px)' : 'none', transition: 'transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease', cursor: 'grab' }}>
       <div style={{ height: 150, background: A.chip, position: 'relative', overflow: 'hidden' }}>
         {image ? <img src={image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.currentTarget.style.display = 'none'} /> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', fontSize: 34 }}>📰</div>}
         <div style={{ position: 'absolute', left: 12, top: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -545,6 +608,7 @@ function AdminNewsCard({ item, onEdit, onPublish, onPin, onDelete, onCheck }) {
           <span style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.48)', color: statusColor, border: `1px solid ${statusColor}55`, fontSize: 10.5, fontWeight: 850 }}>{status}</span>
           {(item.pinned || item.isPinned || (item.priority ?? 0) >= 8) && <span style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.48)', color: A.gold, border: `1px solid ${A.goldBrd}`, fontSize: 10.5, fontWeight: 850 }}>📌</span>}
         </div>
+        <button type="button" onClick={e => { e.stopPropagation(); onSelect?.(); }} style={{ position: 'absolute', right: 12, top: 12, width: 30, height: 30, borderRadius: 999, border: `1px solid ${selected ? A.gold : 'rgba(255,255,255,0.22)'}`, background: selected ? 'rgba(201,168,76,0.86)' : 'rgba(0,0,0,0.42)', color: selected ? '#111' : A.text, fontWeight: 900, cursor: 'pointer' }}>{selected ? '✓' : ''}</button>
       </div>
       <div style={{ padding: 15, display: 'grid', gap: 11 }}>
         <div>
@@ -574,13 +638,133 @@ function AdminNewsCard({ item, onEdit, onPublish, onPin, onDelete, onCheck }) {
   );
 }
 
-function EditorialNewsBoard({ news, onEdit, onPublish, onPin, onDelete, onCheck }) {
+function EditorialNewsBoard({ news, selectedIds, draggingId, onEdit, onPublish, onPin, onDelete, onCheck, onSelect, onBulkPublish, onBulkDelete, onBulkPin, onContextMenu, onPreview, onSwipe, onDragStart, onDragOver, onDrop }) {
   const sorted = [...news].sort(byPriorityDate);
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 14 }}>
-      {sorted.map(item => (
-        <AdminNewsCard key={item.id} item={item} onEdit={() => onEdit(item)} onPublish={() => onPublish(item)} onPin={() => onPin(item)} onDelete={() => onDelete(item.id)} onCheck={() => onCheck(item.id)} />
-      ))}
+    <div>
+      {selectedIds.length > 0 && (
+        <div style={{ ...s.card, position: 'sticky', top: 74, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', marginBottom: 14, borderColor: A.goldBrd }}>
+          <div style={{ color: A.text, fontSize: 13, fontWeight: 850 }}>Выбрано: {selectedIds.length}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={onBulkPublish} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12 }}>🚀 Опубликовать</button>
+            <button type="button" onClick={onBulkPin} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>📌 Закрепить</button>
+            <button type="button" onClick={onBulkDelete} style={{ ...s.btn, ...s.btnDanger, padding: '8px 11px', fontSize: 12 }}>🗑 Удалить</button>
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 14 }}>
+        {sorted.map(item => (
+          <AdminNewsCard
+            key={item.id}
+            item={item}
+            selected={selectedIds.includes(item.id)}
+            dragging={draggingId === item.id}
+            onEdit={() => onEdit(item)}
+            onPublish={() => onPublish(item)}
+            onPin={() => onPin(item)}
+            onDelete={() => onDelete(item.id)}
+            onCheck={() => onCheck(item.id)}
+            onSelect={() => onSelect(item.id)}
+            onContextMenu={onContextMenu}
+            onPreview={() => onPreview(item)}
+            onSwipe={onSwipe}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminQuickNewsEditor({ item, draft, saving, dirty, onPatch, onSave, onClose, onPublish, onDelete }) {
+  if (!item || !draft) return null;
+  return (
+    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 930, width: 'min(100vw, 430px)', background: 'rgba(16,16,32,0.92)', backdropFilter: 'blur(28px) saturate(1.35)', WebkitBackdropFilter: 'blur(28px) saturate(1.35)', borderLeft: `1px solid ${A.goldBrd}`, boxShadow: '-24px 0 70px rgba(0,0,0,0.48)', padding: '18px 18px calc(24px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <div>
+          <div style={{ color: A.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1 }}>Быстрый редактор</div>
+          <h2 style={{ ...s.h2, margin: '4px 0 3px', fontSize: 19 }}>Новость</h2>
+          <div style={{ color: dirty ? A.gold : A.textSec, fontSize: 12 }}>{saving ? 'Сохраняем...' : dirty ? 'Есть несохранённые изменения' : 'Все изменения сохранены'}</div>
+        </div>
+        <button type="button" onClick={onClose} style={{ ...s.btn, ...s.btnGray, width: 38, height: 38, padding: 0 }}>✕</button>
+      </div>
+
+      <label style={s.label}>Заголовок</label>
+      <input style={s.input} value={draft.title} onChange={e => onPatch({ title: e.target.value })} placeholder="Заголовок новости" />
+
+      <label style={s.label}>Текст</label>
+      <textarea style={{ ...s.textarea, minHeight: 220, lineHeight: '20px' }} value={draft.text} onChange={e => onPatch({ text: e.target.value })} placeholder="Текст новости" />
+
+      <label style={s.label}>Категория</label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
+        {CONTENT_CATEGORIES.map(cat => (
+          <button key={cat.id} type="button" onClick={() => onPatch({ category: draft.category === cat.id ? '' : cat.id })}
+            style={{ padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, cursor: 'pointer', border: `1px solid ${draft.category === cat.id ? cat.color : A.border}`, background: draft.category === cat.id ? cat.color + '22' : A.chip, color: draft.category === cat.id ? cat.color : A.textSec }}>
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      <label style={s.label}>Обложка</label>
+      <PhotoUpload value={draft.coverPhoto} onChange={value => onPatch({ coverPhoto: value })} folder="news" label="Заменить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+      {draft.coverPhoto && <img src={draft.coverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 16, border: `1px solid ${A.border}`, margin: '8px 0 14px' }} onError={e => e.currentTarget.style.display = 'none'} />}
+
+      <label style={s.label}>Приоритет</label>
+      <input style={s.input} type="number" value={draft.priority} onChange={e => onPatch({ priority: e.target.value })} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+        <button type="button" disabled={saving} onClick={() => onSave()} style={{ ...s.btn, ...s.btnPri, minHeight: 42 }}>💾 Сохранить</button>
+        <button type="button" onClick={onPublish} style={{ ...s.btn, ...s.btnGray, minHeight: 42 }}>🚀 Опубликовать</button>
+        <button type="button" onClick={onDelete} style={{ ...s.btn, ...s.btnDanger, gridColumn: '1 / -1', minHeight: 42 }}>🗑 Удалить с undo</button>
+      </div>
+
+      <div style={{ marginTop: 18, padding: 12, borderRadius: 16, background: A.goldDim, border: `1px solid ${A.goldBrd}`, color: A.textSec, fontSize: 12, lineHeight: '18px' }}>
+        Автосохранение включено. История изменений пишется в <b style={{ color: A.gold }}>newsChangeHistory</b>, действия администратора — в <b style={{ color: A.gold }}>adminActivity</b>.
+      </div>
+    </div>
+  );
+}
+
+function AdminUndoBar({ undo, onRestore, onClose }) {
+  if (!undo) return null;
+  return (
+    <div style={{ position: 'fixed', left: 18, bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))', zIndex: 940, width: 'min(430px, calc(100vw - 36px))', padding: 14, borderRadius: 18, background: 'rgba(18,18,30,0.92)', border: `1px solid ${A.goldBrd}`, boxShadow: '0 18px 60px rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: A.text, fontSize: 13, fontWeight: 850 }}>{undo.label}</div>
+        <div style={{ color: A.textSec, fontSize: 11, marginTop: 2 }}>Отмена доступна 10 секунд.</div>
+      </div>
+      <button type="button" onClick={onRestore} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12 }}>Отменить</button>
+      <button type="button" onClick={onClose} style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12 }}>✕</button>
+    </div>
+  );
+}
+
+function AdminContextMenu({ menu, onClose, onEdit, onPublish, onPin, onDelete, onCheck }) {
+  if (!menu?.item) return null;
+  const x = Math.min(menu.x || 18, Math.max(18, window.innerWidth - 220));
+  const y = Math.min(menu.y || 18, Math.max(18, window.innerHeight - 260));
+  const item = menu.item;
+  const action = (fn) => {
+    fn();
+    onClose();
+  };
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 925, background: 'transparent' }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: 'fixed', left: x, top: y, width: 210, padding: 8, borderRadius: 16, background: 'rgba(18,18,30,0.96)', border: `1px solid ${A.border}`, boxShadow: '0 18px 50px rgba(0,0,0,0.42)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+        {[
+          ['✏️ Быстро редактировать', () => onEdit(item)],
+          ['🚀 Опубликовать', () => onPublish(item)],
+          ['📌 Закрепить', () => onPin(item)],
+          ['✓ Ссылки проверены', () => onCheck(item.id)],
+          ['🗑 Удалить', () => onDelete(item.id)],
+        ].map(([label, fn], i) => (
+          <button key={label} type="button" onClick={() => action(fn)} style={{ width: '100%', border: 'none', borderBottom: i < 4 ? `1px solid ${A.rowBrd}` : 'none', background: 'transparent', color: label.includes('Удалить') ? '#ff8a8a' : A.text, padding: '10px 11px', borderRadius: 10, textAlign: 'left', cursor: 'pointer', fontWeight: 780 }}>
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1272,7 +1456,7 @@ export const AdminPanel = () => {
   const [prizeClaims, setPrizeClaims] = useState([]);
   const [newsComments, setNewsComments] = useState([]);
   const [adminMetrics, setAdminMetrics] = useState({
-    users: [], scans: [], expertScans: [], reviews: [], expertReviews: [], raffleEntries: [], guestSessions: [], newsComments: [], errorLogs: [],
+    users: [], scans: [], expertScans: [], reviews: [], expertReviews: [], raffleEntries: [], guestSessions: [], newsComments: [], errorLogs: [], adminActivity: [],
   });
   const [loading, setLoading]       = useState(true);
   const [adminLoadIssues, setAdminLoadIssues] = useState([]);
@@ -1406,6 +1590,16 @@ export const AdminPanel = () => {
   const [showSearchDrop, setShowSearchDrop] = useState(false);
   const [showAddDrop, setShowAddDrop]       = useState(false);
   const [showToolsDrop, setShowToolsDrop]   = useState(false);
+  const [selectedNewsIds, setSelectedNewsIds] = useState([]);
+  const [quickEditNews, setQuickEditNews] = useState(null);
+  const [quickNewsDraft, setQuickNewsDraft] = useState(null);
+  const [quickEditorDirty, setQuickEditorDirty] = useState(false);
+  const [quickEditorSaving, setQuickEditorSaving] = useState(false);
+  const [adminUndo, setAdminUndo] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [draggingNewsId, setDraggingNewsId] = useState('');
+  const autoSaveTimerRef = useRef(null);
+  const undoTimerRef = useRef(null);
 
   useEffect(() => {
     const onResize = () => setViewportWidth(window.innerWidth || 1200);
@@ -1554,6 +1748,7 @@ export const AdminPanel = () => {
         { name: 'banners', label: 'Баннеры', ref: () => query(collection(db, 'banners'), orderBy('priority', 'asc')) },
         { name: 'newsComments', label: 'Комментарии новостей', ref: () => query(collection(db, 'newsComments'), orderBy('createdAt', 'desc'), limit(300)), optional: true },
         { name: 'errorLogs', label: 'Ошибки приложения', ref: () => query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)), optional: true },
+        { name: 'adminActivity', label: 'Действия админки', ref: () => query(collection(db, 'adminActivity'), orderBy('createdAt', 'desc'), limit(120)), optional: true },
         { name: 'users', label: 'Пользователи', ref: () => collection(db, 'users'), optional: true },
         { name: 'scans', label: 'Сканы партнёров', ref: () => query(collection(db, 'scans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
         { name: 'expertScans', label: 'Сканы экспертов', ref: () => query(collection(db, 'expertScans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
@@ -1588,6 +1783,7 @@ export const AdminPanel = () => {
         guestSessions: byName.guestSessions?.ok ? byName.guestSessions.docs : prev.guestSessions,
         newsComments: byName.newsComments?.ok ? byName.newsComments.docs : prev.newsComments,
         errorLogs: byName.errorLogs?.ok ? byName.errorLogs.docs : prev.errorLogs,
+        adminActivity: byName.adminActivity?.ok ? byName.adminActivity.docs : prev.adminActivity,
       }));
       setAdminLoadIssues(results.filter(item => !item.ok).map(item => ({
         name: item.name,
@@ -1988,6 +2184,48 @@ export const AdminPanel = () => {
     setEditingNews(null); setShowNewsModal(false);
   };
 
+  const auditAdminAction = useCallback(async (action, targetType, targetId, details = {}) => {
+    const actorId = auth.currentUser?.uid || 'admin-panel';
+    const entry = {
+      action,
+      targetType,
+      targetId: String(targetId || ''),
+      label: details.label || `${action}: ${targetType}`,
+      actorId,
+      actorName: details.actorName || 'Админка АПГ',
+      role: details.role || 'admin',
+      details,
+      userAgent: navigator.userAgent,
+      createdAt: serverTimestamp(),
+    };
+    setAdminMetrics(prev => ({
+      ...prev,
+      adminActivity: [{ id: `local_${Date.now()}`, ...entry, createdAt: new Date() }, ...(prev.adminActivity || [])].slice(0, 120),
+    }));
+    try {
+      await addDoc(collection(db, 'adminActivity'), entry);
+    } catch (e) {
+      logError(e, `AdminPanel.auditAdminAction.${action}`);
+    }
+  }, []);
+
+  const writeNewsHistory = async (newsId, action, before, after) => {
+    try {
+      await addDoc(collection(db, 'newsChangeHistory'), {
+        newsId,
+        action,
+        before: before || null,
+        after: after || null,
+        actorId: auth.currentUser?.uid || 'admin-panel',
+        actorName: 'Админка АПГ',
+        userAgent: navigator.userAgent,
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) {
+      logError(e, `AdminPanel.writeNewsHistory.${action}`);
+    }
+  };
+
   const startEditNews = (item) => {
     setEditingNews(item);
     setNTitle(item.title ?? ''); setNText(item.text ?? '');
@@ -2002,6 +2240,7 @@ export const AdminPanel = () => {
 
   const saveNews = async () => {
     if (!nTitle.trim() || !nText.trim()) return;
+    const before = editingNews ? { ...editingNews } : null;
     const data = {
       title: nTitle.trim(),
       text: nText.trim(),
@@ -2017,17 +2256,50 @@ export const AdminPanel = () => {
     };
     if (editingNews) {
       await updateDoc(doc(db, 'news', editingNews.id), data);
+      await writeNewsHistory(editingNews.id, 'update', before, data);
+      await auditAdminAction('update', 'news', editingNews.id, { label: `Изменена новость: ${data.title}`, fields: Object.keys(data) });
     } else {
-      await addDoc(collection(db, 'news'), data);
+      const ref = await addDoc(collection(db, 'news'), data);
+      await writeNewsHistory(ref.id, 'create', null, data);
+      await auditAdminAction('create', 'news', ref.id, { label: `Создана новость: ${data.title}` });
     }
     resetNewsForm();
     fetchData();
   };
 
-  const deleteNews = async (id) => {
-    if (!window.confirm('Удалить новость?')) return;
-    await deleteDoc(doc(db, 'news', id));
-    fetchData();
+  const showUndo = (payload) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setAdminUndo(payload);
+    undoTimerRef.current = setTimeout(() => setAdminUndo(null), 10000);
+  };
+
+  const deleteNews = async (id, options = {}) => {
+    const item = news.find(n => n.id === id);
+    if (!item) return;
+    if (!options.silent && !window.confirm('Удалить новость? Можно отменить в течение 10 секунд.')) return;
+    const patch = { active: false, status: 'deleted', deletedAt: serverTimestamp(), updatedAt: serverTimestamp() };
+    await updateDoc(doc(db, 'news', id), patch);
+    setNews(prev => prev.map(n => n.id === id ? { ...n, active: false, status: 'deleted' } : n));
+    setSelectedNewsIds(prev => prev.filter(x => x !== id));
+    showUndo({ type: 'news-delete', item, label: `Новость удалена: ${item.title || 'без заголовка'}` });
+    await writeNewsHistory(id, 'soft-delete', item, patch);
+    await auditAdminAction('delete', 'news', id, { label: `Удалена новость: ${item.title || id}`, softDelete: true });
+  };
+
+  const restoreDeletedNews = async () => {
+    if (!adminUndo?.item) return;
+    const item = adminUndo.item;
+    const patch = {
+      active: item.active !== false,
+      status: item.status && item.status !== 'deleted' ? item.status : (item.active === false ? 'draft' : 'published'),
+      deletedAt: null,
+      updatedAt: serverTimestamp(),
+    };
+    await updateDoc(doc(db, 'news', item.id), patch);
+    setNews(prev => prev.map(n => n.id === item.id ? { ...n, ...patch, deletedAt: null } : n));
+    await writeNewsHistory(item.id, 'restore', { status: 'deleted' }, patch);
+    await auditAdminAction('restore', 'news', item.id, { label: `Восстановлена новость: ${item.title || item.id}` });
+    setAdminUndo(null);
   };
 
   const publishNews = async (item) => {
@@ -2038,6 +2310,8 @@ export const AdminPanel = () => {
       updatedAt: serverTimestamp(),
     });
     setNews(prev => prev.map(n => n.id === item.id ? { ...n, active: true, status: 'published' } : n));
+    await writeNewsHistory(item.id, 'publish', item, { active: true, status: 'published' });
+    await auditAdminAction('publish', 'news', item.id, { label: `Опубликована новость: ${item.title || item.id}` });
   };
 
   const pinNews = async (item) => {
@@ -2049,6 +2323,107 @@ export const AdminPanel = () => {
       updatedAt: serverTimestamp(),
     });
     setNews(prev => prev.map(n => n.id === item.id ? { ...n, pinned: next, isPinned: next, priority: next ? Math.max(Number(n.priority || 0), 9) : Number(n.priority || 0) } : n));
+    await writeNewsHistory(item.id, next ? 'pin' : 'unpin', item, { pinned: next, isPinned: next });
+    await auditAdminAction(next ? 'pin' : 'unpin', 'news', item.id, { label: `${next ? 'Закреплена' : 'Откреплена'} новость: ${item.title || item.id}` });
+  };
+
+  const openQuickNewsEditor = (item) => {
+    setQuickEditNews(item);
+    setQuickNewsDraft({
+      title: item.title || '',
+      text: item.text || '',
+      category: item.category || '',
+      priority: Number(item.priority || 0),
+      coverPhoto: contentImageOf(item),
+      linkUrl: item.linkUrl || '',
+      linkLabel: item.linkLabel || '',
+    });
+    setQuickEditorDirty(false);
+    setContextMenu(null);
+  };
+
+  const patchQuickNewsDraft = (patch) => {
+    setQuickNewsDraft(prev => ({ ...(prev || {}), ...patch }));
+    setQuickEditorDirty(true);
+  };
+
+  const saveQuickNewsEditor = useCallback(async ({ silent = false } = {}) => {
+    if (!quickEditNews || !quickNewsDraft?.title?.trim() || !quickNewsDraft?.text?.trim()) return;
+    setQuickEditorSaving(true);
+    const patch = {
+      title: quickNewsDraft.title.trim(),
+      text: quickNewsDraft.text.trim(),
+      category: quickNewsDraft.category || null,
+      priority: Number(quickNewsDraft.priority) || 0,
+      coverPhoto: (quickNewsDraft.coverPhoto || '').trim(),
+      imageUrl: (quickNewsDraft.coverPhoto || '').trim(),
+      linkUrl: (quickNewsDraft.linkUrl || '').trim(),
+      linkLabel: (quickNewsDraft.linkLabel || '').trim(),
+      updatedAt: serverTimestamp(),
+    };
+    try {
+      await updateDoc(doc(db, 'news', quickEditNews.id), patch);
+      setNews(prev => prev.map(n => n.id === quickEditNews.id ? { ...n, ...patch } : n));
+      setQuickEditNews(prev => prev ? { ...prev, ...patch } : prev);
+      setQuickEditorDirty(false);
+      await writeNewsHistory(quickEditNews.id, silent ? 'autosave' : 'quick-update', quickEditNews, patch);
+      await auditAdminAction(silent ? 'autosave' : 'quick-update', 'news', quickEditNews.id, { label: `${silent ? 'Автосохранена' : 'Сохранена'} новость: ${patch.title}` });
+    } catch (e) {
+      logError(e, 'AdminPanel.saveQuickNewsEditor');
+      if (!silent) window.alert(e.message || 'Не удалось сохранить новость.');
+    } finally {
+      setQuickEditorSaving(false);
+    }
+  }, [quickEditNews, quickNewsDraft, auditAdminAction]);
+
+  const toggleNewsSelected = (id) => {
+    setSelectedNewsIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const bulkPublishNews = async () => {
+    const items = news.filter(n => selectedNewsIds.includes(n.id));
+    await Promise.all(items.map(item => publishNews(item)));
+    setSelectedNewsIds([]);
+  };
+
+  const bulkPinNews = async () => {
+    const items = news.filter(n => selectedNewsIds.includes(n.id));
+    await Promise.all(items.map(item => pinNews(item)));
+    setSelectedNewsIds([]);
+  };
+
+  const bulkDeleteNews = async () => {
+    if (!selectedNewsIds.length) return;
+    if (!window.confirm(`Удалить выбранные новости (${selectedNewsIds.length})? Можно отменить последнюю через undo.`)) return;
+    const ids = [...selectedNewsIds];
+    for (const id of ids) {
+      await deleteNews(id, { silent: true });
+    }
+    setSelectedNewsIds([]);
+  };
+
+  const handleNewsSwipe = (item, action) => {
+    if (action === 'publish') publishNews(item);
+    if (action === 'delete') deleteNews(item.id);
+  };
+
+  const handleNewsDrop = async (target) => {
+    if (!draggingNewsId || draggingNewsId === target.id) {
+      setDraggingNewsId('');
+      return;
+    }
+    const dragged = news.find(n => n.id === draggingNewsId);
+    if (!dragged) {
+      setDraggingNewsId('');
+      return;
+    }
+    const targetPriority = Number(target.priority || 0);
+    const patch = { priority: targetPriority + 1, updatedAt: serverTimestamp() };
+    await updateDoc(doc(db, 'news', dragged.id), patch);
+    setNews(prev => prev.map(n => n.id === dragged.id ? { ...n, priority: patch.priority } : n));
+    await writeNewsHistory(dragged.id, 'drag-reorder', dragged, patch);
+    await auditAdminAction('drag-reorder', 'news', dragged.id, { label: `Изменён порядок новости: ${dragged.title || dragged.id}`, targetId: target.id });
+    setDraggingNewsId('');
   };
 
   const loadNewsComments = useCallback(async () => {
@@ -2554,6 +2929,59 @@ export const AdminPanel = () => {
     setAnalyticsLoading(false);
   }, [partners, analyticsLoading]);
 
+  useEffect(() => {
+    if (!quickEditNews || !quickEditorDirty) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveQuickNewsEditor({ silent: true });
+    }, 1400);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [quickEditNews, quickEditorDirty, quickNewsDraft, saveQuickNewsEditor]);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = String(e.target?.tagName || '').toLowerCase();
+      const typing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        if (quickEditNews) {
+          e.preventDefault();
+          saveQuickNewsEditor();
+        }
+        return;
+      }
+      if (typing) return;
+      if (e.key === '/') {
+        e.preventDefault();
+        setShowSearchDrop(true);
+        document.getElementById('admin-global-search')?.focus();
+      }
+      if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        resetNewsForm();
+        setActiveTab('news');
+        setShowNewsModal(true);
+      }
+      if (e.key === 'Escape') {
+        setShowAddDrop(false);
+        setShowToolsDrop(false);
+        setShowSearchDrop(false);
+        setContextMenu(null);
+        setQuickEditNews(null);
+        setQuickNewsDraft(null);
+        setSelectedNewsIds([]);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [quickEditNews, saveQuickNewsEditor]);
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+  }, []);
+
   if (!authed) return <PasswordGate onAllow={() => { setAuthed(true); fetchData(); }} />;
 
   const q = globalSearch.toLowerCase();
@@ -2566,6 +2994,8 @@ export const AdminPanel = () => {
     ...news.filter(n => n.title?.toLowerCase().includes(q)).slice(0, 3).map(n => ({ tab: 'news', id: n.id, label: n.title, emoji: '📢', typeName: 'Новость' })),
     ...prizes.filter(p => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'prizes', id: p.id, label: p.name || p.title, emoji: '🎁', typeName: 'Приз' })),
     ...newsComments.filter(c => String(c.text || '').toLowerCase().includes(q) || String(c.userName || '').toLowerCase().includes(q)).slice(0, 4).map(c => ({ tab: 'comments', id: c.id, label: c.text || 'Комментарий', sub: c.userName, emoji: '💬', typeName: 'Комментарий' })),
+    ...errorLogs.filter(e => String(e.message || e.error || e.source || e.screen || e.userId || '').toLowerCase().includes(q)).slice(0, 4).map(e => ({ tab: 'errors', id: e.id, label: e.message || e.error || 'Ошибка приложения', sub: e.source || e.screen, emoji: '🐞', typeName: 'Ошибка' })),
+    ...((q.includes('ии') || q.includes('ai') || q.includes('чернов')) ? [{ tab: 'ai-drafts', id: 'ai-drafts', label: 'Черновики ИИ', sub: 'Раздел подготовлен к V4.5', emoji: '🤖', typeName: 'Раздел' }] : []),
   ] : [];
   const isCompact = viewportWidth < 860;
   const adminPageStyle = {
@@ -2676,6 +3106,7 @@ export const AdminPanel = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: A.inputBg, border: `1px solid ${globalSearch ? A.gold : A.inputBrd}`, borderRadius: 12, padding: '8px 12px', transition: 'border-color 0.15s' }}>
             <span style={{ fontSize: 14, color: A.textSec, flexShrink: 0 }}>🔍</span>
             <input
+              id="admin-global-search"
               type="search"
               placeholder="Поиск партнёров, экспертов, событий..."
               value={globalSearch}
@@ -3800,14 +4231,26 @@ export const AdminPanel = () => {
 
           <EditorialNewsBoard
             news={news}
-            onEdit={startEditNews}
+            selectedIds={selectedNewsIds}
+            draggingId={draggingNewsId}
+            onEdit={openQuickNewsEditor}
             onPublish={publishNews}
             onPin={pinNews}
             onDelete={deleteNews}
             onCheck={(id) => markLinksChecked('news', id, setNews)}
+            onSelect={toggleNewsSelected}
+            onBulkPublish={bulkPublishNews}
+            onBulkDelete={bulkDeleteNews}
+            onBulkPin={bulkPinNews}
+            onContextMenu={(item, x, y) => setContextMenu({ item, x, y })}
+            onPreview={openQuickNewsEditor}
+            onSwipe={handleNewsSwipe}
+            onDragStart={(item) => setDraggingNewsId(item.id)}
+            onDragOver={(item, e) => e.preventDefault()}
+            onDrop={(item, e) => { e.preventDefault(); handleNewsDrop(item); }}
           />
 
-          <div style={s.card}>
+          <div style={{ display: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Быстрый список новостей</h2>
@@ -4865,6 +5308,34 @@ export const AdminPanel = () => {
         openPrize={() => { resetPrizeForm(); setActiveTab('prizes'); }}
         openPush={() => setActiveTab('notifs')}
         openComments={() => { setActiveTab('comments'); loadNewsComments(); }}
+      />
+
+      <AdminQuickNewsEditor
+        item={quickEditNews}
+        draft={quickNewsDraft}
+        saving={quickEditorSaving}
+        dirty={quickEditorDirty}
+        onPatch={patchQuickNewsDraft}
+        onSave={saveQuickNewsEditor}
+        onClose={() => { setQuickEditNews(null); setQuickNewsDraft(null); setQuickEditorDirty(false); }}
+        onPublish={() => quickEditNews && publishNews(quickEditNews)}
+        onDelete={() => quickEditNews && deleteNews(quickEditNews.id)}
+      />
+
+      <AdminContextMenu
+        menu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onEdit={openQuickNewsEditor}
+        onPublish={publishNews}
+        onPin={pinNews}
+        onDelete={deleteNews}
+        onCheck={(id) => markLinksChecked('news', id, setNews)}
+      />
+
+      <AdminUndoBar
+        undo={adminUndo}
+        onRestore={restoreDeletedNews}
+        onClose={() => setAdminUndo(null)}
       />
 
       {/* QR-модал для партнёра */}
