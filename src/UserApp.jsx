@@ -147,8 +147,7 @@ function isLocalHost() {
 }
 
 async function fetchVkNewsPosts() {
-  if (API_BASE_URL.includes('containers.yandexcloud.net')) return [];
-  const response = await fetch(`${API_BASE_URL}/api/vk-news`);
+  const response = await fetch(`${API_BASE_URL}/api/vk-news?count=30`);
   const data = await response.json().catch(() => ({}));
   return Array.isArray(data.posts) ? data.posts : [];
 }
@@ -719,12 +718,18 @@ export function UserApp() {
 
       const firestoreNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const getMs = n => n.createdAt?.toDate ? n.createdAt.toDate().getTime() : (n.createdAt ?? 0);
-      const freshNews = [...firestoreNews, ...vkPostsRaw]
+      const newsById = new Map();
+      [...firestoreNews, ...vkPostsRaw].forEach(item => {
+        if (!item) return;
+        const id = String(item.id || item.externalId || `${item.source || 'news'}_${item.title || Math.random()}`);
+        newsById.set(id, { ...newsById.get(id), ...item, id });
+      });
+      const freshNews = [...newsById.values()]
         .sort((a, b) => {
           const dp = (b.priority ?? 0) - (a.priority ?? 0);
           return dp !== 0 ? dp : getMs(b) - getMs(a);
         })
-        .slice(0, 20);
+        .slice(0, 50);
       setNews(freshNews);
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
 

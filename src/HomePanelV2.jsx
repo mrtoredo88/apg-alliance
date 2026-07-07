@@ -8,7 +8,7 @@ import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
-import { formatNewsDate, getNewsCategoryLabel, getNewsImage, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
+import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -415,8 +415,6 @@ function V2SecondScreen({
   const eventItem = events[0] ?? null;
   const secondEvent = events.find(e => e.id !== eventItem?.id) ?? null;
   const expertItem = experts[0] ?? null;
-  const firstNews = news[0] ?? null;
-  const smallNews = news.slice(1, 3);
   const raffleImage = profileImageOf(partners[2]) || profileImageOf(primaryPartner);
 
   const forYouCards = [
@@ -453,7 +451,8 @@ function V2SecondScreen({
   ];
 
   const visibleEvents = [eventItem, secondEvent, events[2]].filter(Boolean).slice(0, 3);
-  const newsItems = (news.length ? news : [{ title: 'Город становится ближе' }, { title: 'Новые предложения' }, { title: 'Планы на неделю' }]).slice(0, 3);
+  const apgNews = news.filter(item => getNewsCategory(item) === 'apg');
+  const newsItems = ((apgNews.length ? apgNews : news).length ? (apgNews.length ? apgNews : news) : [{ title: 'Город становится ближе' }, { title: 'Новые предложения' }, { title: 'Планы на неделю' }]).slice(0, 3);
   while (newsItems.length < 3) newsItems.push({ title: newsItems.length === 1 ? 'Новые предложения' : 'Планы на неделю' });
 
   const fallbackCardBg = 'radial-gradient(circle at 24% 14%, rgba(244,217,140,0.28), transparent 38%), radial-gradient(circle at 86% 76%, rgba(82,54,102,0.16), transparent 40%), linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025))';

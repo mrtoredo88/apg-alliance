@@ -1,18 +1,24 @@
 import React, { useMemo, useState } from 'react';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
+import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
 import {
   NEWS_CATEGORIES,
   NEWS_SORTS,
   filterNewsItems,
   formatNewsDate,
+  getNewsDocs,
   getNewsCategory,
   getNewsCategoryLabel,
   getNewsImage,
+  getNewsLinks,
+  getNewsPhotos,
+  getNewsStats,
   getNewsText,
   getNewsTitle,
   getNewsUrl,
+  getNewsVideos,
   getReadingMinutes,
   getNewsViews,
   hasNewsVideo,
@@ -59,12 +65,44 @@ function NewsImage({ item, height = 210, radius = 28, children }) {
   );
 }
 
+function PhotoCarousel({ photos = [] }) {
+  const [idx, setIdx] = useState(0);
+  const safePhotos = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  const safeIdx = Math.min(idx, Math.max(0, safePhotos.length - 1));
+
+  if (safePhotos.length <= 1) return null;
+
+  const go = (dir) => setIdx(current => (current + dir + safePhotos.length) % safePhotos.length);
+
+  return (
+    <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 12, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>
+        <img src={safePhotos[safeIdx]} alt="" loading="lazy" style={{ width: '100%', maxHeight: 430, objectFit: 'contain', display: 'block', background: '#08080a' }} />
+        <button type="button" onClick={() => go(-1)} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(8,8,10,0.52)', color: '#fff', fontSize: 22 }}>‹</button>
+        <button type="button" onClick={() => go(1)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(8,8,10,0.52)', color: '#fff', fontSize: 22 }}>›</button>
+        <div style={{ position: 'absolute', left: '50%', bottom: 10, transform: 'translateX(-50%)', padding: '6px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.54)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 780 }}>{safeIdx + 1} / {safePhotos.length}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }}>
+        {safePhotos.map((photo, index) => (
+          <button key={`${photo}-${index}`} type="button" onClick={() => setIdx(index)} style={{ flex: '0 0 58px', height: 50, borderRadius: 14, padding: 0, overflow: 'hidden', border: index === safeIdx ? '2px solid rgba(215,184,106,0.72)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.15)', background: 'transparent' }}>
+            <img src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </button>
+        ))}
+      </div>
+    </GlassCard>
+  );
+}
+
 function NewsMeta({ item, compact = false }) {
+  const stats = getNewsStats(item);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: APG2_PROFILE.textMuted, fontSize: compact ? 10.5 : 11.5, lineHeight: '15px', fontWeight: 720 }}>
       <span>{formatNewsDate(item)}</span>
       <span>⏱ {getReadingMinutes(item)} мин</span>
-      <span>{getNewsViews(item)} просмотров</span>
+      <span>{stats.views} просмотров</span>
+      {(stats.likes > 0 || stats.comments > 0 || stats.reposts > 0) && (
+        <span>♥ {stats.likes} · 💬 {stats.comments} · ↗ {stats.reposts}</span>
+      )}
       {isFreshNews(item) && <span style={{ color: APG2_PROFILE.gold }}>Новое</span>}
     </div>
   );
@@ -117,6 +155,11 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const url = getNewsUrl(item);
+  const photos = getNewsPhotos(item);
+  const videos = getNewsVideos(item);
+  const links = getNewsLinks(item).filter(link => link.url && link.url !== url);
+  const docs = getNewsDocs(item);
+  const stats = getNewsStats(item);
 
   const handleScroll = (e) => {
     const el = e.currentTarget;
@@ -135,14 +178,18 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
             <button type="button" onClick={() => navigator.clipboard?.writeText(window.location.href).catch(() => {})} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 17 }}>↗</button>
           </div>
 
-          <NewsImage item={item} height={310} radius={34} />
+          <NewsImage item={item} height={310} radius={34}>
+            {(item.isPinned || item.pinned) && (
+              <div style={{ position: 'absolute', left: 16, top: 16, padding: '8px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.56)', border: '1px solid rgba(215,184,106,0.34)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>📌 Закреплено</div>
+            )}
+          </NewsImage>
           <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
             <NewsMeta item={item} />
             <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 32, lineHeight: '37px', fontWeight: 940, letterSpacing: 0 }}>{title}</h1>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <GlassButton onClick={() => onSave?.(item)} tone={saved ? 'gold' : undefined} style={{ minHeight: 40, borderRadius: 17, color: saved ? '#17120a' : APG2_PROFILE.text }}>{saved ? 'Сохранено' : 'Сохранить'}</GlassButton>
               <GlassButton onClick={() => onReadLater?.(item)} tone={later ? 'gold' : undefined} style={{ minHeight: 40, borderRadius: 17, color: later ? '#17120a' : APG2_PROFILE.text }}>{later ? 'В списке позже' : 'Прочитать позже'}</GlassButton>
-              {url && <GlassButton onClick={() => openUrl(url)} style={{ minHeight: 40, borderRadius: 17 }}>Открыть источник</GlassButton>}
+              {url && item.source !== 'vk' && <GlassButton onClick={() => openUrl(url)} style={{ minHeight: 40, borderRadius: 17 }}>Открыть источник</GlassButton>}
             </div>
           </div>
 
@@ -151,6 +198,56 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
               {text || 'Подробный текст новости появится здесь после публикации.'}
             </RichText>
           </GlassCard>
+
+          <PhotoCarousel photos={photos} />
+
+          {videos.length > 0 && (
+            <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: '6px 0 12px' }}>
+              <VideoSection videos={videos} />
+            </GlassCard>
+          )}
+
+          {(links.length > 0 || docs.length > 0) && (
+            <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 12 }}>Вложения</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {links.map((link, index) => (
+                  <button key={`${link.url}-${index}`} type="button" onClick={() => openUrl(link.url)} style={{ display: 'grid', gridTemplateColumns: link.imageUrl ? '58px 1fr' : '1fr', gap: 12, alignItems: 'center', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 20, padding: 10, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
+                    {link.imageUrl && <img src={link.imageUrl} alt="" loading="lazy" style={{ width: 58, height: 50, borderRadius: 14, objectFit: 'cover' }} />}
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 840, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title || link.url}</span>
+                      {link.description && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.description}</span>}
+                    </span>
+                  </button>
+                ))}
+                {docs.map((doc, index) => (
+                  <button key={`${doc.url}-${index}`} type="button" onClick={() => openUrl(doc.url)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 20, padding: 12, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
+                    <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 840 }}>📎 {doc.title}</span>
+                    {doc.ext && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 4 }}>{doc.ext.toUpperCase()}</span>}
+                  </button>
+                ))}
+              </div>
+            </GlassCard>
+          )}
+
+          {item.source === 'vk' && (
+            <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+                {[
+                  ['Просмотры', stats.views],
+                  ['Лайки', stats.likes],
+                  ['Комментарии', stats.comments],
+                  ['Репосты', stats.reposts],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ textAlign: 'center', borderRadius: 18, padding: '10px 6px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900 }}>{value}</div>
+                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, marginTop: 3 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              {url && <GlassButton onClick={() => openUrl(url)} tone="gold" style={{ width: '100%', minHeight: 48, borderRadius: 20, color: '#17120a' }}>Открыть оригинал в ВКонтакте</GlassButton>}
+            </GlassCard>
+          )}
 
           <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900 }}>Реакция</div>
