@@ -482,26 +482,38 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [stopPolling, user]);
 
   const handleTelegramAuth = useCallback(async (isLinking = false) => {
-    tgLinkingRef.current = isLinking;
+    const linking = isLinking === true;
+    tgLinkingRef.current = linking;
     setTgLoading(true);
     setTgError('');
     stopPolling();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      traceAuthStage('telegram_auth_start', { linking: isLinking });
-      const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST' });
+      traceAuthStage('telegram_auth_click', { linking });
+      traceAuthStage('telegram_auth_start', { linking, api: API_BASE_URL });
+      const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST', signal: controller.signal });
       const { state, url, message } = await res.json().catch(() => ({}));
       if (!res.ok || !state || !url) throw new Error(message || 'telegram_start_failed');
       localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));
-      traceAuthStage('telegram_session_created', { state, linking: isLinking });
+      traceAuthStage('telegram_session_created', { state, linking });
       setTgBotUrl(url);
       setTgLoading(false);
       setTgStep('waiting');
       startWaiting(state);
+      setTimeout(() => {
+        traceAuthStage('telegram_open_bot', { state });
+        openUrl(url);
+      }, 80);
     } catch (e) {
       logError(e, 'ProfilePanel.telegram.start');
       traceAuthStage('telegram_start_error', { error: e?.message ?? String(e) });
-      setTgError('Ошибка сети. Попробуйте снова.');
+      const aborted = e?.name === 'AbortError';
+      setTgError(aborted ? 'Telegram не ответил вовремя. Проверьте интернет и попробуйте снова.' : 'Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
+      setTgStep('idle');
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [stopPolling, startWaiting]);
 
@@ -758,7 +770,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                       </button>
                     </div>
                   ) : (
-                    <GlassButton onPointerUp={() => runTelegramAuth(false)} onClick={() => runTelegramAuth(false)} style={{ color: '#26A8EA' }}><TelegramIcon />Войти через Telegram</GlassButton>
+                    <GlassButton onClick={() => runTelegramAuth(false)} style={{ color: '#26A8EA' }}><TelegramIcon />Войти через Telegram</GlassButton>
                   )}
                   {tgError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px', textAlign: 'center' }}>{tgError}</div>}
                 </>
@@ -791,7 +803,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                           </button>
                         </>
                       ) : (
-                        <GlassButton onPointerUp={() => runTelegramAuth(true)} onClick={() => runTelegramAuth(true)} style={{ color: '#26A8EA' }}><TelegramIcon />Привязать Telegram</GlassButton>
+                        <GlassButton onClick={() => runTelegramAuth(true)} style={{ color: '#26A8EA' }}><TelegramIcon />Привязать Telegram</GlassButton>
                       )}
                       {tgError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px', textAlign: 'center' }}>{tgError}</div>}
                     </div>
@@ -1013,7 +1025,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                             Открыть Telegram
                           </button>
                         </div>
-                      : <button onClick={handleTelegramAuth} style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: `1px solid rgba(38,168,234,0.3)`, cursor: 'pointer', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      : <button type="button" onClick={() => runTelegramAuth(false)} style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: `1px solid rgba(38,168,234,0.3)`, cursor: 'pointer', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="#26A8EA"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
                           Войти через Telegram
                         </button>
@@ -1059,7 +1071,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                           </div>
                           <button type="button" onClick={() => openUrl(tgBotUrl)} style={{ display: 'block', padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 13, fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>Открыть Telegram</button>
                         </div>
-                      : <button onClick={() => handleTelegramAuth(true)} style={{ padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.3)', background: 'rgba(38,168,234,0.08)', color: '#26A8EA', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      : <button type="button" onClick={() => runTelegramAuth(true)} style={{ padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.3)', background: 'rgba(38,168,234,0.08)', color: '#26A8EA', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="#26A8EA"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
                           Привязать Telegram
                         </button>
