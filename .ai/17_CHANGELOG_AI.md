@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] P0 восстановление запуска PWA после production deploy
+**Коммит:** `локально`
+**Файлы:** `src/main.jsx`, `public/sw.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Версия service worker cache поднята до `apg-p0-restore-20260708`, чтобы установленная PWA принудительно сбросила старые runtime/static caches. Повторный `controllerchange` reload ограничен одним разом за сессию, чтобы обновление service worker не могло уйти в цикл перезагрузки.
+**Почему:** Свежий production-браузер и persistent PWA-профиль не воспроизвели React runtime error, но после deploy белый экран у пользователя соответствует stale PWA/SW-cache сценарию. Hotfix восстанавливает загрузку без изменения бизнес-логики и UI.
+
+---
+
 ## [2026-07-07] P0 admin API: Firebase token вынесен из Authorization для Yandex
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/userApi.js`, `src/ProfilePanel.jsx`, `src/NewsPage.jsx`, `api/_admin-security.js`, `server/src/lib/adminSecurity.js`, `api/admin-actions.js`, `api/user-actions.js`, `api/email-auth.js`, `api/news-comments.js`, `api/news-engagement.js`, `api/system-status.js`, `api/loki-editor.js`, `server/src/routes/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/server.js`, `.ai/17_CHANGELOG_AI.md`

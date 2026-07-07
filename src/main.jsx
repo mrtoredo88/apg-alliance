@@ -25,6 +25,8 @@ if (_vkHash.includes('access_token=') && window.opener) {
   if ('serviceWorker' in navigator) {
     window.__swRegPromise = navigator.serviceWorker.register('/sw.js').catch(() => null);
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (sessionStorage.getItem('apg_sw_controller_reload') === '1') return;
+      sessionStorage.setItem('apg_sw_controller_reload', '1');
       window.location.reload();
     });
   }
