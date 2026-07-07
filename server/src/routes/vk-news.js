@@ -140,18 +140,35 @@ function mapPost(post) {
   };
 }
 
-async function readCachedPosts(limit = 30) {
+async function readCachedPosts(limit = 30, request = null) {
   try {
     const snap = await getDb().collection('news').where('source', '==', 'vk').limit(limit).get();
     return snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .sort((a, b) => (Number(b.publishedAt) || Number(b.createdAt) || 0) - (Number(a.publishedAt) || Number(a.createdAt) || 0));
-  } catch {
+  } catch (e) {
+    if (request) logVkNews(request, 'warn', { event: 'cache_read_failed', reason: e.message });
     return [];
   }
 }
 
-async function cachePosts(posts) {
+function getVkToken() {
+  if (process.env.VK_SERVICE_TOKEN) return { token: process.env.VK_SERVICE_TOKEN, source: 'VK_SERVICE_TOKEN' };
+  if (process.env.VK_USER_TOKEN) return { token: process.env.VK_USER_TOKEN, source: 'VK_USER_TOKEN' };
+  if (process.env.VK_GROUP_TOKEN) return { token: process.env.VK_GROUP_TOKEN, source: 'VK_GROUP_TOKEN' };
+  return { token: '', source: 'none' };
+}
+
+function logVkNews(request, level, payload) {
+  const data = { scope: 'vk-news', ...payload };
+  if (level === 'warn') {
+    request.log.warn(data);
+    return;
+  }
+  request.log.info(data);
+}
+
+async function cachePosts(posts, request = null) {
   if (!posts.length) return;
   try {
     const db = getDb();
@@ -173,7 +190,9 @@ async function cachePosts(posts) {
       lastError: null,
     }, { merge: true });
     await batch.commit();
-  } catch {
+    if (request) logVkNews(request, 'info', { event: 'cache_write_ok', postsCount: posts.length });
+  } catch (e) {
+    if (request) logVkNews(request, 'warn', { event: 'cache_write_failed', reason: e.message });
   }
 }
 
@@ -187,9 +206,11 @@ export default async function vkNewsRoutes(fastify) {
     reply.header('Cache-Control', 's-maxage=180, stale-while-revalidate=900');
 
     const count = Math.min(50, Math.max(1, Number(request.query.count) || 20));
-    const token = process.env.VK_SERVICE_TOKEN || process.env.VK_USER_TOKEN || process.env.VK_GROUP_TOKEN;
+    const { token, source: tokenSource } = getVkToken();
+    logVkNews(request, 'info', { event: 'request_start', tokenFound: Boolean(token), tokenSource, count });
     if (!token) {
-      const cached = await readCachedPosts(count);
+      const cached = await readCachedPosts(count, request);
+      logVkNews(request, 'warn', { event: 'token_missing', source: 'cache', postsCount: cached.length });
       return { posts: cached, cached: true, unavailable: true, reason: 'token_missing' };
     }
 
@@ -206,7 +227,15 @@ export default async function vkNewsRoutes(fastify) {
       const data = await response.json();
 
       if (data.error) {
-        const cached = await readCachedPosts(count);
+        const cached = await readCachedPosts(count, request);
+        logVkNews(request, 'warn', {
+          event: 'vk_api_error',
+          source: 'cache',
+          tokenSource,
+          code: data.error.error_code,
+          reason: data.error.error_msg,
+          postsCount: cached.length,
+        });
         return {
           posts: cached,
           cached: true,
@@ -220,7 +249,8 @@ export default async function vkNewsRoutes(fastify) {
         .filter(p => !p.marked_as_ads && (p.text?.trim() || p.attachments?.length))
         .map(mapPost);
 
-      cachePosts(posts);
+      cachePosts(posts, request);
+      logVkNews(request, 'info', { event: 'vk_live_ok', source: 'live_vk', tokenSource, postsCount: posts.length });
       return {
         posts,
         cached: false,
@@ -229,7 +259,8 @@ export default async function vkNewsRoutes(fastify) {
         syncedAt: Date.now(),
       };
     } catch (e) {
-      const cached = await readCachedPosts(count);
+      const cached = await readCachedPosts(count, request);
+      logVkNews(request, 'warn', { event: 'vk_request_failed', source: 'cache', tokenSource, reason: e.message, postsCount: cached.length });
       return { posts: cached, cached: true, unavailable: true, reason: e.message };
     }
   });

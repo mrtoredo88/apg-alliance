@@ -147,9 +147,26 @@ async function readCachedPosts(limit = 30) {
     return snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .sort((a, b) => (Number(b.publishedAt) || Number(b.createdAt) || 0) - (Number(a.publishedAt) || Number(a.createdAt) || 0));
-  } catch {
+  } catch (e) {
+    logVkNews('warn', { event: 'cache_read_failed', reason: e.message });
     return [];
   }
+}
+
+function getVkToken() {
+  if (process.env.VK_SERVICE_TOKEN) return { token: process.env.VK_SERVICE_TOKEN, source: 'VK_SERVICE_TOKEN' };
+  if (process.env.VK_USER_TOKEN) return { token: process.env.VK_USER_TOKEN, source: 'VK_USER_TOKEN' };
+  if (process.env.VK_GROUP_TOKEN) return { token: process.env.VK_GROUP_TOKEN, source: 'VK_GROUP_TOKEN' };
+  return { token: '', source: 'none' };
+}
+
+function logVkNews(level, payload) {
+  const data = { scope: 'vk-news', ...payload };
+  if (level === 'warn') {
+    console.warn(data);
+    return;
+  }
+  console.info(data);
 }
 
 async function cachePosts(posts) {
@@ -174,7 +191,9 @@ async function cachePosts(posts) {
       lastError: null,
     }, { merge: true });
     await batch.commit();
-  } catch {
+    logVkNews('info', { event: 'cache_write_ok', postsCount: posts.length });
+  } catch (e) {
+    logVkNews('warn', { event: 'cache_write_failed', reason: e.message });
   }
 }
 
@@ -189,9 +208,11 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=900');
 
   const count = Math.min(50, Math.max(1, Number(req.query.count) || 20));
-  const token = process.env.VK_SERVICE_TOKEN || process.env.VK_USER_TOKEN || process.env.VK_GROUP_TOKEN;
+  const { token, source: tokenSource } = getVkToken();
+  logVkNews('info', { event: 'request_start', tokenFound: Boolean(token), tokenSource, count });
   if (!token) {
     const cached = await readCachedPosts(count);
+    logVkNews('warn', { event: 'token_missing', source: 'cache', postsCount: cached.length });
     return res.status(200).json({ posts: cached, cached: true, unavailable: true, reason: 'token_missing' });
   }
 
@@ -209,6 +230,14 @@ export default async function handler(req, res) {
 
     if (data.error) {
       const cached = await readCachedPosts(count);
+      logVkNews('warn', {
+        event: 'vk_api_error',
+        source: 'cache',
+        tokenSource,
+        code: data.error.error_code,
+        reason: data.error.error_msg,
+        postsCount: cached.length,
+      });
       return res.status(200).json({
         posts: cached,
         cached: true,
@@ -223,6 +252,7 @@ export default async function handler(req, res) {
       .map(mapPost);
 
     cachePosts(posts);
+    logVkNews('info', { event: 'vk_live_ok', source: 'live_vk', tokenSource, postsCount: posts.length });
     return res.status(200).json({
       posts,
       cached: false,
@@ -232,6 +262,7 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     const cached = await readCachedPosts(count);
+    logVkNews('warn', { event: 'vk_request_failed', source: 'cache', tokenSource, reason: e.message, postsCount: cached.length });
     return res.status(200).json({ posts: cached, cached: true, unavailable: true, reason: e.message });
   }
 }

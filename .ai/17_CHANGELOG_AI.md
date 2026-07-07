@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Диагностика VK News live/cache в production API
+**Коммит:** pending
+**Файлы:** `api/vk-news.js`, `server/src/routes/vk-news.js`, `.ai/04_API.md`
+**Тип:** fix
+**Что изменено:** `/api/vk-news` теперь логирует безопасную диагностику: наличие токена, источник токена, live/cache режим, ошибки VK API и количество постов. Ошибки чтения/записи Firestore cache больше не скрываются молча.
+**Почему:** Production возвращал пустой cached fallback из-за `VK_GROUP_TOKEN`, который не подходит для `wall.get`; нужны понятные логи для проверки `VK_SERVICE_TOKEN` / `VK_USER_TOKEN` после добавления в окружение.
+
+---
+
 ## [2026-07-07] Yandex deploy env для VK News
 **Коммит:** `e6fc020d`
 **Файлы:** `server/deploy.sh`, `.ai/04_API.md`, `.ai/13_DEPLOYMENT.md`
