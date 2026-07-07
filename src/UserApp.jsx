@@ -47,6 +47,7 @@ const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
 const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => ({ default: m.ReferencePage })));
 const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
+const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ default: m.NewsPage })));
 
 function safeScrollTop() {
   try {
@@ -134,7 +135,7 @@ function formatCacheAge(ts) {
 initErrorLogger();
 
 const SWIPE_TABS = ['home', 'offers', 'experts', 'profile'];
-const PULL_REFRESH_PANELS = new Set(['home', 'offers', 'experts', 'events']);
+const PULL_REFRESH_PANELS = new Set(['home', 'offers', 'experts', 'events', 'news']);
 
 function isLocalHost() {
   const h = window.location.hostname;
@@ -305,6 +306,9 @@ export function UserApp() {
   const [scannedExperts, setScannedExperts]     = useState({});
   const [events, setEvents]                     = useState([]);
   const [news, setNews]                         = useState([]);
+  const [savedNews, setSavedNews]               = useState([]);
+  const [readLaterNews, setReadLaterNews]       = useState([]);
+  const [newsReactions, setNewsReactions]       = useState({});
   const [notifications, setNotifications]       = useState([]);
   const [customTasks, setCustomTasks]           = useState([]);
   const [loading, setLoading]                   = useState(true);
@@ -809,6 +813,9 @@ export function UserApp() {
         }) : u);
         setUserKeys(keys);
         setFavorites(data.favorites ?? []);
+        setSavedNews(Array.isArray(data.savedNews) ? data.savedNews.map(String) : []);
+        setReadLaterNews(Array.isArray(data.readLaterNews) ? data.readLaterNews.map(String) : []);
+        setNewsReactions(data.newsReactions && typeof data.newsReactions === 'object' ? data.newsReactions : {});
         setScannedPartnerIds(data.scannedPartners ?? {});
         setCompletedTasks(data.completedTasks ?? []);
         setStreak(data.streak ?? 0);
@@ -867,6 +874,7 @@ export function UserApp() {
         await setDoc(userRef, {
           keys: isValidRef ? 2 : 0,          // +2 за переход по реферальной ссылке
           favorites: [], scannedPartners: {},
+          savedNews: [], readLaterNews: [], newsReactions: {},
           completedTasks: [], streak: 0, onboardingDone: false,
           scanDates: [], lastBonusDate: todayKey,
           referredBy: refId ?? null,
@@ -955,6 +963,17 @@ export function UserApp() {
     }
   }, [activePanel, handleRefresh, pullRefreshing]);
 
+  const toastTimerRef = useRef(null);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+  const showToast = useCallback((msg, type = 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ msg, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
   // ─── Onboarding ─────────────────────────────────────────────────────────────
 
   const handleOnboardingComplete = async () => {
@@ -992,18 +1011,64 @@ export function UserApp() {
     } catch { setFavorites(prev); }
   }, [user, favorites, partners, haptic]);
 
-  // ─── Скан ───────────────────────────────────────────────────────────────────
+  const canWriteUserNewsState = useCallback(() => {
+    if (!user || String(user.id).startsWith('guest_')) {
+      showToast('Войдите в аккаунт, чтобы сохранять новости.', 'info');
+      return false;
+    }
+    return true;
+  }, [showToast, user]);
 
-  const toastTimerRef = useRef(null);
-  useEffect(() => () => {
-    mountedRef.current = false;
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-  }, []);
-  const showToast = useCallback((msg, type = 'info') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ msg, type });
-    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
-  }, []);
+  const toggleSavedNews = useCallback(async (item) => {
+    const id = item?.id ? String(item.id) : '';
+    if (!id || !canWriteUserNewsState()) return;
+    const prev = savedNews;
+    const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
+    setSavedNews(next);
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), { savedNews: next });
+      showToast(next.includes(id) ? 'Новость сохранена.' : 'Новость убрана из сохранённых.', 'success');
+    } catch (e) {
+      setSavedNews(prev);
+      logError(e, 'UserApp.toggleSavedNews');
+      showToast('Не удалось сохранить новость. Попробуйте ещё раз.', 'error');
+    }
+  }, [canWriteUserNewsState, savedNews, showToast, user]);
+
+  const toggleReadLaterNews = useCallback(async (item) => {
+    const id = item?.id ? String(item.id) : '';
+    if (!id || !canWriteUserNewsState()) return;
+    const prev = readLaterNews;
+    const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
+    setReadLaterNews(next);
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), { readLaterNews: next });
+      showToast(next.includes(id) ? 'Добавлено в список на потом.' : 'Убрано из списка на потом.', 'success');
+    } catch (e) {
+      setReadLaterNews(prev);
+      logError(e, 'UserApp.toggleReadLaterNews');
+      showToast('Не удалось обновить список. Попробуйте ещё раз.', 'error');
+    }
+  }, [canWriteUserNewsState, readLaterNews, showToast, user]);
+
+  const reactToNews = useCallback(async (item, reaction) => {
+    const id = item?.id ? String(item.id) : '';
+    if (!id || !reaction || !canWriteUserNewsState()) return;
+    const prev = newsReactions;
+    const next = { ...prev, [id]: reaction };
+    setNewsReactions(next);
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), { newsReactions: next });
+      updateDoc(doc(db, 'news', id), { [`reactions.${reaction}`]: increment(1) }).catch(() => {});
+      showToast('Реакция сохранена.', 'success');
+    } catch (e) {
+      setNewsReactions(prev);
+      logError(e, 'UserApp.reactToNews');
+      showToast('Не удалось сохранить реакцию. Попробуйте ещё раз.', 'error');
+    }
+  }, [canWriteUserNewsState, newsReactions, showToast, user]);
+
+  // ─── Скан ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     keyBurstTimersRef.current.forEach(clearTimeout);
@@ -1920,7 +1985,7 @@ export function UserApp() {
       else goPanel('offers');
     },
     [LOKI_APP_ACTIONS.OPEN_EVENT]: () => goPanel('events'),
-    [LOKI_APP_ACTIONS.OPEN_NEWS]: () => goPanel('home'),
+    [LOKI_APP_ACTIONS.OPEN_NEWS]: () => goPanel('news'),
     [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
     [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
     [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
@@ -2039,6 +2104,7 @@ export function UserApp() {
     onOpenLeaderboard: () => goPanel('leaderboard'),
     onOpenRewards: () => goPanel('rewards'),
     onOpenNotifications: openNotifications,
+    onOpenNews: () => goPanel('news'),
     joinedGroup,
     onJoinGroup: handleJoinGroup,
     userCount: platformStats.userCount,
@@ -2120,6 +2186,23 @@ export function UserApp() {
               {/* nav= нужен View для навигации; Panel id внутри компонента — для стилей */}
               <HomePanelV2 {...homePanelProps} />
 
+              <Panel id="news">
+                <Suspense fallback={<LazyFallback />}>
+                  <NewsPage
+                    news={news}
+                    user={user}
+                    savedNews={savedNews}
+                    readLaterNews={readLaterNews}
+                    newsReactions={newsReactions}
+                    onBack={goBackPanel}
+                    onReact={reactToNews}
+                    onSave={toggleSavedNews}
+                    onReadLater={toggleReadLaterNews}
+                    onRefresh={handleRefresh}
+                  />
+                </Suspense>
+              </Panel>
+
               <Panel id="partner">
                 <Suspense fallback={<LazyFallback />}>
                   <PartnerPage
@@ -2168,6 +2251,9 @@ export function UserApp() {
 	                    variant="v2"
 	                    user={user} userKeys={userKeys} favorites={favorites}
                     partners={enrichedPartners} events={events}
+                    news={news}
+                    savedNews={savedNews}
+                    readLaterNews={readLaterNews}
                     registeredEventIds={registeredEventIds}
                     referralCount={referralCount}
                     streak={streak} scannedCount={Object.keys(scannedPartnerIds).length}
@@ -2193,7 +2279,8 @@ export function UserApp() {
                     onEmailAuthSuccess={handleEmailAuthSuccess}
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
-                  />
+                    onOpenNews={() => goPanel('news')}
+	                  />
                 </Suspense>
               </Panel>
 

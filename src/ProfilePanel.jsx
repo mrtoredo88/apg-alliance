@@ -10,6 +10,7 @@ import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL, API_BASE_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
+import { formatNewsDate, getNewsTitle } from './newsUtils.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -376,7 +377,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -666,6 +667,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   useEffect(() => () => clearTimeout(dismissTimerRef.current), []);
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const favoritePartners = useMemo(() => partners.filter(p => favorites.includes(p.id)), [partners, favorites]);
+  const savedNewsItems = useMemo(() => {
+    const saved = new Set((savedNews || []).map(String));
+    const later = new Set((readLaterNews || []).map(String));
+    return (news || [])
+      .filter(item => item?.id && (saved.has(String(item.id)) || later.has(String(item.id))))
+      .slice(0, 5);
+  }, [news, readLaterNews, savedNews]);
 
   const stats = [
     { label: 'Ключей',    value: userKeys,          emoji: '🗝️' },
@@ -887,6 +895,28 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               ))}
             </div>
           )}
+        </GlassSection>
+
+        <GlassSection title="Новости">
+          <GlassCard style={{ display: 'grid', gap: 11 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div>
+                <div style={{ color: APG2.text, fontSize: 17, fontWeight: 860 }}>Сохранённые материалы</div>
+                <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3 }}>{savedNews.length} сохранено · {readLaterNews.length} на потом</div>
+              </div>
+              <GlassButton onClick={onOpenNews} style={{ minHeight: 38, borderRadius: 17, padding: '8px 12px' }}>Открыть</GlassButton>
+            </div>
+            {savedNewsItems.length > 0 && (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {savedNewsItems.map(item => (
+                  <button key={item.id} type="button" onClick={onOpenNews} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2.text, padding: '10px 12px', textAlign: 'left', fontFamily: 'inherit' }}>
+                    <span style={{ display: 'block', color: APG2.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 820, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getNewsTitle(item)}</span>
+                    <span style={{ display: 'block', color: APG2.textMuted, fontSize: 11, lineHeight: '15px', marginTop: 3 }}>{formatNewsDate(item)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </GlassCard>
         </GlassSection>
 
         <GlassSection title="Достижения">

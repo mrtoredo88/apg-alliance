@@ -8,6 +8,7 @@ import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
+import { formatNewsDate, getNewsCategoryLabel, getNewsImage, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -382,6 +383,7 @@ function V2SecondScreen({
   onOpenEvents,
   onOpenExperts,
   onOpenRewards,
+  onOpenNews,
 }) {
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
@@ -523,69 +525,8 @@ function V2SecondScreen({
         </HorizontalScroll>
       </div>
 
-      <div style={{ padding: '0 22px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
-          <div>
-            <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780, marginBottom: 5 }}>
-              Новости
-            </div>
-            <div style={{ color: V2.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 420 }}>
-              Главное за несколько секунд
-            </div>
-          </div>
-          <span style={{ ...GlassBadge, color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text' }}>Live</span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1.12fr 0.88fr', gap: 10, marginBottom: 30, alignItems: 'stretch' }}>
-          <button
-            onClick={onOpenEvents}
-            {...pressMotion}
-            style={{
-              minHeight: 238, border: 'none', borderRadius: 32, overflow: 'hidden', position: 'relative',
-              padding: 0, textAlign: 'left', cursor: 'pointer', background: fallbackCardBg,
-              ...GlassCard,
-              boxShadow: '0 24px 62px var(--apg2-elev-shadow, rgba(0,0,0,0.27)), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -24px 48px rgba(255,255,255,0.032)',
-              animation: 'fadeInUp 0.56s ease both',
-            }}
-          >
-            {renderImageLayer(contentImageOf(newsItems[0]), 0.56)}
-            <div style={{ position: 'absolute', inset: 0, background: layerShade }} />
-            <div style={{ position: 'relative', zIndex: 1, minHeight: 238, padding: 17, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <span style={{ alignSelf: 'flex-start', ...GlassBadge }}>Главное</span>
-              <div>
-                <div style={{ color: V2.text, fontSize: 21, lineHeight: '26px', fontWeight: 790, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', textShadow: '0 12px 28px rgba(0,0,0,0.18)' }}>
-                  {titleOf(newsItems[0], 'Город становится ближе')}
-                </div>
-                <div style={{ marginTop: 14, width: 56, height: 1, background: V2.goldMetal, opacity: 0.8, boxShadow: '0 0 18px rgba(244,217,140,0.22)' }} />
-              </div>
-            </div>
-          </button>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {newsItems.slice(1, 3).map((item, index) => (
-              <button
-                key={`${item.id ?? item.title}-${index}`}
-                onClick={onOpenEvents}
-                {...pressMotion}
-                style={{
-                  minHeight: index === 0 ? 112 : 116, border: 'none', borderRadius: 26, padding: 0, textAlign: 'left', cursor: 'pointer',
-                  ...GlassCard,
-                  overflow: 'hidden',
-                  position: 'relative',
-                  animation: 'fadeInUp 0.56s ease both',
-                  animationDelay: `${0.06 + index * 0.05}s`,
-                }}
-              >
-                {renderImageLayer(contentImageOf(item), 0.34)}
-                <div style={{ position: 'absolute', inset: 0, background: 'var(--apg2-image-shade-soft, linear-gradient(180deg, rgba(14,14,16,0.28), rgba(14,14,16,0.84)))' }} />
-                <span style={{ position: 'relative', zIndex: 1, minHeight: index === 0 ? 112 : 116, padding: 13, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 11, lineHeight: '15px', fontWeight: 820 }}>{index === 0 ? 'Новость' : 'Коротко'}</span>
-                  <span style={{ color: V2.text, fontSize: 16, lineHeight: '21px', fontWeight: 760, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', textShadow: '0 10px 24px rgba(0,0,0,0.16)' }}>{titleOf(item, index === 0 ? 'Новые предложения' : 'Планы на неделю')}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+      <div style={{ padding: '0 0 0' }}>
+        <NewsFeed news={newsItems} onOpenNews={onOpenNews} />
 
         <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780, marginBottom: 16 }}>
           Ближайшие мероприятия
@@ -1213,138 +1154,62 @@ function NewsModal({ item, onClose }) {
   return createPortal(modal, document.body);
 }
 
-function NewsWidget({ news }) {
-  const [idx, setIdx]         = useState(0);
-  const [modal, setModal]     = useState(null);
-  const [offset, setOffset]   = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const widgetBodyRef = useRef(null);
-  const touchY   = useRef(null);
-  const idxRef   = useRef(0);
+function NewsWidget({ news = [], onOpenNews }) {
+  const [modal, setModal] = useState(null);
+  const items = useMemo(() => (Array.isArray(news) ? news.filter(Boolean).slice(0, 8) : []), [news]);
 
-  const ITEM_H    = 270;
-  const THRESHOLD = 55;
-
-  const goTo = useCallback((newIdx) => {
-    const clamped = Math.max(0, Math.min(news.length - 1, newIdx));
-    idxRef.current = clamped;
-    setIdx(clamped);
-    setOffset(0);
-    setIsDragging(false);
-  }, [news.length]);
-
-  // Non-passive touchmove: prevents page scroll while swiping inside the widget
-  useEffect(() => {
-    const el = widgetBodyRef.current;
-    if (!el) return;
-    const onMove = (e) => {
-      if (touchY.current === null) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const dy = e.touches[0].clientY - touchY.current;
-      const cur = idxRef.current;
-      const atEdge = (cur === 0 && dy > 0) || (cur === news.length - 1 && dy < 0);
-      setOffset(atEdge ? dy * 0.2 : dy);
-    };
-    el.addEventListener('touchmove', onMove, { passive: false });
-    return () => el.removeEventListener('touchmove', onMove);
-  }, [news.length]);
-
-  if (!news.length) return null;
-
-  const onTouchStart = (e) => {
-    e.stopPropagation();
-    touchY.current = e.touches[0].clientY;
-    setIsDragging(true);
-  };
-
-  const onTouchEnd = (e) => {
-    if (touchY.current === null) return;
-    const dy = e.changedTouches[0].clientY - touchY.current;
-    touchY.current = null;
-    if (dy < -THRESHOLD && idxRef.current < news.length - 1) goTo(idxRef.current + 1);
-    else if (dy > THRESHOLD && idxRef.current > 0) goTo(idxRef.current - 1);
-    else { setOffset(0); setIsDragging(false); }
-  };
+  if (!items.length) return null;
 
   return (
     <>
-      <div style={{ margin: '8px 16px 0', ...GLASS_STRONG, borderRadius: 24, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
+      <div style={{ margin: '0 0 28px', ...GLASS_STRONG, borderRadius: 32, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 16% 0%, rgba(244,217,140,0.13), transparent 34%)' }} />
+        <div style={{ position: 'relative', padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 880, color: T.gold, letterSpacing: 1.7, textTransform: 'uppercase', marginBottom: 6 }}>✦ Новости АПГ</div>
+              <div style={{ color: T.textPri, fontSize: 22, lineHeight: '27px', fontWeight: 900 }}>Что нового в городе</div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenNews}
+              style={{ border: '1px solid rgba(201,168,76,0.28)', background: 'rgba(201,168,76,0.12)', color: T.gold, borderRadius: 999, minHeight: 36, padding: '0 13px', fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Все →
+            </button>
+          </div>
 
-        {/* Шапка виджета */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, letterSpacing: 2.5, textTransform: 'uppercase' }}>✦ Новости АПГ</span>
-          {news.length > 1 && <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>{idx + 1} / {news.length}</span>}
-        </div>
-
-        {/* Вертикальный слайдер */}
-        <div
-          ref={widgetBodyRef}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-          style={{ height: ITEM_H, overflow: 'hidden', position: 'relative' }}
-        >
-          <div style={{
-            transform: `translateY(${-idx * ITEM_H + offset}px)`,
-            transition: isDragging ? 'none' : motionTransition(['transform'], 'modal', 'soft'),
-          }}>
-            {news.map((n) => {
-              const newsImage = contentImageOf(n);
-              const ds = n.createdAt?.toDate
-                ? n.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-                : n.createdAt
-                ? new Date(n.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-                : '';
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', paddingBottom: 2, margin: '0 -16px', paddingLeft: 16, paddingRight: 16 }}>
+            {items.map((item, index) => {
+              const image = getNewsImage(item);
               return (
-                <div key={n.id} style={{ height: ITEM_H, display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
-                  {newsImage ? (
-                    <div style={{ margin: '0 -16px 12px', position: 'relative', flexShrink: 0 }}>
-                      <img src={newsImage} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
-                        style={{ width: '100%', height: 132, objectFit: 'cover', display: 'block' }} />
-                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(8,8,26,0.55) 0%, transparent 55%)', pointerEvents: 'none' }} />
-                    </div>
-                  ) : (
-                    n.emoji && <div style={{ fontSize: 42, lineHeight: 1, marginBottom: 10, flexShrink: 0 }}>{n.emoji}</div>
-                  )}
-                  <div style={{ fontSize: 17, fontWeight: 900, color: T.textPri, lineHeight: 1.35, marginBottom: 8, letterSpacing: -0.3, flexShrink: 0 }}>
-                    {(n.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
-                    {newsImage && n.emoji && <span style={{ marginRight: 6 }}>{n.emoji}</span>}
-                    {n.title}
-                  </div>
-                  <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px', flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: newsImage ? 3 : 4, WebkitBoxOrient: 'vertical' }}>
-                    {n.text}
-                  </div>
-                  {ds && <div style={{ fontSize: 11, color: T.textSec, marginTop: 8, flexShrink: 0 }}>{ds}</div>}
-                </div>
+                <button
+                  key={item.id || `${getNewsTitle(item)}-${index}`}
+                  type="button"
+                  onClick={() => setModal(item)}
+                  {...pressMotion}
+                  style={{ flex: '0 0 248px', minHeight: 282, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: T.textPri, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', scrollSnapAlign: 'start', fontFamily: 'inherit' }}
+                >
+                  <span style={{ display: 'block', position: 'relative', height: 136, background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
+                    {image && <img src={image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent, rgba(8,8,10,0.72))' }} />
+                    <span style={{ position: 'absolute', left: 12, top: 12, padding: '7px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.48)', border: '1px solid rgba(244,217,140,0.24)', color: T.gold, fontSize: 10.5, lineHeight: '13px', fontWeight: 850, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>{getNewsCategoryLabel(item)}</span>
+                    {hasNewsVideo(item) && <span style={{ position: 'absolute', right: 12, top: 12, width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(8,8,10,0.52)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff' }}>▶</span>}
+                  </span>
+                  <span style={{ display: 'grid', gap: 9, padding: 14 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: T.textSec, fontSize: 10.5, fontWeight: 720 }}>
+                      <span>{formatNewsDate(item)}</span>
+                      <span>{getReadingMinutes(item)} мин</span>
+                      {isFreshNews(item) && <span style={{ color: T.gold }}>Новое</span>}
+                    </span>
+                    <span style={{ color: T.textPri, fontSize: 17, lineHeight: '21px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
+                    <span style={{ color: T.textSec, fontSize: 12.5, lineHeight: '18px', fontWeight: 520, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(item) || 'Короткий материал АПГ. Откройте, чтобы узнать больше.'}</span>
+                    <span style={{ marginTop: 2, color: T.textSoft, fontSize: 11, fontWeight: 720 }}>{getNewsViews(item)} просмотров</span>
+                  </span>
+                </button>
               );
             })}
           </div>
-        </div>
-
-        {/* Подвал: вертикальные точки + кнопка */}
-        <div style={{ padding: '10px 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {news.length > 1 && news.map((_, i) => (
-              <div key={i} onClick={() => goTo(i)} style={{
-                width: 6,
-                height: i === idx ? 20 : 6,
-                borderRadius: 3,
-                cursor: 'pointer',
-                background: i === idx ? T.gold : T.border,
-                transition: 'all 0.25s ease',
-              }} />
-            ))}
-          </div>
-          <button onClick={() => setModal(news[idx])} style={{
-            background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
-            color: '#0F0F1A', border: 'none', borderRadius: 14,
-            padding: '9px 18px', fontSize: 13, fontWeight: 800,
-            cursor: 'pointer', flexShrink: 0, letterSpacing: 0.3,
-            boxShadow: `0 4px 14px rgba(201,168,76,0.35)`,
-            marginLeft: news.length > 1 ? 0 : 'auto',
-          }}>
-            Подробнее
-          </button>
         </div>
       </div>
 
@@ -1353,8 +1218,8 @@ function NewsWidget({ news }) {
   );
 }
 
-function NewsFeed({ news }) {
-  return <NewsWidget news={news} />;
+function NewsFeed({ news, onOpenNews }) {
+  return <NewsWidget news={news} onOpenNews={onOpenNews} />;
 }
 
 // ─── Баннер ───────────────────────────────────────────────────────────────────
@@ -2044,7 +1909,7 @@ export function HomePanelV2({
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
   counterPulse = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -2245,6 +2110,7 @@ export function HomePanelV2({
               onOpenEvents={onOpenEvents}
               onOpenExperts={onOpenExperts}
               onOpenRewards={onOpenRewards}
+              onOpenNews={onOpenNews}
             />
 
           </>
