@@ -769,6 +769,50 @@ function AdminContextMenu({ menu, onClose, onEdit, onPublish, onPin, onDelete, o
   );
 }
 
+function SystemStatusPanel({ status, loading, onRefresh }) {
+  const collections = status?.firestore?.collections || {};
+  const rows = [
+    ['API', status?.api?.ok, status?.api?.runtime || 'unknown', `${status?.latencyMs ?? 0} ms`],
+    ['Firestore', status?.firestore?.ok, 'collections', Object.values(collections).filter(v => v?.ok).length],
+    ['VK News', status?.vkNews?.ok, status?.vkNews?.source || 'unknown', `${status?.vkNews?.count || 0} постов`],
+    ['Очередь задач', status?.queues?.ok, status?.queues?.note || 'ok', status?.queues?.pending ?? 0],
+    ['Backup', status?.backups?.configured, status?.backups?.note || 'нет данных', status?.backups?.lastBackupAt || '—'],
+  ];
+  return (
+    <div>
+      <div style={{ ...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <div>
+          <h1 style={{ ...s.h1, marginBottom: 4 }}>🛡 Состояние системы</h1>
+          <div style={{ color: A.textSec, fontSize: 12 }}>Проверка API, Firestore, VK News, очередей, ошибок и backup markers.</div>
+        </div>
+        <button type="button" onClick={onRefresh} disabled={loading} style={{ ...s.btn, ...s.btnPri, opacity: loading ? 0.55 : 1 }}>{loading ? 'Проверяем...' : '↻ Обновить'}</button>
+      </div>
+      {status?.error && <div style={{ ...s.card, borderColor: A.redBrd, color: '#ff9a9a' }}>{status.error}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+        {rows.map(([label, ok, text, value]) => (
+          <div key={label} style={{ ...s.card, marginBottom: 0, borderColor: ok ? 'rgba(75,179,75,0.3)' : A.redBrd }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+              <div style={{ color: A.text, fontSize: 14, fontWeight: 900 }}>{label}</div>
+              <div style={{ color: ok ? '#4BB34B' : A.red, fontWeight: 900 }}>{ok ? 'OK' : 'WARN'}</div>
+            </div>
+            <div style={{ color: A.textSec, fontSize: 12, lineHeight: '17px' }}>{text}</div>
+            <div style={{ color: A.gold, fontSize: 13, fontWeight: 850, marginTop: 8, overflowWrap: 'anywhere' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...s.card, marginTop: 16 }}>
+        <h2 style={s.h2}>Firestore collections</h2>
+        {Object.entries(collections).map(([name, info]) => (
+          <div key={name} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderBottom: `1px solid ${A.rowBrd}`, color: A.textSec, fontSize: 12 }}>
+            <span>{name}</span>
+            <span style={{ color: info?.ok ? A.gold : A.red }}>{info?.ok ? `${info.count}${info.capped ? '+' : ''}` : info?.error || 'error'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdminCommentsPanel({ comments, news, onRefresh, onModerate }) {
   const visible = comments.filter(c => !c.hidden);
   const pending = visible.filter(c => c.status === 'pending' || !c.moderationReviewedAt);
@@ -1667,6 +1711,8 @@ export const AdminPanel = () => {
   const [errorsLoading, setErrorsLoading]   = useState(false);
   const [errShowResolved, setErrShowResolved] = useState(false);
   const [errExpanded, setErrExpanded]       = useState({});
+  const [systemStatus, setSystemStatus] = useState(null);
+  const [systemStatusLoading, setSystemStatusLoading] = useState(false);
 
   const loadErrors = useCallback(async () => {
     setErrorsLoading(true);
@@ -1686,6 +1732,23 @@ export const AdminPanel = () => {
     await updateDoc(doc(db, 'errorLogs', id), { resolved: true }).catch(() => {});
     setErrorLogs(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
     setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.map(e => e.id === id ? { ...e, resolved: true } : e) }));
+  }, []);
+
+  const loadSystemStatus = useCallback(async () => {
+    setSystemStatusLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/system-status`, {
+        headers: await adminRequestHeaders(`system_${Date.now()}`),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Не удалось получить состояние системы.');
+      setSystemStatus(data);
+    } catch (e) {
+      logError(e, 'AdminPanel.loadSystemStatus');
+      setSystemStatus({ ok: false, error: e.message || 'Состояние системы недоступно.' });
+    } finally {
+      setSystemStatusLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -1713,6 +1776,29 @@ export const AdminPanel = () => {
     if (!trimmed) return '';
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
     return `https://${trimmed}`;
+  };
+
+  const adminRequestHeaders = async (idempotencyKey = '') => {
+    const user = await waitForAdminAuth();
+    const token = await user.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-Idempotency-Key': idempotencyKey || `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      'X-APG-Version': 'v4.4.2',
+    };
+  };
+
+  const runAdminAction = async (action, payload = {}) => {
+    const headers = await adminRequestHeaders(payload.idempotencyKey);
+    const response = await fetch(`${API_BASE_URL}/api/admin-actions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Административное действие не выполнено.');
+    return data;
   };
 
   const fetchData = async () => {
@@ -2076,8 +2162,12 @@ export const AdminPanel = () => {
   };
 
   const markLinksChecked = async (col, id, setList) => {
-    const ts = serverTimestamp();
-    await updateDoc(doc(db, col, id), { linksCheckedAt: ts });
+    if (col === 'news') {
+      await runAdminAction('news:update', { id, patch: { linksCheckedAt: new Date().toISOString() } });
+    } else {
+      const ts = serverTimestamp();
+      await updateDoc(doc(db, col, id), { linksCheckedAt: ts });
+    }
     const now = { toDate: () => new Date() };
     setList(prev => prev.map(x => x.id === id ? { ...x, linksCheckedAt: now } : x));
   };
@@ -2255,13 +2345,9 @@ export const AdminPanel = () => {
       ...(editingNews ? {} : { createdAt: serverTimestamp() }),
     };
     if (editingNews) {
-      await updateDoc(doc(db, 'news', editingNews.id), data);
-      await writeNewsHistory(editingNews.id, 'update', before, data);
-      await auditAdminAction('update', 'news', editingNews.id, { label: `Изменена новость: ${data.title}`, fields: Object.keys(data) });
+      await runAdminAction('news:update', { id: editingNews.id, patch: data });
     } else {
-      const ref = await addDoc(collection(db, 'news'), data);
-      await writeNewsHistory(ref.id, 'create', null, data);
-      await auditAdminAction('create', 'news', ref.id, { label: `Создана новость: ${data.title}` });
+      await runAdminAction('news:create', { patch: data });
     }
     resetNewsForm();
     fetchData();
@@ -2277,13 +2363,10 @@ export const AdminPanel = () => {
     const item = news.find(n => n.id === id);
     if (!item) return;
     if (!options.silent && !window.confirm('Удалить новость? Можно отменить в течение 10 секунд.')) return;
-    const patch = { active: false, status: 'deleted', deletedAt: serverTimestamp(), updatedAt: serverTimestamp() };
-    await updateDoc(doc(db, 'news', id), patch);
+    await runAdminAction('news:delete', { id });
     setNews(prev => prev.map(n => n.id === id ? { ...n, active: false, status: 'deleted' } : n));
     setSelectedNewsIds(prev => prev.filter(x => x !== id));
     showUndo({ type: 'news-delete', item, label: `Новость удалена: ${item.title || 'без заголовка'}` });
-    await writeNewsHistory(id, 'soft-delete', item, patch);
-    await auditAdminAction('delete', 'news', id, { label: `Удалена новость: ${item.title || id}`, softDelete: true });
   };
 
   const restoreDeletedNews = async () => {
@@ -2295,36 +2378,20 @@ export const AdminPanel = () => {
       deletedAt: null,
       updatedAt: serverTimestamp(),
     };
-    await updateDoc(doc(db, 'news', item.id), patch);
+    await runAdminAction('news:restore', { id: item.id, previous: item });
     setNews(prev => prev.map(n => n.id === item.id ? { ...n, ...patch, deletedAt: null } : n));
-    await writeNewsHistory(item.id, 'restore', { status: 'deleted' }, patch);
-    await auditAdminAction('restore', 'news', item.id, { label: `Восстановлена новость: ${item.title || item.id}` });
     setAdminUndo(null);
   };
 
   const publishNews = async (item) => {
-    await updateDoc(doc(db, 'news', item.id), {
-      active: true,
-      status: 'published',
-      publishedAt: item.publishedAt || serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    await runAdminAction('news:publish', { id: item.id });
     setNews(prev => prev.map(n => n.id === item.id ? { ...n, active: true, status: 'published' } : n));
-    await writeNewsHistory(item.id, 'publish', item, { active: true, status: 'published' });
-    await auditAdminAction('publish', 'news', item.id, { label: `Опубликована новость: ${item.title || item.id}` });
   };
 
   const pinNews = async (item) => {
     const next = !(item.pinned || item.isPinned);
-    await updateDoc(doc(db, 'news', item.id), {
-      pinned: next,
-      isPinned: next,
-      priority: next ? Math.max(Number(item.priority || 0), 9) : Number(item.priority || 0),
-      updatedAt: serverTimestamp(),
-    });
+    await runAdminAction('news:pin', { id: item.id });
     setNews(prev => prev.map(n => n.id === item.id ? { ...n, pinned: next, isPinned: next, priority: next ? Math.max(Number(n.priority || 0), 9) : Number(n.priority || 0) } : n));
-    await writeNewsHistory(item.id, next ? 'pin' : 'unpin', item, { pinned: next, isPinned: next });
-    await auditAdminAction(next ? 'pin' : 'unpin', 'news', item.id, { label: `${next ? 'Закреплена' : 'Откреплена'} новость: ${item.title || item.id}` });
   };
 
   const openQuickNewsEditor = (item) => {
@@ -2362,12 +2429,10 @@ export const AdminPanel = () => {
       updatedAt: serverTimestamp(),
     };
     try {
-      await updateDoc(doc(db, 'news', quickEditNews.id), patch);
+      await runAdminAction(silent ? 'news:autosave' : 'news:update', { id: quickEditNews.id, patch });
       setNews(prev => prev.map(n => n.id === quickEditNews.id ? { ...n, ...patch } : n));
       setQuickEditNews(prev => prev ? { ...prev, ...patch } : prev);
       setQuickEditorDirty(false);
-      await writeNewsHistory(quickEditNews.id, silent ? 'autosave' : 'quick-update', quickEditNews, patch);
-      await auditAdminAction(silent ? 'autosave' : 'quick-update', 'news', quickEditNews.id, { label: `${silent ? 'Автосохранена' : 'Сохранена'} новость: ${patch.title}` });
     } catch (e) {
       logError(e, 'AdminPanel.saveQuickNewsEditor');
       if (!silent) window.alert(e.message || 'Не удалось сохранить новость.');
@@ -2419,10 +2484,8 @@ export const AdminPanel = () => {
     }
     const targetPriority = Number(target.priority || 0);
     const patch = { priority: targetPriority + 1, updatedAt: serverTimestamp() };
-    await updateDoc(doc(db, 'news', dragged.id), patch);
+    await runAdminAction('news:reorder', { id: dragged.id, targetId: target.id, priority: targetPriority + 1 });
     setNews(prev => prev.map(n => n.id === dragged.id ? { ...n, priority: patch.priority } : n));
-    await writeNewsHistory(dragged.id, 'drag-reorder', dragged, patch);
-    await auditAdminAction('drag-reorder', 'news', dragged.id, { label: `Изменён порядок новости: ${dragged.title || dragged.id}`, targetId: target.id });
     setDraggingNewsId('');
   };
 
@@ -2446,7 +2509,7 @@ export const AdminPanel = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/news-comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await adminRequestHeaders(`comment_${action}_${comment.id}_${Date.now()}`),
         body: JSON.stringify({ action, commentId: comment.id, user: adminUser }),
       });
       const data = await response.json().catch(() => ({}));
@@ -2492,7 +2555,7 @@ export const AdminPanel = () => {
       try {
         const r = await fetch(`${API_BASE_URL}/api/send-push`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-push-secret': 'apg-push-2024' },
+          headers: await adminRequestHeaders(`push_${Date.now()}`),
           body: JSON.stringify({ broadcast: true, title: ntTitle.trim(), body: ntBody.trim() || undefined }),
         });
         const result = await r.json();
@@ -2982,6 +3045,10 @@ export const AdminPanel = () => {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'system' && !systemStatus && !systemStatusLoading) loadSystemStatus();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus]);
+
   if (!authed) return <PasswordGate onAllow={() => { setAuthed(true); fetchData(); }} />;
 
   const q = globalSearch.toLowerCase();
@@ -3064,6 +3131,7 @@ export const AdminPanel = () => {
             { id: 'rotation',  emoji: '🔄', label: 'Ротация' },
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
+            { id: 'system',    emoji: '🛡', label: 'Система' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
             { id: 'diag',      emoji: '📡', label: 'Диагностика' },
@@ -5210,6 +5278,14 @@ export const AdminPanel = () => {
             </>
           )}
         </div>
+      )}
+
+      {activeTab === 'system' && (
+        <SystemStatusPanel
+          status={systemStatus}
+          loading={systemStatusLoading}
+          onRefresh={loadSystemStatus}
+        />
       )}
 
       {/* ── ОШИБКИ ── */}

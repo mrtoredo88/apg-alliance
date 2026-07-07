@@ -16,6 +16,8 @@ import activityIndexRoutes    from './routes/activity-index.js';
 import qrTokenRoutes          from './routes/qr-token.js';
 import newsCommentsRoutes     from './routes/news-comments.js';
 import newsEngagementRoutes   from './routes/news-engagement.js';
+import adminActionsRoutes     from './routes/admin-actions.js';
+import systemStatusRoutes     from './routes/system-status.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -28,7 +30,7 @@ await fastify.register(cors, {
     /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-Idempotency-Key', 'X-APG-Version'],
 });
 
 fastify.addHook('onSend', async (request, reply) => {
@@ -50,6 +52,8 @@ fastify.register(activityIndexRoutes);
 fastify.register(qrTokenRoutes);
 fastify.register(newsCommentsRoutes);
 fastify.register(newsEngagementRoutes);
+fastify.register(adminActionsRoutes);
+fastify.register(systemStatusRoutes);
 
 fastify.get('/health', async (request, reply) => {
   try {

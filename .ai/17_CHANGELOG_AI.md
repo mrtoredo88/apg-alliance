@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V4.4.2 production security & infrastructure
+**Коммит:** `локально`
+**Файлы:** `api/_firebase-admin.js`, `api/_admin-security.js`, `api/admin-actions.js`, `api/system-status.js`, `api/news-comments.js`, `api/send-push.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-actions.js`, `server/src/routes/system-status.js`, `server/src/routes/news-comments.js`, `server/src/routes/send-push.js`, `server/src/server.js`, `src/AdminPanel.jsx`, `src/NewsPage.jsx`, `.ai/04_API.md`, `.ai/12_SECURITY.md`
+**Тип:** feat
+**Что изменено:** Добавлен backend role guard по Firebase ID Token, permission matrix ролей, защищённый `/api/admin-actions` для news admin actions, idempotency-key защита, полноценный audit log `adminActivity`, системный endpoint `/api/system-status` и вкладка «Система» в админке. Модерация комментариев и push из админки больше не полагаются на подделываемую роль из body / hardcoded secret.
+**Почему:** Перед V4.5 нужен серверный security boundary и инфраструктурная диагностика, чтобы админка была безопасной базой для будущего ИИ-редактора.
+
+---
+
 ## [2026-07-07] V4.4.1 production-ready полировка редакционной админки
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`

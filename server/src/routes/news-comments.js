@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
+import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 
 const MAX_TEXT = 900;
 
@@ -90,7 +91,7 @@ export default async function newsCommentsRoutes(fastify) {
     try {
       const action = String(request.body?.action || '').trim();
       const user = safeUser(request.body?.user);
-      const isAdmin = ['admin', 'owner'].includes(user.role);
+      const requireModerator = async () => requireAdminPermission(request, 'comments:*');
 
       if (action === 'create') {
         const newsId = String(request.body?.newsId || '').trim();
@@ -151,14 +152,17 @@ export default async function newsCommentsRoutes(fastify) {
       if (action === 'update') {
         const text = cleanText(request.body?.text);
         if (!text) return reply.code(400).send({ ok: false, error: 'Комментарий пустой.' });
-        if (!isOwner && !isAdmin) return reply.code(403).send({ ok: false, error: 'Можно редактировать только свой комментарий.' });
+        let actor = null;
+        if (!isOwner) actor = await requireModerator();
         await ref.update({ text, updatedAt: FieldValue.serverTimestamp() });
+        if (actor) await writeAuditLog(db, request, actor, 'comment:update', 'newsComment', commentId, { label: `Изменён комментарий ${commentId}`, newsId: data.newsId });
         const updated = await ref.get();
         return { ok: true, comment: serializeComment(updated) };
       }
 
       if (action === 'delete') {
-        if (!isOwner && !isAdmin) return reply.code(403).send({ ok: false, error: 'Можно удалить только свой комментарий.' });
+        let actor = null;
+        if (!isOwner) actor = await requireModerator();
         await ref.update({
           hidden: true,
           status: 'hidden',
@@ -170,11 +174,12 @@ export default async function newsCommentsRoutes(fastify) {
           },
           updatedAt: FieldValue.serverTimestamp(),
         });
+        if (actor) await writeAuditLog(db, request, actor, 'comment:delete', 'newsComment', commentId, { label: `Скрыт комментарий ${commentId}`, newsId: data.newsId });
         return { ok: true };
       }
 
       if (action === 'togglePin') {
-        if (!isAdmin) return reply.code(403).send({ ok: false, error: 'Недостаточно прав для закрепления.' });
+        const actor = await requireModerator();
         await ref.update({
           isPinned: !Boolean(data.isPinned),
           moderation: {
@@ -184,12 +189,13 @@ export default async function newsCommentsRoutes(fastify) {
           },
           updatedAt: FieldValue.serverTimestamp(),
         });
+        await writeAuditLog(db, request, actor, 'comment:pin', 'newsComment', commentId, { label: `${data.isPinned ? 'Откреплён' : 'Закреплён'} комментарий ${commentId}`, newsId: data.newsId });
         const updated = await ref.get();
         return { ok: true, comment: serializeComment(updated) };
       }
 
       if (action === 'toggleUseful') {
-        if (!isAdmin) return reply.code(403).send({ ok: false, error: 'Недостаточно прав для отметки.' });
+        const actor = await requireModerator();
         await ref.update({
           isUseful: !Boolean(data.isUseful),
           moderation: {
@@ -199,12 +205,13 @@ export default async function newsCommentsRoutes(fastify) {
           },
           updatedAt: FieldValue.serverTimestamp(),
         });
+        await writeAuditLog(db, request, actor, 'comment:useful', 'newsComment', commentId, { label: `${data.isUseful ? 'Снята польза' : 'Отмечен полезным'} комментарий ${commentId}`, newsId: data.newsId });
         const updated = await ref.get();
         return { ok: true, comment: serializeComment(updated) };
       }
 
       if (action === 'blockUser') {
-        if (!isAdmin) return reply.code(403).send({ ok: false, error: 'Недостаточно прав для блокировки.' });
+        const actor = await requireModerator();
         const blockedUserId = String(data.userId || '').trim();
         if (!blockedUserId) return reply.code(400).send({ ok: false, error: 'Пользователь комментария не найден.' });
         await db.collection('newsCommentBlocks').doc(blockedUserId).set({
@@ -225,6 +232,7 @@ export default async function newsCommentsRoutes(fastify) {
           },
           updatedAt: FieldValue.serverTimestamp(),
         });
+        await writeAuditLog(db, request, actor, 'comment:block-user', 'user', blockedUserId, { label: `Заблокирован автор комментария ${commentId}`, commentId, newsId: data.newsId });
         return { ok: true };
       }
 

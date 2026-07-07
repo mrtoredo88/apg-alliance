@@ -13,6 +13,7 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { APP_URL } from './config.js';
+import { requireAdminPermission, writeAuditLog } from './_admin-security.js';
 
 function initAdmin() {
   if (!getApps().length) {
@@ -76,7 +77,14 @@ export default async function handler(req, res) {
   const secret = req.headers['x-push-secret'];
   const valid  = (secret && secret === process.env.PUSH_SECRET) ||
                  (secret && secret === process.env.RAFFLE_SECRET);
-  if (!valid) return res.status(401).json({ error: 'unauthorized' });
+  let actor = null;
+  if (!valid) {
+    try {
+      actor = await requireAdminPermission(req, 'push:*');
+    } catch {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+  }
 
   const { userId, broadcast, title, body, url, tag } = req.body ?? {};
   if (!title) return res.status(400).json({ error: 'title required' });
@@ -98,6 +106,7 @@ export default async function handler(req, res) {
         fcmTokens, fcmTokens.map(() => String(userId)),
         title, body, url, tag
       );
+      if (actor) await writeAuditLog(db, req, actor, 'push:send', 'user', userId, { label: `Push пользователю: ${title}`, sent: stats.sent, failed: stats.failed });
       return res.json(stats);
     }
 
@@ -128,6 +137,7 @@ export default async function handler(req, res) {
         total.failed  += s.failed;
         total.cleaned += s.cleaned;
       }
+      if (actor) await writeAuditLog(db, req, actor, 'push:broadcast', 'notifications', 'broadcast', { label: `Broadcast push: ${title}`, subscribers: tokens.length, sent: total.sent, failed: total.failed });
       return res.json({ broadcast: true, subscribers: tokens.length, ...total });
     }
 

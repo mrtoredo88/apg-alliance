@@ -74,7 +74,7 @@
 **Назначение:** Комментарии к новостям, включая VK-публикации, без прямой клиентской записи в Firestore.
 
 **Методы:** GET, POST
-**Auth:** пользователь передаётся клиентом; запись выполняет backend через Admin SDK
+**Auth:** пользователь передаётся клиентом; модерационные действия требуют Firebase ID Token с ролью `owner/admin/moderator`
 **Коллекция:** `newsComments`
 
 **GET query params:**
@@ -112,7 +112,42 @@
 - `toggleUseful` — отметить/снять «Полезный ответ»; только `admin/owner`
 - `blockUser` — заблокировать автора комментария и скрыть комментарий; только `admin/owner`
 
-**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`. Новые комментарии сохраняют `authorRole`, `status`, `isPinned`, `isUseful`, `moderation` и `ai.summaryEligible`, чтобы V4.4-админка и Локи могли модерировать и анализировать обсуждения без миграции структуры.
+**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`. Модерация (`togglePin`, `toggleUseful`, `blockUser`, удаление/изменение чужого комментария) больше не доверяет `user.role` из body: сервер проверяет `Authorization: Bearer <Firebase ID Token>` и роль через custom claims / `users` / `auth_map`. Новые комментарии сохраняют `authorRole`, `status`, `isPinned`, `isUseful`, `moderation` и `ai.summaryEligible`, чтобы V4.4-админка и Локи могли модерировать и анализировать обсуждения без миграции структуры.
+
+---
+
+## POST /api/admin-actions
+
+**Назначение:** Защищённый backend-слой административных действий.
+
+**Метод:** POST
+**Auth:** `Authorization: Bearer <Firebase ID Token>`
+**Headers:** `X-Idempotency-Key`, `X-APG-Version`
+
+**Actions V4.4.2:**
+- `news:create`
+- `news:update`
+- `news:autosave`
+- `news:publish`
+- `news:pin`
+- `news:delete` — soft-delete
+- `news:restore`
+- `news:reorder`
+
+**Логика:** endpoint проверяет Firebase ID Token через Admin SDK, определяет роль по custom claims и документу пользователя (`users/{uid}`, `auth_map/{firebaseUid}`, `firebaseUid/authUid` fallback), проверяет permission matrix и только после этого меняет Firestore. Все операции пишут `adminActivity`, история новостей пишется в `newsChangeHistory`, повторная отправка с тем же `X-Idempotency-Key` возвращает сохранённый результат из `adminIdempotency`.
+
+---
+
+## GET /api/system-status
+
+**Назначение:** Состояние системы для админки.
+
+**Метод:** GET
+**Auth:** `Authorization: Bearer <Firebase ID Token>` с правом `system:read`
+
+**Проверяет:** API runtime, Firestore availability, счётчики `news`, `newsComments`, `users`, `errorLogs`, `adminActivity`, состояние VK News sync из `config/vkNewsSync`, backup marker из `backups`, базовое состояние очередей задач.
+
+**Логика:** endpoint не делает тяжёлых агрегаций и ограничивает чтение коллекций лимитами, чтобы статус можно было открывать из админки без нагрузки на production.
 
 ---
 

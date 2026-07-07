@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from './_firebase-admin.js';
+import { requireAdminPermission, writeAuditLog } from './_admin-security.js';
 
 const MAX_TEXT = 900;
 
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
 
     const action = String(req.body?.action || '').trim();
     const user = safeUser(req.body?.user);
-    const isAdmin = ['admin', 'owner'].includes(user.role);
+    const requireModerator = async () => requireAdminPermission(req, 'comments:*');
 
     if (action === 'create') {
       const newsId = String(req.body?.newsId || '').trim();
@@ -153,14 +154,17 @@ export default async function handler(req, res) {
     if (action === 'update') {
       const text = cleanText(req.body?.text);
       if (!text) return res.status(400).json({ ok: false, error: 'Комментарий пустой.' });
-      if (!isOwner && !isAdmin) return res.status(403).json({ ok: false, error: 'Можно редактировать только свой комментарий.' });
+      let actor = null;
+      if (!isOwner) actor = await requireModerator();
       await ref.update({ text, updatedAt: FieldValue.serverTimestamp() });
+      if (actor) await writeAuditLog(db, req, actor, 'comment:update', 'newsComment', commentId, { label: `Изменён комментарий ${commentId}`, newsId: data.newsId });
       const updated = await ref.get();
       return res.status(200).json({ ok: true, comment: serializeComment(updated) });
     }
 
     if (action === 'delete') {
-      if (!isOwner && !isAdmin) return res.status(403).json({ ok: false, error: 'Можно удалить только свой комментарий.' });
+      let actor = null;
+      if (!isOwner) actor = await requireModerator();
       await ref.update({
         hidden: true,
         status: 'hidden',
@@ -172,11 +176,12 @@ export default async function handler(req, res) {
         },
         updatedAt: FieldValue.serverTimestamp(),
       });
+      if (actor) await writeAuditLog(db, req, actor, 'comment:delete', 'newsComment', commentId, { label: `Скрыт комментарий ${commentId}`, newsId: data.newsId });
       return res.status(200).json({ ok: true });
     }
 
     if (action === 'togglePin') {
-      if (!isAdmin) return res.status(403).json({ ok: false, error: 'Недостаточно прав для закрепления.' });
+      const actor = await requireModerator();
       await ref.update({
         isPinned: !Boolean(data.isPinned),
         moderation: {
@@ -186,12 +191,13 @@ export default async function handler(req, res) {
         },
         updatedAt: FieldValue.serverTimestamp(),
       });
+      await writeAuditLog(db, req, actor, 'comment:pin', 'newsComment', commentId, { label: `${data.isPinned ? 'Откреплён' : 'Закреплён'} комментарий ${commentId}`, newsId: data.newsId });
       const updated = await ref.get();
       return res.status(200).json({ ok: true, comment: serializeComment(updated) });
     }
 
     if (action === 'toggleUseful') {
-      if (!isAdmin) return res.status(403).json({ ok: false, error: 'Недостаточно прав для отметки.' });
+      const actor = await requireModerator();
       await ref.update({
         isUseful: !Boolean(data.isUseful),
         moderation: {
@@ -201,12 +207,13 @@ export default async function handler(req, res) {
         },
         updatedAt: FieldValue.serverTimestamp(),
       });
+      await writeAuditLog(db, req, actor, 'comment:useful', 'newsComment', commentId, { label: `${data.isUseful ? 'Снята польза' : 'Отмечен полезным'} комментарий ${commentId}`, newsId: data.newsId });
       const updated = await ref.get();
       return res.status(200).json({ ok: true, comment: serializeComment(updated) });
     }
 
     if (action === 'blockUser') {
-      if (!isAdmin) return res.status(403).json({ ok: false, error: 'Недостаточно прав для блокировки.' });
+      const actor = await requireModerator();
       const blockedUserId = String(data.userId || '').trim();
       if (!blockedUserId) return res.status(400).json({ ok: false, error: 'Пользователь комментария не найден.' });
       await db.collection('newsCommentBlocks').doc(blockedUserId).set({
@@ -227,6 +234,7 @@ export default async function handler(req, res) {
         },
         updatedAt: FieldValue.serverTimestamp(),
       });
+      await writeAuditLog(db, req, actor, 'comment:block-user', 'user', blockedUserId, { label: `Заблокирован автор комментария ${commentId}`, commentId, newsId: data.newsId });
       return res.status(200).json({ ok: true });
     }
 

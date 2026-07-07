@@ -5,6 +5,7 @@ import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
 import { API_BASE_URL, APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
+import { auth } from './firebase.js';
 import {
   NEWS_CATEGORIES,
   filterNewsItems,
@@ -394,9 +395,10 @@ function ArticleActions({ item, saved, later, reaction, subscriptions, onReact, 
 }
 
 async function requestNewsComments(path, options = {}) {
+  const token = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => '') : '';
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {

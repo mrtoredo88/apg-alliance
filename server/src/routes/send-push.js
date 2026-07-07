@@ -1,6 +1,7 @@
 import { APP_URL } from '../lib/config.js';
 import { getDb, getDbMessaging } from '../lib/firebase.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 
 async function sendToTokens(tokens, userIds, title, body, url, tag) {
   if (!tokens.length) return { sent: 0, failed: 0, cleaned: 0 };
@@ -55,7 +56,14 @@ export default async function sendPushRoutes(fastify) {
     const secret = request.headers['x-push-secret'];
     const valid  = (secret && secret === process.env.PUSH_SECRET) ||
                    (secret && secret === process.env.RAFFLE_SECRET);
-    if (!valid) return reply.code(401).send({ error: 'unauthorized' });
+    let actor = null;
+    if (!valid) {
+      try {
+        actor = await requireAdminPermission(request, 'push:*');
+      } catch {
+        return reply.code(401).send({ error: 'unauthorized' });
+      }
+    }
 
     const { userId, broadcast, title, body, url, tag } = request.body ?? {};
     if (!title) return reply.code(400).send({ error: 'title required' });
@@ -69,10 +77,12 @@ export default async function sendPushRoutes(fastify) {
         const { fcmTokens = [] } = snap.data();
         if (!fcmTokens.length) return { skipped: true, reason: 'no fcm tokens' };
 
-        return await sendToTokens(
+        const stats = await sendToTokens(
           fcmTokens, fcmTokens.map(() => String(userId)),
           title, body, url, tag,
         );
+        if (actor) await writeAuditLog(db, request, actor, 'push:send', 'user', userId, { label: `Push пользователю: ${title}`, sent: stats.sent, failed: stats.failed });
+        return stats;
       }
 
       if (broadcast) {
@@ -101,6 +111,7 @@ export default async function sendPushRoutes(fastify) {
           total.failed  += s.failed;
           total.cleaned += s.cleaned;
         }
+        if (actor) await writeAuditLog(db, request, actor, 'push:broadcast', 'notifications', 'broadcast', { label: `Broadcast push: ${title}`, subscribers: tokens.length, sent: total.sent, failed: total.failed });
         return { broadcast: true, subscribers: tokens.length, ...total };
       }
 
