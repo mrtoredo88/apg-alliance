@@ -11,7 +11,7 @@ yc serverless container revision deploy \
   --container-name apg-api \
   --image cr.yandex/crpvv13u8vr3qjftdvvg/apg-api:latest \
   --cores 1 --memory 512MB --execution-timeout 30s \
-  --concurrency 16 --min-instances 0 \
+  --concurrency 16 --min-instances 1 \
   --service-account-id ajegfv96md2tqri8gjdp \
   --environment GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json \
   --environment YC_ACCESS_KEY="$(get_env YC_ACCESS_KEY)" \
