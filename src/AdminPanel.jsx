@@ -2021,6 +2021,15 @@ export const AdminPanel = () => {
     return data;
   };
 
+  const fetchAdminNewsComments = async () => {
+    const response = await fetch(`${API_BASE_URL}/api/news-comments?admin=1`, {
+      headers: await adminRequestHeaders(`comments_list_${Date.now()}`),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Не удалось загрузить комментарии.');
+    return Array.isArray(data.comments) ? data.comments : [];
+  };
+
   const runAdminEntityAction = (resource, verb, payload = {}) =>
     runAdminAction(`entity:${verb}`, { resource, ...payload });
 
@@ -2055,7 +2064,6 @@ export const AdminPanel = () => {
         { name: 'customTasks', label: 'Задания', ref: () => query(collection(db, 'customTasks'), orderBy('createdAt', 'asc')) },
         { name: 'prizeClaims', label: 'Выдачи призов', ref: () => query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100)), optional: true },
         { name: 'banners', label: 'Баннеры', ref: () => query(collection(db, 'banners'), orderBy('priority', 'asc')) },
-        { name: 'newsComments', label: 'Комментарии новостей', ref: () => query(collection(db, 'newsComments'), orderBy('createdAt', 'desc'), limit(300)), optional: true },
         { name: 'errorLogs', label: 'Ошибки приложения', ref: () => query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)), optional: true },
         { name: 'adminActivity', label: 'Действия админки', ref: () => query(collection(db, 'adminActivity'), orderBy('createdAt', 'desc'), limit(120)), optional: true },
         { name: 'users', label: 'Пользователи', ref: () => collection(db, 'users'), optional: true },
@@ -2067,7 +2075,14 @@ export const AdminPanel = () => {
         { name: 'guestSessions', label: 'Гостевые сессии', ref: () => query(collection(db, 'guestSessions'), orderBy('createdAt', 'desc'), limit(500)), optional: true },
       ];
       const results = await Promise.all(specs.map(readCollection));
-      const byName = Object.fromEntries(results.map(item => [item.name, item]));
+      const commentsResult = await fetchAdminNewsComments()
+        .then(rows => ({ name: 'newsComments', label: 'Комментарии новостей', optional: true, ok: true, docs: rows, count: rows.length, attempts: 1 }))
+        .catch(error => {
+          logError(error, 'AdminPanel.fetchData.newsComments.api');
+          return { name: 'newsComments', label: 'Комментарии новостей', optional: true, ok: false, docs: null, count: 0, attempts: 1, error: formatAdminLoadError(error), rawError: error };
+        });
+      const allResults = [...results, commentsResult];
+      const byName = Object.fromEntries(allResults.map(item => [item.name, item]));
       const apply = (name, setter) => {
         if (byName[name]?.ok) setter(byName[name].docs);
       };
@@ -2094,7 +2109,7 @@ export const AdminPanel = () => {
         errorLogs: byName.errorLogs?.ok ? byName.errorLogs.docs : prev.errorLogs,
         adminActivity: byName.adminActivity?.ok ? byName.adminActivity.docs : prev.adminActivity,
       }));
-      setAdminLoadIssues(results.filter(item => !item.ok).map(item => ({
+      setAdminLoadIssues(allResults.filter(item => !item.ok).map(item => ({
         name: item.name,
         label: item.label,
         error: item.error,
@@ -2105,7 +2120,7 @@ export const AdminPanel = () => {
         ...prev,
         lastLoadedAt: new Date().toISOString(),
         authUid: user?.uid ?? auth.currentUser?.uid ?? null,
-        counts: Object.fromEntries(results.filter(item => item.ok).map(item => [item.name, item.count])),
+        counts: Object.fromEntries(allResults.filter(item => item.ok).map(item => [item.name, item.count])),
       }));
     } catch (e) {
       logError(e, 'AdminPanel.fetchData.outer');
@@ -2686,12 +2701,7 @@ export const AdminPanel = () => {
 
   const loadNewsComments = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/news-comments?admin=1`, {
-        headers: await adminRequestHeaders(`comments_list_${Date.now()}`),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Не удалось загрузить комментарии.');
-      const rows = Array.isArray(data.comments) ? data.comments : [];
+      const rows = await fetchAdminNewsComments();
       setNewsComments(rows);
       setAdminMetrics(prev => ({ ...prev, newsComments: rows }));
     } catch (e) {

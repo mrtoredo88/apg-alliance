@@ -55,7 +55,9 @@ async function logCommentError(db, request, error, extra = {}) {
       timestamp: FieldValue.serverTimestamp(),
       resolved: false,
     });
-  } catch {}
+  } catch {
+    return null;
+  }
 }
 
 async function listComments(db, newsId) {
@@ -73,11 +75,22 @@ async function listAdminComments(db) {
 
 async function updateNewsCommentCount(db, newsId, delta) {
   if (!newsId || !delta) return;
-  await db.collection('news').doc(String(newsId)).set({
-    comments: FieldValue.increment(delta),
-    'stats.comments': FieldValue.increment(delta),
-    updatedAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
+  try {
+    await db.collection('news').doc(String(newsId)).set({
+      comments: FieldValue.increment(delta),
+      'stats.comments': FieldValue.increment(delta),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    await db.collection('errorLogs').add({
+      source: 'api.news-comments.counter',
+      message: String(error?.message || error).slice(0, 500),
+      newsId: String(newsId),
+      delta,
+      timestamp: FieldValue.serverTimestamp(),
+      resolved: false,
+    }).catch(() => null);
+  }
 }
 
 async function isUserBlocked(db, userId) {
@@ -201,10 +214,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    if (action === 'togglePin') {
-      const actor = await requireModerator();
-      await ref.update({
-        isPinned: !Boolean(data.isPinned),
+      if (action === 'togglePin') {
+        const actor = await requireModerator();
+        await ref.update({
+        isPinned: !data.isPinned,
         moderation: {
           ...(data.moderation || {}),
           pinnedBy: user.id,
@@ -217,10 +230,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, comment: serializeComment(updated) });
     }
 
-    if (action === 'toggleUseful') {
-      const actor = await requireModerator();
-      await ref.update({
-        isUseful: !Boolean(data.isUseful),
+      if (action === 'toggleUseful') {
+        const actor = await requireModerator();
+        await ref.update({
+        isUseful: !data.isUseful,
         moderation: {
           ...(data.moderation || {}),
           usefulBy: user.id,
