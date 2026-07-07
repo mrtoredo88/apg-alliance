@@ -1,8 +1,10 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY server/package.json server/package-lock.json ./
 RUN npm ci --production
-COPY src/ ./src/
-COPY firebase-service-account.json ./firebase-service-account.json
+COPY server/src/ ./src/
+COPY server/firebase-service-account.json ./firebase-service-account.json
+COPY server-shared/ /server-shared/
+RUN ln -s /app/node_modules /node_modules
 EXPOSE 3000
 CMD ["node", "src/server.js"]

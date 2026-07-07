@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Backend API переведён на Yandex Serverless Container
+**Коммит:** текущий
+**Файлы:** `server/Dockerfile`
+**Тип:** fix
+**Что изменено:** Dockerfile переведён на сборку из корня проекта, в образ добавлен `server-shared`, для общего модуля добавлен доступ к `/app/node_modules`. Backend-образ опубликован в Yandex Container Registry, ревизия `apg-api` обновлена, Telegram webhook переключён с Vercel на Yandex Container URL.
+**Почему:** Vercel Hobby не даёт задеплоить API из-за лимита 12 Serverless Functions; новый Telegram webhook должен работать через Yandex backend.
+
+---
+
 ## [2026-07-07] Экосистема АПГ и карманный Локи в Telegram
 **Коммит:** `517c69f2`
 **Файлы:** `src/assistant/AssistantMiniApp.jsx`, `api/telegram-webhook.js`, `server/src/routes/telegram-webhook.js`, `src/loki/knowledge/updates/chronicles.json`
