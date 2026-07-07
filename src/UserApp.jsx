@@ -2199,6 +2199,7 @@ export function UserApp() {
                     savedNews={savedNews}
                     readLaterNews={readLaterNews}
                     newsReactions={newsReactions}
+                    loading={loading}
                     onBack={goBackPanel}
                     onReact={reactToNews}
                     onSave={toggleSavedNews}

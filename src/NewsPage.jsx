@@ -14,16 +14,17 @@ import {
 } from 'firebase/firestore';
 import {
   NEWS_CATEGORIES,
-  NEWS_SORTS,
   filterNewsItems,
   formatNewsDate,
   getNewsDocs,
   getNewsCategory,
   getNewsCategoryLabel,
+  getNewsDate,
   getNewsImage,
   getNewsLinks,
   getNewsPhotoItems,
   getNewsPhotos,
+  getNewsReactionsTotal,
   getNewsStats,
   getNewsText,
   getNewsTitle,
@@ -40,6 +41,15 @@ const REACTIONS = ['👍', '❤️', '🔥', '👏', '😍'];
 const COMMENT_SORTS = [
   { id: 'new', label: 'Новые' },
   { id: 'popular', label: 'Популярные' },
+];
+
+const newsFilterPresets = [
+  { id: 'new', label: 'Новые' },
+  { id: 'today', label: 'Сегодня' },
+  { id: 'week', label: 'Неделя' },
+  { id: 'month', label: 'Месяц' },
+  { id: 'popular', label: 'Популярные' },
+  { id: 'all_time', label: 'Все' },
 ];
 
 const inputStyle = {
@@ -60,6 +70,38 @@ const inputStyle = {
 function getNewsDeepLink(item) {
   const id = encodeURIComponent(String(item?.id || item?.externalId || ''));
   return `${APP_URL}/#/news/${id}`;
+}
+
+function getSmartBadges(item) {
+  const badges = [];
+  const category = getNewsCategory(item);
+  const date = getNewsDate(item);
+  const today = date && new Date().toDateString() === date.toDateString();
+  if (item?.isUrgent || (item?.priority ?? 0) >= 9) badges.push(['🔥', 'Важно']);
+  if (item?.pinned || item?.isPinned) badges.push(['📌', 'Закреплено']);
+  if (isFreshNews(item)) badges.push(['🆕', 'Новое']);
+  if (category === 'partners') badges.push(['🎁', 'Партнёр АПГ']);
+  if (category === 'updates') badges.push(['🤖', 'Обновление АПГ']);
+  if (category === 'events' || today) badges.push(['📅', today ? 'Сегодня' : 'Событие']);
+  return badges.slice(0, 3);
+}
+
+async function shareNewsItem(item, onToast) {
+  const title = getNewsTitle(item);
+  const url = getNewsDeepLink(item);
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text: title, url });
+    } else {
+      await navigator.clipboard?.writeText(url);
+      onToast?.('Ссылка на новость скопирована.', 'success');
+    }
+  } catch (e) {
+    if (e?.name !== 'AbortError') {
+      logError(e, 'NewsPage.cardShare');
+      onToast?.('Не удалось поделиться новостью.', 'error');
+    }
+  }
 }
 
 function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, children }) {
@@ -177,13 +219,18 @@ function PhotoCarousel({ photos = [], onOpen }) {
 
 function NewsMeta({ item, compact = false }) {
   const stats = getNewsStats(item);
+  const date = getNewsDate(item);
+  const source = item?.sourceName || (item?.source === 'vk' ? 'ВКонтакте' : 'АПГ');
+  const reactions = getNewsReactionsTotal(item) || stats.likes;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: APG2_PROFILE.textMuted, fontSize: compact ? 10.5 : 11.5, lineHeight: '15px', fontWeight: 720 }}>
       <span>{formatNewsDate(item)}</span>
+      {date && <span>{date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>}
+      <span>{source}</span>
       <span>⏱ {getReadingMinutes(item)} мин</span>
       <span>{stats.views} просмотров</span>
-      {(stats.likes > 0 || stats.comments > 0 || stats.reposts > 0) && (
-        <span>♥ {stats.likes} · 💬 {stats.comments} · ↗ {stats.reposts}</span>
+      {(reactions > 0 || stats.comments > 0 || stats.reposts > 0) && (
+        <span>♥ {reactions} · 💬 {stats.comments} · ↗ {stats.reposts}</span>
       )}
       {isFreshNews(item) && <span style={{ color: APG2_PROFILE.gold }}>Новое</span>}
     </div>
@@ -470,14 +517,37 @@ function CommentsPanel({ item, user, onToast }) {
   );
 }
 
-function NewsCard({ item, index, onOpen, saved, later }) {
+function NewsSkeleton() {
+  const shimmer = {
+    background: 'linear-gradient(90deg, rgba(var(--apg2-glass-a,255,255,255),0.06), rgba(215,184,106,0.13), rgba(var(--apg2-glass-a,255,255,255),0.06))',
+    backgroundSize: '220% 100%',
+    animation: 'shimmer 1.6s ease-in-out infinite',
+  };
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 14, alignItems: 'start' }}>
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} style={{ ...APG2_PROFILE.glass, borderRadius: 30, overflow: 'hidden', minHeight: index === 0 ? 360 : 310 }}>
+          <div style={{ height: index === 0 ? 220 : 174, ...shimmer }} />
+          <div style={{ display: 'grid', gap: 12, padding: 16 }}>
+            <div style={{ width: '46%', height: 12, borderRadius: 999, ...shimmer }} />
+            <div style={{ width: '92%', height: 20, borderRadius: 999, ...shimmer }} />
+            <div style={{ width: '72%', height: 20, borderRadius: 999, ...shimmer }} />
+            <div style={{ width: '100%', height: 12, borderRadius: 999, ...shimmer }} />
+            <div style={{ width: '58%', height: 12, borderRadius: 999, ...shimmer }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NewsCard({ item, index, onOpen, onShare, saved, later }) {
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const isLarge = index % 5 === 0;
+  const badges = getSmartBadges(item);
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(item)}
+    <div
       style={{
         ...APG2_PROFILE.glass,
         width: '100%',
@@ -486,29 +556,43 @@ function NewsCard({ item, index, onOpen, saved, later }) {
         padding: 0,
         overflow: 'hidden',
         textAlign: 'left',
-        cursor: 'pointer',
         color: APG2_PROFILE.text,
         fontFamily: 'inherit',
         animation: 'fadeInUp 420ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
         animationDelay: `${Math.min(index, 8) * 0.035}s`,
-        transform: 'translateZ(0)',
       }}
     >
-      <NewsImage item={item} height={isLarge ? 240 : 174} radius={30}>
-        <div style={{ position: 'absolute', left: 14, right: 14, top: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <span style={{ padding: '7px 11px', borderRadius: 999, background: 'rgba(8,8,10,0.45)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.28)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', fontSize: 11, fontWeight: 860 }}>{getNewsCategoryLabel(item)}</span>
-          <span style={{ display: 'flex', gap: 6 }}>
-            {saved && <span style={{ padding: '7px 9px', borderRadius: 999, background: 'rgba(215,184,106,0.22)', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 900 }}>Сохранено</span>}
-            {later && <span style={{ padding: '7px 9px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.14)', color: APG2_PROFILE.text, fontSize: 11, fontWeight: 850 }}>Позже</span>}
-          </span>
-        </div>
-      </NewsImage>
-      <span style={{ display: 'grid', gap: 10, padding: 16 }}>
-        <span style={{ color: APG2_PROFILE.text, fontSize: isLarge ? 21 : 17, lineHeight: isLarge ? '26px' : '22px', fontWeight: 920, letterSpacing: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</span>
-        <span style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', fontWeight: 620, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text || 'Короткая новость АПГ. Подробнее внутри материала.'}</span>
-        <NewsMeta item={item} compact />
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={() => onOpen(item)}
+        aria-label={`Открыть новость: ${title}`}
+        style={{ width: '100%', border: 'none', background: 'transparent', padding: 0, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit', cursor: 'pointer' }}
+      >
+        <NewsImage item={item} height={isLarge ? 240 : 174} radius={30}>
+          <div style={{ position: 'absolute', left: 14, right: 14, top: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+              <span style={{ padding: '7px 11px', borderRadius: 999, background: 'rgba(8,8,10,0.45)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.28)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', fontSize: 11, fontWeight: 860 }}>{getNewsCategoryLabel(item)}</span>
+              {badges.map(([emoji, label]) => (
+                <span key={`${emoji}-${label}`} style={{ padding: '7px 9px', borderRadius: 999, background: 'rgba(8,8,10,0.42)', border: '1px solid rgba(255,255,255,0.16)', color: '#FFF8E9', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', fontSize: 10.5, fontWeight: 850 }}>{emoji} {label}</span>
+              ))}
+            </span>
+            <span style={{ display: 'flex', gap: 6 }}>
+              {saved && <span style={{ padding: '7px 9px', borderRadius: 999, background: 'rgba(215,184,106,0.22)', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 900 }}>Сохранено</span>}
+              {later && <span style={{ padding: '7px 9px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.14)', color: APG2_PROFILE.text, fontSize: 11, fontWeight: 850 }}>Позже</span>}
+            </span>
+          </div>
+        </NewsImage>
+        <span style={{ display: 'grid', gap: 10, padding: '16px 16px 10px' }}>
+          <span style={{ color: APG2_PROFILE.text, fontSize: isLarge ? 21 : 17, lineHeight: isLarge ? '26px' : '22px', fontWeight: 920, letterSpacing: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</span>
+          <span style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', fontWeight: 620, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text || 'Короткая новость АПГ. Подробнее внутри материала.'}</span>
+          <NewsMeta item={item} compact />
+        </span>
+      </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: '0 16px 16px' }}>
+        <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', fontWeight: 700 }}>{getNewsPhotos(item).length > 1 ? `${getNewsPhotos(item).length} фото` : 'Материал АПГ'}</span>
+        <button type="button" onClick={() => onShare(item)} aria-label={`Поделиться новостью: ${title}`} style={{ minHeight: 34, borderRadius: 999, padding: '0 12px', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer' }}>Поделиться</button>
+      </div>
+    </div>
   );
 }
 
@@ -691,6 +775,7 @@ export function NewsPage({
   savedNews = [],
   readLaterNews = [],
   newsReactions = {},
+  loading = false,
   onBack,
   onReact,
   onSave,
@@ -704,8 +789,14 @@ export function NewsPage({
   const [visibleCount, setVisibleCount] = useState(9);
   const [selected, setSelected] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showTopButton, setShowTopButton] = useState(false);
+  const [newItemsCount, setNewItemsCount] = useState(0);
+  const pageRef = useRef(null);
+  const searchRef = useRef(null);
+  const knownIdsRef = useRef(new Set());
 
-  const prepared = useMemo(() => sortNewsItems(filterNewsItems(news, category, query), sort), [category, news, query, sort]);
+  const actualSort = sort === 'all_time' ? 'new' : sort;
+  const prepared = useMemo(() => sortNewsItems(filterNewsItems(news, category, query), actualSort), [actualSort, category, news, query]);
   const hero = prepared[0] ?? news[0] ?? null;
   const visible = prepared.slice(0, visibleCount);
   const popular = useMemo(() => sortNewsItems(news, 'popular').slice(0, 5), [news]);
@@ -714,22 +805,56 @@ export function NewsPage({
     : [], [news, selected]);
 
   const refresh = async () => {
+    const before = new Set(news.map(item => String(item?.id || item?.externalId || '')));
     setRefreshing(true);
-    try { await onRefresh?.(); } finally { setRefreshing(false); }
+    try {
+      await onRefresh?.();
+      const fresh = news.filter(item => !before.has(String(item?.id || item?.externalId || ''))).length;
+      if (fresh > 0) setNewItemsCount(fresh);
+    } finally { setRefreshing(false); }
   };
 
   const savedSet = new Set(savedNews || []);
   const laterSet = new Set(readLaterNews || []);
   const selectedId = selected?.id ? String(selected.id) : '';
+  const hasNews = Array.isArray(news) && news.length > 0;
+  const showSkeleton = loading && !hasNews;
+  const resultLabel = query.trim()
+    ? `${prepared.length} найдено`
+    : category === 'all' && sort === 'new'
+      ? `${news.length} материалов`
+      : `${prepared.length} материалов`;
+
+  useEffect(() => {
+    const current = new Set(news.map(item => String(item?.id || item?.externalId || '')).filter(Boolean));
+    if (!knownIdsRef.current.size) {
+      knownIdsRef.current = current;
+      return;
+    }
+    const added = [...current].filter(id => !knownIdsRef.current.has(id)).length;
+    if (added > 0) setNewItemsCount(added);
+    knownIdsRef.current = current;
+  }, [news]);
+
+  const handlePageScroll = (e) => setShowTopButton(e.currentTarget.scrollTop > 560);
+  const scrollToTop = () => {
+    pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    setNewItemsCount(0);
+  };
+  const focusSearch = () => {
+    searchRef.current?.focus();
+    pageRef.current?.scrollTo({ top: 210, behavior: 'smooth' });
+  };
+  const handleShare = (item) => shareNewsItem(item, onToast);
 
   return (
-    <div style={{ minHeight: '100svh', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(108px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
+    <div ref={pageRef} onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(108px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
       <div style={{ width: '100%', maxWidth: 920, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <button type="button" onClick={onBack} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 22 }}>←</button>
           <div style={{ textAlign: 'right' }}>
             <div style={{ color: APG2_PROFILE.gold, fontSize: 12, lineHeight: '16px', fontWeight: 880 }}>Информационный центр</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 650 }}>{news.length} материалов</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 650 }}>{resultLabel}</div>
           </div>
         </div>
 
@@ -752,15 +877,21 @@ export function NewsPage({
           )}
         </section>
 
+        {newItemsCount > 0 && (
+          <button type="button" onClick={scrollToTop} style={{ width: '100%', minHeight: 42, borderRadius: 999, border: '1px solid rgba(215,184,106,0.34)', background: 'rgba(215,184,106,0.14)', color: APG2_PROFILE.gold, fontSize: 13, fontWeight: 860, fontFamily: 'inherit', marginBottom: 14, cursor: 'pointer' }}>
+            Появилось {newItemsCount} {newItemsCount === 1 ? 'новая новость' : newItemsCount < 5 ? 'новые новости' : 'новых новостей'}
+          </button>
+        )}
+
         <div style={{ display: 'grid', gap: 12, marginBottom: 18 }}>
-          <input value={query} onChange={e => { setQuery(e.target.value); setVisibleCount(9); }} placeholder="Поиск по новостям, категориям и тексту" style={inputStyle} />
+          <input ref={searchRef} value={query} onChange={e => { setQuery(e.target.value); setVisibleCount(9); }} placeholder="Поиск по новостям, категориям и тексту" aria-label="Поиск по новостям" style={inputStyle} />
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
             {NEWS_CATEGORIES.map(item => (
               <button key={item.id} type="button" onClick={() => { setCategory(item.id); setVisibleCount(9); }} style={{ flex: '0 0 auto', minHeight: 38, borderRadius: 999, padding: '0 13px', border: category === item.id ? '1px solid rgba(215,184,106,0.48)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: category === item.id ? 'rgba(215,184,106,0.18)' : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: category === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 820, fontFamily: 'inherit' }}>{item.label}</button>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
-            {NEWS_SORTS.map(item => (
+            {newsFilterPresets.map(item => (
               <button key={item.id} type="button" onClick={() => { setSort(item.id); setVisibleCount(9); }} style={{ flex: '0 0 auto', minHeight: 34, borderRadius: 999, padding: '0 12px', border: sort === item.id ? '1px solid rgba(255,255,255,0.22)' : '1px solid transparent', background: sort === item.id ? 'rgba(var(--apg2-glass-a,255,255,255),0.12)' : 'transparent', color: sort === item.id ? APG2_PROFILE.text : APG2_PROFILE.textMuted, fontSize: 11.5, fontWeight: 760, fontFamily: 'inherit' }}>{item.label}</button>
             ))}
           </div>
@@ -783,9 +914,13 @@ export function NewsPage({
           </GlassCard>
         )}
 
-        {visible.length === 0 ? (
+        {showSkeleton ? (
+          <NewsSkeleton />
+        ) : visible.length === 0 ? (
           <GlassCard style={{ borderRadius: 34, padding: 24, textAlign: 'center', color: APG2_PROFILE.textSoft }}>
-            По этому запросу пока нет материалов.
+            <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 900, marginBottom: 7 }}>Материалы не найдены</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px' }}>{hasNews ? 'Попробуйте изменить категорию, период или поисковый запрос.' : 'Новости скоро появятся. Если интернет нестабилен, попробуйте обновить ленту.'}</div>
+            <GlassButton onClick={refresh} tone="gold" style={{ marginTop: 16, color: '#17120a' }}>{refreshing ? 'Обновляем...' : 'Обновить'}</GlassButton>
           </GlassCard>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 14, alignItems: 'start' }}>
@@ -795,6 +930,7 @@ export function NewsPage({
                 item={item}
                 index={index}
                 onOpen={setSelected}
+                onShare={handleShare}
                 saved={savedSet.has(String(item.id))}
                 later={laterSet.has(String(item.id))}
               />
@@ -806,6 +942,13 @@ export function NewsPage({
           <GlassButton onClick={() => setVisibleCount(v => v + 9)} tone="gold" style={{ width: '100%', marginTop: 18, color: '#17120a' }}>
             Показать ещё
           </GlassButton>
+        )}
+      </div>
+
+      <div style={{ position: 'fixed', right: 16, bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', zIndex: 40, display: 'grid', gap: 10, pointerEvents: selected ? 'none' : 'auto' }}>
+        <button type="button" onClick={focusSearch} aria-label="Найти новость" style={{ width: 48, height: 48, borderRadius: 19, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(18,17,15,0.72)', color: APG2_PROFILE.gold, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 18px 44px rgba(0,0,0,0.28)', fontSize: 18, cursor: 'pointer' }}>⌕</button>
+        {showTopButton && (
+          <button type="button" onClick={scrollToTop} aria-label="Вернуться наверх" style={{ width: 48, height: 48, borderRadius: 19, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(18,17,15,0.72)', color: APG2_PROFILE.text, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 18px 44px rgba(0,0,0,0.28)', fontSize: 20, cursor: 'pointer' }}>↑</button>
         )}
       </div>
 

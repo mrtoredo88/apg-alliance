@@ -8,7 +8,7 @@ import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
-import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
+import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsPhotoItems, getNewsReactionsTotal, getNewsStats, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -28,7 +28,7 @@ const CATEGORIES = [
 ];
 
 const contentImageOf = (item) =>
-  item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
+  getNewsPhotoItems(item)[0]?.url || item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
 
 const profileImageOf = (item) =>
   item?.coverPhoto || item?.imageUrl || item?.logoUrl || item?.photoUrl || item?.photo || item?.image || '';
@@ -1156,6 +1156,7 @@ function NewsModal({ item, onClose }) {
 function NewsWidget({ news = [], onOpenNews }) {
   const [modal, setModal] = useState(null);
   const items = useMemo(() => (Array.isArray(news) ? news.filter(Boolean).slice(0, 8) : []), [news]);
+  const freshCount = useMemo(() => items.filter(isFreshNews).length, [items]);
 
   if (!items.length) return null;
 
@@ -1168,31 +1169,39 @@ function NewsWidget({ news = [], onOpenNews }) {
             <div>
               <div style={{ fontSize: 11, fontWeight: 880, color: T.gold, letterSpacing: 1.7, textTransform: 'uppercase', marginBottom: 6 }}>✦ Новости АПГ</div>
               <div style={{ color: T.textPri, fontSize: 22, lineHeight: '27px', fontWeight: 900 }}>Что нового в городе</div>
+              {freshCount > 0 && <div style={{ color: T.textSec, fontSize: 12, lineHeight: '17px', marginTop: 5 }}>{freshCount} новых материалов</div>}
             </div>
             <button
               type="button"
               onClick={onOpenNews}
               style={{ border: '1px solid rgba(201,168,76,0.28)', background: 'rgba(201,168,76,0.12)', color: T.gold, borderRadius: 999, minHeight: 36, padding: '0 13px', fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
-              Все →
+              Все новости →
             </button>
           </div>
 
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', paddingBottom: 2, margin: '0 -16px', paddingLeft: 16, paddingRight: 16 }}>
             {items.map((item, index) => {
               const image = getNewsImage(item);
+              const photo = getNewsPhotoItems(item)[0];
+              const ratio = photo?.width && photo?.height ? photo.width / photo.height : null;
+              const objectFit = item?.source === 'vk' || (ratio && ratio < 0.82) ? 'contain' : 'cover';
+              const stats = getNewsStats(item);
+              const reactions = getNewsReactionsTotal(item) || stats.likes;
               return (
                 <button
                   key={item.id || `${getNewsTitle(item)}-${index}`}
                   type="button"
                   onClick={() => setModal(item)}
                   {...pressMotion}
-                  style={{ flex: '0 0 248px', minHeight: 282, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: T.textPri, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', scrollSnapAlign: 'start', fontFamily: 'inherit' }}
+                  aria-label={`Открыть новость: ${getNewsTitle(item)}`}
+                  style={{ flex: '0 0 260px', minHeight: 304, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: T.textPri, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', scrollSnapAlign: 'start', fontFamily: 'inherit' }}
                 >
                   <span style={{ display: 'block', position: 'relative', height: 136, background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
-                    {image && <img src={image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    {image && <img src={image} alt="" loading="lazy" decoding="async" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit }} />}
                     <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent, rgba(8,8,10,0.72))' }} />
                     <span style={{ position: 'absolute', left: 12, top: 12, padding: '7px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.48)', border: '1px solid rgba(244,217,140,0.24)', color: T.gold, fontSize: 10.5, lineHeight: '13px', fontWeight: 850, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>{getNewsCategoryLabel(item)}</span>
+                    {isFreshNews(item) && <span style={{ position: 'absolute', left: 12, bottom: 12, padding: '6px 9px', borderRadius: 999, background: 'rgba(201,168,76,0.22)', border: '1px solid rgba(244,217,140,0.28)', color: '#FFF2B8', fontSize: 10.5, fontWeight: 870 }}>🆕 Новое</span>}
                     {hasNewsVideo(item) && <span style={{ position: 'absolute', right: 12, top: 12, width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(8,8,10,0.52)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff' }}>▶</span>}
                   </span>
                   <span style={{ display: 'grid', gap: 9, padding: 14 }}>
@@ -1203,7 +1212,7 @@ function NewsWidget({ news = [], onOpenNews }) {
                     </span>
                     <span style={{ color: T.textPri, fontSize: 17, lineHeight: '21px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
                     <span style={{ color: T.textSec, fontSize: 12.5, lineHeight: '18px', fontWeight: 520, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(item) || 'Короткий материал АПГ. Откройте, чтобы узнать больше.'}</span>
-                    <span style={{ marginTop: 2, color: T.textSoft, fontSize: 11, fontWeight: 720 }}>{getNewsViews(item)} просмотров</span>
+                    <span style={{ marginTop: 2, color: T.textSoft, fontSize: 11, fontWeight: 720 }}>{getNewsViews(item)} просмотров · ♥ {reactions} · 💬 {stats.comments}</span>
                   </span>
                 </button>
               );
