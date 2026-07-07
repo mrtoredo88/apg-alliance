@@ -19,6 +19,7 @@ import newsEngagementRoutes   from './routes/news-engagement.js';
 import adminActionsRoutes     from './routes/admin-actions.js';
 import systemStatusRoutes     from './routes/system-status.js';
 import userActionsRoutes      from './routes/user-actions.js';
+import lokiEditorRoutes       from './routes/loki-editor.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -56,6 +57,7 @@ fastify.register(newsEngagementRoutes);
 fastify.register(adminActionsRoutes);
 fastify.register(systemStatusRoutes);
 fastify.register(userActionsRoutes);
+fastify.register(lokiEditorRoutes);
 
 fastify.get('/health', async (request, reply) => {
   try {

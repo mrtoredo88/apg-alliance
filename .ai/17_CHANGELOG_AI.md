@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V5.0 Локи · ИИ-редактор новостей
+**Коммит:** `локально`
+**Файлы:** `api/loki-editor.js`, `server/src/routes/loki-editor.js`, `server/src/server.js`, `src/AdminPanel.jsx`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/ARCHITECTURE.md`
+**Тип:** feat
+**Что изменено:** Добавлен backend `/api/loki-editor` для источников, проверки RSS/XML/JSON/manual материалов, duplicate check, генерации редакционных черновиков, confidence score, объяснения важности, журнала Локи и публикации только после ручного подтверждения редактора. Вкладка «Черновики ИИ» превращена в рабочий раздел «Локи · Редакция» с KPI, источниками, очередью черновиков, действиями и настройками.
+**Почему:** V5.0 запускает интеллектуальную редакционную систему без автопубликации: Локи помогает редактору готовить новости, но не заменяет человека.
+
+---
+
 ## [2026-07-07] V4.4.4 user backend migration и architecture audit
 **Коммит:** `локально`
 **Файлы:** `api/user-actions.js`, `server/src/routes/user-actions.js`, `server/src/server.js`, `src/userApi.js`, `src/UserApp.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/loki/LokiProvider.jsx`, `src/errorLogger.js`, `src/diagnostics.js`, `.ai/04_API.md`, `.ai/ARCHITECTURE.md`

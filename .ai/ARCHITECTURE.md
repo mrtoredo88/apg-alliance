@@ -12,7 +12,8 @@
 - Push: Firebase Cloud Messaging / VK notifications, отправка через backend.
 - Admin: `AdminPanel.jsx` читает Firestore, но административные изменения идут через `/api/admin-actions`.
 - User writes: пользовательские изменения идут через `/api/user-actions`.
-- Loki: frontend personality/UX layer; V5 должен подключать intelligence только через service layer и backend APIs.
+- Loki: frontend personality/UX layer; V5 intelligence подключается только через backend APIs и редакционные сервисы.
+- Loki Editor: `/api/loki-editor` собирает источники, готовит черновики и отдаёт их редактору без автопубликации.
 
 ## Потоки данных
 
@@ -67,7 +68,8 @@
 
 - UI/персонаж живёт на frontend.
 - Настройки синхронизируются через `/api/user-actions` `loki:settings`.
-- V5 intelligence не должен писать в Firestore напрямую: только через Loki services и backend actions.
+- V5.0 редакционный интеллект живёт в `/api/loki-editor`: Source Manager, Parser, Duplicate Checker, Draft Generator, Queue Manager, Activity Logger.
+- Локи не публикует новости сам. Он создаёт `aiDrafts`, объясняет важность и ждёт решения редактора.
 
 ## Backend API
 
@@ -81,6 +83,7 @@
 - `/api/email-auth`, `/api/telegram-*`: auth flows.
 - `/api/send-push`: push notifications.
 - `/api/system-status`: operational status for admin.
+- `/api/loki-editor`: sources, scheduler run, duplicate checks, AI-assisted drafts, editor decisions.
 
 ## Роли
 
@@ -115,6 +118,10 @@
 - `userActivityLog`
 - `config`
 - `stats`
+- `aiSources`
+- `aiDrafts`
+- `aiEditorRuns`
+- `aiEditorActivity`
 
 ## Firebase Usage Audit
 
@@ -126,10 +133,11 @@
 
 ## V5 Roadmap
 
-- V5.1: Loki service layer без AI-автодействий, доступ к APG data через typed services.
-- V5.2: Loki recommendations через backend-safe actions и `userActivityLog`.
-- V5.3: AI News Editor drafts: сбор источников, dedupe, summary, confidence, editor approval.
-- V5.4: Loki editorial workspace: очередь материалов, объяснение выбора, human-in-the-loop publish.
+- V5.0: Loki News Editor drafts: источники, dedupe, summary, confidence, editor approval.
+- V5.1: подключение внешних моделей только к Draft Generator, без автопубликации.
+- V5.2: умный daily digest и объяснение редакционных рекомендаций.
+- V5.3: обучение на решениях редактора (`published/rejected/edited`) без автоматической публикации.
+- V5.4: расширение Loki Editorial Workspace на партнёров, экспертов и события.
 
 ## Architecture Risks
 

@@ -919,23 +919,243 @@ function AdminUsersPanel({ users }) {
   );
 }
 
+async function lokiEditorRequest(action, payload = {}) {
+  const user = auth.currentUser || await signInAnonymously(auth).then(r => r.user);
+  const token = await user.getIdToken();
+  const response = await fetch(`${API_BASE_URL}/api/loki-editor`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-APG-Version': 'v5.0-local',
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'Локи-редактор недоступен.');
+  return data;
+}
+
+function confidenceTone(value) {
+  const n = Number(value || 0);
+  if (n >= 90) return { label: `🟢 ${n}%`, color: '#4ade80' };
+  if (n >= 75) return { label: `🟡 ${n}%`, color: '#facc15' };
+  return { label: `🔴 ${n}%`, color: '#fb7185' };
+}
+
 function AIDraftsPanel() {
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [data, setData] = useState({ sources: [], drafts: [], activity: [], runs: [], stats: {}, settings: {} });
+  const [sourceName, setSourceName] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceType, setSourceType] = useState('rss');
+  const [intervalMinutes, setIntervalMinutes] = useState(10);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(70);
+  const [maxItemsPerRun, setMaxItemsPerRun] = useState(20);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setData(await lokiEditorRequest('status'));
+    } catch (e) {
+      setError(e.message || 'Не удалось загрузить черновики Локи.');
+      logError(e, 'AdminPanel.AIDraftsPanel.load');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setIntervalMinutes(Number(data.settings?.intervalMinutes || 10));
+    setConfidenceThreshold(Number(data.settings?.confidenceThreshold || 70));
+    setMaxItemsPerRun(Number(data.settings?.maxItemsPerRun || 20));
+  }, [data.settings?.intervalMinutes, data.settings?.confidenceThreshold, data.settings?.maxItemsPerRun]);
+
+  const runCycle = async () => {
+    setRunning(true);
+    setError('');
+    try {
+      await lokiEditorRequest('run-cycle');
+      await load();
+    } catch (e) {
+      setError(e.message || 'Не удалось проверить источники.');
+      logError(e, 'AdminPanel.AIDraftsPanel.runCycle');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const saveSource = async () => {
+    if (!sourceName.trim()) return;
+    setError('');
+    try {
+      await lokiEditorRequest('source:save', { source: { name: sourceName.trim(), url: sourceUrl.trim(), type: sourceType, active: true, intervalMinutes: 10 } });
+      setSourceName('');
+      setSourceUrl('');
+      setSourceType('rss');
+      await load();
+    } catch (e) {
+      setError(e.message || 'Источник не сохранён.');
+      logError(e, 'AdminPanel.AIDraftsPanel.saveSource');
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      await lokiEditorRequest('settings:save', {
+        settings: {
+          intervalMinutes: Math.max(1, Number(intervalMinutes || 10)),
+          confidenceThreshold: Math.max(1, Math.min(99, Number(confidenceThreshold || 70))),
+          maxItemsPerRun: Math.max(1, Math.min(100, Number(maxItemsPerRun || 20))),
+        },
+      });
+      await load();
+    } catch (e) {
+      setError(e.message || 'Настройки не сохранены.');
+      logError(e, 'AdminPanel.AIDraftsPanel.saveSettings');
+    }
+  };
+
+  const updateDraft = async (id, patch, editorAction = 'update') => {
+    await lokiEditorRequest('draft:update', { id, patch, editorAction });
+    await load();
+  };
+
+  const editDraft = async (draft) => {
+    const title = window.prompt('Заголовок черновика', draft.title || '');
+    if (title == null) return;
+    const summary = window.prompt('Краткое описание', draft.summary || '');
+    if (summary == null) return;
+    await updateDraft(draft.id, { title, summary }, 'edit');
+  };
+
+  const publishDraft = async (draft) => {
+    if (!window.confirm('Опубликовать черновик как новость? Публикация выполняется только по вашему подтверждению.')) return;
+    await lokiEditorRequest('draft:publish', { id: draft.id });
+    await load();
+  };
+
+  const stats = data.stats || {};
+  const readyDrafts = (data.drafts || []).filter(d => d.status !== 'rejected').sort((a, b) => Number(toJsDate(b.createdAt || b.fetchedAt) || 0) - Number(toJsDate(a.createdAt || a.fetchedAt) || 0));
+
   return (
-    <div style={{ ...s.card, padding: 24, border: `1px dashed ${A.goldBrd}`, background: 'linear-gradient(135deg, rgba(201,168,76,0.10), rgba(255,255,255,0.035))' }}>
-      <div style={{ fontSize: 38, marginBottom: 12 }}>🤖</div>
-      <h1 style={{ ...s.h1, fontSize: 26, marginBottom: 8 }}>Черновики ИИ</h1>
-      <div style={{ color: A.textSec, fontSize: 14, lineHeight: '22px', maxWidth: 680 }}>
-        Раздел подготовлен для V4.5. Здесь будут появляться автоматически подготовленные материалы: черновики новостей, варианты заголовков, подборки фото, очередь публикаций и редакторские подсказки. Сейчас логика ИИ не подключена намеренно.
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ ...s.card, padding: 24, border: `1px solid ${A.goldBrd}`, background: 'linear-gradient(135deg, rgba(201,168,76,0.14), rgba(255,255,255,0.035))' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>🤖</div>
+            <h1 style={{ ...s.h1, fontSize: 26, marginBottom: 8 }}>Локи · Редакция</h1>
+            <div style={{ color: A.textSec, fontSize: 14, lineHeight: '22px', maxWidth: 720 }}>
+              Локи собирает материалы из разрешённых источников, готовит черновики и отдаёт их редактору. Автопубликация отключена: финальное решение всегда принимает человек.
+            </div>
+          </div>
+          <button onClick={runCycle} disabled={running} style={{ ...s.btnGold, minHeight: 44, opacity: running ? 0.65 : 1 }}>
+            {running ? 'Проверяем...' : '🔄 Проверить источники'}
+          </button>
+        </div>
+        {error && <div style={{ marginTop: 14, padding: 12, borderRadius: 14, background: 'rgba(251,113,133,0.12)', border: '1px solid rgba(251,113,133,0.32)', color: '#fecdd3', fontSize: 13 }}>{error}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 18 }}>
+          {[
+            ['Найдено', stats.found ?? 0],
+            ['Готово', stats.ready ?? 0],
+            ['Дубликатов', stats.duplicates ?? 0],
+            ['Ошибок', stats.errors ?? 0],
+            ['Опубликовано', stats.published ?? 0],
+          ].map(([label, value]) => (
+            <div key={label} style={{ padding: 14, borderRadius: 16, background: A.chip, border: `1px solid ${A.border}` }}>
+              <div style={{ color: A.textSec, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>{label}</div>
+              <div style={{ color: A.text, fontSize: 24, fontWeight: 950, marginTop: 4 }}>{value}</div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 18 }}>
-        {[
-          ['drafts', 'Черновики материалов'],
-          ['sources', 'Источники и факты'],
-          ['queue', 'Очередь публикаций'],
-          ['review', 'Проверка редактором'],
-        ].map(([id, label]) => (
-          <div key={id} style={{ padding: 14, borderRadius: 16, background: A.chip, border: `1px solid ${A.border}`, color: A.text, fontSize: 13, fontWeight: 800 }}>{label}</div>
-        ))}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ ...s.card, marginBottom: 0 }}>
+            <h2 style={s.h2}>Черновики</h2>
+            {loading ? <div style={{ color: A.textSec }}>Загружаем очередь...</div> : readyDrafts.length === 0 ? (
+              <div style={{ color: A.textSec, lineHeight: '22px' }}>Очередь пуста. Добавьте источник и запустите проверку.</div>
+            ) : readyDrafts.map(draft => {
+              const tone = confidenceTone(draft.confidence);
+              return (
+                <div key={draft.id} style={{ marginTop: 12, padding: 14, borderRadius: 18, background: A.chip, border: `1px solid ${A.border}` }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: draft.imageUrl ? '96px 1fr' : '1fr', gap: 12 }}>
+                    {draft.imageUrl && <img src={draft.imageUrl} alt="" loading="lazy" style={{ width: 96, height: 76, objectFit: 'cover', borderRadius: 14, border: `1px solid ${A.border}` }} onError={e => e.currentTarget.style.display = 'none'} />}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 7 }}>
+                        <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: tone.color, fontSize: 11, fontWeight: 900 }}>{tone.label}</span>
+                        <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: A.textSec, fontSize: 11, fontWeight: 800 }}>{draft.category || 'society'}</span>
+                        <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: A.textSec, fontSize: 11, fontWeight: 800 }}>{draft.status || 'ready'}</span>
+                      </div>
+                      <div style={{ color: A.text, fontSize: 16, fontWeight: 920, lineHeight: '21px' }}>{draft.title}</div>
+                      <div style={{ color: A.textSec, fontSize: 12.5, lineHeight: '19px', marginTop: 6 }}>{draft.summary}</div>
+                      <div style={{ color: A.muted, fontSize: 11.5, marginTop: 8 }}>{draft.sourceName || 'Источник'} · {draft.readingTime || 1} мин чтения</div>
+                    </div>
+                  </div>
+                  <details style={{ marginTop: 10 }}>
+                    <summary style={{ color: A.gold, cursor: 'pointer', fontSize: 12.5, fontWeight: 850 }}>🤖 Почему Локи считает это важным?</summary>
+                    <div style={{ color: A.textSec, fontSize: 12.5, lineHeight: '19px', marginTop: 8 }}>{draft.explain || 'Материал требует редакторской проверки.'}</div>
+                  </details>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                    <button style={s.btn} onClick={() => window.alert(draft.text || draft.summary || '')}>👁 Просмотреть</button>
+                    <button style={s.btn} onClick={() => editDraft(draft)}>✏️ Редактировать</button>
+                    <button style={s.btnGold} onClick={() => publishDraft(draft)} disabled={draft.status === 'published'}>✅ Опубликовать</button>
+                    <button style={s.btn} onClick={() => updateDraft(draft.id, { status: 'scheduled' }, 'schedule')}>📅 Отложить</button>
+                    <button style={{ ...s.btn, color: '#fecdd3', borderColor: 'rgba(251,113,133,0.35)' }} onClick={() => updateDraft(draft.id, { status: 'rejected' }, 'reject')}>🗑 Отклонить</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
+          <div style={{ ...s.card, marginBottom: 0 }}>
+            <h2 style={s.h2}>Источники</h2>
+            <input style={s.input} value={sourceName} onChange={e => setSourceName(e.target.value)} placeholder="Название источника" />
+            <input style={s.input} value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="URL RSS / JSON" />
+            <select style={s.input} value={sourceType} onChange={e => setSourceType(e.target.value)}>
+              <option value="rss">RSS / XML</option>
+              <option value="json">JSON API</option>
+              <option value="manual">Ручной импорт</option>
+            </select>
+            <button style={{ ...s.btnGold, width: '100%' }} onClick={saveSource}>➕ Добавить источник</button>
+            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+              {(data.sources || []).slice(0, 12).map(source => (
+                <div key={source.id} style={{ padding: 11, borderRadius: 14, background: A.chip, border: `1px solid ${A.border}` }}>
+                  <div style={{ color: A.text, fontWeight: 850, fontSize: 13 }}>{source.name}</div>
+                  <div style={{ color: A.textSec, fontSize: 11.5, marginTop: 3 }}>{source.type} · {source.status || 'new'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ ...s.card, marginBottom: 0 }}>
+            <h2 style={s.h2}>Журнал Локи</h2>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {(data.activity || []).slice(0, 12).map(item => (
+                <div key={item.id} style={{ color: A.textSec, fontSize: 12.5, lineHeight: '18px', paddingBottom: 8, borderBottom: `1px solid ${A.border}` }}>
+                  <b style={{ color: A.text }}>{item.type}</b>{item.sourceName ? ` · ${item.sourceName}` : ''}{item.error ? ` · ${item.error}` : ''}
+                </div>
+              ))}
+              {(!data.activity || data.activity.length === 0) && <div style={{ color: A.textSec, fontSize: 13 }}>Пока нет действий.</div>}
+            </div>
+          </div>
+          <div style={{ ...s.card, marginBottom: 0 }}>
+            <h2 style={s.h2}>Настройки Локи</h2>
+            <label style={{ color: A.textSec, fontSize: 12, fontWeight: 800 }}>Период проверки, мин</label>
+            <input style={s.input} type="number" min="1" value={intervalMinutes} onChange={e => setIntervalMinutes(e.target.value)} />
+            <label style={{ color: A.textSec, fontSize: 12, fontWeight: 800 }}>Минимум доверия, %</label>
+            <input style={s.input} type="number" min="1" max="99" value={confidenceThreshold} onChange={e => setConfidenceThreshold(e.target.value)} />
+            <label style={{ color: A.textSec, fontSize: 12, fontWeight: 800 }}>Материалов за цикл</label>
+            <input style={s.input} type="number" min="1" max="100" value={maxItemsPerRun} onChange={e => setMaxItemsPerRun(e.target.value)} />
+            <button style={{ ...s.btn, width: '100%' }} onClick={saveSettings}>Сохранить настройки</button>
+          </div>
+        </div>
       </div>
     </div>
   );
