@@ -3,6 +3,23 @@ import { getAdminDb } from './_firebase-admin.js';
 import { adminError, requireAdminPermission, writeAuditLog } from './_admin-security.js';
 
 const NEWS_FIELDS = new Set(['title', 'text', 'emoji', 'imageUrl', 'coverPhoto', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'linksCheckedAt']);
+const RESOURCE_CONFIG = {
+  partners: { collection: 'partners', scope: 'partners', label: 'партнёр' },
+  experts: { collection: 'experts', scope: 'experts', label: 'эксперт' },
+  events: { collection: 'events', scope: 'events', label: 'событие' },
+  banners: { collection: 'banners', scope: 'banners', label: 'баннер' },
+  prizes: { collection: 'prizes', scope: 'prizes', label: 'приз' },
+  notifications: { collection: 'notifications', scope: 'notifications', label: 'уведомление' },
+  customTasks: { collection: 'customTasks', scope: 'tasks', label: 'задание' },
+  users: { collection: 'users', scope: 'users', label: 'пользователь' },
+  prizeClaims: { collection: 'prizeClaims', scope: 'claims', label: 'выдача приза' },
+  errorLogs: { collection: 'errorLogs', scope: 'errors', label: 'ошибка' },
+  scans: { collection: 'scans', scope: 'maintenance', label: 'скан' },
+  raffleEntries: { collection: 'raffleEntries', scope: 'maintenance', label: 'участие в розыгрыше' },
+  expertReviews: { collection: 'expertReviews', scope: 'maintenance', label: 'отзыв эксперта' },
+  config: { collection: 'config', scope: 'settings', label: 'настройка' },
+  stats: { collection: 'stats', scope: 'stats', label: 'статистика' },
+};
 
 function cleanPatch(input = {}) {
   const patch = {};
@@ -10,6 +27,24 @@ function cleanPatch(input = {}) {
     if (NEWS_FIELDS.has(key)) patch[key] = value;
   });
   return patch;
+}
+
+function cleanEntityPatch(input = {}) {
+  const patch = {};
+  Object.entries(input || {}).forEach(([key, value]) => {
+    if (['id', 'createdAt', 'updatedAt', 'deletedAt'].includes(key)) return;
+    if (value === undefined) return;
+    patch[key] = value;
+  });
+  return patch;
+}
+
+function withServerTimestamps(patch, fields = []) {
+  const next = { ...patch };
+  fields.forEach(field => {
+    if (field) next[field] = FieldValue.serverTimestamp();
+  });
+  return next;
 }
 
 async function writeHistory(db, actor, newsId, action, before, after) {
@@ -157,6 +192,78 @@ async function handleNewsAction(db, req, actor) {
   throw error;
 }
 
+async function handleEntityAction(db, req, actor) {
+  const action = String(req.body?.action || '').trim();
+  const resource = String(req.body?.resource || '').trim();
+  const config = RESOURCE_CONFIG[resource];
+  if (!config) {
+    const error = new Error('Неизвестный административный ресурс.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const verb = action.split(':')[1] || '';
+  const id = String(req.body?.id || req.body?.targetId || '').trim();
+  const idempotencyKey = String(req.headers['x-idempotency-key'] || req.body?.idempotencyKey || '').trim();
+
+  if (action === 'entity:create') {
+    await requireAdminPermission(req, `${config.scope}:create`);
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const patch = withServerTimestamps(cleanEntityPatch(req.body?.patch), req.body?.serverTimestampFields || []);
+      const data = { ...patch, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
+      const ref = await db.collection(config.collection).add(data);
+      await writeAuditLog(db, req, actor, `${config.scope}:create`, config.collection, ref.id, { label: `Создан ${config.label}: ${patch.name || patch.title || ref.id}` });
+      return { ok: true, resource, id: ref.id, patch: data };
+    });
+  }
+
+  if (!id) {
+    const error = new Error('Не указан id административного объекта.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const ref = db.collection(config.collection).doc(id);
+
+  if (action === 'entity:update') {
+    await requireAdminPermission(req, `${config.scope}:update`);
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const increments = req.body?.increments || {};
+      const patch = withServerTimestamps(cleanEntityPatch(req.body?.patch), req.body?.serverTimestampFields || []);
+      Object.entries(increments).forEach(([key, value]) => {
+        patch[key] = FieldValue.increment(Number(value) || 0);
+      });
+      patch.updatedAt = FieldValue.serverTimestamp();
+      await ref.set(patch, { merge: true });
+      await writeAuditLog(db, req, actor, `${config.scope}:update`, config.collection, id, { label: `Обновлён ${config.label}: ${patch.name || patch.title || id}`, fields: Object.keys(patch) });
+      return { ok: true, resource, id, patch: cleanEntityPatch(req.body?.patch), increments };
+    });
+  }
+
+  if (action === 'entity:delete') {
+    await requireAdminPermission(req, `${config.scope}:delete`);
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      await ref.delete();
+      await writeAuditLog(db, req, actor, `${config.scope}:delete`, config.collection, id, { label: `Удалён ${config.label}: ${id}` });
+      return { ok: true, resource, id };
+    });
+  }
+
+  if (action === 'entity:set') {
+    await requireAdminPermission(req, `${config.scope}:update`);
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const patch = withServerTimestamps(cleanEntityPatch(req.body?.patch), req.body?.serverTimestampFields || []);
+      await ref.set({ ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      await writeAuditLog(db, req, actor, `${config.scope}:set`, config.collection, id, { label: `Сохранён ${config.label}: ${id}`, fields: Object.keys(patch) });
+      return { ok: true, resource, id, patch };
+    });
+  }
+
+  const error = new Error(`Неизвестное действие ${verb || action}.`);
+  error.statusCode = 400;
+  throw error;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -167,7 +274,10 @@ export default async function handler(req, res) {
   const db = getAdminDb();
   try {
     const actor = await requireAdminPermission(req, 'system:read');
-    const result = await handleNewsAction(db, req, actor);
+    const action = String(req.body?.action || '');
+    const result = action.startsWith('entity:')
+      ? await handleEntityAction(db, req, actor)
+      : await handleNewsAction(db, req, actor);
     return res.status(200).json(result);
   } catch (error) {
     try {

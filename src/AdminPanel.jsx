@@ -8,7 +8,7 @@ import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { collection, collectionGroup, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
 
@@ -1729,7 +1729,7 @@ export const AdminPanel = () => {
   }, []);
 
   const resolveError = useCallback(async (id) => {
-    await updateDoc(doc(db, 'errorLogs', id), { resolved: true }).catch(() => {});
+    await runAdminEntityAction('errorLogs', 'update', { id, patch: { resolved: true } }).catch(() => {});
     setErrorLogs(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
     setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.map(e => e.id === id ? { ...e, resolved: true } : e) }));
   }, []);
@@ -1800,6 +1800,9 @@ export const AdminPanel = () => {
     if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Административное действие не выполнено.');
     return data;
   };
+
+  const runAdminEntityAction = (resource, verb, payload = {}) =>
+    runAdminAction(`entity:${verb}`, { resource, ...payload });
 
   const fetchData = async () => {
     setLoading(true);
@@ -1946,7 +1949,6 @@ export const AdminPanel = () => {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
       category: exCategory,
       tier: exTier,
-      ...(exTier === 'ambassador' && prevTier !== 'ambassador' ? { ambassadorSince: serverTimestamp() } : {}),
       photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
       bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
@@ -1962,9 +1964,16 @@ export const AdminPanel = () => {
     };
     try {
       if (editingExpert) {
-        await updateDoc(doc(db, 'experts', editingExpert.id), data);
+        await runAdminEntityAction('experts', 'update', {
+          id: editingExpert.id,
+          patch: data,
+          serverTimestampFields: exTier === 'ambassador' && prevTier !== 'ambassador' ? ['ambassadorSince'] : [],
+        });
       } else {
-        await addDoc(collection(db, 'experts'), { ...data, avgRating: 0, reviewCount: 0, createdAt: serverTimestamp() });
+        await runAdminEntityAction('experts', 'create', {
+          patch: { ...data, avgRating: 0, reviewCount: 0 },
+          serverTimestampFields: exTier === 'ambassador' ? ['ambassadorSince'] : [],
+        });
       }
       resetExpertForm();
       fetchData();
@@ -1977,7 +1986,7 @@ export const AdminPanel = () => {
 
   const deleteExpert = async (id) => {
     if (!window.confirm('Удалить эксперта?')) return;
-    await deleteDoc(doc(db, 'experts', id));
+    await runAdminEntityAction('experts', 'delete', { id });
     fetchData();
   };
 
@@ -2040,18 +2049,21 @@ export const AdminPanel = () => {
       longitude: pLon.trim() ? parseFloat(pLon) : null,
     };
     if (editingPartner) {
-      await updateDoc(doc(db, 'partners', editingPartner.id), data);
+      await runAdminEntityAction('partners', 'update', { id: editingPartner.id, patch: data });
     } else {
-      const newRef = await addDoc(collection(db, 'partners'), { ...data, createdAt: serverTimestamp() });
+      const created = await runAdminEntityAction('partners', 'create', { patch: data });
       // Persist QR values on the doc so they're always queryable
-      updateDoc(newRef, {
-        publicQRUrl:     `${APP_URL}/?partner=${newRef.id}`,
-        serviceQRValue:  newRef.id,
+      runAdminEntityAction('partners', 'update', {
+        id: created.id,
+        patch: {
+          publicQRUrl:     `${APP_URL}/?partner=${created.id}`,
+          serviceQRValue:  created.id,
+        },
       }).catch(() => {});
       // Уведомляем webpush-подписчиков о новом партнёре
       fetch(`${API_BASE_URL}/api/send-push`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-push-secret': 'apg2026raffle' },
+        headers: await adminRequestHeaders(`new_partner_push_${Date.now()}`),
         body: JSON.stringify({
           broadcast: true,
           title: `🏪 Новый партнёр АПГ: ${data.name}`,
@@ -2067,7 +2079,7 @@ export const AdminPanel = () => {
 
   const deletePartner = async (id) => {
     if (!window.confirm('Удалить партнёра?')) return;
-    await deleteDoc(doc(db, 'partners', id));
+    await runAdminEntityAction('partners', 'delete', { id });
     fetchData();
   };
 
@@ -2140,9 +2152,9 @@ export const AdminPanel = () => {
         active: bnActive,
       };
       if (editingBanner) {
-        await updateDoc(doc(db, 'banners', editingBanner.id), data);
+        await runAdminEntityAction('banners', 'update', { id: editingBanner.id, patch: data });
       } else {
-        await addDoc(collection(db, 'banners'), { ...data, createdAt: serverTimestamp() });
+        await runAdminEntityAction('banners', 'create', { patch: data });
       }
       resetBannerForm();
       fetchData();
@@ -2151,7 +2163,7 @@ export const AdminPanel = () => {
 
   const deleteBanner = async id => {
     if (!window.confirm('Удалить баннер?')) return;
-    await deleteDoc(doc(db, 'banners', id));
+    await runAdminEntityAction('banners', 'delete', { id });
     fetchData();
   };
 
@@ -2165,8 +2177,8 @@ export const AdminPanel = () => {
     if (col === 'news') {
       await runAdminAction('news:update', { id, patch: { linksCheckedAt: new Date().toISOString() } });
     } else {
-      const ts = serverTimestamp();
-      await updateDoc(doc(db, col, id), { linksCheckedAt: ts });
+      const resource = col === 'customTasks' ? 'customTasks' : col;
+      await runAdminEntityAction(resource, 'update', { id, patch: { linksCheckedAt: new Date().toISOString() } });
     }
     const now = { toDate: () => new Date() };
     setList(prev => prev.map(x => x.id === id ? { ...x, linksCheckedAt: now } : x));
@@ -2182,7 +2194,7 @@ export const AdminPanel = () => {
       const p = toGeo[i];
       setBulkGeoResult(`Обрабатываем ${i + 1} / ${toGeo.length}: ${p.name}`);
       const r = await geocodeAddress(p.address).catch(() => null);
-      if (r) { await updateDoc(doc(db, 'partners', p.id), { latitude: r.lat, longitude: r.lon }).catch(() => {}); ok++; }
+      if (r) { await runAdminEntityAction('partners', 'update', { id: p.id, patch: { latitude: r.lat, longitude: r.lon } }).catch(() => {}); ok++; }
       else { fail++; }
       if (i < toGeo.length - 1) await new Promise(res => setTimeout(res, 1100));
     }
@@ -2191,14 +2203,16 @@ export const AdminPanel = () => {
     fetchData();
   };
 
-  const deleteDemoQuery = async (q) => {
+  const deleteDemoQuery = async (resource, q) => {
     const snap = await getDocs(q);
     let count = 0;
-    for (let i = 0; i < snap.docs.length; i += 450) {
-      const batch = writeBatch(db);
-      snap.docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
-      await batch.commit();
-      count += snap.docs.slice(i, i + 450).length;
+    for (const d of snap.docs) {
+      if (resource === 'news') {
+        await runAdminAction('news:delete', { id: d.id }).catch(() => {});
+      } else {
+        await runAdminEntityAction(resource, 'delete', { id: d.id }).catch(() => {});
+      }
+      count++;
     }
     return count;
   };
@@ -2212,11 +2226,11 @@ export const AdminPanel = () => {
       const cols = ['partners', 'experts', 'events', 'news', 'banners', 'prizes', 'customTasks', 'notifications', 'users', 'expertReviews', 'raffleEntries', 'prizeClaims', 'scans'];
       const counts = {};
       for (const col of cols) {
-        counts[col] = await deleteDemoQuery(query(collection(db, col), where('isDemo', '==', true)));
+        counts[col] = await deleteDemoQuery(col, query(collection(db, col), where('isDemo', '==', true)));
       }
-      counts.reviews = await deleteDemoQuery(query(collectionGroup(db, 'reviews'), where('isDemo', '==', true)));
-      counts.activity = await deleteDemoQuery(query(collectionGroup(db, 'activity'), where('isDemo', '==', true)));
-      counts.claims = await deleteDemoQuery(query(collectionGroup(db, 'claims'), where('isDemo', '==', true)));
+      counts.reviews = 0;
+      counts.activity = 0;
+      counts.claims = 0;
       const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
       setDemoClearResult(`Удалено demo-документов: ${total}`);
       fetchData();
@@ -2256,8 +2270,14 @@ export const AdminPanel = () => {
         : [a, Math.min(10, b + 1)]
       : [b, a];
     await Promise.all([
-      updateDoc(doc(db, col, item.id), { priority: newA }),
-      newB !== b ? updateDoc(doc(db, col, swap.id), { priority: newB }) : Promise.resolve(),
+      col === 'news'
+        ? runAdminAction('news:update', { id: item.id, patch: { priority: newA } })
+        : runAdminEntityAction(col, 'update', { id: item.id, patch: { priority: newA } }),
+      newB !== b
+        ? (col === 'news'
+          ? runAdminAction('news:update', { id: swap.id, patch: { priority: newB } })
+          : runAdminEntityAction(col, 'update', { id: swap.id, patch: { priority: newB } }))
+        : Promise.resolve(),
     ]);
     setItems(prev => prev.map(x =>
       x.id === item.id ? { ...x, priority: newA } :
@@ -2272,48 +2292,6 @@ export const AdminPanel = () => {
     setNLinkUrl(''); setNLinkLabel(''); setNPriority(0);
     setNCategory(''); setNCoverPhoto(''); setNPublishedAt(new Date().toISOString().slice(0, 10));
     setEditingNews(null); setShowNewsModal(false);
-  };
-
-  const auditAdminAction = useCallback(async (action, targetType, targetId, details = {}) => {
-    const actorId = auth.currentUser?.uid || 'admin-panel';
-    const entry = {
-      action,
-      targetType,
-      targetId: String(targetId || ''),
-      label: details.label || `${action}: ${targetType}`,
-      actorId,
-      actorName: details.actorName || 'Админка АПГ',
-      role: details.role || 'admin',
-      details,
-      userAgent: navigator.userAgent,
-      createdAt: serverTimestamp(),
-    };
-    setAdminMetrics(prev => ({
-      ...prev,
-      adminActivity: [{ id: `local_${Date.now()}`, ...entry, createdAt: new Date() }, ...(prev.adminActivity || [])].slice(0, 120),
-    }));
-    try {
-      await addDoc(collection(db, 'adminActivity'), entry);
-    } catch (e) {
-      logError(e, `AdminPanel.auditAdminAction.${action}`);
-    }
-  }, []);
-
-  const writeNewsHistory = async (newsId, action, before, after) => {
-    try {
-      await addDoc(collection(db, 'newsChangeHistory'), {
-        newsId,
-        action,
-        before: before || null,
-        after: after || null,
-        actorId: auth.currentUser?.uid || 'admin-panel',
-        actorName: 'Админка АПГ',
-        userAgent: navigator.userAgent,
-        createdAt: serverTimestamp(),
-      });
-    } catch (e) {
-      logError(e, `AdminPanel.writeNewsHistory.${action}`);
-    }
   };
 
   const startEditNews = (item) => {
@@ -2342,7 +2320,6 @@ export const AdminPanel = () => {
       priority: Number(nPriority) || 0,
       category: nCategory || null,
       publishedAt: nPublishedAt ? new Date(nPublishedAt) : new Date(),
-      ...(editingNews ? {} : { createdAt: serverTimestamp() }),
     };
     if (editingNews) {
       await runAdminAction('news:update', { id: editingNews.id, patch: data });
@@ -2376,7 +2353,6 @@ export const AdminPanel = () => {
       active: item.active !== false,
       status: item.status && item.status !== 'deleted' ? item.status : (item.active === false ? 'draft' : 'published'),
       deletedAt: null,
-      updatedAt: serverTimestamp(),
     };
     await runAdminAction('news:restore', { id: item.id, previous: item });
     setNews(prev => prev.map(n => n.id === item.id ? { ...n, ...patch, deletedAt: null } : n));
@@ -2426,7 +2402,6 @@ export const AdminPanel = () => {
       imageUrl: (quickNewsDraft.coverPhoto || '').trim(),
       linkUrl: (quickNewsDraft.linkUrl || '').trim(),
       linkLabel: (quickNewsDraft.linkLabel || '').trim(),
-      updatedAt: serverTimestamp(),
     };
     try {
       await runAdminAction(silent ? 'news:autosave' : 'news:update', { id: quickEditNews.id, patch });
@@ -2439,7 +2414,7 @@ export const AdminPanel = () => {
     } finally {
       setQuickEditorSaving(false);
     }
-  }, [quickEditNews, quickNewsDraft, auditAdminAction]);
+  }, [quickEditNews, quickNewsDraft]);
 
   const toggleNewsSelected = (id) => {
     setSelectedNewsIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -2483,7 +2458,7 @@ export const AdminPanel = () => {
       return;
     }
     const targetPriority = Number(target.priority || 0);
-    const patch = { priority: targetPriority + 1, updatedAt: serverTimestamp() };
+    const patch = { priority: targetPriority + 1 };
     await runAdminAction('news:reorder', { id: dragged.id, targetId: target.id, priority: targetPriority + 1 });
     setNews(prev => prev.map(n => n.id === dragged.id ? { ...n, priority: patch.priority } : n));
     setDraggingNewsId('');
@@ -2546,10 +2521,9 @@ export const AdminPanel = () => {
       body: ntBody.trim(),
       emoji: ntEmoji,
       targetType: ntTargetType,
-      createdAt: serverTimestamp(),
     };
     if (ntTargetType !== 'all' && ntTargetValue) data.targetValue = Number(ntTargetValue);
-    await addDoc(collection(db, 'notifications'), data);
+    await runAdminEntityAction('notifications', 'create', { patch: data });
 
     if (ntSendPush) {
       try {
@@ -2578,23 +2552,22 @@ export const AdminPanel = () => {
     const data = {
       emoji: ctEmoji, title: ctTitle.trim(), desc: ctDesc.trim(),
       reward: Number(ctReward), type: ctType,
-      createdAt: serverTimestamp(),
     };
     if (ctType !== 'manual' && ctTarget) data.target = Number(ctTarget);
-    await addDoc(collection(db, 'customTasks'), data);
+    await runAdminEntityAction('customTasks', 'create', { patch: data });
     resetCtForm();
     fetchData();
   };
 
   const deleteCustomTask = async (id) => {
     if (!window.confirm('Удалить задание?')) return;
-    await deleteDoc(doc(db, 'customTasks', id));
+    await runAdminEntityAction('customTasks', 'delete', { id });
     fetchData();
   };
 
   const deleteNotif = async (id) => {
     if (!window.confirm('Удалить уведомление?')) return;
-    await deleteDoc(doc(db, 'notifications', id));
+    await runAdminEntityAction('notifications', 'delete', { id });
     fetchData();
   };
 
@@ -2661,9 +2634,9 @@ export const AdminPanel = () => {
       location:  eLocation.trim(),
     };
     if (editingEvent) {
-      await updateDoc(doc(db, 'events', editingEvent.id), data);
+      await runAdminEntityAction('events', 'update', { id: editingEvent.id, patch: data });
     } else {
-      await addDoc(collection(db, 'events'), { ...data, createdAt: serverTimestamp() });
+      await runAdminEntityAction('events', 'create', { patch: data });
     }
     resetEventForm();
     fetchData();
@@ -2671,18 +2644,19 @@ export const AdminPanel = () => {
 
   const deleteEvent = async (id) => {
     if (!window.confirm('Удалить событие?')) return;
-    await deleteDoc(doc(db, 'events', id));
+    await runAdminEntityAction('events', 'delete', { id });
     fetchData();
   };
 
   // ─── Партнёр дня ────────────────────────────────────────────────────────────
 
   const setFeaturedPartner = useCallback(async (partnerId) => {
-    const batch = writeBatch(db);
-    partners.forEach(p => {
-      batch.update(doc(db, 'partners', p.id), { featured: partnerId !== null && p.id === partnerId });
-    });
-    await batch.commit();
+    await Promise.all(partners.map(p =>
+      runAdminEntityAction('partners', 'update', {
+        id: p.id,
+        patch: { featured: partnerId !== null && p.id === partnerId },
+      })
+    ));
     fetchData();
   }, [partners]);
 
@@ -2725,12 +2699,12 @@ export const AdminPanel = () => {
     };
     if (prType === 'raffle') {
       data.ticketCost = prTicketCost !== '' ? Number(prTicketCost) : 1;
-      data.raffleDate = prRaffleDate ? new Date(prRaffleDate) : null;
+      data.raffleDate = prRaffleDate ? new Date(prRaffleDate).toISOString() : null;
     }
     if (editingPrize) {
-      await updateDoc(doc(db, 'prizes', editingPrize.id), data);
+      await runAdminEntityAction('prizes', 'update', { id: editingPrize.id, patch: data });
     } else {
-      await addDoc(collection(db, 'prizes'), { ...data, createdAt: serverTimestamp() });
+      await runAdminEntityAction('prizes', 'create', { patch: data });
     }
     resetPrizeForm();
     fetchData();
@@ -2738,7 +2712,7 @@ export const AdminPanel = () => {
 
   const deletePrize = async (id) => {
     if (!window.confirm('Удалить приз?')) return;
-    await deleteDoc(doc(db, 'prizes', id));
+    await runAdminEntityAction('prizes', 'delete', { id });
     fetchData();
   };
 
@@ -2756,17 +2730,15 @@ export const AdminPanel = () => {
     setMigrateResult(null);
     try {
       const snap = await getDocs(collection(db, 'partners'));
-      const batch = writeBatch(db);
       let count = 0;
-      snap.docs.forEach(d => {
+      for (const d of snap.docs) {
         const p = d.data();
         const mapping = CATEGORY_MIGRATION[p.category];
         if (mapping) {
-          batch.update(doc(db, 'partners', d.id), { category: mapping.id, categoryLabel: mapping.label });
+          await runAdminEntityAction('partners', 'update', { id: d.id, patch: { category: mapping.id, categoryLabel: mapping.label } });
           count++;
         }
-      });
-      if (count > 0) await batch.commit();
+      }
       setMigrateResult(`Обновлено: ${count} партнёров`);
       fetchData();
     } catch (e) {
@@ -2814,7 +2786,7 @@ export const AdminPanel = () => {
     if (!awardUserId.trim() || !Number(awardAmount)) return;
     setAwardMsg('Начисляем...');
     try {
-      await updateDoc(doc(db, 'users', awardUserId.trim()), { keys: increment(Number(awardAmount)) });
+      await runAdminEntityAction('users', 'update', { id: awardUserId.trim(), increments: { keys: Number(awardAmount) } });
       setAwardMsg(`✅ +${awardAmount} ключей начислено`);
       setAwardUserId(''); setAwardAmount('');
     } catch { setAwardMsg('❌ Ошибка — проверьте ID'); }
@@ -2831,7 +2803,7 @@ export const AdminPanel = () => {
       const userCount  = users.filter(u => !u.id.startsWith('guest_')).length;
       const totalScans = users.reduce((sum, u) =>
         sum + Object.values(u.visitCounts ?? {}).reduce((s, v) => s + (Number(v) || 0), 0), 0);
-      await setDoc(doc(db, 'stats', 'global'), { userCount, totalScans }, { merge: true });
+      await runAdminEntityAction('stats', 'set', { id: 'global', patch: { userCount, totalScans } });
       setRecalcMsg(`✅ Обновлено: ${userCount} пользователей, ${totalScans} визитов`);
     } catch (e) {
       logError(e, 'AdminPanel.recalcStats');
@@ -4888,7 +4860,7 @@ export const AdminPanel = () => {
                       : <button
                           style={{ ...s.btn, background: 'rgba(75,179,75,0.15)', color: '#4BB34B', border: '1px solid rgba(75,179,75,0.35)', padding: '5px 10px', fontSize: 12, fontWeight: 700, flexShrink: 0 }}
                           onClick={async () => {
-                            await updateDoc(doc(db, 'prizeClaims', c.id), { status: 'given' });
+                            await runAdminEntityAction('prizeClaims', 'update', { id: c.id, patch: { status: 'given' } });
                             setPrizeClaims(prev => prev.map(x => x.id === c.id ? { ...x, status: 'given' } : x));
                           }}
                         >

@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V4.4.3 complete backend migration для админки
+**Коммит:** `локально`
+**Файлы:** `api/_admin-security.js`, `api/admin-actions.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `.ai/04_API.md`
+**Тип:** refactor
+**Что изменено:** `/api/admin-actions` расширен универсальными `entity:create/update/delete/set` для партнёров, экспертов, событий, баннеров, призов, уведомлений, заданий, пользователей, выдачи призов, ошибок, настроек и статистики. AdminPanel больше не выполняет прямые Firestore-записи для административных изменений; клиент читает коллекции напрямую, а все изменения идут через backend с Firebase ID Token, permission matrix, idempotency и audit log.
+**Почему:** V4.4.3 закрывает смешанную архитектуру старой админки и готовит безопасный серверный слой для будущего V5 AI News Editor / Loki редакции.
+
+---
+
 ## [2026-07-07] V4.4.2 production security & infrastructure
 **Коммит:** `локально`
 **Файлы:** `api/_firebase-admin.js`, `api/_admin-security.js`, `api/admin-actions.js`, `api/system-status.js`, `api/news-comments.js`, `api/send-push.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-actions.js`, `server/src/routes/system-status.js`, `server/src/routes/news-comments.js`, `server/src/routes/send-push.js`, `server/src/server.js`, `src/AdminPanel.jsx`, `src/NewsPage.jsx`, `.ai/04_API.md`, `.ai/12_SECURITY.md`

@@ -124,7 +124,7 @@
 **Auth:** `Authorization: Bearer <Firebase ID Token>`
 **Headers:** `X-Idempotency-Key`, `X-APG-Version`
 
-**Actions V4.4.2:**
+**Actions новостей:**
 - `news:create`
 - `news:update`
 - `news:autosave`
@@ -134,7 +134,22 @@
 - `news:restore`
 - `news:reorder`
 
-**Логика:** endpoint проверяет Firebase ID Token через Admin SDK, определяет роль по custom claims и документу пользователя (`users/{uid}`, `auth_map/{firebaseUid}`, `firebaseUid/authUid` fallback), проверяет permission matrix и только после этого меняет Firestore. Все операции пишут `adminActivity`, история новостей пишется в `newsChangeHistory`, повторная отправка с тем же `X-Idempotency-Key` возвращает сохранённый результат из `adminIdempotency`.
+**Actions универсальных ресурсов V4.4.3:**
+- `entity:create`
+- `entity:update`
+- `entity:delete`
+- `entity:set`
+
+**Resources:** `partners`, `experts`, `events`, `banners`, `prizes`, `notifications`, `customTasks`, `users`, `prizeClaims`, `errorLogs`, `scans`, `raffleEntries`, `expertReviews`, `config`, `stats`.
+
+**Дополнительные поля body для entity-actions:**
+- `resource` — имя ресурса из списка выше
+- `id` — id документа для update/delete/set
+- `patch` — поля для записи
+- `increments` — числовые инкременты для update, например `{ "keys": 1 }`
+- `serverTimestampFields` — список полей, которые backend заполнит серверным временем
+
+**Логика:** endpoint проверяет Firebase ID Token через Admin SDK, определяет роль по custom claims и документу пользователя (`users/{uid}`, `auth_map/{firebaseUid}`, `firebaseUid/authUid` fallback), проверяет permission matrix и только после этого меняет Firestore. Все операции пишут `adminActivity`, история новостей пишется в `newsChangeHistory`, повторная отправка с тем же `X-Idempotency-Key` возвращает сохранённый результат из `adminIdempotency`. Клиентская админка больше не выполняет прямые записи в Firestore для партнёров, экспертов, событий, баннеров, призов, уведомлений, заданий, пользователей, ошибок и выдачи призов; прямой Firestore SDK в админке используется только для чтения списков.
 
 ---
 

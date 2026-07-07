@@ -3,9 +3,9 @@ import { getAdminAuth, getAdminDb } from './_firebase-admin.js';
 
 export const ROLE_PERMISSIONS = {
   owner: ['*'],
-  admin: ['news:*', 'comments:*', 'push:*', 'system:read', 'audit:read'],
-  editor: ['news:create', 'news:update', 'news:publish', 'news:pin', 'news:delete', 'news:restore', 'news:reorder', 'system:read'],
-  moderator: ['comments:*', 'news:update', 'news:delete', 'system:read'],
+  admin: ['news:*', 'comments:*', 'push:*', 'system:*', 'audit:*', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'settings:*', 'stats:*', 'claims:*', 'errors:*', 'maintenance:*'],
+  editor: ['news:*', 'partners:update', 'experts:update', 'events:*', 'banners:*', 'prizes:*', 'notifications:create', 'tasks:*', 'system:read'],
+  moderator: ['comments:*', 'news:update', 'news:delete', 'partners:update', 'experts:update', 'events:update', 'system:read'],
   partner: [],
   expert: [],
   user: [],
