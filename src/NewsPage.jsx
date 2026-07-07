@@ -154,6 +154,7 @@ function Lightbox({ photos = [], initial = 0, onClose }) {
   const [idx, setIdx] = useState(initial);
   const [zoom, setZoom] = useState(false);
   const startXRef = useRef(0);
+  const startYRef = useRef(0);
   const safePhotos = Array.isArray(photos) ? photos.filter(Boolean) : [];
   const safeIdx = Math.min(idx, Math.max(0, safePhotos.length - 1));
   const go = (dir) => {
@@ -169,9 +170,17 @@ function Lightbox({ photos = [], initial = 0, onClose }) {
       </div>
       <div
         onDoubleClick={() => setZoom(v => !v)}
-        onTouchStart={e => { startXRef.current = e.touches[0].clientX; }}
+        onTouchStart={e => {
+          startXRef.current = e.touches[0].clientX;
+          startYRef.current = e.touches[0].clientY;
+        }}
         onTouchEnd={e => {
           const dx = e.changedTouches[0].clientX - startXRef.current;
+          const dy = e.changedTouches[0].clientY - startYRef.current;
+          if (dy > 86 && Math.abs(dx) < 70) {
+            onClose?.();
+            return;
+          }
           if (Math.abs(dx) > 52) go(dx > 0 ? -1 : 1);
         }}
         style={{ minHeight: 0, overflow: zoom ? 'auto' : 'hidden', display: 'grid', placeItems: 'center' }}
@@ -270,6 +279,72 @@ function SharePanel({ item, onToast }) {
           <GlassButton key={label} onClick={() => openUrl(href)} style={{ minHeight: 42, borderRadius: 18 }}>{label}</GlassButton>
         ))}
         <GlassButton onClick={copy} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a' }}>Скопировать</GlassButton>
+      </div>
+    </GlassCard>
+  );
+}
+
+function ArticleHeader({ item, wordCount }) {
+  const title = getNewsTitle(item);
+  const text = getNewsText(item);
+  const stats = getNewsStats(item);
+  const reactions = getNewsReactionsTotal(item) || stats.likes;
+  const date = getNewsDate(item);
+  const source = item?.sourceName || (item?.source === 'vk' ? 'ВКонтакте' : 'АПГ');
+  const badges = getSmartBadges(item);
+
+  return (
+    <GlassCard style={{ marginTop: 18, borderRadius: 32, padding: 18, display: 'grid', gap: 14 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ padding: '8px 12px', borderRadius: 999, background: 'rgba(215,184,106,0.14)', border: '1px solid rgba(215,184,106,0.28)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900 }}>{getNewsCategoryLabel(item)}</span>
+        {badges.map(([emoji, label]) => (
+          <span key={`${emoji}-${label}`} style={{ padding: '8px 11px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', color: APG2_PROFILE.text, fontSize: 11.5, fontWeight: 820 }}>{emoji} {label}</span>
+        ))}
+      </div>
+      <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: '1.08', fontWeight: 950, letterSpacing: 0 }}>{title}</h1>
+      {text && (
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15.5, lineHeight: '24px', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {text}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(116px, 1fr))', gap: 8 }}>
+        {[
+          ['Источник', source],
+          ['Дата', date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'Недавно'],
+          ['Время', date ? date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'сейчас'],
+          ['Чтение', `${getReadingMinutes(item)} мин`],
+          ['Слова', String(wordCount)],
+          ['Просмотры', String(stats.views)],
+          ['Реакции', String(reactions)],
+          ['Комментарии', String(stats.comments)],
+        ].map(([label, value]) => (
+          <div key={label} style={{ minHeight: 58, borderRadius: 18, padding: '10px 11px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', boxSizing: 'border-box' }}>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', fontWeight: 720 }}>{label}</div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 880, marginTop: 4 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </GlassCard>
+  );
+}
+
+function ArticleActions({ item, saved, later, reaction, onReact, onSave, onReadLater, onToast }) {
+  return (
+    <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16, display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 9 }}>
+        <GlassButton onClick={() => onSave?.(item)} tone={saved ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: saved ? '#17120a' : APG2_PROFILE.text }}>⭐ {saved ? 'Сохранено' : 'Сохранить'}</GlassButton>
+        <GlassButton onClick={() => onReadLater?.(item)} tone={later ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: later ? '#17120a' : APG2_PROFILE.text }}>{later ? 'В списке позже' : 'Прочитать позже'}</GlassButton>
+        <GlassButton onClick={() => shareNewsItem(item, onToast)} style={{ minHeight: 44, borderRadius: 18 }}>📤 Поделиться</GlassButton>
+      </div>
+      <div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Реакция</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {REACTIONS.map(value => (
+            <button key={value} type="button" onClick={() => onReact?.(item, value)} style={{ width: 48, height: 44, borderRadius: 18, border: reaction === value ? '1px solid rgba(215,184,106,0.52)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: reaction === value ? 'rgba(215,184,106,0.18)' : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', fontSize: 20, cursor: 'pointer' }}>
+              {value}
+            </button>
+          ))}
+        </div>
       </div>
     </GlassCard>
   );
@@ -596,10 +671,13 @@ function NewsCard({ item, index, onOpen, onShare, saved, later }) {
   );
 }
 
-function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, saved, later, reaction, user, onToast }) {
+function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, saved, later, reaction, user, onToast }) {
   const [progress, setProgress] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [showArticleTop, setShowArticleTop] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const scrollRef = useRef(null);
+  const lastScrollRef = useRef(0);
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const url = getNewsUrl(item);
@@ -611,6 +689,8 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
   const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean) : [];
   const articleId = item?.id ? String(item.id) : '';
   const scrollKey = articleId ? `apg_news_scroll_${articleId}` : '';
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const completed = progress > 0.92;
 
   useEffect(() => {
     const id = articleId;
@@ -629,28 +709,45 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
   useEffect(() => {
     if (!scrollKey) return;
     const savedTop = Number(localStorage.getItem(scrollKey) || 0);
-    if (!savedTop) return;
     requestAnimationFrame(() => {
-      if (scrollRef.current) scrollRef.current.scrollTop = savedTop;
+      if (scrollRef.current) scrollRef.current.scrollTop = Number.isFinite(savedTop) ? savedTop : 0;
     });
+    setProgress(0);
+    setHeaderHidden(false);
+    setShowArticleTop(false);
+    lastScrollRef.current = Number.isFinite(savedTop) ? savedTop : 0;
   }, [scrollKey]);
+
+  useEffect(() => {
+    const nextPhoto = getNewsPhotoItems(nextItem || {})[0]?.url;
+    if (!nextPhoto) return;
+    const image = new Image();
+    image.src = nextPhoto;
+  }, [nextItem]);
 
   const handleScroll = (e) => {
     const el = e.currentTarget;
     const max = Math.max(1, el.scrollHeight - el.clientHeight);
-    setProgress(Math.min(1, Math.max(0, el.scrollTop / max)));
+    const nextProgress = Math.min(1, Math.max(0, el.scrollTop / max));
+    const currentTop = el.scrollTop;
+    setProgress(nextProgress);
+    setShowArticleTop(currentTop > 620);
+    setHeaderHidden(currentTop > 120 && currentTop > lastScrollRef.current + 4);
+    if (currentTop < lastScrollRef.current - 8) setHeaderHidden(false);
+    lastScrollRef.current = currentTop;
     if (scrollKey) localStorage.setItem(scrollKey, String(el.scrollTop));
   };
+  const scrollArticleTop = () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: `${progress * 100}%`, background: 'linear-gradient(90deg, #9F7932, #F4D98C, #FFF0B8)', boxShadow: '0 0 18px rgba(244,217,140,0.44)', zIndex: 2, transition: 'width 80ms linear' }} />
       <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(110px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-            <button type="button" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 22 }}>←</button>
-            <span style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880 }}>{getNewsCategoryLabel(item)}</span>
-            <button type="button" onClick={() => navigator.clipboard?.writeText(window.location.href).catch(() => {})} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 17 }}>↗</button>
+          <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, transform: headerHidden ? 'translateY(calc(-100% - 18px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
+            <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 22, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>←</button>
+            <span style={{ minWidth: 0, flex: 1, textAlign: 'center', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress > 0.08 ? title : getNewsCategoryLabel(item)}</span>
+            <button type="button" onClick={() => shareNewsItem(item, onToast)} aria-label="Поделиться новостью" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 17, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>↗</button>
           </div>
 
           <NewsImage item={item} height={310} radius={34} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
@@ -658,25 +755,17 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
               <div style={{ position: 'absolute', left: 16, top: 16, padding: '8px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.56)', border: '1px solid rgba(215,184,106,0.34)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>📌 Закреплено</div>
             )}
           </NewsImage>
-          <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
-            <NewsMeta item={item} />
-            <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 32, lineHeight: '37px', fontWeight: 940, letterSpacing: 0 }}>{title}</h1>
-            {tags.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {tags.slice(0, 8).map(tag => (
-                  <span key={tag} style={{ padding: '6px 10px', borderRadius: 999, background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.20)', fontSize: 11, fontWeight: 820 }}>#{tag}</span>
-                ))}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <GlassButton onClick={() => onSave?.(item)} tone={saved ? 'gold' : undefined} style={{ minHeight: 40, borderRadius: 17, color: saved ? '#17120a' : APG2_PROFILE.text }}>{saved ? 'Сохранено' : 'Сохранить'}</GlassButton>
-              <GlassButton onClick={() => onReadLater?.(item)} tone={later ? 'gold' : undefined} style={{ minHeight: 40, borderRadius: 17, color: later ? '#17120a' : APG2_PROFILE.text }}>{later ? 'В списке позже' : 'Прочитать позже'}</GlassButton>
-              {url && item.source !== 'vk' && <GlassButton onClick={() => openUrl(url)} style={{ minHeight: 40, borderRadius: 17 }}>Открыть источник</GlassButton>}
+          <ArticleHeader item={item} wordCount={wordCount} />
+          {tags.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+              {tags.slice(0, 8).map(tag => (
+                <span key={tag} style={{ padding: '7px 11px', borderRadius: 999, background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.20)', fontSize: 11, fontWeight: 820 }}>#{tag}</span>
+              ))}
             </div>
-          </div>
+          )}
 
-          <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 18 }}>
-            <RichText color={APG2_PROFILE.textSoft} fontSize={15} lineHeight="24px">
+          <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 'clamp(18px, 4vw, 28px)' }}>
+            <RichText color={APG2_PROFILE.textSoft} fontSize={16} lineHeight="27px">
               {text || 'Подробный текст новости появится здесь после публикации.'}
             </RichText>
           </GlassCard>
@@ -733,16 +822,7 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
 
           <SharePanel item={item} onToast={onToast} />
 
-          <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900 }}>Реакция</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {REACTIONS.map(value => (
-                <button key={value} type="button" onClick={() => onReact?.(item, value)} style={{ width: 48, height: 44, borderRadius: 18, border: reaction === value ? '1px solid rgba(215,184,106,0.52)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: reaction === value ? 'rgba(215,184,106,0.18)' : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', fontSize: 20 }}>
-                  {value}
-                </button>
-              ))}
-            </div>
-          </div>
+          <ArticleActions item={item} saved={saved} later={later} reaction={reaction} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onToast={onToast} />
 
           <CommentsPanel item={item} user={user} onToast={onToast} />
 
@@ -762,8 +842,31 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
               </div>
             </div>
           )}
+
+          {(previousItem || nextItem) && (
+            <GlassCard style={{ marginTop: 20, borderRadius: 30, padding: 14, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              <button type="button" disabled={!previousItem} onClick={() => previousItem && onNavigate(previousItem)} style={{ minHeight: 70, borderRadius: 22, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: previousItem ? 'rgba(var(--apg2-glass-a,255,255,255),0.06)' : 'rgba(var(--apg2-glass-a,255,255,255),0.025)', color: previousItem ? APG2_PROFILE.text : APG2_PROFILE.textMuted, padding: 12, textAlign: 'left', fontFamily: 'inherit', opacity: previousItem ? 1 : 0.48 }}>
+                <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, marginBottom: 5 }}>← Предыдущая</span>
+                <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '17px', fontWeight: 800 }}>{previousItem ? getNewsTitle(previousItem) : 'Нет материала'}</span>
+              </button>
+              <button type="button" disabled={!nextItem} onClick={() => nextItem && onNavigate(nextItem)} style={{ minHeight: 70, borderRadius: 22, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: nextItem ? 'rgba(var(--apg2-glass-a,255,255,255),0.06)' : 'rgba(var(--apg2-glass-a,255,255,255),0.025)', color: nextItem ? APG2_PROFILE.text : APG2_PROFILE.textMuted, padding: 12, textAlign: 'right', fontFamily: 'inherit', opacity: nextItem ? 1 : 0.48 }}>
+                <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, marginBottom: 5 }}>Следующая →</span>
+                <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '17px', fontWeight: 800 }}>{nextItem ? getNewsTitle(nextItem) : 'Нет материала'}</span>
+              </button>
+            </GlassCard>
+          )}
+
+          {completed && (
+            <GlassCard style={{ marginTop: 16, borderRadius: 28, padding: 16, textAlign: 'center', color: APG2_PROFILE.textSoft }}>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 13, fontWeight: 900, marginBottom: 5 }}>Материал дочитан</div>
+              <div style={{ fontSize: 13, lineHeight: '19px' }}>Можно перейти к следующей новости или сохранить эту публикацию.</div>
+            </GlassCard>
+          )}
         </div>
       </div>
+      {showArticleTop && (
+        <button type="button" onClick={scrollArticleTop} aria-label="Вернуться к началу новости" style={{ position: 'fixed', right: 16, bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', zIndex: 6, width: 48, height: 48, borderRadius: 19, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(18,17,15,0.72)', color: APG2_PROFILE.text, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 18px 44px rgba(0,0,0,0.28)', fontSize: 20, cursor: 'pointer' }}>↑</button>
+      )}
       {lightboxIndex !== null && <Lightbox photos={photos} initial={lightboxIndex} onClose={() => setLightboxIndex(null)} />}
     </div>
   );
@@ -803,6 +906,9 @@ export function NewsPage({
   const related = useMemo(() => selected
     ? sortNewsItems(news.filter(item => item !== selected && getNewsCategory(item) === getNewsCategory(selected)), 'popular')
     : [], [news, selected]);
+  const selectedIndex = selected ? prepared.findIndex(item => String(item?.id || item?.externalId || '') === String(selected?.id || selected?.externalId || '')) : -1;
+  const previousItem = selectedIndex > 0 ? prepared[selectedIndex - 1] : null;
+  const nextItem = selectedIndex >= 0 && selectedIndex < prepared.length - 1 ? prepared[selectedIndex + 1] : null;
 
   const refresh = async () => {
     const before = new Set(news.map(item => String(item?.id || item?.externalId || '')));
@@ -956,7 +1062,10 @@ export function NewsPage({
         <ArticleView
           item={selected}
           related={related}
+          previousItem={previousItem}
+          nextItem={nextItem}
           onClose={(next) => setSelected(next?.id ? next : null)}
+          onNavigate={setSelected}
           onReact={onReact}
           onSave={onSave}
           onReadLater={onReadLater}
