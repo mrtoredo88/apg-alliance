@@ -1894,6 +1894,46 @@ export function UserApp() {
     </div>
   );
 
+  const lokiAppState = useMemo(() => ({
+    activePanel,
+    user,
+    partners: enrichedPartners,
+    events,
+    news,
+    notifications,
+    customTasks,
+    experts,
+    userKeys,
+    favorites,
+    lastScanDate,
+    unreadCount,
+    registeredEventIds,
+    completedTasks,
+    platform: isVK() ? 'vk-miniapp' : 'web-app',
+  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
+
+  const lokiAppActions = useMemo(() => ({
+    [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
+      const targetId = partnerId ?? id;
+      const partner = targetId ? enrichedPartners.find(p => p.id === targetId) : enrichedPartners[0];
+      if (partner) openPartner(partner);
+      else goPanel('offers');
+    },
+    [LOKI_APP_ACTIONS.OPEN_EVENT]: () => goPanel('events'),
+    [LOKI_APP_ACTIONS.OPEN_NEWS]: () => goPanel('home'),
+    [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
+    [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
+    [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
+    [LOKI_APP_ACTIONS.SHOW_PROFILE]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS]: () => goPanel('tasks'),
+    [LOKI_APP_ACTIONS.SHOW_FAVORITES]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),
+    [LOKI_APP_ACTIONS.START_QR_SCANNER]: () => setIsScannerOpen(true),
+    [LOKI_APP_ACTIONS.OPEN_SETTINGS]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.OPEN_REFERENCE]: () => goPanel('reference'),
+    [LOKI_APP_ACTIONS.OPEN_LOKI]: () => goPanel('loki'),
+  }), [enrichedPartners, goPanel, openNotifications, openPartner]);
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   if (networkError) {
@@ -2008,46 +2048,6 @@ export function UserApp() {
     onOpenReference: () => goPanel('reference'),
     onOpenLoki: () => goPanel('loki'),
   };
-
-  const lokiAppState = useMemo(() => ({
-    activePanel,
-    user,
-    partners: enrichedPartners,
-    events,
-    news,
-    notifications,
-    customTasks,
-    experts,
-    userKeys,
-    favorites,
-    lastScanDate,
-    unreadCount,
-    registeredEventIds,
-    completedTasks,
-    platform: isVK() ? 'vk-miniapp' : 'web-app',
-  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
-
-  const lokiAppActions = useMemo(() => ({
-    [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
-      const targetId = partnerId ?? id;
-      const partner = targetId ? enrichedPartners.find(p => p.id === targetId) : enrichedPartners[0];
-      if (partner) openPartner(partner);
-      else goPanel('offers');
-    },
-    [LOKI_APP_ACTIONS.OPEN_EVENT]: () => goPanel('events'),
-    [LOKI_APP_ACTIONS.OPEN_NEWS]: () => goPanel('home'),
-    [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
-    [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
-    [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
-    [LOKI_APP_ACTIONS.SHOW_PROFILE]: () => goPanel('profile'),
-    [LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS]: () => goPanel('tasks'),
-    [LOKI_APP_ACTIONS.SHOW_FAVORITES]: () => goPanel('profile'),
-    [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),
-    [LOKI_APP_ACTIONS.START_QR_SCANNER]: () => setIsScannerOpen(true),
-    [LOKI_APP_ACTIONS.OPEN_SETTINGS]: () => goPanel('profile'),
-    [LOKI_APP_ACTIONS.OPEN_REFERENCE]: () => goPanel('reference'),
-    [LOKI_APP_ACTIONS.OPEN_LOKI]: () => goPanel('loki'),
-  }), [enrichedPartners, goPanel, openNotifications, openPartner]);
 
   return (
     <ConfigProvider appearance={appearance}>

@@ -17,6 +17,7 @@ export class ErrorBoundary extends React.Component {
     const source = 'ErrorBoundary:' + (info.componentStack ?? '').slice(0, 220);
     this.setState({ info });
     try {
+      const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
       sessionStorage.setItem('apg_last_startup_error', JSON.stringify({
         at: new Date().toISOString(),
         id: this.state.errorId,
@@ -24,6 +25,8 @@ export class ErrorBoundary extends React.Component {
         stack: String(error?.stack ?? '').slice(0, 2400),
         componentStack: String(info?.componentStack ?? '').slice(0, 1600),
         url: window.location.href,
+        route: window.location.hash || window.location.pathname,
+        standalone,
         userAgent: navigator.userAgent,
       }));
     } catch {}

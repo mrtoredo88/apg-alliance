@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Исправление React invariant #300 при запуске
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `src/ErrorBoundary.jsx`
+**Тип:** fix
+**Что изменено:** `lokiAppState` и `lokiAppActions` перенесены выше всех условных `return` в `UserApp`, чтобы хуки `useMemo` всегда вызывались в одном порядке. Диагностика ErrorBoundary дополнена route и standalone/PWA mode.
+**Почему:** При состояниях `networkError` или `loggedOut` компонент возвращал ранний экран до этих хуков, а при обычном запуске вызывал их позже. В Safari/PWA это проявлялось как minified React error #300.
+
+---
+
 ## [2026-07-07] Исправление ошибки запуска Web App в Safari/PWA
 **Коммит:** `локально`
 **Файлы:** `src/UserApp.jsx`, `src/ErrorBoundary.jsx`
