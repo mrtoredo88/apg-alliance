@@ -16,11 +16,20 @@
 ---
 
 ## [2026-07-07] Backend API переведён на Yandex Serverless Container
-**Коммит:** текущий
+**Коммит:** `100af015`
 **Файлы:** `server/Dockerfile`, `server/deploy.sh`
 **Тип:** fix
 **Что изменено:** Dockerfile переведён на сборку из корня проекта, в образ добавлен `server-shared`, для общего модуля добавлен доступ к `/app/node_modules`. Backend-образ опубликован в Yandex Container Registry, ревизия `apg-api` обновлена, Telegram webhook переключён с Vercel на Yandex Container URL. Для production webhook включён `min-instances=1`, чтобы убрать cold start timeout.
 **Почему:** Vercel Hobby не даёт задеплоить API из-за лимита 12 Serverless Functions; новый Telegram webhook должен работать через Yandex backend.
+
+---
+
+## [2026-07-07] VK Mini App получил Локи и справочник АПГ
+**Коммит:** `574f6cce`
+**Файлы:** `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/ProfilePanel.jsx`, `src/LokiPage.jsx`, `src/ReferencePage.jsx`, `src/vk.js`, `src/loki/lokiEvents.js`, `src/loki/lokiPhrases.js`, `src/loki/lokiActionTypes.js`, `src/EventsPage.jsx`, `src/ForPartnersPage.jsx`, `src/MapPage.jsx`
+**Тип:** feat
+**Что изменено:** В основное приложение добавлены панели «Локи» и «Справочник» на общей Loki/FAQ/Guides архитектуре, новые входы с главной и профиля, VK-специфичные реплики Локи, безопасное подтверждение внешних ссылок в VK Mini App.
+**Почему:** VK Mini App должен ощущаться частью той же экосистемы АПГ, что Web App и Telegram Mini App, без урезанного интерфейса и опасных внешних переходов.
 
 ---
 

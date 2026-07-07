@@ -5,7 +5,7 @@ import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
-import vkBridge from './vk.js';
+import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
 
@@ -163,6 +163,8 @@ function V2FirstScreen({
   onOpenEvents,
   onOpenRewards,
   onOpenTasks,
+  onOpenReference,
+  onOpenLoki,
 }) {
   const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
   const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
@@ -213,6 +215,8 @@ function V2FirstScreen({
   }, []);
 
   const todayCards = [
+    { icon: '◌', value: 'Локи', title: 'Помощник', sub: 'спросить', onClick: onOpenLoki },
+    { icon: '⌕', value: 'FAQ', title: 'Справочник', sub: 'ответы', onClick: onOpenReference },
     { icon: '✦', value: userKeys, title: 'Ключи', sub: 'баланс', onClick: onOpenTasks },
     { icon: '◆', value: 'Подарки', title: 'Призы', sub: 'розыгрыши', onClick: onOpenRewards },
     { icon: '⌖', value: 'Рядом', title: 'Места', sub: 'поблизости', onClick: onOpenNearby },
@@ -751,7 +755,7 @@ function EventModal({ event, onClose }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {event.address && (
-            <button onClick={() => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`, '_blank')} style={{
+            <button onClick={() => openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`)} style={{
               width: '100%', padding: '15px 0', borderRadius: 14, border: 'none',
               background: 'linear-gradient(135deg, #FF6600, #FF8C00)',
               color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
@@ -760,7 +764,7 @@ function EventModal({ event, onClose }) {
             </button>
           )}
           {event.socialUrl && (
-            <button onClick={() => window.open(event.socialUrl, '_blank')} style={{
+            <button onClick={() => openUrl(event.socialUrl)} style={{
               width: '100%', padding: '15px 0', borderRadius: 14, border: 'none',
               background: `linear-gradient(135deg, ${T.blue}, #2D6FBC)`,
               color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
@@ -769,7 +773,7 @@ function EventModal({ event, onClose }) {
             </button>
           )}
           {event.linkUrl && event.linkLabel && (
-            <button onClick={() => window.open(event.linkUrl, '_blank')} style={{
+            <button onClick={() => openUrl(event.linkUrl)} style={{
               width: '100%', padding: '15px 0', borderRadius: 14, border: `1px solid ${T.border}`,
               background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
               color: T.textPri, fontSize: 15, fontWeight: 600, cursor: 'pointer',
@@ -1180,12 +1184,12 @@ function NewsModal({ item, onClose }) {
             {dateStr && <div style={{ fontSize: 11, color: T.textSec, marginBottom: 14 }}>{dateStr}</div>}
             <div style={{ fontSize: 15, color: T.textSec, lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
             {item.linkUrl && item.linkLabel && (
-              <a
-                href={item.linkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openUrl(item.linkUrl)}
                 style={{
                   display: 'block',
+                  width: '100%',
                   marginTop: 24,
                   padding: '16px 18px',
                   background: T.chipBg,
@@ -1194,12 +1198,12 @@ function NewsModal({ item, onClose }) {
                   color: T.textPri,
                   fontSize: 15,
                   fontWeight: 600,
-                  textDecoration: 'none',
                   textAlign: 'center',
+                  cursor: 'pointer',
                 }}
               >
                 {item.linkLabel} →
-              </a>
+              </button>
             )}
           </div>
         </div>
@@ -1834,6 +1838,8 @@ function V2FullHomeSections({
   const keyProgress = Math.min(100, Math.round((userKeys / keyGoal) * 100));
   const keysLeft = Math.max(0, keyGoal - userKeys);
   const quickActions = [
+    { icon: '◌', label: 'Локи', sub: 'помощник АПГ', onClick: onOpenLoki },
+    { icon: '⌕', label: 'Справочник', sub: 'быстрые ответы', onClick: onOpenReference },
     { icon: '✦', label: 'Получить ключ', sub: 'Скан QR у партнера', onClick: onOpenTasks },
     { icon: '⌖', label: 'Рядом со мной', sub: 'Места поблизости', onClick: onOpenNearby || onOpenMap },
     { icon: '◆', label: 'Розыгрыши', sub: 'Подарки недели', onClick: onOpenRewards },
@@ -2038,7 +2044,7 @@ export function HomePanelV2({
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
   counterPulse = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -2163,6 +2169,8 @@ export function HomePanelV2({
         onOpenEvents={onOpenEvents}
         onOpenRewards={onOpenRewards}
         onOpenTasks={onOpenTasks}
+        onOpenReference={onOpenReference}
+        onOpenLoki={onOpenLoki}
       />
 
       {/* Pull-to-refresh indicator */}

@@ -11,6 +11,8 @@ export const LOKI_APP_ACTIONS = {
   SHOW_NOTIFICATIONS: 'showNotifications',
   START_QR_SCANNER: 'startQrScanner',
   OPEN_SETTINGS: 'openSettings',
+  OPEN_REFERENCE: 'openReference',
+  OPEN_LOKI: 'openLoki',
 };
 
 export const LOKI_MESSAGE_PRIORITY = {
@@ -33,6 +35,8 @@ export const LOKI_ACTION_LABELS = {
   [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: 'Уведомления',
   [LOKI_APP_ACTIONS.START_QR_SCANNER]: 'Сканировать QR',
   [LOKI_APP_ACTIONS.OPEN_SETTINGS]: 'Настройки',
+  [LOKI_APP_ACTIONS.OPEN_REFERENCE]: 'Справочник',
+  [LOKI_APP_ACTIONS.OPEN_LOKI]: 'Спросить Локи',
 };
 
 export function createLokiAction(type, payload = {}) {

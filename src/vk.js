@@ -131,12 +131,28 @@ export const vkWebLogin = () => new Promise((resolve, reject) => {
 // VK Bridge вызывается параллельно — для нативного Mini App контекста.
 export const openUrl = (url) => {
   if (!url) return;
+  const normalized = String(url).trim();
+
+  if (isVK() && /^https?:\/\//i.test(normalized)) {
+    let host = '';
+    try { host = new URL(normalized).hostname.replace(/^www\./, ''); } catch {}
+    const allowedDirect = host === 'vk.com' || host.endsWith('.vk.com') || host === 'myapg.ru';
+    if (!allowedDirect) {
+      window.dispatchEvent(new CustomEvent('apg:vk-external-link', { detail: { url: normalized, host } }));
+      const ok = window.confirm(`Ссылка ведёт за пределы VK:\n${host || normalized}\n\nОткрыть внешний сайт?`);
+      if (!ok) return;
+    }
+    _vkBridge.send('VKWebAppOpenLink', { link: normalized }).catch(() => {
+      window.open(normalized, '_blank', 'noopener,noreferrer');
+    });
+    return;
+  }
 
   // tel: — пробуем VK Bridge (работает в нативном WebView), потом fallback
-  if (url.startsWith('tel:')) {
-    _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {
+  if (normalized.startsWith('tel:')) {
+    _vkBridge.send('VKWebAppOpenLink', { link: normalized }).catch(() => {
       // fallback для браузера
-      window.location.href = url;
+      window.location.href = normalized;
     });
     return;
   }
@@ -144,7 +160,7 @@ export const openUrl = (url) => {
   // http/https:
   // 1. Синхронный anchor click — работает в VK-браузере и обычных браузерах
   const a = document.createElement('a');
-  a.href = url;
+  a.href = normalized;
   a.target = '_blank';
   a.rel = 'noopener noreferrer';
   document.body.appendChild(a);
@@ -152,7 +168,7 @@ export const openUrl = (url) => {
   setTimeout(() => a.remove(), 100);
 
   // 2. VK Bridge — для нативного VK Mini App (Android/iOS)
-  _vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => {});
+  _vkBridge.send('VKWebAppOpenLink', { link: normalized }).catch(() => {});
 };
 
 export default vkBridge;

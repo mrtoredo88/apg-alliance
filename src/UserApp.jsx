@@ -45,6 +45,8 @@ const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(
 const ExpertCabinetPage    = lazy(() => import('./ExpertCabinetPage.jsx').then(m => ({ default: m.ExpertCabinetPage })));
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
+const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => ({ default: m.ReferencePage })));
+const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
 
 function getQrErrorMessage(error) {
   const code = String(error?.code ?? '');
@@ -369,6 +371,8 @@ export function UserApp() {
     if (id === 'events') showLokiMessage(LOKI_EVENTS.EVENT_OPENED, { source: 'bottom_nav' });
     if (id === 'rewards') showLokiMessage(LOKI_EVENTS.PRIZE_OPENED, { source: 'home' });
     if (id === 'profile') showLokiMessage(LOKI_EVENTS.PROFILE_OPENED, { source: 'bottom_nav' });
+    if (id === 'reference') showLokiMessage(LOKI_EVENTS.REFERENCE_OPENED, { source: 'navigation' });
+    if (id === 'loki') showLokiMessage(LOKI_EVENTS.VK_ENTRY, { source: isVK() ? 'vk_miniapp' : 'web_app' });
     if (id === 'map' || id === 'nearby') showLokiMessage(LOKI_EVENTS.MAP_OPENED, { source: id });
   }, [navigatePanel]);
 
@@ -398,6 +402,23 @@ export function UserApp() {
     };
     vkBridge.subscribe(handler);
     return () => vkBridge.unsubscribe(handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isVK() || !user || loading) return;
+    const key = `apg_loki_vk_entry_${user.id ?? 'guest'}`;
+    if (sessionStorage.getItem(key) === '1') return;
+    sessionStorage.setItem(key, '1');
+    const t = setTimeout(() => showLokiMessage(LOKI_EVENTS.VK_ENTRY, { source: 'vk_miniapp' }), 1800);
+    return () => clearTimeout(t);
+  }, [loading, user]);
+
+  useEffect(() => {
+    const handler = (event) => {
+      showLokiMessage(LOKI_EVENTS.VK_EXTERNAL_LINK, { source: 'vk_safe_link', host: event.detail?.host });
+    };
+    window.addEventListener('apg:vk-external-link', handler);
+    return () => window.removeEventListener('apg:vk-external-link', handler);
   }, []);
 
   const handleToggleTheme = useCallback(() => {
@@ -1846,6 +1867,8 @@ export function UserApp() {
     onOpenForPartners: () => goPanel('for-partners'),
     onOpenMap: () => goPanel('map'),
     onOpenNearby: () => goPanel('nearby'),
+    onOpenReference: () => goPanel('reference'),
+    onOpenLoki: () => goPanel('loki'),
   };
 
   const lokiAppState = useMemo(() => ({
@@ -1863,6 +1886,7 @@ export function UserApp() {
     unreadCount,
     registeredEventIds,
     completedTasks,
+    platform: isVK() ? 'vk-miniapp' : 'web-app',
   }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
 
   const lokiAppActions = useMemo(() => ({
@@ -1883,6 +1907,8 @@ export function UserApp() {
     [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),
     [LOKI_APP_ACTIONS.START_QR_SCANNER]: () => setIsScannerOpen(true),
     [LOKI_APP_ACTIONS.OPEN_SETTINGS]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.OPEN_REFERENCE]: () => goPanel('reference'),
+    [LOKI_APP_ACTIONS.OPEN_LOKI]: () => goPanel('loki'),
   }), [enrichedPartners, goPanel, openNotifications, openPartner]);
 
   return (
@@ -1977,6 +2003,26 @@ export function UserApp() {
                 </Suspense>
               </Panel>
 
+              <Panel id="loki">
+                <Suspense fallback={<LazyFallback />}>
+                  <LokiPage
+                    onBack={goBackPanel}
+                    onOpenReference={() => goPanel('reference')}
+                    onOpenPanel={goPanel}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="reference">
+                <Suspense fallback={<LazyFallback />}>
+                  <ReferencePage
+                    onBack={goBackPanel}
+                    onOpenLoki={() => goPanel('loki')}
+                    onOpenPanel={goPanel}
+                  />
+                </Suspense>
+              </Panel>
+
               {/* ProfilePanel не рендерит Panel — оборачиваем */}
               <Panel id="profile">
                 <Suspense fallback={<LazyFallback />}>
@@ -2007,6 +2053,8 @@ export function UserApp() {
                     onOpenExpertCabinet={() => goPanel('expert-cabinet')}
                     onUserUpdate={(patch) => setUser(u => ({ ...u, ...patch }))}
                     onEmailAuthSuccess={handleEmailAuthSuccess}
+                    onOpenReference={() => goPanel('reference')}
+                    onOpenLoki={() => goPanel('loki')}
                   />
                 </Suspense>
               </Panel>

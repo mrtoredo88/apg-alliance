@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { HorizontalScroll } from '@vkontakte/vkui';
-import vkBridge from './vk.js';
+import { openUrl } from './vk.js';
 
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
@@ -41,7 +41,7 @@ function PartnerLogo({ partner, size = 44 }) {
 
 function openRoute(address) {
   const url = `https://yandex.ru/maps/?rtext=~${encodeURIComponent(address + ', Зеленоград')}&rtt=auto`;
-  vkBridge.send('VKWebAppOpenLink', { link: url }).catch(() => window.open(url, '_blank'));
+  openUrl(url);
 }
 
 export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }) {

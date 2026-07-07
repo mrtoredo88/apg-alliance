@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom';
 import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
-import vkBridge, { isVK, vkWebLogin } from './vk.js';
+import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
@@ -355,7 +355,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -641,11 +641,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   };
 
   const handleWriteAdmin = async () => {
-    try {
-      await vkBridge.send('VKWebAppOpenLink', { link: 'https://vk.me/id988504' });
-    } catch {
-      window.open('https://vk.me/id988504', '_blank');
-    }
+    openUrl('https://vk.me/id988504');
   };
 
   if (variant === 'v2') {
@@ -728,9 +724,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   ) : tgStep === 'waiting' ? (
                     <div style={{ display: 'grid', gap: 9 }}>
                       <div style={{ color: '#26A8EA', fontSize: 13, lineHeight: '18px', fontWeight: 760, textAlign: 'center' }}>Ждём подтверждения в Telegram...</div>
-                      <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ ...APG2.glass, minHeight: 46, borderRadius: APG2.radius.button, padding: '11px 14px', color: '#26A8EA', border: APG2.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', boxSizing: 'border-box' }}>
+                      <button type="button" onClick={() => openUrl(tgBotUrl)} style={{ ...APG2.glass, minHeight: 46, borderRadius: APG2.radius.button, padding: '11px 14px', color: '#26A8EA', border: APG2.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box', cursor: 'pointer' }}>
                         <TelegramIcon />Открыть Telegram
-                      </a>
+                      </button>
                     </div>
                   ) : (
                     <GlassButton onPointerUp={() => runTelegramAuth(false)} onClick={() => runTelegramAuth(false)} style={{ color: '#26A8EA' }}><TelegramIcon />Войти через Telegram</GlassButton>
@@ -761,9 +757,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                       ) : tgStep === 'waiting' ? (
                         <>
                           <div style={{ color: '#26A8EA', fontSize: 13, lineHeight: '18px', fontWeight: 760, textAlign: 'center' }}>Ждём подтверждения в Telegram...</div>
-                          <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ ...APG2.glass, minHeight: 46, borderRadius: APG2.radius.button, padding: '11px 14px', color: '#26A8EA', border: APG2.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', boxSizing: 'border-box' }}>
+                          <button type="button" onClick={() => openUrl(tgBotUrl)} style={{ ...APG2.glass, minHeight: 46, borderRadius: APG2.radius.button, padding: '11px 14px', color: '#26A8EA', border: APG2.glass.border, fontSize: 13.5, lineHeight: '18px', fontWeight: 760, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box', cursor: 'pointer' }}>
                             <TelegramIcon />Открыть Telegram
-                          </a>
+                          </button>
                         </>
                       ) : (
                         <GlassButton onPointerUp={() => runTelegramAuth(true)} onClick={() => runTelegramAuth(true)} style={{ color: '#26A8EA' }}><TelegramIcon />Привязать Telegram</GlassButton>
@@ -984,9 +980,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                             <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                             Ждём подтверждения в Telegram...
                           </div>
-                          <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', padding: '11px 0', borderRadius: 12, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
+                          <button type="button" onClick={() => openUrl(tgBotUrl)} style={{ display: 'block', width: '100%', padding: '11px 0', borderRadius: 12, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
                             Открыть Telegram
-                          </a>
+                          </button>
                         </div>
                       : <button onClick={handleTelegramAuth} style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: `1px solid rgba(38,168,234,0.3)`, cursor: 'pointer', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="#26A8EA"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
@@ -1032,7 +1028,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                             <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(38,168,234,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                             Ждём подтверждения...
                           </div>
-                          <a href={tgBotUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 13, fontWeight: 700, textAlign: 'center', textDecoration: 'none' }}>Открыть Telegram</a>
+                          <button type="button" onClick={() => openUrl(tgBotUrl)} style={{ display: 'block', padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.35)', background: 'rgba(38,168,234,0.1)', color: '#26A8EA', fontSize: 13, fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>Открыть Telegram</button>
                         </div>
                       : <button onClick={() => handleTelegramAuth(true)} style={{ padding: '10px 0', borderRadius: 11, border: '1px solid rgba(38,168,234,0.3)', background: 'rgba(38,168,234,0.08)', color: '#26A8EA', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="#26A8EA"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg>
@@ -1481,10 +1477,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Настройки</div>
         <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
           {[
+            { icon: '◌', label: 'Локи АПГ',          action: onOpenLoki,             right: 'помощник' },
+            { icon: '⌕', label: 'Справочник',        action: onOpenReference,        right: null },
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },
-          ].map((item, i, arr) => (
+          ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
             <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
               <span style={{ fontSize: 15, color: T.textPri, fontWeight: 500 }}>{item.label}</span>
@@ -1511,6 +1509,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
           {[
             {
+              icon: '⌕',
+              label: 'Открыть справочник',
+              sub: 'Ключи, QR, призы и роли АПГ',
+              action: onOpenReference,
+              color: T.gold,
+            },
+            {
               icon: '💬',
               label: 'Написать нам',
               sub: 'Ответим в течение дня',
@@ -1531,7 +1536,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               action: handleWriteAdmin,
               color: T.red,
             },
-          ].map((item, i, arr) => (
+          ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
             <button key={item.label} onClick={item.action}
               style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: item.color + '18', border: `1px solid ${item.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>

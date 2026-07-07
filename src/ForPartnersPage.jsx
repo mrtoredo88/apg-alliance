@@ -1,5 +1,6 @@
 import React from 'react';
 import { T, GLASS, GLASS_GOLD } from './design.js';
+import { openUrl } from './vk.js';
 
 const LAUNCH_DATE = 'Январь 2025';
 
@@ -124,7 +125,7 @@ export function ForPartnersPage({ userCount = 0, partnerCount = 0, totalScans = 
             Свяжитесь с нами — расскажем об условиях и поможем настроить кабинет
           </div>
           <button
-            onClick={() => window.open('https://vk.com/apg_zelenograd', '_blank')}
+            onClick={() => openUrl('https://vk.com/apg_zelenograd')}
             style={{
               padding: '12px 28px', borderRadius: 14, border: 'none',
               background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,

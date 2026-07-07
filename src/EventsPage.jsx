@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { T, GLASS } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, ApgModal, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { openUrl } from './vk.js';
 
 const GRADIENTS_DARK = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
@@ -136,13 +137,13 @@ function EventModal({ event, onClose }) {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {event.address && (
-            <GlassButton onClick={() => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`, '_blank')} tone="gold" style={{ width: '100%', color: '#17120a' }}>Проложить маршрут</GlassButton>
+            <GlassButton onClick={() => openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`)} tone="gold" style={{ width: '100%', color: '#17120a' }}>Проложить маршрут</GlassButton>
           )}
           {event.socialUrl && (
-            <GlassButton onClick={() => window.open(event.socialUrl, '_blank')} tone="gold" style={{ width: '100%', color: '#17120a' }}>Перейти к событию</GlassButton>
+            <GlassButton onClick={() => openUrl(event.socialUrl)} tone="gold" style={{ width: '100%', color: '#17120a' }}>Перейти к событию</GlassButton>
           )}
           {event.linkUrl && event.linkLabel && (
-            <GlassButton onClick={() => window.open(event.linkUrl, '_blank')} style={{ width: '100%' }}>{event.linkLabel} →</GlassButton>
+            <GlassButton onClick={() => openUrl(event.linkUrl)} style={{ width: '100%' }}>{event.linkLabel} →</GlassButton>
           )}
           <GlassButton onClick={onClose} style={{ width: '100%' }}>Закрыть</GlassButton>
         </div>
