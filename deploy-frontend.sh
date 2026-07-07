@@ -21,8 +21,7 @@ npm run build
 # Hashed assets — immutable, 1 year cache
 echo "Uploading assets/..."
 aws s3 sync dist/assets/ "s3://$BUCKET/assets/" $S3 \
-  --cache-control "public, max-age=31536000, immutable" \
-  --delete
+  --cache-control "public, max-age=31536000, immutable"
 
 # Critical no-cache files (change on every deploy)
 echo "Uploading no-cache files..."
