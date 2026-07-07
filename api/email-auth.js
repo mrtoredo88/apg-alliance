@@ -209,7 +209,6 @@ export default async function handler(req, res) {
       return res.status(409).json({ ok: false, error: 'already_linked', message: 'Этот Telegram уже привязан к другому аккаунту.' });
     }
 
-    const tgName = [firstName, lastName].filter(Boolean).join(' ') || null;
     try {
       await db.runTransaction(async tx => {
         const linkRef = db.collection('tgLinks').doc(normalizedTgId);
@@ -228,9 +227,6 @@ export default async function handler(req, res) {
         }, { merge: true });
         tx.set(userRef, {
           linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
-          ...(firstName ? { firstName, displayName: tgName } : {}),
-          ...(lastName  ? { lastName } : {}),
-          ...(photo     ? { photo } : {}),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       });

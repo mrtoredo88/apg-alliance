@@ -14,11 +14,27 @@ const RESOURCE_CONFIG = {
   users: { collection: 'users', scope: 'users', label: 'пользователь' },
   prizeClaims: { collection: 'prizeClaims', scope: 'claims', label: 'выдача приза' },
   errorLogs: { collection: 'errorLogs', scope: 'errors', label: 'ошибка' },
+  adminActivity: { collection: 'adminActivity', scope: 'audit', label: 'действие админки' },
   scans: { collection: 'scans', scope: 'maintenance', label: 'скан' },
+  expertScans: { collection: 'expertScans', scope: 'maintenance', label: 'скан эксперта' },
   raffleEntries: { collection: 'raffleEntries', scope: 'maintenance', label: 'участие в розыгрыше' },
   expertReviews: { collection: 'expertReviews', scope: 'maintenance', label: 'отзыв эксперта' },
+  guestSessions: { collection: 'guestSessions', scope: 'stats', label: 'гостевая сессия' },
   config: { collection: 'config', scope: 'settings', label: 'настройка' },
   stats: { collection: 'stats', scope: 'stats', label: 'статистика' },
+};
+
+const LIST_CONFIG = {
+  users: { orderBy: null, limit: 1000 },
+  prizeClaims: { orderBy: ['claimedAt', 'desc'], limit: 200 },
+  banners: { orderBy: ['priority', 'asc'], limit: 200 },
+  errorLogs: { orderBy: ['timestamp', 'desc'], limit: 200 },
+  adminActivity: { orderBy: ['createdAt', 'desc'], limit: 200 },
+  scans: { orderBy: ['scannedAt', 'desc'], limit: 500 },
+  expertScans: { orderBy: ['scannedAt', 'desc'], limit: 500 },
+  expertReviews: { orderBy: ['createdAt', 'desc'], limit: 300 },
+  raffleEntries: { orderBy: ['createdAt', 'desc'], limit: 500 },
+  guestSessions: { orderBy: ['createdAt', 'desc'], limit: 500 },
 };
 
 function cleanPatch(input = {}) {
@@ -45,6 +61,39 @@ function withServerTimestamps(patch, fields = []) {
     if (field) next[field] = FieldValue.serverTimestamp();
   });
   return next;
+}
+
+function serializeAdminValue(value) {
+  if (!value) return value;
+  if (typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (Array.isArray(value)) return value.map(serializeAdminValue);
+  if (typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serializeAdminValue(item)]));
+  }
+  return value;
+}
+
+async function handleEntityList(db, req) {
+  const resource = String(req.body?.resource || '').trim();
+  const config = RESOURCE_CONFIG[resource];
+  const listConfig = LIST_CONFIG[resource];
+  if (!config || !listConfig) {
+    const error = new Error('Неизвестный административный список.');
+    error.statusCode = 400;
+    throw error;
+  }
+  await requireAdminPermission(req, `${config.scope}:read`);
+  let ref = db.collection(config.collection);
+  if (listConfig.orderBy) ref = ref.orderBy(listConfig.orderBy[0], listConfig.orderBy[1]);
+  const max = Math.min(Number(req.body?.limit || listConfig.limit || 200), listConfig.limit || 200, 1000);
+  if (max > 0) ref = ref.limit(max);
+  const snap = await ref.get();
+  return {
+    ok: true,
+    resource,
+    rows: snap.docs.map(doc => ({ id: doc.id, ...serializeAdminValue(doc.data() || {}) })),
+    count: snap.size,
+  };
 }
 
 async function writeHistory(db, actor, newsId, action, before, after) {
@@ -195,6 +244,7 @@ async function handleNewsAction(db, req, actor) {
 async function handleEntityAction(db, req, actor) {
   const action = String(req.body?.action || '').trim();
   const resource = String(req.body?.resource || '').trim();
+  if (action === 'entity:list') return handleEntityList(db, req, actor);
   const config = RESOURCE_CONFIG[resource];
   if (!config) {
     const error = new Error('Неизвестный административный ресурс.');

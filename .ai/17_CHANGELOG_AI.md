@@ -15,6 +15,33 @@
 
 ---
 
+## [2026-07-07] P0 закрытые чтения админки переведены на backend
+**Коммит:** `локально`
+**Файлы:** `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Добавлен `entity:list` в обе backend-ветки `/api/admin-actions` с role guard, limit/order config и безопасной сериализацией Firestore Timestamp. AdminPanel больше не читает напрямую закрытые коллекции `banners`, `errorLogs`, `adminActivity`, `users`, `prizeClaims`, `scans`, `expertScans`, `expertReviews`, `raffleEntries`, `guestSessions`; они загружаются через backend, а публичные каталоги остаются read-only Firestore.
+**Почему:** Массовая ошибка админки была вызвана `permission-denied` от Firestore после ужесточения архитектуры: часть legacy-разделов всё ещё читала закрытые коллекции напрямую. Исправление закрывает первопричину без ослабления Firestore Rules.
+
+---
+
+## [2026-07-07] P0 исправление авторизации после смешивания профилей
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `api/email-auth.js`, `server/src/routes/email-auth.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Strong identity аккаунты `email:*` и `tg_*` больше не проходят через опасное перепривязывание anonymous `auth_map`: после custom token сессии используются напрямую и только best-effort чинят `auth_map`. Logout очищает auth/local/session кэши пользователя. Привязка Telegram больше не перезаписывает основное имя, фамилию и аватар email-профиля; добавлен `FINISH LOGIN` dev-log для ошибок входа/согласий.
+**Почему:** У пользователя после входа по email отображалось имя другого Telegram-профиля, а после согласий вход падал из-за mismatch между custom-token session и старым `auth_map`. Теперь профиль берётся только из текущего userId, а Telegram хранится как связанный метод входа, не как замена личности.
+
+---
+
+## [2026-07-07] P0 диагностика загрузки админки и stale Firestore emulator
+**Коммит:** `локально`
+**Файлы:** `src/firebase.js`, `src/AdminPanel.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Админские роуты больше не наследуют старый `localStorage.apg_demo_content=emulator`, который мог направлять Firestore-запросы в локальный эмулятор и валить все разделы одинаковой network/Firestore ошибкой. Загрузка админки получила расширенную диагностику: Firebase code/message, auth uid/email/claims role, project/env, online state и emulator state.
+**Почему:** Перед production deploy админка показывала массовые ошибки “попыток: 3, временная ошибка сети/Firestore”; Admin SDK и Web SDK подтвердили, что коллекции и rules рабочие, а общий сбой соответствует клиентскому подключению к неверному Firestore endpoint/cache.
+
+---
+
 ## [2026-07-07] P0 защита от смешивания Email и Telegram аккаунтов
 **Коммит:** `локально`
 **Файлы:** `api/email-auth.js`, `api/telegram-auth-check.js`, `api/telegram-webhook.js`, `api/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/routes/telegram-auth-check.js`, `server/src/routes/telegram-webhook.js`, `server/src/routes/user-actions.js`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`

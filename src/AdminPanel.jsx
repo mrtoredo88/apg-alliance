@@ -6,7 +6,7 @@ import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
-import { db, auth } from './firebase';
+import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
@@ -81,6 +81,69 @@ function formatAdminLoadError(error) {
     return `${code}временная ошибка сети/Firestore. Можно повторить загрузку.`;
   }
   return `${code}${message}`;
+}
+
+function adminLoadErrorDetails(error) {
+  const details = [];
+  if (error?.code) details.push(`code=${error.code}`);
+  if (error?.name) details.push(`name=${error.name}`);
+  if (error?.message) details.push(`message=${String(error.message).slice(0, 260)}`);
+  return details.join(' · ');
+}
+
+async function collectAdminAuthDiagnostics() {
+  const user = auth.currentUser;
+  let tokenClaims = null;
+  if (user?.getIdTokenResult) {
+    tokenClaims = await user.getIdTokenResult().catch(() => null);
+  }
+  const role = tokenClaims?.claims?.role || tokenClaims?.claims?.userRole || null;
+  return {
+    uid: user?.uid ?? null,
+    email: user?.email ?? null,
+    isAnonymous: user?.isAnonymous ?? null,
+    role,
+    claims: tokenClaims?.claims
+      ? Object.fromEntries(['role', 'userRole', 'admin', 'owner'].map(key => [key, tokenClaims.claims[key]]).filter(([, value]) => value !== undefined))
+      : null,
+  };
+}
+
+function buildAdminLoadDiagnostic(name, label, error, authInfo) {
+  const nav = typeof navigator !== 'undefined' ? navigator : null;
+  const loc = typeof window !== 'undefined' ? window.location : null;
+  return {
+    section: name,
+    label,
+    collectionOrApi: name === 'newsComments' ? '/api/news-comments?admin=1' : name,
+    code: error?.code ?? null,
+    name: error?.name ?? null,
+    message: error?.message ?? String(error ?? ''),
+    stack: error?.stack ? String(error.stack).slice(0, 1800) : '',
+    auth: authInfo,
+    firebase: FIREBASE_CLIENT_DIAGNOSTICS,
+    version: import.meta.env.VITE_APP_VERSION || 'local',
+    environment: import.meta.env.MODE,
+    route: loc ? `${loc.pathname}${loc.hash}` : '',
+    userAgent: nav?.userAgent ?? '',
+    online: nav?.onLine ?? null,
+  };
+}
+
+function reviveAdminValue(value) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    return {
+      toDate: () => new Date(value),
+      toMillis: () => new Date(value).getTime(),
+      toString: () => value,
+      valueOf: () => new Date(value).getTime(),
+    };
+  }
+  if (Array.isArray(value)) return value.map(reviveAdminValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, reviveAdminValue(item)]));
+  }
+  return value;
 }
 
 function docsToItems(snap) {
@@ -1945,8 +2008,7 @@ export const AdminPanel = () => {
   const loadErrors = useCallback(async () => {
     setErrorsLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)));
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const rows = await fetchAdminEntityList('errorLogs', 100);
       setErrorLogs(rows);
       setAdminMetrics(prev => ({ ...prev, errorLogs: rows }));
     } catch (e) {
@@ -2041,14 +2103,27 @@ export const AdminPanel = () => {
   const runAdminEntityAction = (resource, verb, payload = {}) =>
     runAdminAction(`entity:${verb}`, { resource, ...payload });
 
+  const fetchAdminEntityList = async (resource, limitValue) => {
+    const data = await runAdminEntityAction(resource, 'list', {
+      idempotencyKey: `list_${resource}_${Date.now()}`,
+      ...(limitValue ? { limit: limitValue } : {}),
+    });
+    return Array.isArray(data.rows) ? data.rows.map(reviveAdminValue) : [];
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setAdminLoadIssues([]);
     setAdminLoadInfo(prev => ({ ...prev, attempt: (prev.attempt ?? 0) + 1 }));
-    const readCollection = async ({ name, label, ref, optional = false }) => {
+    let authDiagnostics = null;
+    const readCollection = async ({ name, label, ref, load, optional = false }) => {
       let lastError = null;
       for (let attempt = 1; attempt <= ADMIN_LOAD_RETRIES + 1; attempt++) {
         try {
+          if (load) {
+            const docs = await withTimeout(load(), ADMIN_LOAD_TIMEOUT_MS, label);
+            return { name, label, optional, ok: true, docs, count: docs.length, attempts: attempt };
+          }
           const snap = await withTimeout(getDocs(ref()), ADMIN_LOAD_TIMEOUT_MS, label);
           return { name, label, optional, ok: true, docs: docsToItems(snap), count: snap.docs.length, attempts: attempt };
         } catch (error) {
@@ -2058,10 +2133,23 @@ export const AdminPanel = () => {
           await sleep(450 * attempt);
         }
       }
-      return { name, label, optional, ok: false, docs: null, count: 0, attempts: ADMIN_LOAD_RETRIES + 1, error: formatAdminLoadError(lastError), rawError: lastError };
+      return {
+        name,
+        label,
+        optional,
+        ok: false,
+        docs: null,
+        count: 0,
+        attempts: ADMIN_LOAD_RETRIES + 1,
+        error: formatAdminLoadError(lastError),
+        details: adminLoadErrorDetails(lastError),
+        diagnostic: buildAdminLoadDiagnostic(name, label, lastError, authDiagnostics),
+        rawError: lastError,
+      };
     };
     try {
       const user = await waitForAdminAuth();
+      authDiagnostics = await collectAdminAuthDiagnostics();
       const specs = [
         { name: 'partners', label: 'Партнёры', ref: () => collection(db, 'partners') },
         { name: 'experts', label: 'Эксперты', ref: () => collection(db, 'experts') },
@@ -2070,24 +2158,36 @@ export const AdminPanel = () => {
         { name: 'notifications', label: 'Уведомления', ref: () => query(collection(db, 'notifications'), orderBy('createdAt', 'desc')) },
         { name: 'prizes', label: 'Призы', ref: () => query(collection(db, 'prizes'), orderBy('cost', 'asc')) },
         { name: 'customTasks', label: 'Задания', ref: () => query(collection(db, 'customTasks'), orderBy('createdAt', 'asc')) },
-        { name: 'prizeClaims', label: 'Выдачи призов', ref: () => query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100)), optional: true },
-        { name: 'banners', label: 'Баннеры', ref: () => query(collection(db, 'banners'), orderBy('priority', 'asc')) },
-        { name: 'errorLogs', label: 'Ошибки приложения', ref: () => query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)), optional: true },
-        { name: 'adminActivity', label: 'Действия админки', ref: () => query(collection(db, 'adminActivity'), orderBy('createdAt', 'desc'), limit(120)), optional: true },
-        { name: 'users', label: 'Пользователи', ref: () => collection(db, 'users'), optional: true },
-        { name: 'scans', label: 'Сканы партнёров', ref: () => query(collection(db, 'scans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
-        { name: 'expertScans', label: 'Сканы экспертов', ref: () => query(collection(db, 'expertScans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
+        { name: 'prizeClaims', label: 'Выдачи призов', load: () => fetchAdminEntityList('prizeClaims', 100), optional: true },
+        { name: 'banners', label: 'Баннеры', load: () => fetchAdminEntityList('banners', 200) },
+        { name: 'errorLogs', label: 'Ошибки приложения', load: () => fetchAdminEntityList('errorLogs', 100), optional: true },
+        { name: 'adminActivity', label: 'Действия админки', load: () => fetchAdminEntityList('adminActivity', 120), optional: true },
+        { name: 'users', label: 'Пользователи', load: () => fetchAdminEntityList('users', 1000), optional: true },
+        { name: 'scans', label: 'Сканы партнёров', load: () => fetchAdminEntityList('scans', 500), optional: true },
+        { name: 'expertScans', label: 'Сканы экспертов', load: () => fetchAdminEntityList('expertScans', 500), optional: true },
         { name: 'reviews', label: 'Отзывы партнёров', ref: () => query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(200)), optional: true },
-        { name: 'expertReviews', label: 'Отзывы экспертов', ref: () => query(collection(db, 'expertReviews'), orderBy('createdAt', 'desc'), limit(200)), optional: true },
-        { name: 'raffleEntries', label: 'Участники розыгрышей', ref: () => query(collection(db, 'raffleEntries'), orderBy('createdAt', 'desc'), limit(500)), optional: true },
-        { name: 'guestSessions', label: 'Гостевые сессии', ref: () => query(collection(db, 'guestSessions'), orderBy('createdAt', 'desc'), limit(500)), optional: true },
+        { name: 'expertReviews', label: 'Отзывы экспертов', load: () => fetchAdminEntityList('expertReviews', 200), optional: true },
+        { name: 'raffleEntries', label: 'Участники розыгрышей', load: () => fetchAdminEntityList('raffleEntries', 500), optional: true },
+        { name: 'guestSessions', label: 'Гостевые сессии', load: () => fetchAdminEntityList('guestSessions', 500), optional: true },
       ];
       const results = await Promise.all(specs.map(readCollection));
       const commentsResult = await fetchAdminNewsComments()
         .then(rows => ({ name: 'newsComments', label: 'Комментарии новостей', optional: true, ok: true, docs: rows, count: rows.length, attempts: 1 }))
         .catch(error => {
           logError(error, 'AdminPanel.fetchData.newsComments.api');
-          return { name: 'newsComments', label: 'Комментарии новостей', optional: true, ok: false, docs: null, count: 0, attempts: 1, error: formatAdminLoadError(error), rawError: error };
+          return {
+            name: 'newsComments',
+            label: 'Комментарии новостей',
+            optional: true,
+            ok: false,
+            docs: null,
+            count: 0,
+            attempts: 1,
+            error: formatAdminLoadError(error),
+            details: adminLoadErrorDetails(error),
+            diagnostic: buildAdminLoadDiagnostic('newsComments', 'Комментарии новостей', error, authDiagnostics),
+            rawError: error,
+          };
         });
       const allResults = [...results, commentsResult];
       const byName = Object.fromEntries(allResults.map(item => [item.name, item]));
@@ -2121,6 +2221,8 @@ export const AdminPanel = () => {
         name: item.name,
         label: item.label,
         error: item.error,
+        details: item.details,
+        diagnostic: item.diagnostic,
         optional: item.optional,
         attempts: item.attempts,
       })));
@@ -2128,13 +2230,24 @@ export const AdminPanel = () => {
         ...prev,
         lastLoadedAt: new Date().toISOString(),
         authUid: user?.uid ?? auth.currentUser?.uid ?? null,
+        authEmail: authDiagnostics?.email ?? null,
+        authRole: authDiagnostics?.role ?? null,
+        firebase: FIREBASE_CLIENT_DIAGNOSTICS,
         counts: Object.fromEntries(allResults.filter(item => item.ok).map(item => [item.name, item.count])),
       }));
     } catch (e) {
       logError(e, 'AdminPanel.fetchData.outer');
       setAdminLoadIssues(prev => [
         ...prev,
-        { name: 'admin-load', label: 'Загрузка админки', error: formatAdminLoadError(e), optional: false, attempts: 1 },
+        {
+          name: 'admin-load',
+          label: 'Загрузка админки',
+          error: formatAdminLoadError(e),
+          details: adminLoadErrorDetails(e),
+          diagnostic: buildAdminLoadDiagnostic('admin-load', 'Загрузка админки', e, authDiagnostics),
+          optional: false,
+          attempts: 1,
+        },
       ]);
     } finally {
       setLoading(false);
@@ -3040,8 +3153,7 @@ export const AdminPanel = () => {
     setRecalcLoading(true);
     setRecalcMsg('Считаем...');
     try {
-      const snap = await getDocs(collection(db, 'users'));
-      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const users = await fetchAdminEntityList('users', 1000);
       const userCount  = users.filter(u => !u.id.startsWith('guest_')).length;
       const totalScans = users.reduce((sum, u) =>
         sum + Object.values(u.visitCounts ?? {}).reduce((s, v) => s + (Number(v) || 0), 0), 0);
@@ -3084,8 +3196,7 @@ export const AdminPanel = () => {
     if (analyticsLoading) return;
     setAnalyticsLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'users'));
-      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const users = await fetchAdminEntityList('users', 1000);
 
       const totalUsers  = users.length;
       const totalKeys   = users.reduce((s, u) => s + (u.keys ?? 0), 0);
@@ -3175,14 +3286,7 @@ export const AdminPanel = () => {
       const referralKeysOut = referredCount * 2 + totalReferrals * 2;
 
       // Гостевые сессии (последние 30 дней)
-      const guestSnap = await getDocs(
-        query(collection(db, 'guestSessions'),
-          where('date', '>=', cutoff30.toISOString().slice(0, 10)),
-          orderBy('date'),
-          limit(2000),
-        )
-      ).catch(() => ({ docs: [] }));
-      const guestDocs      = guestSnap.docs.map(d => d.data());
+      const guestDocs      = (adminMetrics.guestSessions || []).filter(d => String(d.date || '') >= cutoff30.toISOString().slice(0, 10));
       const guestTotal     = guestDocs.length;
       const guestConverted = guestDocs.filter(d => d.converted).length;
       const guestRate      = guestTotal > 0 ? ((guestConverted / guestTotal) * 100).toFixed(1) : '0';
@@ -3524,6 +3628,10 @@ export const AdminPanel = () => {
               </div>
               <div style={{ marginTop: 4, fontSize: 11, lineHeight: '16px', color: A.textSec }}>
                 {adminLoadInfo.authUid ? `Auth UID: ${adminLoadInfo.authUid}` : 'Firebase Auth ещё не подтверждён'}
+                {adminLoadInfo.authEmail && ` · ${adminLoadInfo.authEmail}`}
+                {adminLoadInfo.authRole && ` · role: ${adminLoadInfo.authRole}`}
+                {adminLoadInfo.firebase?.staleAdminEmulatorCleared && ' · очищен stale Firestore emulator'}
+                {adminLoadInfo.firebase?.emulatorConnected && ` · emulator: ${adminLoadInfo.firebase.emulatorHost}:${adminLoadInfo.firebase.emulatorPort}`}
                 {adminLoadInfo.lastLoadedAt && ` · ${new Date(adminLoadInfo.lastLoadedAt).toLocaleString('ru-RU')}`}
               </div>
             </div>
@@ -3545,6 +3653,17 @@ export const AdminPanel = () => {
                     <span style={{ color: A.textSec, fontSize: 10 }}>попыток: {item.attempts}</span>
                   </div>
                   <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px' }}>{item.error}</div>
+                  {item.details && (
+                    <div style={{ marginTop: 4, color: 'rgba(240,240,240,0.56)', fontSize: 10, lineHeight: '14px', wordBreak: 'break-word' }}>
+                      {item.details}
+                    </div>
+                  )}
+                  {item.diagnostic && (
+                    <div style={{ marginTop: 4, color: 'rgba(240,240,240,0.42)', fontSize: 10, lineHeight: '14px', wordBreak: 'break-word' }}>
+                      {item.diagnostic.environment} · {item.diagnostic.firebase?.projectId} · auth: {item.diagnostic.auth?.uid || 'none'} · online: {String(item.diagnostic.online)}
+                      {item.diagnostic.firebase?.emulatorConnected ? ` · emulator ${item.diagnostic.firebase.emulatorHost}:${item.diagnostic.firebase.emulatorPort}` : ''}
+                    </div>
+                  )}
                 </div>
               ))}
               {adminLoadIssues.length > 8 && (

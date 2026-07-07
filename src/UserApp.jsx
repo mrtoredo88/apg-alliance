@@ -177,6 +177,30 @@ function hasAcceptedCurrentLegal(data) {
 }
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
+const USER_AUTH_STORAGE_KEYS = [
+  'apg_tg_user',
+  'apg_email_user',
+  'apg_tg_pending',
+  'apg_pending_consents',
+  'apg_web_user',
+  'apg_guest_id',
+  'apg_gsid',
+  'apg_request_notification_after_login',
+  'apg_notif_enabled',
+  'apg_notif_consent',
+  'apg_pending_ref',
+  'apg_loki_memory',
+  'apg_loki_user_memory',
+];
+
+function clearUserAuthStorage() {
+  USER_AUTH_STORAGE_KEYS.forEach(key => {
+    try {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    } catch {}
+  });
+}
 
 function traceAuthStage(stage, details = {}) {
   try {
@@ -210,6 +234,7 @@ function getAuthErrorMessage(error) {
 async function ensureOwnerAuthSession(userId, source = 'auth') {
   const targetUserId = String(userId || '');
   if (!targetUserId || targetUserId.startsWith('guest_')) return null;
+  const strongIdentity = targetUserId.startsWith('email:') || targetUserId.startsWith('tg_');
 
   const ensureAnonymous = async (reason) => {
     if (auth.currentUser) return auth.currentUser;
@@ -234,6 +259,18 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   };
 
   traceAuthStage('owner_session_check', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
+  if (strongIdentity) {
+    const current = auth.currentUser;
+    if (current?.uid === targetUserId) {
+      await userAction('auth:linkUser', { userId: targetUserId, source }).catch(error => {
+        traceAuthStage('strong_identity_auth_map_repair_failed', { source, userId: targetUserId, uid: current.uid, error: error?.message ?? String(error) });
+      });
+      traceAuthStage('strong_identity_session_ready', { source, userId: targetUserId, uid: current.uid });
+      return current;
+    }
+    traceAuthStage('strong_identity_session_mismatch', { source, userId: targetUserId, uid: current?.uid ?? null });
+    throw Object.assign(new Error('Требуется повторная авторизация пользователя.'), { code: 'STRONG_IDENTITY_REQUIRED' });
+  }
   if (await checkOrCreateMap()) return auth.currentUser;
 
   traceAuthStage('auth_map_mismatch', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
@@ -1393,6 +1430,16 @@ export function UserApp() {
       }
     } catch (e) {
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
+      console.error('FINISH LOGIN', {
+        stage: 'email_check_consents',
+        uid: auth.currentUser?.uid ?? null,
+        email: emailUser.email ?? null,
+        telegramId: emailUser.linkedTelegram?.tgId ?? null,
+        profileId: emailUser.id ?? null,
+        authProvider: emailUser.authProvider ?? 'email',
+        error: e?.message ?? String(e),
+        code: e?.code ?? null,
+      });
       traceAuthStage('email_auth_error', { userId: emailUser.id, error: e?.message ?? String(e) });
       setConsentError(getAuthErrorMessage(e));
     }
@@ -1475,6 +1522,16 @@ export function UserApp() {
       traceAuthStage('consent_flow_complete', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
     } catch (e) {
       logError(e, 'UserApp.handleConsentAccept');
+      console.error('FINISH LOGIN', {
+        stage: 'consent_accept',
+        uid: auth.currentUser?.uid ?? null,
+        email: targetUser.email ?? null,
+        telegramId: targetUser.linkedTelegram?.tgId ?? null,
+        profileId: targetUser.id ?? null,
+        authProvider: targetUser.authProvider ?? consentRequest?.mode ?? 'unknown',
+        error: e?.message ?? String(e),
+        code: e?.code ?? null,
+      });
       traceAuthStage('consent_error', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown', error: e?.message ?? String(e) });
       setConsentError(getAuthErrorMessage(e));
       showToast('Не удалось сохранить согласия. Ошибка записана, попробуйте ещё раз.', 'error');
@@ -1485,18 +1542,14 @@ export function UserApp() {
 
   const handleLogout = useCallback(async () => {
     localStorage.setItem('manualLogout', 'true');
-    localStorage.removeItem('apg_tg_user');
-    localStorage.removeItem('apg_email_user');
-    localStorage.removeItem('apg_guest_id');
-    localStorage.removeItem('apg_web_user');
-    localStorage.removeItem('apg_notif_enabled');
-    localStorage.removeItem('apg_request_notification_after_login');
+    clearUserAuthStorage();
     try { await signOut(auth); } catch {}
     window.location.reload();
   }, []);
 
   const handleLoginAfterLogout = useCallback(() => {
     localStorage.removeItem('manualLogout');
+    clearUserAuthStorage();
     window.location.reload();
   }, []);
 

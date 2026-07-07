@@ -289,7 +289,6 @@ export default async function emailAuthRoutes(fastify) {
         return reply.code(409).send({ ok: false, error: 'already_linked', message: 'Этот Telegram уже привязан к другому аккаунту.' });
       }
 
-      const tgName = [firstName, lastName].filter(Boolean).join(' ') || null;
       try {
         await db.runTransaction(async tx => {
           const linkRef = db.collection('tgLinks').doc(normalizedTgId);
@@ -308,9 +307,6 @@ export default async function emailAuthRoutes(fastify) {
           }, { merge: true });
           tx.set(userRef, {
             linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
-            ...(firstName ? { firstName, displayName: tgName } : {}),
-            ...(lastName  ? { lastName } : {}),
-            ...(photo     ? { photo } : {}),
             updatedAt: FieldValue.serverTimestamp(),
           }, { merge: true });
         });

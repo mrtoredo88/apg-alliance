@@ -443,12 +443,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             if (!linkRes.ok || linkData.ok === false) {
               throw new Error(linkData.message || 'telegram_link_failed');
             }
-            const tgName = [tgPayload.firstName, tgPayload.lastName].filter(Boolean).join(' ') || null;
             const userPatch = {
               linkedTelegram: tgPayload,
-              ...(tgPayload.firstName ? { first_name: tgPayload.firstName, displayName: tgName } : {}),
-              ...(tgPayload.lastName  ? { last_name:  tgPayload.lastName  } : {}),
-              ...(tgPayload.photo     ? { photo_200:  tgPayload.photo     } : {}),
             };
             onUserUpdate(userPatch);
             try {
