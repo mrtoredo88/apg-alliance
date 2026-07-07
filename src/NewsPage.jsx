@@ -1028,6 +1028,7 @@ export function NewsPage({
   onSubscribe,
   onRefresh,
   onToast,
+  initialNewsTarget = null,
 }) {
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('new');
@@ -1084,6 +1085,13 @@ export function NewsPage({
     if (added > 0) setNewItemsCount(added);
     knownIdsRef.current = current;
   }, [news]);
+
+  useEffect(() => {
+    const targetId = initialNewsTarget?.id ? String(initialNewsTarget.id) : '';
+    if (!targetId) return;
+    const target = news.find(item => String(item?.id || item?.externalId || '') === targetId);
+    if (target) setSelected(target);
+  }, [initialNewsTarget, news]);
 
   const handlePageScroll = (e) => setShowTopButton(e.currentTarget.scrollTop > 560);
   const scrollToTop = () => {

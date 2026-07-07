@@ -293,7 +293,7 @@ function EmptyState({ tab }) {
   );
 }
 
-export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark' }) {
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
@@ -308,6 +308,15 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
   const upcoming = events.filter(e => !isEventPast(e));
   const past     = events.filter(e => isEventPast(e)).reverse();
   const list     = tab === 'upcoming' ? upcoming : past;
+
+  useEffect(() => {
+    const targetId = initialEventTarget?.id ? String(initialEventTarget.id) : '';
+    if (!targetId) return;
+    const target = events.find(event => String(event?.id || '') === targetId);
+    if (!target) return;
+    setTab(isEventPast(target) ? 'past' : 'upcoming');
+    setSelectedEvent(target);
+  }, [events, initialEventTarget]);
 
   if (variant === 'v2') {
     return (

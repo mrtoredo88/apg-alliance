@@ -1,11 +1,37 @@
 import { LOKI_APP_ACTIONS, createLokiAction } from '../../lokiActionTypes.js';
 import { includesAny, makeResultCard, normalizeText, openNearbyResult, titleOf } from '../lokiCoreUtils.js';
 
-const GENERIC_PARTNER_WORDS = ['партнер', 'партнёр', 'места', 'рядом', 'куда сходить', 'посоветуй', 'где можно', 'что есть'];
+const GENERIC_PARTNER_WORDS = ['партнер', 'партнёр', 'места', 'рядом', 'куда сходить', 'посоветуй', 'где можно', 'что есть', 'найди', 'подбери'];
 const AMBIGUOUS_WORDS = ['салон', 'студия', 'мастер', 'записаться', 'услуга'];
-const FOLLOWUP_WORDS = ['парковк', 'адрес', 'далеко', 'рядом', 'маршрут', 'как добраться', 'цена', 'дешев', 'подешевле', 'сегодня', 'открыто'];
+const FOLLOWUP_WORDS = ['парковк', 'адрес', 'далеко', 'рядом', 'маршрут', 'как добраться', 'цена', 'дешев', 'подешевле', 'сегодня', 'открыто', 'вечер', 'поздно', 'работают', 'ближе', 'еще', 'ещё'];
 const SEMANTIC_STOP_WORDS = new Set(['куда', 'сходить', 'можно', 'хочу', 'есть', 'хорошие', 'посоветуй', 'что', 'нибудь', 'рядом', 'сегодня', 'лучше', 'где']);
-const SPECIFIC_SERVICE_WORDS = ['красот', 'маникюр', 'педикюр', 'ногти', 'стриж', 'парикмах', 'барбер', 'косметолог', 'бров', 'ресниц', 'массаж', 'spa', 'спа', 'кофе', 'капучино', 'завтрак', 'пицца', 'подар', 'цвет', 'фитнес', 'йога'];
+const SPECIFIC_SERVICE_WORDS = ['красот', 'маникюр', 'педикюр', 'ногти', 'ногот', 'стриж', 'парикмах', 'барбер', 'косметолог', 'бров', 'ресниц', 'массаж', 'spa', 'спа', 'кофе', 'капучино', 'завтрак', 'пицца', 'подар', 'цвет', 'фитнес', 'йога'];
+
+function editDistance(a, b) {
+  if (!a || !b) return Math.max(a.length, b.length);
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let leftTop = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const old = prev[j];
+      prev[j] = a[i - 1] === b[j - 1]
+        ? leftTop
+        : Math.min(leftTop + 1, prev[j] + 1, prev[j - 1] + 1);
+      leftTop = old;
+    }
+  }
+  return prev[b.length];
+}
+
+function fuzzyWordHit(word, candidates) {
+  if (word.length < 5) return false;
+  return candidates.some(candidate => {
+    if (candidate.includes(word) || word.includes(candidate)) return true;
+    if (Math.abs(candidate.length - word.length) > 2) return false;
+    return editDistance(word, candidate) <= 2;
+  });
+}
 
 function scorePhrase(query, phrase) {
   const text = normalizeText(phrase);
@@ -19,6 +45,8 @@ function scorePhrase(query, phrase) {
 
 function detectPartnerIntent(query, context) {
   const categories = context.knowledge?.categories ?? [];
+  const lastQuery = normalizeText(context.memory?.lastConversation?.userText || context.memory?.lastUserText || '');
+  const contextualQuery = includesAny(query, FOLLOWUP_WORDS) && lastQuery ? `${lastQuery} ${query}` : query;
   const scored = categories
     .map(category => {
       const phrases = [
@@ -26,7 +54,7 @@ function detectPartnerIntent(query, context) {
         ...(category.includes ?? []),
         ...(category.synonyms ?? []),
       ];
-      const score = phrases.reduce((sum, phrase) => sum + scorePhrase(query, phrase), 0);
+      const score = phrases.reduce((sum, phrase) => sum + scorePhrase(contextualQuery, phrase), 0);
       return { ...category, score };
     })
     .filter(category => category.score > 0)
@@ -46,6 +74,7 @@ function detectPartnerIntent(query, context) {
     ambiguous,
     followUp: includesAny(query, FOLLOWUP_WORDS) && !!(context.memory?.lastAction || context.memory?.lastConversation || context.memory?.lastMessage),
     previous: normalizeText(previous),
+    contextualQuery,
   };
 }
 
@@ -68,16 +97,20 @@ function findPartners(query, partners = [], intent) {
     ...(intent.category?.synonyms ?? []),
     intent.category?.title,
   ].filter(Boolean).map(normalizeText);
+  const hintWords = categoryHints.join(' ').split(/\s+/).filter(word => word.length > 3 && !SEMANTIC_STOP_WORDS.has(word));
+  const sourceQuery = intent.contextualQuery || query;
 
   return partners
     .map(partner => {
       const haystack = partnerHaystack(partner);
-      const queryWords = query.split(/\s+/).filter(w => w.length > 3);
+      const queryWords = sourceQuery.split(/\s+/).filter(w => w.length > 3 && !SEMANTIC_STOP_WORDS.has(w));
       const categoryScore = categoryHints.reduce((sum, hint) => sum + (hint && haystack.includes(hint) ? 4 : 0), 0);
+      const semanticScore = hintWords.reduce((sum, word) => sum + (haystack.includes(word) || fuzzyWordHit(word, haystack.split(/\s+/)) ? 1.35 : 0), 0);
       const queryScore = queryWords.reduce((sum, word) => sum + (haystack.includes(word) ? 1.25 : 0), 0);
       const score = [
         partner.name && query.includes(normalizeText(partner.name)) ? 10 : 0,
         categoryScore,
+        semanticScore,
         queryScore,
         partner.offer || partner.promo ? 1 : 0,
         partner.featured ? 1 : 0,

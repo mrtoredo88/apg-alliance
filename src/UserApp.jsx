@@ -384,6 +384,8 @@ export function UserApp() {
   const [pullDistance, setPullDistance]         = useState(0);
   const [pullRefreshing, setPullRefreshing]     = useState(false);
   const [activePartner, setActivePartner]       = useState(null);
+  const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(null);
+  const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(null);
 
   const [user, setUser]                         = useState(null);
   const [userKeys, setUserKeys]                 = useState(0);
@@ -2084,8 +2086,16 @@ export function UserApp() {
       if (partner) openPartner(partner);
       else goPanel('offers');
     },
-    [LOKI_APP_ACTIONS.OPEN_EVENT]: () => goPanel('events'),
-    [LOKI_APP_ACTIONS.OPEN_NEWS]: () => goPanel('news'),
+    [LOKI_APP_ACTIONS.OPEN_EVENT]: ({ eventId, id } = {}) => {
+      const targetId = eventId ?? id;
+      if (targetId) setPendingLokiEventTarget({ id: targetId, nonce: Date.now() });
+      goPanel('events');
+    },
+    [LOKI_APP_ACTIONS.OPEN_NEWS]: ({ newsId, id } = {}) => {
+      const targetId = newsId ?? id;
+      if (targetId) setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
+      goPanel('news');
+    },
     [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
     [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
     [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
@@ -2303,6 +2313,7 @@ export function UserApp() {
                     onSubscribe={toggleNewsSubscription}
                     onRefresh={handleRefresh}
                     onToast={showToast}
+                    initialNewsTarget={pendingLokiNewsTarget}
                   />
                 </Suspense>
               </Panel>
@@ -2391,7 +2402,7 @@ export function UserApp() {
               {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
               <Panel id="events">
                 <Suspense fallback={<LazyFallback />}>
-                  <EventsPage nav="events" variant="v2" events={events} onBack={goBackPanel} appearance={appearance} />
+                  <EventsPage nav="events" variant="v2" events={events} onBack={goBackPanel} appearance={appearance} initialEventTarget={pendingLokiEventTarget} />
                 </Suspense>
               </Panel>
 

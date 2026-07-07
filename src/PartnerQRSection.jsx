@@ -15,48 +15,79 @@ function triggerDownload(dataUrl, filename) {
   a.click();
 }
 
-function openPdfWindow(dataUrl, title, subtitle) {
-  const win = window.open('', '_blank', 'width=640,height=820');
-  if (!win) { alert('Разрешите всплывающие окна для скачивания PDF'); return; }
-  win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="utf-8"><title>${title}</title>
-    <style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{display:flex;flex-direction:column;align-items:center;justify-content:center;
-        min-height:100vh;background:#fff;font-family:Arial,sans-serif;padding:40px;gap:14px}
-      h2{font-size:20px;font-weight:900;text-align:center;color:#0f0f1a;max-width:400px}
-      p{font-size:12px;color:#666;text-align:center;max-width:400px;line-height:1.5}
-      img.qr{width:260px;height:260px;border:1px solid #ddd;padding:10px}
-      .btn{padding:11px 28px;background:#C9A84C;color:#000;border:none;border-radius:8px;
-        font-size:14px;font-weight:700;cursor:pointer}
-      @media print{.btn{display:none}}
-    </style>
-  </head><body>
-    <h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}
-    <img class="qr" src="${dataUrl}" />
-    <button class="btn" onclick="window.print()">🖨️ Печать / Сохранить PDF</button>
-  </body></html>`);
-  win.document.close();
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function openPosterPdfWindow(posterUrl, entityName) {
-  const win = window.open('', '_blank', 'width=720,height=900');
-  if (!win) { alert('Разрешите всплывающие окна для скачивания PDF'); return; }
-  win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="utf-8"><title>Плакат — ${entityName}</title>
+function getPdfSize(options) {
+  const preset = options?.format === 'A5'
+    ? { width: 148, height: 210 }
+    : { width: 210, height: 297 };
+  return options?.orientation === 'landscape'
+    ? { width: preset.height, height: preset.width }
+    : preset;
+}
+
+function buildPrintHtml({ imageUrl, title, subtitle, type = 'poster', options }) {
+  const size = getPdfSize(options);
+  const margin = Number(options?.marginMm ?? 8);
+  const quality = Number(options?.quality ?? 100);
+  const imageFit = type === 'poster' ? 'contain' : 'none';
+  const qrSize = type === 'qr' ? Math.min(size.width, size.height) * 0.46 : null;
+  return `<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${escapeHtml(title)}</title>
     <style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{display:flex;flex-direction:column;align-items:center;justify-content:center;
-        min-height:100vh;background:#fff;font-family:Arial,sans-serif;padding:20px;gap:16px}
-      img{max-width:100%;max-height:80vh;object-fit:contain}
-      .btn{padding:11px 28px;background:#C9A84C;color:#000;border:none;border-radius:8px;
-        font-size:14px;font-weight:700;cursor:pointer}
-      @media print{.btn{display:none};@page{margin:0}}
+      @page { size: ${size.width}mm ${size.height}mm; margin: ${margin}mm; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #f4f1e8; font-family: Arial, sans-serif; }
+      .toolbar { position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; align-items: center; justify-content: center; padding: 12px; background: rgba(15,15,26,.92); color: #fff; }
+      .toolbar button { border: 0; border-radius: 10px; padding: 10px 14px; background: #C9A84C; color: #0F0F1A; font-weight: 800; cursor: pointer; }
+      .hint { font-size: 12px; opacity: .78; }
+      .sheet-wrap { min-height: calc(100vh - 62px); display: grid; place-items: center; padding: 18px; }
+      .sheet { width: ${size.width}mm; height: ${size.height}mm; padding: ${margin}mm; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.22); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6mm; overflow: hidden; }
+      h1 { margin: 0; max-width: 100%; text-align: center; color: #0F0F1A; font-size: ${type === 'poster' ? 14 : 18}pt; line-height: 1.15; font-weight: 900; }
+      p { margin: 0; max-width: 82%; text-align: center; color: #59564d; font-size: 9pt; line-height: 1.45; }
+      img.poster { width: 100%; height: 100%; object-fit: ${imageFit}; image-rendering: auto; }
+      img.qr { width: ${qrSize ?? 0}mm; height: ${qrSize ?? 0}mm; object-fit: contain; image-rendering: pixelated; border: .5mm solid #ece6d5; padding: 4mm; }
+      @media print {
+        html, body { background: #fff; }
+        .toolbar { display: none; }
+        .sheet-wrap { display: block; min-height: 0; padding: 0; }
+        .sheet { width: auto; height: auto; min-height: calc(${size.height}mm - ${margin * 2}mm); padding: 0; box-shadow: none; page-break-after: avoid; }
+        img.poster { max-width: 100%; max-height: calc(${size.height}mm - ${margin * 2}mm); }
+      }
     </style>
   </head><body>
-    <img src="${posterUrl}" />
-    <button class="btn" onclick="window.print()">🖨️ Печать / Сохранить PDF</button>
-  </body></html>`);
+    <div class="toolbar">
+      <button onclick="window.print()">Сохранить в PDF</button>
+      <span class="hint">${options?.format ?? 'A4'} · ${options?.orientation === 'landscape' ? 'горизонтально' : 'вертикально'} · поля ${margin} мм · качество ${quality}%</span>
+    </div>
+    <main class="sheet-wrap">
+      <section class="sheet">
+        ${type === 'poster'
+          ? `<img class="poster" src="${imageUrl}" alt="${escapeHtml(title)}">`
+          : `<h1>${escapeHtml(title)}</h1>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}<img class="qr" src="${imageUrl}" alt="QR">`}
+      </section>
+    </main>
+  </body></html>`;
+}
+
+function openPrintDocument(html) {
+  const win = window.open('', '_blank', 'noopener,noreferrer,width=900,height=1100');
+  if (!win) {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    triggerDownload(URL.createObjectURL(blob), 'apg-pdf-preview.html');
+    alert('Открылся fallback-файл. Откройте его и выберите «Печать / Сохранить в PDF».');
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
   win.document.close();
 }
 
@@ -172,6 +203,8 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
   const [tab, setTab]             = useState('qr1');
   const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState(null);
+  const [pdfOptions, setPdfOptions] = useState({ format: 'A4', orientation: 'portrait', marginMm: 6, quality: 100 });
   const [copied, setCopied]       = useState(null);
 
   const getCanvasDataUrl = useCallback((wrapRef) => {
@@ -184,10 +217,19 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
     if (url) triggerDownload(url, `${prefix}-${entityId}.png`);
   }, [getCanvasDataUrl, entityId]);
 
+  const openPdfPreview = useCallback(({ imageUrl, title, subtitle = '', type = 'qr' }) => {
+    setPdfPreview({ imageUrl, title, subtitle, type });
+  }, []);
+
+  const printPdfPreview = useCallback(() => {
+    if (!pdfPreview?.imageUrl) return;
+    openPrintDocument(buildPrintHtml({ ...pdfPreview, options: pdfOptions }));
+  }, [pdfOptions, pdfPreview]);
+
   const downloadPdf = useCallback((wrapRef, title, sub) => {
     const url = getCanvasDataUrl(wrapRef);
-    if (url) openPdfWindow(url, title, sub);
-  }, [getCanvasDataUrl]);
+    if (url) openPdfPreview({ imageUrl: url, title, subtitle: sub, type: 'qr' });
+  }, [getCanvasDataUrl, openPdfPreview]);
 
   const copyLink = useCallback((text, key) => {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -234,6 +276,82 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
       </div>
     </div>
   );
+
+  const optionButton = (active) => ({
+    padding: '8px 10px',
+    borderRadius: 10,
+    border: active ? '1px solid rgba(201,168,76,0.72)' : '1px solid rgba(255,255,255,0.14)',
+    background: active ? 'rgba(201,168,76,0.22)' : 'rgba(255,255,255,0.07)',
+    color: active ? T.gold : T.textSec,
+    fontSize: 11,
+    fontWeight: 800,
+    cursor: 'pointer',
+  });
+
+  const PdfPreviewModal = () => {
+    if (!pdfPreview) return null;
+    const size = getPdfSize(pdfOptions);
+    const isPoster = pdfPreview.type === 'poster';
+    return (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) setPdfPreview(null); }}
+        style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', padding: '18px 14px 34px', overflowY: 'auto' }}
+      >
+        <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', display: 'grid', gap: 12 }}>
+          <div style={{ background: 'rgba(18,18,28,0.92)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 20, padding: 14, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div>
+                <div style={{ color: T.textPri, fontSize: 16, fontWeight: 900 }}>Preview PDF</div>
+                <div style={{ color: T.textSec, fontSize: 11, marginTop: 3 }}>Проверьте пропорции перед сохранением.</div>
+              </div>
+              <button onClick={() => setPdfPreview(null)} style={{ width: 36, height: 36, borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: T.textPri, fontSize: 22, cursor: 'pointer' }}>×</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+              {['A4', 'A5'].map(format => (
+                <button key={format} onClick={() => setPdfOptions(prev => ({ ...prev, format }))} style={optionButton(pdfOptions.format === format)}>{format}</button>
+              ))}
+              <button onClick={() => setPdfOptions(prev => ({ ...prev, orientation: 'portrait' }))} style={optionButton(pdfOptions.orientation === 'portrait')}>Вертикально</button>
+              <button onClick={() => setPdfOptions(prev => ({ ...prev, orientation: 'landscape' }))} style={optionButton(pdfOptions.orientation === 'landscape')}>Горизонтально</button>
+            </div>
+
+            <label style={{ display: 'grid', gap: 6, color: T.textSec, fontSize: 11, fontWeight: 700 }}>
+              Поля: {pdfOptions.marginMm} мм
+              <input type="range" min="0" max="20" value={pdfOptions.marginMm} onChange={e => setPdfOptions(prev => ({ ...prev, marginMm: Number(e.target.value) }))} />
+            </label>
+            <label style={{ display: 'grid', gap: 6, color: T.textSec, fontSize: 11, fontWeight: 700 }}>
+              Качество: {pdfOptions.quality}%
+              <input type="range" min="70" max="100" step="5" value={pdfOptions.quality} onChange={e => setPdfOptions(prev => ({ ...prev, quality: Number(e.target.value) }))} />
+            </label>
+            <button onClick={printPdfPreview} style={{ ...btnGold, width: '100%', flex: 'unset', padding: '13px 0' }}>Сохранить в PDF</button>
+          </div>
+
+          <div style={{ display: 'grid', placeItems: 'center', padding: 12, background: '#e9e2d2', borderRadius: 18 }}>
+            <div style={{
+              width: `min(100%, ${size.width * 1.7}px)`,
+              aspectRatio: `${size.width} / ${size.height}`,
+              background: '#fff',
+              padding: `${pdfOptions.marginMm / 2}px`,
+              boxShadow: '0 16px 48px rgba(0,0,0,0.22)',
+              display: 'grid',
+              placeItems: 'center',
+              overflow: 'hidden',
+            }}>
+              {isPoster ? (
+                <img src={pdfPreview.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              ) : (
+                <div style={{ textAlign: 'center', display: 'grid', placeItems: 'center', gap: 10 }}>
+                  <div style={{ color: '#0F0F1A', fontSize: 18, fontWeight: 900 }}>{pdfPreview.title}</div>
+                  {pdfPreview.subtitle && <div style={{ color: '#5d584f', fontSize: 12, lineHeight: '17px' }}>{pdfPreview.subtitle}</div>}
+                  <img src={pdfPreview.imageUrl} alt="" style={{ width: 'min(58vw, 220px)', maxWidth: '72%', aspectRatio: '1', objectFit: 'contain', imageRendering: 'pixelated', border: '1px solid #eee', padding: 10 }} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -282,13 +400,14 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
               <img src={posterUrl} alt="Плакат" style={{ width: '100%', borderRadius: 12, marginBottom: 10, display: 'block' }} />
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <button style={btnBase} onClick={() => triggerDownload(posterUrl, `poster-${entityId}.png`)}>⬇️ PNG</button>
-                <button style={btnGold} onClick={() => openPosterPdfWindow(posterUrl, entityName)}>🖨️ PDF</button>
+                <button style={btnGold} onClick={() => openPdfPreview({ imageUrl: posterUrl, title: `Плакат — ${entityName}`, type: 'poster' })}>🖨️ PDF</button>
               </div>
               <button onClick={() => setPosterUrl(null)} style={{ ...btnBase, width: '100%', fontSize: 11 }}>↺ Перегенерировать</button>
             </>
           )}
         </div>
       )}
+      <PdfPreviewModal />
     </div>
   );
 }
