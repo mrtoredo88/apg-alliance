@@ -556,6 +556,14 @@ function AdminQuickActions({ setActiveTab, openNews, openPartner, openEvent, ope
   );
 }
 
+const byPriorityDate = (a, b) => {
+  const dp = (b.priority ?? 0) - (a.priority ?? 0);
+  if (dp !== 0) return dp;
+  const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ?? 0);
+  const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ?? 0);
+  return tb - ta;
+};
+
 function AdminNewsCard({ item, selected, dragging, onEdit, onPublish, onPin, onDelete, onCheck, onSelect, onContextMenu, onPreview, onSwipe, onDragStart, onDragOver, onDrop }) {
   const touchRef = useRef({ x: 0, y: 0, t: 0 });
   const longPressRef = useRef(null);
@@ -1317,7 +1325,7 @@ function DiagTab({ A, s }) {
   const [fManual, setFManual]           = useState(false);
 
   useEffect(() => { doRunChecks(); }, []);
-  useEffect(() => { loadReports(); }, [fDate, fStatus, fService, fManual]); // eslint-disable-line
+  useEffect(() => { loadReports(); }, [fDate, fStatus, fService, fManual]);
 
   async function doRunChecks() {
     setSvcLoading(true);

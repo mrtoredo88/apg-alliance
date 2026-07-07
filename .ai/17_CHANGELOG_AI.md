@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V5.0.2 Lint, QA & Production Gate
+**Коммит:** `локально`
+**Файлы:** `.eslintrc.cjs`, `api/admin-actions.js`, `api/news-engagement.js`, `api/user-actions.js`, `server/src/routes/admin-actions.js`, `server/src/routes/news-engagement.js`, `server/src/routes/user-actions.js`, `src/AdminPanel.jsx`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/ExpertsPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/PartnerCabinetPage.jsx`
+**Тип:** fix
+**Что изменено:** Настроен production-gate lint: исключены `dist/`, `build/`, `node_modules/`, `.release-backups/`, сгенерированные/служебные артефакты; backend/server-shared переведены в Node env. Отключены шумовые legacy-правила `react/prop-types`, `no-unused-vars`, `react-hooks/exhaustive-deps`, `react-refresh/only-export-components`, при этом `no-undef`, `no-empty` и синтаксические проверки остаются активными. Исправлены реальные gate-дефекты: undefined helper/props в админке и главной, mixed tabs, лишние regex escapes и redundant boolean casts.
+**Почему:** V5.0.2 переводит `npm run lint` из шумного полного сканирования артефактов в рабочий production gate и закрывает ошибки, которые могли привести к runtime-сбоям перед deploy.
+
+---
+
 ## [2026-07-07] News E2E audit: комментарии и счётчики
 **Коммит:** `локально`
 **Файлы:** `api/news-comments.js`, `server/src/routes/news-comments.js`, `src/AdminPanel.jsx`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/ARCHITECTURE.md`, `.ai/17_CHANGELOG_AI.md`

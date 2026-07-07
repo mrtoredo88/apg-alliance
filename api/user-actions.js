@@ -453,7 +453,7 @@ async function actionReviewExpert(db, req, actor) {
   const expertId = safeString(req.body?.expertId, 160);
   const rating = Math.max(1, Math.min(5, Number(req.body?.rating || 0)));
   if (!expertId || !rating) throw Object.assign(new Error('Некорректный отзыв.'), { statusCode: 400 });
-  const reviewId = `${expertId}_${userId}`.replace(/[\/#?[\\\]]/g, '_');
+  const reviewId = `${expertId}_${userId}`.replace(/[/#?[\\\]]/g, '_');
   const reviewData = {
     expertId,
     userId,
@@ -522,7 +522,7 @@ async function actionLogCreate(db, req, actor, collection, source) {
 }
 
 async function actionGuestSession(db, req, actor) {
-  const sid = safeString(req.body?.sid, 220).replace(/[\/#?[\\\]]/g, '_');
+  const sid = safeString(req.body?.sid, 220).replace(/[/#?[\\\]]/g, '_');
   if (!sid) throw Object.assign(new Error('Не указана гостевая сессия.'), { statusCode: 400 });
   const patch = {
     firebaseUid: actor?.uid || null,

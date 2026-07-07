@@ -154,6 +154,7 @@ function getDayGreeting() {
 function V2FirstScreen({
   user,
   userKeys,
+  counterPulse,
   events,
   featuredPartner,
   partnerOfMonth,
@@ -1232,7 +1233,7 @@ function NewsFeed({ news, onOpenNews }) {
 
 // ─── Баннер ───────────────────────────────────────────────────────────────────
 
-function HeroBanner({ userKeys, userName, streak }) {
+function HeroBanner({ userKeys, userName, streak, counterPulse = false }) {
   const level    = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
   const pct      = getLevelProgress(userKeys);
@@ -1694,6 +1695,8 @@ function V2FullHomeSections({
   onShare,
   onJoinGroup,
   onOpenForPartners,
+  onOpenReference,
+  onOpenLoki,
   onEventRegister,
   onSelectEvent,
 }) {
@@ -2036,6 +2039,7 @@ export function HomePanelV2({
         featuredPartner={featuredPartner}
         partnerOfMonth={partnerOfMonth}
         unreadCount={unreadCount}
+        counterPulse={counterPulse}
         onOpenNotifications={onOpenNotifications}
         onOpenPartner={onOpenPartner}
         onOpenNearby={onOpenNearby}

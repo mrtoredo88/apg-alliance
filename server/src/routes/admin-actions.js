@@ -139,7 +139,7 @@ async function handleNewsAction(db, request, actor) {
   if (action === 'news:pin') {
     await requireAdminPermission(request, 'news:pin');
     return runIdempotent(db, actor, idempotencyKey, async () => {
-      const next = !Boolean(before.pinned || before.isPinned);
+      const next = !(before.pinned || before.isPinned);
       const patch = { pinned: next, isPinned: next, priority: next ? Math.max(Number(before.priority || 0), 9) : Number(before.priority || 0), updatedAt: FieldValue.serverTimestamp() };
       await ref.update(patch);
       await writeHistory(db, actor, id, next ? 'pin' : 'unpin', before, patch);

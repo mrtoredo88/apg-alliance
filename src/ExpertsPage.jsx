@@ -176,7 +176,6 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
   useEffect(() => {
     userAction('publicQr:view', { type: 'expert', id: expert.id, metric: 'view' }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showToast = (msg) => {

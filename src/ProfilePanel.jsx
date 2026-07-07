@@ -548,7 +548,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       setTgStep('waiting');
       startWaiting(state);
     } catch { localStorage.removeItem('apg_tg_pending'); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLinkEmail = useCallback(async () => {

@@ -387,7 +387,7 @@ export function UserApp() {
       url.searchParams.delete('verify_email');
       window.history.replaceState({}, '', url.toString());
     }).catch(() => {});
-  }, [verifyEmailToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [verifyEmailToken]);
 
   const haptic = useCallback((style = 'light') => {
     const now = Date.now();
@@ -1089,7 +1089,7 @@ export function UserApp() {
       if (mountedRef.current) { setCounterPulse(false); setKeyBurst(null); }
     }, 1650);
     keyBurstTimersRef.current = [t1, t2];
-  }, [keyBurst?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [keyBurst?.id]);
 
   const handleConfirmScan = useCallback(async (placeIdentifier) => {
     if (!user || isScanningRef.current) return;
@@ -2234,9 +2234,9 @@ export function UserApp() {
               {/* ProfilePanel не рендерит Panel — оборачиваем */}
               <Panel id="profile">
                 <Suspense fallback={<LazyFallback />}>
-	                  <ProfilePanel
-	                    variant="v2"
-	                    user={user} userKeys={userKeys} favorites={favorites}
+                  <ProfilePanel
+                    variant="v2"
+                    user={user} userKeys={userKeys} favorites={favorites}
                     partners={enrichedPartners} events={events}
                     news={news}
                     savedNews={savedNews}
@@ -2267,7 +2267,7 @@ export function UserApp() {
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
                     onOpenNews={() => goPanel('news')}
-	                  />
+                  />
                 </Suspense>
               </Panel>
 

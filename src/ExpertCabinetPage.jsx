@@ -74,7 +74,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const handleSave = async () => {
     if (!expert?.id) return;
     const phone = fPhone.trim();
-    if (phone && !/^[+\d()\s\-]{7,16}$/.test(phone)) {
+    if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) {
       alert('Некорректный формат номера телефона.\nПример: +7 (499) 123-45-67');
       return;
     }

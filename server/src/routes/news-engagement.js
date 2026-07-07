@@ -38,7 +38,7 @@ async function trackView(db, body) {
   if (!newsId) throw new Error('newsId is required');
   const day = todayKey();
   const viewerId = user.id || safeId(body.viewerId, 'guest');
-  const viewId = `${newsId}_${viewerId}_${day}`.replace(/[\/#?[\\\]]/g, '_');
+  const viewId = `${newsId}_${viewerId}_${day}`.replace(/[/#?[\\\]]/g, '_');
   const viewRef = db.collection('newsViewEvents').doc(viewId);
   const newsRef = db.collection('news').doc(newsId);
   const progress = Math.max(0, Math.min(1, Number(body.progress || 0)));
@@ -119,7 +119,7 @@ async function trackFeedback(db, body) {
   const user = safeUser(body.user);
   if (!newsId || !user.id || user.id.startsWith('guest_')) throw new Error('Авторизуйтесь, чтобы оставить оценку.');
   const helpful = Boolean(body.helpful);
-  const feedbackId = `${newsId}_${user.id}`.replace(/[\/#?[\\\]]/g, '_');
+  const feedbackId = `${newsId}_${user.id}`.replace(/[/#?[\\\]]/g, '_');
   const ref = db.collection('newsFeedback').doc(feedbackId);
   const newsRef = db.collection('news').doc(newsId);
   await db.runTransaction(async tx => {
