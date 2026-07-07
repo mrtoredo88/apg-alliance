@@ -112,19 +112,31 @@ function actionToUrl(action) {
   return APP_URL;
 }
 
+function getLokiVoice() {
+  try {
+    const voices = window.speechSynthesis?.getVoices?.() ?? [];
+    return voices.find(voice => voice.lang === 'ru-RU' && /milena|yuri|google|microsoft|premium|natural/i.test(voice.name))
+      ?? voices.find(voice => voice.lang === 'ru-RU')
+      ?? voices.find(voice => String(voice.lang || '').startsWith('ru'))
+      ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function LokiHero({ state }) {
   const listening = state === 'listening';
   const thinking = state === 'thinking';
   const speaking = state === 'speaking';
-  const animation = speaking ? 'lokiWave 1.1s' : listening ? 'lokiListen 1.55s' : thinking ? 'lokiThinking 1.4s' : 'lokiIdle 4.8s';
+  const animation = speaking ? 'lokiWave 1.35s' : listening ? 'lokiListen 1.8s' : thinking ? 'lokiThinking 1.65s' : 'lokiIdle 6.2s';
   return (
     <GlassCard style={{ borderRadius: 38, padding: 18, display: 'grid', gap: 13, justifyItems: 'center', overflow: 'hidden', position: 'relative' }}>
       <span style={{ position: 'absolute', inset: -80, background: 'radial-gradient(circle at 50% 18%, rgba(215,184,106,0.24), transparent 28%), radial-gradient(circle at 82% 8%, rgba(255,255,255,0.10), transparent 24%)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', width: 154, height: 154, display: 'grid', placeItems: 'center' }}>
-        <span style={{ position: 'absolute', inset: 10, borderRadius: 54, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.25), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(9px)', opacity: listening || thinking || speaking ? 1 : 0.72, animation: thinking || speaking ? 'lokiSparkle 1.3s ease-in-out infinite' : 'none' }} />
+        <span style={{ position: 'absolute', inset: 8, borderRadius: 56, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.25), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(10px)', opacity: listening || thinking || speaking ? 1 : 0.76, animation: thinking || speaking ? 'lokiAmbientGlow 2.8s ease-in-out infinite' : 'lokiAmbientGlow 5.2s ease-in-out infinite' }} />
         <span style={{ width: 132, height: 132, borderRadius: 44, overflow: 'hidden', position: 'relative', border: '1px solid rgba(215,184,106,0.34)', backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', boxShadow: '0 28px 70px rgba(0,0,0,0.32), 0 0 38px rgba(215,184,106,0.22)', animation: `${animation} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
           <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 24%, rgba(255,255,255,0.16), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.10))' }} />
-          {speaking && <span style={{ position: 'absolute', left: 52, bottom: 32, width: 30, height: 7, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiBlink 740ms ease-in-out infinite' }} />}
+          {speaking && <span style={{ position: 'absolute', left: 52, bottom: 32, width: 30, height: 7, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiMouthSmile 820ms ease-in-out infinite' }} />}
         </span>
       </div>
       <div style={{ position: 'relative', textAlign: 'center', display: 'grid', gap: 5 }}>
@@ -184,8 +196,10 @@ function LokiScreen({ tg }) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ru-RU';
-    utterance.rate = 1;
-    utterance.pitch = 1.05;
+    utterance.voice = getLokiVoice();
+    utterance.rate = 0.88;
+    utterance.pitch = 0.96;
+    utterance.volume = 0.92;
     utterance.onstart = () => setVoiceState('speaking');
     utterance.onend = () => setVoiceState('idle');
     utterance.onerror = () => setVoiceState('idle');

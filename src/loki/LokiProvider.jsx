@@ -75,6 +75,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const actionTimerRef = useRef(null);
   const presenceTimerRef = useRef(null);
   const farewellTimerRef = useRef(null);
+  const homePresenceTimerRef = useRef(null);
   const settingsHydratedRef = useRef(false);
   const settingsDirtyRef = useRef(false);
   const userId = getUserId(user);
@@ -175,22 +176,24 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setCard(null);
       setEmotion(eventType === LOKI_EVENTS.USER_IDLE ? 'sleep' : 'idle');
     }, emotionalPresentation.duration);
-    if (eventType === LOKI_EVENTS.PROACTIVE_SUGGESTION) {
+    if (eventType === LOKI_EVENTS.PROACTIVE_SUGGESTION || activePanel !== 'home') {
       farewellTimerRef.current = setTimeout(() => {
         setAction(LOKI_ACTIONS.WAVE);
         setEmotion('happy');
       }, emotionalPresentation.duration + 520);
     }
     presenceTimerRef.current = setTimeout(() => {
-      setVisible(false);
+      const shouldStayHome = activePanel === 'home' && settings.enabled && !isHiddenOnPanel;
+      setVisible(shouldStayHome);
       setAnchor('home');
       setAction(LOKI_ACTIONS.IDLE);
+      setEmotion('idle');
       currentPriorityRef.current = LOKI_MESSAGE_PRIORITY.LOW;
       updateMemory({ inDialog: false, lastPanel: activePanel, emotionalState: nextEmotionalState });
       const next = queueRef.current.shift();
       if (next) setTimeout(() => displayMessage(next.eventType, next.payload), 420);
     }, emotionalPresentation.duration + 1900);
-  }, [activePanel, emotionalState, settings.bubbleEnabled, settings.enabled, updateHistory, updateMemory]);
+  }, [activePanel, emotionalState, isHiddenOnPanel, settings.bubbleEnabled, settings.enabled, updateHistory, updateMemory]);
 
   const showMessage = useCallback((eventType, payload = {}) => {
     if (!settings.enabled) return;
@@ -237,6 +240,25 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       return () => clearTimeout(t);
     }
   }, [settings.enabled, showMessage, user, userId]);
+
+  useEffect(() => {
+    if (!settings.enabled || !user || activePanel !== 'home' || isHiddenOnPanel || dismissed || experienceOpen) return undefined;
+    if (homePresenceTimerRef.current) clearTimeout(homePresenceTimerRef.current);
+    homePresenceTimerRef.current = setTimeout(() => {
+      setAnchor('home');
+      setVisible(true);
+      setEmotion(prev => (prev === 'sleep' ? 'sleep' : 'idle'));
+      setAction(LOKI_ACTIONS.PEEK);
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = setTimeout(() => {
+        setAction(LOKI_ACTIONS.IDLE);
+        setEmotion('idle');
+      }, 1800);
+    }, message || card ? 2600 : 760);
+    return () => {
+      if (homePresenceTimerRef.current) clearTimeout(homePresenceTimerRef.current);
+    };
+  }, [activePanel, card, dismissed, experienceOpen, isHiddenOnPanel, message, settings.enabled, user]);
 
   useEffect(() => {
     if (!settings.enabled || !user) return;
@@ -313,6 +335,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
     if (farewellTimerRef.current) clearTimeout(farewellTimerRef.current);
+    if (homePresenceTimerRef.current) clearTimeout(homePresenceTimerRef.current);
     if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
   }, []);
 
@@ -374,14 +397,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       await handler(normalized.payload ?? {});
       setCard(null);
       setMessage('');
-      setVisible(false);
+      setAction(LOKI_ACTIONS.WAVE);
+      setEmotion('happy');
+      setTimeout(() => {
+        if (activePanel !== 'home') setVisible(false);
+      }, 520);
       return true;
     } catch (e) {
       logError(e, 'LokiProvider.executeAction');
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [appActions, memory, showMessage, updateHistory, updateMemory]);
+  }, [activePanel, appActions, memory, showMessage, updateHistory, updateMemory]);
 
   const askBrain = useCallback(async (text) => {
     if (!settings.enabled) return false;
@@ -506,7 +533,12 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (memory?.lastRecommendation) {
         updateMemory({ learning: learnFromRecommendationResult(memory.learning, memory.lastRecommendation, 'ignored') });
       }
-      setDismissed(true); setVisible(false);
+      setAction(LOKI_ACTIONS.WAVE);
+      setEmotion('happy');
+      setMessage('');
+      setCard(null);
+      setDismissed(true);
+      setTimeout(() => setVisible(false), 360);
     },
     show: () => { setDismissed(false); setVisible(true); },
     hideCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: [...new Set([...settings.hiddenPanels, activePanel])] }),

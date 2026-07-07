@@ -16,14 +16,26 @@ function getShortTitle(value) {
   return String(value || 'АПГ').trim().slice(0, 48);
 }
 
+function getLokiVoice() {
+  try {
+    const voices = window.speechSynthesis?.getVoices?.() ?? [];
+    return voices.find(voice => voice.lang === 'ru-RU' && /milena|yuri|google|microsoft|premium|natural/i.test(voice.name))
+      ?? voices.find(voice => voice.lang === 'ru-RU')
+      ?? voices.find(voice => String(voice.lang || '').startsWith('ru'))
+      ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function LokiAvatar({ thinking, listening, speaking }) {
-  const animation = speaking ? 'lokiWave 1.15s' : listening ? 'lokiListen 1.6s' : thinking ? 'lokiThinking 1.45s' : 'lokiIdle 4.8s';
+  const animation = speaking ? 'lokiWave 1.35s' : listening ? 'lokiListen 1.8s' : thinking ? 'lokiThinking 1.65s' : 'lokiIdle 6.2s';
   return (
     <div style={{ position: 'relative', width: 178, height: 178, margin: '0 auto', display: 'grid', placeItems: 'center' }}>
-      <span style={{ position: 'absolute', inset: 16, borderRadius: 56, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.24), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(8px)', opacity: thinking || listening || speaking ? 1 : 0.72, animation: thinking || speaking ? 'lokiSparkle 1.3s ease-in-out infinite' : 'none' }} />
+      <span style={{ position: 'absolute', inset: 12, borderRadius: 60, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.24), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(10px)', opacity: thinking || listening || speaking ? 1 : 0.76, animation: thinking || speaking ? 'lokiAmbientGlow 2.8s ease-in-out infinite' : 'lokiAmbientGlow 5.2s ease-in-out infinite' }} />
       <span style={{ width: 148, height: 148, borderRadius: 48, overflow: 'hidden', position: 'relative', border: '1px solid rgba(215,184,106,0.34)', backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', boxShadow: '0 30px 80px rgba(0,0,0,0.34), 0 0 44px rgba(215,184,106,0.22)', animation: `${animation} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
         <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 24%, rgba(255,255,255,0.16), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.10))' }} />
-        {speaking && <span style={{ position: 'absolute', left: 58, bottom: 36, width: 34, height: 8, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiBlink 740ms ease-in-out infinite' }} />}
+        {speaking && <span style={{ position: 'absolute', left: 58, bottom: 36, width: 34, height: 8, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiMouthSmile 820ms ease-in-out infinite' }} />}
       </span>
     </div>
   );
@@ -73,8 +85,10 @@ export function LokiExperience({ loki }) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ru-RU';
-    utterance.rate = 1;
-    utterance.pitch = 1.05;
+    utterance.voice = getLokiVoice();
+    utterance.rate = 0.88;
+    utterance.pitch = 0.96;
+    utterance.volume = 0.92;
     utterance.onstart = () => setVoiceState('speaking');
     utterance.onend = () => setVoiceState('idle');
     utterance.onerror = () => setVoiceState('idle');
