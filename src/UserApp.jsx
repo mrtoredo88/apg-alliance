@@ -191,25 +191,26 @@ function docFromPublicRow(row) {
 
 async function loadPublicSnap(label, promiseFactory) {
   try {
-    return await promiseFactory();
-  } catch (error) {
-    logError(error, `UserApp.loadData.${label}.firestore`);
     const data = await fetchPublicBootstrap();
     const rows = data?.[label];
-    if (!Array.isArray(rows)) throw error;
-    console.warn(`[APG-DIAG] public-data fallback used for ${label}`);
+    if (!Array.isArray(rows)) throw new Error(`public_data_missing_${label}`);
     return snapFromPublicRows(rows);
+  } catch (error) {
+    logError(error, `UserApp.loadData.${label}.publicData`);
+    console.warn(`[APG-DIAG] public-data failed for ${label}, using firestore fallback`);
+    return await promiseFactory();
   }
 }
 
 async function loadPublicStats(promiseFactory) {
   try {
-    return await promiseFactory();
-  } catch (error) {
-    logError(error, 'UserApp.loadData.stats.firestore');
     const data = await fetchPublicBootstrap();
-    console.warn('[APG-DIAG] public-data fallback used for stats');
+    if (!data?.stats) throw new Error('public_data_missing_stats');
     return docFromPublicRow(data?.stats || null);
+  } catch (error) {
+    logError(error, 'UserApp.loadData.stats.publicData');
+    console.warn('[APG-DIAG] public-data failed for stats, using firestore fallback');
+    return await promiseFactory();
   }
 }
 

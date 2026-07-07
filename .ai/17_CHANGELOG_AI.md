@@ -708,21 +708,30 @@
 
 ---
 
+## [2026-07-08] Production follow-up: backend-first public data и обновление SW cache
+**Коммит:** `pending`
+**Файлы:** `src/UserApp.jsx`, `public/sw.js`
+**Тип:** fix
+**Что изменено:** Стартовые публичные данные главной теперь сначала загружаются через backend `/api/public-data`, а прямой Firestore read используется только как fallback. Версия service worker cache поднята до `apg-v5-hotfix-20260708`, чтобы установленная PWA быстрее сбросила старые runtime/static caches.
+**Почему:** У пользователей production мог продолжать показывать пустые блоки из-за client Firestore/Auth/rules/cache, а установленная PWA могла оставаться на старом service worker cache после предыдущего deploy.
+
+---
+
 ## [2026-07-07] Исправлена запись согласий после email/Telegram авторизации
 **Коммит:** pending
+**Файлы:** `src/UserApp.jsx`, `src/ConsentScreen.jsx`, `src/EmailAuth.jsx`, `src/ProfilePanel.jsx`
+**Тип:** fix
+**Что изменено:** Перед записью профиля и согласий добавлена явная подготовка Firebase owner-сессии через `auth_map`; если текущая сессия привязана к другому пользователю, создаётся новая анонимная Firebase-сессия с корректной связкой. Экран согласий теперь показывает понятную ошибку внутри модального окна. EmailAuth передаёт наверх полный ответ API, Telegram/email этапы авторизации пишут диагностический trace в `localStorage.apg_auth_trace`, сетевые ошибки отправляются через `errorLogger`.
+**Почему:** После входа по email/Telegram пользовательский документ создавался backend'ом, но клиентская запись согласий могла блокироваться Firestore rules из-за отсутствующего или устаревшего `auth_map`, поэтому кнопка «Продолжить» визуально ничего не завершала.
+
+---
+
 ## [2026-07-07] Production hotfix главной, экспертов и Telegram auth
 **Коммит:** `pending`
 **Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `api/public-data.js`, `server/src/routes/public-data.js`, `server/src/server.js`
 **Тип:** fix
 **Что изменено:** Добавлен backend fallback `/api/public-data` для стартовых публичных данных главной (партнёры, события, новости, уведомления, отзывы, задания, эксперты, stats), который используется только если прямое Firestore-чтение на клиенте падает. Telegram auth start теперь отправляет валидный JSON body, чтобы Fastify не отклонял POST до обработчика при `Content-Type: application/json`.
 **Почему:** В production нужно быстро восстановить устойчивость главной/экспертов при закрытых или нестабильных Firestore reads и устранить сценарий, когда кнопка Telegram login не создаёт auth-сессию из-за пустого JSON body.
-
----
-
-**Файлы:** `src/UserApp.jsx`, `src/ConsentScreen.jsx`, `src/EmailAuth.jsx`, `src/ProfilePanel.jsx`
-**Тип:** fix
-**Что изменено:** Перед записью профиля и согласий добавлена явная подготовка Firebase owner-сессии через `auth_map`; если текущая сессия привязана к другому пользователю, создаётся новая анонимная Firebase-сессия с корректной связкой. Экран согласий теперь показывает понятную ошибку внутри модального окна. EmailAuth передаёт наверх полный ответ API, Telegram/email этапы авторизации пишут диагностический trace в `localStorage.apg_auth_trace`, сетевые ошибки отправляются через `errorLogger`.
-**Почему:** После входа по email/Telegram пользовательский документ создавался backend'ом, но клиентская запись согласий могла блокироваться Firestore rules из-за отсутствующего или устаревшего `auth_map`, поэтому кнопка «Продолжить» визуально ничего не завершала.
 
 ---
 
