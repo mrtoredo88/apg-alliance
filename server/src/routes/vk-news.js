@@ -4,22 +4,30 @@ import { getDb } from '../lib/firebase.js';
 const GROUP_ID = 229980067;
 const API_VERSION = '5.199';
 
-function pickBestPhoto(sizes = []) {
-  const best = [...sizes]
+function pickBestPhotoSize(sizes = []) {
+  return [...sizes]
     .filter(s => s?.url)
-    .sort((a, b) => (Number(b.width) || 0) - (Number(a.width) || 0))[0];
-  return best?.url ?? null;
+    .sort((a, b) => {
+      const areaA = (Number(a.width) || 0) * (Number(a.height) || 0);
+      const areaB = (Number(b.width) || 0) * (Number(b.height) || 0);
+      return areaB - areaA || (Number(b.width) || 0) - (Number(a.width) || 0);
+    })[0] ?? null;
+}
+
+function pickBestPhoto(sizes = []) {
+  return pickBestPhotoSize(sizes)?.url ?? null;
 }
 
 function normalizePhoto(photo) {
-  const url = pickBestPhoto(photo?.sizes);
+  const best = pickBestPhotoSize(photo?.sizes);
+  const url = best?.url ?? null;
   if (!url) return null;
   return {
     type: 'photo',
     id: photo.id ? `${photo.owner_id}_${photo.id}` : url,
     url,
-    width: Number(photo.width) || null,
-    height: Number(photo.height) || null,
+    width: Number(best.width || photo.width) || null,
+    height: Number(best.height || photo.height) || null,
     text: photo.text || '',
   };
 }
@@ -93,7 +101,8 @@ function buildTitle(text = '', attachments = []) {
 
 function mapPost(post) {
   const attachments = (post.attachments || []).map(normalizeAttachment).filter(Boolean);
-  const photos = attachments.filter(a => a.type === 'photo').map(a => a.url);
+  const photoItems = attachments.filter(a => a.type === 'photo');
+  const photos = photoItems.map(a => a.url);
   const videos = attachments.filter(a => a.type === 'video');
   const links = attachments.filter(a => a.type === 'link');
   const docs = attachments.filter(a => a.type === 'doc');
@@ -114,6 +123,7 @@ function mapPost(post) {
     coverPhoto: photos[0] || '',
     photos,
     gallery: photos,
+    photoItems,
     videos,
     links,
     docs,

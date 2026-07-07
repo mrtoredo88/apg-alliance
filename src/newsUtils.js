@@ -1,6 +1,7 @@
 export const NEWS_CATEGORIES = [
   { id: 'all', label: 'Все' },
   { id: 'apg', label: 'Новости АПГ' },
+  { id: 'vk', label: 'ВКонтакте' },
   { id: 'city', label: 'Новости города' },
   { id: 'useful', label: 'Полезные статьи' },
   { id: 'updates', label: 'Обновления' },
@@ -52,17 +53,34 @@ const CATEGORY_ALIASES = {
 };
 
 export function getNewsImage(item) {
-  return item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || item?.photo || item?.photos?.[0] || item?.gallery?.[0] || '';
+  const firstPhoto = getNewsPhotoItems(item)[0]?.url;
+  return item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || item?.photo || firstPhoto || '';
 }
 
-export function getNewsPhotos(item) {
+export function getNewsPhotoItems(item) {
   const values = [
+    ...(Array.isArray(item?.photoItems) ? item.photoItems : []),
     ...(Array.isArray(item?.photos) ? item.photos : []),
     ...(Array.isArray(item?.gallery) ? item.gallery : []),
     item?.coverPhoto,
     item?.imageUrl,
   ].filter(Boolean);
-  return [...new Set(values)];
+  const seen = new Set();
+  return values
+    .map(value => {
+      if (typeof value === 'string') return { url: value, width: null, height: null };
+      if (value?.url) return { url: value.url, width: Number(value.width) || null, height: Number(value.height) || null, text: value.text || '' };
+      return null;
+    })
+    .filter(item => {
+      if (!item?.url || seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+}
+
+export function getNewsPhotos(item) {
+  return getNewsPhotoItems(item).map(photo => photo.url);
 }
 
 export function getNewsVideos(item) {
@@ -198,9 +216,11 @@ export function sortNewsItems(items, sortId = 'new') {
 export function filterNewsItems(items, categoryId, queryText) {
   const q = String(queryText || '').trim().toLowerCase();
   return items.filter(item => {
-    const categoryOk = !categoryId || categoryId === 'all' || getNewsCategory(item) === categoryId;
+    const categoryOk = !categoryId
+      || categoryId === 'all'
+      || (categoryId === 'vk' ? item?.source === 'vk' : getNewsCategory(item) === categoryId);
     if (!categoryOk) return false;
     if (!q) return true;
-    return `${getNewsTitle(item)} ${getNewsText(item)} ${getNewsCategoryLabel(item)} ${(item?.tags || []).join(' ')}`.toLowerCase().includes(q);
+    return `${getNewsTitle(item)} ${getNewsText(item)} ${getNewsCategoryLabel(item)} ${item?.sourceName || ''} ${item?.author || ''} ${(item?.tags || []).join(' ')}`.toLowerCase().includes(q);
   });
 }

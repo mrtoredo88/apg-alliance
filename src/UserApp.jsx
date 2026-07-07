@@ -2204,6 +2204,7 @@ export function UserApp() {
                     onSave={toggleSavedNews}
                     onReadLater={toggleReadLaterNews}
                     onRefresh={handleRefresh}
+                    onToast={showToast}
                   />
                 </Suspense>
               </Panel>

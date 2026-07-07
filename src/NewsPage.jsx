@@ -1,8 +1,24 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
+import { APP_URL } from './constants.js';
+import { db } from './firebase.js';
+import { logError } from './errorLogger.js';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  increment,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import {
   NEWS_CATEGORIES,
   NEWS_SORTS,
@@ -13,6 +29,7 @@ import {
   getNewsCategoryLabel,
   getNewsImage,
   getNewsLinks,
+  getNewsPhotoItems,
   getNewsPhotos,
   getNewsStats,
   getNewsText,
@@ -27,6 +44,10 @@ import {
 } from './newsUtils.js';
 
 const REACTIONS = ['👍', '❤️', '🔥', '👏', '😍'];
+const COMMENT_SORTS = [
+  { id: 'new', label: 'Новые' },
+  { id: 'popular', label: 'Популярные' },
+];
 
 const inputStyle = {
   width: '100%',
@@ -43,20 +64,42 @@ const inputStyle = {
   boxSizing: 'border-box',
 };
 
-function NewsImage({ item, height = 210, radius = 28, children }) {
-  const image = getNewsImage(item);
+function getNewsDeepLink(item) {
+  const id = encodeURIComponent(String(item?.id || item?.externalId || ''));
+  return `${APP_URL}/#/news/${id}`;
+}
+
+function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, children }) {
+  const photo = getNewsPhotoItems(item)[0] || { url: getNewsImage(item) };
+  const image = photo?.url || '';
+  const ratio = photo?.width && photo?.height ? photo.width / photo.height : null;
+  const isTall = ratio && ratio < 0.82;
+  const fit = mode === 'hero' || mode === 'article' || isTall ? 'contain' : 'cover';
   return (
-    <div style={{ position: 'relative', height, borderRadius: radius, overflow: 'hidden', background: 'radial-gradient(circle at 24% 18%, rgba(215,184,106,0.22), transparent 38%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.10), rgba(var(--apg2-glass-a,255,255,255),0.03))' }}>
+    <div
+      onClick={onOpen}
+      style={{ position: 'relative', height, borderRadius: radius, overflow: 'hidden', background: 'radial-gradient(circle at 24% 18%, rgba(215,184,106,0.22), transparent 38%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.10), rgba(var(--apg2-glass-a,255,255,255),0.03))', cursor: onOpen ? 'zoom-in' : 'inherit' }}
+    >
       {image && (
-        <img
-          src={image}
-          alt=""
-          loading="lazy"
-          onError={e => { e.currentTarget.style.display = 'none'; }}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(1.08) contrast(1.03)', transform: 'translateZ(0)' }}
-        />
+        <>
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+            onError={e => { e.currentTarget.style.display = 'none'; }}
+            style={{ position: 'absolute', inset: -18, width: 'calc(100% + 36px)', height: 'calc(100% + 36px)', objectFit: 'cover', filter: 'blur(22px) saturate(1.12) brightness(0.62)', transform: 'scale(1.04)' }}
+          />
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+            onError={e => { e.currentTarget.style.display = 'none'; }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit, filter: 'saturate(1.07) contrast(1.02)', transform: 'translateZ(0)' }}
+          />
+        </>
       )}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(7,7,9,0.02), rgba(7,7,9,0.30) 38%, rgba(7,7,9,0.82))' }} />
+      {!image && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, fontSize: 42 }}>📰</div>}
+      <div style={{ position: 'absolute', inset: 0, background: mode === 'article' ? 'linear-gradient(180deg, rgba(7,7,9,0.02), rgba(7,7,9,0.12) 52%, rgba(7,7,9,0.38))' : 'linear-gradient(180deg, rgba(7,7,9,0.02), rgba(7,7,9,0.30) 38%, rgba(7,7,9,0.82))' }} />
       {hasNewsVideo(item) && (
         <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 58, height: 58, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(8,8,10,0.52)', border: '1px solid rgba(255,255,255,0.28)', color: '#FFF8E9', fontSize: 23, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 18px 46px rgba(0,0,0,0.28)' }}>▶</div>
       )}
@@ -65,7 +108,44 @@ function NewsImage({ item, height = 210, radius = 28, children }) {
   );
 }
 
-function PhotoCarousel({ photos = [] }) {
+function Lightbox({ photos = [], initial = 0, onClose }) {
+  const [idx, setIdx] = useState(initial);
+  const [zoom, setZoom] = useState(false);
+  const startXRef = useRef(0);
+  const safePhotos = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  const safeIdx = Math.min(idx, Math.max(0, safePhotos.length - 1));
+  const go = (dir) => {
+    setZoom(false);
+    setIdx(current => (current + dir + safePhotos.length) % safePhotos.length);
+  };
+  if (!safePhotos.length) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 15000, background: 'rgba(3,3,5,0.94)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gridTemplateRows: 'auto 1fr auto', padding: 'calc(var(--safe-top, 0px) + 12px) 14px calc(18px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
+        <span style={{ fontSize: 13, fontWeight: 800 }}>{safeIdx + 1} / {safePhotos.length}</span>
+        <button type="button" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22 }}>×</button>
+      </div>
+      <div
+        onDoubleClick={() => setZoom(v => !v)}
+        onTouchStart={e => { startXRef.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          const dx = e.changedTouches[0].clientX - startXRef.current;
+          if (Math.abs(dx) > 52) go(dx > 0 ? -1 : 1);
+        }}
+        style={{ minHeight: 0, overflow: zoom ? 'auto' : 'hidden', display: 'grid', placeItems: 'center' }}
+      >
+        <img src={safePhotos[safeIdx]} alt="" style={{ maxWidth: zoom ? 'none' : '100%', maxHeight: zoom ? 'none' : '100%', width: zoom ? '165%' : 'auto', height: 'auto', objectFit: 'contain', borderRadius: zoom ? 0 : 20, transition: 'width 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+        {safePhotos.length > 1 && <button type="button" onClick={() => go(-1)} style={{ width: 54, height: 46, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 24 }}>‹</button>}
+        <button type="button" onClick={() => setZoom(v => !v)} style={{ minWidth: 118, height: 46, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, fontWeight: 820 }}>{zoom ? 'Уместить' : 'Увеличить'}</button>
+        {safePhotos.length > 1 && <button type="button" onClick={() => go(1)} style={{ width: 54, height: 46, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 24 }}>›</button>}
+      </div>
+    </div>
+  );
+}
+
+function PhotoCarousel({ photos = [], onOpen }) {
   const [idx, setIdx] = useState(0);
   const safePhotos = Array.isArray(photos) ? photos.filter(Boolean) : [];
   const safeIdx = Math.min(idx, Math.max(0, safePhotos.length - 1));
@@ -77,7 +157,9 @@ function PhotoCarousel({ photos = [] }) {
   return (
     <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 12, overflow: 'hidden' }}>
       <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>
-        <img src={safePhotos[safeIdx]} alt="" loading="lazy" style={{ width: '100%', maxHeight: 430, objectFit: 'contain', display: 'block', background: '#08080a' }} />
+        <button type="button" onClick={() => onOpen?.(safeIdx)} style={{ width: '100%', padding: 0, border: 'none', background: '#08080a', display: 'block', cursor: 'zoom-in' }}>
+          <img src={safePhotos[safeIdx]} alt="" loading="lazy" style={{ width: '100%', maxHeight: 430, objectFit: 'contain', display: 'block' }} />
+        </button>
         <button type="button" onClick={() => go(-1)} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(8,8,10,0.52)', color: '#fff', fontSize: 22 }}>‹</button>
         <button type="button" onClick={() => go(1)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(8,8,10,0.52)', color: '#fff', fontSize: 22 }}>›</button>
         <div style={{ position: 'absolute', left: '50%', bottom: 10, transform: 'translateX(-50%)', padding: '6px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.54)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 780 }}>{safeIdx + 1} / {safePhotos.length}</div>
@@ -105,6 +187,185 @@ function NewsMeta({ item, compact = false }) {
       )}
       {isFreshNews(item) && <span style={{ color: APG2_PROFILE.gold }}>Новое</span>}
     </div>
+  );
+}
+
+function SharePanel({ item, onToast }) {
+  const url = getNewsDeepLink(item);
+  const title = getNewsTitle(item);
+  const encodedUrl = encodeURIComponent(url);
+  const encodedTitle = encodeURIComponent(title);
+  const copy = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: title, url });
+      } else {
+        await navigator.clipboard?.writeText(url);
+        onToast?.('Ссылка скопирована.', 'success');
+      }
+    } catch (e) {
+      if (e?.name !== 'AbortError') {
+        logError(e, 'NewsPage.share');
+        onToast?.('Не удалось поделиться ссылкой.', 'error');
+      }
+    }
+  };
+  const items = [
+    ['Telegram', `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`],
+    ['VK', `https://vk.com/share.php?url=${encodedUrl}&title=${encodedTitle}`],
+    ['WhatsApp', `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`],
+  ];
+  return (
+    <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
+      <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 12 }}>Поделиться</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
+        {items.map(([label, href]) => (
+          <GlassButton key={label} onClick={() => openUrl(href)} style={{ minHeight: 42, borderRadius: 18 }}>{label}</GlassButton>
+        ))}
+        <GlassButton onClick={copy} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a' }}>Скопировать</GlassButton>
+      </div>
+    </GlassCard>
+  );
+}
+
+function CommentRow({ comment, user, onDelete, onLike }) {
+  const name = comment.userName || 'Участник АПГ';
+  const avatar = comment.userAvatar || '';
+  const canDelete = user?.id && (String(user.id) === String(comment.userId) || ['admin', 'owner'].includes(String(user.role || '')));
+  const date = comment.createdAt?.toDate ? comment.createdAt.toDate() : comment.createdAt ? new Date(comment.createdAt) : null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '42px 1fr', gap: 11 }}>
+      <div style={{ width: 42, height: 42, borderRadius: 16, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, fontWeight: 900 }}>
+        {avatar ? <img src={avatar} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name.slice(0, 1).toUpperCase()}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 13.5, fontWeight: 860 }}>{name}</div>
+          {date && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 680 }}>{date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</div>}
+        </div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '20px', marginTop: 4, whiteSpace: 'pre-wrap' }}>{comment.text}</div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button type="button" onClick={() => onLike(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820 }}>❤️ {Number(comment.likes || 0)}</button>
+          {canDelete && <button type="button" onClick={() => onDelete(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Удалить</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommentsPanel({ item, user, onToast }) {
+  const newsId = String(item?.id || '');
+  const [comments, setComments] = useState([]);
+  const [sort, setSort] = useState('new');
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const load = async () => {
+    if (!newsId) return;
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'newsComments'), where('newsId', '==', newsId)));
+      setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => !v.hidden));
+    } catch (e) {
+      logError(e, 'NewsPage.comments.load');
+      onToast?.('Не удалось загрузить комментарии.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [newsId]);
+
+  const sorted = useMemo(() => [...comments].sort((a, b) => {
+    if (sort === 'popular') return (Number(b.likes) || 0) - (Number(a.likes) || 0);
+    const at = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : Number(new Date(a.createdAt || 0));
+    const bt = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : Number(new Date(b.createdAt || 0));
+    return bt - at;
+  }), [comments, sort]);
+
+  const submit = async () => {
+    const value = text.trim();
+    if (!value || !newsId) return;
+    if (!user || String(user.id).startsWith('guest_')) {
+      onToast?.('Авторизуйтесь, чтобы оставить комментарий.', 'info');
+      return;
+    }
+    setSending(true);
+    try {
+      await addDoc(collection(db, 'newsComments'), {
+        newsId,
+        userId: String(user.id),
+        userName: user.name || user.first_name || user.email || 'Участник АПГ',
+        userAvatar: user.avatar || user.photo_100 || user.photo || '',
+        text: value,
+        likes: 0,
+        hidden: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setText('');
+      onToast?.('Комментарий опубликован.', 'success');
+      await load();
+    } catch (e) {
+      logError(e, 'NewsPage.comments.submit');
+      onToast?.('Не удалось отправить комментарий.', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const like = async (comment) => {
+    try {
+      setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(v.likes || 0) + 1 } : v));
+      await updateDoc(doc(db, 'newsComments', comment.id), { likes: increment(1) });
+    } catch (e) {
+      logError(e, 'NewsPage.comments.like');
+      await load();
+    }
+  };
+
+  const remove = async (comment) => {
+    try {
+      if (['admin', 'owner'].includes(String(user?.role || ''))) {
+        await updateDoc(doc(db, 'newsComments', comment.id), { hidden: true, hiddenAt: serverTimestamp() });
+      } else {
+        await deleteDoc(doc(db, 'newsComments', comment.id));
+      }
+      setComments(prev => prev.filter(v => v.id !== comment.id));
+      onToast?.('Комментарий удалён.', 'success');
+    } catch (e) {
+      logError(e, 'NewsPage.comments.delete');
+      onToast?.('Не удалось удалить комментарий.', 'error');
+    }
+  };
+
+  return (
+    <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 920 }}>Комментарии</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {COMMENT_SORTS.map(item => (
+            <button key={item.id} type="button" onClick={() => setSort(item.id)} style={{ minHeight: 30, borderRadius: 999, padding: '0 10px', border: sort === item.id ? '1px solid rgba(215,184,106,0.44)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: sort === item.id ? 'rgba(215,184,106,0.16)' : 'transparent', color: sort === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 780 }}>{item.label}</button>
+          ))}
+        </div>
+      </div>
+      {user && !String(user.id || '').startsWith('guest_') ? (
+        <div style={{ display: 'grid', gap: 9, marginBottom: 14 }}>
+          <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Напишите комментарий" maxLength={900} style={{ ...inputStyle, minHeight: 82, height: 82, resize: 'vertical', paddingTop: 13, lineHeight: '20px' }} />
+          <GlassButton onClick={submit} disabled={sending || !text.trim()} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a', opacity: sending || !text.trim() ? 0.58 : 1 }}>{sending ? 'Отправляем...' : 'Отправить'}</GlassButton>
+        </div>
+      ) : (
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginBottom: 14 }}>Авторизуйтесь, чтобы оставить комментарий.</div>
+      )}
+      {loading ? (
+        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Загружаем обсуждение...</div>
+      ) : sorted.length ? (
+        <div style={{ display: 'grid', gap: 15 }}>{sorted.map(comment => <CommentRow key={comment.id} comment={comment} user={user} onDelete={remove} onLike={like} />)}</div>
+      ) : (
+        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Пока нет комментариев. Можно быть первым.</div>
+      )}
+    </GlassCard>
   );
 }
 
@@ -150,8 +411,9 @@ function NewsCard({ item, index, onOpen, saved, later }) {
   );
 }
 
-function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, saved, later, reaction }) {
+function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, saved, later, reaction, user, onToast }) {
   const [progress, setProgress] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const url = getNewsUrl(item);
@@ -160,6 +422,21 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
   const links = getNewsLinks(item).filter(link => link.url && link.url !== url);
   const docs = getNewsDocs(item);
   const stats = getNewsStats(item);
+  const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean) : [];
+
+  useEffect(() => {
+    const id = item?.id ? String(item.id) : '';
+    if (!id) return;
+    const viewer = String(user?.id || localStorage.getItem('apg_guest_id') || 'local');
+    const key = `apg_news_viewed_${id}_${viewer}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, String(Date.now()));
+    setDoc(doc(db, 'news', id), {
+      views: increment(1),
+      stats: { views: increment(1) },
+      lastViewedAt: serverTimestamp(),
+    }, { merge: true }).catch(e => logError(e, 'NewsPage.trackView'));
+  }, [item?.id, user?.id]);
 
   const handleScroll = (e) => {
     const el = e.currentTarget;
@@ -178,7 +455,7 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
             <button type="button" onClick={() => navigator.clipboard?.writeText(window.location.href).catch(() => {})} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 17 }}>↗</button>
           </div>
 
-          <NewsImage item={item} height={310} radius={34}>
+          <NewsImage item={item} height={310} radius={34} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
             {(item.isPinned || item.pinned) && (
               <div style={{ position: 'absolute', left: 16, top: 16, padding: '8px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.56)', border: '1px solid rgba(215,184,106,0.34)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>📌 Закреплено</div>
             )}
@@ -186,6 +463,13 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
           <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
             <NewsMeta item={item} />
             <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 32, lineHeight: '37px', fontWeight: 940, letterSpacing: 0 }}>{title}</h1>
+            {tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {tags.slice(0, 8).map(tag => (
+                  <span key={tag} style={{ padding: '6px 10px', borderRadius: 999, background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.20)', fontSize: 11, fontWeight: 820 }}>#{tag}</span>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <GlassButton onClick={() => onSave?.(item)} tone={saved ? 'gold' : undefined} style={{ minHeight: 40, borderRadius: 17, color: saved ? '#17120a' : APG2_PROFILE.text }}>{saved ? 'Сохранено' : 'Сохранить'}</GlassButton>
               <GlassButton onClick={() => onReadLater?.(item)} tone={later ? 'gold' : undefined} style={{ minHeight: 40, borderRadius: 17, color: later ? '#17120a' : APG2_PROFILE.text }}>{later ? 'В списке позже' : 'Прочитать позже'}</GlassButton>
@@ -199,7 +483,7 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
             </RichText>
           </GlassCard>
 
-          <PhotoCarousel photos={photos} />
+          <PhotoCarousel photos={photos} onOpen={setLightboxIndex} />
 
           {videos.length > 0 && (
             <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: '6px 0 12px' }}>
@@ -249,6 +533,8 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
             </GlassCard>
           )}
 
+          <SharePanel item={item} onToast={onToast} />
+
           <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900 }}>Реакция</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -260,9 +546,11 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
             </div>
           </div>
 
+          <CommentsPanel item={item} user={user} onToast={onToast} />
+
           {!!related.length && (
             <div style={{ marginTop: 28 }}>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 21, lineHeight: '26px', fontWeight: 920, marginBottom: 12 }}>Вам может понравиться</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 21, lineHeight: '26px', fontWeight: 920, marginBottom: 12 }}>Локи рекомендует прочитать ещё</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 {related.slice(0, 3).map(next => (
                   <button key={next.id || getNewsTitle(next)} type="button" onClick={() => onClose(next)} style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 12, display: 'grid', gridTemplateColumns: '76px 1fr', gap: 12, textAlign: 'left', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', color: APG2_PROFILE.text }}>
@@ -278,6 +566,7 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
           )}
         </div>
       </div>
+      {lightboxIndex !== null && <Lightbox photos={photos} initial={lightboxIndex} onClose={() => setLightboxIndex(null)} />}
     </div>
   );
 }
@@ -293,6 +582,7 @@ export function NewsPage({
   onSave,
   onReadLater,
   onRefresh,
+  onToast,
 }) {
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('new');
@@ -337,7 +627,7 @@ export function NewsPage({
 
           {hero && (
             <button type="button" onClick={() => setSelected(hero)} style={{ border: 'none', background: 'transparent', padding: 0, textAlign: 'left', color: APG2_PROFILE.text, cursor: 'pointer' }}>
-              <NewsImage item={hero} height={340} radius={36}>
+              <NewsImage item={hero} height={340} radius={36} mode="hero">
                 <div style={{ position: 'absolute', left: 18, right: 18, bottom: 18, display: 'grid', gap: 10 }}>
                   <span style={{ justifySelf: 'start', padding: '8px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.48)', border: '1px solid rgba(215,184,106,0.30)', color: APG2_PROFILE.gold, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', fontSize: 12, fontWeight: 900 }}>{(hero.priority ?? 0) >= 9 ? '🔥 Важно' : 'Главная новость'}</span>
                   <span style={{ color: '#FFF9EA', fontSize: 27, lineHeight: '32px', fontWeight: 940, textShadow: '0 14px 34px rgba(0,0,0,0.42)' }}>{getNewsTitle(hero)}</span>
@@ -413,6 +703,7 @@ export function NewsPage({
           onReact={onReact}
           onSave={onSave}
           onReadLater={onReadLater}
+          onToast={onToast}
           saved={savedSet.has(selectedId)}
           later={laterSet.has(selectedId)}
           reaction={newsReactions?.[selectedId]}
