@@ -1,11 +1,26 @@
 import _vkBridge from '@vkontakte/vk-bridge';
 
+function getLaunchParams() {
+  const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash || '';
+  const hashQuery = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
+  if (hashQuery) {
+    const extra = new URLSearchParams(hashQuery);
+    extra.forEach((value, key) => {
+      if (!params.has(key)) params.set(key, value);
+    });
+  }
+  return params;
+}
+
 // true когда запущено внутри VK Mini App
 // Намеренно НЕ используем _vkBridge.supports() — он возвращает true даже в обычном браузере
 export const isVK = () =>
   /VKAndroidApp|VKiOSApp/i.test(navigator.userAgent) ||
-  new URLSearchParams(window.location.search).has('vk_app_id') ||
-  new URLSearchParams(window.location.search).has('vk_user_id');
+  getLaunchParams().has('vk_app_id') ||
+  getLaunchParams().has('vk_user_id') ||
+  getLaunchParams().has('vk_platform') ||
+  getLaunchParams().has('sign');
 
 const send = async (method, params = {}) => {
   if (!isVK()) {

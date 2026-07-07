@@ -7,7 +7,7 @@ import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth } from './firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { collection, collectionGroup, getDocs, doc, deleteDoc, addDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch, increment, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
@@ -41,6 +41,72 @@ const CONTENT_CATEGORIES = [
 const PARTNER_EMOJIS = ['🏪','💆','💄','🍽️','☕','🎓','🏋️','💅','🎉','🛍️','🎭','🌿'];
 const contentImageOf = (item) =>
   item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
+
+const ADMIN_LOAD_TIMEOUT_MS = 12000;
+const ADMIN_LOAD_RETRIES = 2;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}: timeout ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function isTransientFirestoreError(error) {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'unavailable'
+    || code === 'deadline-exceeded'
+    || code === 'resource-exhausted'
+    || message.includes('network')
+    || message.includes('timeout')
+    || message.includes('transport');
+}
+
+function formatAdminLoadError(error) {
+  const code = error?.code ? `${error.code}: ` : '';
+  const message = error?.message || String(error);
+  if (error?.code === 'permission-denied') {
+    return `${code}нет прав на чтение коллекции. Проверьте Firestore Rules и текущую авторизацию.`;
+  }
+  if (error?.code === 'failed-precondition') {
+    return `${code}для запроса нужен индекс Firestore или коллекция временно недоступна.`;
+  }
+  if (isTransientFirestoreError(error)) {
+    return `${code}временная ошибка сети/Firestore. Можно повторить загрузку.`;
+  }
+  return `${code}${message}`;
+}
+
+function docsToItems(snap) {
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function waitForAdminAuth() {
+  if (auth.currentUser) return auth.currentUser;
+  let unsubscribe = null;
+  const authReady = new Promise(resolve => {
+    unsubscribe = onAuthStateChanged(auth, user => {
+      if (!user) return;
+      unsubscribe?.();
+      resolve(user);
+    });
+  });
+  const signIn = signInAnonymously(auth).catch(error => {
+    logError(error, 'AdminPanel.auth.signInAnonymously');
+    return null;
+  });
+  await signIn;
+  const user = await withTimeout(authReady, 6500, 'admin auth').catch(() => auth.currentUser);
+  unsubscribe?.();
+  if (!user && !auth.currentUser) throw new Error('Firebase Auth не готов: анонимная авторизация не завершилась.');
+  return user || auth.currentUser;
+}
 
 // Admin panel always uses dark theme
 const A = {
@@ -993,6 +1059,8 @@ export const AdminPanel = () => {
     users: [], scans: [], expertScans: [], reviews: [], expertReviews: [], raffleEntries: [], guestSessions: [],
   });
   const [loading, setLoading]       = useState(true);
+  const [adminLoadIssues, setAdminLoadIssues] = useState([]);
+  const [adminLoadInfo, setAdminLoadInfo] = useState({ lastLoadedAt: null, authUid: null, attempt: 0 });
   const [activeTab, setActiveTab]   = useState('dashboard');
 
   // Форма эксперта
@@ -1205,10 +1273,17 @@ export const AdminPanel = () => {
       try {
         await Promise.race([vkBridge.send('VKWebAppInit'), new Promise((_, r) => setTimeout(() => r(new Error()), 1000))]);
       } catch (e) {}
-      if (!auth.currentUser) {
-        await signInAnonymously(auth).catch(() => {});
+      try {
+        await waitForAdminAuth();
+        await fetchData();
+      } catch (e) {
+        logError(e, 'AdminPanel.initAuth');
+        setAdminLoadIssues(prev => [
+          ...prev,
+          { name: 'auth', label: 'Firebase Auth', error: formatAdminLoadError(e), optional: false, attempts: 1 },
+        ]);
+        setLoading(false);
       }
-      fetchData();
     };
     init();
   }, []);
@@ -1222,59 +1297,88 @@ export const AdminPanel = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    console.log('[ADMIN] fetchData start, auth.currentUser:', auth.currentUser?.uid ?? 'null');
+    setAdminLoadIssues([]);
+    setAdminLoadInfo(prev => ({ ...prev, attempt: (prev.attempt ?? 0) + 1 }));
+    const readCollection = async ({ name, label, ref, optional = false }) => {
+      let lastError = null;
+      for (let attempt = 1; attempt <= ADMIN_LOAD_RETRIES + 1; attempt++) {
+        try {
+          const snap = await withTimeout(getDocs(ref()), ADMIN_LOAD_TIMEOUT_MS, label);
+          return { name, label, optional, ok: true, docs: docsToItems(snap), count: snap.docs.length, attempts: attempt };
+        } catch (error) {
+          lastError = error;
+          logError(error, `AdminPanel.fetchData.${name}.attempt${attempt}`);
+          if (!isTransientFirestoreError(error) || attempt > ADMIN_LOAD_RETRIES) break;
+          await sleep(450 * attempt);
+        }
+      }
+      return { name, label, optional, ok: false, docs: null, count: 0, attempts: ADMIN_LOAD_RETRIES + 1, error: formatAdminLoadError(lastError), rawError: lastError };
+    };
     try {
-      const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap, uSnap, scSnap, escSnap, rvSnap, ervSnap, reSnap, gsSnap] = await Promise.all([
-        getDocs(collection(db, 'partners')).catch(err => { logError(err, 'AdminPanel.fetchData.partners'); return { docs: [] }; }),
-        getDocs(collection(db, 'events')).catch(err => { logError(err, 'AdminPanel.fetchData.events'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'))).catch(err => { logError(err, 'AdminPanel.fetchData.news'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))).catch(err => { logError(err, 'AdminPanel.fetchData.notifications'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'prizes'), orderBy('cost', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.prizes'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.customTasks'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100))).catch(err => { logError(err, 'AdminPanel.fetchData.prizeClaims'); return { docs: [] }; }),
-        getDocs(collection(db, 'experts')).catch(err => { logError(err, 'AdminPanel.fetchData.experts'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'banners'), orderBy('priority', 'asc'))).catch(err => { logError(err, 'AdminPanel.fetchData.banners'); return { docs: [] }; }),
-        getDocs(collection(db, 'users')).catch(err => { logError(err, 'AdminPanel.fetchData.users'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'scans'), orderBy('scannedAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.scans'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'expertScans'), orderBy('scannedAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.expertScans'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(200))).catch(err => { logError(err, 'AdminPanel.fetchData.reviews'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'expertReviews'), orderBy('createdAt', 'desc'), limit(200))).catch(err => { logError(err, 'AdminPanel.fetchData.expertReviews'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'raffleEntries'), orderBy('createdAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.raffleEntries'); return { docs: [] }; }),
-        getDocs(query(collection(db, 'guestSessions'), orderBy('createdAt', 'desc'), limit(500))).catch(err => { logError(err, 'AdminPanel.fetchData.guestSessions'); return { docs: [] }; }),
+      const user = await waitForAdminAuth();
+      const specs = [
+        { name: 'partners', label: 'Партнёры', ref: () => collection(db, 'partners') },
+        { name: 'experts', label: 'Эксперты', ref: () => collection(db, 'experts') },
+        { name: 'events', label: 'События', ref: () => collection(db, 'events') },
+        { name: 'news', label: 'Новости', ref: () => query(collection(db, 'news'), orderBy('createdAt', 'desc')) },
+        { name: 'notifications', label: 'Уведомления', ref: () => query(collection(db, 'notifications'), orderBy('createdAt', 'desc')) },
+        { name: 'prizes', label: 'Призы', ref: () => query(collection(db, 'prizes'), orderBy('cost', 'asc')) },
+        { name: 'customTasks', label: 'Задания', ref: () => query(collection(db, 'customTasks'), orderBy('createdAt', 'asc')) },
+        { name: 'prizeClaims', label: 'Выдачи призов', ref: () => query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100)), optional: true },
+        { name: 'banners', label: 'Баннеры', ref: () => query(collection(db, 'banners'), orderBy('priority', 'asc')) },
+        { name: 'users', label: 'Пользователи', ref: () => collection(db, 'users'), optional: true },
+        { name: 'scans', label: 'Сканы партнёров', ref: () => query(collection(db, 'scans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
+        { name: 'expertScans', label: 'Сканы экспертов', ref: () => query(collection(db, 'expertScans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
+        { name: 'reviews', label: 'Отзывы партнёров', ref: () => query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(200)), optional: true },
+        { name: 'expertReviews', label: 'Отзывы экспертов', ref: () => query(collection(db, 'expertReviews'), orderBy('createdAt', 'desc'), limit(200)), optional: true },
+        { name: 'raffleEntries', label: 'Участники розыгрышей', ref: () => query(collection(db, 'raffleEntries'), orderBy('createdAt', 'desc'), limit(500)), optional: true },
+        { name: 'guestSessions', label: 'Гостевые сессии', ref: () => query(collection(db, 'guestSessions'), orderBy('createdAt', 'desc'), limit(500)), optional: true },
+      ];
+      const results = await Promise.all(specs.map(readCollection));
+      const byName = Object.fromEntries(results.map(item => [item.name, item]));
+      const apply = (name, setter) => {
+        if (byName[name]?.ok) setter(byName[name].docs);
+      };
+      apply('partners', setPartners);
+      apply('experts', setExperts);
+      apply('events', setEvents);
+      apply('news', setNews);
+      apply('notifications', setNotifs);
+      apply('prizes', setPrizes);
+      apply('customTasks', setCustomTasks);
+      apply('prizeClaims', setPrizeClaims);
+      apply('banners', setBanners);
+      setAdminMetrics(prev => ({
+        users: byName.users?.ok ? byName.users.docs : prev.users,
+        scans: byName.scans?.ok ? byName.scans.docs : prev.scans,
+        expertScans: byName.expertScans?.ok ? byName.expertScans.docs : prev.expertScans,
+        reviews: byName.reviews?.ok ? byName.reviews.docs : prev.reviews,
+        expertReviews: byName.expertReviews?.ok ? byName.expertReviews.docs : prev.expertReviews,
+        raffleEntries: byName.raffleEntries?.ok ? byName.raffleEntries.docs : prev.raffleEntries,
+        guestSessions: byName.guestSessions?.ok ? byName.guestSessions.docs : prev.guestSessions,
+      }));
+      setAdminLoadIssues(results.filter(item => !item.ok).map(item => ({
+        name: item.name,
+        label: item.label,
+        error: item.error,
+        optional: item.optional,
+        attempts: item.attempts,
+      })));
+      setAdminLoadInfo(prev => ({
+        ...prev,
+        lastLoadedAt: new Date().toISOString(),
+        authUid: user?.uid ?? auth.currentUser?.uid ?? null,
+        counts: Object.fromEntries(results.filter(item => item.ok).map(item => [item.name, item.count])),
+      }));
+    } catch (e) {
+      logError(e, 'AdminPanel.fetchData.outer');
+      setAdminLoadIssues(prev => [
+        ...prev,
+        { name: 'admin-load', label: 'Загрузка админки', error: formatAdminLoadError(e), optional: false, attempts: 1 },
       ]);
-      console.log('[ADMIN] загружено:', {
-        partners: pSnap.docs.length,
-        events: eSnap.docs.length,
-        news: nSnap.docs.length,
-        notifications: ntSnap.docs.length,
-        prizes: prSnap.docs.length,
-        customTasks: ctSnap.docs.length,
-        prizeClaims: clSnap.docs.length,
-        experts: exSnap.docs.length,
-        banners: bnSnap.docs.length,
-        users: uSnap.docs.length,
-        scans: scSnap.docs.length + escSnap.docs.length,
-      });
-      setPartners(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setExperts(exSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setEvents(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setNews(nSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setNotifs(ntSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPrizes(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPrizeClaims(clSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setBanners(bnSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setAdminMetrics({
-        users: uSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-        scans: scSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-        expertScans: escSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-        reviews: rvSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-        expertReviews: ervSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-        raffleEntries: reSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-        guestSessions: gsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-      });
-    } catch (e) { logError(e, 'AdminPanel.fetchData.outer'); }
-    setLoading(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetExpertForm = () => {
@@ -2151,9 +2255,7 @@ export const AdminPanel = () => {
     setAnalyticsLoading(false);
   }, [partners, analyticsLoading]);
 
-  if (!authed) return <PasswordGate onAllow={() => setAuthed(true)} />;
-
-  console.log('[ADMIN] render state:', { loading, partners: partners.length, experts: experts.length, events: events.length, activeTab });
+  if (!authed) return <PasswordGate onAllow={() => { setAuthed(true); fetchData(); }} />;
 
   const q = globalSearch.toLowerCase();
   const searchResults = globalSearch.length > 1 ? [
@@ -2352,6 +2454,51 @@ export const AdminPanel = () => {
           )}
         </div>
       </div>
+
+      {(loading || adminLoadIssues.length > 0 || adminLoadInfo.lastLoadedAt) && (
+        <div style={{
+          ...s.card,
+          marginBottom: 18,
+          border: adminLoadIssues.some(item => !item.optional) ? '1px solid rgba(230,70,70,0.34)' : adminLoadIssues.length ? '1px solid rgba(245,158,11,0.32)' : `1px solid ${A.border}`,
+          background: adminLoadIssues.some(item => !item.optional) ? 'rgba(230,70,70,0.08)' : adminLoadIssues.length ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.035)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 850, color: A.text }}>
+                {loading ? 'Загружаем данные админки...' : adminLoadIssues.length ? 'Данные загружены частично' : 'Данные админки загружены'}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, lineHeight: '16px', color: A.textSec }}>
+                {adminLoadInfo.authUid ? `Auth UID: ${adminLoadInfo.authUid}` : 'Firebase Auth ещё не подтверждён'}
+                {adminLoadInfo.lastLoadedAt && ` · ${new Date(adminLoadInfo.lastLoadedAt).toLocaleString('ru-RU')}`}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={fetchData}
+              disabled={loading}
+              style={{ ...s.btn, ...s.btnGray, flexShrink: 0, opacity: loading ? 0.55 : 1, padding: '8px 12px', fontSize: 12 }}
+            >
+              {loading ? '⏳ Загрузка' : '↻ Повторить'}
+            </button>
+          </div>
+          {adminLoadIssues.length > 0 && (
+            <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+              {adminLoadIssues.slice(0, 8).map(item => (
+                <div key={`${item.name}-${item.error}`} style={{ padding: '9px 11px', borderRadius: 12, background: 'rgba(0,0,0,0.16)', border: `1px solid ${item.optional ? 'rgba(245,158,11,0.24)' : 'rgba(230,70,70,0.28)'}` }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3 }}>
+                    <span style={{ color: item.optional ? '#f59e0b' : A.red, fontSize: 12, fontWeight: 850 }}>{item.optional ? '⚠' : '✗'} {item.label}</span>
+                    <span style={{ color: A.textSec, fontSize: 10 }}>попыток: {item.attempts}</span>
+                  </div>
+                  <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px' }}>{item.error}</div>
+                </div>
+              ))}
+              {adminLoadIssues.length > 8 && (
+                <div style={{ color: A.textSec, fontSize: 11 }}>Ещё ошибок: {adminLoadIssues.length - 8}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'dashboard' && (
         <AdminDashboard

@@ -167,6 +167,84 @@ function hasAcceptedCurrentLegal(data) {
     && Number(data?.consents?.legalVersion ?? data?.legalVersion ?? data?.consentLegalVersion ?? 0) >= LEGAL_VERSION;
 }
 
+const AUTH_TRACE_KEY = 'apg_auth_trace';
+
+function traceAuthStage(stage, details = {}) {
+  try {
+    const entry = {
+      at: new Date().toISOString(),
+      stage,
+      ...Object.fromEntries(
+        Object.entries(details).map(([key, value]) => [
+          key,
+          typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value == null
+            ? value
+            : JSON.stringify(value).slice(0, 240),
+        ]),
+      ),
+    };
+    const current = JSON.parse(localStorage.getItem(AUTH_TRACE_KEY) || '[]');
+    localStorage.setItem(AUTH_TRACE_KEY, JSON.stringify([...current.slice(-29), entry]));
+  } catch {}
+}
+
+function getAuthErrorMessage(error) {
+  const code = String(error?.code ?? '');
+  const message = String(error?.message ?? '');
+  if (code.includes('permission-denied') || message.includes('permission-denied')) {
+    return 'Не удалось сохранить данные аккаунта из-за ограничений доступа. Мы уже записали ошибку, попробуйте ещё раз.';
+  }
+  if (!navigator.onLine) return 'Нет подключения к интернету. Проверьте сеть и попробуйте снова.';
+  return 'Не удалось завершить вход. Попробуйте ещё раз или выберите другой способ авторизации.';
+}
+
+async function ensureOwnerAuthSession(userId, source = 'auth') {
+  const targetUserId = String(userId || '');
+  if (!targetUserId || targetUserId.startsWith('guest_')) return null;
+
+  const ensureAnonymous = async (reason) => {
+    if (auth.currentUser) return auth.currentUser;
+    traceAuthStage('firebase_auth_start', { source, reason });
+    await signInAnonymously(auth);
+    traceAuthStage('firebase_auth_ready', { source, uid: auth.currentUser?.uid ?? null });
+    return auth.currentUser;
+  };
+
+  const checkOrCreateMap = async () => {
+    const current = await ensureAnonymous('owner_map');
+    const mapRef = doc(db, 'auth_map', current.uid);
+    const mapSnap = await getDoc(mapRef);
+    if (mapSnap.exists()) {
+      const mappedId = String(mapSnap.data()?.vkId ?? '');
+      traceAuthStage('auth_map_found', { source, uid: current.uid, userId: targetUserId, mappedId });
+      return mappedId === targetUserId;
+    }
+    await setDoc(mapRef, {
+      vkId: targetUserId,
+      source,
+      createdAt: serverTimestamp(),
+    });
+    traceAuthStage('auth_map_created', { source, uid: current.uid, userId: targetUserId });
+    return true;
+  };
+
+  traceAuthStage('owner_session_check', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
+  if (await checkOrCreateMap()) return auth.currentUser;
+
+  traceAuthStage('auth_map_mismatch', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
+  await signOut(auth).catch(() => {});
+  await signInAnonymously(auth);
+  const current = auth.currentUser;
+  if (!current) throw new Error('firebase_auth_unavailable');
+  await setDoc(doc(db, 'auth_map', current.uid), {
+    vkId: targetUserId,
+    source,
+    createdAt: serverTimestamp(),
+  });
+  traceAuthStage('owner_session_recreated', { source, uid: current.uid, userId: targetUserId });
+  return current;
+}
+
 function LazyFallback() {
   return (
     <div style={{ minHeight: '100svh', padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: APG2_PROFILE.bg }}>
@@ -229,6 +307,7 @@ export function UserApp() {
   const [loggedOut, setLoggedOut]               = useState(false);
   const [consentRequest, setConsentRequest]         = useState(null);
   const [consentSaving, setConsentSaving]       = useState(false);
+  const [consentError, setConsentError]         = useState('');
   const [pendingNotificationPrompt, setPendingNotificationPrompt] = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
@@ -559,13 +638,8 @@ export function UserApp() {
         }
       }
 
-      // auth_map нужно создать ДО getDoc(userRef) — isOwner() проверяет его наличие
-      if (!isGuest && auth.currentUser) {
-        setDoc(
-          doc(db, 'auth_map', auth.currentUser.uid),
-          { vkId: String(userData.id) },
-          { merge: true },
-        ).catch(() => {});
+      if (!isGuest) {
+        await ensureOwnerAuthSession(userData.id, userData.authProvider || (userData.email ? 'email_restore' : String(userData.id).startsWith('tg_') ? 'telegram_restore' : 'vk'));
       }
 
       const emptySnap = { docs: [] };
@@ -1237,16 +1311,22 @@ export function UserApp() {
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
   const completeEmailLogin = useCallback((emailUser) => {
+    traceAuthStage('email_login_complete', { userId: emailUser?.id ?? null });
     localStorage.removeItem('manualLogout');
     localStorage.setItem('apg_email_user', JSON.stringify(emailUser));
     window.location.reload();
   }, []);
 
-  const handleEmailAuthSuccess = useCallback(async (emailUser) => {
+  const handleEmailAuthSuccess = useCallback(async (emailUser, authPayload = {}) => {
     if (!emailUser?.id) return;
+    setConsentError('');
+    traceAuthStage('email_user_received', { userId: emailUser.id, hasToken: !!authPayload?.token });
     try {
+      await ensureOwnerAuthSession(emailUser.id, 'email');
+      traceAuthStage('email_owner_session_ready', { userId: emailUser.id, uid: auth.currentUser?.uid ?? null });
       const snap = await getDoc(doc(db, 'users', String(emailUser.id)));
       const data = snap.exists() ? snap.data() : null;
+      traceAuthStage('email_user_doc_loaded', { userId: emailUser.id, exists: snap.exists(), acceptedLegal: hasAcceptedCurrentLegal(data) });
       if (hasAcceptedCurrentLegal(data)) {
         completeEmailLogin({
           ...emailUser,
@@ -1258,6 +1338,8 @@ export function UserApp() {
       }
     } catch (e) {
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
+      traceAuthStage('email_auth_error', { userId: emailUser.id, error: e?.message ?? String(e) });
+      setConsentError(getAuthErrorMessage(e));
     }
     setConsentRequest({
       user: emailUser,
@@ -1273,9 +1355,14 @@ export function UserApp() {
     const targetUser = consentRequest?.user;
     if (!targetUser?.id || !termsAccepted || !privacyAccepted || consentSaving) return;
     setConsentSaving(true);
+    setConsentError('');
+    traceAuthStage('consent_accept_start', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
     try {
+      await ensureOwnerAuthSession(targetUser.id, consentRequest?.mode === 'email' ? 'email_consent' : 'legal_consent');
+      traceAuthStage('consent_owner_session_ready', { userId: targetUser.id, uid: auth.currentUser?.uid ?? null });
       const userRef = doc(db, 'users', String(targetUser.id));
       const existingSnap = await getDoc(userRef);
+      traceAuthStage('consent_user_doc_loaded', { userId: targetUser.id, exists: existingSnap.exists() });
       const consentPayload = {
         userId: String(targetUser.id),
         termsAccepted: true,
@@ -1296,6 +1383,7 @@ export function UserApp() {
           notificationConsent: !!notificationsAccepted,
           ...(notificationsAccepted ? { notificationsRequestedAt: serverTimestamp() } : {}),
         }, { merge: true });
+        traceAuthStage('consent_saved_firestore', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
       } else {
         localStorage.setItem('apg_pending_consents', JSON.stringify({
           userId: String(targetUser.id),
@@ -1304,6 +1392,7 @@ export function UserApp() {
           consentLegalVersion: LEGAL_VERSION,
           notificationConsent: !!notificationsAccepted,
         }));
+        traceAuthStage('consent_saved_pending', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
       }
       if (notificationsAccepted) localStorage.setItem('apg_notif_consent', '1');
       if (consentRequest.mode === 'email') {
@@ -1325,9 +1414,12 @@ export function UserApp() {
       setConsentRequest(null);
       if (consentRequest.needsOnboarding) setShowOnboarding(true);
       if (notificationsAccepted) setPendingNotificationPrompt(true);
+      traceAuthStage('consent_flow_complete', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
     } catch (e) {
       logError(e, 'UserApp.handleConsentAccept');
-      showToast('Не удалось сохранить согласия. Проверьте интернет и попробуйте снова.', 'error');
+      traceAuthStage('consent_error', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown', error: e?.message ?? String(e) });
+      setConsentError(getAuthErrorMessage(e));
+      showToast('Не удалось сохранить согласия. Ошибка записана, попробуйте ещё раз.', 'error');
     } finally {
       if (mountedRef.current) setConsentSaving(false);
     }
@@ -2366,8 +2458,13 @@ export function UserApp() {
               subtitle={consentRequest.subtitle}
               badge={consentRequest.badge}
               notificationsDefault={consentRequest.notificationsDefault}
+              error={consentError}
               onAccept={handleConsentAccept}
-              onCancel={consentRequest.mode === 'email' ? () => !consentSaving && setConsentRequest(null) : undefined}
+              onCancel={consentRequest.mode === 'email' ? () => {
+                if (consentSaving) return;
+                setConsentError('');
+                setConsentRequest(null);
+              } : undefined}
             />
           )}
 

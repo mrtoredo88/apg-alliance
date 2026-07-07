@@ -11,6 +11,27 @@ import { APP_URL, API_BASE_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
 
+const AUTH_TRACE_KEY = 'apg_auth_trace';
+
+function traceAuthStage(stage, details = {}) {
+  try {
+    const entry = {
+      at: new Date().toISOString(),
+      stage,
+      ...Object.fromEntries(
+        Object.entries(details).map(([key, value]) => [
+          key,
+          typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value == null
+            ? value
+            : JSON.stringify(value).slice(0, 240),
+        ]),
+      ),
+    };
+    const current = JSON.parse(localStorage.getItem(AUTH_TRACE_KEY) || '[]');
+    localStorage.setItem(AUTH_TRACE_KEY, JSON.stringify([...current.slice(-29), entry]));
+  } catch {}
+}
+
 function EmailVerifyBanner({ userId }) {
   const [sent, setSent]       = useState(false);
   const [loading, setLoading] = useState(false);
@@ -390,10 +411,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const poll = async () => {
       if (tgStateRef.current !== state) return;
       try {
+        traceAuthStage('telegram_poll_start', { state });
         const r    = await fetch(`${API_BASE_URL}/api/telegram-auth-check?state=${state}`);
         const data = await r.json();
         if (tgStateRef.current !== state) return;
         if (data.status === 'done') {
+          traceAuthStage('telegram_auth_done', { state, userId: data.user?.id ?? null, linking: !!tgLinkingRef.current });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
           if (tgLinkingRef.current && user?.id) {
@@ -427,9 +450,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             setTgStep('linked');
           } else {
             localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
+            traceAuthStage('telegram_user_saved', { userId: data.user?.id ?? null });
             window.location.reload();
           }
         } else if (data.status === 'expired' || data.status === 'not_found') {
+          traceAuthStage('telegram_auth_unavailable', { state, status: data.status });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
           setTgError('Сессия истекла. Попробуйте снова.');
@@ -439,6 +464,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         }
       } catch (e) {
         logError(e, 'ProfilePanel.telegram.poll');
+        traceAuthStage('telegram_poll_error', { state, error: e?.message ?? String(e) });
         if (tgStateRef.current !== state) return;
         if (tgLinkingRef.current) {
           tgStateRef.current = null;
@@ -461,16 +487,19 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     setTgError('');
     stopPolling();
     try {
+      traceAuthStage('telegram_auth_start', { linking: isLinking });
       const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST' });
       const { state, url, message } = await res.json().catch(() => ({}));
       if (!res.ok || !state || !url) throw new Error(message || 'telegram_start_failed');
       localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));
+      traceAuthStage('telegram_session_created', { state, linking: isLinking });
       setTgBotUrl(url);
       setTgLoading(false);
       setTgStep('waiting');
       startWaiting(state);
     } catch (e) {
       logError(e, 'ProfilePanel.telegram.start');
+      traceAuthStage('telegram_start_error', { error: e?.message ?? String(e) });
       setTgError('Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
     }
@@ -587,9 +616,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     }
   }, [onDeleteProfile]);
 
-  const handleEmailAuthSuccess = useCallback((emailUser) => {
+  const handleEmailAuthSuccess = useCallback((emailUser, authPayload) => {
     setShowEmailAuth(false);
-    onEmailAuthSuccess?.(emailUser);
+    onEmailAuthSuccess?.(emailUser, authPayload);
   }, [onEmailAuthSuccess]);
 
   const dismissToast = useCallback(() => {

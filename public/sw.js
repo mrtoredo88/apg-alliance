@@ -1,5 +1,5 @@
 // APG Service Worker — local-production friendly cache strategy.
-const CACHE_VERSION = 'apg-v3-1-local-20260706';
+const CACHE_VERSION = 'apg-v5-vk-sync-20260707';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

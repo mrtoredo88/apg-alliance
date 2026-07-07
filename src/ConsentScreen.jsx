@@ -96,6 +96,7 @@ export function ConsentScreen({
   subtitle = 'Перед продолжением использования приложения подтвердите необходимые согласия.',
   badge = 'Обновление документов',
   notificationsDefault = true,
+  error = '',
 }) {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -161,6 +162,25 @@ export function ConsentScreen({
         <div style={{ marginTop: 14, color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px' }}>
           Обязательные согласия отмечены звёздочкой. Уведомления можно включить сейчас или позже в профиле.
         </div>
+
+        {error && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 12,
+              padding: '11px 12px',
+              borderRadius: 18,
+              border: '1px solid rgba(230,70,70,0.28)',
+              background: 'rgba(230,70,70,0.10)',
+              color: APG2_PROFILE.text,
+              fontSize: 13,
+              lineHeight: '19px',
+              fontWeight: 650,
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
           <GlassButton
