@@ -31,7 +31,7 @@ import {
   sortNewsItems,
 } from './newsUtils.js';
 
-const REACTIONS = ['👍', '❤️', '🔥', '👏', '😮'];
+const REACTIONS = ['👍', '❤️', '🔥', '👏', '🎉', '🤔'];
 const COMMENT_SORTS = [
   { id: 'new', label: 'Новые' },
   { id: 'popular', label: 'Популярные' },
@@ -259,6 +259,77 @@ function PhotoCarousel({ photos = [], onOpen }) {
   );
 }
 
+function SocialLinksBlock({ links = [] }) {
+  const safeLinks = Array.isArray(links) ? links.filter(link => link?.url) : [];
+  if (!safeLinks.length) return null;
+  const iconByType = {
+    vk: 'VK',
+    telegram: 'TG',
+    youtube: '▶',
+    dzen: 'Дз',
+    instagram: 'IG',
+    tiktok: 'TT',
+    ok: 'OK',
+    facebook: 'Fb',
+    x: 'X',
+    threads: '@',
+    site: '⌁',
+    other: '↗',
+  };
+  return (
+    <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
+      <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 12 }}>Социальные сети и ссылки</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 9 }}>
+        {safeLinks.map((link, index) => (
+          <GlassButton key={`${link.url}-${index}`} onClick={() => openUrl(link.url)} style={{ minHeight: 42, borderRadius: 18 }}>
+            {iconByType[link.type] || '↗'} {link.label || 'Открыть'}
+          </GlassButton>
+        ))}
+      </div>
+    </GlassCard>
+  );
+}
+
+function ContentBlocks({ blocks = [] }) {
+  const safeBlocks = Array.isArray(blocks) ? blocks.filter(Boolean) : [];
+  if (!safeBlocks.length) return null;
+  return (
+    <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+      {safeBlocks.map((block, index) => {
+        const type = block.type || 'note';
+        if (type === 'divider') {
+          return <div key={index} style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(215,184,106,0.46), transparent)', margin: '8px 10%' }} />;
+        }
+        if (type === 'button') {
+          return (
+            <GlassButton key={index} tone="gold" onClick={() => block.url && openUrl(block.url)} style={{ minHeight: 48, borderRadius: 20, color: '#17120a' }}>
+              {block.text || block.title || 'Открыть'}
+            </GlassButton>
+          );
+        }
+        const tone = type === 'warning'
+          ? { border: '1px solid rgba(248,113,113,0.30)', background: 'rgba(248,113,113,0.09)', mark: '!' }
+          : type === 'tip'
+            ? { border: '1px solid rgba(215,184,106,0.30)', background: 'rgba(215,184,106,0.10)', mark: '✓' }
+            : type === 'faq'
+              ? { border: '1px solid rgba(96,165,250,0.30)', background: 'rgba(96,165,250,0.08)', mark: '?' }
+              : { border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', mark: '“' };
+        return (
+          <GlassCard key={index} style={{ borderRadius: 26, padding: 16, border: tone.border, background: tone.background }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '34px 1fr', gap: 12, alignItems: 'start' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 14, display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, background: 'rgba(8,8,10,0.22)', fontWeight: 950 }}>{tone.mark}</div>
+              <div style={{ minWidth: 0 }}>
+                {block.title && <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 900, marginBottom: block.text ? 6 : 0 }}>{block.title}</div>}
+                {block.text && <RichText color={APG2_PROFILE.textSoft} fontSize={14.5} lineHeight="23px">{block.text}</RichText>}
+              </div>
+            </div>
+          </GlassCard>
+        );
+      })}
+    </div>
+  );
+}
+
 function NewsMeta({ item, compact = false }) {
   const stats = getNewsStats(item);
   const date = getNewsDate(item);
@@ -321,6 +392,8 @@ function SharePanel({ item, onToast, onShare }) {
 function ArticleHeader({ item, wordCount }) {
   const title = getNewsTitle(item);
   const text = getNewsText(item);
+  const subtitle = String(item?.subtitle || '').trim();
+  const summary = String(item?.summary || '').trim();
   const stats = getNewsStats(item);
   const reactions = getNewsReactionsTotal(item) || stats.likes;
   const date = getNewsDate(item);
@@ -336,9 +409,14 @@ function ArticleHeader({ item, wordCount }) {
         ))}
       </div>
       <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: '1.08', fontWeight: 950, letterSpacing: 0 }}>{title}</h1>
-      {text && (
+      {subtitle && (
+        <div style={{ color: APG2_PROFILE.gold, fontSize: 18, lineHeight: '25px', fontWeight: 850 }}>
+          {subtitle}
+        </div>
+      )}
+      {(summary || text) && (
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15.5, lineHeight: '24px', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {text}
+          {summary || text}
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(116px, 1fr))', gap: 8 }}>
@@ -902,6 +980,8 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
             </RichText>
           </GlassCard>
 
+          <ContentBlocks blocks={item.contentBlocks} />
+
           <PhotoCarousel photos={photos} onOpen={setLightboxIndex} />
 
           {videos.length > 0 && (
@@ -909,6 +989,8 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
               <VideoSection videos={videos} />
             </GlassCard>
           )}
+
+          <SocialLinksBlock links={item.socialLinks} />
 
           {(links.length > 0 || docs.length > 0) && (
             <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
@@ -965,7 +1047,13 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
 
           <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
 
-          <CommentsPanel item={item} user={user} onToast={onToast} />
+          {item.commentsEnabled === false ? (
+            <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16, color: APG2_PROFILE.textMuted, fontSize: 13.5, lineHeight: '20px' }}>
+              Комментарии к этой публикации отключены редакцией.
+            </GlassCard>
+          ) : (
+            <CommentsPanel item={item} user={user} onToast={onToast} />
+          )}
 
           {!!related.length && (
             <div style={{ marginTop: 28 }}>

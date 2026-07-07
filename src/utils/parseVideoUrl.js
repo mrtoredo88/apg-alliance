@@ -1,6 +1,7 @@
 const YT_THUMB = id => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
 const VK_THUMB  = '/video-placeholder-vk.svg';
 const RT_THUMB  = '/video-placeholder-rt.svg';
+const VIMEO_THUMB = '/video-placeholder-vk.svg';
 
 export function parseVideoUrl(raw) {
   if (!raw) return null;
@@ -52,6 +53,17 @@ export function parseVideoUrl(raw) {
         videoId:      id,
         embedUrl:     `https://rutube.ru/play/embed/${id}`,
         thumbnailUrl: RT_THUMB,
+      };
+    }
+
+    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+      const id = u.pathname.split('/').filter(Boolean).pop();
+      if (!id || !/^\d+$/.test(id)) return null;
+      return {
+        platform:     'vimeo',
+        videoId:      id,
+        embedUrl:     `https://player.vimeo.com/video/${id}`,
+        thumbnailUrl: VIMEO_THUMB,
       };
     }
   } catch {

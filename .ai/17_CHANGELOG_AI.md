@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] News mini-CMS foundation
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `src/NewsPage.jsx`, `src/newsUtils.js`, `src/utils/parseVideoUrl.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Форма новости расширена до первого слоя мини-CMS: подзаголовок, анонс, автор, источник, срок актуальности, теги, галерея с подписями/сортировкой, несколько видео, соцссылки, структурные блоки и выключатель комментариев. Страница новости показывает подзаголовок, отдельный блок соцссылок, content blocks и уважает `commentsEnabled=false`; реакции обновлены до набора `👍 ❤️ 🔥 👏 🎉 🤔`.
+**Почему:** Новости АПГ должны стать универсальной контент-платформой без сторонних сервисов, при этом backend должен безопасно сохранять новые поля через существующий admin action слой.
+
+---
+
 ## [2026-07-08] Локи semantic search и PDF-preview плакатов
 **Коммит:** `локально`
 **Файлы:** `src/loki/core/modules/PartnerExpert.js`, `src/loki/knowledge/categories/categories.json`, `src/UserApp.jsx`, `src/NewsPage.jsx`, `src/EventsPage.jsx`, `src/PartnerQRSection.jsx`, `.ai/17_CHANGELOG_AI.md`

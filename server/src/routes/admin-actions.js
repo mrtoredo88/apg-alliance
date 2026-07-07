@@ -2,7 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 
-const NEWS_FIELDS = new Set(['title', 'text', 'emoji', 'imageUrl', 'coverPhoto', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'linksCheckedAt']);
+const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt']);
 const RESOURCE_CONFIG = {
   partners: { collection: 'partners', scope: 'partners', label: 'партнёр' },
   experts: { collection: 'experts', scope: 'experts', label: 'эксперт' },

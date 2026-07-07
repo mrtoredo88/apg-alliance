@@ -135,6 +135,8 @@
 - `news:restore`
 - `news:reorder`
 
+**CMS-поля новостей:** backend whitelist для `news:create/update/autosave` поддерживает базовые поля (`title`, `subtitle`, `summary`, `text`, `fullText`, `author`, `sourceName`, `source`, `category`, `tags`, `publishedAt`, `expiresAt`, `priority`, `status`, `commentsEnabled`) и медиа/контент поля (`coverPhoto`, `imageUrl`, `photos`, `photoItems`, `gallery`, `videos`, `links`, `socialLinks`, `contentBlocks`, `faq`, `ctaButtons`, `docs`). Это позволяет админке создавать публикации с галереей, видео, социальными кнопками и структурными блоками без отдельного API.
+
 **Actions универсальных ресурсов V4.4.3:**
 - `entity:create`
 - `entity:update`

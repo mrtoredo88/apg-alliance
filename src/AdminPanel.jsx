@@ -38,6 +38,28 @@ const CONTENT_CATEGORIES = [
   { id: 'education', label: 'Образование', color: '#38bdf8' },
   { id: 'transport', label: 'Транспорт',   color: '#fb923c' },
 ];
+const NEWS_SOCIAL_TYPES = [
+  ['vk', 'ВКонтакте'],
+  ['telegram', 'Telegram'],
+  ['youtube', 'YouTube'],
+  ['dzen', 'Дзен'],
+  ['instagram', 'Instagram'],
+  ['tiktok', 'TikTok'],
+  ['ok', 'Одноклассники'],
+  ['facebook', 'Facebook'],
+  ['x', 'X'],
+  ['threads', 'Threads'],
+  ['site', 'Сайт'],
+  ['other', 'Другое'],
+];
+const NEWS_BLOCK_TYPES = [
+  ['quote', 'Цитата'],
+  ['tip', 'Совет'],
+  ['warning', 'Предупреждение'],
+  ['button', 'Кнопка'],
+  ['divider', 'Разделитель'],
+  ['faq', 'FAQ'],
+];
 const PARTNER_EMOJIS = ['🏪','💆','💄','🍽️','☕','🎓','🏋️','💅','🎉','🛍️','🎭','🌿'];
 const contentImageOf = (item) =>
   item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
@@ -2004,6 +2026,8 @@ export const AdminPanel = () => {
 
   // Форма новости
   const [nTitle, setNTitle]               = useState('');
+  const [nSubtitle, setNSubtitle]         = useState('');
+  const [nSummary, setNSummary]           = useState('');
   const [nText, setNText]                 = useState('');
   const [nEmoji, setNEmoji]               = useState('📢');
   const [nImage, setNImage]               = useState('');
@@ -2012,6 +2036,26 @@ export const AdminPanel = () => {
   const [nPriority, setNPriority]         = useState(0);
   const [nCategory, setNCategory]         = useState('');
   const [nCoverPhoto, setNCoverPhoto]     = useState('');
+  const [nGallery, setNGallery]           = useState([]);
+  const [nPhotoCaptions, setNPhotoCaptions] = useState({});
+  const [nVideos, setNVideos]             = useState([]);
+  const [nVideoUrl, setNVideoUrl]         = useState('');
+  const [nVideoTitle, setNVideoTitle]     = useState('');
+  const [nVideoError, setNVideoError]     = useState('');
+  const [nSocialLinks, setNSocialLinks]   = useState([]);
+  const [nSocialType, setNSocialType]     = useState('vk');
+  const [nSocialLabel, setNSocialLabel]   = useState('');
+  const [nSocialUrl, setNSocialUrl]       = useState('');
+  const [nContentBlocks, setNContentBlocks] = useState([]);
+  const [nBlockType, setNBlockType]       = useState('quote');
+  const [nBlockTitle, setNBlockTitle]     = useState('');
+  const [nBlockText, setNBlockText]       = useState('');
+  const [nBlockUrl, setNBlockUrl]         = useState('');
+  const [nTags, setNTags]                 = useState('');
+  const [nAuthor, setNAuthor]             = useState('');
+  const [nSourceName, setNSourceName]     = useState('');
+  const [nExpiresAt, setNExpiresAt]       = useState('');
+  const [nCommentsEnabled, setNCommentsEnabled] = useState(true);
   const [nPublishedAt, setNPublishedAt]   = useState(() => new Date().toISOString().slice(0, 10));
 
   // Форма уведомления
@@ -2748,21 +2792,53 @@ export const AdminPanel = () => {
 
   // ─── Новости ────────────────────────────────────────────────────────────────
 
+  const normalizeNewsGallery = (gallery = [], captions = {}) => {
+    return (gallery || []).filter(Boolean).map((item, index) => {
+      const url = typeof item === 'string' ? item : item?.url;
+      return {
+        url,
+        caption: captions[url] ?? item?.caption ?? item?.text ?? '',
+        order: index,
+      };
+    }).filter(item => item.url);
+  };
+
   const resetNewsForm = () => {
-    setNTitle(''); setNText(''); setNEmoji('📢'); setNImage('');
+    setNTitle(''); setNSubtitle(''); setNSummary(''); setNText(''); setNEmoji('📢'); setNImage('');
     setNLinkUrl(''); setNLinkLabel(''); setNPriority(0);
     setNCategory(''); setNCoverPhoto(''); setNPublishedAt(new Date().toISOString().slice(0, 10));
+    setNGallery([]); setNPhotoCaptions({}); setNVideos([]); setNVideoUrl(''); setNVideoTitle(''); setNVideoError('');
+    setNSocialLinks([]); setNSocialType('vk'); setNSocialLabel(''); setNSocialUrl('');
+    setNContentBlocks([]); setNBlockType('quote'); setNBlockTitle(''); setNBlockText(''); setNBlockUrl('');
+    setNTags(''); setNAuthor(''); setNSourceName(''); setNExpiresAt(''); setNCommentsEnabled(true);
     setEditingNews(null); setShowNewsModal(false);
   };
 
   const startEditNews = (item) => {
     setEditingNews(item);
-    setNTitle(item.title ?? ''); setNText(item.text ?? '');
+    const gallery = (Array.isArray(item.photoItems) && item.photoItems.length ? item.photoItems : (Array.isArray(item.gallery) ? item.gallery : Array.isArray(item.photos) ? item.photos : []));
+    const galleryUrls = gallery.map(photo => typeof photo === 'string' ? photo : photo?.url).filter(Boolean);
+    const captions = {};
+    gallery.forEach(photo => {
+      const url = typeof photo === 'string' ? photo : photo?.url;
+      if (url) captions[url] = photo?.caption || photo?.text || '';
+    });
+    setNTitle(item.title ?? ''); setNSubtitle(item.subtitle ?? ''); setNSummary(item.summary ?? item.description ?? ''); setNText(item.text ?? item.fullText ?? '');
     setNEmoji(item.emoji ?? '📢'); setNImage(item.imageUrl ?? '');
     setNLinkUrl(item.linkUrl ?? ''); setNLinkLabel(item.linkLabel ?? '');
     setNPriority(item.priority ?? 0);
     setNCategory(item.category ?? '');
     setNCoverPhoto(item.coverPhoto ?? item.imageUrl ?? '');
+    setNGallery(galleryUrls);
+    setNPhotoCaptions(captions);
+    setNVideos(Array.isArray(item.videos) ? item.videos : []);
+    setNSocialLinks(Array.isArray(item.socialLinks) ? item.socialLinks : []);
+    setNContentBlocks(Array.isArray(item.contentBlocks) ? item.contentBlocks : []);
+    setNTags(Array.isArray(item.tags) ? item.tags.join(', ') : '');
+    setNAuthor(item.author ?? '');
+    setNSourceName(item.sourceName ?? '');
+    setNExpiresAt(item.expiresAt?.toDate ? item.expiresAt.toDate().toISOString().slice(0, 10) : (item.expiresAt ? new Date(item.expiresAt).toISOString().slice(0, 10) : ''));
+    setNCommentsEnabled(item.commentsEnabled !== false);
     setNPublishedAt(item.publishedAt?.toDate ? item.publishedAt.toDate().toISOString().slice(0, 10) : (item.publishedAt ? new Date(item.publishedAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)));
     setShowNewsModal(true);
   };
@@ -2773,14 +2849,28 @@ export const AdminPanel = () => {
     const data = {
       title: nTitle.trim(),
       text: nText.trim(),
+      fullText: nText.trim(),
+      subtitle: nSubtitle.trim(),
+      summary: nSummary.trim(),
       emoji: nEmoji,
       imageUrl: (nCoverPhoto || nImage).trim(),
       coverPhoto: (nCoverPhoto || nImage).trim(),
+      photos: nGallery,
+      gallery: nGallery,
+      photoItems: normalizeNewsGallery(nGallery, nPhotoCaptions),
+      videos: nVideos,
+      socialLinks: nSocialLinks,
+      contentBlocks: nContentBlocks,
+      tags: nTags.split(',').map(tag => tag.trim().replace(/^#/, '')).filter(Boolean).slice(0, 12),
+      author: nAuthor.trim(),
+      sourceName: nSourceName.trim(),
       linkUrl: nLinkUrl.trim(),
       linkLabel: nLinkLabel.trim(),
       priority: Number(nPriority) || 0,
       category: nCategory || null,
+      commentsEnabled: nCommentsEnabled,
       publishedAt: nPublishedAt ? new Date(nPublishedAt) : new Date(),
+      expiresAt: nExpiresAt ? new Date(nExpiresAt) : null,
     };
     if (editingNews) {
       await runAdminAction('news:update', { id: editingNews.id, patch: data });
@@ -4717,8 +4807,25 @@ export const AdminPanel = () => {
             <label style={s.label}>Заголовок *</label>
             <input style={s.input} placeholder="Новый партнёр АПГ!" value={nTitle} onChange={e => setNTitle(e.target.value)} />
 
-            <label style={s.label}>Текст новости *</label>
-            <textarea style={{ ...s.textarea, minHeight: 120 }} placeholder="Подробный текст..." value={nText} onChange={e => setNText(e.target.value)} />
+            <label style={s.label}>Подзаголовок</label>
+            <input style={s.input} placeholder="Короткая строка под заголовком" value={nSubtitle} onChange={e => setNSubtitle(e.target.value)} />
+
+            <label style={s.label}>Краткое описание</label>
+            <textarea style={{ ...s.textarea, minHeight: 74 }} placeholder="Анонс для карточек, поиска и предпросмотра" value={nSummary} onChange={e => setNSummary(e.target.value)} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div>
+                <label style={s.label}>Автор</label>
+                <input style={s.input} placeholder="Редакция АПГ" value={nAuthor} onChange={e => setNAuthor(e.target.value)} />
+              </div>
+              <div>
+                <label style={s.label}>Источник</label>
+                <input style={s.input} placeholder="АПГ / партнёр / эксперт" value={nSourceName} onChange={e => setNSourceName(e.target.value)} />
+              </div>
+            </div>
+
+            <label style={s.label}>Полный текст *</label>
+            <MdEditor value={nText} onChange={setNText} placeholder="Подробный текст с Markdown: заголовки, списки, ссылки, выделение..." style={{ ...s.textarea, minHeight: 180 }} />
 
             <label style={s.label}>Эмодзи</label>
             <EmojiPicker emojis={NEWS_EMOJIS} value={nEmoji} onChange={setNEmoji} />
@@ -4764,8 +4871,107 @@ export const AdminPanel = () => {
             <PhotoUpload value={nCoverPhoto} onChange={setNCoverPhoto} folder="news" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
             {nCoverPhoto && <img src={nCoverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 12, marginBottom: 12, marginTop: 4 }} onError={e => e.target.style.display = 'none'} />}
 
+            <label style={s.label}>Галерея фотографий</label>
+            <GalleryUpload value={nGallery} onChange={setNGallery} folder="news/gallery" max={24} theme={{ chipBg: 'rgba(255,255,255,0.06)', border: A.border, textSec: A.textSec, gold: A.goldBrd }} />
+            {nGallery.length > 0 && (
+              <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+                {nGallery.map((url, index) => (
+                  <div key={`${url}-${index}`} style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto auto', gap: 8, alignItems: 'center', padding: 8, borderRadius: 12, border: `1px solid ${A.border}`, background: A.chip }}>
+                    <img src={url} alt="" loading="lazy" style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 8 }} onError={e => e.currentTarget.style.display = 'none'} />
+                    <input style={{ ...s.input, marginBottom: 0 }} placeholder="Подпись к фото" value={nPhotoCaptions[url] || ''} onChange={e => setNPhotoCaptions(prev => ({ ...prev, [url]: e.target.value }))} />
+                    <button type="button" disabled={index === 0} onClick={() => setNGallery(list => { const next = [...list]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })} style={{ ...s.btn, ...s.btnGray, padding: '7px 9px', opacity: index === 0 ? 0.35 : 1 }}>↑</button>
+                    <button type="button" disabled={index === nGallery.length - 1} onClick={() => setNGallery(list => { const next = [...list]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })} style={{ ...s.btn, ...s.btnGray, padding: '7px 9px', opacity: index === nGallery.length - 1 ? 0.35 : 1 }}>↓</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label style={s.label}>Видео (VK · YouTube · Rutube · Vimeo) — {nVideos.length}/12</label>
+            {nVideos.length < 12 && (
+              <div style={{ marginBottom: 8 }}>
+                <input style={s.input} placeholder="https://youtube.com/watch?v=... или vk.com/video..." value={nVideoUrl} onChange={e => { setNVideoUrl(e.target.value); setNVideoError(''); }} />
+                <input style={{ ...s.input, marginTop: 6 }} placeholder="Название видео" value={nVideoTitle} onChange={e => setNVideoTitle(e.target.value)} />
+                {nVideoError && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>{nVideoError}</div>}
+                <button type="button" style={{ ...s.btn, ...s.btnGray, marginTop: 4 }} onClick={() => {
+                  const parsed = parseVideoUrl(nVideoUrl);
+                  if (!parsed) { setNVideoError('Не удалось распознать ссылку'); return; }
+                  setNVideos(v => [...v, { url: nVideoUrl.trim(), title: nVideoTitle.trim(), platform: parsed.platform, videoId: parsed.videoId, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }]);
+                  setNVideoUrl(''); setNVideoTitle(''); setNVideoError('');
+                }}>+ Добавить видео</button>
+              </div>
+            )}
+            {nVideos.map((video, index) => (
+              <div key={`${video.url}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${A.border}` }}>
+                <img src={video.thumbnailUrl} alt="" loading="lazy" style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 6, background: '#111' }} onError={e => e.currentTarget.style.display = 'none'} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 750, color: A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.title || video.url}</div>
+                  <div style={{ fontSize: 11, color: A.gold }}>{video.platform}</div>
+                </div>
+                <button type="button" disabled={index === 0} onClick={() => setNVideos(list => { const next = [...list]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', opacity: index === 0 ? 0.35 : 1 }}>↑</button>
+                <button type="button" disabled={index === nVideos.length - 1} onClick={() => setNVideos(list => { const next = [...list]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', opacity: index === nVideos.length - 1 ? 0.35 : 1 }}>↓</button>
+                <button type="button" onClick={() => setNVideos(list => list.filter((_, i) => i !== index))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px' }}>✕</button>
+              </div>
+            ))}
+
+            <label style={s.label}>Социальные ссылки</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 8 }}>
+              <select style={s.input} value={nSocialType} onChange={e => setNSocialType(e.target.value)}>
+                {NEWS_SOCIAL_TYPES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </select>
+              <input style={s.input} placeholder="Название кнопки" value={nSocialLabel} onChange={e => setNSocialLabel(e.target.value)} />
+            </div>
+            <input style={s.input} placeholder="https://..." value={nSocialUrl} onChange={e => setNSocialUrl(e.target.value)} />
+            <button type="button" style={{ ...s.btn, ...s.btnGray, marginBottom: 10 }} onClick={() => {
+              if (!nSocialUrl.trim()) return;
+              const label = nSocialLabel.trim() || NEWS_SOCIAL_TYPES.find(([id]) => id === nSocialType)?.[1] || 'Ссылка';
+              setNSocialLinks(prev => [...prev, { type: nSocialType, label, url: nSocialUrl.trim() }]);
+              setNSocialLabel(''); setNSocialUrl('');
+            }}>+ Добавить соцссылку</button>
+            {nSocialLinks.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {nSocialLinks.map((link, index) => (
+                  <button key={`${link.url}-${index}`} type="button" onClick={() => setNSocialLinks(prev => prev.filter((_, i) => i !== index))} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>{link.label} ✕</button>
+                ))}
+              </div>
+            )}
+
+            <label style={s.label}>Дополнительные блоки</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 8 }}>
+              <select style={s.input} value={nBlockType} onChange={e => setNBlockType(e.target.value)}>
+                {NEWS_BLOCK_TYPES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </select>
+              <input style={s.input} placeholder="Заголовок блока" value={nBlockTitle} onChange={e => setNBlockTitle(e.target.value)} />
+            </div>
+            <textarea style={{ ...s.textarea, minHeight: 76 }} placeholder="Текст блока, вопрос/ответ FAQ или подпись кнопки" value={nBlockText} onChange={e => setNBlockText(e.target.value)} />
+            {nBlockType === 'button' && <input style={s.input} placeholder="URL кнопки" value={nBlockUrl} onChange={e => setNBlockUrl(e.target.value)} />}
+            <button type="button" style={{ ...s.btn, ...s.btnGray, marginBottom: 10 }} onClick={() => {
+              if (nBlockType !== 'divider' && !nBlockText.trim() && !nBlockTitle.trim()) return;
+              setNContentBlocks(prev => [...prev, { type: nBlockType, title: nBlockTitle.trim(), text: nBlockText.trim(), url: nBlockUrl.trim() }]);
+              setNBlockTitle(''); setNBlockText(''); setNBlockUrl('');
+            }}>+ Добавить блок</button>
+            {nContentBlocks.map((block, index) => (
+              <div key={`${block.type}-${index}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, padding: 10, borderRadius: 12, border: `1px solid ${A.border}`, background: A.chip }}>
+                <div style={{ flex: 1, minWidth: 0, color: A.textSec, fontSize: 12 }}>
+                  <b style={{ color: A.text }}>{NEWS_BLOCK_TYPES.find(([id]) => id === block.type)?.[1] || block.type}</b>
+                  {block.title ? ` · ${block.title}` : ''}{block.text ? ` · ${block.text.slice(0, 80)}` : ''}
+                </div>
+                <button type="button" onClick={() => setNContentBlocks(prev => prev.filter((_, i) => i !== index))} style={{ ...s.btn, ...s.btnDanger, padding: '4px 8px' }}>✕</button>
+              </div>
+            ))}
+
+            <label style={s.label}>Теги</label>
+            <input style={s.input} placeholder="апг, зеленоград, партнёры" value={nTags} onChange={e => setNTags(e.target.value)} />
+
             <label style={s.label}>Дата публикации</label>
             <input style={s.input} type="date" value={nPublishedAt} onChange={e => setNPublishedAt(e.target.value)} />
+
+            <label style={s.label}>Дата окончания актуальности</label>
+            <input style={s.input} type="date" value={nExpiresAt} onChange={e => setNExpiresAt(e.target.value)} />
+
+            <label style={{ ...s.label, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <input type="checkbox" checked={nCommentsEnabled} onChange={e => setNCommentsEnabled(e.target.checked)} />
+              Комментарии включены
+            </label>
 
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>

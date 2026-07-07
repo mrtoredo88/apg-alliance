@@ -103,7 +103,7 @@ export function getNewsDocs(item) {
 }
 
 export function getNewsText(item) {
-  return String(item?.text || item?.description || item?.excerpt || item?.body || '').trim();
+  return String(item?.text || item?.fullText || item?.description || item?.summary || item?.excerpt || item?.body || '').trim();
 }
 
 export function getNewsTitle(item) {
@@ -221,6 +221,8 @@ export function filterNewsItems(items, categoryId, queryText) {
       || (categoryId === 'vk' ? item?.source === 'vk' : getNewsCategory(item) === categoryId);
     if (!categoryOk) return false;
     if (!q) return true;
-    return `${getNewsTitle(item)} ${getNewsText(item)} ${getNewsCategoryLabel(item)} ${item?.sourceName || ''} ${item?.author || ''} ${(item?.tags || []).join(' ')}`.toLowerCase().includes(q);
+    const blockText = Array.isArray(item?.contentBlocks) ? item.contentBlocks.map(block => `${block?.title || ''} ${block?.text || ''}`).join(' ') : '';
+    const socialText = Array.isArray(item?.socialLinks) ? item.socialLinks.map(link => `${link?.label || ''} ${link?.url || ''}`).join(' ') : '';
+    return `${getNewsTitle(item)} ${item?.subtitle || ''} ${item?.summary || ''} ${getNewsText(item)} ${blockText} ${socialText} ${getNewsCategoryLabel(item)} ${item?.sourceName || ''} ${item?.author || ''} ${(item?.tags || []).join(' ')}`.toLowerCase().includes(q);
   });
 }
