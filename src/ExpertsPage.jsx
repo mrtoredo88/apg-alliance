@@ -5,8 +5,8 @@ import { EXPERT_CATEGORIES } from './constants.js';
 import { db } from './firebase';
 import {
   collection, getDocs, query, where,
-  addDoc, updateDoc, doc, increment, serverTimestamp,
 } from 'firebase/firestore';
+import { userAction } from './userApi.js';
 
 function getISOWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -175,9 +175,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
   const shareToastRef = useRef(null);
 
   useEffect(() => {
-    import('firebase/firestore').then(({ doc: d, updateDoc: u, increment: inc }) => {
-      u(d(db, 'experts', expert.id), { viewCount: inc(1) }).catch(() => {});
-    });
+    userAction('publicQr:view', { type: 'expert', id: expert.id, metric: 'view' }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -267,14 +265,17 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
         userPhoto: user.photo_200 ?? null,
         rating: myRating,
         text: myText.trim(),
-        createdAt: serverTimestamp(),
       };
-      await addDoc(collection(db, 'expertReviews'), reviewData);
-      const newCount = (expert.reviewCount ?? 0) + 1;
-      const newAvg = Math.round((((expert.avgRating ?? 0) * (expert.reviewCount ?? 0)) + myRating) / newCount * 10) / 10;
-      updateDoc(doc(db, 'experts', expert.id), { avgRating: newAvg, reviewCount: increment(1) }).catch(() => {});
+      const result = await userAction('review:expert', {
+        userId: String(user.id),
+        expertId: expert.id,
+        rating: myRating,
+        text: myText.trim(),
+        userName: reviewData.userName,
+        userPhoto: reviewData.userPhoto,
+      });
       if (mountedRef.current) {
-        setReviews(prev => [{ id: `local_${Date.now()}`, ...reviewData, createdAt: { toDate: () => new Date() } }, ...prev]);
+        setReviews(prev => [{ id: result.review?.id || `local_${Date.now()}`, ...reviewData, createdAt: { toDate: () => new Date() } }, ...prev]);
         setSubmitDone(true);
         setMyRating(0);
         setMyText('');

@@ -1,7 +1,8 @@
 import { db, auth } from './firebase.js';
 import { API_BASE_URL } from './constants.js';
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
+import { userAction } from './userApi.js';
 
 let _version = '?';
 fetch('/version.json').then(r => r.json()).then(d => { _version = d.v ?? '?'; }).catch(() => {});
@@ -66,15 +67,18 @@ export async function sendDiagReport({
   userId = null,
 } = {}) {
   try {
-    await addDoc(collection(db, 'diagnostics'), {
-      ...getDeviceInfo(),
-      userId: userId != null ? String(userId) : null,
-      checks,
-      errorText: errorText || null,
-      timeout,
-      stack: stack || null,
-      manual,
-      timestamp: serverTimestamp(),
+    if (!auth.currentUser) await signInAnonymously(auth).catch(() => {});
+    if (!auth.currentUser) return;
+    await userAction('log:diagnostic', {
+      payload: {
+        ...getDeviceInfo(),
+        userId: userId != null ? String(userId) : null,
+        checks,
+        errorText: errorText || null,
+        timeout,
+        stack: stack || null,
+        manual,
+      },
     });
   } catch {}
 }

@@ -166,6 +166,35 @@
 
 ---
 
+## POST /api/user-actions
+
+**Назначение:** Единый backend-first слой пользовательских write-сценариев.
+
+**Метод:** POST
+**Auth:** `Authorization: Bearer <Firebase ID Token>`
+**Headers:** `X-APG-Version`
+
+**Actions V4.4.4:**
+- `auth:linkUser` — связать Firebase uid с APG userId через `auth_map`
+- `profile:sync` — создать/синхронизировать профиль, `lastSeen`, daily bonus, referral base state
+- `profile:update` — onboarding, согласия, уведомления, публичные поля профиля, `joinedGroup`
+- `profile:delete` — удалить свой профиль
+- `favorites:toggle` — избранное партнёров + счётчик партнёра + activity
+- `news:saved`, `news:readLater`, `news:reaction`, `news:subscriptions`
+- `publicQr:view` — публичный QR / просмотр партнёра или эксперта
+- `task:claim` — выполнение задания и начисление ключей
+- `prize:claim` — получение приза, списание ключей, stock, claim history
+- `raffle:enter` — участие в розыгрыше и списание ключей
+- `event:toggle` — регистрация/отмена регистрации на мероприятие
+- `review:partner`, `review:expert`
+- `partner:profileUpdate`, `expert:profileUpdate` — кабинеты владельцев с server-side owner check
+- `loki:settings`
+- `log:error`, `log:diagnostic`, `guest:session`
+
+**Логика:** клиент больше не пишет пользовательские изменения напрямую в Firestore. Endpoint проверяет Firebase ID Token, определяет APG userId через `auth_map` / `users`, проверяет принадлежность данных пользователю, выполняет бизнес-логику через Admin SDK и пишет `userActivityLog`. Прямые Firestore reads на клиенте сохраняются для публичных каталогов и экранов, чтобы не ухудшать скорость.
+
+---
+
 ## POST /api/news-engagement
 
 **Назначение:** Сбор вовлечённости новостей: уникальные просмотры, дочитывание, репосты и быстрый feedback.

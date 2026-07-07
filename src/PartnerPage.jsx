@@ -11,11 +11,12 @@ function sanitizeForVK(text) {
     .replace(/@\S+/g, '[скрыто]');
 }
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, doc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
+import { userAction } from './userApi.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
@@ -172,7 +173,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   // Считаем просмотр карточки (один раз при открытии каждого партнёра)
   useEffect(() => {
     if (!partner?.id) return;
-    updateDoc(doc(db, 'partners', partner.id), { viewCount: increment(1) }).catch(() => {});
+    userAction('publicQr:view', { type: 'partner', id: partner.id, metric: 'view' }).catch(() => {});
   }, [partner?.id]);
 
   useEffect(() => {
@@ -219,20 +220,19 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     if (!partner || !userId || formStars === 0 || submitting) return;
     setSubmitting(true);
     try {
-      const reviewRef = doc(db, 'partners', partner.id, 'reviews', userId);
       const reviewData = {
         userId,
         userName: user?.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : 'Участник АПГ',
         userPhoto: user?.photo_200 ?? null,
         stars: formStars,
         text: formText.trim(),
-        createdAt: serverTimestamp(),
       };
-      await setDoc(reviewRef, reviewData);
-      // Также пишем в глобальную коллекцию для фида отзывов на главной
-      setDoc(doc(db, 'reviews', `${partner.id}_${userId}`), {
-        ...reviewData, partnerId: partner.id, partnerName: partner.name,
-      }).catch(() => {});
+      const result = await userAction('review:partner', {
+        userId,
+        partnerId: partner.id,
+        partnerName: partner.name,
+        ...reviewData,
+      });
 
       // Обновляем список отзывов
       const snap = await getDocs(query(
@@ -243,11 +243,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const allReviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReviews(allReviews);
 
-      // Считаем новый средний рейтинг
-      const avg = allReviews.length > 0 ? allReviews.reduce((s, r) => s + (r.stars ?? 0), 0) / allReviews.length : 0;
-      const newAvg = Math.round(avg * 10) / 10;
-      const newCount = allReviews.length;
-      await updateDoc(doc(db, 'partners', partner.id), { avgRating: newAvg, reviewCount: newCount });
+      const newAvg = result.avgRating ?? partner.avgRating ?? 0;
+      const newCount = result.reviewCount ?? allReviews.length;
       if (!mountedRef.current) return;
       onPartnerUpdate?.(partner.id, { avgRating: newAvg, reviewCount: newCount });
 

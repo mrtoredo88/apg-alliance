@@ -1,6 +1,6 @@
-import { db, auth } from './firebase.js';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { auth } from './firebase.js';
 import { signInAnonymously } from 'firebase/auth';
+import { userAction } from './userApi.js';
 
 let _userId = null;
 let _version = '?';
@@ -37,16 +37,17 @@ async function log(message, stack, source) {
 
   const { device, browser } = deviceInfo();
   try {
-    await addDoc(collection(db, 'errorLogs'), {
-      message: String(message).slice(0, 500),
-      stack:   String(stack  ?? '').slice(0, 3000),
-      source:  String(source ?? '').slice(0, 300),
-      userId:  _userId,
-      device, browser,
-      url:     window.location.href.slice(0, 300),
-      version: _version,
-      timestamp: serverTimestamp(),
-      resolved: false,
+    await userAction('log:error', {
+      payload: {
+        message: String(message).slice(0, 500),
+        stack:   String(stack  ?? '').slice(0, 3000),
+        source:  String(source ?? '').slice(0, 300),
+        userId:  _userId,
+        device, browser,
+        url:     window.location.href.slice(0, 300),
+        version: _version,
+        resolved: false,
+      },
     });
   } catch { /* не логируем ошибки логгера */ }
 }

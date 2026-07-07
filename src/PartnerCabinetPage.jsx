@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { PartnerQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, ContactCard, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
 
@@ -104,9 +105,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
         hours:            fHours.trim(),
         socialUrl:        fSocial.trim(),
         logoUrl:          fLogo.trim(),
-        profileUpdatedAt: serverTimestamp(),
       };
-      await updateDoc(doc(db, 'partners', partner.id), data);
+      await userAction('partner:profileUpdate', { id: partner.id, patch: data });
       const updated = { ...partner, ...data };
       setPartner(updated);
       onPartnerUpdate?.(updated);

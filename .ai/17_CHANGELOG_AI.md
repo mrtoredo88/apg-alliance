@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] V4.4.4 user backend migration и architecture audit
+**Коммит:** `локально`
+**Файлы:** `api/user-actions.js`, `server/src/routes/user-actions.js`, `server/src/server.js`, `src/userApi.js`, `src/UserApp.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/loki/LokiProvider.jsx`, `src/errorLogger.js`, `src/diagnostics.js`, `.ai/04_API.md`, `.ai/ARCHITECTURE.md`
+**Тип:** refactor
+**Что изменено:** Добавлен единый `/api/user-actions` для пользовательских write-сценариев с Firebase ID Token, owner checks и журналом `userActivityLog`. Пользовательские записи профиля, согласий, избранного, новостей, событий, призов, розыгрышей, заданий, отзывов, кабинетов, Локи, ошибок и диагностики переведены с прямого Firestore SDK на backend API; Firestore на клиенте оставлен для read-only каталогов и экранов.
+**Почему:** V4.4.4 завершает backend-first миграцию перед V5 и готовит архитектуру для Loki/AI-платформы без прямых клиентских записей в базу.
+
+---
+
 ## [2026-07-07] V4.4.3 complete backend migration для админки
 **Коммит:** `локально`
 **Файлы:** `api/_admin-security.js`, `api/admin-actions.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `.ai/04_API.md`

@@ -7,11 +7,12 @@ import vkBridge, { isVK } from './vk.js';
 import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js';
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
 import { confirmQrScan } from './rewardApi.js';
+import { userAction } from './userApi.js';
 import { db, auth, getMessagingIfSupported } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc, increment, arrayUnion,
-  collection, getDocs, query, orderBy, addDoc, serverTimestamp,
+  doc, getDoc,
+  collection, getDocs, query, orderBy,
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
@@ -227,11 +228,7 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
       traceAuthStage('auth_map_found', { source, uid: current.uid, userId: targetUserId, mappedId });
       return mappedId === targetUserId;
     }
-    await setDoc(mapRef, {
-      vkId: targetUserId,
-      source,
-      createdAt: serverTimestamp(),
-    });
+    await userAction('auth:linkUser', { userId: targetUserId, source });
     traceAuthStage('auth_map_created', { source, uid: current.uid, userId: targetUserId });
     return true;
   };
@@ -244,11 +241,7 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   await signInAnonymously(auth);
   const current = auth.currentUser;
   if (!current) throw new Error('firebase_auth_unavailable');
-  await setDoc(doc(db, 'auth_map', current.uid), {
-    vkId: targetUserId,
-    source,
-    createdAt: serverTimestamp(),
-  });
+  await userAction('auth:linkUser', { userId: targetUserId, source });
   traceAuthStage('owner_session_recreated', { source, uid: current.uid, userId: targetUserId });
   return current;
 }
@@ -633,8 +626,9 @@ export function UserApp() {
         if (!sid) {
           sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
           sessionStorage.setItem(GS_KEY, sid);
-          setDoc(doc(db, 'guestSessions', sid), {
-            timestamp: serverTimestamp(),
+          if (!auth.currentUser) await signInAnonymously(auth).catch(() => {});
+          userAction('guest:session', {
+            sid,
             date: new Date().toISOString().slice(0, 10),
             converted: false,
           }).catch(() => {});
@@ -642,7 +636,8 @@ export function UserApp() {
       } else {
         const sid = sessionStorage.getItem(GS_KEY);
         if (sid) {
-          updateDoc(doc(db, 'guestSessions', sid), {
+          userAction('guest:session', {
+            sid,
             converted: true,
             userId: String(userData.id),
           }).catch(() => {});
@@ -782,7 +777,6 @@ export function UserApp() {
         firstName: userData.first_name ?? null,
         lastName:  userData.last_name  ?? null,
         photo:     userData.photo_200  ?? null,
-        lastSeen:  serverTimestamp(),
       };
 
       if (docSnap.exists()) {
@@ -858,11 +852,11 @@ export function UserApp() {
 
         // Ежедневный бонус: +1 ключ за первый вход каждый день
         if (data.lastBonusDate !== todayKey) {
-          updateDoc(userRef, { keys: increment(1), lastBonusDate: todayKey, ...profilePatch }).catch(() => {});
+          userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } }).catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
           setUserKeys(keys + 1);
           if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
         } else {
-          updateDoc(userRef, profilePatch).catch(() => {});
+          userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } }).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
         }
       } else {
         // Новый пользователь
@@ -878,30 +872,18 @@ export function UserApp() {
             pendingConsents = parsed;
           }
         } catch {}
-        await setDoc(userRef, {
-          keys: isValidRef ? 2 : 0,          // +2 за переход по реферальной ссылке
-          favorites: [], scannedPartners: {},
-          savedNews: [], readLaterNews: [], newsReactions: {}, newsSubscriptions: {},
-          completedTasks: [], streak: 0, onboardingDone: false,
-          scanDates: [], lastBonusDate: todayKey,
-          referredBy: refId ?? null,
-          registeredAt: serverTimestamp(),
-          ...(pendingConsents ? {
-            consents: { ...pendingConsents.consents, acceptedAt: serverTimestamp() },
-            consentAcceptedAt: serverTimestamp(),
-            consentDocsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
-            consentLegalVersion: pendingConsents.consentLegalVersion ?? LEGAL_VERSION,
+        await userAction('profile:sync', {
+          userId: String(userData.id),
+          profile: { ...userData, ...profilePatch },
+          referrerId: refId,
+          consent: pendingConsents ? {
+            ...pendingConsents.consents,
+            docsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
             legalVersion: pendingConsents.consentLegalVersion ?? LEGAL_VERSION,
-            notificationConsent: !!pendingConsents.notificationConsent,
-            ...(pendingConsents.notificationConsent ? { notificationsRequestedAt: serverTimestamp() } : {}),
-          } : {}),
-          ...profilePatch,
+            notificationsAccepted: !!pendingConsents.notificationConsent,
+          } : null,
         });
         if (pendingConsents) localStorage.removeItem('apg_pending_consents');
-
-        if (isRealUser) {
-          setDoc(doc(db, 'stats', 'global'), { userCount: increment(1) }, { merge: true }).catch(() => {});
-        }
 
         if (isValidRef) {
           localStorage.removeItem('apg_pending_ref');
@@ -987,7 +969,7 @@ export function UserApp() {
     setShowOnboarding(false);
     setShowScannerHint(true);
     if (user) {
-      try { await updateDoc(doc(db, 'users', String(user.id)), { onboardingDone: true }); }
+      try { await userAction('profile:update', { userId: String(user.id), patch: { onboardingDone: true } }); }
       catch (e) { logError(e, 'UserApp.handleOnboardingComplete'); }
     }
   };
@@ -1004,17 +986,8 @@ export function UserApp() {
       : favorites.filter(id => id !== partnerId);
     setFavorites(next);
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), { favorites: next });
-      updateDoc(doc(db, 'partners', partnerId), { favoritesCount: increment(isAdding ? 1 : -1) }).catch(() => {});
-      const partner = partners.find(p => p.id === partnerId);
-      addDoc(collection(db, 'users', String(user.id), 'activity'), {
-        type: isAdding ? 'favorite_add' : 'favorite_remove',
-        icon: isAdding ? '⭐' : '✕',
-        text: isAdding
-          ? `Добавлено в избранное: ${partner?.name ?? partnerId}`
-          : `Убрано из избранного: ${partner?.name ?? partnerId}`,
-        ts: serverTimestamp(),
-      }).catch(() => {});
+      const result = await userAction('favorites:toggle', { userId: String(user.id), partnerId });
+      if (Array.isArray(result.favorites)) setFavorites(result.favorites);
     } catch { setFavorites(prev); }
   }, [user, favorites, partners, haptic]);
 
@@ -1033,7 +1006,7 @@ export function UserApp() {
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
     setSavedNews(next);
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), { savedNews: next });
+      await userAction('news:saved', { userId: String(user.id), values: next });
       showToast(next.includes(id) ? 'Новость сохранена.' : 'Новость убрана из сохранённых.', 'success');
     } catch (e) {
       setSavedNews(prev);
@@ -1049,7 +1022,7 @@ export function UserApp() {
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
     setReadLaterNews(next);
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), { readLaterNews: next });
+      await userAction('news:readLater', { userId: String(user.id), values: next });
       showToast(next.includes(id) ? 'Добавлено в список на потом.' : 'Убрано из списка на потом.', 'success');
     } catch (e) {
       setReadLaterNews(prev);
@@ -1070,10 +1043,7 @@ export function UserApp() {
     const next = { ...prev, [id]: reaction };
     setNewsReactions(next);
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), { newsReactions: next });
-      const patch = { [`reactions.${reaction}`]: increment(1) };
-      if (previousReaction) patch[`reactions.${previousReaction}`] = increment(-1);
-      updateDoc(doc(db, 'news', id), patch).catch(e => logError(e, 'UserApp.reactToNews.stats'));
+      await userAction('news:reaction', { userId: String(user.id), newsId: id, reaction, previousReaction });
       showToast('Реакция сохранена.', 'success');
     } catch (e) {
       setNewsReactions(prev);
@@ -1099,7 +1069,7 @@ export function UserApp() {
     const next = { ...prev, [field]: nextList };
     setNewsSubscriptions(next);
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), { newsSubscriptions: next });
+      await userAction('news:subscriptions', { userId: String(user.id), subscriptions: next });
       showToast(enabled ? 'Подписка отключена.' : `Подписка включена${label ? `: ${label}` : ''}.`, 'success');
     } catch (e) {
       setNewsSubscriptions(prev);
@@ -1141,7 +1111,7 @@ export function UserApp() {
         const partner = enrichedPartners.find(p => p.id === partnerId);
         if (partner) {
           openPartner(partner);
-          updateDoc(doc(db, 'partners', partner.id), { publicQRScans: increment(1) }).catch(() => {});
+          userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
           showToast('Это информационный QR. Для ключа попросите служебный QR у сотрудника.', 'info');
         } else {
           showToast('Партнёр не найден');
@@ -1152,7 +1122,7 @@ export function UserApp() {
       } else if (expertId) {
         const expert = experts.find(e => e.id === expertId);
         if (expert) {
-          updateDoc(doc(db, 'experts', expert.id), { publicQRScans: increment(1) }).catch(() => {});
+          userAction('publicQr:view', { type: 'expert', id: expert.id }).catch(() => {});
           showToast('Это информационный QR. Для ключа попросите служебный QR у эксперта.', 'info');
         } else {
           showToast('Эксперт не найден');
@@ -1233,7 +1203,7 @@ export function UserApp() {
     const p = partners.find(p => p.id === pendingPartnerId);
     if (p) {
       openPartner(p);
-      updateDoc(doc(db, 'partners', p.id), { publicQRScans: increment(1) }).catch(() => {});
+      userAction('publicQr:view', { type: 'partner', id: p.id }).catch(() => {});
     } else {
       showToast('🔍 Партнёр не найден');
     }
@@ -1253,7 +1223,7 @@ export function UserApp() {
     const e = experts.find(e => e.id === pendingExpertId);
     if (e) {
       navigatePanel('experts');
-      updateDoc(doc(db, 'experts', e.id), { publicQRScans: increment(1) }).catch(() => {});
+      userAction('publicQr:view', { type: 'expert', id: e.id }).catch(() => {});
     }
   }, [pendingExpertId, experts, navigatePanel]);
 
@@ -1266,13 +1236,10 @@ export function UserApp() {
     setUserKeys(prev => prev + reward);
     try {
       const uid = String(user.id);
-      await updateDoc(doc(db, 'users', uid), { completedTasks: captured, keys: increment(reward) });
+      const result = await userAction('task:claim', { userId: uid, taskId, reward });
+      if (Array.isArray(result.completedTasks)) setCompletedTasks(result.completedTasks);
+      if (!result.awarded) setUserKeys(prev => prev - reward);
       showLokiMessage(LOKI_EVENTS.ACHIEVEMENT_UNLOCKED, { taskId, reward });
-      addDoc(collection(db, 'users', uid, 'activity'), {
-        type: 'task', icon: '✅',
-        text: `Задание выполнено: +${reward} ключей`,
-        ts: serverTimestamp(),
-      }).catch(() => {});
     } catch (e) {
       logError(e, 'UserApp.handleClaim');
       showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'task_claim' });
@@ -1299,29 +1266,12 @@ export function UserApp() {
     } catch {}
     setUserKeys(prev => prev - prize.cost); // оптимистичное списание
     try {
-      const batch = [];
-      batch.push(updateDoc(doc(db, 'users', String(user.id)), { keys: increment(-prize.cost) }));
-      batch.push(addDoc(collection(db, 'users', String(user.id), 'claims'), {
-        prizeId: prize.id, prizeName: prize.name,
-        prizeEmoji: prize.emoji ?? '🎁', cost: prize.cost,
-        claimedAt: serverTimestamp(),
-      }));
-      if (prize.stock !== null && prize.stock !== undefined) {
-        batch.push(updateDoc(doc(db, 'prizes', prize.id), { stock: increment(-1) }));
-      }
-      await Promise.all(batch);
       const uid = String(user.id);
-      addDoc(collection(db, 'users', uid, 'activity'), {
-        type: 'prize', icon: prize.emoji ?? '🎁',
-        text: `Приз получен: ${prize.name} (−${prize.cost} 🗝️)`,
-        ts: serverTimestamp(),
-      }).catch(() => {});
-      addDoc(collection(db, 'prizeClaims'), {
-        userId: uid, userName: user.first_name ?? '',
-        prizeId: prize.id, prizeName: prize.name,
-        prizeEmoji: prize.emoji ?? '🎁', cost: prize.cost,
-        status: 'pending', claimedAt: serverTimestamp(),
-      }).catch(() => {});
+      await userAction('prize:claim', {
+        userId: uid,
+        userName: user.first_name ?? '',
+        prize,
+      });
       return true;
     } catch (e) {
       logError(e, 'UserApp.handlePrizeClaim');
@@ -1342,20 +1292,13 @@ export function UserApp() {
     try {
       const uid = String(user.id);
       const userName = user.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : 'Участник АПГ';
-      await Promise.all([
-        updateDoc(doc(db, 'users', uid), { keys: increment(-cost) }),
-        setDoc(doc(db, 'raffleEntries', `${prize.id}_${uid}`), {
-          prizeId: prize.id, userId: uid, userName,
-          userPhoto: user.photo_200 ?? null,
-          ticketsCount: increment(ticketCount),
-          updatedAt: serverTimestamp(),
-        }, { merge: true }),
-      ]);
-      addDoc(collection(db, 'users', uid, 'activity'), {
-        type: 'raffle_enter', icon: prize.emoji ?? '🎟️',
-        text: `Участие в розыгрыше: ${prize.name} (−${cost} 🗝️)`,
-        ts: serverTimestamp(),
-      }).catch(() => {});
+      await userAction('raffle:enter', {
+        userId: uid,
+        userName,
+        userPhoto: user.photo_200 ?? null,
+        prize,
+        ticketCount,
+      });
       return true;
     } catch (e) {
       logError(e, 'UserApp.handleRaffleEnter');
@@ -1379,11 +1322,8 @@ export function UserApp() {
       setRegisteredEventIds(next);
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount ?? 1) - 1) } : e));
       try {
-        await Promise.all([
-          deleteDoc(doc(db, 'events', eventId, 'registrations', userId)),
-          updateDoc(doc(db, 'users', userId), { registeredEvents: next }),
-          updateDoc(doc(db, 'events', eventId), { registeredCount: increment(-1) }),
-        ]);
+        const result = await userAction('event:toggle', { userId, event, register: false });
+        if (Array.isArray(result.registeredEvents)) setRegisteredEventIds(result.registeredEvents);
       } catch (e) {
         logError(e, 'UserApp.handleEventUnregister');
         setRegisteredEventIds(prev => [...prev, eventId]);
@@ -1402,16 +1342,14 @@ export function UserApp() {
       setRegisteredEventIds(next);
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       try {
-        await Promise.all([
-          setDoc(doc(db, 'events', eventId, 'registrations', userId), {
-            userId,
-            userName: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim(),
-            userPhoto: user.photo_200 ?? null,
-            registeredAt: serverTimestamp(),
-          }),
-          updateDoc(doc(db, 'users', userId), { registeredEvents: next }),
-          updateDoc(doc(db, 'events', eventId), { registeredCount: increment(1) }),
-        ]);
+        const result = await userAction('event:toggle', {
+          userId,
+          event,
+          register: true,
+          userName: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim(),
+          userPhoto: user.photo_200 ?? null,
+        });
+        if (Array.isArray(result.registeredEvents)) setRegisteredEventIds(result.registeredEvents);
         showToast(`✓ Вы записаны: ${event.title}!`, 'success');
       } catch (e) {
         logError(e, 'UserApp.handleEventRegister');
@@ -1487,15 +1425,18 @@ export function UserApp() {
         privacyPolicyUrl: CONSENT_DOCS.privacyPolicyUrl,
       };
       if (existingSnap.exists()) {
-        await setDoc(userRef, {
-          consents: { ...consentPayload, acceptedAt: serverTimestamp() },
-          consentAcceptedAt: serverTimestamp(),
-          consentDocsVersion: CONSENT_DOCS_VERSION,
-          consentLegalVersion: LEGAL_VERSION,
-          legalVersion: LEGAL_VERSION,
-          notificationConsent: !!notificationsAccepted,
-          ...(notificationsAccepted ? { notificationsRequestedAt: serverTimestamp() } : {}),
-        }, { merge: true });
+        await userAction('profile:update', {
+          userId: String(targetUser.id),
+          serverConsentAt: true,
+          patch: {
+            consents: consentPayload,
+            consentDocsVersion: CONSENT_DOCS_VERSION,
+            consentLegalVersion: LEGAL_VERSION,
+            legalVersion: LEGAL_VERSION,
+            notificationConsent: !!notificationsAccepted,
+            ...(notificationsAccepted ? { notificationsRequestedAt: true } : {}),
+          },
+        });
         traceAuthStage('consent_saved_firestore', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
       } else {
         localStorage.setItem('apg_pending_consents', JSON.stringify({
@@ -1558,7 +1499,7 @@ export function UserApp() {
   const handleDeleteProfile = useCallback(async () => {
     if (!user || String(user.id).startsWith('guest_')) return;
     try {
-      await deleteDoc(doc(db, 'users', String(user.id)));
+      await userAction('profile:delete', { userId: String(user.id) });
       handleLogout();
     } catch (e) { logError(e, 'UserApp.handleDeleteProfile'); }
   }, [user, handleLogout]);
@@ -1663,10 +1604,13 @@ export function UserApp() {
       const token = await getToken(msg, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
 
       if (token && user?.id) {
-        await updateDoc(doc(db, 'users', String(user.id)), {
-          fcmTokens: arrayUnion(token),
-          notificationProvider: 'webpush',
-          notificationsEnabled: true,
+        await userAction('profile:update', {
+          userId: String(user.id),
+          patch: {
+            fcmTokens: [token],
+            notificationProvider: 'webpush',
+            notificationsEnabled: true,
+          },
         });
       }
       localStorage.setItem('apg_notif_enabled', '1');
@@ -1703,9 +1647,7 @@ export function UserApp() {
     if (isVK()) {
       localStorage.setItem('apg_notif_enabled', '1');
       setNotifEnabled(true);
-      if (uid) updateDoc(doc(db, 'users', uid), {
-        notificationsEnabled: true, notificationProvider: 'vk',
-      }).catch(() => {});
+      if (uid) userAction('profile:update', { userId: uid, patch: { notificationsEnabled: true, notificationProvider: 'vk' } }).catch(() => {});
       showToast('🔔 Уведомления включены!', 'success');
       vkBridge.send('VKWebAppAllowNotifications').catch(() => {});
       return;
@@ -1733,7 +1675,8 @@ export function UserApp() {
       await vkBridge.send('VKWebAppJoinGroup', { group_id: VK_GROUP_ID });
       // Успешно вступил (или уже был членом) — начисляем бонус только если ещё не получал
       if (user && !joinedGroup) {
-        updateDoc(doc(db, 'users', String(user.id)), { joinedGroup: true, keys: increment(1) }).catch(() => {});
+        userAction('profile:update', { userId: String(user.id), patch: { joinedGroup: true } }).catch(() => {});
+        userAction('task:claim', { userId: String(user.id), taskId: 'join_vk_group', reward: 1 }).catch(() => {});
         setUserKeys(prev => prev + 1);
         showToast('🎉 +1 ключ за подписку на сообщество!', 'success');
       }
@@ -1744,7 +1687,7 @@ export function UserApp() {
       } else {
         // Веб-режим: открыли группу, считаем выполненным (без бонуса)
         setJoinedGroup(true);
-        if (user) updateDoc(doc(db, 'users', String(user.id)), { joinedGroup: true }).catch(() => {});
+        if (user) userAction('profile:update', { userId: String(user.id), patch: { joinedGroup: true } }).catch(() => {});
       }
     }
   }, [user, joinedGroup, showToast]);

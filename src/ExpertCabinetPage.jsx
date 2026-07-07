@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
 
@@ -89,9 +90,8 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
         telegramUrl:      fTelegram.trim(),
         maxUrl:           fMax.trim(),
         photo:            fPhoto.trim(),
-        profileUpdatedAt: serverTimestamp(),
       };
-      await updateDoc(doc(db, 'experts', expert.id), data);
+      await userAction('expert:profileUpdate', { id: expert.id, patch: data });
       const updated = { ...expert, ...data };
       setExpert(updated);
       onExpertUpdate?.(updated);

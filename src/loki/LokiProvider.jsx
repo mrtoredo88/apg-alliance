@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase.js';
 import { logError } from '../errorLogger.js';
+import { userAction } from '../userApi.js';
 import { LOKI_EVENTS } from './lokiEvents.js';
 import { getLokiPhrase } from './lokiPhrases.js';
 import { subscribeLoki } from './lokiBus.js';
@@ -222,10 +221,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   useEffect(() => {
     if (!user?.id || user.isGuest) return;
     if (!settingsDirtyRef.current) return;
-    setDoc(doc(db, 'users', String(user.id)), {
-      lokiSettings: settings,
-      lokiSettingsUpdatedAt: serverTimestamp(),
-    }, { merge: true })
+    userAction('loki:settings', { userId: String(user.id), settings })
       .then(() => { settingsDirtyRef.current = false; })
       .catch(e => logError(e, 'LokiProvider.persistSettings'));
   }, [settings, user?.id, user?.isGuest]);
