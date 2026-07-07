@@ -14,6 +14,7 @@ import expertRotationRoutes   from './routes/expert-rotation.js';
 import raffleDrawRoutes       from './routes/raffle-draw.js';
 import activityIndexRoutes    from './routes/activity-index.js';
 import qrTokenRoutes          from './routes/qr-token.js';
+import newsCommentsRoutes     from './routes/news-comments.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -46,6 +47,7 @@ fastify.register(expertRotationRoutes);
 fastify.register(raffleDrawRoutes);
 fastify.register(activityIndexRoutes);
 fastify.register(qrTokenRoutes);
+fastify.register(newsCommentsRoutes);
 
 fastify.get('/health', async (request, reply) => {
   try {

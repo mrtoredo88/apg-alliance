@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Исправление изображений и комментариев новостей
+**Коммит:** `локально`
+**Файлы:** `src/NewsPage.jsx`, `api/news-comments.js`, `server/src/routes/news-comments.js`, `server/src/server.js`, `.ai/04_API.md`
+**Тип:** fix
+**Что изменено:** Из media-frame новостей убран неявный CSS scale/translate для фото, VK-изображения теперь показываются с сохранением пропорций через `object-fit: contain`. Комментарии перенесены с прямой клиентской записи в Firestore на backend `/api/news-comments`, добавлены ответы, редактирование, лайки, скрытие и понятное сообщение об ошибке с повторной загрузкой.
+**Почему:** Последняя VK-новость визуально растягивалась/масштабировалась, а комментарии не размещались из-за отсутствия клиентского доступа к коллекции `newsComments` в Firestore rules.
+
+---
+
 ## [2026-07-07] Premium News media polish
 **Коммит:** `758702c7`
 **Файлы:** `api/vk-news.js`, `server/src/routes/vk-news.js`, `src/newsUtils.js`, `src/NewsPage.jsx`, `src/UserApp.jsx`, `.ai/04_API.md`

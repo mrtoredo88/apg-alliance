@@ -69,6 +69,50 @@
 
 ---
 
+## GET/POST /api/news-comments
+
+**Назначение:** Комментарии к новостям, включая VK-публикации, без прямой клиентской записи в Firestore.
+
+**Методы:** GET, POST
+**Auth:** пользователь передаётся клиентом; запись выполняет backend через Admin SDK
+**Коллекция:** `newsComments`
+
+**GET query params:**
+- `newsId` (required) — id новости или VK-поста (`vk_...`)
+
+**GET response 200:**
+```json
+{
+  "ok": true,
+  "comments": [
+    {
+      "id": "commentId",
+      "newsId": "vk_229980067_1234",
+      "parentId": null,
+      "userId": "123",
+      "userName": "Участник АПГ",
+      "userAvatar": "https://...",
+      "text": "Комментарий",
+      "likes": 0,
+      "likedBy": ["123"],
+      "hidden": false,
+      "createdAt": "2026-07-07T12:00:00.000Z",
+      "updatedAt": "2026-07-07T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+**POST actions:**
+- `create` — создать комментарий или ответ (`newsId`, `text`, `parentId?`, `user`)
+- `update` — изменить свой комментарий (`commentId`, `text`, `user`)
+- `delete` — скрыть свой комментарий; `admin/owner` может скрывать любой (`commentId`, `user`)
+- `like` — поставить лайк один раз от пользователя (`commentId`, `user`)
+
+**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`.
+
+---
+
 ## POST /api/upload-photo
 
 **Назначение:** Загрузить фото в Yandex Cloud S3.

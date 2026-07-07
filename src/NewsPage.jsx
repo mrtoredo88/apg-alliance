@@ -3,21 +3,14 @@ import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
-import { APP_URL } from './constants.js';
+import { API_BASE_URL, APP_URL } from './constants.js';
 import { db } from './firebase.js';
 import { logError } from './errorLogger.js';
 import {
-  addDoc,
-  collection,
-  deleteDoc,
   doc,
-  getDocs,
   increment,
-  query,
   serverTimestamp,
   setDoc,
-  updateDoc,
-  where,
 } from 'firebase/firestore';
 import {
   NEWS_CATEGORIES,
@@ -74,7 +67,12 @@ function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, chi
   const image = photo?.url || '';
   const ratio = photo?.width && photo?.height ? photo.width / photo.height : null;
   const isTall = ratio && ratio < 0.82;
-  const fit = mode === 'hero' || mode === 'article' || isTall ? 'contain' : 'cover';
+  const isVk = item?.source === 'vk';
+  const fit = mode === 'card' && !isTall && !isVk ? 'cover' : 'contain';
+  const handleImageError = (e, layer) => {
+    e.currentTarget.style.display = 'none';
+    logError(new Error(`News image failed: ${image}`), `NewsPage.image.${layer}.${item?.id || item?.externalId || 'unknown'}`);
+  };
   return (
     <div
       onClick={onOpen}
@@ -86,15 +84,17 @@ function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, chi
             src={image}
             alt=""
             loading="lazy"
-            onError={e => { e.currentTarget.style.display = 'none'; }}
-            style={{ position: 'absolute', inset: -18, width: 'calc(100% + 36px)', height: 'calc(100% + 36px)', objectFit: 'cover', filter: 'blur(22px) saturate(1.12) brightness(0.62)', transform: 'scale(1.04)' }}
+            decoding="async"
+            onError={e => handleImageError(e, 'backdrop')}
+            style={{ position: 'absolute', inset: -18, width: 'calc(100% + 36px)', height: 'calc(100% + 36px)', objectFit: 'cover', filter: 'blur(22px) saturate(1.12) brightness(0.62)' }}
           />
           <img
             src={image}
             alt=""
             loading="lazy"
-            onError={e => { e.currentTarget.style.display = 'none'; }}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit, filter: 'saturate(1.07) contrast(1.02)', transform: 'translateZ(0)' }}
+            decoding="async"
+            onError={e => handleImageError(e, 'main')}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit, filter: 'saturate(1.07) contrast(1.02)' }}
           />
         </>
       )}
@@ -228,24 +228,39 @@ function SharePanel({ item, onToast }) {
   );
 }
 
-function CommentRow({ comment, user, onDelete, onLike }) {
+async function requestNewsComments(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || 'Не удалось выполнить действие с комментарием.');
+  }
+  return data;
+}
+
+function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, compact = false }) {
   const name = comment.userName || 'Участник АПГ';
   const avatar = comment.userAvatar || '';
   const canDelete = user?.id && (String(user.id) === String(comment.userId) || ['admin', 'owner'].includes(String(user.role || '')));
-  const date = comment.createdAt?.toDate ? comment.createdAt.toDate() : comment.createdAt ? new Date(comment.createdAt) : null;
+  const canEdit = user?.id && String(user.id) === String(comment.userId);
+  const date = comment.createdAt ? new Date(comment.createdAt) : null;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '42px 1fr', gap: 11 }}>
-      <div style={{ width: 42, height: 42, borderRadius: 16, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, fontWeight: 900 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: compact ? '34px 1fr' : '42px 1fr', gap: compact ? 9 : 11 }}>
+      <div style={{ width: compact ? 34 : 42, height: compact ? 34 : 42, borderRadius: compact ? 13 : 16, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, fontWeight: 900 }}>
         {avatar ? <img src={avatar} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name.slice(0, 1).toUpperCase()}
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 13.5, fontWeight: 860 }}>{name}</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: compact ? 12.5 : 13.5, fontWeight: 860 }}>{name}</div>
           {date && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 680 }}>{date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</div>}
         </div>
-        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '20px', marginTop: 4, whiteSpace: 'pre-wrap' }}>{comment.text}</div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: compact ? 13 : 13.5, lineHeight: compact ? '19px' : '20px', marginTop: 4, whiteSpace: 'pre-wrap' }}>{comment.text}</div>
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
           <button type="button" onClick={() => onLike(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820 }}>❤️ {Number(comment.likes || 0)}</button>
+          <button type="button" onClick={() => onReply(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Ответить</button>
+          {canEdit && <button type="button" onClick={() => onEdit(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Изменить</button>}
           {canDelete && <button type="button" onClick={() => onDelete(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Удалить</button>}
         </div>
       </div>
@@ -260,29 +275,61 @@ function CommentsPanel({ item, user, onToast }) {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [error, setError] = useState('');
+  const draftKey = useMemo(() => newsId ? `apg_news_comment_draft_${newsId}` : '', [newsId]);
+
+  const apiUser = useMemo(() => ({
+    id: String(user?.id || ''),
+    name: user?.name || user?.first_name || user?.email || 'Участник АПГ',
+    avatar: user?.avatar || user?.photo_100 || user?.photo || '',
+    role: user?.role || '',
+  }), [user]);
 
   const load = async () => {
     if (!newsId) return;
     setLoading(true);
+    setError('');
     try {
-      const snap = await getDocs(query(collection(db, 'newsComments'), where('newsId', '==', newsId)));
-      setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => !v.hidden));
+      const data = await requestNewsComments(`/api/news-comments?newsId=${encodeURIComponent(newsId)}`);
+      setComments(Array.isArray(data.comments) ? data.comments : []);
     } catch (e) {
       logError(e, 'NewsPage.comments.load');
-      onToast?.('Не удалось загрузить комментарии.', 'error');
+      setError('Не удалось загрузить комментарии. Проверьте подключение и попробуйте ещё раз.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, [newsId]);
+  useEffect(() => {
+    if (!draftKey) return;
+    setText(localStorage.getItem(draftKey) || '');
+    setEditing(null);
+    setReplyTo(null);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftKey || editing) return;
+    const value = text.trim();
+    if (value) localStorage.setItem(draftKey, text);
+    else localStorage.removeItem(draftKey);
+  }, [draftKey, editing, text]);
 
   const sorted = useMemo(() => [...comments].sort((a, b) => {
     if (sort === 'popular') return (Number(b.likes) || 0) - (Number(a.likes) || 0);
-    const at = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : Number(new Date(a.createdAt || 0));
-    const bt = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : Number(new Date(b.createdAt || 0));
+    const at = Number(new Date(a.createdAt || 0));
+    const bt = Number(new Date(b.createdAt || 0));
     return bt - at;
-  }), [comments, sort]);
+  }).filter(comment => !comment.parentId), [comments, sort]);
+
+  const repliesByParent = useMemo(() => comments.reduce((acc, comment) => {
+    if (!comment.parentId) return acc;
+    const key = String(comment.parentId);
+    acc[key] = [...(acc[key] || []), comment].sort((a, b) => Number(new Date(a.createdAt || 0)) - Number(new Date(b.createdAt || 0)));
+    return acc;
+  }, {}), [comments]);
 
   const submit = async () => {
     const value = text.trim();
@@ -292,24 +339,31 @@ function CommentsPanel({ item, user, onToast }) {
       return;
     }
     setSending(true);
+    setError('');
     try {
-      await addDoc(collection(db, 'newsComments'), {
-        newsId,
-        userId: String(user.id),
-        userName: user.name || user.first_name || user.email || 'Участник АПГ',
-        userAvatar: user.avatar || user.photo_100 || user.photo || '',
-        text: value,
-        likes: 0,
-        hidden: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      if (editing) {
+        const data = await requestNewsComments('/api/news-comments', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'update', commentId: editing.id, text: value, user: apiUser }),
+        });
+        setComments(prev => prev.map(comment => comment.id === editing.id ? data.comment : comment));
+        setEditing(null);
+        onToast?.('Комментарий обновлён.', 'success');
+      } else {
+        const data = await requestNewsComments('/api/news-comments', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'create', newsId, parentId: replyTo?.id || null, text: value, user: apiUser }),
+        });
+        setComments(prev => [data.comment, ...prev]);
+        onToast?.(replyTo ? 'Ответ опубликован.' : 'Комментарий опубликован.', 'success');
+      }
       setText('');
-      onToast?.('Комментарий опубликован.', 'success');
-      await load();
+      setReplyTo(null);
+      if (draftKey) localStorage.removeItem(draftKey);
     } catch (e) {
       logError(e, 'NewsPage.comments.submit');
-      onToast?.('Не удалось отправить комментарий.', 'error');
+      setError(e?.message || 'Комментарий не размещён. Попробуйте ещё раз.');
+      onToast?.('Комментарий не размещён.', 'error');
     } finally {
       setSending(false);
     }
@@ -318,26 +372,48 @@ function CommentsPanel({ item, user, onToast }) {
   const like = async (comment) => {
     try {
       setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(v.likes || 0) + 1 } : v));
-      await updateDoc(doc(db, 'newsComments', comment.id), { likes: increment(1) });
+      const data = await requestNewsComments('/api/news-comments', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'like', commentId: comment.id, user: apiUser }),
+      });
+      setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(data.likes ?? v.likes ?? 0) } : v));
     } catch (e) {
       logError(e, 'NewsPage.comments.like');
+      onToast?.(e?.message || 'Не удалось поставить реакцию.', 'error');
       await load();
     }
   };
 
   const remove = async (comment) => {
     try {
-      if (['admin', 'owner'].includes(String(user?.role || ''))) {
-        await updateDoc(doc(db, 'newsComments', comment.id), { hidden: true, hiddenAt: serverTimestamp() });
-      } else {
-        await deleteDoc(doc(db, 'newsComments', comment.id));
-      }
+      await requestNewsComments('/api/news-comments', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'delete', commentId: comment.id, user: apiUser }),
+      });
       setComments(prev => prev.filter(v => v.id !== comment.id));
       onToast?.('Комментарий удалён.', 'success');
     } catch (e) {
       logError(e, 'NewsPage.comments.delete');
-      onToast?.('Не удалось удалить комментарий.', 'error');
+      onToast?.(e?.message || 'Не удалось удалить комментарий.', 'error');
     }
+  };
+
+  const startEdit = (comment) => {
+    setEditing(comment);
+    setReplyTo(null);
+    setText(comment.text || '');
+  };
+
+  const startReply = (comment) => {
+    setEditing(null);
+    setReplyTo(comment);
+    setText('');
+  };
+
+  const cancelComposerMode = () => {
+    setEditing(null);
+    setReplyTo(null);
+    setText('');
   };
 
   return (
@@ -352,16 +428,41 @@ function CommentsPanel({ item, user, onToast }) {
       </div>
       {user && !String(user.id || '').startsWith('guest_') ? (
         <div style={{ display: 'grid', gap: 9, marginBottom: 14 }}>
-          <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Напишите комментарий" maxLength={900} style={{ ...inputStyle, minHeight: 82, height: 82, resize: 'vertical', paddingTop: 13, lineHeight: '20px' }} />
-          <GlassButton onClick={submit} disabled={sending || !text.trim()} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a', opacity: sending || !text.trim() ? 0.58 : 1 }}>{sending ? 'Отправляем...' : 'Отправить'}</GlassButton>
+          {(replyTo || editing) && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', border: '1px solid rgba(215,184,106,0.18)', background: 'rgba(215,184,106,0.08)', borderRadius: 18, padding: '9px 11px' }}>
+              <span>{editing ? 'Редактирование комментария' : `Ответ для ${replyTo?.userName || 'участника'}`}</span>
+              <button type="button" onClick={cancelComposerMode} style={{ border: 'none', background: 'transparent', color: APG2_PROFILE.gold, fontWeight: 840 }}>Отмена</button>
+            </div>
+          )}
+          <textarea value={text} onChange={e => setText(e.target.value)} placeholder={editing ? 'Обновите комментарий' : replyTo ? 'Напишите ответ' : 'Напишите комментарий'} maxLength={900} style={{ ...inputStyle, minHeight: 82, height: 82, resize: 'vertical', paddingTop: 13, lineHeight: '20px' }} />
+          <GlassButton onClick={submit} disabled={sending || !text.trim()} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a', opacity: sending || !text.trim() ? 0.58 : 1 }}>{sending ? 'Отправляем...' : editing ? 'Сохранить' : 'Отправить'}</GlassButton>
         </div>
       ) : (
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginBottom: 14 }}>Авторизуйтесь, чтобы оставить комментарий.</div>
       )}
+      {error && (
+        <div style={{ display: 'grid', gap: 8, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', border: '1px solid rgba(255,119,92,0.24)', background: 'rgba(255,119,92,0.08)', borderRadius: 20, padding: 12, marginBottom: 14 }}>
+          <span>{error}</span>
+          <button type="button" onClick={load} style={{ justifySelf: 'start', border: 'none', background: 'transparent', color: APG2_PROFILE.gold, fontSize: 12.5, fontWeight: 850, padding: 0 }}>Повторить загрузку</button>
+        </div>
+      )}
       {loading ? (
         <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Загружаем обсуждение...</div>
       ) : sorted.length ? (
-        <div style={{ display: 'grid', gap: 15 }}>{sorted.map(comment => <CommentRow key={comment.id} comment={comment} user={user} onDelete={remove} onLike={like} />)}</div>
+        <div style={{ display: 'grid', gap: 15 }}>
+          {sorted.map(comment => (
+            <div key={comment.id} style={{ display: 'grid', gap: 11 }}>
+              <CommentRow comment={comment} user={user} onDelete={remove} onLike={like} onEdit={startEdit} onReply={startReply} />
+              {!!repliesByParent[comment.id]?.length && (
+                <div style={{ display: 'grid', gap: 10, marginLeft: 28, paddingLeft: 12, borderLeft: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
+                  {repliesByParent[comment.id].map(reply => (
+                    <CommentRow key={reply.id} comment={reply} user={user} onDelete={remove} onLike={like} onEdit={startEdit} onReply={startReply} compact />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       ) : (
         <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Пока нет комментариев. Можно быть первым.</div>
       )}
@@ -414,6 +515,7 @@ function NewsCard({ item, index, onOpen, saved, later }) {
 function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, saved, later, reaction, user, onToast }) {
   const [progress, setProgress] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const scrollRef = useRef(null);
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const url = getNewsUrl(item);
@@ -423,9 +525,11 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
   const docs = getNewsDocs(item);
   const stats = getNewsStats(item);
   const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean) : [];
+  const articleId = item?.id ? String(item.id) : '';
+  const scrollKey = articleId ? `apg_news_scroll_${articleId}` : '';
 
   useEffect(() => {
-    const id = item?.id ? String(item.id) : '';
+    const id = articleId;
     if (!id) return;
     const viewer = String(user?.id || localStorage.getItem('apg_guest_id') || 'local');
     const key = `apg_news_viewed_${id}_${viewer}`;
@@ -436,18 +540,28 @@ function ArticleView({ item, related, onClose, onReact, onSave, onReadLater, sav
       stats: { views: increment(1) },
       lastViewedAt: serverTimestamp(),
     }, { merge: true }).catch(e => logError(e, 'NewsPage.trackView'));
-  }, [item?.id, user?.id]);
+  }, [articleId, user?.id]);
+
+  useEffect(() => {
+    if (!scrollKey) return;
+    const savedTop = Number(localStorage.getItem(scrollKey) || 0);
+    if (!savedTop) return;
+    requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = savedTop;
+    });
+  }, [scrollKey]);
 
   const handleScroll = (e) => {
     const el = e.currentTarget;
     const max = Math.max(1, el.scrollHeight - el.clientHeight);
     setProgress(Math.min(1, Math.max(0, el.scrollTop / max)));
+    if (scrollKey) localStorage.setItem(scrollKey, String(el.scrollTop));
   };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text }}>
       <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: `${progress * 100}%`, background: 'linear-gradient(90deg, #9F7932, #F4D98C, #FFF0B8)', boxShadow: '0 0 18px rgba(244,217,140,0.44)', zIndex: 2, transition: 'width 80ms linear' }} />
-      <div onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(110px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
             <button type="button" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 22 }}>←</button>

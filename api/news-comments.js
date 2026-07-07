@@ -1,0 +1,161 @@
+import { FieldValue } from 'firebase-admin/firestore';
+import { getAdminDb } from './_firebase-admin.js';
+
+const MAX_TEXT = 900;
+
+function cleanText(value) {
+  return String(value || '').replace(/\s+\n/g, '\n').trim().slice(0, MAX_TEXT);
+}
+
+function safeUser(user = {}) {
+  const id = String(user.id || user.userId || '').trim();
+  return {
+    id,
+    name: String(user.name || user.first_name || user.email || 'Участник АПГ').trim().slice(0, 90),
+    avatar: String(user.avatar || user.photo_100 || user.photo || '').trim().slice(0, 500),
+    role: String(user.role || '').trim(),
+  };
+}
+
+function serializeComment(doc) {
+  const data = doc.data() || {};
+  const toIso = value => value?.toDate ? value.toDate().toISOString() : value || null;
+  return {
+    id: doc.id,
+    newsId: data.newsId || '',
+    parentId: data.parentId || null,
+    userId: data.userId || '',
+    userName: data.userName || 'Участник АПГ',
+    userAvatar: data.userAvatar || '',
+    text: data.text || '',
+    likes: Number(data.likes || 0),
+    likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
+    hidden: Boolean(data.hidden),
+    createdAt: toIso(data.createdAt),
+    updatedAt: toIso(data.updatedAt),
+  };
+}
+
+async function logCommentError(db, request, error, extra = {}) {
+  try {
+    await db.collection('errorLogs').add({
+      source: 'api.news-comments',
+      message: String(error?.message || error).slice(0, 500),
+      stack: String(error?.stack || '').slice(0, 3000),
+      extra,
+      userAgent: String(request.headers['user-agent'] || '').slice(0, 300),
+      url: String(request.url || '').slice(0, 300),
+      timestamp: FieldValue.serverTimestamp(),
+      resolved: false,
+    });
+  } catch {}
+}
+
+async function listComments(db, newsId) {
+  const snap = await db.collection('newsComments').where('newsId', '==', newsId).get();
+  return snap.docs
+    .map(serializeComment)
+    .filter(comment => !comment.hidden)
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+export default async function handler(req, res) {
+  const db = getAdminDb();
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  try {
+    if (req.method === 'GET') {
+      const newsId = String(req.query.newsId || '').trim();
+      if (!newsId) return res.status(400).json({ ok: false, error: 'newsId is required' });
+      const comments = await listComments(db, newsId);
+      return res.status(200).json({ ok: true, comments });
+    }
+
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
+
+    const action = String(req.body?.action || '').trim();
+    const user = safeUser(req.body?.user);
+    const isAdmin = ['admin', 'owner'].includes(user.role);
+
+    if (action === 'create') {
+      const newsId = String(req.body?.newsId || '').trim();
+      const text = cleanText(req.body?.text);
+      const parentId = req.body?.parentId ? String(req.body.parentId).trim() : null;
+      if (!newsId || !text || !user.id || user.id.startsWith('guest_')) {
+        return res.status(400).json({ ok: false, error: 'Недостаточно данных для комментария.' });
+      }
+      const ref = await db.collection('newsComments').add({
+        newsId,
+        parentId,
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar,
+        text,
+        likes: 0,
+        likedBy: [],
+        hidden: false,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const created = await ref.get();
+      return res.status(200).json({ ok: true, comment: serializeComment(created) });
+    }
+
+    const commentId = String(req.body?.commentId || '').trim();
+    if (!commentId) return res.status(400).json({ ok: false, error: 'commentId is required' });
+
+    const ref = db.collection('newsComments').doc(commentId);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ ok: false, error: 'Комментарий не найден.' });
+    const data = snap.data() || {};
+    const isOwner = user.id && String(data.userId) === user.id;
+
+    if (action === 'like') {
+      if (!user.id || user.id.startsWith('guest_')) {
+        return res.status(401).json({ ok: false, error: 'Авторизуйтесь, чтобы поставить реакцию.' });
+      }
+      const likedBy = Array.isArray(data.likedBy) ? data.likedBy.map(String) : [];
+      if (likedBy.includes(user.id)) {
+        return res.status(200).json({ ok: true, alreadyLiked: true, likes: Number(data.likes || 0) });
+      }
+      await ref.update({
+        likes: FieldValue.increment(1),
+        likedBy: FieldValue.arrayUnion(user.id),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return res.status(200).json({ ok: true, likes: Number(data.likes || 0) + 1 });
+    }
+
+    if (action === 'update') {
+      const text = cleanText(req.body?.text);
+      if (!text) return res.status(400).json({ ok: false, error: 'Комментарий пустой.' });
+      if (!isOwner && !isAdmin) return res.status(403).json({ ok: false, error: 'Можно редактировать только свой комментарий.' });
+      await ref.update({ text, updatedAt: FieldValue.serverTimestamp() });
+      const updated = await ref.get();
+      return res.status(200).json({ ok: true, comment: serializeComment(updated) });
+    }
+
+    if (action === 'delete') {
+      if (!isOwner && !isAdmin) return res.status(403).json({ ok: false, error: 'Можно удалить только свой комментарий.' });
+      await ref.update({
+        hidden: true,
+        hiddenAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ ok: false, error: 'Unknown action' });
+  } catch (error) {
+    await logCommentError(db, req, error, {
+      method: req.method,
+      action: req.body?.action || null,
+      newsId: req.body?.newsId || req.query?.newsId || null,
+      commentId: req.body?.commentId || null,
+    });
+    return res.status(500).json({ ok: false, error: 'Комментарий не размещён. Попробуйте ещё раз.' });
+  }
+}
