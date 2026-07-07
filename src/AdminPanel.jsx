@@ -7,7 +7,7 @@ import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
@@ -71,6 +71,9 @@ function isTransientFirestoreError(error) {
 function formatAdminLoadError(error) {
   const code = error?.code ? `${error.code}: ` : '';
   const message = error?.message || String(error);
+  if (error?.code === 'admin/auth-not-ready') {
+    return `${code}${message}`;
+  }
   if (error?.code === 'permission-denied') {
     return `${code}нет прав на чтение коллекции. Проверьте Firestore Rules и текущую авторизацию.`;
   }
@@ -107,6 +110,20 @@ async function collectAdminAuthDiagnostics() {
       ? Object.fromEntries(['role', 'userRole', 'admin', 'owner'].map(key => [key, tokenClaims.claims[key]]).filter(([, value]) => value !== undefined))
       : null,
   };
+}
+
+function logAdminAuthStage(stage, details = {}) {
+  const entry = {
+    at: new Date().toISOString(),
+    stage,
+    ...details,
+  };
+  try {
+    console.info('[APG ADMIN AUTH]', entry);
+    const current = JSON.parse(localStorage.getItem('apg_admin_auth_trace') || '[]');
+    localStorage.setItem('apg_admin_auth_trace', JSON.stringify([...current.slice(-39), entry]));
+  } catch {}
+  return entry;
 }
 
 function buildAdminLoadDiagnostic(name, label, error, authInfo) {
@@ -150,24 +167,62 @@ function docsToItems(snap) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-async function waitForAdminAuth() {
-  if (auth.currentUser) return auth.currentUser;
+async function waitForAdminAuth(onStage) {
+  const emit = (stage, details = {}) => {
+    const entry = logAdminAuthStage(stage, {
+      uid: auth.currentUser?.uid ?? null,
+      email: auth.currentUser?.email ?? null,
+      isAnonymous: auth.currentUser?.isAnonymous ?? null,
+      ...details,
+    });
+    onStage?.(entry);
+  };
+
+  emit('firebase_initialized', {
+    projectId: FIREBASE_CLIENT_DIAGNOSTICS.projectId,
+    authDomain: FIREBASE_CLIENT_DIAGNOSTICS.authDomain,
+  });
+
+  if (auth.currentUser) {
+    emit('auth_cached_user_detected');
+    return auth.currentUser;
+  }
+
   let unsubscribe = null;
   const authReady = new Promise(resolve => {
     unsubscribe = onAuthStateChanged(auth, user => {
-      if (!user) return;
       unsubscribe?.();
+      emit('onAuthStateChanged_fired', {
+        detected: Boolean(user),
+        uid: user?.uid ?? null,
+        email: user?.email ?? null,
+        isAnonymous: user?.isAnonymous ?? null,
+      });
       resolve(user);
     });
   });
-  const signIn = signInAnonymously(auth).catch(error => {
-    logError(error, 'AdminPanel.auth.signInAnonymously');
-    return null;
+
+  emit('auth_state_wait_started');
+  const user = await withTimeout(authReady, 8000, 'admin auth initial state').catch(error => {
+    emit('auth_state_wait_failed', { error: error?.message ?? String(error) });
+    return auth.currentUser;
   });
-  await signIn;
-  const user = await withTimeout(authReady, 6500, 'admin auth').catch(() => auth.currentUser);
   unsubscribe?.();
-  if (!user && !auth.currentUser) throw new Error('Firebase Auth не готов: анонимная авторизация не завершилась.');
+
+  if (!user && !auth.currentUser) {
+    const error = Object.assign(
+      new Error('Firebase Auth не подтверждён: войдите в приложение под owner/admin аккаунтом и откройте админку снова.'),
+      { code: 'admin/auth-not-ready' },
+    );
+    emit('auth_missing_user', { error: error.message });
+    throw error;
+  }
+
+  emit('auth_user_detected', {
+    uid: (user || auth.currentUser)?.uid ?? null,
+    email: (user || auth.currentUser)?.email ?? null,
+    isAnonymous: (user || auth.currentUser)?.isAnonymous ?? null,
+  });
   return user || auth.currentUser;
 }
 
@@ -991,7 +1046,7 @@ function AdminUsersPanel({ users }) {
 }
 
 async function lokiEditorRequest(action, payload = {}) {
-  const user = auth.currentUser || await signInAnonymously(auth).then(r => r.user);
+  const user = await waitForAdminAuth();
   const token = await user.getIdToken();
   const response = await fetch(`${API_BASE_URL}/api/loki-editor`, {
     method: 'POST',
@@ -1795,7 +1850,7 @@ export const AdminPanel = () => {
   });
   const [loading, setLoading]       = useState(true);
   const [adminLoadIssues, setAdminLoadIssues] = useState([]);
-  const [adminLoadInfo, setAdminLoadInfo] = useState({ lastLoadedAt: null, authUid: null, attempt: 0 });
+  const [adminLoadInfo, setAdminLoadInfo] = useState({ lastLoadedAt: null, authUid: null, attempt: 0, authStatus: 'waiting' });
   const [activeTab, setActiveTab]   = useState('dashboard');
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth || 1200);
 
@@ -2041,16 +2096,29 @@ export const AdminPanel = () => {
     }
   }, []);
 
+  const noteAdminAuthStage = useCallback((entry) => {
+    setAdminLoadInfo(prev => ({
+      ...prev,
+      authStatus: entry.stage,
+      authStageAt: entry.at,
+      authUid: entry.uid ?? prev.authUid ?? null,
+      authEmail: entry.email ?? prev.authEmail ?? null,
+      authRole: entry.role ?? prev.authRole ?? null,
+      authIsAnonymous: entry.isAnonymous ?? prev.authIsAnonymous ?? null,
+    }));
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       try {
         await Promise.race([vkBridge.send('VKWebAppInit'), new Promise((_, r) => setTimeout(() => r(new Error()), 1000))]);
       } catch (e) {}
       try {
-        await waitForAdminAuth();
+        await waitForAdminAuth(noteAdminAuthStage);
         await fetchData();
       } catch (e) {
         logError(e, 'AdminPanel.initAuth');
+        setAdminLoadInfo(prev => ({ ...prev, authStatus: 'error', authError: e?.message ?? String(e) }));
         setAdminLoadIssues(prev => [
           ...prev,
           { name: 'auth', label: 'Firebase Auth', error: formatAdminLoadError(e), optional: false, attempts: 1 },
@@ -2069,8 +2137,18 @@ export const AdminPanel = () => {
   };
 
   const adminRequestHeaders = async (idempotencyKey = '') => {
-    const user = await waitForAdminAuth();
+    const user = await waitForAdminAuth(noteAdminAuthStage);
+    noteAdminAuthStage({ at: new Date().toISOString(), stage: 'token_request_started', uid: user.uid, email: user.email ?? null, isAnonymous: user.isAnonymous ?? null });
     const token = await user.getIdToken();
+    const tokenResult = await user.getIdTokenResult().catch(() => null);
+    noteAdminAuthStage({
+      at: new Date().toISOString(),
+      stage: 'token_received',
+      uid: user.uid,
+      email: user.email ?? null,
+      isAnonymous: user.isAnonymous ?? null,
+      role: tokenResult?.claims?.role || tokenResult?.claims?.userRole || null,
+    });
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
@@ -2148,8 +2226,16 @@ export const AdminPanel = () => {
       };
     };
     try {
-      const user = await waitForAdminAuth();
+      const user = await waitForAdminAuth(noteAdminAuthStage);
       authDiagnostics = await collectAdminAuthDiagnostics();
+      noteAdminAuthStage({
+        at: new Date().toISOString(),
+        stage: 'admin_loading_started',
+        uid: user?.uid ?? auth.currentUser?.uid ?? null,
+        email: authDiagnostics?.email ?? null,
+        role: authDiagnostics?.role ?? null,
+        isAnonymous: authDiagnostics?.isAnonymous ?? null,
+      });
       const specs = [
         { name: 'partners', label: 'Партнёры', ref: () => collection(db, 'partners') },
         { name: 'experts', label: 'Эксперты', ref: () => collection(db, 'experts') },
@@ -2229,9 +2315,11 @@ export const AdminPanel = () => {
       setAdminLoadInfo(prev => ({
         ...prev,
         lastLoadedAt: new Date().toISOString(),
+        authStatus: 'admin_loading_finished',
         authUid: user?.uid ?? auth.currentUser?.uid ?? null,
         authEmail: authDiagnostics?.email ?? null,
         authRole: authDiagnostics?.role ?? null,
+        authIsAnonymous: authDiagnostics?.isAnonymous ?? null,
         firebase: FIREBASE_CLIENT_DIAGNOSTICS,
         counts: Object.fromEntries(allResults.filter(item => item.ok).map(item => [item.name, item.count])),
       }));
@@ -3369,6 +3457,45 @@ export const AdminPanel = () => {
 
   if (!authed) return <PasswordGate onAllow={() => { setAuthed(true); fetchData(); }} />;
 
+  const fatalAuthIssue = !loading
+    && !adminLoadInfo.authUid
+    && adminLoadIssues.some(item => !item.optional && (item.name === 'auth' || item.name === 'admin-load'));
+
+  if (fatalAuthIssue) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)',
+        boxSizing: 'border-box',
+      }}>
+        <div style={{ ...s.card, maxWidth: 560, width: '100%', margin: 0, border: '1px solid rgba(230,70,70,0.34)', background: 'rgba(230,70,70,0.08)' }}>
+          <div style={{ fontSize: 42, marginBottom: 14 }}>🔐</div>
+          <h2 style={{ ...s.h2, marginBottom: 8 }}>Firebase Auth не подтверждён</h2>
+          <div style={{ color: A.textSec, fontSize: 14, lineHeight: '22px', marginBottom: 14 }}>
+            Админка не получила Firebase ID Token с ролью администратора. Откройте АПГ под owner/admin аккаунтом, затем вернитесь в админку.
+          </div>
+          {adminLoadIssues.slice(0, 2).map(item => (
+            <div key={item.name} style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(230,70,70,0.25)', marginBottom: 10 }}>
+              <div style={{ color: A.red, fontSize: 12, fontWeight: 850 }}>{item.label}</div>
+              <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px', marginTop: 4 }}>{item.error}</div>
+            </div>
+          ))}
+          <div style={{ color: 'rgba(240,240,240,0.5)', fontSize: 11, lineHeight: '16px', marginBottom: 14 }}>
+            Статус: {adminLoadInfo.authStatus || 'unknown'}
+            {adminLoadInfo.authStageAt && ` · ${new Date(adminLoadInfo.authStageAt).toLocaleTimeString('ru-RU')}`}
+          </div>
+          <button type="button" onClick={fetchData} style={{ ...s.btn, ...s.btnPri, width: '100%' }}>
+            ↻ Проверить авторизацию снова
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const q = globalSearch.toLowerCase();
   const searchResults = globalSearch.length > 1 ? [
     ...adminMetrics.users.filter(u => userDisplayName(u).toLowerCase().includes(q) || String(u.email ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase().includes(q)).slice(0, 4).map(u => ({ tab: 'users', id: u.id, label: userDisplayName(u), sub: providerLabel(u), emoji: '👤', typeName: 'Пользователь' })),
@@ -3630,9 +3757,12 @@ export const AdminPanel = () => {
                 {adminLoadInfo.authUid ? `Auth UID: ${adminLoadInfo.authUid}` : 'Firebase Auth ещё не подтверждён'}
                 {adminLoadInfo.authEmail && ` · ${adminLoadInfo.authEmail}`}
                 {adminLoadInfo.authRole && ` · role: ${adminLoadInfo.authRole}`}
+                {adminLoadInfo.authStatus && ` · ${adminLoadInfo.authStatus}`}
+                {adminLoadInfo.authIsAnonymous === true && ' · anonymous'}
                 {adminLoadInfo.firebase?.staleAdminEmulatorCleared && ' · очищен stale Firestore emulator'}
                 {adminLoadInfo.firebase?.emulatorConnected && ` · emulator: ${adminLoadInfo.firebase.emulatorHost}:${adminLoadInfo.firebase.emulatorPort}`}
                 {adminLoadInfo.lastLoadedAt && ` · ${new Date(adminLoadInfo.lastLoadedAt).toLocaleString('ru-RU')}`}
+                {adminLoadInfo.authError && ` · ${adminLoadInfo.authError}`}
               </div>
             </div>
             <button

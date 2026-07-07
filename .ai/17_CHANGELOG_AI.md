@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] P0 админка больше не зависает на Firebase Auth
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Админка больше не создаёт anonymous Firebase-сессию как fallback для административного доступа. `waitForAdminAuth` ждёт первичный `onAuthStateChanged`, пишет таймлайн этапов (`firebase_initialized`, `onAuthStateChanged_fired`, `token_received`, `admin_loading_started`) в консоль и `localStorage.apg_admin_auth_trace`, а при отсутствии owner/admin Firebase-сессии показывает явный стоп-экран вместо пустого dashboard.
+**Почему:** Экран “Firebase Auth ещё не подтверждён” означал, что админка не дождалась валидного Firebase ID Token; anonymous fallback приводил к backend 403/Firestore permission-denied и выглядел как массовая ошибка загрузки разделов.
+
+---
+
 ## [2026-07-07] P0 закрытые чтения админки переведены на backend
 **Коммит:** `локально`
 **Файлы:** `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `.ai/17_CHANGELOG_AI.md`
