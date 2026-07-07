@@ -155,14 +155,25 @@ async function fetchVkNewsPosts() {
 
 let publicBootstrapPromise = null;
 
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 5200) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchPublicBootstrap() {
   if (!publicBootstrapPromise) {
-    publicBootstrapPromise = fetch(`${API_BASE_URL}/api/public-data`, {
+    publicBootstrapPromise = fetchJsonWithTimeout(`${API_BASE_URL}/api/public-data`, {
       headers: { 'X-APG-Version': 'hotfix-public-data' },
       cache: 'no-store',
     })
-      .then(async response => {
-        const payload = await response.json().catch(() => ({}));
+      .then(({ response, payload }) => {
         if (!response.ok || payload?.ok === false) throw new Error(payload?.error || 'public_data_failed');
         return payload?.data || {};
       })
@@ -744,7 +755,14 @@ export function UserApp() {
       }
 
       if (!isGuest) {
-        await ensureOwnerAuthSession(userData.id, userData.authProvider || (userData.email ? 'email_restore' : String(userData.id).startsWith('tg_') ? 'telegram_restore' : 'vk'));
+        const ownerSource = userData.authProvider || (userData.email ? 'email_restore' : String(userData.id).startsWith('tg_') ? 'telegram_restore' : 'vk');
+        await Promise.race([
+          ensureOwnerAuthSession(userData.id, ownerSource),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('owner_auth_timeout')), 2400)),
+        ]).catch(error => {
+          traceAuthStage('owner_session_deferred', { source: ownerSource, userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
+          console.warn(`[APG-DIAG] owner-auth=deferred ${error?.code ?? error?.message ?? String(error)}`);
+        });
       }
 
       const emptySnap = { docs: [] };
@@ -760,30 +778,10 @@ export function UserApp() {
         safeLoad('stats', () => loadPublicStats(() => getDoc(doc(db, 'stats', 'global'))), null),
       ]);
 
-      let _loadResult = null;
-      for (let _attempt = 0; _attempt < 3; _attempt++) {
-        try {
-          console.time('apg:load-all');
-          _loadResult = await Promise.race([
-            _buildAll(),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('load_timeout')), 9000)),
-          ]);
-          console.timeEnd('apg:load-all');
-          console.log(`[APG-DIAG] firestore=ok attempt=${_attempt + 1} ${Math.round(performance.now() - _diagT0)}ms`);
-          break;
-        } catch (_e) {
-          console.warn(`[APG-DIAG] firestore=fail attempt=${_attempt + 1} err=${_e.message}`);
-          if (_attempt < 2) {
-            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, _attempt)));
-          } else {
-            if (isMounted.current) { setNetworkError(true); setLoading(false); }
-            runServiceChecks().then(checks =>
-              sendDiagReport({ checks, errorText: _e.message, userId: userData?.id })
-            );
-            return;
-          }
-        }
-      }
+      console.time('apg:load-all');
+      const _loadResult = await _buildAll();
+      console.timeEnd('apg:load-all');
+      console.log(`[APG-DIAG] public-data=settled ${Math.round(performance.now() - _diagT0)}ms`);
       const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap] = _loadResult;
 
       if (!isMounted.current) return;
@@ -862,6 +860,7 @@ export function UserApp() {
         return date > lastSeenDate;
       }).length;
       setUnreadCount(unread);
+      if (isMounted.current) setLoading(false);
 
       if (!isGuest) { try {
       const userRef = doc(db, 'users', String(userData.id));

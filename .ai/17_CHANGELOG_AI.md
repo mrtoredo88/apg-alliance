@@ -33,6 +33,15 @@
 
 ---
 
+## [2026-07-08] P0 устойчивый bootstrap главной
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** `/api/public-data` получил AbortController timeout и сброс общего pending promise при ошибке, чтобы один зависший bootstrap-запрос не отравлял последующие загрузки. Убран общий `load_timeout`, который переводил всю главную в `networkError`; публичные блоки теперь завершаются через собственные `safeLoad` fallback. Owner auth session вынесена в короткий best-effort timeout, чтобы авторизационная синхронизация не блокировала Home.
+**Почему:** Повторяющиеся симптомы “частичная главная”, отсутствие экспертов и ложное “нет соединения” были вызваны архитектурой загрузки: один зависший `/api/public-data`/auth promise мог блокировать весь старт приложения вместо деградации отдельного блока.
+
+---
+
 ## [2026-07-07] P0 admin API: Firebase token вынесен из Authorization для Yandex
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/userApi.js`, `src/ProfilePanel.jsx`, `src/NewsPage.jsx`, `api/_admin-security.js`, `server/src/lib/adminSecurity.js`, `api/admin-actions.js`, `api/user-actions.js`, `api/email-auth.js`, `api/news-comments.js`, `api/news-engagement.js`, `api/system-status.js`, `api/loki-editor.js`, `server/src/routes/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/server.js`, `.ai/17_CHANGELOG_AI.md`
