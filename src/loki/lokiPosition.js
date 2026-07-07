@@ -7,25 +7,25 @@ export const LOKI_POSITIONS = {
   },
   firstCard: {
     right: 'max(18px, env(safe-area-inset-right, 0px))',
-    bottom: 'calc(206px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(174px + env(safe-area-inset-bottom, 0px))',
     width: 'min(292px, calc(100vw - 24px))',
     justifyItems: 'end',
   },
   eventCard: {
     right: 'max(20px, env(safe-area-inset-right, 0px))',
-    bottom: 'calc(242px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(188px + env(safe-area-inset-bottom, 0px))',
     width: 'min(300px, calc(100vw - 24px))',
     justifyItems: 'end',
   },
   profile: {
     right: 'max(16px, env(safe-area-inset-right, 0px))',
-    bottom: 'calc(178px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(156px + env(safe-area-inset-bottom, 0px))',
     width: 'min(292px, calc(100vw - 24px))',
     justifyItems: 'end',
   },
   rewardShelf: {
     right: 'max(18px, env(safe-area-inset-right, 0px))',
-    bottom: 'calc(220px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(184px + env(safe-area-inset-bottom, 0px))',
     width: 'min(292px, calc(100vw - 24px))',
     justifyItems: 'end',
   },
@@ -49,7 +49,7 @@ export const LOKI_POSITIONS = {
   },
   notice: {
     right: 'max(18px, env(safe-area-inset-right, 0px))',
-    bottom: 'calc(184px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(162px + env(safe-area-inset-bottom, 0px))',
     width: 'min(292px, calc(100vw - 24px))',
     justifyItems: 'end',
   },

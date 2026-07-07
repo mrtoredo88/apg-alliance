@@ -62,11 +62,43 @@ const phrases = {
   [LOKI_EVENTS.USER_IDLE]: [
     'Я тут рядом, если что.',
     'Можно открыть партнёров, события или проверить призы.',
+    'Я помолчу немного. Просто буду рядом.',
   ],
   [LOKI_EVENTS.DAILY_VISIT]: [
     'Сегодня в городе точно есть что открыть.',
     'Хороший день, чтобы забрать новый ключ.',
+    'Пойдём посмотрим, чем город сегодня удивит.',
   ],
+};
+
+const timePhrases = {
+  morning: {
+    [LOKI_EVENTS.DAILY_VISIT]: ['Доброе утро. У города сегодня свежее настроение.'],
+    [LOKI_EVENTS.USER_IDLE]: ['Утро любит маленькие открытия. Я рядом.'],
+  },
+  evening: {
+    [LOKI_EVENTS.DAILY_VISIT]: ['Вечером город звучит мягче. Можно выбрать что-то спокойное.'],
+    [LOKI_EVENTS.USER_IDLE]: ['Я рядом, но не буду мешать. Вечер всё-таки.'],
+  },
+  night: {
+    [LOKI_EVENTS.USER_IDLE]: ['Я чуть тише ночью. Если что, я рядом.'],
+    [LOKI_EVENTS.CHARACTER_TAP]: ['Тихо-тихо. Ночь в АПГ тоже живая.'],
+  },
+};
+
+const seasonPhrases = {
+  spring: {
+    [LOKI_EVENTS.DAILY_VISIT]: ['Весной особенно приятно открывать новые места.'],
+  },
+  summer: {
+    [LOKI_EVENTS.EVENT_OPENED]: ['Летом город будто сам зовёт куда-нибудь выбраться.'],
+  },
+  autumn: {
+    [LOKI_EVENTS.PARTNER_OPENED]: ['Осенью новые места становятся чуть уютнее.'],
+  },
+  winter: {
+    [LOKI_EVENTS.PRIZE_OPENED]: ['Зимой подарки ощущаются особенно вовремя.'],
+  },
 };
 
 export function getLokiPhrase(eventType, payload = {}) {
@@ -74,8 +106,12 @@ export function getLokiPhrase(eventType, payload = {}) {
   if (eventType === LOKI_EVENTS.KEY_RECEIVED && Number(payload.keysCount) > 1) {
     return `Ух ты! +${payload.keysCount} ключа у тебя. Город становится ближе ✨`;
   }
-  const list = phrases[eventType] ?? phrases[LOKI_EVENTS.DAILY_VISIT];
-  const seed = `${eventType}:${payload.source ?? ''}:${payload.id ?? ''}`;
+  const emotional = payload.emotionalState ?? {};
+  const timeList = timePhrases[emotional.timePhase]?.[eventType] ?? [];
+  const seasonList = seasonPhrases[emotional.season]?.[eventType] ?? [];
+  const baseList = phrases[eventType] ?? phrases[LOKI_EVENTS.DAILY_VISIT];
+  const list = [...timeList, ...seasonList, ...baseList];
+  const seed = `${eventType}:${payload.source ?? ''}:${payload.id ?? ''}:${emotional.mood ?? ''}:${emotional.phraseNonce ?? ''}:${Date.now()}`;
   const index = Math.abs([...seed].reduce((acc, char) => acc + char.charCodeAt(0), 0)) % list.length;
   return list[index];
 }

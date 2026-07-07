@@ -6,6 +6,7 @@ export const DEFAULT_LOKI_MEMORY = {
   lastPanel: null,
   panelVisits: {},
   shownAdvice: {},
+  emotionalState: null,
   inDialog: false,
   updatedAt: null,
 };
