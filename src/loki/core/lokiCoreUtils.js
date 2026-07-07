@@ -28,14 +28,33 @@ export function imageOf(item) {
 }
 
 export function makeResultCard(item, type, action) {
+  const rating = item?.avgRating || item?.rating || item?.stats?.rating || null;
+  const hours = item?.hours || item?.workHours || '';
+  const offer = item?.offer || item?.promo || item?.discount || '';
+  const phone = item?.phone || '';
+  const url = item?.bookingUrl || item?.websiteUrl || item?.linkUrl || item?.vkUrl || item?.socialUrl || '';
   return {
     id: item?.id ?? `${type}-${titleOf(item, 'item')}`,
     type,
     title: titleOf(item, type === 'event' ? 'Мероприятие' : type === 'news' ? 'Новость' : 'Партнёр АПГ'),
-    text: item?.category || item?.address || item?.location || item?.place || item?.description || item?.text || 'Открою детали.',
+    text: item?.address || item?.location || item?.place || item?.specialization || item?.categoryLabel || item?.category || item?.description || item?.text || 'Открою детали.',
     image: imageOf(item),
+    meta: [
+      rating ? `★ ${rating}` : '',
+      hours ? `⌚ ${hours}` : '',
+      item?.address ? `📍 ${item.address}` : '',
+      offer ? `✨ ${offer}` : '',
+    ].filter(Boolean).slice(0, 3),
+    phone,
+    url,
     action,
     label: type === 'news' ? 'Читать' : 'Открыть',
+    actions: [
+      { label: type === 'news' ? 'Читать' : 'Открыть', action },
+      phone ? { label: 'Позвонить', href: `tel:${phone}` } : null,
+      item?.address ? { label: 'Маршрут', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_MAP) } : null,
+      url ? { label: 'Записаться', href: url } : null,
+    ].filter(Boolean).slice(0, 4),
   };
 }
 

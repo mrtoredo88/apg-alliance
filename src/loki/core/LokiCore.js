@@ -1,4 +1,5 @@
 import { Navigator } from './modules/Navigator.js';
+import { ActionRouter } from './modules/ActionRouter.js';
 import { PartnerExpert } from './modules/PartnerExpert.js';
 import { EventExpert } from './modules/EventExpert.js';
 import { RewardsExpert } from './modules/RewardsExpert.js';
@@ -16,6 +17,7 @@ import { explainLastRecommendation } from '../LokiIntelligence.js';
 import { buildPersonalRoute, buildSurprisePick } from '../LokiPlanner.js';
 
 const LOKI_MODULES = [
+  ActionRouter,
   Navigator,
   KnowledgeExpert,
   PartnerExpert,
@@ -58,7 +60,10 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
       notifications: appState.notifications ?? [],
       prizesKnown: false,
     },
-    knowledge: APG_KNOWLEDGE_BASE,
+    knowledge: {
+      ...APG_KNOWLEDGE_BASE,
+      custom: Array.isArray(appState.lokiKnowledge) ? appState.lokiKnowledge : [],
+    },
     knowledgeHealth: validateApgKnowledgeBase(APG_KNOWLEDGE_BASE),
   };
   return MemoryEngine.enrich({ context: base, memory, userMemory });
@@ -107,6 +112,10 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
     const handleStart = nowMs();
     rawResult = await module.handle({ query, context, text });
     trace.push({ module: `${module.id}.handle`, ms: Math.round(nowMs() - handleStart), decision: rawResult?.intent ?? 'handled' });
+    if (!rawResult) {
+      selected = null;
+      continue;
+    }
     break;
   }
 

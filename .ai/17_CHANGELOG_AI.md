@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Loki Action Router и админская база знаний
+**Коммит:** `локально`
+**Файлы:** `src/loki/core/LokiCore.js`, `src/loki/core/modules/ActionRouter.js`, `src/loki/core/lokiCoreUtils.js`, `src/loki/core/modules/KnowledgeExpert.js`, `src/loki/lokiActionTypes.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `api/admin-actions.js`, `api/user-actions.js`, `api/public-data.js`, `server/src/routes/admin-actions.js`, `server/src/routes/user-actions.js`, `server/src/routes/public-data.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Локи получил отдельный Action Router для прямых команд навигации и единого поиска по партнёрам, экспертам, событиям, новостям и заданиям. Карточки ответов стали богаче: изображение, тип, мета-строки и быстрые действия; в админке добавлены вкладки «База знаний Локи» и «Аналитика Локи».
+**Почему:** Локи должен постепенно становиться центральным интерфейсом АПГ: не только отвечать текстом, но и безопасно выполнять действия, помнить реальные запросы и позволять администратору расширять знания без релиза.
+
+---
+
 ## [2026-07-08] News mini-CMS foundation
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/NewsPage.jsx`, `src/newsUtils.js`, `src/utils/parseVideoUrl.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`

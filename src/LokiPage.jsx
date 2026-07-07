@@ -4,11 +4,13 @@ import { useLoki } from './loki/LokiProvider.jsx';
 import { isVK } from './vk.js';
 
 const QUICK_QUESTIONS = [
+  'Покажи кафе рядом',
+  'Где мои ключи?',
+  'Покажи призы',
   'Как получать ключи?',
   'Что интересного сегодня?',
-  'Где найти партнёров?',
-  'Как участвовать в розыгрыше?',
-  'Что умеет Локи?',
+  'Куда сходить с детьми?',
+  'Нужен хороший массаж',
 ];
 
 export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
@@ -44,6 +46,13 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
   const runCardAction = async (action) => {
     if (!action) return;
     await loki.executeAction(action);
+  };
+
+  const openHref = (href) => {
+    if (!href) return;
+    try {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    } catch {}
   };
 
   return (
@@ -84,11 +93,40 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
               </div>
               {!!item.cards?.length && (
                 <div style={{ width: '100%', display: 'grid', gap: 8 }}>
-                  {item.cards.slice(0, 3).map(card => (
-                    <GlassCard key={`${item.id}-${card.id}`} onClick={() => runCardAction(card.action)} style={{ borderRadius: 22, padding: 12 }}>
-                      <div style={{ color: APG2_PROFILE.text, fontSize: 14.5, lineHeight: '19px', fontWeight: 860 }}>{card.title}</div>
-                      <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{card.text}</div>
-                      <div style={{ color: APG2_PROFILE.gold, fontSize: 12.5, lineHeight: '17px', fontWeight: 820, marginTop: 8 }}>{card.label || 'Открыть'}</div>
+                  {item.cards.slice(0, 5).map(card => (
+                    <GlassCard key={`${item.id}-${card.id}`} onClick={() => runCardAction(card.action)} style={{ borderRadius: 24, padding: 0, overflow: 'hidden' }}>
+                      {card.image && (
+                        <div style={{ height: 126, backgroundImage: `url(${card.image})`, backgroundSize: 'cover', backgroundPosition: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }} />
+                      )}
+                      <div style={{ padding: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                          <GlassBadge tone="gold">{card.type === 'partner' ? 'Партнёр' : card.type === 'expert' ? 'Эксперт' : card.type === 'event' ? 'Событие' : card.type === 'news' ? 'Новость' : 'АПГ'}</GlassBadge>
+                          <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820 }}>{card.label || 'Открыть'}</div>
+                        </div>
+                        <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '20px', fontWeight: 900 }}>{card.title}</div>
+                        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 5 }}>{card.text}</div>
+                        {!!card.meta?.length && (
+                          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
+                            {card.meta.map((line, idx) => (
+                              <div key={`${card.id}-meta-${idx}`} style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px' }}>{line}</div>
+                            ))}
+                          </div>
+                        )}
+                        {!!card.actions?.length && (
+                          <div style={{ display: 'flex', gap: 7, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }} onClick={e => e.stopPropagation()}>
+                            {card.actions.map((act, idx) => (
+                              <GlassButton
+                                key={`${card.id}-action-${idx}`}
+                                tone={idx === 0 ? 'gold' : 'default'}
+                                onClick={() => act.href ? openHref(act.href) : runCardAction(act.action)}
+                                style={{ minHeight: 34, borderRadius: 999, padding: '7px 10px', fontSize: 12, flex: '0 0 auto', color: idx === 0 ? '#17120a' : undefined }}
+                              >
+                                {act.label}
+                              </GlassButton>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </GlassCard>
                   ))}
                 </div>

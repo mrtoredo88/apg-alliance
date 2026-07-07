@@ -8,6 +8,7 @@ const PUBLIC_COLLECTIONS = {
   reviews:       { collection: 'reviews', orderBy: ['createdAt', 'desc'], limit: 50 },
   customTasks:   { collection: 'customTasks', orderBy: ['createdAt', 'asc'], limit: 50 },
   experts:       { collection: 'experts', limit: 100 },
+  lokiKnowledge: { collection: 'lokiKnowledge', orderBy: ['priority', 'desc'], limit: 120, activeOnly: true },
 };
 
 function serializePublicValue(value) {
@@ -26,7 +27,9 @@ async function readPublicCollection(db, name, config) {
   if (config.orderBy) ref = ref.orderBy(config.orderBy[0], config.orderBy[1]);
   if (config.limit) ref = ref.limit(config.limit);
   const snap = await ref.get();
-  return snap.docs.map(doc => ({ id: doc.id, ...serializePublicValue(doc.data()) }));
+  return snap.docs
+    .map(doc => ({ id: doc.id, ...serializePublicValue(doc.data()) }))
+    .filter(item => !config.activeOnly || item.active !== false);
 }
 
 export default async function publicDataRoutes(fastify) {

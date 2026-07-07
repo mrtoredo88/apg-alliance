@@ -215,9 +215,23 @@
 - `review:partner`, `review:expert`
 - `partner:profileUpdate`, `expert:profileUpdate` — кабинеты владельцев с server-side owner check
 - `loki:settings`
+- `loki:analytics` — best-effort запись запроса Локи: текст, intent, количество результатов, действие, экран и время ответа
 - `log:error`, `log:diagnostic`, `guest:session`
 
 **Логика:** клиент больше не пишет пользовательские изменения напрямую в Firestore. Endpoint проверяет Firebase ID Token, определяет APG userId через `auth_map` / `users`, проверяет принадлежность данных пользователю, выполняет бизнес-логику через Admin SDK и пишет `userActivityLog`. Прямые Firestore reads на клиенте сохраняются для публичных каталогов и экранов, чтобы не ухудшать скорость.
+
+---
+
+## GET /api/public-data
+
+**Назначение:** Быстрый публичный bootstrap пользовательского приложения.
+
+**Метод:** GET
+**Auth:** нет
+
+**Ресурсы:** `partners`, `events`, `news`, `notifications`, `reviews`, `customTasks`, `experts`, `lokiKnowledge`, `stats`.
+
+**Локи:** `lokiKnowledge` отдаёт только активные публичные записи из админской базы знаний Локи. Если загрузка не удалась, приложение продолжает использовать встроенную APG Knowledge Base.
 
 ---
 

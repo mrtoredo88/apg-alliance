@@ -415,6 +415,7 @@ export function UserApp() {
   const [newsSubscriptions, setNewsSubscriptions] = useState({});
   const [notifications, setNotifications]       = useState([]);
   const [customTasks, setCustomTasks]           = useState([]);
+  const [lokiKnowledge, setLokiKnowledge]       = useState([]);
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [networkError, setNetworkError]         = useState(false);
@@ -778,13 +779,14 @@ export function UserApp() {
         safeLoad('vkNews', fetchVkNewsPosts, []),
         safeLoad('experts', () => loadPublicSnap('experts', () => getDocs(query(collection(db, 'experts'), limit(100)))), emptySnap),
         safeLoad('stats', () => loadPublicStats(() => getDoc(doc(db, 'stats', 'global'))), null),
+        safeLoad('lokiKnowledge', () => loadPublicSnap('lokiKnowledge', () => getDocs(query(collection(db, 'lokiKnowledge'), orderBy('priority', 'desc'), limit(120)))), emptySnap),
       ]);
 
       console.time('apg:load-all');
       const _loadResult = await _buildAll();
       console.timeEnd('apg:load-all');
       console.log(`[APG-DIAG] public-data=settled ${Math.round(performance.now() - _diagT0)}ms`);
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap] = _loadResult;
+      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap, lkSnap] = _loadResult;
 
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -828,6 +830,7 @@ export function UserApp() {
       try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
+      setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
       const freshExperts = exSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (isMounted.current) {
         setExperts(freshExperts);
@@ -2069,6 +2072,7 @@ export function UserApp() {
     news,
     notifications,
     customTasks,
+    lokiKnowledge,
     experts,
     userKeys,
     favorites,
@@ -2077,7 +2081,7 @@ export function UserApp() {
     registeredEventIds,
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
-  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
+  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, lokiKnowledge, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -2097,6 +2101,11 @@ export function UserApp() {
       goPanel('news');
     },
     [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
+    [LOKI_APP_ACTIONS.OPEN_PARTNERS]: () => goPanel('offers'),
+    [LOKI_APP_ACTIONS.OPEN_EXPERTS]: () => goPanel('experts'),
+    [LOKI_APP_ACTIONS.OPEN_EVENTS]: () => goPanel('events'),
+    [LOKI_APP_ACTIONS.OPEN_NEWS_FEED]: () => goPanel('news'),
+    [LOKI_APP_ACTIONS.OPEN_TASKS]: () => goPanel('tasks'),
     [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
     [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
     [LOKI_APP_ACTIONS.SHOW_PROFILE]: () => goPanel('profile'),

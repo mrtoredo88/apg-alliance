@@ -445,6 +445,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     setBrainThinking(true);
     setEmotion('thinking');
     setAction(LOKI_ACTIONS.LOOK_AROUND);
@@ -461,6 +462,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         inDialog: true,
       });
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
+      userAction('loki:analytics', {
+        payload: {
+          query: text,
+          intent: result.intent,
+          resultCount: result.cards?.length || (result.card ? 1 : 0),
+          actionType: result.executeAction?.type || result.autoAction?.type || result.card?.action?.type || '',
+          panel: activePanel,
+          ms: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+          success: true,
+          source: 'loki_experience',
+        },
+      }).catch(e => logError(e, 'LokiProvider.analytics'));
       updateHistory(prev => addLokiHistoryItem(prev, {
         kind: 'brain',
         eventType: LOKI_EVENTS.BRAIN_RESPONSE,

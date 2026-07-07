@@ -14,13 +14,57 @@ function makeKnowledgeCard(item) {
   };
 }
 
+function scoreCustomKnowledge(query, item) {
+  const haystack = [
+    item.title,
+    item.question,
+    item.answer,
+    item.type,
+    item.tags?.join?.(' '),
+  ].filter(Boolean).join(' ').toLowerCase().replace(/ё/g, 'е');
+  if (!haystack) return 0;
+  if (haystack.includes(query)) return 12;
+  return query.split(/\s+/)
+    .filter(word => word.length > 2)
+    .reduce((sum, word) => sum + (haystack.includes(word) ? 1 : 0), 0);
+}
+
+function findCustomKnowledge(query, context) {
+  return (context.knowledge?.custom ?? [])
+    .filter(item => item.active !== false)
+    .map(item => ({ item, score: scoreCustomKnowledge(query, item) + Number(item.priority || 0) / 10 }))
+    .filter(row => row.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(row => row.item);
+}
+
 export const KnowledgeExpert = {
   id: 'knowledgeExpert',
   label: 'Knowledge Expert',
-  canHandle({ query }) {
-    return includesAny(query, ['что нового', 'как работает', 'что такое', 'когда появ', 'истори', 'хроник', 'раздел', 'функци', 'обновлен', 'обновлён']);
+  canHandle({ query, context }) {
+    return includesAny(query, ['что нового', 'как работает', 'что такое', 'когда появ', 'истори', 'хроник', 'раздел', 'функци', 'обновлен', 'обновлён'])
+      || findCustomKnowledge(query, context).length > 0;
   },
   handle({ query, context }) {
+    const customMatches = findCustomKnowledge(query, context);
+    if (customMatches.length) {
+      const cards = customMatches.map(item => ({
+        id: item.id,
+        type: item.type || 'knowledge',
+        title: item.title,
+        text: item.answer,
+        image: '',
+        action: createLokiAction(LOKI_APP_ACTIONS.OPEN_REFERENCE),
+        label: 'Справочник',
+      }));
+      return {
+        intent: 'knowledge.custom',
+        text: customMatches[0].answer || `Нашёл ответ в базе знаний Локи: «${customMatches[0].title}».`,
+        card: cards[0],
+        cards,
+      };
+    }
     if (includesAny(query, ['что нового', 'обновлен', 'обновлён', 'истори', 'хроник', 'когда появ'])) {
       const chapters = getLatestChronicles(3, context.knowledge);
       if (!chapters.length) return { intent: 'knowledge.empty', text: 'В Хрониках АПГ пока нет записей об обновлениях.', card: null, cards: [] };

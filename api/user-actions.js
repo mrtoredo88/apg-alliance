@@ -524,6 +524,28 @@ async function actionLokiSettings(db, req, actor) {
   return { ok: true };
 }
 
+async function actionLokiAnalytics(db, req, actor) {
+  const payload = req.body?.payload && typeof req.body.payload === 'object' ? req.body.payload : {};
+  const safe = {
+    query: safeString(payload.query, 500),
+    intent: safeString(payload.intent, 120),
+    resultCount: Math.max(0, Math.min(50, Number(payload.resultCount || 0))),
+    actionType: safeString(payload.actionType, 120),
+    panel: safeString(payload.panel, 80),
+    ms: Math.max(0, Math.min(60000, Number(payload.ms || 0))),
+    success: payload.success !== false,
+    source: safeString(payload.source || 'loki', 80),
+  };
+  await db.collection('lokiAnalytics').add({
+    ...safe,
+    userId: actor.userId,
+    firebaseUid: actor.uid,
+    timestamp: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+}
+
 async function actionLogCreate(db, req, actor, collection, source) {
   const payload = req.body?.payload && typeof req.body.payload === 'object' ? req.body.payload : {};
   await db.collection(collection).add({
@@ -573,6 +595,7 @@ async function routeAction(db, req, actor) {
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');
   if (action === 'expert:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'expert');
   if (action === 'loki:settings') return actionLokiSettings(db, req, actor);
+  if (action === 'loki:analytics') return actionLokiAnalytics(db, req, actor);
   if (action === 'log:error') return actionLogCreate(db, req, actor, 'errorLogs', 'api.user-actions');
   if (action === 'log:diagnostic') return actionLogCreate(db, req, actor, 'diagnostics', 'api.user-actions');
   if (action === 'guest:session') return actionGuestSession(db, req, actor);

@@ -20,6 +20,8 @@ const RESOURCE_CONFIG = {
   raffleEntries: { collection: 'raffleEntries', scope: 'maintenance', label: 'участие в розыгрыше' },
   expertReviews: { collection: 'expertReviews', scope: 'maintenance', label: 'отзыв эксперта' },
   guestSessions: { collection: 'guestSessions', scope: 'stats', label: 'гостевая сессия' },
+  lokiKnowledge: { collection: 'lokiKnowledge', scope: 'settings', label: 'знание Локи' },
+  lokiAnalytics: { collection: 'lokiAnalytics', scope: 'stats', label: 'аналитика Локи' },
   config: { collection: 'config', scope: 'settings', label: 'настройка' },
   stats: { collection: 'stats', scope: 'stats', label: 'статистика' },
 };
@@ -35,6 +37,8 @@ const LIST_CONFIG = {
   expertReviews: { orderBy: ['createdAt', 'desc'], limit: 300 },
   raffleEntries: { orderBy: ['createdAt', 'desc'], limit: 500 },
   guestSessions: { orderBy: ['createdAt', 'desc'], limit: 500 },
+  lokiKnowledge: { orderBy: ['priority', 'desc'], limit: 300 },
+  lokiAnalytics: { orderBy: ['createdAt', 'desc'], limit: 500 },
 };
 
 function cleanPatch(input = {}) {

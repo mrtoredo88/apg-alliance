@@ -2015,6 +2015,18 @@ export const AdminPanel = () => {
   const [adminUndo, setAdminUndo] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [draggingNewsId, setDraggingNewsId] = useState('');
+  const [lokiKnowledge, setLokiKnowledge] = useState([]);
+  const [lokiAnalytics, setLokiAnalytics] = useState([]);
+  const [lokiKnowledgeLoading, setLokiKnowledgeLoading] = useState(false);
+  const [lokiAnalyticsLoading, setLokiAnalyticsLoading] = useState(false);
+  const [editingLokiKnowledge, setEditingLokiKnowledge] = useState(null);
+  const [lkTitle, setLkTitle] = useState('');
+  const [lkQuestion, setLkQuestion] = useState('');
+  const [lkAnswer, setLkAnswer] = useState('');
+  const [lkType, setLkType] = useState('faq');
+  const [lkPriority, setLkPriority] = useState('5');
+  const [lkTags, setLkTags] = useState('');
+  const [lkActive, setLkActive] = useState(true);
   const autoSaveTimerRef = useRef(null);
   const undoTimerRef = useRef(null);
 
@@ -2248,6 +2260,76 @@ export const AdminPanel = () => {
       ...(limitValue ? { limit: limitValue } : {}),
     });
     return Array.isArray(data.rows) ? data.rows.map(reviveAdminValue) : [];
+  };
+
+  const loadLokiKnowledge = useCallback(async () => {
+    setLokiKnowledgeLoading(true);
+    try {
+      setLokiKnowledge(await fetchAdminEntityList('lokiKnowledge', 300));
+    } catch (e) {
+      logError(e, 'AdminPanel.loadLokiKnowledge');
+    } finally {
+      setLokiKnowledgeLoading(false);
+    }
+  }, []);
+
+  const loadLokiAnalytics = useCallback(async () => {
+    setLokiAnalyticsLoading(true);
+    try {
+      setLokiAnalytics(await fetchAdminEntityList('lokiAnalytics', 500));
+    } catch (e) {
+      logError(e, 'AdminPanel.loadLokiAnalytics');
+    } finally {
+      setLokiAnalyticsLoading(false);
+    }
+  }, []);
+
+  const resetLokiKnowledgeForm = () => {
+    setEditingLokiKnowledge(null);
+    setLkTitle('');
+    setLkQuestion('');
+    setLkAnswer('');
+    setLkType('faq');
+    setLkPriority('5');
+    setLkTags('');
+    setLkActive(true);
+  };
+
+  const startEditLokiKnowledge = (item) => {
+    setEditingLokiKnowledge(item);
+    setLkTitle(item.title ?? '');
+    setLkQuestion(item.question ?? '');
+    setLkAnswer(item.answer ?? '');
+    setLkType(item.type ?? 'faq');
+    setLkPriority(String(item.priority ?? 5));
+    setLkTags(Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags ?? ''));
+    setLkActive(item.active !== false);
+  };
+
+  const saveLokiKnowledge = async () => {
+    const patch = {
+      title: lkTitle.trim(),
+      question: lkQuestion.trim(),
+      answer: lkAnswer.trim(),
+      type: lkType,
+      priority: Number(lkPriority || 0),
+      tags: lkTags.split(',').map(x => x.trim()).filter(Boolean),
+      active: lkActive,
+    };
+    if (!patch.title || !patch.answer) return;
+    if (editingLokiKnowledge?.id) {
+      await runAdminEntityAction('lokiKnowledge', 'update', { id: editingLokiKnowledge.id, patch });
+    } else {
+      await runAdminEntityAction('lokiKnowledge', 'create', { patch });
+    }
+    resetLokiKnowledgeForm();
+    await loadLokiKnowledge();
+  };
+
+  const deleteLokiKnowledge = async (id) => {
+    if (!id) return;
+    await runAdminEntityAction('lokiKnowledge', 'delete', { id });
+    setLokiKnowledge(prev => prev.filter(item => item.id !== id));
   };
 
   const fetchData = async () => {
@@ -3686,12 +3768,14 @@ export const AdminPanel = () => {
             { id: 'system',    emoji: '🛡', label: 'Система' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
+            { id: 'loki-knowledge', emoji: '🧠', label: 'База знаний Локи', count: lokiKnowledge.length || undefined },
+            { id: 'loki-analytics', emoji: '📈', label: 'Аналитика Локи', count: lokiAnalytics.length || undefined },
             { id: 'diag',      emoji: '📡', label: 'Диагностика' },
           ].map(t => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -3952,6 +4036,136 @@ export const AdminPanel = () => {
       {activeTab === 'ai-drafts' && (
         <AIDraftsPanel />
       )}
+
+      {activeTab === 'loki-knowledge' && (
+        <div>
+          <div style={s.card}>
+            <h2 style={s.h2}>🧠 База знаний Локи</h2>
+            <p style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', margin: '0 0 14px' }}>
+              FAQ, инструкции и сценарии, которые можно менять без релиза приложения. Локи использует встроенную базу знаний, а эти записи готовы для расширения server-side знаний.
+            </p>
+
+            <label style={s.label}>Тип</label>
+            <select style={s.select} value={lkType} onChange={e => setLkType(e.target.value)}>
+              <option value="faq">FAQ</option>
+              <option value="scenario">Сценарий общения</option>
+              <option value="instruction">Инструкция</option>
+              <option value="policy">Правило ответа</option>
+            </select>
+
+            <label style={s.label}>Название *</label>
+            <input style={s.input} value={lkTitle} onChange={e => setLkTitle(e.target.value)} placeholder="Как получать ключи" />
+
+            <label style={s.label}>Вопрос / триггер</label>
+            <input style={s.input} value={lkQuestion} onChange={e => setLkQuestion(e.target.value)} placeholder="как получить ключи, где мои ключи" />
+
+            <label style={s.label}>Ответ *</label>
+            <MdEditor value={lkAnswer} onChange={setLkAnswer} placeholder="Короткий ответ Локи..." style={{ ...s.textarea, minHeight: 120 }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 620 ? '1fr' : '120px 1fr', gap: 10 }}>
+              <div>
+                <label style={s.label}>Приоритет</label>
+                <input style={s.input} type="number" value={lkPriority} onChange={e => setLkPriority(e.target.value)} />
+              </div>
+              <div>
+                <label style={s.label}>Теги</label>
+                <input style={s.input} value={lkTags} onChange={e => setLkTags(e.target.value)} placeholder="ключи, профиль, помощь" />
+              </div>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0', color: A.text, fontSize: 14 }}>
+              <input type="checkbox" checked={lkActive} onChange={e => setLkActive(e.target.checked)} style={{ width: 18, height: 18, accentColor: A.gold }} />
+              Активно
+            </label>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveLokiKnowledge}>{editingLokiKnowledge ? '💾 Сохранить' : '➕ Добавить'}</button>
+              {editingLokiKnowledge && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetLokiKnowledgeForm}>Отмена</button>}
+              <button style={{ ...s.btn, ...s.btnGray }} onClick={loadLokiKnowledge}>{lokiKnowledgeLoading ? '...' : '↻'}</button>
+            </div>
+          </div>
+
+          <div style={s.card}>
+            <h2 style={s.h2}>Записи ({lokiKnowledge.length})</h2>
+            {lokiKnowledgeLoading ? <p style={{ color: A.textSec }}>Загружаем...</p> : lokiKnowledge.length === 0 ? (
+              <p style={{ color: A.textSec, fontSize: 14 }}>Пока нет записей. Встроенная база Локи продолжает работать.</p>
+            ) : lokiKnowledge.map(item => (
+              <div key={item.id} style={s.row}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ color: A.text, fontWeight: 800, fontSize: 14 }}>{item.title}</span>
+                    <span style={{ color: item.active === false ? A.red : A.green, fontSize: 11, fontWeight: 800 }}>{item.active === false ? 'выкл' : 'активно'}</span>
+                    <span style={{ color: A.textSec, fontSize: 11 }}>#{item.priority ?? 0}</span>
+                    <span style={{ color: A.gold, fontSize: 11 }}>{item.type ?? 'faq'}</span>
+                  </div>
+                  <div style={{ color: A.textSec, fontSize: 12, lineHeight: '17px', marginTop: 4 }}>{item.question || item.answer?.slice?.(0, 120)}</div>
+                </div>
+                <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => startEditLokiKnowledge(item)}>✏️</button>
+                <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteLokiKnowledge(item.id)}>🗑️</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'loki-analytics' && (() => {
+        const total = lokiAnalytics.length;
+        const unanswered = lokiAnalytics.filter(x => !x.success || x.intent === 'knowledge.unknown' || x.intent === 'partner.empty').length;
+        const byIntent = Object.entries(lokiAnalytics.reduce((acc, item) => {
+          const key = item.intent || 'unknown';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const popularQuestions = lokiAnalytics
+          .map(x => String(x.query || '').trim())
+          .filter(Boolean)
+          .reduce((acc, q) => ({ ...acc, [q]: (acc[q] || 0) + 1 }), {});
+        const topQuestions = Object.entries(popularQuestions).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const avgMs = total ? Math.round(lokiAnalytics.reduce((sum, x) => sum + Number(x.ms || 0), 0) / total) : 0;
+        return (
+          <div>
+            <div style={s.card}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <h2 style={{ ...s.h2, margin: 0, flex: 1 }}>📈 Аналитика Локи</h2>
+                <button style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }} onClick={loadLokiAnalytics}>{lokiAnalyticsLoading ? '⏳' : '↻ Обновить'}</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10 }}>
+                {[
+                  ['Диалогов', total, A.gold],
+                  ['Без ответа', unanswered, unanswered ? A.red : A.green],
+                  ['Успешность', total ? `${Math.round((total - unanswered) / total * 100)}%` : '—', A.green],
+                  ['Средний ответ', avgMs ? `${avgMs} мс` : '—', A.text],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${A.border}`, borderRadius: 14, padding: 14 }}>
+                    <div style={{ color, fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+                    <div style={{ color: A.textSec, fontSize: 11, marginTop: 6 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 860 ? '1fr' : '1fr 1fr', gap: 12 }}>
+              <div style={s.card}>
+                <h2 style={s.h2}>Популярные вопросы</h2>
+                {topQuestions.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : topQuestions.map(([q, count]) => (
+                  <div key={q} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{q}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Интенты и действия</h2>
+                {byIntent.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : byIntent.map(([intent, count]) => (
+                  <div key={intent} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{intent}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── ЭКСПЕРТЫ ── */}
       {activeTab === 'experts' && (
