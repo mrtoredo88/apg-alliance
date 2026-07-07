@@ -141,46 +141,9 @@ export default async function telegramWebhookRoutes(fastify) {
       return { ok: true };
     }
 
-    // /start без payload
+    // /start без payload: только приветствие. Auth требует персональный state.
     if (text === '/start') {
-      const db = getDb();
-      let authed = false;
-      try {
-        const q = await db.collection('telegramAuthSessions')
-          .where('status', '==', 'pending')
-          .get();
-        const now   = Date.now();
-        const valid = q.docs
-          .filter(d => {
-            const exp = d.data().expiresAt;
-            const t = exp?.toDate ? exp.toDate().getTime() : new Date(exp).getTime();
-            return t > now;
-          })
-          .sort((a, b) => {
-            const ta = a.data().expiresAt?.toDate?.() ?? new Date(a.data().expiresAt);
-            const tb = b.data().expiresAt?.toDate?.() ?? new Date(b.data().expiresAt);
-            return tb.getTime() - ta.getTime();
-          });
-        if (valid.length > 0) {
-          const recentDoc = valid[0];
-          const photoUrl  = await tgGetPhotoUrl(from.id);
-          await recentDoc.ref.update({
-            status:    'done',
-            tgUserId:  String(from.id),
-            firstName: from.first_name ?? '',
-            lastName:  from.last_name  ?? '',
-            username:  from.username   ?? '',
-            photoUrl:  photoUrl ?? null,
-          });
-          await upsertUser(db, from, photoUrl);
-          await tgSend(from.id,
-            `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
-            { reply_markup: SOCIAL_KEYBOARD },
-          );
-          authed = true;
-        }
-      } catch {}
-      if (!authed) await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+      await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
       return { ok: true };
     }
 

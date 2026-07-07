@@ -155,71 +155,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── /start без payload — завершаем любую pending-сессию, иначе приветствие ──
+  // ── /start без payload — только приветствие. Auth требует персональный state ──
   if (text === '/start') {
-    const db = getFirestore(getAdminApp());
-    let authed = false;
-    try {
-      const q = await db.collection('telegramAuthSessions')
-        .where('status', '==', 'pending')
-        .get();
-      const now = Date.now();
-      const valid = q.docs
-        .filter(d => {
-          const exp = d.data().expiresAt;
-          const t = exp?.toDate ? exp.toDate().getTime() : new Date(exp).getTime();
-          return t > now;
-        })
-        .sort((a, b) => {
-          const ta = a.data().expiresAt?.toDate?.() ?? new Date(a.data().expiresAt);
-          const tb = b.data().expiresAt?.toDate?.() ?? new Date(b.data().expiresAt);
-          return tb.getTime() - ta.getTime();
-        });
-      if (valid.length > 0) {
-        const recentDoc = valid[0];
-        const photoUrl = await tgGetPhotoUrl(from.id);
-        await recentDoc.ref.update({
-          status:    'done',
-          tgUserId:  String(from.id),
-          firstName: from.first_name ?? '',
-          lastName:  from.last_name  ?? '',
-          username:  from.username   ?? '',
-          photoUrl:  photoUrl ?? null,
-        });
-        const uid     = `tg_${from.id}`;
-        const userRef = db.collection('users').doc(uid);
-        const userSnap = await userRef.get();
-        const profilePatch = {
-          authProvider: 'telegram',
-          displayName: [from.first_name, from.last_name].filter(Boolean).join(' ') || null,
-          firstName: from.first_name ?? null,
-          lastName:  from.last_name  ?? null,
-          photo:     photoUrl ?? null,
-          lastSeen:  FieldValue.serverTimestamp(),
-        };
-        if (!userSnap.exists) {
-          await userRef.set({
-            keys: 0, favorites: [], scannedPartners: {},
-            completedTasks: [], streak: 0, onboardingDone: false,
-            scanDates: [], lastBonusDate: new Date().toLocaleDateString('sv'),
-            referredBy: null,
-            registeredAt: FieldValue.serverTimestamp(),
-            ...profilePatch,
-          });
-          db.collection('stats').doc('global')
-            .set({ userCount: FieldValue.increment(1) }, { merge: true })
-            .catch(() => {});
-        } else {
-          await userRef.update(profilePatch);
-        }
-        await tgSend(from.id,
-          `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
-          { reply_markup: SOCIAL_KEYBOARD },
-        );
-        authed = true;
-      }
-    } catch {}
-    if (!authed) await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+    await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
     return res.status(200).json({ ok: true });
   }
 

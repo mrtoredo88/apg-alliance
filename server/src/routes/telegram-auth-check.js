@@ -1,4 +1,4 @@
-import { getDb } from '../lib/firebase.js';
+import { getDb, getDbAuth } from '../lib/firebase.js';
 
 export default async function telegramAuthCheckRoutes(fastify) {
   fastify.get('/api/telegram-auth-check', async (request, reply) => {
@@ -24,11 +24,14 @@ export default async function telegramAuthCheckRoutes(fastify) {
         const tgId = `tg_${data.tgUserId}`;
         const linkSnap = await db.collection('tgLinks').doc(tgId).get();
         const linkedUserId = linkSnap.exists ? linkSnap.data().userId : null;
+        const targetUserId = linkedUserId ?? tgId;
+        const token = await getDbAuth().createCustomToken(targetUserId);
         return {
           status: 'done',
           tgId,
+          token,
           user: {
-            id:         linkedUserId ?? tgId,
+            id:         targetUserId,
             first_name: data.firstName ?? '',
             last_name:  data.lastName  ?? '',
             photo_200:  data.photoUrl  ?? null,

@@ -7,6 +7,7 @@ import nodemailer from 'nodemailer';
 import { APP_URL } from './config.js';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 let _app = null;
 function getAdminApp() {
@@ -29,20 +30,72 @@ function generateCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+function getBearerToken(req) {
+  const header = String(req.headers.authorization || req.headers.Authorization || '');
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] || '';
+}
+
+function safeString(value, max = 300) {
+  return String(value ?? '').trim().slice(0, max);
+}
+
+function normalizeTgId(value) {
+  const raw = safeString(value, 80);
+  if (!raw) return '';
+  return raw.startsWith('tg_') ? raw : `tg_${raw}`;
+}
+
+async function getActor(req, db) {
+  const token = getBearerToken(req);
+  if (!token) {
+    const error = new Error('Требуется авторизация.');
+    error.statusCode = 401;
+    throw error;
+  }
+  const decoded = await getAuth(getAdminApp()).verifyIdToken(token);
+  const uid = decoded.uid;
+  const direct = await db.collection('users').doc(uid).get().catch(() => null);
+  if (direct?.exists) return { uid, userId: uid, user: direct.data() || {}, source: 'users.uid' };
+  const map = await db.collection('auth_map').doc(uid).get().catch(() => null);
+  const mappedUserId = map?.exists ? safeString(map.data()?.userId || map.data()?.vkId, 180) : '';
+  if (mappedUserId) {
+    const mapped = await db.collection('users').doc(mappedUserId).get().catch(() => null);
+    return { uid, userId: mappedUserId, user: mapped?.data?.() || {}, source: 'auth_map' };
+  }
+  return { uid, userId: uid, user: {}, source: 'token' };
+}
+
+async function auditAccountLink(db, req, payload) {
+  await db.collection('accountLinkAudit').add({
+    ...payload,
+    userAgent: safeString(req.headers['user-agent'], 300),
+    appVersion: safeString(req.headers['x-apg-version'], 80),
+    createdAt: FieldValue.serverTimestamp(),
+  }).catch(() => {});
+}
+
+async function createFirebaseToken(userId) {
+  return getAuth(getAdminApp()).createCustomToken(String(userId));
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', APP_URL);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-APG-Version');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
 
   const { action, email: rawEmail, code, ref } = req.body ?? {};
 
-  if (!rawEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(rawEmail))) {
-    return res.status(400).json({ ok: false, error: 'invalid_email', message: 'Неверный формат email' });
+  const NO_EMAIL_ACTIONS = ['verify-email', 'link-telegram', 'grant-referral', 'resend-verification'];
+  if (!NO_EMAIL_ACTIONS.includes(action)) {
+    if (!rawEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(rawEmail))) {
+      return res.status(400).json({ ok: false, error: 'invalid_email', message: 'Неверный формат email' });
+    }
   }
 
-  const email = String(rawEmail).trim().toLowerCase();
+  const email = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
   const db = getFirestore(getAdminApp());
   const codeRef = db.collection('emailAuthCodes').doc(email);
 
@@ -124,8 +177,10 @@ export default async function handler(req, res) {
 
     const userId = await resolveEmailUser(db, email, ref ?? null);
 
+    const token = await createFirebaseToken(userId);
     return res.status(200).json({
       ok: true,
+      token,
       user: {
         id: userId,
         first_name: email.split('@')[0],
@@ -139,22 +194,50 @@ export default async function handler(req, res) {
   // ── LINK TELEGRAM ───────────────────────────────────────────────────────────
   if (action === 'link-telegram') {
     const { userId, tgId, firstName, lastName, photo } = req.body ?? {};
-    if (!userId || !tgId) return res.status(400).json({ ok: false, error: 'missing_fields' });
+    const normalizedTgId = normalizeTgId(tgId);
+    if (!userId || !normalizedTgId) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
-    // Проверяем что tgId не привязан к другому аккаунту
-    const existingLink = await db.collection('tgLinks').doc(tgId).get();
-    if (existingLink.exists && existingLink.data().userId !== userId) {
-      return res.status(409).json({ ok: false, error: 'already_linked', message: 'Этот Telegram уже привязан к другому аккаунту' });
+    const actor = await getActor(req, db);
+    if (String(actor.userId) !== String(userId)) {
+      await auditAccountLink(db, req, { action: 'link-telegram', result: 'blocked_owner_mismatch', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId });
+      return res.status(403).json({ ok: false, error: 'owner_mismatch', message: 'Нельзя привязать Telegram к другому аккаунту.' });
     }
 
-    await db.collection('tgLinks').doc(tgId).set({ userId, createdAt: FieldValue.serverTimestamp() });
+    const otherUserByTg = await db.collection('users').where('linkedTelegram.tgId', '==', normalizedTgId).limit(1).get();
+    if (!otherUserByTg.empty && otherUserByTg.docs[0].id !== String(userId)) {
+      await auditAccountLink(db, req, { action: 'link-telegram', result: 'blocked_existing_user_link', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId, existingUserId: otherUserByTg.docs[0].id });
+      return res.status(409).json({ ok: false, error: 'already_linked', message: 'Этот Telegram уже привязан к другому аккаунту.' });
+    }
+
     const tgName = [firstName, lastName].filter(Boolean).join(' ') || null;
-    await db.collection('users').doc(userId).update({
-      linkedTelegram: { tgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
-      ...(firstName  ? { firstName, displayName: tgName } : {}),
-      ...(lastName   ? { lastName } : {}),
-      ...(photo      ? { photo } : {}),
-    }).catch(() => {});
+    try {
+      await db.runTransaction(async tx => {
+        const linkRef = db.collection('tgLinks').doc(normalizedTgId);
+        const userRef = db.collection('users').doc(String(userId));
+        const [existingLink, userSnap] = await Promise.all([tx.get(linkRef), tx.get(userRef)]);
+        if (!userSnap.exists) throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404 });
+        if (existingLink.exists && String(existingLink.data().userId) !== String(userId)) {
+          throw Object.assign(new Error('Этот Telegram уже привязан к другому аккаунту.'), { statusCode: 409 });
+        }
+        tx.set(linkRef, {
+          userId: String(userId),
+          telegramId: normalizedTgId,
+          firebaseUid: actor.uid,
+          updatedAt: FieldValue.serverTimestamp(),
+          createdAt: existingLink.exists ? existingLink.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
+        }, { merge: true });
+        tx.set(userRef, {
+          linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
+          ...(firstName ? { firstName, displayName: tgName } : {}),
+          ...(lastName  ? { lastName } : {}),
+          ...(photo     ? { photo } : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+    } catch (e) {
+      return res.status(e.statusCode || 500).json({ ok: false, error: e.statusCode === 409 ? 'already_linked' : 'link_failed', message: e.message || 'Не удалось привязать Telegram.' });
+    }
+    await auditAccountLink(db, req, { action: 'link-telegram', result: 'success', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId });
 
     return res.status(200).json({ ok: true });
   }
@@ -164,16 +247,39 @@ export default async function handler(req, res) {
     const { userId } = req.body ?? {};
     if (!userId || !email) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
-    const userSnap = await db.collection('users').doc(userId).get();
-    if (!userSnap.exists) return res.status(404).json({ ok: false, error: 'user_not_found' });
+    const actor = await getActor(req, db);
+    if (String(actor.userId) !== String(userId)) {
+      await auditAccountLink(db, req, { action: 'link-email', result: 'blocked_owner_mismatch', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), email });
+      return res.status(403).json({ ok: false, error: 'owner_mismatch', message: 'Нельзя привязать email к другому аккаунту.' });
+    }
 
-    // Проверяем что email не занят другим аккаунтом
     const existing = await db.collection('users').where('email', '==', email).limit(1).get();
     if (!existing.empty && existing.docs[0].id !== userId) {
+      await auditAccountLink(db, req, { action: 'link-email', result: 'blocked_existing_user_email', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), email, existingUserId: existing.docs[0].id });
       return res.status(409).json({ ok: false, error: 'already_used', message: 'Этот email уже привязан к другому аккаунту' });
     }
 
-    await db.collection('users').doc(userId).update({ linkedEmail: email });
+    try {
+      await db.runTransaction(async tx => {
+        const userRef = db.collection('users').doc(String(userId));
+        const emailRef = db.collection('emailIndex').doc(email);
+        const [userSnap, emailSnap] = await Promise.all([tx.get(userRef), tx.get(emailRef)]);
+        if (!userSnap.exists) throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404 });
+        if (emailSnap.exists && String(emailSnap.data().userId) !== String(userId)) {
+          throw Object.assign(new Error('Этот email уже привязан к другому аккаунту.'), { statusCode: 409 });
+        }
+        tx.set(emailRef, {
+          userId: String(userId),
+          firebaseUid: actor.uid,
+          updatedAt: FieldValue.serverTimestamp(),
+          createdAt: emailSnap.exists ? emailSnap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
+        }, { merge: true });
+        tx.set(userRef, { linkedEmail: email, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      });
+    } catch (e) {
+      return res.status(e.statusCode || 500).json({ ok: false, error: e.statusCode === 409 ? 'already_used' : 'link_failed', message: e.message || 'Не удалось привязать email.' });
+    }
+    await auditAccountLink(db, req, { action: 'link-email', result: 'success', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), email });
     return res.status(200).json({ ok: true });
   }
 
@@ -210,8 +316,10 @@ export default async function handler(req, res) {
     if (ud.emailVerified === false) {
       sendVerificationEmail(db, email, userId, APP_URL).catch(() => {});
     }
+    const token = await createFirebaseToken(userId);
     return res.status(200).json({
       ok: true,
+      token,
       user: {
         id: userId,
         first_name: ud.firstName ?? email.split('@')[0],

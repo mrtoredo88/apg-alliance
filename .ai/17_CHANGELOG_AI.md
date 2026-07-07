@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] P0 защита от смешивания Email и Telegram аккаунтов
+**Коммит:** `локально`
+**Файлы:** `api/email-auth.js`, `api/telegram-auth-check.js`, `api/telegram-webhook.js`, `api/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/routes/telegram-auth-check.js`, `server/src/routes/telegram-webhook.js`, `server/src/routes/user-actions.js`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`
+**Тип:** fix
+**Что изменено:** Привязка Telegram/email больше не доверяет `userId` из body: link endpoints требуют Firebase ID Token, сверяют владельца аккаунта, проверяют уникальность `tgLinks`/`emailIndex`, выполняют запись в transaction и пишут `accountLinkAudit`. Telegram `/start` без персонального `auth_state` больше не завершает чужую pending-сессию; email/Telegram auth-check возвращают Firebase custom token для точного APG userId.
+**Почему:** Расследование P0 показало риск объединения данных разных людей через старые localStorage/auth_map и Telegram fallback «последняя pending-сессия». Теперь email/Telegram аккаунты требуют strong identity, а referral-flow не может менять владельца профиля.
+
+---
+
 ## [2026-07-07] V5.0.2 Lint, QA & Production Gate
 **Коммит:** `локально`
 **Файлы:** `.eslintrc.cjs`, `api/admin-actions.js`, `api/news-engagement.js`, `api/user-actions.js`, `server/src/routes/admin-actions.js`, `server/src/routes/news-engagement.js`, `server/src/routes/user-actions.js`, `src/AdminPanel.jsx`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/ExpertsPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/PartnerCabinetPage.jsx`

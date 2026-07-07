@@ -2,6 +2,7 @@
 // Long-polls Firestore up to 25 s, returns immediately when status changes from 'pending'
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 let _app = null;
 function getAdminApp() {
@@ -39,11 +40,14 @@ export default async function handler(req, res) {
       // Проверяем привязку к email-аккаунту
       const linkSnap = await db.collection('tgLinks').doc(tgId).get();
       const linkedUserId = linkSnap.exists ? linkSnap.data().userId : null;
+      const targetUserId = linkedUserId ?? tgId;
+      const token = await getAuth(getAdminApp()).createCustomToken(targetUserId);
       return res.json({
         status: 'done',
         tgId,
+        token,
         user: {
-          id:         linkedUserId ?? tgId,
+          id:         targetUserId,
           first_name: data.firstName ?? '',
           last_name:  data.lastName  ?? '',
           photo_200:  data.photoUrl  ?? null,

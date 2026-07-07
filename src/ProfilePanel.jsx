@@ -4,10 +4,12 @@ import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
+import { signInWithCustomToken } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL, API_BASE_URL } from './constants.js';
+import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
 import { formatNewsDate, getNewsTitle } from './newsUtils.js';
@@ -67,6 +69,14 @@ function EmailVerifyBanner({ userId }) {
       </button>
     </div>
   );
+}
+
+async function getAuthHeaders() {
+  const token = await auth.currentUser?.getIdToken?.();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 const ACHIEVEMENTS = [
@@ -426,7 +436,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             const tgPayload = { tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name ?? null, photo: data.user.photo_200 ?? null };
             const linkRes = await fetch(`${API_BASE_URL}/api/email-auth`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: await getAuthHeaders(),
               body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
             });
             const linkData = await linkRes.json().catch(() => ({}));
@@ -450,6 +460,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             } catch {}
             setTgStep('linked');
           } else {
+            if (data.token) {
+              await signInWithCustomToken(auth, data.token);
+              traceAuthStage('telegram_firebase_token_ready', { state, userId: data.user?.id ?? null, uid: auth.currentUser?.uid ?? null });
+            }
             localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
             traceAuthStage('telegram_user_saved', { userId: data.user?.id ?? null });
             window.location.reload();
@@ -557,7 +571,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     try {
       const res = await fetch(`${API_BASE_URL}/api/email-auth`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: 'link-email', email: linkEmailValue, userId: String(user.id) }),
       });
       const data = await res.json();

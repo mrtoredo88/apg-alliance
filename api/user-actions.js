@@ -90,6 +90,10 @@ async function audit(db, req, actor, action, targetType, targetId, result = 'suc
 async function actionAuthLink(db, req, actor) {
   const userId = safeUserId(req.body?.userId);
   if (!userId) throw Object.assign(new Error('Не указан пользователь.'), { statusCode: 400 });
+  if ((userId.startsWith('email:') || userId.startsWith('tg_')) && actor.uid !== userId) {
+    await audit(db, req, actor, 'auth:linkUser:blocked', 'auth_map', actor.uid, 'blocked', { requestedUserId: userId, reason: 'strong_identity_required' });
+    throw Object.assign(new Error('Для этого аккаунта требуется повторная авторизация.'), { statusCode: 403 });
+  }
   await db.collection('auth_map').doc(actor.uid).set({
     vkId: userId,
     userId,
@@ -105,6 +109,15 @@ async function actionProfileSync(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const todayKey = new Date().toLocaleDateString('sv');
   const profile = stripUndefined(sanitizePublicProfile(req.body?.profile || {}));
+  if (profile.email) {
+    const normalizedEmail = safeString(profile.email, 200).toLowerCase();
+    if (userId.startsWith('email:') && normalizedEmail === userId.slice(6).toLowerCase()) {
+      profile.email = normalizedEmail;
+    } else {
+      delete profile.email;
+      delete profile.emailVerified;
+    }
+  }
   const refId = safeUserId(req.body?.referrerId);
   const consent = req.body?.consent || null;
   const ref = db.collection('users').doc(userId);
@@ -168,7 +181,7 @@ async function actionProfileSync(db, req, actor) {
 
 async function actionProfilePatch(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
-  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'displayName', 'firstName', 'lastName', 'photo', 'linkedTelegram', 'linkedEmail', 'joinedGroup']);
+  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (allowed.has(key)) patch[key] = value;

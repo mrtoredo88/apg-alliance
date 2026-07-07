@@ -1373,6 +1373,10 @@ export function UserApp() {
     setConsentError('');
     traceAuthStage('email_user_received', { userId: emailUser.id, hasToken: !!authPayload?.token });
     try {
+      if (authPayload?.token) {
+        await signInWithCustomToken(auth, authPayload.token);
+        traceAuthStage('email_firebase_token_ready', { userId: emailUser.id, uid: auth.currentUser?.uid ?? null });
+      }
       await ensureOwnerAuthSession(emailUser.id, 'email');
       traceAuthStage('email_owner_session_ready', { userId: emailUser.id, uid: auth.currentUser?.uid ?? null });
       const snap = await getDoc(doc(db, 'users', String(emailUser.id)));
