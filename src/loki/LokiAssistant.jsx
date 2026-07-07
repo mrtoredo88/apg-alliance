@@ -40,6 +40,8 @@ export function LokiAssistant() {
   const motionName = getMotionName(loki.emotion);
   const actionName = getActionName(loki.action);
   const position = getLokiPosition(loki.anchor);
+  const bubbleText = String(loki.message || '');
+  const isLongMessage = bubbleText.length > 86;
 
   useEffect(() => {
     if (!loki.visible) return undefined;
@@ -154,32 +156,33 @@ export function LokiAssistant() {
         <div
           style={{
             ...lokiPanelStyle,
-            maxWidth: 246,
-            borderRadius: 22,
-            padding: '13px 13px 12px',
+            width: 'min(312px, calc(100vw - 28px))',
+            maxWidth: 312,
+            borderRadius: 24,
+            padding: isLongMessage ? '15px 15px 14px' : '14px 14px 13px',
             color: APG2_PROFILE.text,
-            border: '1px solid rgba(215,184,106,0.24)',
-            boxShadow: '0 20px 58px rgba(0,0,0,0.34), 0 0 28px rgba(215,184,106,0.12), inset 0 1px 0 rgba(255,255,255,0.24)',
+            border: '1px solid rgba(232,201,122,0.32)',
             pointerEvents: 'auto',
-            animation: 'lokiBubbleIn var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
+            transformOrigin: 'calc(100% - 36px) 100%',
+            animation: 'lokiBubbleIn 340ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) 120ms both',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 860, marginBottom: 4 }}>Локи</div>
-              <div style={{ color: '#FFF8E9', fontSize: 13.5, lineHeight: '19px', fontWeight: 780, textShadow: '0 1px 12px rgba(0,0,0,0.28)' }}>{loki.message}</div>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '15px', fontWeight: 880, marginBottom: 5 }}>Локи</div>
+              <div style={{ color: '#FFF9EA', fontSize: isLongMessage ? 13.5 : 14, lineHeight: isLongMessage ? '19.5px' : '20px', fontWeight: 800, letterSpacing: 0, overflowWrap: 'anywhere', hyphens: 'auto', textShadow: '0 1px 14px rgba(0,0,0,0.34)' }}>{bubbleText}</div>
             </div>
             <button
               type="button"
               onClick={() => loki.hide()}
               aria-label="Скрыть Локи"
-              style={{ width: 28, height: 28, borderRadius: 12, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 18, lineHeight: '24px', fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0 }}
+              style={{ width: 30, height: 30, borderRadius: 13, border: '1px solid rgba(255,248,233,0.18)', background: 'rgba(255,255,255,0.09)', color: 'rgba(255,248,233,0.78)', fontSize: 18, lineHeight: '24px', fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}
             >
               ×
             </button>
           </div>
           {loki.card && (
-            <div style={{ marginTop: 10, borderRadius: 18, padding: 10, background: 'rgba(12,11,13,0.46)', border: '1px solid rgba(215,184,106,0.22)', display: 'grid', gap: 8 }}>
+            <div style={{ marginTop: 11, borderRadius: 19, padding: 11, background: 'linear-gradient(145deg, rgba(12,11,13,0.68), rgba(32,26,18,0.52))', border: '1px solid rgba(215,184,106,0.26)', display: 'grid', gap: 8, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
               <div>
                 <div style={{ color: '#FFF8E9', fontSize: 12.5, lineHeight: '16px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loki.card.title}</div>
                 <div style={{ color: 'rgba(255,248,233,0.76)', fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{loki.card.text}</div>
@@ -204,16 +207,16 @@ export function LokiAssistant() {
               </button>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <button type="button" onClick={() => loki.hideCurrentPanel()} style={{ flex: 1, minHeight: 30, borderRadius: 13, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 760, fontFamily: 'inherit' }}>Скрыть тут</button>
-            <button type="button" onClick={() => loki.setHintsEnabled(false)} style={{ flex: 1, minHeight: 30, borderRadius: 13, border: '1px solid rgba(215,184,106,0.22)', background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 800, fontFamily: 'inherit' }}>Выключить</button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
+            <button type="button" onClick={() => loki.hideCurrentPanel()} style={lokiSecondaryButtonStyle}>Скрыть тут</button>
+            <button type="button" onClick={() => loki.setHintsEnabled(false)} style={{ ...lokiSecondaryButtonStyle, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(215,184,106,0.14)', color: APG2_PROFILE.gold }}>Выключить</button>
           </div>
         </div>
       )}
 
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
         {menuOpen && (
-          <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 86, width: 178, borderRadius: 22, padding: 8, display: 'grid', gap: 6, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+          <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 190, borderRadius: 24, padding: 9, display: 'grid', gap: 7, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
             <button type="button" onClick={() => { loki.openExperience(); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
             <button type="button" onClick={() => { setBrainOpen(v => !v); setHistoryOpen(false); setMenuOpen(false); }} style={menuButtonStyle}>Спросить Локи</button>
             <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
@@ -231,12 +234,12 @@ export function LokiAssistant() {
               setBrainText('');
               await loki.askBrain(text);
             }}
-            style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 86, width: 270, borderRadius: 24, padding: 11, display: 'grid', gap: 9, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}
+            style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 'min(304px, calc(100vw - 28px))', borderRadius: 26, padding: 13, display: 'grid', gap: 10, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div>
                 <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880 }}>Спросить Локи</div>
-                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, marginTop: 2 }}>Только по данным АПГ</div>
+                <div style={{ color: 'rgba(255,248,233,0.68)', fontSize: 10.5, marginTop: 2 }}>Только по данным АПГ</div>
               </div>
               <button type="button" onClick={() => setBrainOpen(false)} style={{ width: 26, height: 26, borderRadius: 11, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 16 }}>×</button>
             </div>
@@ -244,7 +247,7 @@ export function LokiAssistant() {
               value={brainText}
               onChange={e => setBrainText(e.target.value)}
               placeholder="Например: где выпить кофе?"
-              style={{ minHeight: 40, borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '0 12px' }}
+              style={{ minHeight: 44, borderRadius: 17, border: '1px solid rgba(255,248,233,0.18)', background: 'rgba(8,8,10,0.32)', color: '#FFF9EA', fontSize: 14, fontWeight: 720, fontFamily: 'inherit', outline: 'none', padding: '0 13px', boxSizing: 'border-box' }}
             />
             <button
               type="submit"
@@ -256,7 +259,7 @@ export function LokiAssistant() {
           </form>
         )}
         {historyOpen && (
-          <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 86, width: 252, maxHeight: 310, overflowY: 'auto', borderRadius: 24, padding: 10, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.22)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+          <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 'min(294px, calc(100vw - 28px))', maxHeight: 'min(340px, calc(100svh - 220px))', overflowY: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 26, padding: 12, display: 'grid', gap: 9, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880 }}>История Локи</div>
               <button type="button" onClick={() => setHistoryOpen(false)} style={{ width: 26, height: 26, borderRadius: 11, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 16 }}>×</button>
@@ -319,22 +322,37 @@ export function LokiAssistant() {
 }
 
 const menuButtonStyle = {
-  minHeight: 36,
-  borderRadius: 15,
-  border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)',
-  background: 'rgba(255,255,255,0.08)',
+  minHeight: 38,
+  borderRadius: 16,
+  border: '1px solid rgba(255,248,233,0.14)',
+  background: 'linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.045))',
   color: '#FFF8E9',
-  fontSize: 12,
-  fontWeight: 760,
+  fontSize: 12.5,
+  fontWeight: 790,
   fontFamily: 'inherit',
   textAlign: 'left',
-  padding: '0 10px',
+  padding: '0 11px',
   cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent',
 };
 
 const lokiPanelStyle = {
-  background: 'radial-gradient(circle at 18% 0%, rgba(255,244,205,0.20), transparent 36%), linear-gradient(145deg, rgba(32,27,24,0.92), rgba(18,17,20,0.86))',
-  backdropFilter: 'blur(44px) saturate(1.72)',
-  WebkitBackdropFilter: 'blur(44px) saturate(1.72)',
-  boxShadow: '0 24px 68px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -20px 42px rgba(215,184,106,0.055)',
+  background: 'radial-gradient(circle at 18% 0%, rgba(255,244,205,0.24), transparent 38%), radial-gradient(circle at 80% 100%, rgba(215,184,106,0.13), transparent 46%), linear-gradient(145deg, rgba(34,28,24,0.965), rgba(15,15,18,0.925))',
+  backdropFilter: 'blur(54px) saturate(1.86)',
+  WebkitBackdropFilter: 'blur(54px) saturate(1.86)',
+  boxShadow: '0 26px 74px rgba(0,0,0,0.44), 0 0 36px rgba(215,184,106,0.13), inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -24px 48px rgba(215,184,106,0.07)',
+};
+
+const lokiSecondaryButtonStyle = {
+  flex: 1,
+  minHeight: 34,
+  borderRadius: 15,
+  border: '1px solid rgba(255,248,233,0.16)',
+  background: 'rgba(255,255,255,0.075)',
+  color: 'rgba(255,248,233,0.78)',
+  fontSize: 11.5,
+  fontWeight: 790,
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent',
 };

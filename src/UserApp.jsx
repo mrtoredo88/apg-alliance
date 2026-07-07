@@ -182,6 +182,7 @@ export function UserApp() {
   const mountedRef                              = useRef(true);
   const claimingPrizeRef                        = useRef(false);
   const tabBarRef                               = useRef(null);
+  const tabSlotRefs                             = useRef([]);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
   const [scanSuccess, setScanSuccess]           = useState(null);
@@ -191,6 +192,7 @@ export function UserApp() {
   const [activePanel, setActivePanel]           = useState('home');
   const panelHistoryRef                         = useRef(['home']);
   const [panelTransition, setPanelTransition]   = useState('forward');
+  const [tabIndicator, setTabIndicator]         = useState({ center: 0, width: 0, ready: false });
   const [pullDistance, setPullDistance]         = useState(0);
   const [pullRefreshing, setPullRefreshing]     = useState(false);
   const [activePartner, setActivePartner]       = useState(null);
@@ -1652,6 +1654,37 @@ export function UserApp() {
   }, []);
 
   useEffect(() => {
+    const updateIndicator = () => {
+      const shell = tabBarRef.current;
+      const slot = tabSlotRefs.current[activeTabIndex];
+      if (!shell || !slot || activeTabIndex < 0 || isScannerOpen) {
+        setTabIndicator(prev => prev.ready ? { ...prev, ready: false } : prev);
+        return;
+      }
+      const next = {
+        center: Math.round(slot.offsetLeft + slot.offsetWidth / 2 - 2),
+        width: Math.max(0, Math.round(slot.offsetWidth)),
+        ready: true,
+      };
+      setTabIndicator(prev => (
+        prev.center === next.center && prev.width === next.width && prev.ready === next.ready ? prev : next
+      ));
+    };
+
+    updateIndicator();
+    const raf = requestAnimationFrame(updateIndicator);
+    window.addEventListener('resize', updateIndicator, { passive: true });
+    window.visualViewport?.addEventListener('resize', updateIndicator, { passive: true });
+    window.addEventListener('orientationchange', updateIndicator);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updateIndicator);
+      window.visualViewport?.removeEventListener('resize', updateIndicator);
+      window.removeEventListener('orientationchange', updateIndicator);
+    };
+  }, [activeTabIndex, isScannerOpen]);
+
+  useEffect(() => {
     const applyVisualViewport = () => {
       const viewport = window.visualViewport;
       const bottomInset = viewport
@@ -1700,25 +1733,28 @@ export function UserApp() {
       {activeTabIndex >= 0 && !isScannerOpen && (
         <div
           aria-hidden="true"
+          data-apg-tab-indicator="true"
           style={{
             position: 'absolute',
             top: 'var(--apg-island-pad, 8px)',
             bottom: 'var(--apg-island-pad, 8px)',
-            left: `calc(${activeTabIndex * 20}% + 6px)`,
-            width: 'calc(20% - 8px)',
+            left: tabIndicator.ready ? tabIndicator.center : '10%',
+            width: tabIndicator.ready ? tabIndicator.width : 'calc(20% - 8px)',
+            boxSizing: 'border-box',
             borderRadius: 23,
             background: 'radial-gradient(circle at 50% 0%, rgba(255,245,203,0.26), transparent 56%), linear-gradient(145deg, rgba(244,217,140,0.19), rgba(255,255,255,0.07))',
             border: '1px solid rgba(244,217,140,0.24)',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.24), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.16))',
-            transform: 'translate3d(0,0,0)',
+            transform: 'translate3d(-50%,0,0)',
             transition: `left ${MOTION.duration.base}ms ${MOTION.ease.standard}, width ${MOTION.duration.base}ms ${MOTION.ease.standard}, opacity ${MOTION.duration.fast}ms ${MOTION.ease.standard}`,
+            opacity: tabIndicator.ready ? 1 : 0,
             zIndex: 0,
           }}
         />
       )}
       {TABS.map((tab, i) => {
         if (i === 2) return (
-          <button key="scan" aria-label="Открыть сканер" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
+          <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
             style={{ flex: 1, background: isScannerOpen ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isScannerOpen ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isScannerOpen ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 0, position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
               width: 42, height: 42, marginTop: 0, borderRadius: 18,
@@ -1738,9 +1774,11 @@ export function UserApp() {
 
         return (
           <button key={tab.id}
+            ref={node => { tabSlotRefs.current[i] = node; }}
+            data-apg-tab-slot={tab.id}
             aria-label={`Открыть раздел ${tab.label}`}
             onClick={() => { haptic('light'); goPanel(tab.id); }}
-            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? `translateY(-0.5px) scale(${MOTION.press.tab})` : 'translateY(0) scale(1)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>
+            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
               {hasNotif && (
