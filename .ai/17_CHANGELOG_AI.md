@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Premium News media polish
-**Коммит:** pending
+**Коммит:** `758702c7`
 **Файлы:** `api/vk-news.js`, `server/src/routes/vk-news.js`, `src/newsUtils.js`, `src/NewsPage.jsx`, `src/UserApp.jsx`, `.ai/04_API.md`
 **Тип:** feat
 **Что изменено:** VK News pipeline теперь выбирает фото по максимальной площади и сохраняет размеры в `photoItems`. Раздел новостей получил адаптивный media-frame без кривого растягивания, fullscreen-галерею с zoom/swipe, share-панель, теги, блок «Локи рекомендует», уникальный view tracking и базовую систему комментариев с лайками/удалением.
