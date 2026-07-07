@@ -503,7 +503,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     try {
       traceAuthStage('telegram_auth_click', { linking });
       traceAuthStage('telegram_auth_start', { linking, api: API_BASE_URL });
-      const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, { method: 'POST', signal: controller.signal });
+      const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-APG-Version': 'hotfix-telegram-auth' },
+        body: JSON.stringify({ source: 'profile_panel', linking }),
+        signal: controller.signal,
+      });
       const { state, url, message } = await res.json().catch(() => ({}));
       if (!res.ok || !state || !url) throw new Error(message || 'telegram_start_failed');
       localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));

@@ -153,6 +153,66 @@ async function fetchVkNewsPosts() {
   return Array.isArray(data.posts) ? data.posts : [];
 }
 
+let publicBootstrapPromise = null;
+
+async function fetchPublicBootstrap() {
+  if (!publicBootstrapPromise) {
+    publicBootstrapPromise = fetch(`${API_BASE_URL}/api/public-data`, {
+      headers: { 'X-APG-Version': 'hotfix-public-data' },
+      cache: 'no-store',
+    })
+      .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok === false) throw new Error(payload?.error || 'public_data_failed');
+        return payload?.data || {};
+      })
+      .catch(error => {
+        publicBootstrapPromise = null;
+        throw error;
+      });
+  }
+  return publicBootstrapPromise;
+}
+
+function snapFromPublicRows(rows = []) {
+  return {
+    docs: rows.map(row => ({
+      id: row.id,
+      data: () => row,
+    })),
+  };
+}
+
+function docFromPublicRow(row) {
+  return row
+    ? { exists: () => true, data: () => row }
+    : { exists: () => false, data: () => ({}) };
+}
+
+async function loadPublicSnap(label, promiseFactory) {
+  try {
+    return await promiseFactory();
+  } catch (error) {
+    logError(error, `UserApp.loadData.${label}.firestore`);
+    const data = await fetchPublicBootstrap();
+    const rows = data?.[label];
+    if (!Array.isArray(rows)) throw error;
+    console.warn(`[APG-DIAG] public-data fallback used for ${label}`);
+    return snapFromPublicRows(rows);
+  }
+}
+
+async function loadPublicStats(promiseFactory) {
+  try {
+    return await promiseFactory();
+  } catch (error) {
+    logError(error, 'UserApp.loadData.stats.firestore');
+    const data = await fetchPublicBootstrap();
+    console.warn('[APG-DIAG] public-data fallback used for stats');
+    return docFromPublicRow(data?.stats || null);
+  }
+}
+
 async function safeLoad(label, promiseFactory, fallback, timeoutMs = 6500) {
   let timer;
   try {
@@ -688,15 +748,15 @@ export function UserApp() {
 
       const emptySnap = { docs: [] };
       const _buildAll = () => Promise.all([
-        safeLoad('partners', () => getDocs(query(collection(db, 'partners'), limit(100))), emptySnap),
-        safeLoad('events', () => getDocs(query(collection(db, 'events'), limit(100))), emptySnap),
-        safeLoad('news', () => getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30))), emptySnap),
-        safeLoad('notifications', () => getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50))), emptySnap),
-        safeLoad('reviews', () => getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(50))), emptySnap),
-        safeLoad('customTasks', () => getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'), limit(50))), emptySnap),
+        safeLoad('partners', () => loadPublicSnap('partners', () => getDocs(query(collection(db, 'partners'), limit(100)))), emptySnap),
+        safeLoad('events', () => loadPublicSnap('events', () => getDocs(query(collection(db, 'events'), limit(100)))), emptySnap),
+        safeLoad('news', () => loadPublicSnap('news', () => getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30)))), emptySnap),
+        safeLoad('notifications', () => loadPublicSnap('notifications', () => getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)))), emptySnap),
+        safeLoad('reviews', () => loadPublicSnap('reviews', () => getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(50)))), emptySnap),
+        safeLoad('customTasks', () => loadPublicSnap('customTasks', () => getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'), limit(50)))), emptySnap),
         safeLoad('vkNews', fetchVkNewsPosts, []),
-        safeLoad('experts', () => getDocs(query(collection(db, 'experts'), limit(100))), emptySnap),
-        safeLoad('stats', () => getDoc(doc(db, 'stats', 'global')), null),
+        safeLoad('experts', () => loadPublicSnap('experts', () => getDocs(query(collection(db, 'experts'), limit(100)))), emptySnap),
+        safeLoad('stats', () => loadPublicStats(() => getDoc(doc(db, 'stats', 'global'))), null),
       ]);
 
       let _loadResult = null;

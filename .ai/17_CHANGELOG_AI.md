@@ -710,6 +710,15 @@
 
 ## [2026-07-07] Исправлена запись согласий после email/Telegram авторизации
 **Коммит:** pending
+## [2026-07-07] Production hotfix главной, экспертов и Telegram auth
+**Коммит:** `pending`
+**Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `api/public-data.js`, `server/src/routes/public-data.js`, `server/src/server.js`
+**Тип:** fix
+**Что изменено:** Добавлен backend fallback `/api/public-data` для стартовых публичных данных главной (партнёры, события, новости, уведомления, отзывы, задания, эксперты, stats), который используется только если прямое Firestore-чтение на клиенте падает. Telegram auth start теперь отправляет валидный JSON body, чтобы Fastify не отклонял POST до обработчика при `Content-Type: application/json`.
+**Почему:** В production нужно быстро восстановить устойчивость главной/экспертов при закрытых или нестабильных Firestore reads и устранить сценарий, когда кнопка Telegram login не создаёт auth-сессию из-за пустого JSON body.
+
+---
+
 **Файлы:** `src/UserApp.jsx`, `src/ConsentScreen.jsx`, `src/EmailAuth.jsx`, `src/ProfilePanel.jsx`
 **Тип:** fix
 **Что изменено:** Перед записью профиля и согласий добавлена явная подготовка Firebase owner-сессии через `auth_map`; если текущая сессия привязана к другому пользователю, создаётся новая анонимная Firebase-сессия с корректной связкой. Экран согласий теперь показывает понятную ошибку внутри модального окна. EmailAuth передаёт наверх полный ответ API, Telegram/email этапы авторизации пишут диагностический trace в `localStorage.apg_auth_trace`, сетевые ошибки отправляются через `errorLogger`.
