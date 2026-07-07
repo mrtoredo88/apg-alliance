@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Proactive Intelligence Локи
+**Коммит:** `d24851a7`
+**Файлы:** `src/loki/LokiIntelligence.js`, `src/loki/LokiPlanner.js`, `src/loki/LokiLearning.js`, `src/loki/LokiObserver.js`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `src/loki/lokiMemory.js`
+**Тип:** feat
+**Что изменено:** Добавлен отдельный proactive intelligence слой Локи: анализ ситуации, персональные рекомендации, обучение на принятых/проигнорированных советах, объяснение рекомендаций, маршрут на сегодня и режим «Удиви меня». Observer теперь использует новый движок с fallback на старые правила, а Loki Core отвечает на новые речевые сценарии через существующие безопасные Loki Actions.
+**Почему:** Локи должен быть не только ответчиком, а деликатным городским спутником, который замечает полезные моменты и предлагает помощь без навязчивости.
+
+---
+
 ## [2026-07-07] Premium Polish Локи и Bottom Island
 **Коммит:** `локально`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/lokiPosition.js`, `src/UserApp.jsx`

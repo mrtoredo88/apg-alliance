@@ -10,8 +10,10 @@ import { RecommendationEngine } from './modules/RecommendationEngine.js';
 import { ObserverModule } from './modules/ObserverModule.js';
 import { PersonalityEngine } from './modules/PersonalityEngine.js';
 import { getActiveLokiAiProvider } from './lokiAiProviders.js';
-import { emptyResult, normalizeText } from './lokiCoreUtils.js';
+import { emptyResult, includesAny, normalizeText } from './lokiCoreUtils.js';
 import { APG_KNOWLEDGE_BASE, validateApgKnowledgeBase } from '../knowledge/index.js';
+import { explainLastRecommendation } from '../LokiIntelligence.js';
+import { buildPersonalRoute, buildSurprisePick } from '../LokiPlanner.js';
 
 const LOKI_MODULES = [
   Navigator,
@@ -62,7 +64,7 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
   return MemoryEngine.enrich({ context: base, memory, userMemory });
 }
 
-export async function askLokiCore({ text, appState, memory, userMemory, debug = false }) {
+export async function askLokiCore({ text, appState, memory, userMemory, history = [], debug = false }) {
   const start = nowMs();
   const query = normalizeText(text);
   const trace = [];
@@ -77,6 +79,21 @@ export async function askLokiCore({ text, appState, memory, userMemory, debug = 
       context,
     });
     return debug ? { ...result, debug: { provider, totalMs: Math.round(nowMs() - start), trace } } : result;
+  }
+
+  const intelligenceStart = nowMs();
+  let intelligenceResult = null;
+  if (includesAny(query, ['почему ты', 'почему предлож', 'зачем предлож', 'объясни рекомендац'])) {
+    intelligenceResult = explainLastRecommendation(memory);
+  } else if (includesAny(query, ['что мне сегодня посмотреть', 'маршрут', 'план на сегодня', 'куда сходить сегодня'])) {
+    intelligenceResult = buildPersonalRoute({ appState, learning: memory?.learning ?? {}, now: new Date() });
+  } else if (includesAny(query, ['удиви меня', 'что-нибудь необыч', 'что нибудь необыч', 'случайно', 'сюрприз'])) {
+    intelligenceResult = buildSurprisePick({ appState, learning: memory?.learning ?? {}, history });
+  }
+  trace.push({ module: 'lokiIntelligence', ms: Math.round(nowMs() - intelligenceStart), decision: intelligenceResult?.intent ?? 'skipped' });
+  if (intelligenceResult) {
+    const shaped = PersonalityEngine.shape({ result: intelligenceResult, context, selectedModule: { id: 'lokiIntelligence' } });
+    return debug ? { ...shaped, debug: { provider, selectedModule: 'lokiIntelligence', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
   let selected = null;

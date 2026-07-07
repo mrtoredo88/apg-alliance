@@ -13,6 +13,10 @@ Loki User Memory
 
 Loki Brain
   Loki Core combines Knowledge Base + User Memory + current app data.
+
+Loki Proactive Intelligence
+  Loki observes app context, learns from accepted/ignored advice, plans routes,
+  and shows useful recommendations only when the priority/quiet rules allow it.
 ```
 
 ## Files
@@ -26,6 +30,9 @@ src/loki/knowledge/
   index.js
 
 src/loki/core/lokiUserMemory.js
+src/loki/LokiIntelligence.js
+src/loki/LokiLearning.js
+src/loki/LokiPlanner.js
 scripts/update-apg-chronicles.mjs
 ```
 
@@ -61,6 +68,24 @@ This regenerates `src/loki/knowledge/updates/chronicles.json` from the AI change
 - last few queries.
 
 It does not store sensitive personal details. The UI can clear this memory through `loki.resetUserMemory()`.
+
+## Proactive Intelligence
+
+`LokiIntelligence` analyzes the current app state and returns only real APG-backed recommendations. It must not invent partners, events, news, offers, prizes, or routes.
+
+`LokiLearning` stores lightweight local signals:
+
+- screen visits;
+- accepted recommendations;
+- ignored recommendations;
+- category affinity.
+
+`LokiPlanner` builds user-facing plans:
+
+- personal route for “Что мне сегодня посмотреть?”;
+- discovery answer for “Удиви меня”.
+
+All recommendations must pass `lokiPriority` quiet rules before they reach the UI.
 
 ## Voice Mode
 

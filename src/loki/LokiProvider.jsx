@@ -21,6 +21,7 @@ import {
   shouldLokiStayQuiet,
 } from './LokiEmotionEngine.js';
 import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from './core/lokiUserMemory.js';
+import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearning.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -129,7 +130,22 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       const emotionalPayload = { ...payload, ...getLokiEmotionalPayload(nextEmotionalState) };
       const nextMessage = getLokiPhrase(eventType, emotionalPayload);
       setMessage(nextMessage);
-      updateMemory({ lastMessage: { eventType, text: nextMessage, payload: emotionalPayload }, lastPanel: activePanel, inDialog: true, emotionalState: nextEmotionalState });
+      const memoryPatch = {
+        lastMessage: { eventType, text: nextMessage, payload: emotionalPayload },
+        lastPanel: activePanel,
+        inDialog: true,
+        emotionalState: nextEmotionalState,
+      };
+      if (eventType === LOKI_EVENTS.PROACTIVE_SUGGESTION) {
+        memoryPatch.lastRecommendation = {
+          adviceId: payload.adviceId ?? null,
+          reason: payload.reason ?? null,
+          card: nextCard,
+          panel: activePanel,
+          shownAt: new Date().toISOString(),
+        };
+      }
+      updateMemory(memoryPatch);
       updateHistory(prev => {
         const item = {
           kind: payload.kind ?? 'message',
@@ -304,7 +320,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     lastPanelChangeAtRef.current = Date.now();
     setMemory(prev => {
       const panelVisits = { ...(prev.panelVisits ?? {}), [activePanel]: ((prev.panelVisits ?? {})[activePanel] ?? 0) + 1 };
-      const next = { ...prev, lastPanel: activePanel, panelVisits, updatedAt: new Date().toISOString() };
+      const next = { ...prev, lastPanel: activePanel, panelVisits, learning: learnFromPanelVisit(prev.learning, activePanel), updatedAt: new Date().toISOString() };
       saveLokiMemory(next);
       return next;
     });
@@ -318,6 +334,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         appState: { ...appState, activePanel },
         memory,
         history,
+        userMemory,
         lastUserActionAt: lastUserActionAtRef.current,
         lastPanelChangeAt: lastPanelChangeAtRef.current,
       });
@@ -326,7 +343,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     return () => {
       if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
     };
-  }, [activePanel, appState, history, memory, settings.enabled, showMessage, user]);
+  }, [activePanel, appState, history, memory, settings.enabled, showMessage, user, userMemory]);
 
   const handleCharacterTap = useCallback(() => {
     const tapAction = getRandomLokiAction(TAP_ACTIONS);
@@ -343,7 +360,12 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_missing', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-    updateMemory({ lastAction: { ...normalized, ts: new Date().toISOString() }, inDialog: false });
+    const activeAdvice = memory?.lastRecommendation;
+    updateMemory({
+      lastAction: { ...normalized, ts: new Date().toISOString() },
+      inDialog: false,
+      ...(activeAdvice ? { learning: learnFromRecommendationResult(memory.learning, activeAdvice, 'opened') } : {}),
+    });
     if (activeHistoryIdRef.current) {
       const id = activeHistoryIdRef.current;
       updateHistory(prev => markLokiHistoryItem(prev, id, 'opened'));
@@ -359,7 +381,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [appActions, showMessage, updateHistory, updateMemory]);
+  }, [appActions, memory, showMessage, updateHistory, updateMemory]);
 
   const askBrain = useCallback(async (text) => {
     if (!settings.enabled) return false;
@@ -373,7 +395,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setBrainThinking(true);
     }, 1000);
     try {
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, userMemory, debug: isLokiDebugEnabled() });
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, userMemory, history, debug: isLokiDebugEnabled() });
       clearTimeout(thinkingTimer);
       setBrainThinking(false);
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
@@ -396,7 +418,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appState, executeAction, memory, settings.enabled, showMessage, user]);
+  }, [activePanel, appState, executeAction, history, memory, settings.enabled, showMessage, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
@@ -405,7 +427,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setAction(LOKI_ACTIONS.LOOK_AROUND);
     updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text });
     try {
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, userMemory, debug: isLokiDebugEnabled() });
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, userMemory, history, debug: isLokiDebugEnabled() });
       setBrainThinking(false);
       setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
       setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
@@ -437,7 +459,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activePanel, appState, executeAction, memory, settings.enabled, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activePanel, appState, executeAction, history, memory, settings.enabled, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const value = useMemo(() => ({
     action,
@@ -480,6 +502,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (activeHistoryIdRef.current) {
         const id = activeHistoryIdRef.current;
         updateHistory(prev => markLokiHistoryItem(prev, id, 'ignored'));
+      }
+      if (memory?.lastRecommendation) {
+        updateMemory({ learning: learnFromRecommendationResult(memory.learning, memory.lastRecommendation, 'ignored') });
       }
       setDismissed(true); setVisible(false);
     },
