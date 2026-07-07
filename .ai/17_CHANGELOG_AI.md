@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] P0 admin API: Firebase token вынесен из Authorization для Yandex
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `src/userApi.js`, `src/ProfilePanel.jsx`, `src/NewsPage.jsx`, `api/_admin-security.js`, `server/src/lib/adminSecurity.js`, `api/admin-actions.js`, `api/user-actions.js`, `api/email-auth.js`, `api/news-comments.js`, `api/news-engagement.js`, `api/system-status.js`, `api/loki-editor.js`, `server/src/routes/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/server.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Firebase ID Token теперь передаётся в `X-Firebase-Auth`, а backend поддерживает и новый заголовок, и старый `Authorization` для совместимости. CORS обновлён для `X-Firebase-Auth`; admin diagnostics теперь показывает endpoint/action/resource/status/body для failed admin actions и backend возвращает стабильные коды `AUTH_REQUIRED`, `FORBIDDEN_ROLE`, `UNKNOWN_ACTION`, `INVALID_PAYLOAD`, `SERVER_ERROR`.
+**Почему:** Yandex Serverless Container перехватывал внешний `Authorization: Bearer <Firebase ID Token>` и отвечал собственным `403 Forbidden: Not authorized` до Fastify. Из-за этого `/api/admin-actions` не доходил до backend, а админка видела общий текст “Административное действие не выполнено”.
+
+---
+
 ## [2026-07-07] P0 админка больше не зависает на Firebase Auth
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `.ai/17_CHANGELOG_AI.md`

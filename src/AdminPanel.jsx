@@ -88,9 +88,14 @@ function formatAdminLoadError(error) {
 
 function adminLoadErrorDetails(error) {
   const details = [];
+  if (error?.status) details.push(`status=${error.status}`);
   if (error?.code) details.push(`code=${error.code}`);
+  if (error?.endpoint) details.push(`endpoint=${error.endpoint}`);
+  if (error?.action) details.push(`action=${error.action}`);
+  if (error?.resource) details.push(`resource=${error.resource}`);
   if (error?.name) details.push(`name=${error.name}`);
   if (error?.message) details.push(`message=${String(error.message).slice(0, 260)}`);
+  if (error?.responseBody) details.push(`body=${JSON.stringify(error.responseBody).slice(0, 360)}`);
   return details.join(' · ');
 }
 
@@ -1052,7 +1057,7 @@ async function lokiEditorRequest(action, payload = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      'X-Firebase-Auth': token,
       'X-APG-Version': 'v5.0-local',
     },
     body: JSON.stringify({ action, ...payload }),
@@ -2151,7 +2156,7 @@ export const AdminPanel = () => {
     });
     return {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      'X-Firebase-Auth': token,
       'X-Idempotency-Key': idempotencyKey || `${Date.now()}_${Math.random().toString(16).slice(2)}`,
       'X-APG-Version': 'v4.4.2',
     };
@@ -2159,13 +2164,25 @@ export const AdminPanel = () => {
 
   const runAdminAction = async (action, payload = {}) => {
     const headers = await adminRequestHeaders(payload.idempotencyKey);
+    const requestBody = { action, ...payload };
     const response = await fetch(`${API_BASE_URL}/api/admin-actions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ action, ...payload }),
+      body: JSON.stringify(requestBody),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Административное действие не выполнено.');
+    if (!response.ok || data?.ok === false) {
+      const backendMessage = data?.error || data?.message || data?.errorMessage || 'Административное действие не выполнено.';
+      const error = new Error(backendMessage);
+      error.code = data?.code || data?.errorCode || data?.errorType || 'ADMIN_ACTION_FAILED';
+      error.status = response.status;
+      error.endpoint = '/api/admin-actions';
+      error.action = action;
+      error.resource = payload.resource || null;
+      error.responseBody = data;
+      error.requestPayload = Object.fromEntries(Object.entries(requestBody).filter(([key]) => key !== 'token' && key !== 'Authorization'));
+      throw error;
+    }
     return data;
   };
 

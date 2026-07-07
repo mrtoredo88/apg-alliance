@@ -16,6 +16,8 @@ function jsonError(res, status, message, code = 'USER_ACTION_ERROR') {
 }
 
 function getBearerToken(req) {
+  const direct = String(req.headers['x-firebase-auth'] || req.headers['x-apg-auth'] || '').trim();
+  if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match?.[1] || '';

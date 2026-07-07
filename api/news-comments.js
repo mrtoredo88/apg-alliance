@@ -103,7 +103,7 @@ export default async function handler(req, res) {
   const db = getAdminDb();
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Firebase-Auth,X-APG-Auth');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {

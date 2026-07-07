@@ -31,6 +31,8 @@ function generateCode() {
 }
 
 function getBearerToken(req) {
+  const direct = String(req.headers['x-firebase-auth'] || req.headers['X-Firebase-Auth'] || req.headers['x-apg-auth'] || req.headers['X-APG-Auth'] || '').trim();
+  if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match?.[1] || '';
@@ -82,7 +84,7 @@ async function createFirebaseToken(userId) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', APP_URL);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-APG-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-Auth, X-APG-Auth, X-APG-Version');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
 

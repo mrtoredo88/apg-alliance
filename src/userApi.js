@@ -25,7 +25,7 @@ export async function userAction(action, payload = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      'X-Firebase-Auth': token,
       'X-APG-Version': version,
     },
     body: JSON.stringify({ action, ...payload }),

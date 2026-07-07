@@ -32,7 +32,7 @@ await fastify.register(cors, {
     /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-Idempotency-Key', 'X-APG-Version'],
+  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-Firebase-Auth', 'X-APG-Auth', 'X-Idempotency-Key', 'X-APG-Version'],
 });
 
 fastify.addHook('onSend', async (request, reply) => {

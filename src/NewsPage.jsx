@@ -398,7 +398,7 @@ async function requestNewsComments(path, options = {}) {
   const token = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => '') : '';
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Firebase-Auth': token } : {}), ...(options.headers || {}) },
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {

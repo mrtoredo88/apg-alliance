@@ -25,6 +25,8 @@ function hasPermission(role, permission) {
 }
 
 function getBearerToken(req) {
+  const direct = String(req.headers['x-firebase-auth'] || req.headers['X-Firebase-Auth'] || req.headers['x-apg-auth'] || req.headers['X-APG-Auth'] || '').trim();
+  if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match?.[1] || '';
@@ -101,11 +103,29 @@ export async function writeAuditLog(db, req, actor, action, targetType, targetId
   return entry;
 }
 
+function classifyAdminError(error) {
+  const status = error?.statusCode || 500;
+  const message = String(error?.message || '');
+  const code = String(error?.code || '');
+  if (error?.code) return error.code;
+  if (status === 401) return 'AUTH_REQUIRED';
+  if (status === 403) return 'FORBIDDEN_ROLE';
+  if (message.includes('Неизвестное административное действие')) return 'UNKNOWN_ACTION';
+  if (message.includes('Неизвестный административный ресурс') || message.includes('Неизвестный административный список')) return 'UNKNOWN_RESOURCE';
+  if (status === 400) return 'INVALID_PAYLOAD';
+  if (code.includes('permission-denied') || message.includes('PERMISSION_DENIED')) return 'FIRESTORE_PERMISSION';
+  if (code.includes('not-found') || message.includes('NOT_FOUND')) return 'FIRESTORE_COLLECTION_NOT_FOUND';
+  if (message.includes('env var') || message.includes('Firebase не настроен')) return 'ENV_MISSING';
+  return 'SERVER_ERROR';
+}
+
 export function adminError(res, error) {
   const status = error?.statusCode || 500;
+  const code = classifyAdminError(error);
   return res.status(status).json({
     ok: false,
     error: status >= 500 ? 'Административное действие временно недоступно.' : error.message,
-    code: error?.code || undefined,
+    code,
+    role: error?.role || undefined,
   });
 }

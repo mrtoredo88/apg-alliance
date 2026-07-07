@@ -16,6 +16,8 @@ function jsonError(res, status, message, code = 'USER_ACTION_ERROR') {
 }
 
 function getBearerToken(req) {
+  const direct = String(req.headers['x-firebase-auth'] || req.headers['X-Firebase-Auth'] || req.headers['x-apg-auth'] || req.headers['X-APG-Auth'] || '').trim();
+  if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match?.[1] || '';
@@ -581,7 +583,7 @@ export default async function handler(req, res) {
   const db = getAdminDb();
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-APG-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Firebase-Auth,X-APG-Auth,X-APG-Version');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return jsonError(res, 405, 'Method not allowed', 'METHOD_NOT_ALLOWED');
   let actor = null;

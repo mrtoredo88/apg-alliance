@@ -75,7 +75,7 @@ async function getAuthHeaders() {
   const token = await auth.currentUser?.getIdToken?.();
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token ? { 'X-Firebase-Auth': token } : {}),
   };
 }
 
