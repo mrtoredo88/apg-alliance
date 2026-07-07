@@ -66,6 +66,20 @@ async function listComments(db, newsId) {
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
+async function listAdminComments(db) {
+  const snap = await db.collection('newsComments').orderBy('createdAt', 'desc').limit(300).get();
+  return snap.docs.map(serializeComment);
+}
+
+async function updateNewsCommentCount(db, newsId, delta) {
+  if (!newsId || !delta) return;
+  await db.collection('news').doc(String(newsId)).set({
+    comments: FieldValue.increment(delta),
+    'stats.comments': FieldValue.increment(delta),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 async function isUserBlocked(db, userId) {
   if (!userId) return false;
   const snap = await db.collection('newsCommentBlocks').doc(String(userId)).get();
@@ -82,6 +96,11 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const newsId = String(req.query.newsId || '').trim();
+      if (!newsId && req.query.admin === '1') {
+        await requireAdminPermission(req, 'comments:*');
+        const comments = await listAdminComments(db);
+        return res.status(200).json({ ok: true, comments });
+      }
       if (!newsId) return res.status(400).json({ ok: false, error: 'newsId is required' });
       const comments = await listComments(db, newsId);
       return res.status(200).json({ ok: true, comments });
@@ -122,6 +141,7 @@ export default async function handler(req, res) {
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
+      await updateNewsCommentCount(db, newsId, 1);
       const created = await ref.get();
       return res.status(200).json({ ok: true, comment: serializeComment(created) });
     }
@@ -176,6 +196,7 @@ export default async function handler(req, res) {
         },
         updatedAt: FieldValue.serverTimestamp(),
       });
+      if (!data.hidden) await updateNewsCommentCount(db, data.newsId, -1);
       if (actor) await writeAuditLog(db, req, actor, 'comment:delete', 'newsComment', commentId, { label: `Скрыт комментарий ${commentId}`, newsId: data.newsId });
       return res.status(200).json({ ok: true });
     }
@@ -234,6 +255,7 @@ export default async function handler(req, res) {
         },
         updatedAt: FieldValue.serverTimestamp(),
       });
+      if (!data.hidden) await updateNewsCommentCount(db, data.newsId, -1);
       await writeAuditLog(db, req, actor, 'comment:block-user', 'user', blockedUserId, { label: `Заблокирован автор комментария ${commentId}`, commentId, newsId: data.newsId });
       return res.status(200).json({ ok: true });
     }

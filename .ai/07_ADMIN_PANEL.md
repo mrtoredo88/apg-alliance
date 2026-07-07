@@ -68,7 +68,7 @@
 - Карточки комментариев из `newsComments`
 - Показывает автора, роль, новость, дату, текст, лайки
 - Действия: `toggleUseful`, `togglePin`, `delete`, `blockUser`
-- Backend: `/api/news-comments`, запись через Admin SDK
+- Backend: `/api/news-comments`, загрузка и модерация через Admin SDK без прямого Firestore read/write
 
 ## Вкладка «Пользователи»
 

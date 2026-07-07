@@ -34,8 +34,8 @@
 ### Комментарии
 
 - Пользователь отправляет комментарий в `/api/news-comments`.
-- Backend валидирует автора, пишет `newsComments`.
-- Модерационные действия требуют admin role и Firebase ID Token.
+- Backend валидирует автора, пишет `newsComments` и синхронизирует счётчики `news.comments` / `news.stats.comments`.
+- Модерационные действия и административная загрузка комментариев требуют admin role и Firebase ID Token.
 
 ### Партнёры
 

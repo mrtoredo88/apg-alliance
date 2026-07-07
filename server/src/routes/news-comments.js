@@ -66,6 +66,20 @@ async function listComments(db, newsId) {
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
+async function listAdminComments(db) {
+  const snap = await db.collection('newsComments').orderBy('createdAt', 'desc').limit(300).get();
+  return snap.docs.map(serializeComment);
+}
+
+async function updateNewsCommentCount(db, newsId, delta) {
+  if (!newsId || !delta) return;
+  await db.collection('news').doc(String(newsId)).set({
+    comments: FieldValue.increment(delta),
+    'stats.comments': FieldValue.increment(delta),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 async function isUserBlocked(db, userId) {
   if (!userId) return false;
   const snap = await db.collection('newsCommentBlocks').doc(String(userId)).get();
@@ -77,6 +91,11 @@ export default async function newsCommentsRoutes(fastify) {
     const db = getDb();
     try {
       const newsId = String(request.query?.newsId || '').trim();
+      if (!newsId && request.query?.admin === '1') {
+        await requireAdminPermission(request, 'comments:*');
+        const comments = await listAdminComments(db);
+        return { ok: true, comments };
+      }
       if (!newsId) return reply.code(400).send({ ok: false, error: 'newsId is required' });
       const comments = await listComments(db, newsId);
       return { ok: true, comments };
@@ -122,6 +141,7 @@ export default async function newsCommentsRoutes(fastify) {
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
+        await updateNewsCommentCount(db, newsId, 1);
         const created = await ref.get();
         return { ok: true, comment: serializeComment(created) };
       }
@@ -174,6 +194,7 @@ export default async function newsCommentsRoutes(fastify) {
           },
           updatedAt: FieldValue.serverTimestamp(),
         });
+        if (!data.hidden) await updateNewsCommentCount(db, data.newsId, -1);
         if (actor) await writeAuditLog(db, request, actor, 'comment:delete', 'newsComment', commentId, { label: `Скрыт комментарий ${commentId}`, newsId: data.newsId });
         return { ok: true };
       }
@@ -232,6 +253,7 @@ export default async function newsCommentsRoutes(fastify) {
           },
           updatedAt: FieldValue.serverTimestamp(),
         });
+        if (!data.hidden) await updateNewsCommentCount(db, data.newsId, -1);
         await writeAuditLog(db, request, actor, 'comment:block-user', 'user', blockedUserId, { label: `Заблокирован автор комментария ${commentId}`, commentId, newsId: data.newsId });
         return { ok: true };
       }

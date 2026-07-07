@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] News E2E audit: комментарии и счётчики
+**Коммит:** `локально`
+**Файлы:** `api/news-comments.js`, `server/src/routes/news-comments.js`, `src/AdminPanel.jsx`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/ARCHITECTURE.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Админская загрузка комментариев переведена с прямого Firestore read на `GET /api/news-comments?admin=1` с проверкой `comments:*`. Создание, удаление и блокировка комментариев теперь синхронизируют `news.comments` и `news.stats.comments` в обеих backend-реализациях.
+**Почему:** Интеграционный аудит новостной цепочки показал риск пустой модерации при закрытых Firestore rules и расхождение счётчиков обсуждения после пользовательских действий.
+
+---
+
 ## [2026-07-07] V5.0 Локи · ИИ-редактор новостей
 **Коммит:** `локально`
 **Файлы:** `api/loki-editor.js`, `server/src/routes/loki-editor.js`, `server/src/server.js`, `src/AdminPanel.jsx`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/ARCHITECTURE.md`

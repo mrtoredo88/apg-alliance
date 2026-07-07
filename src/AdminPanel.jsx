@@ -2686,8 +2686,12 @@ export const AdminPanel = () => {
 
   const loadNewsComments = useCallback(async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'newsComments'), orderBy('createdAt', 'desc'), limit(300)));
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const response = await fetch(`${API_BASE_URL}/api/news-comments?admin=1`, {
+        headers: await adminRequestHeaders(`comments_list_${Date.now()}`),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Не удалось загрузить комментарии.');
+      const rows = Array.isArray(data.comments) ? data.comments : [];
       setNewsComments(rows);
       setAdminMetrics(prev => ({ ...prev, newsComments: rows }));
     } catch (e) {

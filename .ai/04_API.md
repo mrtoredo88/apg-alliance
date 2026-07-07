@@ -79,6 +79,7 @@
 
 **GET query params:**
 - `newsId` (required) — id новости или VK-поста (`vk_...`)
+- `admin=1` — административная загрузка последних 300 комментариев; требует `Authorization: Bearer <Firebase ID Token>` и роль с `comments:*`
 
 **GET response 200:**
 ```json
@@ -112,7 +113,7 @@
 - `toggleUseful` — отметить/снять «Полезный ответ»; только `admin/owner`
 - `blockUser` — заблокировать автора комментария и скрыть комментарий; только `admin/owner`
 
-**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`. Модерация (`togglePin`, `toggleUseful`, `blockUser`, удаление/изменение чужого комментария) больше не доверяет `user.role` из body: сервер проверяет `Authorization: Bearer <Firebase ID Token>` и роль через custom claims / `users` / `auth_map`. Новые комментарии сохраняют `authorRole`, `status`, `isPinned`, `isUseful`, `moderation` и `ai.summaryEligible`, чтобы V4.4-админка и Локи могли модерировать и анализировать обсуждения без миграции структуры.
+**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`. Модерация (`togglePin`, `toggleUseful`, `blockUser`, удаление/изменение чужого комментария) больше не доверяет `user.role` из body: сервер проверяет `Authorization: Bearer <Firebase ID Token>` и роль через custom claims / `users` / `auth_map`. Новые комментарии сохраняют `authorRole`, `status`, `isPinned`, `isUseful`, `moderation` и `ai.summaryEligible`, чтобы V4.4-админка и Локи могли модерировать и анализировать обсуждения без миграции структуры. Создание и скрытие комментария синхронизируют `news.comments` и `news.stats.comments`; админка получает список комментариев через `GET /api/news-comments?admin=1`, а не прямым Firestore read.
 
 ---
 
