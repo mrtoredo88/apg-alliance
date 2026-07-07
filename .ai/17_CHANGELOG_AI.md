@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Диагностика VK News live/cache в production API
-**Коммит:** pending
+**Коммит:** `6ae1eb79`
 **Файлы:** `api/vk-news.js`, `server/src/routes/vk-news.js`, `.ai/04_API.md`
 **Тип:** fix
 **Что изменено:** `/api/vk-news` теперь логирует безопасную диагностику: наличие токена, источник токена, live/cache режим, ошибки VK API и количество постов. Ошибки чтения/записи Firestore cache больше не скрываются молча.
