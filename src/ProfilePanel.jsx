@@ -1651,13 +1651,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       </div>
 
       {/* ── Администрирование (только для админа) ── */}
-      {user?.id === 988504 && (
+      {(user?.id === 988504 || ['admin', 'owner'].includes(String(user?.role || user?.userRole || '').toLowerCase())) && (
         <div style={{ padding: '16px 16px 0' }}>
           <button
-            onClick={() => { window.location.hash = '/admin'; }}
+            onClick={() => { window.location.hash = '/admin-app'; }}
             style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.gold}44`, background: T.gold + '15', color: T.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
-            ⚙️ Панель администратора
+            ⚙️ Администрирование
           </button>
         </div>
       )}

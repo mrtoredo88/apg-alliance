@@ -311,6 +311,8 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   const expertReviews = metrics?.expertReviews ?? [];
   const raffleEntries = metrics?.raffleEntries ?? [];
   const guestSessions = metrics?.guestSessions ?? [];
+  const comments = metrics?.newsComments ?? [];
+  const errors = metrics?.errorLogs ?? [];
   const allScans = [...scans, ...expertScans];
   const today = new Date().toISOString().slice(0, 10);
   const newToday = users.filter(u => dateKey(u.registeredAt || u.createdAt) === today).length;
@@ -324,6 +326,10 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   const activeNews = news.filter(n => n.active !== false).length;
   const activeOffers = partners.filter(p => p.offer).length + experts.filter(e => e.offer).length;
   const reviewTotal = reviews.length + expertReviews.length;
+  const newComments = comments.filter(c => !c.hidden && withinDays(c.createdAt || c.updatedAt, 1)).length;
+  const moderationComments = comments.filter(c => !c.hidden && (c.status === 'pending' || !c.moderationReviewedAt)).length;
+  const openErrors = errors.filter(e => !e.resolved).length;
+  const pendingNews = news.filter(n => ['draft', 'pending', 'scheduled'].includes(String(n.status || '').toLowerCase()) || n.active === false).length;
   const sourceRows = Object.entries(users.reduce((acc, u) => {
     const label = providerLabel(u);
     acc[label] = (acc[label] ?? 0) + 1;
@@ -383,15 +389,18 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
       <div style={{ ...s.card, padding: 22, marginBottom: 18, background: 'linear-gradient(135deg, rgba(201,168,76,0.14), rgba(255,255,255,0.045))' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
           <div>
-            <div style={{ fontSize: 12, color: A.gold, fontWeight: 900, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>Admin Pro V5.0</div>
-            <h1 style={{ ...s.h1, fontSize: 30, lineHeight: '34px', marginBottom: 8 }}>Что сейчас происходит в АПГ?</h1>
-            <div style={{ fontSize: 14, color: A.textSec, lineHeight: '21px', maxWidth: 620 }}>Главный центр управления проектом: аудитория, QR, ключи, партнёры, эксперты, контент и воронка роста в одном месте.</div>
+            <div style={{ fontSize: 12, color: A.gold, fontWeight: 900, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>Редакционная админка V4.4</div>
+            <h1 style={{ ...s.h1, fontSize: 30, lineHeight: '34px', marginBottom: 8 }}>Добро пожаловать в рабочий центр АПГ</h1>
+            <div style={{ fontSize: 14, color: A.textSec, lineHeight: '21px', maxWidth: 620 }}>Главный экран теперь показывает не меню, а состояние проекта: публикации, комментарии, ошибки, рост пользователей, партнёры, эксперты и быстрые действия.</div>
           </div>
           <button onClick={() => onOpenTab('analytics')} style={{ ...s.btn, ...s.btnPri, whiteSpace: 'nowrap' }}>Открыть аналитику</button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <button onClick={() => onOpenTab('moderation')} style={{ border: 'none', background: 'transparent', padding: 0, textAlign: 'left' }}><StatTile label="На модерации" value={pendingNews + moderationComments} icon="🚦" color={pendingNews + moderationComments ? '#f59e0b' : '#4BB34B'} sub={`${pendingNews} новостей · ${moderationComments} комментариев`} /></button>
+        <button onClick={() => onOpenTab('comments')} style={{ border: 'none', background: 'transparent', padding: 0, textAlign: 'left' }}><StatTile label="Новых комментариев" value={newComments} icon="💬" color="#38bdf8" sub={`${comments.filter(c => !c.hidden).length} всего`} /></button>
+        <button onClick={() => onOpenTab('errors')} style={{ border: 'none', background: 'transparent', padding: 0, textAlign: 'left' }}><StatTile label="Ошибок приложения" value={openErrors} icon="🐞" color={openErrors ? A.red : '#4BB34B'} sub={openErrors ? 'требуют внимания' : 'критичных нет'} /></button>
         <StatTile label="Всего пользователей" value={users.length} icon="👥" color={A.blue} sub={`+${newToday} сегодня`} />
         <StatTile label="Новых за неделю" value={newWeek} icon="🆕" color="#4BB34B" sub={`+${newMonth} за месяц`} />
         <StatTile label="Партнёров" value={partners.length} icon="🤝" color={A.gold} />
@@ -492,6 +501,212 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
             </div>
             <div style={{ color: A.textSec, fontSize: 11, flexShrink: 0 }}>{item.ts.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminQuickActions({ setActiveTab, openNews, openPartner, openEvent, openPrize, openPush, openComments }) {
+  const actions = [
+    ['📢', 'Новость', openNews],
+    ['📸', 'Фото к новости', openNews],
+    ['🤝', 'Партнёр', openPartner],
+    ['📅', 'Событие', openEvent],
+    ['🎁', 'Приз', openPrize],
+    ['📣', 'Push', openPush],
+    ['💬', 'Комментарии', openComments],
+    ['🤖', 'Черновики ИИ', () => setActiveTab('ai-drafts')],
+  ];
+  return (
+    <div style={{ position: 'fixed', right: 18, bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))', zIndex: 850, display: 'grid', gap: 8, width: 178 }}>
+      {actions.map(([icon, label, onClick]) => (
+        <button key={label} type="button" onClick={onClick} style={{ ...s.btn, ...s.btnPri, minHeight: 40, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, boxShadow: '0 18px 46px rgba(0,0,0,0.34)', fontSize: 12.5 }}>
+          <span>{icon}</span><span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AdminNewsCard({ item, onEdit, onPublish, onPin, onDelete, onCheck }) {
+  const image = contentImageOf(item);
+  const published = item.publishedAt?.toDate ? item.publishedAt.toDate() : item.publishedAt ? new Date(item.publishedAt) : item.createdAt?.toDate ? item.createdAt.toDate() : null;
+  const stats = item.stats || {};
+  const reactions = Object.values(item.reactions || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const status = item.active === false ? 'Черновик' : String(item.status || '').toLowerCase() === 'scheduled' ? 'Отложено' : 'Опубликовано';
+  const statusColor = status === 'Опубликовано' ? '#4BB34B' : status === 'Отложено' ? '#f59e0b' : A.textSec;
+  return (
+    <div style={{ ...s.card, marginBottom: 0, padding: 0, overflow: 'hidden', minHeight: 320 }}>
+      <div style={{ height: 150, background: A.chip, position: 'relative', overflow: 'hidden' }}>
+        {image ? <img src={image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => e.currentTarget.style.display = 'none'} /> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', fontSize: 34 }}>📰</div>}
+        <div style={{ position: 'absolute', left: 12, top: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.48)', color: A.gold, border: `1px solid ${A.goldBrd}`, fontSize: 10.5, fontWeight: 850 }}>{item.source === 'vk' ? 'VK' : 'АПГ'}</span>
+          <span style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.48)', color: statusColor, border: `1px solid ${statusColor}55`, fontSize: 10.5, fontWeight: 850 }}>{status}</span>
+          {(item.pinned || item.isPinned || (item.priority ?? 0) >= 8) && <span style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.48)', color: A.gold, border: `1px solid ${A.goldBrd}`, fontSize: 10.5, fontWeight: 850 }}>📌</span>}
+        </div>
+      </div>
+      <div style={{ padding: 15, display: 'grid', gap: 11 }}>
+        <div>
+          <div style={{ color: A.text, fontSize: 15, lineHeight: '20px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title || 'Без заголовка'}</div>
+          <div style={{ color: A.textSec, fontSize: 11.5, lineHeight: '16px', marginTop: 4 }}>{published ? published.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Дата не задана'} · {item.category || 'без категории'}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {[
+            ['👁', stats.views ?? item.views ?? 0],
+            ['💬', stats.comments ?? item.comments ?? 0],
+            ['❤️', reactions],
+            ['↗', stats.reposts ?? item.shares ?? 0],
+          ].map(([icon, value]) => (
+            <div key={icon} style={{ padding: '7px 5px', borderRadius: 12, background: A.chip, textAlign: 'center', color: A.text, fontSize: 12, fontWeight: 850 }}>{icon} {value}</div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          <button type="button" onClick={onEdit} style={{ ...s.btn, ...s.btnGray, padding: '8px 6px', fontSize: 11.5 }}>✏️</button>
+          <button type="button" onClick={onPublish} style={{ ...s.btn, ...s.btnGray, padding: '8px 6px', fontSize: 11.5 }}>🚀</button>
+          <button type="button" onClick={onPin} style={{ ...s.btn, ...s.btnGray, padding: '8px 6px', fontSize: 11.5 }}>📌</button>
+          <button type="button" onClick={onCheck} style={{ ...s.btn, ...s.btnGray, padding: '8px 6px', fontSize: 11.5 }}>✓</button>
+          <button type="button" onClick={onEdit} style={{ ...s.btn, ...s.btnGray, padding: '8px 6px', fontSize: 11.5 }}>👁</button>
+          <button type="button" onClick={onDelete} style={{ ...s.btn, ...s.btnDanger, padding: '8px 6px', fontSize: 11.5 }}>🗑</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditorialNewsBoard({ news, onEdit, onPublish, onPin, onDelete, onCheck }) {
+  const sorted = [...news].sort(byPriorityDate);
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 14 }}>
+      {sorted.map(item => (
+        <AdminNewsCard key={item.id} item={item} onEdit={() => onEdit(item)} onPublish={() => onPublish(item)} onPin={() => onPin(item)} onDelete={() => onDelete(item.id)} onCheck={() => onCheck(item.id)} />
+      ))}
+    </div>
+  );
+}
+
+function AdminCommentsPanel({ comments, news, onRefresh, onModerate }) {
+  const visible = comments.filter(c => !c.hidden);
+  const pending = visible.filter(c => c.status === 'pending' || !c.moderationReviewedAt);
+  const rows = [...visible].sort((a, b) => Number(toJsDate(b.createdAt) || 0) - Number(toJsDate(a.createdAt) || 0));
+  const titleOf = (id) => news.find(n => String(n.id) === String(id))?.title || id || 'Новость';
+  return (
+    <div>
+      <div style={{ ...s.card, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+        <div>
+          <h2 style={{ ...s.h2, margin: '0 0 4px' }}>💬 Комментарии</h2>
+          <div style={{ color: A.textSec, fontSize: 12 }}>{visible.length} активных · {pending.length} требуют просмотра</div>
+        </div>
+        <button type="button" onClick={onRefresh} style={{ ...s.btn, ...s.btnGray }}>↻ Обновить</button>
+      </div>
+      {rows.length === 0 ? (
+        <div style={{ ...s.card, color: A.textSec, textAlign: 'center' }}>Комментариев пока нет.</div>
+      ) : rows.map(comment => (
+        <div key={comment.id} style={{ ...s.card, display: 'grid', gap: 10, borderLeft: `3px solid ${comment.isUseful ? A.gold : comment.isPinned ? '#38bdf8' : A.border}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: A.text, fontSize: 14, fontWeight: 850 }}>{comment.userName || 'Участник'} {comment.authorRole && <span style={{ color: A.gold, fontSize: 11 }}>· {comment.authorRole}</span>}</div>
+              <div style={{ color: A.textSec, fontSize: 11, marginTop: 2 }}>{titleOf(comment.newsId)} · {toJsDate(comment.createdAt)?.toLocaleString('ru-RU') || 'дата не задана'}</div>
+            </div>
+            <div style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>❤️ {Number(comment.likes || 0)}</div>
+          </div>
+          <div style={{ color: A.text, fontSize: 13.5, lineHeight: '20px', whiteSpace: 'pre-wrap' }}>{comment.text}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => onModerate(comment, 'toggleUseful')} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>{comment.isUseful ? 'Снять полезный' : '⭐ Полезный'}</button>
+            <button type="button" onClick={() => onModerate(comment, 'togglePin')} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>{comment.isPinned ? 'Открепить' : '📌 Закрепить'}</button>
+            <button type="button" onClick={() => onModerate(comment, 'delete')} style={{ ...s.btn, ...s.btnDanger, padding: '7px 10px', fontSize: 12 }}>Скрыть</button>
+            <button type="button" onClick={() => onModerate(comment, 'blockUser')} style={{ ...s.btn, ...s.btnDanger, padding: '7px 10px', fontSize: 12 }}>Блокировать</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ModerationPanel({ news, comments, onOpenNews, onOpenComments }) {
+  const pendingNews = news.filter(n => ['draft', 'pending', 'scheduled'].includes(String(n.status || '').toLowerCase()) || n.active === false);
+  const pendingComments = comments.filter(c => !c.hidden && (c.status === 'pending' || !c.moderationReviewedAt));
+  return (
+    <div>
+      <div style={{ ...s.card, padding: 22, background: 'linear-gradient(135deg, rgba(245,158,11,0.13), rgba(255,255,255,0.04))' }}>
+        <div style={{ color: A.gold, fontSize: 12, fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>Очередь публикации и модерации</div>
+        <h1 style={{ ...s.h1, fontSize: 26, marginTop: 6 }}>На модерации</h1>
+        <div style={{ color: A.textSec, fontSize: 14, lineHeight: '20px' }}>На телефоне карточки готовы к свайп-механике, на ноутбуке работают кнопки и контекстные действия.</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 14 }}>
+        <button type="button" onClick={onOpenNews} style={{ ...s.card, textAlign: 'left', cursor: 'pointer', border: `1px solid ${pendingNews.length ? 'rgba(245,158,11,0.34)' : A.border}` }}>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>📰</div>
+          <div style={{ color: A.text, fontSize: 18, fontWeight: 900 }}>{pendingNews.length} новостей</div>
+          <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Черновики, отложенные и выключенные публикации.</div>
+        </button>
+        <button type="button" onClick={onOpenComments} style={{ ...s.card, textAlign: 'left', cursor: 'pointer', border: `1px solid ${pendingComments.length ? 'rgba(245,158,11,0.34)' : A.border}` }}>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>💬</div>
+          <div style={{ color: A.text, fontSize: 18, fontWeight: 900 }}>{pendingComments.length} комментариев</div>
+          <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Новые ответы, полезные комментарии и будущая очередь жалоб.</div>
+        </button>
+        <div style={{ ...s.card, border: `1px dashed ${A.goldBrd}` }}>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>🤖</div>
+          <div style={{ color: A.text, fontSize: 18, fontWeight: 900 }}>Черновики ИИ</div>
+          <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Место для V4.5: автоматические материалы, очередь публикаций и редакторские подсказки.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminUsersPanel({ users }) {
+  const [queryText, setQueryText] = useState('');
+  const filtered = users
+    .filter(user => {
+      const q = queryText.toLowerCase();
+      return !q || userDisplayName(user).toLowerCase().includes(q) || String(user.email || '').toLowerCase().includes(q) || String(user.id || '').toLowerCase().includes(q);
+    })
+    .sort((a, b) => Number(toJsDate(b.registeredAt || b.createdAt) || 0) - Number(toJsDate(a.registeredAt || a.createdAt) || 0));
+  return (
+    <div>
+      <div style={s.card}>
+        <h2 style={s.h2}>👥 Пользователи</h2>
+        <input value={queryText} onChange={e => setQueryText(e.target.value)} placeholder="Поиск по имени, email или id" style={s.input} />
+        <div style={{ color: A.textSec, fontSize: 12 }}>{filtered.length} из {users.length}</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 12 }}>
+        {filtered.slice(0, 120).map(user => (
+          <div key={user.id} style={{ ...s.card, marginBottom: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: A.text, fontSize: 15, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userDisplayName(user)}</div>
+                <div style={{ color: A.textSec, fontSize: 11.5, marginTop: 3 }}>{providerLabel(user)}</div>
+              </div>
+              <div style={{ color: A.gold, fontWeight: 950 }}>{Number(user.keys || 0)} 🗝</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+              {['role', 'email', 'telegramId'].map(key => user[key] ? (
+                <span key={key} style={{ padding: '5px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
+              ) : null)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AIDraftsPanel() {
+  return (
+    <div style={{ ...s.card, padding: 24, border: `1px dashed ${A.goldBrd}`, background: 'linear-gradient(135deg, rgba(201,168,76,0.10), rgba(255,255,255,0.035))' }}>
+      <div style={{ fontSize: 38, marginBottom: 12 }}>🤖</div>
+      <h1 style={{ ...s.h1, fontSize: 26, marginBottom: 8 }}>Черновики ИИ</h1>
+      <div style={{ color: A.textSec, fontSize: 14, lineHeight: '22px', maxWidth: 680 }}>
+        Раздел подготовлен для V4.5. Здесь будут появляться автоматически подготовленные материалы: черновики новостей, варианты заголовков, подборки фото, очередь публикаций и редакторские подсказки. Сейчас логика ИИ не подключена намеренно.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 18 }}>
+        {[
+          ['drafts', 'Черновики материалов'],
+          ['sources', 'Источники и факты'],
+          ['queue', 'Очередь публикаций'],
+          ['review', 'Проверка редактором'],
+        ].map(([id, label]) => (
+          <div key={id} style={{ padding: 14, borderRadius: 16, background: A.chip, border: `1px solid ${A.border}`, color: A.text, fontSize: 13, fontWeight: 800 }}>{label}</div>
         ))}
       </div>
     </div>
@@ -1055,13 +1270,15 @@ export const AdminPanel = () => {
   const [notifs, setNotifs]         = useState([]);
   const [customTasks, setCustomTasks] = useState([]);
   const [prizeClaims, setPrizeClaims] = useState([]);
+  const [newsComments, setNewsComments] = useState([]);
   const [adminMetrics, setAdminMetrics] = useState({
-    users: [], scans: [], expertScans: [], reviews: [], expertReviews: [], raffleEntries: [], guestSessions: [],
+    users: [], scans: [], expertScans: [], reviews: [], expertReviews: [], raffleEntries: [], guestSessions: [], newsComments: [], errorLogs: [],
   });
   const [loading, setLoading]       = useState(true);
   const [adminLoadIssues, setAdminLoadIssues] = useState([]);
   const [adminLoadInfo, setAdminLoadInfo] = useState({ lastLoadedAt: null, authUid: null, attempt: 0 });
   const [activeTab, setActiveTab]   = useState('dashboard');
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth || 1200);
 
   // Форма эксперта
   const [editingExpert, setEditingExpert] = useState(null);
@@ -1190,6 +1407,12 @@ export const AdminPanel = () => {
   const [showAddDrop, setShowAddDrop]       = useState(false);
   const [showToolsDrop, setShowToolsDrop]   = useState(false);
 
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth || 1200);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   // Форма новости
   const [nTitle, setNTitle]               = useState('');
   const [nText, setNText]                 = useState('');
@@ -1255,7 +1478,9 @@ export const AdminPanel = () => {
     setErrorsLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)));
-      setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setErrorLogs(rows);
+      setAdminMetrics(prev => ({ ...prev, errorLogs: rows }));
     } catch (e) {
       logError(e, 'AdminPanel.loadErrors');
     } finally {
@@ -1266,6 +1491,7 @@ export const AdminPanel = () => {
   const resolveError = useCallback(async (id) => {
     await updateDoc(doc(db, 'errorLogs', id), { resolved: true }).catch(() => {});
     setErrorLogs(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
+    setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.map(e => e.id === id ? { ...e, resolved: true } : e) }));
   }, []);
 
   useEffect(() => {
@@ -1326,6 +1552,8 @@ export const AdminPanel = () => {
         { name: 'customTasks', label: 'Задания', ref: () => query(collection(db, 'customTasks'), orderBy('createdAt', 'asc')) },
         { name: 'prizeClaims', label: 'Выдачи призов', ref: () => query(collection(db, 'prizeClaims'), orderBy('claimedAt', 'desc'), limit(100)), optional: true },
         { name: 'banners', label: 'Баннеры', ref: () => query(collection(db, 'banners'), orderBy('priority', 'asc')) },
+        { name: 'newsComments', label: 'Комментарии новостей', ref: () => query(collection(db, 'newsComments'), orderBy('createdAt', 'desc'), limit(300)), optional: true },
+        { name: 'errorLogs', label: 'Ошибки приложения', ref: () => query(collection(db, 'errorLogs'), orderBy('timestamp', 'desc'), limit(100)), optional: true },
         { name: 'users', label: 'Пользователи', ref: () => collection(db, 'users'), optional: true },
         { name: 'scans', label: 'Сканы партнёров', ref: () => query(collection(db, 'scans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
         { name: 'expertScans', label: 'Сканы экспертов', ref: () => query(collection(db, 'expertScans'), orderBy('scannedAt', 'desc'), limit(500)), optional: true },
@@ -1348,6 +1576,8 @@ export const AdminPanel = () => {
       apply('customTasks', setCustomTasks);
       apply('prizeClaims', setPrizeClaims);
       apply('banners', setBanners);
+      apply('newsComments', setNewsComments);
+      apply('errorLogs', setErrorLogs);
       setAdminMetrics(prev => ({
         users: byName.users?.ok ? byName.users.docs : prev.users,
         scans: byName.scans?.ok ? byName.scans.docs : prev.scans,
@@ -1356,6 +1586,8 @@ export const AdminPanel = () => {
         expertReviews: byName.expertReviews?.ok ? byName.expertReviews.docs : prev.expertReviews,
         raffleEntries: byName.raffleEntries?.ok ? byName.raffleEntries.docs : prev.raffleEntries,
         guestSessions: byName.guestSessions?.ok ? byName.guestSessions.docs : prev.guestSessions,
+        newsComments: byName.newsComments?.ok ? byName.newsComments.docs : prev.newsComments,
+        errorLogs: byName.errorLogs?.ok ? byName.errorLogs.docs : prev.errorLogs,
       }));
       setAdminLoadIssues(results.filter(item => !item.ok).map(item => ({
         name: item.name,
@@ -1796,6 +2028,73 @@ export const AdminPanel = () => {
     if (!window.confirm('Удалить новость?')) return;
     await deleteDoc(doc(db, 'news', id));
     fetchData();
+  };
+
+  const publishNews = async (item) => {
+    await updateDoc(doc(db, 'news', item.id), {
+      active: true,
+      status: 'published',
+      publishedAt: item.publishedAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    setNews(prev => prev.map(n => n.id === item.id ? { ...n, active: true, status: 'published' } : n));
+  };
+
+  const pinNews = async (item) => {
+    const next = !(item.pinned || item.isPinned);
+    await updateDoc(doc(db, 'news', item.id), {
+      pinned: next,
+      isPinned: next,
+      priority: next ? Math.max(Number(item.priority || 0), 9) : Number(item.priority || 0),
+      updatedAt: serverTimestamp(),
+    });
+    setNews(prev => prev.map(n => n.id === item.id ? { ...n, pinned: next, isPinned: next, priority: next ? Math.max(Number(n.priority || 0), 9) : Number(n.priority || 0) } : n));
+  };
+
+  const loadNewsComments = useCallback(async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'newsComments'), orderBy('createdAt', 'desc'), limit(300)));
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setNewsComments(rows);
+      setAdminMetrics(prev => ({ ...prev, newsComments: rows }));
+    } catch (e) {
+      logError(e, 'AdminPanel.loadNewsComments');
+    }
+  }, []);
+
+  const moderateNewsComment = async (comment, action) => {
+    const adminUser = {
+      id: auth.currentUser?.uid || 'admin-panel',
+      name: 'Администрация АПГ',
+      role: 'owner',
+    };
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/news-comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, commentId: comment.id, user: adminUser }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Не удалось выполнить действие.');
+      if (action === 'delete' || action === 'blockUser') {
+        setNewsComments(prev => prev.map(c => c.id === comment.id ? { ...c, hidden: true, status: 'hidden' } : c));
+      } else if (data.comment) {
+        setNewsComments(prev => prev.map(c => c.id === comment.id ? data.comment : c));
+      } else {
+        await loadNewsComments();
+      }
+      setAdminMetrics(prev => ({
+        ...prev,
+        newsComments: (action === 'delete' || action === 'blockUser')
+          ? prev.newsComments.map(c => c.id === comment.id ? { ...c, hidden: true, status: 'hidden' } : c)
+          : data.comment
+            ? prev.newsComments.map(c => c.id === comment.id ? data.comment : c)
+            : prev.newsComments,
+      }));
+    } catch (e) {
+      logError(e, `AdminPanel.moderateNewsComment.${action}`);
+      window.alert(e.message || 'Не удалось выполнить действие модерации.');
+    }
   };
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
@@ -2259,29 +2558,71 @@ export const AdminPanel = () => {
 
   const q = globalSearch.toLowerCase();
   const searchResults = globalSearch.length > 1 ? [
-    ...adminMetrics.users.filter(u => userDisplayName(u).toLowerCase().includes(q) || String(u.email ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase().includes(q)).slice(0, 4).map(u => ({ tab: 'dashboard', id: u.id, label: userDisplayName(u), sub: providerLabel(u), emoji: '👤', typeName: 'Пользователь' })),
+    ...adminMetrics.users.filter(u => userDisplayName(u).toLowerCase().includes(q) || String(u.email ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase().includes(q)).slice(0, 4).map(u => ({ tab: 'users', id: u.id, label: userDisplayName(u), sub: providerLabel(u), emoji: '👤', typeName: 'Пользователь' })),
     ...partners.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 4).map(p => ({ tab: 'partners', id: p.id, label: p.name, sub: CATEGORIES.find(c => c.id === p.category)?.label, emoji: '🤝', typeName: 'Партнёр' })),
     ...partners.filter(p => p.offer?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'partners', id: p.id, label: p.offer, sub: p.name, emoji: '🏷️', typeName: 'Акция' })),
     ...experts.filter(ex => ex.name?.toLowerCase().includes(q)).slice(0, 4).map(ex => ({ tab: 'experts', id: ex.id, label: ex.name, sub: ex.specialization, emoji: '🧑‍💼', typeName: 'Эксперт' })),
     ...events.filter(e => e.title?.toLowerCase().includes(q)).slice(0, 3).map(e => ({ tab: 'events', id: e.id, label: e.title, emoji: '🎉', typeName: 'Событие' })),
     ...news.filter(n => n.title?.toLowerCase().includes(q)).slice(0, 3).map(n => ({ tab: 'news', id: n.id, label: n.title, emoji: '📢', typeName: 'Новость' })),
     ...prizes.filter(p => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'prizes', id: p.id, label: p.name || p.title, emoji: '🎁', typeName: 'Приз' })),
+    ...newsComments.filter(c => String(c.text || '').toLowerCase().includes(q) || String(c.userName || '').toLowerCase().includes(q)).slice(0, 4).map(c => ({ tab: 'comments', id: c.id, label: c.text || 'Комментарий', sub: c.userName, emoji: '💬', typeName: 'Комментарий' })),
   ] : [];
+  const isCompact = viewportWidth < 860;
+  const adminPageStyle = {
+    ...s.page,
+    display: isCompact ? 'block' : 'flex',
+    height: '100svh',
+    overflow: 'hidden',
+  };
+  const sidebarStyle = {
+    ...s.sidebar,
+    width: isCompact ? '100%' : 220,
+    height: isCompact ? 'auto' : '100vh',
+    maxHeight: isCompact ? 178 : '100vh',
+    flexDirection: isCompact ? 'row' : 'column',
+    overflowX: isCompact ? 'auto' : 'hidden',
+    overflowY: isCompact ? 'hidden' : 'auto',
+    borderRight: isCompact ? 'none' : s.sidebar.borderRight,
+    borderBottom: isCompact ? '1px solid rgba(255,255,255,0.07)' : 'none',
+    padding: isCompact ? '12px 10px' : s.sidebar.padding,
+  };
+  const contentStyle = {
+    ...s.content,
+    height: isCompact ? 'calc(100svh - 86px)' : '100vh',
+    maxWidth: isCompact ? 'none' : 1180,
+    padding: isCompact ? '14px 14px 112px' : s.content.padding,
+  };
+  const toolbarStyle = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)',
+    borderBottom: `1px solid ${A.border}`,
+    margin: isCompact ? '-14px -14px 16px' : '-24px -28px 20px',
+    padding: isCompact ? '10px 12px' : '10px 20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: isCompact ? 'wrap' : 'nowrap',
+  };
 
   return (
-    <div style={s.page}>
+    <div style={adminPageStyle}>
       {/* Боковое меню */}
-      <aside style={s.sidebar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: 14 }}>
+      <aside style={sidebarStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isCompact ? '4px 8px' : '4px 8px 18px', borderBottom: isCompact ? 'none' : '1px solid rgba(255,255,255,0.07)', marginBottom: isCompact ? 0 : 14, flexShrink: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 4px 12px rgba(201,168,76,0.35)' }}>⚙️</div>
-          <div>
+          {!isCompact && <div>
             <div style={{ fontSize: 13, fontWeight: 800, color: A.text, lineHeight: 1.3 }}>Управление</div>
             <div style={{ fontSize: 10, color: A.gold, fontWeight: 700, letterSpacing: 0.5 }}>АПГ Зеленоград</div>
-          </div>
+          </div>}
         </div>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav style={{ display: 'flex', flexDirection: isCompact ? 'row' : 'column', gap: 2, minWidth: isCompact ? 'max-content' : 'auto' }}>
           {[
-            { id: 'dashboard', emoji: '📊', label: 'Dashboard' },
+            { id: 'dashboard', emoji: '📊', label: 'Рабочий стол' },
+            { id: 'moderation', emoji: '🚦', label: 'Модерация', count: newsComments.filter(c => !c.hidden && (c.status === 'pending' || !c.moderationReviewedAt)).length || undefined },
+            { id: 'comments', emoji: '💬', label: 'Комментарии', count: newsComments.filter(c => !c.hidden).length || undefined },
+            { id: 'users', emoji: '👥', label: 'Пользователи', count: adminMetrics.users.length || undefined },
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
@@ -2294,24 +2635,25 @@ export const AdminPanel = () => {
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
+            { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
             { id: 'diag',      emoji: '📡', label: 'Диагностика' },
           ].map(t => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                  padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
                   background: active ? 'rgba(201,168,76,0.13)' : 'transparent',
                   borderLeft: active ? `3px solid ${A.gold}` : '3px solid transparent',
                   color: active ? A.gold : A.textSec,
                   fontSize: 13, fontWeight: active ? 700 : 400,
-                  textAlign: 'left', width: '100%', transition: 'all 0.15s',
+                  textAlign: 'left', width: isCompact ? 'auto' : '100%', transition: 'all 0.15s', whiteSpace: 'nowrap',
                 }}
               >
                 <span style={{ fontSize: 15, flexShrink: 0 }}>{t.emoji}</span>
-                <span style={{ flex: 1 }}>{t.label}</span>
+                <span style={{ flex: 1 }}>{isCompact ? t.label.replace('Рабочий стол', 'Дом') : t.label}</span>
                 {t.count != null && t.count > 0 && (
                   <span style={{ fontSize: 11, background: active ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.08)', color: active ? A.gold : A.textSec, padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>
                     {t.count}
@@ -2324,10 +2666,10 @@ export const AdminPanel = () => {
       </aside>
 
       {/* Основной контент */}
-      <div style={s.content}>
+      <div style={contentStyle}>
 
       {/* ── Тулбар ── */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'linear-gradient(160deg, #0C0C1E 0%, #14142A 100%)', borderBottom: `1px solid ${A.border}`, margin: '-24px -28px 20px', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={toolbarStyle}>
 
         {/* Глобальный поиск */}
         <div style={{ position: 'relative', flex: 1 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowSearchDrop(false); }}>
@@ -2514,6 +2856,32 @@ export const AdminPanel = () => {
           onOpenPartner={(id) => { setActiveTab('partners'); setExpandedPartnerId(id); setPartnerLinksFilter('all'); }}
           onOpenExpert={(id) => { setActiveTab('experts'); setExpandedExpertId(id); setExpertLinksFilter('all'); }}
         />
+      )}
+
+      {activeTab === 'moderation' && (
+        <ModerationPanel
+          news={news}
+          comments={newsComments}
+          onOpenNews={() => setActiveTab('news')}
+          onOpenComments={() => setActiveTab('comments')}
+        />
+      )}
+
+      {activeTab === 'comments' && (
+        <AdminCommentsPanel
+          comments={newsComments}
+          news={news}
+          onRefresh={loadNewsComments}
+          onModerate={moderateNewsComment}
+        />
+      )}
+
+      {activeTab === 'users' && (
+        <AdminUsersPanel users={adminMetrics.users} />
+      )}
+
+      {activeTab === 'ai-drafts' && (
+        <AIDraftsPanel />
       )}
 
       {/* ── ЭКСПЕРТЫ ── */}
@@ -3430,10 +3798,19 @@ export const AdminPanel = () => {
             </div>
           )}
 
+          <EditorialNewsBoard
+            news={news}
+            onEdit={startEditNews}
+            onPublish={publishNews}
+            onPin={pinNews}
+            onDelete={deleteNews}
+            onCheck={(id) => markLinksChecked('news', id, setNews)}
+          />
+
           <div style={s.card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div>
-                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все новости</h2>
+                <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Быстрый список новостей</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
                   {news.length} · <span style={{ color: news.filter(n => !isCheckedRecently(n.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{news.filter(n => !isCheckedRecently(n.linksCheckedAt)).length} не проверено</span>
                 </span>
@@ -4479,6 +4856,16 @@ export const AdminPanel = () => {
 
       <div style={{ height: 32 }} />
       </div>{/* end content */}
+
+      <AdminQuickActions
+        setActiveTab={setActiveTab}
+        openNews={() => { resetNewsForm(); setActiveTab('news'); setShowNewsModal(true); }}
+        openPartner={() => { resetPartnerForm(); setActiveTab('partners'); setShowPartnerModal(true); }}
+        openEvent={() => { resetEventForm(); setActiveTab('events'); setShowEventModal(true); }}
+        openPrize={() => { resetPrizeForm(); setActiveTab('prizes'); }}
+        openPush={() => setActiveTab('notifs')}
+        openComments={() => { setActiveTab('comments'); loadNewsComments(); }}
+      />
 
       {/* QR-модал для партнёра */}
       {qrPartner && (

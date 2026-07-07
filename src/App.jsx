@@ -47,6 +47,11 @@ export function App() {
               <AdminPanel />
             </Suspense>
           } />
+          <Route path="/admin-app" element={
+            <Suspense fallback={<AppFallback label="Загрузка админки АПГ..." />}>
+              <AdminPanel />
+            </Suspense>
+          } />
           <Route path="/assistant" element={
             <Suspense fallback={<AppFallback label="Загрузка помощника..." />}>
               <AssistantMiniApp />
