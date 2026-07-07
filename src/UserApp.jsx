@@ -308,6 +308,7 @@ export function UserApp() {
   const [savedNews, setSavedNews]               = useState([]);
   const [readLaterNews, setReadLaterNews]       = useState([]);
   const [newsReactions, setNewsReactions]       = useState({});
+  const [newsSubscriptions, setNewsSubscriptions] = useState({});
   const [notifications, setNotifications]       = useState([]);
   const [customTasks, setCustomTasks]           = useState([]);
   const [loading, setLoading]                   = useState(true);
@@ -821,6 +822,7 @@ export function UserApp() {
         setSavedNews(Array.isArray(data.savedNews) ? data.savedNews.map(String) : []);
         setReadLaterNews(Array.isArray(data.readLaterNews) ? data.readLaterNews.map(String) : []);
         setNewsReactions(data.newsReactions && typeof data.newsReactions === 'object' ? data.newsReactions : {});
+        setNewsSubscriptions(data.newsSubscriptions && typeof data.newsSubscriptions === 'object' ? data.newsSubscriptions : {});
         setScannedPartnerIds(data.scannedPartners ?? {});
         setCompletedTasks(data.completedTasks ?? []);
         setStreak(data.streak ?? 0);
@@ -879,7 +881,7 @@ export function UserApp() {
         await setDoc(userRef, {
           keys: isValidRef ? 2 : 0,          // +2 за переход по реферальной ссылке
           favorites: [], scannedPartners: {},
-          savedNews: [], readLaterNews: [], newsReactions: {},
+          savedNews: [], readLaterNews: [], newsReactions: {}, newsSubscriptions: {},
           completedTasks: [], streak: 0, onboardingDone: false,
           scanDates: [], lastBonusDate: todayKey,
           referredBy: refId ?? null,
@@ -1060,11 +1062,18 @@ export function UserApp() {
     const id = item?.id ? String(item.id) : '';
     if (!id || !reaction || !canWriteUserNewsState()) return;
     const prev = newsReactions;
+    const previousReaction = prev[id];
+    if (previousReaction === reaction) {
+      showToast('Эта реакция уже выбрана.', 'info');
+      return;
+    }
     const next = { ...prev, [id]: reaction };
     setNewsReactions(next);
     try {
       await updateDoc(doc(db, 'users', String(user.id)), { newsReactions: next });
-      updateDoc(doc(db, 'news', id), { [`reactions.${reaction}`]: increment(1) }).catch(() => {});
+      const patch = { [`reactions.${reaction}`]: increment(1) };
+      if (previousReaction) patch[`reactions.${previousReaction}`] = increment(-1);
+      updateDoc(doc(db, 'news', id), patch).catch(e => logError(e, 'UserApp.reactToNews.stats'));
       showToast('Реакция сохранена.', 'success');
     } catch (e) {
       setNewsReactions(prev);
@@ -1072,6 +1081,32 @@ export function UserApp() {
       showToast('Не удалось сохранить реакцию. Попробуйте ещё раз.', 'error');
     }
   }, [canWriteUserNewsState, newsReactions, showToast, user]);
+
+  const toggleNewsSubscription = useCallback(async ({ type, targetId, label }) => {
+    const id = targetId ? String(targetId) : '';
+    if (!id || !canWriteUserNewsState()) return;
+    const fieldByType = {
+      category: 'categories',
+      partner: 'partners',
+      expert: 'experts',
+    };
+    const field = fieldByType[type];
+    if (!field) return;
+    const prev = newsSubscriptions && typeof newsSubscriptions === 'object' ? newsSubscriptions : {};
+    const current = Array.isArray(prev[field]) ? prev[field].map(String) : [];
+    const enabled = current.includes(id);
+    const nextList = enabled ? current.filter(value => value !== id) : [...current, id];
+    const next = { ...prev, [field]: nextList };
+    setNewsSubscriptions(next);
+    try {
+      await updateDoc(doc(db, 'users', String(user.id)), { newsSubscriptions: next });
+      showToast(enabled ? 'Подписка отключена.' : `Подписка включена${label ? `: ${label}` : ''}.`, 'success');
+    } catch (e) {
+      setNewsSubscriptions(prev);
+      logError(e, 'UserApp.toggleNewsSubscription');
+      showToast('Не удалось обновить подписку. Попробуйте ещё раз.', 'error');
+    }
+  }, [canWriteUserNewsState, newsSubscriptions, showToast, user]);
 
   // ─── Скан ───────────────────────────────────────────────────────────────────
 
@@ -2199,11 +2234,13 @@ export function UserApp() {
                     savedNews={savedNews}
                     readLaterNews={readLaterNews}
                     newsReactions={newsReactions}
+                    newsSubscriptions={newsSubscriptions}
                     loading={loading}
                     onBack={goBackPanel}
                     onReact={reactToNews}
                     onSave={toggleSavedNews}
                     onReadLater={toggleReadLaterNews}
+                    onSubscribe={toggleNewsSubscription}
                     onRefresh={handleRefresh}
                     onToast={showToast}
                   />

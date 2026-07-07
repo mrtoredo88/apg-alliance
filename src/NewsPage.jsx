@@ -4,14 +4,7 @@ import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGl
 import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
 import { API_BASE_URL, APP_URL } from './constants.js';
-import { db } from './firebase.js';
 import { logError } from './errorLogger.js';
-import {
-  doc,
-  increment,
-  serverTimestamp,
-  setDoc,
-} from 'firebase/firestore';
 import {
   NEWS_CATEGORIES,
   filterNewsItems,
@@ -37,10 +30,11 @@ import {
   sortNewsItems,
 } from './newsUtils.js';
 
-const REACTIONS = ['👍', '❤️', '🔥', '👏', '😍'];
+const REACTIONS = ['👍', '❤️', '🔥', '👏', '😮'];
 const COMMENT_SORTS = [
   { id: 'new', label: 'Новые' },
   { id: 'popular', label: 'Популярные' },
+  { id: 'useful', label: 'Полезные' },
 ];
 
 const newsFilterPresets = [
@@ -102,6 +96,44 @@ async function shareNewsItem(item, onToast) {
       onToast?.('Не удалось поделиться новостью.', 'error');
     }
   }
+}
+
+async function requestNewsEngagement(action, payload = {}) {
+  const response = await fetch(`${API_BASE_URL}/api/news-engagement`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload }),
+    keepalive: true,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || 'Не удалось сохранить активность новости.');
+  }
+  return data;
+}
+
+function getCommentBadge(comment) {
+  const role = String(comment?.authorRole || comment?.userRole || '').toLowerCase();
+  if (role === 'owner' || role === 'admin') return ['🛠', 'Администрация АПГ'];
+  if (role === 'partner') return ['🤝', 'Партнёр'];
+  if (role === 'expert') return ['🎓', 'Эксперт'];
+  return null;
+}
+
+function sortDiscussionComments(comments, sort) {
+  return [...comments].sort((a, b) => {
+    const pinDelta = Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
+    if (pinDelta) return pinDelta;
+    const usefulDelta = Number(Boolean(b.isUseful)) - Number(Boolean(a.isUseful));
+    if (usefulDelta) return usefulDelta;
+    if (sort === 'popular' || sort === 'useful') {
+      const likeDelta = (Number(b.likes) || 0) - (Number(a.likes) || 0);
+      if (likeDelta) return likeDelta;
+    }
+    const at = Number(new Date(a.createdAt || 0));
+    const bt = Number(new Date(b.createdAt || 0));
+    return bt - at;
+  });
 }
 
 function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, children }) {
@@ -246,7 +278,7 @@ function NewsMeta({ item, compact = false }) {
   );
 }
 
-function SharePanel({ item, onToast }) {
+function SharePanel({ item, onToast, onShare }) {
   const url = getNewsDeepLink(item);
   const title = getNewsTitle(item);
   const encodedUrl = encodeURIComponent(url);
@@ -259,6 +291,7 @@ function SharePanel({ item, onToast }) {
         await navigator.clipboard?.writeText(url);
         onToast?.('Ссылка скопирована.', 'success');
       }
+      onShare?.('copy');
     } catch (e) {
       if (e?.name !== 'AbortError') {
         logError(e, 'NewsPage.share');
@@ -276,7 +309,7 @@ function SharePanel({ item, onToast }) {
       <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 12 }}>Поделиться</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
         {items.map(([label, href]) => (
-          <GlassButton key={label} onClick={() => openUrl(href)} style={{ minHeight: 42, borderRadius: 18 }}>{label}</GlassButton>
+          <GlassButton key={label} onClick={() => { onShare?.(label.toLowerCase()); openUrl(href); }} style={{ minHeight: 42, borderRadius: 18 }}>{label}</GlassButton>
         ))}
         <GlassButton onClick={copy} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a' }}>Скопировать</GlassButton>
       </div>
@@ -328,13 +361,23 @@ function ArticleHeader({ item, wordCount }) {
   );
 }
 
-function ArticleActions({ item, saved, later, reaction, onReact, onSave, onReadLater, onToast }) {
+function ArticleActions({ item, saved, later, reaction, subscriptions, onReact, onSave, onReadLater, onSubscribe, onShare, onToast }) {
+  const categoryId = getNewsCategory(item);
+  const categoryLabel = getNewsCategoryLabel(item);
+  const partnerId = item?.partnerId ? String(item.partnerId) : '';
+  const expertId = item?.expertId ? String(item.expertId) : '';
+  const isCategorySubscribed = Array.isArray(subscriptions?.categories) && subscriptions.categories.map(String).includes(categoryId);
+  const isPartnerSubscribed = partnerId && Array.isArray(subscriptions?.partners) && subscriptions.partners.map(String).includes(partnerId);
+  const isExpertSubscribed = expertId && Array.isArray(subscriptions?.experts) && subscriptions.experts.map(String).includes(expertId);
   return (
     <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16, display: 'grid', gap: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 9 }}>
         <GlassButton onClick={() => onSave?.(item)} tone={saved ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: saved ? '#17120a' : APG2_PROFILE.text }}>⭐ {saved ? 'Сохранено' : 'Сохранить'}</GlassButton>
         <GlassButton onClick={() => onReadLater?.(item)} tone={later ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: later ? '#17120a' : APG2_PROFILE.text }}>{later ? 'В списке позже' : 'Прочитать позже'}</GlassButton>
-        <GlassButton onClick={() => shareNewsItem(item, onToast)} style={{ minHeight: 44, borderRadius: 18 }}>📤 Поделиться</GlassButton>
+        <GlassButton onClick={async () => { await shareNewsItem(item, onToast); onShare?.('native'); }} style={{ minHeight: 44, borderRadius: 18 }}>📤 Поделиться</GlassButton>
+        <GlassButton onClick={() => onSubscribe?.({ type: 'category', targetId: categoryId, label: categoryLabel })} tone={isCategorySubscribed ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: isCategorySubscribed ? '#17120a' : APG2_PROFILE.text }}>{isCategorySubscribed ? '🔔 Категория' : '🔔 Подписаться'}</GlassButton>
+        {partnerId && <GlassButton onClick={() => onSubscribe?.({ type: 'partner', targetId: partnerId, label: item?.partnerName || 'партнёр' })} tone={isPartnerSubscribed ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: isPartnerSubscribed ? '#17120a' : APG2_PROFILE.text }}>{isPartnerSubscribed ? '🤝 Партнёр' : '🤝 На партнёра'}</GlassButton>}
+        {expertId && <GlassButton onClick={() => onSubscribe?.({ type: 'expert', targetId: expertId, label: item?.expertName || 'эксперт' })} tone={isExpertSubscribed ? 'gold' : undefined} style={{ minHeight: 44, borderRadius: 18, color: isExpertSubscribed ? '#17120a' : APG2_PROFILE.text }}>{isExpertSubscribed ? '🎓 Эксперт' : '🎓 На эксперта'}</GlassButton>}
       </div>
       <div>
         <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Реакция</div>
@@ -362,11 +405,15 @@ async function requestNewsComments(path, options = {}) {
   return data;
 }
 
-function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, compact = false }) {
+function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, onPin, onUseful, onBlock, compact = false }) {
   const name = comment.userName || 'Участник АПГ';
   const avatar = comment.userAvatar || '';
-  const canDelete = user?.id && (String(user.id) === String(comment.userId) || ['admin', 'owner'].includes(String(user.role || '')));
+  const userRole = String(user?.role || '');
+  const canModerate = ['admin', 'owner'].includes(userRole);
+  const canDelete = user?.id && (String(user.id) === String(comment.userId) || canModerate);
   const canEdit = user?.id && String(user.id) === String(comment.userId);
+  const liked = user?.id && Array.isArray(comment.likedBy) && comment.likedBy.map(String).includes(String(user.id));
+  const badge = getCommentBadge(comment);
   const date = comment.createdAt ? new Date(comment.createdAt) : null;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: compact ? '34px 1fr' : '42px 1fr', gap: compact ? 9 : 11 }}>
@@ -375,15 +422,27 @@ function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, compact 
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-          <div style={{ color: APG2_PROFILE.text, fontSize: compact ? 12.5 : 13.5, fontWeight: 860 }}>{name}</div>
+          <div style={{ minWidth: 0, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: compact ? 12.5 : 13.5, fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+            {badge && <span style={{ padding: '3px 7px', borderRadius: 999, background: 'rgba(215,184,106,0.13)', border: '1px solid rgba(215,184,106,0.22)', color: APG2_PROFILE.gold, fontSize: 10, lineHeight: '13px', fontWeight: 850 }}>{badge[0]} {badge[1]}</span>}
+          </div>
           {date && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 680 }}>{date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</div>}
         </div>
+        {(comment.isPinned || comment.isUseful) && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            {comment.isPinned && <span style={{ padding: '5px 8px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', color: APG2_PROFILE.textSoft, fontSize: 10.5, fontWeight: 820 }}>📌 Закреплено</span>}
+            {comment.isUseful && <span style={{ padding: '5px 8px', borderRadius: 999, background: 'rgba(215,184,106,0.13)', border: '1px solid rgba(215,184,106,0.22)', color: APG2_PROFILE.gold, fontSize: 10.5, fontWeight: 880 }}>⭐ Полезный ответ</span>}
+          </div>
+        )}
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: compact ? 13 : 13.5, lineHeight: compact ? '19px' : '20px', marginTop: 4, whiteSpace: 'pre-wrap' }}>{comment.text}</div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-          <button type="button" onClick={() => onLike(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820 }}>❤️ {Number(comment.likes || 0)}</button>
-          <button type="button" onClick={() => onReply(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Ответить</button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => onLike(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: liked ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 820 }}>❤️ {Number(comment.likes || 0)}</button>
+          {!compact && <button type="button" onClick={() => onReply(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Ответить</button>}
           {canEdit && <button type="button" onClick={() => onEdit(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Изменить</button>}
           {canDelete && <button type="button" onClick={() => onDelete(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>Удалить</button>}
+          {canModerate && <button type="button" onClick={() => onUseful(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>{comment.isUseful ? 'Убрать пользу' : 'Полезный'}</button>}
+          {canModerate && !compact && <button type="button" onClick={() => onPin(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>{comment.isPinned ? 'Открепить' : 'Закрепить'}</button>}
+          {canModerate && <button type="button" onClick={() => onBlock(comment)} style={{ border: 'none', padding: 0, background: 'transparent', color: 'rgba(255,119,92,0.88)', fontSize: 12, fontWeight: 760 }}>Блок</button>}
         </div>
       </div>
     </div>
@@ -406,7 +465,7 @@ function CommentsPanel({ item, user, onToast }) {
     id: String(user?.id || ''),
     name: user?.name || user?.first_name || user?.email || 'Участник АПГ',
     avatar: user?.avatar || user?.photo_100 || user?.photo || '',
-    role: user?.role || '',
+    role: user?.role || user?.userRole || '',
   }), [user]);
 
   const load = async () => {
@@ -439,12 +498,8 @@ function CommentsPanel({ item, user, onToast }) {
     else localStorage.removeItem(draftKey);
   }, [draftKey, editing, text]);
 
-  const sorted = useMemo(() => [...comments].sort((a, b) => {
-    if (sort === 'popular') return (Number(b.likes) || 0) - (Number(a.likes) || 0);
-    const at = Number(new Date(a.createdAt || 0));
-    const bt = Number(new Date(b.createdAt || 0));
-    return bt - at;
-  }).filter(comment => !comment.parentId), [comments, sort]);
+  const sorted = useMemo(() => sortDiscussionComments(comments, sort).filter(comment => !comment.parentId), [comments, sort]);
+  const discussionHot = comments.length >= 6 || comments.some(comment => Number(comment.likes || 0) >= 5);
 
   const repliesByParent = useMemo(() => comments.reduce((acc, comment) => {
     if (!comment.parentId) return acc;
@@ -492,13 +547,17 @@ function CommentsPanel({ item, user, onToast }) {
   };
 
   const like = async (comment) => {
+    if (user?.id && Array.isArray(comment.likedBy) && comment.likedBy.map(String).includes(String(user.id))) {
+      onToast?.('Вы уже отметили этот комментарий.', 'info');
+      return;
+    }
     try {
-      setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(v.likes || 0) + 1 } : v));
+      setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(v.likes || 0) + 1, likedBy: [...(Array.isArray(v.likedBy) ? v.likedBy : []), String(user?.id || '')].filter(Boolean) } : v));
       const data = await requestNewsComments('/api/news-comments', {
         method: 'POST',
         body: JSON.stringify({ action: 'like', commentId: comment.id, user: apiUser }),
       });
-      setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(data.likes ?? v.likes ?? 0) } : v));
+      setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(data.likes ?? v.likes ?? 0), likedBy: data.likedBy || v.likedBy } : v));
     } catch (e) {
       logError(e, 'NewsPage.comments.like');
       onToast?.(e?.message || 'Не удалось поставить реакцию.', 'error');
@@ -517,6 +576,24 @@ function CommentsPanel({ item, user, onToast }) {
     } catch (e) {
       logError(e, 'NewsPage.comments.delete');
       onToast?.(e?.message || 'Не удалось удалить комментарий.', 'error');
+    }
+  };
+
+  const moderate = async (comment, action, label) => {
+    try {
+      const data = await requestNewsComments('/api/news-comments', {
+        method: 'POST',
+        body: JSON.stringify({ action, commentId: comment.id, user: apiUser }),
+      });
+      if (data.comment) {
+        setComments(prev => prev.map(v => v.id === comment.id ? data.comment : v));
+      } else {
+        await load();
+      }
+      onToast?.(label, 'success');
+    } catch (e) {
+      logError(e, `NewsPage.comments.${action}`);
+      onToast?.(e?.message || 'Не удалось выполнить действие модерации.', 'error');
     }
   };
 
@@ -541,7 +618,11 @@ function CommentsPanel({ item, user, onToast }) {
   return (
     <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 920 }}>Комментарии</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 920 }}>Комментарии</div>
+          {comments.length > 0 && <span style={{ color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 800 }}>{comments.length}</span>}
+          {discussionHot && <span style={{ padding: '6px 9px', borderRadius: 999, background: 'rgba(255,119,92,0.12)', border: '1px solid rgba(255,119,92,0.24)', color: '#ffb19f', fontSize: 10.5, fontWeight: 900 }}>🔥 Сейчас обсуждают</span>}
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {COMMENT_SORTS.map(item => (
             <button key={item.id} type="button" onClick={() => setSort(item.id)} style={{ minHeight: 30, borderRadius: 999, padding: '0 10px', border: sort === item.id ? '1px solid rgba(215,184,106,0.44)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: sort === item.id ? 'rgba(215,184,106,0.16)' : 'transparent', color: sort === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 780 }}>{item.label}</button>
@@ -574,11 +655,11 @@ function CommentsPanel({ item, user, onToast }) {
         <div style={{ display: 'grid', gap: 15 }}>
           {sorted.map(comment => (
             <div key={comment.id} style={{ display: 'grid', gap: 11 }}>
-              <CommentRow comment={comment} user={user} onDelete={remove} onLike={like} onEdit={startEdit} onReply={startReply} />
+              <CommentRow comment={comment} user={user} onDelete={remove} onLike={like} onEdit={startEdit} onReply={startReply} onUseful={c => moderate(c, 'toggleUseful', c.isUseful ? 'Комментарий убран из полезных.' : 'Комментарий отмечен как полезный.')} onPin={c => moderate(c, 'togglePin', c.isPinned ? 'Комментарий откреплён.' : 'Комментарий закреплён.')} onBlock={c => moderate(c, 'blockUser', 'Пользователь заблокирован для комментариев.')} />
               {!!repliesByParent[comment.id]?.length && (
                 <div style={{ display: 'grid', gap: 10, marginLeft: 28, paddingLeft: 12, borderLeft: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
                   {repliesByParent[comment.id].map(reply => (
-                    <CommentRow key={reply.id} comment={reply} user={user} onDelete={remove} onLike={like} onEdit={startEdit} onReply={startReply} compact />
+                    <CommentRow key={reply.id} comment={reply} user={user} onDelete={remove} onLike={like} onEdit={startEdit} onReply={startReply} onUseful={c => moderate(c, 'toggleUseful', c.isUseful ? 'Комментарий убран из полезных.' : 'Комментарий отмечен как полезный.')} onPin={c => moderate(c, 'togglePin', c.isPinned ? 'Комментарий откреплён.' : 'Комментарий закреплён.')} onBlock={c => moderate(c, 'blockUser', 'Пользователь заблокирован для комментариев.')} compact />
                   ))}
                 </div>
               )}
@@ -671,13 +752,17 @@ function NewsCard({ item, index, onOpen, onShare, saved, later }) {
   );
 }
 
-function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, saved, later, reaction, user, onToast }) {
+function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, onSubscribe, saved, later, reaction, subscriptions, user, onToast }) {
   const [progress, setProgress] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showArticleTop, setShowArticleTop] = useState(false);
   const [headerHidden, setHeaderHidden] = useState(false);
+  const [feedback, setFeedback] = useState(null);
   const scrollRef = useRef(null);
   const lastScrollRef = useRef(0);
+  const readStartRef = useRef(Date.now());
+  const maxProgressRef = useRef(0);
+  const completedSentRef = useRef(false);
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const url = getNewsUrl(item);
@@ -691,20 +776,40 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
   const scrollKey = articleId ? `apg_news_scroll_${articleId}` : '';
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   const completed = progress > 0.92;
+  const engagementUser = useMemo(() => ({
+    id: String(user?.id || localStorage.getItem('apg_guest_id') || 'guest'),
+    name: user?.name || user?.first_name || user?.email || '',
+    role: user?.role || '',
+  }), [user]);
+
+  const sendEngagement = (action, extra = {}) => {
+    if (!articleId) return;
+    requestNewsEngagement(action, { newsId: articleId, user: engagementUser, ...extra })
+      .catch(e => logError(e, `NewsPage.engagement.${action}`));
+  };
 
   useEffect(() => {
     const id = articleId;
     if (!id) return;
-    const viewer = String(user?.id || localStorage.getItem('apg_guest_id') || 'local');
-    const key = `apg_news_viewed_${id}_${viewer}`;
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, String(Date.now()));
-    setDoc(doc(db, 'news', id), {
-      views: increment(1),
-      stats: { views: increment(1) },
-      lastViewedAt: serverTimestamp(),
-    }, { merge: true }).catch(e => logError(e, 'NewsPage.trackView'));
-  }, [articleId, user?.id]);
+    readStartRef.current = Date.now();
+    maxProgressRef.current = 0;
+    completedSentRef.current = false;
+    setFeedback(null);
+    sendEngagement('view', { source: item?.source || 'apg' });
+    return () => {
+      const readTimeMs = Date.now() - readStartRef.current;
+      if (readTimeMs > 2200 || maxProgressRef.current > 0.18) {
+        requestNewsEngagement('read', {
+          newsId: id,
+          user: engagementUser,
+          progress: maxProgressRef.current,
+          readTimeMs,
+          completed: maxProgressRef.current > 0.92,
+          source: item?.source || 'apg',
+        }).catch(e => logError(e, 'NewsPage.engagement.read.cleanup'));
+      }
+    };
+  }, [articleId]);
 
   useEffect(() => {
     if (!scrollKey) return;
@@ -730,14 +835,39 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
     const max = Math.max(1, el.scrollHeight - el.clientHeight);
     const nextProgress = Math.min(1, Math.max(0, el.scrollTop / max));
     const currentTop = el.scrollTop;
+    maxProgressRef.current = Math.max(maxProgressRef.current, nextProgress);
     setProgress(nextProgress);
     setShowArticleTop(currentTop > 620);
     setHeaderHidden(currentTop > 120 && currentTop > lastScrollRef.current + 4);
     if (currentTop < lastScrollRef.current - 8) setHeaderHidden(false);
     lastScrollRef.current = currentTop;
     if (scrollKey) localStorage.setItem(scrollKey, String(el.scrollTop));
+    if (nextProgress > 0.92 && !completedSentRef.current) {
+      completedSentRef.current = true;
+      sendEngagement('read', {
+        progress: nextProgress,
+        readTimeMs: Date.now() - readStartRef.current,
+        completed: true,
+        source: item?.source || 'apg',
+      });
+    }
   };
   const scrollArticleTop = () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  const trackShare = (channel) => sendEngagement('share', { channel });
+  const submitFeedback = (helpful) => {
+    if (!user || String(user.id || '').startsWith('guest_')) {
+      onToast?.('Авторизуйтесь, чтобы оценить новость.', 'info');
+      return;
+    }
+    setFeedback(helpful);
+    requestNewsEngagement('feedback', { newsId: articleId, user: engagementUser, helpful })
+      .then(() => onToast?.('Спасибо, обратная связь сохранена.', 'success'))
+      .catch(e => {
+        setFeedback(null);
+        logError(e, 'NewsPage.engagement.feedback');
+        onToast?.('Не удалось сохранить оценку. Попробуйте ещё раз.', 'error');
+      });
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
@@ -747,7 +877,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
           <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, transform: headerHidden ? 'translateY(calc(-100% - 18px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
             <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 22, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>←</button>
             <span style={{ minWidth: 0, flex: 1, textAlign: 'center', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress > 0.08 ? title : getNewsCategoryLabel(item)}</span>
-            <button type="button" onClick={() => shareNewsItem(item, onToast)} aria-label="Поделиться новостью" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 17, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>↗</button>
+            <button type="button" onClick={async () => { await shareNewsItem(item, onToast); trackShare('top'); }} aria-label="Поделиться новостью" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 17, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>↗</button>
           </div>
 
           <NewsImage item={item} height={310} radius={34} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
@@ -820,9 +950,18 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
             </GlassCard>
           )}
 
-          <SharePanel item={item} onToast={onToast} />
+          <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 6 }}>Была полезна эта новость?</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginBottom: 12 }}>Короткий ответ помогает редакции лучше понимать, что важно жителям.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
+              <GlassButton onClick={() => submitFeedback(true)} tone={feedback === true ? 'gold' : undefined} style={{ minHeight: 42, borderRadius: 18, color: feedback === true ? '#17120a' : APG2_PROFILE.text }}>👍 Да</GlassButton>
+              <GlassButton onClick={() => submitFeedback(false)} tone={feedback === false ? 'gold' : undefined} style={{ minHeight: 42, borderRadius: 18, color: feedback === false ? '#17120a' : APG2_PROFILE.text }}>👎 Нет</GlassButton>
+            </div>
+          </GlassCard>
 
-          <ArticleActions item={item} saved={saved} later={later} reaction={reaction} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onToast={onToast} />
+          <SharePanel item={item} onToast={onToast} onShare={trackShare} />
+
+          <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
 
           <CommentsPanel item={item} user={user} onToast={onToast} />
 
@@ -878,11 +1017,13 @@ export function NewsPage({
   savedNews = [],
   readLaterNews = [],
   newsReactions = {},
+  newsSubscriptions = {},
   loading = false,
   onBack,
   onReact,
   onSave,
   onReadLater,
+  onSubscribe,
   onRefresh,
   onToast,
 }) {
@@ -1069,10 +1210,12 @@ export function NewsPage({
           onReact={onReact}
           onSave={onSave}
           onReadLater={onReadLater}
+          onSubscribe={onSubscribe}
           onToast={onToast}
           saved={savedSet.has(selectedId)}
           later={laterSet.has(selectedId)}
           reaction={newsReactions?.[selectedId]}
+          subscriptions={newsSubscriptions}
           user={user}
         />
       )}

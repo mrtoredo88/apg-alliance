@@ -108,8 +108,29 @@
 - `update` — изменить свой комментарий (`commentId`, `text`, `user`)
 - `delete` — скрыть свой комментарий; `admin/owner` может скрывать любой (`commentId`, `user`)
 - `like` — поставить лайк один раз от пользователя (`commentId`, `user`)
+- `togglePin` — закрепить/открепить комментарий; только `admin/owner`
+- `toggleUseful` — отметить/снять «Полезный ответ»; только `admin/owner`
+- `blockUser` — заблокировать автора комментария и скрыть комментарий; только `admin/owner`
 
-**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`.
+**Логика:** клиентский Firestore не пишет в `newsComments`, потому что коллекция не открыта в `firestore.rules`. Backend использует Admin SDK, возвращает понятные ошибки пользователю и пишет сбои в `errorLogs` с source `api.news-comments` / `server.news-comments`. Новые комментарии сохраняют `authorRole`, `status`, `isPinned`, `isUseful`, `moderation` и `ai.summaryEligible`, чтобы V4.4-админка и Локи могли модерировать и анализировать обсуждения без миграции структуры.
+
+---
+
+## POST /api/news-engagement
+
+**Назначение:** Сбор вовлечённости новостей: уникальные просмотры, дочитывание, репосты и быстрый feedback.
+
+**Метод:** POST  
+**Auth:** пользователь передаётся клиентом; запись выполняет backend через Admin SDK  
+**Коллекции:** `newsViewEvents`, `newsReadEvents`, `newsShareEvents`, `newsFeedback`
+
+**POST actions:**
+- `view` — уникальный просмотр за сутки (`newsId`, `user`, `source`, `progress?`, `readTimeMs?`)
+- `read` — событие чтения/дочитывания (`newsId`, `user`, `progress`, `readTimeMs`, `completed`)
+- `share` — факт репоста/шаринга (`newsId`, `user`, `channel`)
+- `feedback` — быстрый ответ «полезна ли новость» (`newsId`, `user`, `helpful`)
+
+**Логика:** `view` пишет детерминированный документ `newsViewEvents/{newsId_userId_day}` и увеличивает `news.views`, `stats.views`, `dailyViews.YYYY-MM-DD` только при первом просмотре за сутки. `read` сохраняет `stopPercent`, `readTimeMs` и `completed`, чтобы редакция могла видеть дочитывания и точки выхода. `share` увеличивает `shares` и `stats.reposts`. `feedback` хранит одну оценку на пользователя и корректно переносит счётчик при изменении ответа.
 
 ---
 

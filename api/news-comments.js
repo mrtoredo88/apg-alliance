@@ -27,10 +27,16 @@ function serializeComment(doc) {
     userId: data.userId || '',
     userName: data.userName || 'Участник АПГ',
     userAvatar: data.userAvatar || '',
+    authorRole: data.authorRole || data.userRole || '',
     text: data.text || '',
     likes: Number(data.likes || 0),
     likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
     hidden: Boolean(data.hidden),
+    status: data.status || (data.hidden ? 'hidden' : 'visible'),
+    isPinned: Boolean(data.isPinned),
+    isUseful: Boolean(data.isUseful),
+    moderation: data.moderation || null,
+    ai: data.ai || null,
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
   };
@@ -57,6 +63,12 @@ async function listComments(db, newsId) {
     .map(serializeComment)
     .filter(comment => !comment.hidden)
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+async function isUserBlocked(db, userId) {
+  if (!userId) return false;
+  const snap = await db.collection('newsCommentBlocks').doc(String(userId)).get();
+  return snap.exists && snap.data()?.active !== false;
 }
 
 export default async function handler(req, res) {
@@ -87,16 +99,25 @@ export default async function handler(req, res) {
       if (!newsId || !text || !user.id || user.id.startsWith('guest_')) {
         return res.status(400).json({ ok: false, error: 'Недостаточно данных для комментария.' });
       }
+      if (await isUserBlocked(db, user.id)) {
+        return res.status(403).json({ ok: false, error: 'Комментарии для этого аккаунта временно ограничены.' });
+      }
       const ref = await db.collection('newsComments').add({
         newsId,
         parentId,
         userId: user.id,
         userName: user.name,
         userAvatar: user.avatar,
+        authorRole: user.role,
         text,
         likes: 0,
         likedBy: [],
         hidden: false,
+        status: 'visible',
+        isPinned: false,
+        isUseful: false,
+        moderation: {},
+        ai: { summaryEligible: true, topics: [], sentiment: null },
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -126,7 +147,7 @@ export default async function handler(req, res) {
         likedBy: FieldValue.arrayUnion(user.id),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return res.status(200).json({ ok: true, likes: Number(data.likes || 0) + 1 });
+      return res.status(200).json({ ok: true, likes: Number(data.likes || 0) + 1, likedBy: [...likedBy, user.id] });
     }
 
     if (action === 'update') {
@@ -142,7 +163,68 @@ export default async function handler(req, res) {
       if (!isOwner && !isAdmin) return res.status(403).json({ ok: false, error: 'Можно удалить только свой комментарий.' });
       await ref.update({
         hidden: true,
+        status: 'hidden',
         hiddenAt: FieldValue.serverTimestamp(),
+        moderation: {
+          ...(data.moderation || {}),
+          hiddenBy: user.id,
+          hiddenAt: FieldValue.serverTimestamp(),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'togglePin') {
+      if (!isAdmin) return res.status(403).json({ ok: false, error: 'Недостаточно прав для закрепления.' });
+      await ref.update({
+        isPinned: !Boolean(data.isPinned),
+        moderation: {
+          ...(data.moderation || {}),
+          pinnedBy: user.id,
+          pinnedAt: FieldValue.serverTimestamp(),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const updated = await ref.get();
+      return res.status(200).json({ ok: true, comment: serializeComment(updated) });
+    }
+
+    if (action === 'toggleUseful') {
+      if (!isAdmin) return res.status(403).json({ ok: false, error: 'Недостаточно прав для отметки.' });
+      await ref.update({
+        isUseful: !Boolean(data.isUseful),
+        moderation: {
+          ...(data.moderation || {}),
+          usefulBy: user.id,
+          usefulAt: FieldValue.serverTimestamp(),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const updated = await ref.get();
+      return res.status(200).json({ ok: true, comment: serializeComment(updated) });
+    }
+
+    if (action === 'blockUser') {
+      if (!isAdmin) return res.status(403).json({ ok: false, error: 'Недостаточно прав для блокировки.' });
+      const blockedUserId = String(data.userId || '').trim();
+      if (!blockedUserId) return res.status(400).json({ ok: false, error: 'Пользователь комментария не найден.' });
+      await db.collection('newsCommentBlocks').doc(blockedUserId).set({
+        userId: blockedUserId,
+        active: true,
+        reason: 'moderation',
+        blockedBy: user.id,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      await ref.update({
+        hidden: true,
+        status: 'hidden',
+        moderation: {
+          ...(data.moderation || {}),
+          blockedBy: user.id,
+          blockedAt: FieldValue.serverTimestamp(),
+        },
         updatedAt: FieldValue.serverTimestamp(),
       });
       return res.status(200).json({ ok: true });
