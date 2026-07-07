@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Исправление ошибки запуска Web App в Safari/PWA
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `src/ErrorBoundary.jsx`
+**Тип:** fix
+**Что изменено:** Небезопасный `window.scrollTo({ behavior: 'instant' })` заменён на safe helper с `behavior: 'auto'` и fallback `scrollTo(0, 0)`. ErrorBoundary теперь сохраняет локальную диагностику запуска, показывает код/текст ошибки и даёт кнопку очистки service worker/cache с перезапуском.
+**Почему:** В Safari/PWA недопустимое значение `instant` могло выбрасывать TypeError в effect и переводить приложение на экран «Что-то пошло не так».
+
+---
+
 ## [2026-07-07] Восстановление открытия PWA после deploy
 **Коммит:** `локально`
 **Файлы:** `deploy-frontend.sh`

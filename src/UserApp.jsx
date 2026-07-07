@@ -48,6 +48,14 @@ const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m =
 const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => ({ default: m.ReferencePage })));
 const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
 
+function safeScrollTop() {
+  try {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  } catch {
+    try { window.scrollTo(0, 0); } catch {}
+  }
+}
+
 function getQrErrorMessage(error) {
   const code = String(error?.code ?? '');
   if (code === 'TOKEN_USED') return 'Этот QR уже использован. Попросите сотрудника показать актуальный QR-код.';
@@ -1797,7 +1805,7 @@ export function UserApp() {
   }, []);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    safeScrollTop();
   }, [activePanel]);
 
   const tabBarShellStyle = {
