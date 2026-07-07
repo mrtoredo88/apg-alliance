@@ -24,6 +24,15 @@
 
 ---
 
+## [2026-07-08] P0 аварийное отключение service worker
+**Коммит:** `локально`
+**Файлы:** `src/main.jsx`, `public/sw.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Регистрация service worker на старте отключена: приложение удаляет существующие SW-регистрации и очищает browser caches. `sw.js` превращён в emergency restore worker: очищает все кэши, unregister-ит себя и не перехватывает fetch-запросы.
+**Почему:** После первого restore у пользователя всё ещё оставался белый экран, значит нужно полностью вывести PWA из-под старого service worker/cache-контроллера. Работоспособность приложения важнее offline/push-кэша в P0-инциденте.
+
+---
+
 ## [2026-07-07] P0 admin API: Firebase token вынесен из Authorization для Yandex
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/userApi.js`, `src/ProfilePanel.jsx`, `src/NewsPage.jsx`, `api/_admin-security.js`, `server/src/lib/adminSecurity.js`, `api/admin-actions.js`, `api/user-actions.js`, `api/email-auth.js`, `api/news-comments.js`, `api/news-engagement.js`, `api/system-status.js`, `api/loki-editor.js`, `server/src/routes/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/server.js`, `.ai/17_CHANGELOG_AI.md`

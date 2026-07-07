@@ -23,12 +23,10 @@ if (_vkHash.includes('access_token=') && window.opener) {
   createRoot(document.getElementById('root')).render(<App />);
 
   if ('serviceWorker' in navigator) {
-    window.__swRegPromise = navigator.serviceWorker.register('/sw.js').catch(() => null);
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (sessionStorage.getItem('apg_sw_controller_reload') === '1') return;
-      sessionStorage.setItem('apg_sw_controller_reload', '1');
-      window.location.reload();
-    });
+    window.__swRegPromise = navigator.serviceWorker.getRegistrations()
+      .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+      .then(() => ('caches' in window ? caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))) : null))
+      .catch(() => null);
   }
 
   if (import.meta.env.MODE === 'development') {
