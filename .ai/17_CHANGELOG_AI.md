@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Yandex deploy env для VK News
-**Коммит:** pending
+**Коммит:** `e6fc020d`
 **Файлы:** `server/deploy.sh`, `.ai/04_API.md`, `.ai/13_DEPLOYMENT.md`
 **Тип:** fix
 **Что изменено:** Deploy backend на Яндекс теперь передаёт `VK_SERVICE_TOKEN` и `VK_USER_TOKEN` вместе с fallback `VK_GROUP_TOKEN`; документация уточняет, что для `wall.get` предпочтителен сервисный или пользовательский токен.
