@@ -1052,7 +1052,7 @@ function AdminUsersPanel({ users }) {
 
 async function lokiEditorRequest(action, payload = {}) {
   const user = await waitForAdminAuth();
-  const token = await user.getIdToken();
+  const token = await user.getIdToken(true);
   const response = await fetch(`${API_BASE_URL}/api/loki-editor`, {
     method: 'POST',
     headers: {
@@ -2144,8 +2144,8 @@ export const AdminPanel = () => {
   const adminRequestHeaders = async (idempotencyKey = '') => {
     const user = await waitForAdminAuth(noteAdminAuthStage);
     noteAdminAuthStage({ at: new Date().toISOString(), stage: 'token_request_started', uid: user.uid, email: user.email ?? null, isAnonymous: user.isAnonymous ?? null });
-    const token = await user.getIdToken();
-    const tokenResult = await user.getIdTokenResult().catch(() => null);
+    const token = await user.getIdToken(true);
+    const tokenResult = await user.getIdTokenResult(true).catch(() => null);
     noteAdminAuthStage({
       at: new Date().toISOString(),
       stage: 'token_received',

@@ -19,8 +19,8 @@
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/userApi.js`, `src/ProfilePanel.jsx`, `src/NewsPage.jsx`, `api/_admin-security.js`, `server/src/lib/adminSecurity.js`, `api/admin-actions.js`, `api/user-actions.js`, `api/email-auth.js`, `api/news-comments.js`, `api/news-engagement.js`, `api/system-status.js`, `api/loki-editor.js`, `server/src/routes/user-actions.js`, `server/src/routes/email-auth.js`, `server/src/server.js`, `.ai/17_CHANGELOG_AI.md`
 **Тип:** fix
-**Что изменено:** Firebase ID Token теперь передаётся в `X-Firebase-Auth`, а backend поддерживает и новый заголовок, и старый `Authorization` для совместимости. CORS обновлён для `X-Firebase-Auth`; admin diagnostics теперь показывает endpoint/action/resource/status/body для failed admin actions и backend возвращает стабильные коды `AUTH_REQUIRED`, `FORBIDDEN_ROLE`, `UNKNOWN_ACTION`, `INVALID_PAYLOAD`, `SERVER_ERROR`.
-**Почему:** Yandex Serverless Container перехватывал внешний `Authorization: Bearer <Firebase ID Token>` и отвечал собственным `403 Forbidden: Not authorized` до Fastify. Из-за этого `/api/admin-actions` не доходил до backend, а админка видела общий текст “Административное действие не выполнено”.
+**Что изменено:** Firebase ID Token теперь передаётся в `X-Firebase-Auth`, а backend поддерживает и новый заголовок, и старый `Authorization` для совместимости. CORS обновлён для `X-Firebase-Auth`; admin diagnostics теперь показывает endpoint/action/resource/status/body для failed admin actions и backend возвращает стабильные коды `AUTH_REQUIRED`, `FORBIDDEN_ROLE`, `UNKNOWN_ACTION`, `INVALID_PAYLOAD`, `SERVER_ERROR`. Админка принудительно обновляет ID token через `getIdToken(true)` / `getIdTokenResult(true)`, чтобы новые custom claims применялись сразу.
+**Почему:** Yandex Serverless Container перехватывал внешний `Authorization: Bearer <Firebase ID Token>` и отвечал собственным `403 Forbidden: Not authorized` до Fastify. После исправления транспорта backend показал вторую причину: у текущего Firebase UID не было owner/admin claims, поэтому role guard возвращал `FORBIDDEN_ROLE`.
 
 ---
 
