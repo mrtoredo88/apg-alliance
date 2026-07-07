@@ -2,6 +2,7 @@ import world from './world/about.json';
 import screens from './screens/screens.json';
 import features from './features/features.json';
 import chronicles from './updates/chronicles.json';
+import categories from './categories/categories.json';
 
 export const APG_KNOWLEDGE_BASE = {
   id: 'apg-chronicles',
@@ -12,6 +13,7 @@ export const APG_KNOWLEDGE_BASE = {
   screens,
   features,
   chronicles,
+  categories,
 };
 
 export function validateApgKnowledgeBase(knowledge = APG_KNOWLEDGE_BASE) {
@@ -20,6 +22,7 @@ export function validateApgKnowledgeBase(knowledge = APG_KNOWLEDGE_BASE) {
   if (!Array.isArray(knowledge.screens) || !knowledge.screens.length) issues.push('screens missing');
   if (!Array.isArray(knowledge.features) || !knowledge.features.length) issues.push('features missing');
   if (!Array.isArray(knowledge.chronicles)) issues.push('chronicles missing');
+  if (!Array.isArray(knowledge.categories) || !knowledge.categories.length) issues.push('categories missing');
   return { ok: issues.length === 0, issues };
 }
 

@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-07] Loki UX 2.0 и семантическое понимание запросов
+**Коммит:** `локально`
+**Файлы:** `src/loki/lokiPosition.js`, `src/loki/core/modules/PartnerExpert.js`, `src/loki/knowledge/index.js`, `src/loki/knowledge/categories/categories.json`
+**Тип:** feat
+**Что изменено:** Позиционирование Локи переведено на единый safe-area Position Manager, который держит персонажа и облачко внутри видимой области на всех anchor. В Knowledge Base добавлены смысловые категории партнёров, а Partner Expert теперь понимает синонимы, разговорные формулировки, неоднозначные запросы и контекстные follow-up вопросы.
+**Почему:** Локи не должен выходить за экран на внутренних страницах и должен понимать намерение пользователя, а не только точное совпадение слов.
+
+---
+
 ## [2026-07-07] AAA-полировка цифрового персонажа Локи
 **Коммит:** `локально`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `src/assistant/AssistantMiniApp.jsx`, `src/index.css`
