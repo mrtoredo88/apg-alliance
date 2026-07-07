@@ -112,7 +112,7 @@ export default async function telegramWebhookRoutes(fastify) {
       const snap  = await ref.get();
 
       if (!snap.exists || snap.data().status !== 'pending') {
-        await tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
+        tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
         return { ok: true };
       }
 
@@ -120,21 +120,23 @@ export default async function telegramWebhookRoutes(fastify) {
       const expired   = (expiresAt?.toDate ? expiresAt.toDate() : new Date(expiresAt)) < new Date();
       if (expired) {
         await ref.update({ status: 'expired' });
-        await tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
+        tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
         return { ok: true };
       }
 
-      const photoUrl = await tgGetPhotoUrl(from.id);
       await ref.update({
         status:    'done',
         tgUserId:  String(from.id),
         firstName: from.first_name ?? '',
         lastName:  from.last_name  ?? '',
         username:  from.username   ?? '',
-        photoUrl:  photoUrl ?? null,
+        photoUrl:  null,
       });
-      await upsertUser(db, from, photoUrl);
-      await tgSend(from.id,
+
+      tgGetPhotoUrl(from.id)
+        .then(photoUrl => upsertUser(db, from, photoUrl))
+        .catch(error => request.log.warn({ message: error?.message || String(error) }, 'telegram profile background update failed'));
+      tgSend(from.id,
         `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
         { reply_markup: SOCIAL_KEYBOARD },
       );
@@ -143,17 +145,17 @@ export default async function telegramWebhookRoutes(fastify) {
 
     // /start без payload: только приветствие. Auth требует персональный state.
     if (text === '/start') {
-      await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+      tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
       return { ok: true };
     }
 
     if (text === '/links' || text === '/social') {
-      await tgSend(from.id, LINKS_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+      tgSend(from.id, LINKS_TEXT, { reply_markup: SOCIAL_KEYBOARD });
       return { ok: true };
     }
 
     if (text === '/help') {
-      await tgSend(from.id,
+      tgSend(from.id,
         'ℹ️ Команды бота АПГ:\n\n' +
         '/start — приветствие и ссылки\n' +
         '/links — наши соцсети\n' +
@@ -165,7 +167,7 @@ export default async function telegramWebhookRoutes(fastify) {
       return { ok: true };
     }
 
-    await tgSend(from.id,
+    tgSend(from.id,
       `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».\n\n` +
       'Чтобы быстро попасть в АПГ — нажми «Локи АПГ».',
       { reply_markup: SOCIAL_KEYBOARD },

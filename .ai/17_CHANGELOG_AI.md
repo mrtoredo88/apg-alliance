@@ -708,6 +708,15 @@
 
 ---
 
+## [2026-07-08] Incident fix: быстрый Telegram webhook
+**Коммит:** `pending`
+**Файлы:** `server/src/routes/telegram-webhook.js`, `api/telegram-webhook.js`
+**Тип:** fix
+**Что изменено:** Telegram webhook теперь сначала быстро переводит auth-сессию в `done` и возвращает 200, а загрузка фото профиля, обновление пользователя и отправка сообщения в Telegram выполняются фоном без блокировки ответа webhook.
+**Почему:** Telegram `getWebhookInfo` показывал `Connection timed out`; из-за ожидания внешних Telegram API и обновления профиля webhook мог не успевать ответить на `/start auth_...`, поэтому приложение не завершало Telegram-авторизацию.
+
+---
+
 ## [2026-07-08] Production follow-up: backend-first public data и обновление SW cache
 **Коммит:** `pending`
 **Файлы:** `src/UserApp.jsx`, `public/sw.js`

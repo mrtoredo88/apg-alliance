@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     const snap  = await ref.get();
 
     if (!snap.exists || snap.data().status !== 'pending') {
-      await tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
+      tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
       return res.status(200).json({ ok: true });
     }
 
@@ -104,11 +104,9 @@ export default async function handler(req, res) {
     const expired   = (expiresAt?.toDate ? expiresAt.toDate() : new Date(expiresAt)) < new Date();
     if (expired) {
       await ref.update({ status: 'expired' });
-      await tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
+      tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
       return res.status(200).json({ ok: true });
     }
-
-    const photoUrl = await tgGetPhotoUrl(from.id);
 
     await ref.update({
       status:    'done',
@@ -116,39 +114,42 @@ export default async function handler(req, res) {
       firstName: from.first_name ?? '',
       lastName:  from.last_name  ?? '',
       username:  from.username   ?? '',
-      photoUrl:  photoUrl ?? null,
+      photoUrl:  null,
     });
-
 
     const uid      = `tg_${from.id}`;
     const userRef  = db.collection('users').doc(uid);
-    const userSnap = await userRef.get();
-    const profilePatch = {
-      authProvider: 'telegram',
-      displayName: [from.first_name, from.last_name].filter(Boolean).join(' ') || null,
-      firstName: from.first_name ?? null,
-      lastName:  from.last_name  ?? null,
-      photo:     photoUrl ?? null,
-      lastSeen:  FieldValue.serverTimestamp(),
-    };
+    tgGetPhotoUrl(from.id)
+      .then(async (photoUrl) => {
+        const userSnap = await userRef.get();
+        const profilePatch = {
+          authProvider: 'telegram',
+          displayName: [from.first_name, from.last_name].filter(Boolean).join(' ') || null,
+          firstName: from.first_name ?? null,
+          lastName:  from.last_name  ?? null,
+          photo:     photoUrl ?? null,
+          lastSeen:  FieldValue.serverTimestamp(),
+        };
 
-    if (!userSnap.exists) {
-      await userRef.set({
-        keys: 0, favorites: [], scannedPartners: {},
-        completedTasks: [], streak: 0, onboardingDone: false,
-        scanDates: [], lastBonusDate: new Date().toLocaleDateString('sv'),
-        referredBy: null,
-        registeredAt: FieldValue.serverTimestamp(),
-        ...profilePatch,
-      });
-      db.collection('stats').doc('global')
-        .set({ userCount: FieldValue.increment(1) }, { merge: true })
-        .catch(() => {});
-    } else {
-      await userRef.update(profilePatch);
-    }
+        if (!userSnap.exists) {
+          await userRef.set({
+            keys: 0, favorites: [], scannedPartners: {},
+            completedTasks: [], streak: 0, onboardingDone: false,
+            scanDates: [], lastBonusDate: new Date().toLocaleDateString('sv'),
+            referredBy: null,
+            registeredAt: FieldValue.serverTimestamp(),
+            ...profilePatch,
+          });
+          db.collection('stats').doc('global')
+            .set({ userCount: FieldValue.increment(1) }, { merge: true })
+            .catch(() => {});
+        } else {
+          await userRef.update(profilePatch);
+        }
+      })
+      .catch(error => console.warn('[telegram-webhook] profile background update failed', error?.message || String(error)));
 
-    await tgSend(from.id,
+    tgSend(from.id,
       `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
       { reply_markup: SOCIAL_KEYBOARD },
     );
@@ -157,19 +158,19 @@ export default async function handler(req, res) {
 
   // ── /start без payload — только приветствие. Auth требует персональный state ──
   if (text === '/start') {
-    await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+    tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
     return res.status(200).json({ ok: true });
   }
 
   // ── /links или /social — повторный показ соцсетей ───────────────────────────
   if (text === '/links' || text === '/social') {
-    await tgSend(from.id, LINKS_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+    tgSend(from.id, LINKS_TEXT, { reply_markup: SOCIAL_KEYBOARD });
     return res.status(200).json({ ok: true });
   }
 
   // ── /help ────────────────────────────────────────────────────────────────────
   if (text === '/help') {
-    await tgSend(from.id,
+    tgSend(from.id,
       'ℹ️ Команды бота АПГ:\n\n' +
       '/start — приветствие и ссылки\n' +
       '/links — наши соцсети\n' +
@@ -182,7 +183,7 @@ export default async function handler(req, res) {
   }
 
   // ── Любое другое сообщение ───────────────────────────────────────────────────
-  await tgSend(from.id,
+  tgSend(from.id,
     `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».\n\n` +
     'Чтобы быстро попасть в АПГ — нажми «Локи АПГ».',
     { reply_markup: SOCIAL_KEYBOARD },
