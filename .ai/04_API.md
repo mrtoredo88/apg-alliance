@@ -415,7 +415,8 @@ score =
 | Переменная | Используется в |
 |---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | все функции (Firebase Admin) |
-| `VK_GROUP_TOKEN` | vk-news.js |
+| `VK_SERVICE_TOKEN` / `VK_USER_TOKEN` | vk-news.js (предпочтительно для `wall.get`) |
+| `VK_GROUP_TOKEN` | vk-news.js (fallback; часть методов VK может быть недоступна с group-auth) |
 | `PUSH_SECRET` | send-push.js |
 | `RAFFLE_SECRET` | raffle-draw.js, send-push.js |
 | `ACTIVITY_SECRET` | activity-index.js |

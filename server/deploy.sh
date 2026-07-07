@@ -20,6 +20,8 @@ yc serverless container revision deploy \
   --environment RAFFLE_SECRET="$(get_env RAFFLE_SECRET)" \
   --environment ACTIVITY_SECRET="$(get_env ACTIVITY_SECRET)" \
   --environment TELEGRAM_BOT_TOKEN="$(get_env TELEGRAM_BOT_TOKEN)" \
+  --environment VK_SERVICE_TOKEN="$(get_env VK_SERVICE_TOKEN)" \
+  --environment VK_USER_TOKEN="$(get_env VK_USER_TOKEN)" \
   --environment VK_GROUP_TOKEN="$(get_env VK_GROUP_TOKEN)" \
   --environment YANDEX_EMAIL="$(get_env YANDEX_EMAIL)" \
   --environment YANDEX_EMAIL_PASS="$(get_env YANDEX_EMAIL_PASS)" \
