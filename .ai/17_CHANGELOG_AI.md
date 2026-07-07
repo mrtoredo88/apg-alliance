@@ -16,7 +16,7 @@
 ---
 
 ## [2026-07-07] Экосистема АПГ и карманный Локи в Telegram
-**Коммит:** `pending`
+**Коммит:** `517c69f2`
 **Файлы:** `src/assistant/AssistantMiniApp.jsx`, `api/telegram-webhook.js`, `server/src/routes/telegram-webhook.js`, `src/loki/knowledge/updates/chronicles.json`
 **Тип:** feat
 **Что изменено:** Telegram Mini App перестроен из справочника в карманный вход к Локи: единый Loki Core, APG Knowledge Base, voice/text режим, быстрые команды, вкладки экосистемы, справочник, переходы в Web App. Telegram-бот получил тексты и кнопки «Локи АПГ» / «Быстрый вход в АПГ».
