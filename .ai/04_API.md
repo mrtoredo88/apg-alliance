@@ -143,7 +143,7 @@
 - `entity:delete`
 - `entity:set`
 
-**Resources:** `partners`, `experts`, `events`, `banners`, `prizes`, `notifications`, `customTasks`, `users`, `prizeClaims`, `errorLogs`, `scans`, `raffleEntries`, `expertReviews`, `lokiKnowledge`, `lokiAnalytics`, `aiImportRequests`, `config`, `stats`.
+**Resources:** `partners`, `experts`, `events`, `banners`, `prizes`, `notifications`, `customTasks`, `users`, `prizeClaims`, `errorLogs`, `scans`, `raffleEntries`, `expertReviews`, `lokiKnowledge`, `lokiAnalytics`, `aiImportRequests`, `publicFormLinks`, `config`, `stats`.
 
 **Дополнительные поля body для entity-actions:**
 - `resource` — имя ресурса из списка выше
@@ -155,6 +155,51 @@
 **Логика:** endpoint проверяет Firebase ID Token через Admin SDK, определяет роль по custom claims и документу пользователя (`users/{uid}`, `auth_map/{firebaseUid}`, `firebaseUid/authUid` fallback), проверяет permission matrix и только после этого меняет Firestore. Все операции пишут `adminActivity`, история новостей пишется в `newsChangeHistory`, повторная отправка с тем же `X-Idempotency-Key` возвращает сохранённый результат из `adminIdempotency`. Клиентская админка больше не выполняет прямые записи в Firestore для партнёров, экспертов, событий, баннеров, призов, уведомлений, заданий, пользователей, ошибок и выдачи призов; прямой Firestore SDK в админке используется только для чтения списков.
 
 **ИИ-импорт заявок:** ресурс `aiImportRequests` хранит исходный текст/метаданные файла, распознанные поля, confidence, недостающие поля и статус заявки. Публикации из заявки не выполняются автоматически: админка создаёт только черновик в целевом ресурсе после явного действия редактора.
+
+**Публичные формы:** ресурс `publicFormLinks` хранит выданные администратором токен-ссылки для публичных анкет партнёров, экспертов, событий, новостей и призов. Заполненная публичная форма через `/api/public-submit` создаёт запись в `aiImportRequests` со статусом `processed` или `missing`; публикация остаётся ручным действием редактора.
+
+---
+
+## GET/POST /api/public-submit
+
+**Назначение:** Публичная отправка заявок по токен-ссылке без входа в приложение.
+
+**Auth:** нет, доступ только по случайному токену из `publicFormLinks`.
+
+**GET query params:**
+- `token` — публичный токен формы.
+
+**GET response 200:**
+```json
+{
+  "ok": true,
+  "token": "4FD82A...",
+  "type": "partner",
+  "typeLabel": "Партнёр",
+  "title": "Партнёр · публичная анкета",
+  "status": "link_created"
+}
+```
+
+**POST body:**
+```json
+{
+  "token": "4FD82A...",
+  "fields": {
+    "title": "Vibes",
+    "description": "Описание",
+    "phone": "+7...",
+    "vk": "vk.com/vibes"
+  },
+  "files": [
+    { "name": "photo.jpg", "type": "image/jpeg", "size": 123456, "url": "https://storage.yandexcloud.net/..." }
+  ]
+}
+```
+
+**POST response 200:** `{ "ok": true, "id": "aiImportRequestId", "status": "processed", "missingFields": [], "confidence": 88 }`.
+
+**Логика:** backend ищет токен в `publicFormLinks`, проверяет статус/срок действия, нормализует ссылки, создаёт обработанную заявку в `aiImportRequests`, переносит фото как `sourceFiles`, затем закрывает ссылку статусом `submitted`. Повторная отправка по той же ссылке возвращает понятную ошибку и не создаёт дубль.
 
 ---
 

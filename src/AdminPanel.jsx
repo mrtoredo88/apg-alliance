@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
 import { PartnerQRSection, ExpertQRSection } from './PartnerQRSection.jsx';
@@ -104,6 +105,7 @@ const AI_IMPORT_TYPES = [
 ];
 
 const AI_IMPORT_STATUSES = [
+  ['link_created', 'Ссылка выдана'],
   ['new', 'Новая заявка'],
   ['processed', 'Обработано ИИ'],
   ['review', 'Требует проверки'],
@@ -595,21 +597,23 @@ function analyzeAiImportText(type, rawText, files = []) {
   };
 }
 
-function aiImportDraftPatch(type, draft) {
+function aiImportDraftPatch(type, draft, sourceFiles = []) {
   const f = draft?.fields || {};
+  const images = Array.isArray(sourceFiles) ? sourceFiles.map(file => file.url).filter(Boolean) : [];
+  const mainImage = images[0] || '';
   if (type === 'news') {
-    return { title: f.title || 'Черновик новости', text: f.description || f.shortDescription || 'Текст будет заполнен редактором.', fullText: f.description || f.shortDescription || 'Текст будет заполнен редактором.', summary: f.shortDescription || '', category: f.category || 'society', sourceName: f.source || 'ИИ-импорт', linkUrl: f.website || '', status: 'draft', active: false, commentsEnabled: true };
+    return { title: f.title || 'Черновик новости', text: f.description || f.shortDescription || 'Текст будет заполнен редактором.', fullText: f.description || f.shortDescription || 'Текст будет заполнен редактором.', summary: f.shortDescription || '', category: f.category || 'society', sourceName: f.source || 'ИИ-импорт', linkUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, photos: images, status: 'draft', active: false, commentsEnabled: true };
   }
   if (type === 'expert') {
-    return { name: f.title || 'Новый эксперт', specialization: f.category || f.services || 'Уточнить направление', category: detectAiImportCategory([f.category, f.description].join(' '), 'expert'), description: f.description || f.shortDescription || '', phone: f.phone || '', websiteUrl: f.website || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', offer: f.offer || '', active: false, status: 'draft', verified: false, keys: 1 };
+    return { name: f.title || 'Новый эксперт', specialization: f.category || f.services || 'Уточнить направление', category: detectAiImportCategory([f.category, f.description].join(' '), 'expert'), description: f.description || f.shortDescription || '', phone: f.phone || '', websiteUrl: f.website || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', offer: f.offer || '', photo: mainImage, gallery: images, active: false, status: 'draft', verified: false, keys: 1 };
   }
   if (type === 'event') {
-    return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', category: f.category || 'society', active: false, status: 'draft', priority: 0 };
+    return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, category: f.category || 'society', active: false, status: 'draft', priority: 0 };
   }
   if (type === 'prize') {
-    return { name: f.title || 'Новый приз', title: f.title || 'Новый приз', description: f.description || f.shortDescription || '', donorName: f.source || '', raffleDate: f.date || '', type: 'raffle', active: false, status: 'draft', cost: 0, stock: 1, emoji: '🎁' };
+    return { name: f.title || 'Новый приз', title: f.title || 'Новый приз', description: f.description || f.shortDescription || '', donorName: f.source || '', raffleDate: f.date || '', imageUrl: mainImage, photo: mainImage, type: 'raffle', active: false, status: 'draft', cost: 0, stock: 1, emoji: '🎁' };
   }
-  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', phone: f.phone || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', socialUrl: f.instagram || '', offer: f.offer || '', active: false, status: 'draft', emoji: '🏪' };
+  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', phone: f.phone || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', socialUrl: f.instagram || '', offer: f.offer || '', logoUrl: mainImage, coverPhoto: mainImage, gallery: images, active: false, status: 'draft', emoji: '🏪' };
 }
 
 function StatTile({ label, value, icon, color = A.gold, sub }) {
@@ -1385,17 +1389,67 @@ function AdminUsersPanel({ users }) {
   );
 }
 
-function AdminAiImportPanel({ requests, loading, onAnalyze, onSaveRequest, onRefresh, onPublishDraft, onUpdateRequest }) {
+function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink }) {
   const [type, setType] = useState('partner');
   const [sourceText, setSourceText] = useState('');
   const [sourceFiles, setSourceFiles] = useState([]);
   const [draft, setDraft] = useState(null);
   const [activeRequestId, setActiveRequestId] = useState('');
+  const [activePublicLinkId, setActivePublicLinkId] = useState('');
+  const [generatedPublicLink, setGeneratedPublicLink] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const activeRequest = requests.find(item => item.id === activeRequestId) || null;
+  const visiblePublicLinks = [...(publicLinks || [])].sort((a, b) => Number(toJsDate(b.createdAt || b.updatedAt) || 0) - Number(toJsDate(a.createdAt || a.updatedAt) || 0));
   const visibleRequests = [...requests].sort((a, b) => Number(toJsDate(b.createdAt || b.processedAt) || 0) - Number(toJsDate(a.createdAt || a.processedAt) || 0));
   const meta = aiImportTypeMeta(type);
+  const publicTemplate = buildAiImportTemplate(type);
+  const publicLinkUrl = generatedPublicLink?.url || (generatedPublicLink?.token ? `${APP_URL}/submit/${generatedPublicLink.type}/${generatedPublicLink.token}` : '');
+  const publicMessage = publicLinkUrl ? [
+    'Здравствуйте!',
+    '',
+    'Спасибо за интерес к проекту АПГ.',
+    '',
+    'Чтобы оформить карточку, заполните небольшую анкету.',
+    'Это займёт всего пару минут.',
+    '',
+    publicLinkUrl,
+    '',
+    'После отправки информация автоматически попадёт в нашу систему, где её обработает Локи, а затем мы проверим и опубликуем карточку.',
+    '',
+    'Спасибо!',
+  ].join('\n') : '';
+
+  const copyText = async (text, okMessage) => {
+    await navigator.clipboard?.writeText(text).catch(() => {});
+    setMessage(okMessage);
+  };
+
+  const createPublicLink = async () => {
+    setBusy(true);
+    try {
+      const saved = await onCreatePublicLink(type);
+      const link = { ...saved, url: `${APP_URL}/submit/${saved.type}/${saved.token}` };
+      setGeneratedPublicLink(link);
+      setActivePublicLinkId(saved.id || '');
+      setMessage('Публичная ссылка создана. Можно отправлять анкету.');
+    } catch (e) {
+      setMessage(e.message || 'Не удалось создать публичную ссылку.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const shareTelegram = () => {
+    if (!publicMessage) return;
+    const url = `https://t.me/share/url?url=${encodeURIComponent(publicLinkUrl)}&text=${encodeURIComponent(publicMessage.replace(publicLinkUrl, '').trim())}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const shareWhatsApp = () => {
+    if (!publicMessage) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(publicMessage)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const runAnalyze = async () => {
     if (!sourceText.trim() && sourceFiles.length === 0) {
@@ -1503,6 +1557,93 @@ function AdminAiImportPanel({ requests, loading, onAnalyze, onSaveRequest, onRef
         <h1 style={{ ...s.h1, fontSize: 26, marginTop: 6 }}>Источник → Локи → Черновик → Редактор</h1>
         <div style={{ color: A.textSec, fontSize: 14, lineHeight: '20px' }}>
           Загружайте анкеты партнёров, экспертов, событий, новостей и призов. Автопубликации нет: система создаёт только черновик для проверки.
+        </div>
+      </div>
+
+      <div style={{ ...s.card, padding: 22, border: `1px solid ${A.goldBrd}`, background: 'linear-gradient(135deg, rgba(201,168,76,0.14), rgba(255,255,255,0.035))' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ color: A.gold, fontSize: 12, fontWeight: 950, textTransform: 'uppercase', letterSpacing: 1 }}>Публичные формы</div>
+            <h2 style={{ ...s.h2, marginTop: 6 }}>Ссылка вместо переписки</h2>
+            <p style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', margin: 0 }}>
+              Создайте персональную ссылку, отправьте её партнёру или эксперту, а заполненная анкета автоматически попадёт в очередь Локи.
+            </p>
+          </div>
+          <div style={{ color: A.textSec, fontSize: 12, fontWeight: 850 }}>{visiblePublicLinks.length} выданных ссылок</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12, marginTop: 16 }}>
+          <div>
+            <label style={s.label}>Тип публичной формы</label>
+            <select value={type} onChange={e => { setType(e.target.value); setDraft(null); setGeneratedPublicLink(null); }} style={s.select}>
+              {AI_IMPORT_TYPES.map(item => <option key={item.id} value={item.id}>{item.emoji} {item.label}</option>)}
+            </select>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button type="button" onClick={() => copyText(publicTemplate, 'Шаблон скопирован.')} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>📋 Скопировать шаблон</button>
+              <button type="button" disabled={busy} onClick={createPublicLink} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12 }}>{busy ? 'Создаём...' : '🔗 Получить ссылку'}</button>
+            </div>
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <label style={s.label}>Ссылка для отправки</label>
+            <input readOnly value={publicLinkUrl} placeholder="Сначала нажмите «Получить ссылку»" style={s.input} />
+            {publicLinkUrl && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                <button type="button" onClick={() => copyText(publicLinkUrl, 'Ссылка скопирована.')} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Скопировать ссылку</button>
+                <button type="button" onClick={() => copyText(publicMessage, 'Текст сообщения скопирован.')} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Скопировать текст</button>
+                <button type="button" onClick={shareTelegram} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Telegram</button>
+                <button type="button" onClick={shareWhatsApp} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>WhatsApp</button>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 166, borderRadius: 20, border: `1px solid ${A.border}`, background: 'rgba(255,255,255,0.05)' }}>
+            {publicLinkUrl ? (
+              <div style={{ background: '#fff', padding: 12, borderRadius: 16 }}>
+                <QRCodeCanvas value={publicLinkUrl} size={132} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
+              </div>
+            ) : (
+              <div style={{ color: A.textSec, fontSize: 12, textAlign: 'center', lineHeight: '18px' }}>QR появится после генерации ссылки</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <h3 style={{ margin: '0 0 10px', color: A.text, fontSize: 15 }}>Выданные ссылки</h3>
+          {publicLinksLoading ? (
+            <div style={{ color: A.textSec, fontSize: 12 }}>Загружаем ссылки...</div>
+          ) : visiblePublicLinks.length === 0 ? (
+            <div style={{ color: A.textSec, fontSize: 12 }}>Пока нет выданных ссылок.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {visiblePublicLinks.slice(0, 12).map(link => {
+                const linkMeta = aiImportTypeMeta(link.type);
+                const url = `${APP_URL}/submit/${link.type}/${link.token}`;
+                const isActive = activePublicLinkId === link.id;
+                const statusLabel = AI_IMPORT_STATUSES.find(([id]) => id === link.status)?.[1] || link.status || 'Активна';
+                return (
+                  <div key={link.id} style={{ padding: 11, borderRadius: 15, background: isActive ? 'rgba(201,168,76,0.10)' : 'rgba(255,255,255,0.035)', border: `1px solid ${isActive ? A.goldBrd : A.border}` }}>
+                    <button type="button" onClick={() => { setActivePublicLinkId(isActive ? '' : link.id); setGeneratedPublicLink({ ...link, url }); }} style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, border: 'none', background: 'transparent', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: A.text, fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{linkMeta.emoji} {link.title || linkMeta.label}</div>
+                        <div style={{ color: A.textSec, fontSize: 11, marginTop: 3 }}>{statusLabel} · открыта {Number(link.openedCount || 0)} · {toJsDate(link.createdAt)?.toLocaleString('ru-RU') || 'без даты'}</div>
+                      </div>
+                      <span style={{ color: link.status === 'submitted' ? '#4ade80' : A.gold, fontSize: 11, fontWeight: 900 }}>{link.token}</span>
+                    </button>
+                    {isActive && (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                        <button type="button" onClick={() => copyText(url, 'Ссылка скопирована.')} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 11 }}>Копировать</button>
+                        <button type="button" onClick={() => { setGeneratedPublicLink({ ...link, url }); setMessage('QR для выбранной ссылки показан выше.'); }} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 11 }}>Показать QR</button>
+                        {link.status !== 'disabled' && link.status !== 'submitted' && (
+                          <button type="button" onClick={() => onUpdatePublicLink(link.id, { status: 'disabled' })} style={{ ...s.btn, ...s.btnDanger, padding: '7px 10px', fontSize: 11 }}>Отключить</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2735,9 +2876,11 @@ export const AdminPanel = () => {
   const [lokiKnowledge, setLokiKnowledge] = useState([]);
   const [lokiAnalytics, setLokiAnalytics] = useState([]);
   const [aiImportRequests, setAiImportRequests] = useState([]);
+  const [publicFormLinks, setPublicFormLinks] = useState([]);
   const [lokiKnowledgeLoading, setLokiKnowledgeLoading] = useState(false);
   const [lokiAnalyticsLoading, setLokiAnalyticsLoading] = useState(false);
   const [aiImportLoading, setAiImportLoading] = useState(false);
+  const [publicFormLinksLoading, setPublicFormLinksLoading] = useState(false);
   const [editingLokiKnowledge, setEditingLokiKnowledge] = useState(null);
   const [lkTitle, setLkTitle] = useState('');
   const [lkQuestion, setLkQuestion] = useState('');
@@ -3062,6 +3205,17 @@ export const AdminPanel = () => {
     }
   }, []);
 
+  const loadPublicFormLinks = useCallback(async () => {
+    setPublicFormLinksLoading(true);
+    try {
+      setPublicFormLinks(await fetchAdminEntityList('publicFormLinks', 300));
+    } catch (e) {
+      logError(e, 'AdminPanel.loadPublicFormLinks');
+    } finally {
+      setPublicFormLinksLoading(false);
+    }
+  }, []);
+
   const resetLokiKnowledgeForm = () => {
     setEditingLokiKnowledge(null);
     setLkTitle('');
@@ -3138,10 +3292,44 @@ export const AdminPanel = () => {
     setAiImportRequests(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
   };
 
+  const createPublicFormToken = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, value => alphabet[value % alphabet.length]).join('');
+  };
+
+  const createPublicFormLink = async (type) => {
+    const meta = aiImportTypeMeta(type);
+    const token = createPublicFormToken();
+    const patch = {
+      type,
+      typeLabel: meta.label,
+      title: `${meta.label} · публичная анкета`,
+      token,
+      status: 'link_created',
+      openedCount: 0,
+      submittedCount: 0,
+      source: 'admin-public-form',
+      formVersion: 1,
+      url: `${APP_URL}/submit/${type}/${token}`,
+    };
+    const result = await runAdminEntityAction('publicFormLinks', 'create', { patch });
+    const saved = { id: result.id, ...patch, createdAt: new Date().toISOString() };
+    setPublicFormLinks(prev => [saved, ...prev]);
+    return saved;
+  };
+
+  const updatePublicFormLink = async (id, patch) => {
+    if (!id) return;
+    await runAdminEntityAction('publicFormLinks', 'update', { id, patch });
+    setPublicFormLinks(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
+  };
+
   const publishAiImportDraft = async (request) => {
     if (!request?.id) return;
     const type = request.type || 'partner';
-    const patch = aiImportDraftPatch(type, request.draft);
+    const patch = aiImportDraftPatch(type, request.draft, request.sourceFiles);
     let created = null;
     if (type === 'news') {
       created = await runAdminAction('news:create', { patch });
@@ -3224,6 +3412,7 @@ export const AdminPanel = () => {
         { name: 'raffleEntries', label: 'Участники розыгрышей', load: () => fetchAdminEntityList('raffleEntries', 500), optional: true },
         { name: 'guestSessions', label: 'Гостевые сессии', load: () => fetchAdminEntityList('guestSessions', 500), optional: true },
         { name: 'aiImportRequests', label: 'ИИ-импорт заявок', load: () => fetchAdminEntityList('aiImportRequests', 300), optional: true },
+        { name: 'publicFormLinks', label: 'Публичные формы', load: () => fetchAdminEntityList('publicFormLinks', 300), optional: true },
       ];
       const results = await Promise.all(specs.map(readCollection));
       const commentsResult = await fetchAdminNewsComments()
@@ -3261,6 +3450,7 @@ export const AdminPanel = () => {
       apply('newsComments', setNewsComments);
       apply('errorLogs', setErrorLogs);
       apply('aiImportRequests', setAiImportRequests);
+      apply('publicFormLinks', setPublicFormLinks);
       setAdminMetrics(prev => ({
         users: byName.users?.ok ? byName.users.docs : prev.users,
         scans: byName.scans?.ok ? byName.scans.docs : prev.scans,
@@ -4561,7 +4751,8 @@ export const AdminPanel = () => {
     if (activeTab === 'system' && !systemStatus && !systemStatusLoading) loadSystemStatus();
     if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
     if (activeTab === 'ai-import' && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests]);
+    if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks]);
 
   if (!authed) return <AdminLoginGate onAllow={(actor) => { setAdminSession(actor || null); setAuthed(true); fetchData(); }} />;
 
@@ -5029,12 +5220,16 @@ export const AdminPanel = () => {
       {activeTab === 'ai-import' && (
         <AdminAiImportPanel
           requests={aiImportRequests}
+          publicLinks={publicFormLinks}
           loading={aiImportLoading}
+          publicLinksLoading={publicFormLinksLoading}
           onAnalyze={analyzeAiImportRequest}
           onSaveRequest={saveAiImportRequest}
-          onRefresh={loadAiImportRequests}
+          onCreatePublicLink={createPublicFormLink}
+          onRefresh={async () => { await Promise.all([loadAiImportRequests(), loadPublicFormLinks()]); }}
           onPublishDraft={publishAiImportDraft}
           onUpdateRequest={updateAiImportRequest}
+          onUpdatePublicLink={updatePublicFormLink}
         />
       )}
 

@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Публичные формы заявок АПГ
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `src/UserApp.jsx`, `src/PublicSubmitPage.jsx`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `server/src/server.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** В «ИИ-импорт» добавлен блок публичных форм для партнёров, экспертов, событий, новостей и призов: генерация токен-ссылки, готовое сообщение, QR-код и история выданных ссылок. Добавлена публичная страница `/submit/:type/:token` с формой, загрузкой фото и отправкой заявки без авторизации. Backend `/api/public-submit` создаёт обработанную запись в `aiImportRequests` и закрывает ссылку после отправки.
+**Почему:** Нужно убрать ручной сбор данных через переписки и получать структурированные заявки сразу в редакционную очередь АПГ.
+
+---
+
 ## [2026-07-08] Нормализация внешних ссылок партнёров и экспертов
 **Коммит:** `локально`
 **Файлы:** `src/utils/externalUrls.js`, `src/vk.js`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `.ai/17_CHANGELOG_AI.md`

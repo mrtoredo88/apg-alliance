@@ -23,6 +23,7 @@ import systemStatusRoutes     from './routes/system-status.js';
 import userActionsRoutes      from './routes/user-actions.js';
 import lokiEditorRoutes       from './routes/loki-editor.js';
 import publicDataRoutes       from './routes/public-data.js';
+import publicSubmitRoutes     from './routes/public-submit.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -64,6 +65,7 @@ fastify.register(systemStatusRoutes);
 fastify.register(userActionsRoutes);
 fastify.register(lokiEditorRoutes);
 fastify.register(publicDataRoutes);
+fastify.register(publicSubmitRoutes);
 
 fastify.get('/health', async (request, reply) => {
   try {

@@ -49,6 +49,7 @@ const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m =
 const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => ({ default: m.ReferencePage })));
 const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
 const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ default: m.NewsPage })));
+const PublicSubmitPage     = lazy(() => import('./PublicSubmitPage.jsx').then(m => ({ default: m.PublicSubmitPage })));
 
 function safeScrollTop() {
   try {
@@ -636,6 +637,10 @@ export function UserApp() {
 
   // Подтверждение email по ссылке из письма: ?verify_email=TOKEN
   const verifyEmailToken = useMemo(() => new URLSearchParams(window.location.search).get('verify_email'), []);
+  const publicSubmitRoute = useMemo(() => (
+    window.location.pathname.startsWith('/submit/')
+    || window.location.hash.startsWith('#/submit/')
+  ), []);
 
   useEffect(() => {
     if (!verifyEmailToken) return;
@@ -810,6 +815,10 @@ export function UserApp() {
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
   const loadData = useCallback(async (isMounted) => {
+    if (publicSubmitRoute) {
+      if (isMounted.current) setLoading(false);
+      return;
+    }
     if (localStorage.getItem('manualLogout') === 'true') {
       if (isMounted.current) { setLoading(false); setLoggedOut(true); }
       return;
@@ -1188,7 +1197,7 @@ export function UserApp() {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [pendingRefId]);
+  }, [pendingRefId, publicSubmitRoute]);
 
   useEffect(() => {
     const isMounted = { current: true };
@@ -2332,6 +2341,20 @@ export function UserApp() {
   }), [enrichedPartners, goPanel, openNotifications, openPartner]);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
+
+  if (publicSubmitRoute) {
+    return (
+      <ConfigProvider appearance={appearance}>
+        <AdaptivityProvider>
+          <AppRoot>
+            <Suspense fallback={<div style={{ minHeight: '100svh', display: 'grid', placeItems: 'center', background: '#f4f1e9', color: '#191713', fontFamily: 'Manrope, system-ui, sans-serif' }}>Загружаем анкету...</div>}>
+              <PublicSubmitPage />
+            </Suspense>
+          </AppRoot>
+        </AdaptivityProvider>
+      </ConfigProvider>
+    );
+  }
 
   if (networkError) {
     return (
