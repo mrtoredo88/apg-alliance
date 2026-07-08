@@ -308,20 +308,24 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
     return createPortal(
       <>
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 12000, display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-          onClick={onClose}
+          style={{ position: 'fixed', inset: 0, zIndex: 12000, background: APG2.bg, overflowY: 'auto', color: APG2.text }}
           onTouchStart={e => e.stopPropagation()}
           onTouchMove={e => e.stopPropagation()}
           onTouchEnd={e => e.stopPropagation()}
         >
-          <div style={{ width: '100%', maxHeight: '96vh', overflowY: 'auto', background: APG2.bg, borderRadius: '34px 34px 0 0', padding: '10px 16px calc(96px + env(safe-area-inset-bottom, 0px))', color: APG2.text, boxShadow: '0 -28px 80px var(--apg2-elev-shadow, rgba(0,0,0,0.52))' }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(247,241,230,0.22)', margin: '0 auto 14px' }} />
-            {shareToast && (
-              <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 60px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20000, ...APG2.glass, borderRadius: 18, padding: '11px 18px', fontSize: 13, fontWeight: 760, color: APG2.text, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-                {shareToast}
-              </div>
-            )}
-
+          {shareToast && (
+            <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 60px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20000, ...APG2.glass, borderRadius: 18, padding: '11px 18px', fontSize: 13, fontWeight: 760, color: APG2.text, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+              {shareToast}
+            </div>
+          )}
+          <div style={{ position: 'sticky', top: 0, zIndex: 50, padding: 'calc(8px + var(--safe-top, 0px)) 16px 8px', background: 'linear-gradient(180deg,var(--apg2-header-bg-strong, rgba(17,17,19,0.92)),var(--apg2-header-bg-soft, rgba(17,17,19,0.56)),transparent)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button onClick={onClose} style={{ ...APG2.glass, width: 42, height: 42, borderRadius: 18, color: APG2.text, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
+              <div style={{ flex: 1, minWidth: 0, color: APG2.textSoft, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expert.name}</div>
+              <button onClick={handleShare} style={{ ...APG2.glass, width: 42, height: 42, borderRadius: 18, color: APG2.textSoft, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↗</button>
+            </div>
+          </div>
+          <main style={{ padding: '0 16px', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', maxWidth: 520, margin: '0 auto' }}>
             <ProfileHero
               image={heroImage}
               title={expert.name}
@@ -424,7 +428,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                 </div>
               )}
             </GlassSection>
-          </div>
+          </main>
         </div>
         {lightboxIdx !== null && expert.gallery?.length > 0 && (
           <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
@@ -838,20 +842,8 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
 
   useEffect(() => {
     if (!selected) return;
-    // iOS/VK: overflow:hidden alone resets scroll to 0 visually.
-    // position:fixed freezes the layout at the captured offset.
-    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
     document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.top      = `-${scrollY}px`;
-    document.body.style.width    = '100%';
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top      = '';
-      document.body.style.width    = '';
-      window.scrollTo(0, scrollY);
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [selected]);
 
   if (variant === 'v2') {
