@@ -41,6 +41,12 @@ aws s3 cp dist/version.json "s3://$BUCKET/version.json" $S3 \
   --content-type "application/json" \
   --cache-control "no-cache, no-store, must-revalidate"
 
+if [ -f dist/network-diagnostics-lite ]; then
+  aws s3 cp dist/network-diagnostics-lite "s3://$BUCKET/network-diagnostics-lite" $S3 \
+    --content-type "text/html; charset=utf-8" \
+    --cache-control "no-cache, no-store, must-revalidate"
+fi
+
 # Other static files (images, fonts, etc.) — 1 day cache
 echo "Uploading static files..."
 aws s3 sync dist/ "s3://$BUCKET/" $S3 \
@@ -49,6 +55,7 @@ aws s3 sync dist/ "s3://$BUCKET/" $S3 \
   --exclude "sw.js" \
   --exclude "manifest.json" \
   --exclude "version.json" \
+  --exclude "network-diagnostics-lite" \
   --cache-control "public, max-age=86400" \
   --delete
 

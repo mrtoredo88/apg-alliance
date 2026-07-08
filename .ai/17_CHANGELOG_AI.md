@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Safe bootstrap и lite-диагностика без React
+**Коммит:** `локально`
+**Файлы:** `index.html`, `public/network-diagnostics-lite`, `src/App.jsx`, `src/main.jsx`, `src/ErrorBoundary.jsx`, `deploy-frontend.sh`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Добавлен аварийный pre-React fallback в `index.html`, статическая страница `/network-diagnostics-lite` без React/Firebase/внешних скриптов, ранний bootstrap trace и режим `?no-sw=1`. `UserApp` переведён в lazy-load, чтобы Firebase/Auth/Firestore не были частью самого первого React shell, а внешний Telegram script больше не блокирует старт приложения.
+**Почему:** На телефонах без VPN приложение могло показывать белый экран до роутинга и React-диагностики. Теперь даже при недоступности Firebase/Google/Telegram пользователь должен увидеть shell, ошибку или lite-диагностику вместо пустого экрана.
+
+---
+
 ## [2026-07-08] Диагностика запуска без VPN и устойчивый public-data
 **Коммит:** `локально`
 **Файлы:** `src/main.jsx`, `src/App.jsx`, `src/UserApp.jsx`, `src/networkDiagnostics.js`, `src/NetworkDiagnosticsPage.jsx`, `api/public-data.js`, `server/src/routes/public-data.js`, `.ai/17_CHANGELOG_AI.md`

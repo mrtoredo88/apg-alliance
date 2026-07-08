@@ -1,6 +1,5 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { UserApp } from './UserApp.jsx';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 async function checkForUpdate() {
@@ -24,6 +23,7 @@ async function checkForUpdate() {
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
 const NetworkDiagnosticsPage = lazy(() => import('./NetworkDiagnosticsPage.jsx').then(m => ({ default: m.NetworkDiagnosticsPage })));
+const UserApp = lazy(() => import('./UserApp.jsx').then(m => ({ default: m.UserApp })));
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C' };
 
@@ -37,12 +37,20 @@ function AppFallback({ label = 'Загрузка...' }) {
 }
 
 export function App() {
-  useEffect(() => { checkForUpdate(); }, []);
+  useEffect(() => {
+    window.__APG_BOOT_MARK?.('app_mounted');
+    window.__APG_BOOT_OK = true;
+    checkForUpdate();
+  }, []);
   return (
     <ErrorBoundary>
       <HashRouter>
         <Routes>
-          <Route path="/" element={<UserApp />} />
+          <Route path="/" element={
+            <Suspense fallback={<AppFallback label="Загрузка АПГ..." />}>
+              <UserApp />
+            </Suspense>
+          } />
           <Route path="/admin" element={
             <Suspense fallback={<AppFallback label="Загрузка панели..." />}>
               <AdminPanel />

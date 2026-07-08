@@ -49,10 +49,18 @@ export class ErrorBoundary extends React.Component {
     window.location.reload();
   }
 
+  openLiteDiagnostics() {
+    window.location.href = '/network-diagnostics-lite';
+  }
+
   render() {
     if (this.state.error) {
       const message = this.state.error?.message ?? String(this.state.error);
       const componentLine = String(this.state.info?.componentStack ?? '').trim().split('\n')[0] ?? '';
+      let bootTrace = '';
+      try {
+        bootTrace = sessionStorage.getItem('apg_boot_trace') || '';
+      } catch {}
       return (
         <div style={{
           minHeight: '100vh',
@@ -86,6 +94,7 @@ export class ErrorBoundary extends React.Component {
             <div style={{ color: '#E8C97A', fontWeight: 800, marginBottom: 5 }}>{this.state.errorId}</div>
             <div>{message}</div>
             {componentLine && <div style={{ marginTop: 6, color: 'rgba(240,240,240,0.42)' }}>{componentLine}</div>}
+            {bootTrace && <div style={{ marginTop: 8, color: 'rgba(240,240,240,0.38)' }}>{bootTrace.slice(0, 700)}</div>}
           </div>
           <button
             onClick={() => window.location.reload()}
@@ -97,6 +106,19 @@ export class ErrorBoundary extends React.Component {
             }}
           >
             Перезагрузить
+          </button>
+          <button
+            onClick={() => this.openLiteDiagnostics()}
+            style={{
+              marginTop: 10,
+              background: 'rgba(201,168,76,0.16)',
+              border: '1px solid rgba(201,168,76,0.32)',
+              borderRadius: 14,
+              color: '#E8C97A', fontSize: 14, fontWeight: 800,
+              padding: '12px 22px', cursor: 'pointer',
+            }}
+          >
+            Открыть диагностику
           </button>
           <button
             onClick={() => this.clearCacheAndReload()}
