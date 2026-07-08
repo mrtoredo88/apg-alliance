@@ -12,11 +12,28 @@ import { userAction } from './userApi.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 
+function getExpertReadyState(expert = {}) {
+  const galleryCount = (Array.isArray(expert.gallery) ? expert.gallery : []).filter(Boolean).length;
+  const videosCount  = (Array.isArray(expert.videos)  ? expert.videos  : []).filter(Boolean).length;
+  const checks = [
+    { key: 'photo',    label: 'добавить фото профиля',      done: Boolean(expert.photo),                                                                                    tab: 'edit' },
+    { key: 'desc',     label: 'написать о себе',             done: Boolean(String(expert.description || '').trim()),                                                        tab: 'edit' },
+    { key: 'spec',     label: 'указать специализацию',       done: Boolean(String(expert.specialization || '').trim()),                                                     tab: 'edit' },
+    { key: 'contacts', label: 'добавить контакты / запись',  done: Boolean(expert.phone || expert.bookingUrl || expert.vkUrl || expert.telegramUrl),                       tab: 'edit' },
+    { key: 'offer',    label: 'создать предложение для АПГ', done: Boolean(String(expert.offer || '').trim()),                                                              tab: 'edit' },
+    { key: 'gallery',  label: 'добавить фото в галерею',     done: galleryCount >= 1,                                                                                      tab: 'content' },
+    { key: 'video',    label: 'добавить видео',              done: videosCount  >= 1,                                                                                      tab: 'content' },
+    { key: 'verified', label: 'получить подтверждение АПГ',  done: Boolean(expert.verified),                                                                               tab: 'start' },
+  ];
+  const doneCount = checks.filter(c => c.done).length;
+  return { checks, percent: Math.round((doneCount / checks.length) * 100), doneCount };
+}
+
 export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, onBack, onExpertUpdate }) {
   const [expert, setExpert]       = useState(initialExpert);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState('start');
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -141,46 +158,316 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   };
 
   if (variant === 'v2') {
+    const galleryCount  = (Array.isArray(expert.gallery) ? expert.gallery : []).filter(Boolean).length;
+    const videosCount   = (Array.isArray(expert.videos)  ? expert.videos  : []).filter(Boolean).length;
+    const favCount      = expert.favoritesCount ?? 0;
+    const readyState    = getExpertReadyState(expert);
+    const firstTodoIdx  = readyState.checks.findIndex(c => !c.done);
+    const nextTodo      = firstTodoIdx >= 0 ? readyState.checks[firstTodoIdx] : null;
+    const statusLabel   = expert.tier === 'ambassador' ? 'Амбассадор' : expert.verified ? 'Проверенный' : 'Эксперт';
+
+    const achievements = [
+      { icon: '👁',  label: 'Первый просмотр',  done: viewCount   >= 1,   need: Math.max(0, 1   - viewCount),   unit: 'просмотр' },
+      { icon: '🎯',  label: 'Первый клиент',    done: totalVisits >= 1,   need: Math.max(0, 1   - totalVisits), unit: 'клиент'   },
+      { icon: '⭐',  label: 'Первый отзыв',     done: ratingCount >= 1,   need: Math.max(0, 1   - ratingCount), unit: 'отзыв'    },
+      { icon: '💫',  label: '100 просмотров',   done: viewCount   >= 100, need: Math.max(0, 100 - viewCount),   unit: 'просмотров' },
+      { icon: '🔟',  label: '10 клиентов',      done: totalVisits >= 10,  need: Math.max(0, 10  - totalVisits), unit: 'клиентов' },
+      { icon: '✅',  label: 'Подтверждён АПГ',  done: Boolean(expert.verified), need: 0, unit: '' },
+    ];
+    const weekGoal = achievements.find(a => !a.done && a.need > 0);
+
+    const getLokiMsg = () => {
+      if (!expert.photo)                             return { msg: 'Добавьте фото профиля — карточки с фото получают вдвое больше просмотров.', cta: 'Загрузить фото', tab: 'edit' };
+      if (!String(expert.description || '').trim())  return { msg: 'Расскажите о себе и своём подходе — именно по описанию клиенты выбирают специалиста.', cta: 'Написать о себе', tab: 'edit' };
+      if (!String(expert.offer || '').trim())        return { msg: 'Специальное предложение для участников АПГ поможет привлечь первых клиентов быстрее.', cta: 'Добавить предложение', tab: 'edit' };
+      if (viewCount > 20 && totalVisits === 0)       return { msg: `Карточку посмотрели ${viewCount} раз, но до записи не доходят. Добавьте прямую ссылку или телефон.`, cta: 'Добавить контакты', tab: 'edit' };
+      if (!videosCount)                              return { msg: 'Видео о вашей работе значительно повышает доверие клиентов и конверсию в запись.', cta: 'Перейти к контенту', tab: 'content' };
+      if (!galleryCount)                             return { msg: 'Добавьте фото из вашей работы — это первое, что видят потенциальные клиенты.', cta: 'Перейти к контенту', tab: 'content' };
+      if (avgRating > 0 && avgRating < 3.5)          return { msg: 'Рейтинг можно повысить — попросите довольных клиентов оставить отзыв.', cta: 'Посмотреть отзывы', tab: 'reviews' };
+      if (readyState.percent === 100)                return { msg: 'Профиль полностью готов! Поддерживайте активность — ваша карточка всегда в топе.', cta: 'Посмотреть статистику', tab: 'stats' };
+      return { msg: 'Заполняйте профиль шаг за шагом — каждый дополненный раздел увеличивает шансы на запись.', cta: null, tab: null };
+    };
+    const loki = getLokiMsg();
+
     return (
       <Panel id={nav}>
         <GlassPanel>
           <ScreenHeader title="Кабинет" subtitle={expert.name} kicker="Эксперт АПГ" onBack={onBack} />
+
           <ProfileHero
-            image={fPhoto}
+            image={fPhoto || expert.coverPhoto}
             title={expert.name}
             subtitle={expert.specialization}
-            status="Эксперт"
+            status={statusLabel}
             description={expert.offer || expert.description}
-            avatar={fPhoto ? <img src={fPhoto} alt="" style={{ width: 64, height: 64, borderRadius: 24, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.24)' }} /> : <GlassBadge tone="gold">🧑‍💼</GlassBadge>}
-            badges={[expert.premium ? 'Premium' : 'Проверенный', avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : `${ratingCount} отзывов`].filter(Boolean)}
+            avatar={fPhoto
+              ? <img src={fPhoto} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(215,184,106,0.4)' }} />
+              : <GlassBadge tone="gold">🧑‍💼</GlassBadge>}
+            badges={[
+              expert.tier === 'ambassador' ? '🏆 Амбассадор' : expert.verified ? '✅ Проверенный' : null,
+              avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : null,
+              expert.keys ? `+${expert.keys} 🗝️ за визит` : null,
+            ].filter(Boolean)}
           />
-          <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 16 }}>
-            {[['stats', 'Статистика'], ['qr', 'QR'], ['edit', 'Карточка']].map(([id, label]) => (
+
+          {/* Быстрые действия */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 7, marginTop: 12 }}>
+            {[
+              { icon: '✏️', label: 'Профиль',  action: () => setActiveTab('edit') },
+              { icon: '📸', label: 'Контент',  action: () => setActiveTab('content') },
+              { icon: '📲', label: 'QR-код',   action: () => setActiveTab('qr') },
+              { icon: '🌐', label: 'Карточка', action: () => window.open(`${APP_URL}/?expert=${expert.id}`, '_blank') },
+            ].map(({ icon, label, action }) => (
+              <button key={label} onClick={action} style={{
+                ...APG2_PROFILE.glass, borderRadius: 22, padding: '11px 4px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                cursor: 'pointer', fontFamily: 'inherit',
+                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+              }}>
+                <span style={{ fontSize: 22, lineHeight: 1 }}>{icon}</span>
+                <span style={{ fontSize: 10, fontWeight: 760, color: APG2_PROFILE.textSoft, textAlign: 'center', lineHeight: '13px' }}>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Навигация */}
+          <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
+            {[['start', 'Старт'], ['stats', 'Аналитика'], ['content', 'Контент'], ['qr', 'QR'], ['reviews', 'Отзывы'], ['edit', 'Карточка']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
 
+          {/* ── СТАРТ ── */}
+          {activeTab === 'start' && (
+            <GlassSection title="Готовность профиля">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+                <StatPill label="просмотров" value={viewCount} />
+                <StatPill label="клиентов" value={totalVisits} tone="gold" />
+                <StatPill label="рейтинг" value={avgRating > 0 ? avgRating.toFixed(1) : '—'} />
+              </div>
+
+              <GlassCard tone="gold" style={{ borderRadius: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ color: '#17120a', fontSize: 18, lineHeight: '22px', fontWeight: 930 }}>
+                      Профиль готов на {readyState.percent}%
+                    </div>
+                    <div style={{ color: 'rgba(23,18,10,0.60)', fontSize: 13, marginTop: 3 }}>
+                      {readyState.doneCount} из {readyState.checks.length} шагов выполнено
+                    </div>
+                  </div>
+                  <svg width="52" height="52" viewBox="0 0 52 52" style={{ flexShrink: 0 }}>
+                    <circle cx="26" cy="26" r="21" fill="none" stroke="rgba(23,18,10,0.14)" strokeWidth="4" />
+                    <circle
+                      cx="26" cy="26" r="21" fill="none" stroke="#17120a" strokeWidth="4"
+                      strokeLinecap="round" transform="rotate(-90 26 26)"
+                      strokeDasharray={String(2 * Math.PI * 21)}
+                      strokeDashoffset={String(2 * Math.PI * 21 * (1 - readyState.percent / 100))}
+                      style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                    />
+                    <text x="26" y="31" textAnchor="middle" fontSize="12" fontWeight="900" fill="#17120a">{readyState.percent}%</text>
+                  </svg>
+                </div>
+
+                <div style={{ height: 6, borderRadius: 999, background: 'rgba(23,18,10,0.14)', overflow: 'hidden', marginBottom: 14 }}>
+                  <div style={{ width: `${readyState.percent}%`, height: '100%', borderRadius: 999, background: '#17120a', transition: 'width 0.8s ease' }} />
+                </div>
+
+                {nextTodo && (
+                  <div style={{ background: 'rgba(255,255,255,0.30)', borderRadius: 20, padding: '10px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 16, flexShrink: 0, color: '#17120a' }}>▶</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: 'rgba(23,18,10,0.52)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Следующий шаг</div>
+                      <div style={{ fontSize: 13, color: '#17120a', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextTodo.label}</div>
+                    </div>
+                    <button onClick={() => setActiveTab(nextTodo.tab)} style={{
+                      background: '#17120a', border: 'none', borderRadius: 14, padding: '6px 12px',
+                      color: '#D7B86A', fontSize: 12, fontWeight: 800, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}>Сделать</button>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {readyState.checks.map((item, idx) => (
+                    <button key={item.key} onClick={() => setActiveTab(item.tab)} style={{
+                      border: 0, borderRadius: 16, padding: '9px 12px', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      background: item.done ? 'rgba(23,18,10,0.08)' : idx === firstTodoIdx ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.22)',
+                      color: '#17120a', fontWeight: 780, cursor: 'pointer', fontFamily: 'inherit',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <span style={{
+                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                        background: item.done ? '#17120a' : 'rgba(23,18,10,0.12)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 900,
+                        color: item.done ? '#D7B86A' : 'rgba(23,18,10,0.45)',
+                      }}>{item.done ? '✓' : String(idx + 1)}</span>
+                      <span style={{ flex: 1, fontSize: 13, opacity: item.done ? 0.60 : 1, textDecoration: item.done ? 'line-through' : 'none' }}>{item.label}</span>
+                      {!item.done && <span style={{ fontSize: 13, color: 'rgba(23,18,10,0.40)', flexShrink: 0 }}>→</span>}
+                    </button>
+                  ))}
+                </div>
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 30, marginTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 14, background: APG2_PROFILE.goldSoft, border: '1px solid rgba(215,184,106,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🦊</div>
+                  <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Локи · персональный менеджер</div>
+                </div>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '21px', fontWeight: 760 }}>{loki.msg}</div>
+                {loki.cta && loki.tab && (
+                  <GlassButton onClick={() => setActiveTab(loki.tab)} style={{ marginTop: 12, width: '100%' }}>{loki.cta}</GlassButton>
+                )}
+              </GlassCard>
+
+              <GlassSection title="Достижения">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {achievements.map(a => (
+                    <GlassCard key={a.label} style={{ borderRadius: 22, padding: '12px 12px', opacity: a.done ? 1 : 0.55 }}>
+                      <div style={{ fontSize: 26, marginBottom: 6, filter: a.done ? 'none' : 'grayscale(1)' }}>{a.icon}</div>
+                      <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 820, lineHeight: '17px' }}>{a.label}</div>
+                      {a.done
+                        ? <div style={{ fontSize: 10, color: 'rgba(75,179,75,0.9)', fontWeight: 760, marginTop: 4 }}>Выполнено ✓</div>
+                        : <div style={{ fontSize: 10, color: APG2_PROFILE.textMuted, marginTop: 4 }}>{a.need > 0 ? `ещё ${a.need} ${a.unit}` : 'Обратитесь к АПГ'}</div>}
+                    </GlassCard>
+                  ))}
+                </div>
+              </GlassSection>
+
+              {weekGoal && (
+                <GlassCard tone="gold" style={{ borderRadius: 26, marginTop: 4 }}>
+                  <div style={{ color: 'rgba(23,18,10,0.60)', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Ближайшая цель</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 28 }}>{weekGoal.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: '#17120a', fontSize: 15, fontWeight: 900 }}>{weekGoal.label}</div>
+                      <div style={{ color: 'rgba(23,18,10,0.60)', fontSize: 13, marginTop: 2 }}>Ещё {weekGoal.need} {weekGoal.unit}</div>
+                    </div>
+                  </div>
+                </GlassCard>
+              )}
+            </GlassSection>
+          )}
+
+          {/* ── АНАЛИТИКА ── */}
           {activeTab === 'stats' && (
-            <GlassSection title="Метрики">
-              {loading ? <EmptyStateV2 icon="📊" title="Загружаем статистику" text="Собираем данные карточки эксперта." /> : (
+            <GlassSection title="Аналитика">
+              {loading ? (
+                <EmptyStateV2 icon="📊" title="Загружаем статистику" text="Собираем данные профиля." />
+              ) : totalVisits === 0 && viewCount === 0 && publicQRScans === 0 ? (
+                <EmptyStateV2
+                  icon="📊"
+                  title="Статистика собирается"
+                  text="Данные появятся после первых посещений вашей карточки участниками АПГ."
+                  action={<GlassButton onClick={() => setActiveTab('qr')}>Посмотреть QR-коды</GlassButton>}
+                />
+              ) : (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, fontWeight: 760, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Охват</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                    <StatPill label="просмотров карточки" value={viewCount} />
+                    <StatPill label="в избранном" value={favCount} />
+                  </div>
+                  <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, fontWeight: 760, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Клиенты</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
                     <StatPill label="служебный QR" value={totalVisits} tone="gold" />
                     <StatPill label="публичный QR" value={publicQRScans} />
-                    <StatPill label="просмотров" value={viewCount} />
                     <StatPill label="конверсия" value={viewCount > 0 ? `${conversionPct}%` : '—'} />
                   </div>
                   {(avgRating > 0 || ratingCount > 0) && (
-                    <GlassCard style={{ marginTop: 12, borderRadius: 30 }}>
-                      <div style={{ color: APG2_PROFILE.gold, fontSize: 34, fontWeight: 930 }}>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</div>
-                      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>{ratingCount} отзывов</div>
-                    </GlassCard>
+                    <>
+                      <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, fontWeight: 760, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Рейтинг</div>
+                      <GlassCard style={{ borderRadius: 30 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          <div style={{ flexShrink: 0 }}>
+                            <div style={{ color: APG2_PROFILE.gold, fontSize: 38, fontWeight: 930, lineHeight: 1 }}>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</div>
+                            <Stars rating={avgRating} />
+                            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 4 }}>{ratingCount} отзывов</div>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            {[5,4,3,2,1].map(star => {
+                              const count = reviews.filter(r => (r.stars ?? r.rating) === star).length;
+                              const pct   = ratingCount > 0 ? (count / ratingCount) * 100 : 0;
+                              return (
+                                <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                                  <span style={{ fontSize: 10, color: APG2_PROFILE.textMuted, width: 8 }}>{star}</span>
+                                  <span style={{ fontSize: 10, color: '#FFD700' }}>★</span>
+                                  <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${pct}%`, background: APG2_PROFILE.gold, borderRadius: 2, transition: 'width 0.5s' }} />
+                                  </div>
+                                  <span style={{ fontSize: 10, color: APG2_PROFILE.textMuted, width: 14, textAlign: 'right' }}>{count}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </GlassCard>
+                    </>
                   )}
                 </>
               )}
             </GlassSection>
           )}
 
+          {/* ── КОНТЕНТ ── */}
+          {activeTab === 'content' && (
+            <GlassSection title="Контент">
+              <div style={{ display: 'grid', gap: 10 }}>
+                {[
+                  { icon: '📸', title: 'Фото в галерее',   count: galleryCount, unit: 'фото',   done: galleryCount >= 1 },
+                  { icon: '🎬', title: 'Видео',            count: videosCount,  unit: 'видео',  done: videosCount  >= 1 },
+                  { icon: '📋', title: 'Форматы работы',   count: (Array.isArray(expert.formats) ? expert.formats : []).length, unit: 'формата', done: (Array.isArray(expert.formats) ? expert.formats : []).length > 0 },
+                ].map(({ icon, title, count, unit, done }) => (
+                  <GlassCard key={title} style={{ borderRadius: 24, display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{
+                      width: 50, height: 50, borderRadius: 18, flexShrink: 0,
+                      background: done ? 'rgba(75,179,75,0.18)' : APG2_PROFILE.goldSoft,
+                      border: done ? '1px solid rgba(75,179,75,0.34)' : '1px solid rgba(215,184,106,0.25)',
+                      display: 'grid', placeItems: 'center', fontSize: 24,
+                    }}>
+                      {done ? '✓' : icon}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 850 }}>{title}</div>
+                      <div style={{ color: done ? 'rgba(75,179,75,0.88)' : APG2_PROFILE.textSoft, fontSize: 12, marginTop: 3 }}>
+                        {count > 0 ? `${count} ${unit}` : 'Не добавлено'}
+                      </div>
+                    </div>
+                    {count > 0 && (
+                      <div style={{ background: APG2_PROFILE.goldSoft, borderRadius: 12, padding: '4px 10px', color: APG2_PROFILE.gold, fontSize: 14, fontWeight: 900, flexShrink: 0 }}>{count}</div>
+                    )}
+                  </GlassCard>
+                ))}
+
+                {galleryCount > 0 && (
+                  <GlassCard style={{ borderRadius: 24 }}>
+                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginBottom: 10 }}>Фото</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+                      {expert.gallery.filter(Boolean).slice(0, 6).map((url, i) => (
+                        <div key={i} style={{ aspectRatio: '1', borderRadius: 14, overflow: 'hidden', background: APG2_PROFILE.goldSoft }}>
+                          <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none'; }} />
+                        </div>
+                      ))}
+                    </div>
+                  </GlassCard>
+                )}
+              </div>
+
+              <GlassCard style={{ borderRadius: 24, marginTop: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 18 }}>🦊</span>
+                  <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Совет Локи</span>
+                </div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px' }}>
+                  Галерея, видео и форматы работы добавляются совместно с командой АПГ. Пришлите нам материалы, и мы их оформим и разместим.
+                </div>
+              </GlassCard>
+            </GlassSection>
+          )}
+
+          {/* ── QR ── */}
           {activeTab === 'qr' && (
             <GlassSection title="QR-коды и материалы">
               <GlassCard style={{ borderRadius: 32 }}>
@@ -189,29 +476,73 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
             </GlassSection>
           )}
 
+          {/* ── ОТЗЫВЫ ── */}
+          {activeTab === 'reviews' && (
+            <GlassSection title="Отзывы">
+              {reviews.length === 0 ? (
+                <EmptyStateV2 icon="⭐" title="Отзывов пока нет" text="После первых сессий здесь появятся оценки и комментарии ваших клиентов." />
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {reviews.map(review => (
+                    <GlassCard key={review.id} style={{ borderRadius: 24 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                        <div style={{ color: APG2_PROFILE.text, fontSize: 14, fontWeight: 850 }}>{review.userName || 'Участник АПГ'}</div>
+                        <Stars rating={review.stars ?? review.rating ?? 0} />
+                      </div>
+                      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>{review.text || 'Без текста'}</div>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+            </GlassSection>
+          )}
+
+          {/* ── КАРТОЧКА ── */}
           {activeTab === 'edit' && (
             <GlassSection title="Карточка эксперта">
               <GlassCard style={{ borderRadius: 32 }}>
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Фото</label>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Фото профиля</label>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '8px 0 14px' }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 24, background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{fPhoto ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🧑‍💼'}</div>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {fPhoto ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🧑‍💼'}
+                  </div>
                   <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
                   <GlassButton onClick={() => photoInputRef.current?.click()}>{uploading ? 'Загрузка...' : 'Загрузить'}</GlassButton>
                 </div>
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Описание</label>
-                <textarea value={fDesc} onChange={e => setFDesc(e.target.value)} rows={4} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} />
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Акция / предложение</label>
-                <textarea value={fOffer} onChange={e => setFOffer(e.target.value)} rows={3} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} />
-                {[['Телефон', fPhone, setFPhone], ['Запись', fBooking, setFBooking], ['Сайт', fWebsite, setFWebsite], ['VK', fVk, setFVk], ['Telegram', fTelegram, setFTelegram], ['MAX', fMax, setFMax]].map(([label, value, setter]) => (
+
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>О себе</label>
+                <textarea value={fDesc} onChange={e => setFDesc(e.target.value)} rows={4} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} placeholder="Расскажите о своей деятельности, опыте, подходе к работе..." />
+
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Предложение для участников АПГ</label>
+                <textarea value={fOffer} onChange={e => setFOffer(e.target.value)} rows={3} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} placeholder="Скидка 10% на первую консультацию" />
+
+                {[
+                  ['Телефон',       fPhone,    setFPhone,    '+7 (499) 123-45-67'],
+                  ['Ссылка для записи', fBooking, setFBooking, 'https://...'],
+                  ['Сайт',          fWebsite,  setFWebsite,  'https://...'],
+                  ['ВКонтакте',     fVk,       setFVk,       'https://vk.com/...'],
+                  ['Telegram',      fTelegram, setFTelegram, 'https://t.me/...'],
+                  ['Max',           fMax,      setFMax,      'https://...'],
+                ].map(([label, value, setter, ph]) => (
                   <React.Fragment key={label}>
                     <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
-                    <input value={value} onChange={e => setter(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} />
+                    <input value={value} onChange={e => setter(e.target.value)} placeholder={ph} style={{ ...v2InputStyle, marginTop: 6 }} />
                   </React.Fragment>
                 ))}
-                <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a' }}>{saving ? 'Сохраняем...' : saved ? 'Сохранено' : 'Сохранить изменения'}</GlassButton>
+
+                <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
+                  {saving ? 'Сохраняем...' : saved ? '✓ Сохранено' : 'Сохранить изменения'}
+                </GlassButton>
+
+                <div style={{ marginTop: 10, padding: '10px 12px', background: 'rgba(215,184,106,0.07)', border: '1px solid rgba(215,184,106,0.18)', borderRadius: 16 }}>
+                  <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, lineHeight: '17px' }}>
+                    💡 Имя, специализация, ключи и категории управляются администратором АПГ.
+                  </div>
+                </div>
               </GlassCard>
             </GlassSection>
           )}
+
         </GlassPanel>
       </Panel>
     );

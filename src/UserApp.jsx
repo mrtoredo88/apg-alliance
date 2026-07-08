@@ -50,6 +50,7 @@ const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => 
 const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
 const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ default: m.NewsPage })));
 const PublicSubmitPage     = lazy(() => import('./PublicSubmitPage.jsx').then(m => ({ default: m.PublicSubmitPage })));
+const ApgHealthPage        = lazy(() => import('./ApgHealthPage.jsx').then(m => ({ default: m.ApgHealthPage })));
 
 function safeScrollTop() {
   try {
@@ -2477,6 +2478,7 @@ export function UserApp() {
     onJoinGroup: handleJoinGroup,
     userCount: platformStats.userCount,
     onOpenForPartners: () => goPanel('for-partners'),
+    onOpenHealth: () => goPanel('health'),
     onOpenMap: () => goPanel('map'),
     onOpenNearby: () => goPanel('nearby'),
     onOpenReference: () => goPanel('reference'),
@@ -2653,6 +2655,7 @@ export function UserApp() {
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
                     onOpenNews={() => goPanel('news')}
+                    onOpenHealth={() => goPanel('health')}
                   />
                 </Suspense>
               </Panel>
@@ -2811,6 +2814,23 @@ export function UserApp() {
                     partnerCount={partners.length}
                     totalScans={platformStats.totalScans}
                     onBack={goBackPanel}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="health">
+                <Suspense fallback={<LazyFallback />}>
+                  <ApgHealthPage
+                    nav="health"
+                    partners={partners}
+                    experts={experts}
+                    events={events}
+                    news={news}
+                    customTasks={customTasks}
+                    userCount={platformStats.userCount}
+                    totalScans={platformStats.totalScans}
+                    onBack={goBackPanel}
+                    onGoAdmin={() => { window.location.hash = '/admin-app'; }}
                   />
                 </Suspense>
               </Panel>

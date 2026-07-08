@@ -243,15 +243,18 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
   const [dragY, setDragY] = useState(0);
 
   const handleTouchStart = (e) => {
+    e.stopPropagation();
     startYRef.current = e.touches[0].clientY;
     dragReadyRef.current = e.currentTarget.scrollTop <= 2;
   };
   const handleTouchMove = (e) => {
+    e.stopPropagation();
     if (!dragReadyRef.current) return;
     const dy = e.touches[0].clientY - startYRef.current;
     if (dy > 0) setDragY(Math.min(dy, 180));
   };
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
+    e.stopPropagation();
     const shouldClose = dragY > 88;
     setDragY(0);
     dragReadyRef.current = false;
@@ -264,6 +267,9 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
       aria-modal="true"
       aria-label={title}
       onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}
+      onTouchStart={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
       style={{
         position: 'fixed',
         inset: 0,

@@ -307,7 +307,13 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
     return createPortal(
       <>
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 12000, display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} onClick={onClose}>
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 12000, display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+          onClick={onClose}
+          onTouchStart={e => e.stopPropagation()}
+          onTouchMove={e => e.stopPropagation()}
+          onTouchEnd={e => e.stopPropagation()}
+        >
           <div style={{ width: '100%', maxHeight: '96vh', overflowY: 'auto', background: APG2.bg, borderRadius: '34px 34px 0 0', padding: '10px 16px calc(96px + env(safe-area-inset-bottom, 0px))', color: APG2.text, boxShadow: '0 -28px 80px var(--apg2-elev-shadow, rgba(0,0,0,0.52))' }} onClick={e => e.stopPropagation()}>
             <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(247,241,230,0.22)', margin: '0 auto 14px' }} />
             {shareToast && (
@@ -433,18 +439,24 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
     <div
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
       onClick={onClose}
+      onTouchStart={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
     >
       <div
         onTouchStart={(e) => {
+          e.stopPropagation();
           dragStartYRef.current = e.touches[0].clientY;
           dragReadyRef.current = e.currentTarget.scrollTop <= 2;
         }}
         onTouchMove={(e) => {
+          e.stopPropagation();
           if (!dragReadyRef.current) return;
           const dy = e.touches[0].clientY - dragStartYRef.current;
           if (dy > 0) setDragY(Math.min(dy, 190));
         }}
-        onTouchEnd={() => {
+        onTouchEnd={(e) => {
+          e.stopPropagation();
           const shouldClose = dragY > 92;
           setDragY(0);
           dragReadyRef.current = false;
@@ -825,10 +837,21 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
   }, [isActive, selected]);
 
   useEffect(() => {
-    if (selected) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    }
+    if (!selected) return;
+    // iOS/VK: overflow:hidden alone resets scroll to 0 visually.
+    // position:fixed freezes the layout at the captured offset.
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top      = `-${scrollY}px`;
+    document.body.style.width    = '100%';
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top      = '';
+      document.body.style.width    = '';
+      window.scrollTo(0, scrollY);
+    };
   }, [selected]);
 
   if (variant === 'v2') {

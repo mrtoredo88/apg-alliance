@@ -299,10 +299,19 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
   const [tab, setTab] = useState('upcoming');
 
   useEffect(() => {
-    if (selectedEvent) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    }
+    if (!selectedEvent) return;
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top      = `-${scrollY}px`;
+    document.body.style.width    = '100%';
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top      = '';
+      document.body.style.width    = '';
+      window.scrollTo(0, scrollY);
+    };
   }, [selectedEvent]);
 
   const upcoming = events.filter(e => !isEventPast(e));
