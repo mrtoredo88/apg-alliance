@@ -38,6 +38,69 @@ function stripUndefined(input = {}) {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
+function boolFromLegacy(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function getConsentStatus(profile = {}) {
+  const consents = profile.consents && typeof profile.consents === 'object' ? profile.consents : {};
+  const explicitTerms = boolFromLegacy(consents.termsAccepted)
+    || boolFromLegacy(profile.termsAccepted)
+    || boolFromLegacy(profile.acceptedTerms)
+    || boolFromLegacy(profile.userAgreementAccepted)
+    || boolFromLegacy(profile.consentAccepted);
+  const explicitPrivacy = boolFromLegacy(consents.privacyAccepted)
+    || boolFromLegacy(profile.privacyAccepted)
+    || boolFromLegacy(profile.acceptedPrivacy)
+    || boolFromLegacy(profile.privacyPolicyAccepted)
+    || boolFromLegacy(profile.consentAccepted);
+  const acceptedAt = consents.acceptedAt
+    || profile.consentAcceptedAt
+    || profile.acceptedAt
+    || profile.termsAcceptedAt
+    || profile.privacyAcceptedAt
+    || null;
+  const hasLegacyAcceptedMarker = !!acceptedAt || boolFromLegacy(profile.consentAccepted);
+  const termsAccepted = explicitTerms || (hasLegacyAcceptedMarker && profile.termsAccepted !== false);
+  const privacyAccepted = explicitPrivacy || (hasLegacyAcceptedMarker && profile.privacyAccepted !== false);
+  const rawLegalVersion = consents.legalVersion ?? profile.legalVersion ?? profile.consentLegalVersion ?? profile.documentsVersion ?? 1;
+  const legalVersion = Number(rawLegalVersion || 1);
+  const versionOk = !Number.isFinite(legalVersion) || legalVersion >= 1;
+  const valid = !!termsAccepted && !!privacyAccepted && versionOk;
+  const missing = [];
+  if (!termsAccepted) missing.push('missing_termsAccepted');
+  if (!privacyAccepted) missing.push('missing_privacyAccepted');
+  if (!versionOk) missing.push('outdated_legalVersion');
+  const formatVersion = consents.termsAccepted || consents.privacyAccepted ? 'v1' : (hasLegacyAcceptedMarker ? 'legacy' : 'missing');
+  return {
+    consentRequired: !valid,
+    reason: valid ? 'accepted' : (missing[0] || 'missing_consent'),
+    formatVersion,
+    acceptedAt,
+    normalizedConsent: valid ? {
+      termsAccepted: true,
+      privacyAccepted: true,
+      notificationsAccepted: boolFromLegacy(consents.notificationsAccepted ?? profile.notificationConsent ?? profile.notificationsConsent ?? profile.notificationsEnabled),
+      legalVersion: Number.isFinite(legalVersion) && legalVersion > 0 ? legalVersion : 1,
+      docsVersion: safeString(consents.docsVersion || profile.consentDocsVersion || profile.documentsVersion || 'legacy', 80) || 'legacy',
+    } : null,
+  };
+}
+
+function buildConsentMigrationPatch(status) {
+  if (!status?.normalizedConsent || status.formatVersion === 'v1') return null;
+  return {
+    consents: { ...status.normalizedConsent, acceptedAt: status.acceptedAt || FieldValue.serverTimestamp() },
+    consentAcceptedAt: status.acceptedAt || FieldValue.serverTimestamp(),
+    consentDocsVersion: status.normalizedConsent.docsVersion,
+    consentLegalVersion: status.normalizedConsent.legalVersion,
+    legalVersion: status.normalizedConsent.legalVersion,
+    notificationConsent: status.normalizedConsent.notificationsAccepted,
+    consentMigratedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
 function sanitizeWebPushSubscription(input = {}) {
   const endpoint = safeString(input.endpoint, 2000);
   const p256dh = safeString(input.keys?.p256dh, 500);
@@ -84,6 +147,25 @@ function assertOwn(actor, userId) {
   if (!target || target.startsWith('guest_')) throw Object.assign(new Error('Действие доступно только авторизованному пользователю.'), { statusCode: 401 });
   if (actor.userId !== target && actor.uid !== target) throw Object.assign(new Error('Нельзя менять данные другого пользователя.'), { statusCode: 403 });
   return target;
+}
+
+function assertOwner(actor) {
+  const role = String(actor?.user?.role || actor?.user?.userRole || '').toLowerCase();
+  if (role !== 'owner') throw Object.assign(new Error('Действие доступно только Owner.'), { statusCode: 403, code: 'OWNER_REQUIRED' });
+}
+
+async function findUserRefForOwner(db, req) {
+  const userId = safeUserId(req.body?.userId || req.body?.uid);
+  const email = safeString(req.body?.email, 200).toLowerCase();
+  if (userId) return db.collection('users').doc(userId);
+  if (email) {
+    const emailDoc = db.collection('users').doc(`email:${email}`);
+    const emailSnap = await emailDoc.get();
+    if (emailSnap.exists) return emailDoc;
+    const snap = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (snap.docs[0]) return snap.docs[0].ref;
+  }
+  throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
 }
 
 async function audit(db, req, actor, action, targetType, targetId, result = 'success', details = {}) {
@@ -138,19 +220,36 @@ async function actionProfileSync(db, req, actor) {
   let created = false;
   let dailyBonusAwarded = false;
   let userDoc = {};
+  let consentStatus = null;
 
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     if (snap.exists) {
       const before = snap.data() || {};
       const patch = { ...profile, lastSeen: FieldValue.serverTimestamp() };
+      consentStatus = getConsentStatus(before);
+      const consentMigration = buildConsentMigrationPatch(consentStatus);
+      if (consentMigration) Object.assign(patch, consentMigration);
       if (before.lastBonusDate !== todayKey) {
         patch.keys = FieldValue.increment(1);
         patch.lastBonusDate = todayKey;
         dailyBonusAwarded = true;
       }
       tx.set(ref, patch, { merge: true });
-      userDoc = { ...before, ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null)), lastBonusDate: patch.lastBonusDate || before.lastBonusDate, keys: Number(before.keys || 0) + (dailyBonusAwarded ? 1 : 0) };
+      userDoc = {
+        ...before,
+        ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null)),
+        ...(consentMigration ? {
+          consents: { ...consentStatus.normalizedConsent, acceptedAt: consentStatus.acceptedAt || null },
+          consentAcceptedAt: consentStatus.acceptedAt || before.consentAcceptedAt || null,
+          consentDocsVersion: consentStatus.normalizedConsent.docsVersion,
+          consentLegalVersion: consentStatus.normalizedConsent.legalVersion,
+          legalVersion: consentStatus.normalizedConsent.legalVersion,
+          notificationConsent: consentStatus.normalizedConsent.notificationsAccepted,
+        } : {}),
+        lastBonusDate: patch.lastBonusDate || before.lastBonusDate,
+        keys: Number(before.keys || 0) + (dailyBonusAwarded ? 1 : 0),
+      };
       return;
     }
 
@@ -184,13 +283,15 @@ async function actionProfileSync(db, req, actor) {
       base.notificationConsent = Boolean(consent.notificationsAccepted);
       if (consent.notificationsAccepted) base.notificationsRequestedAt = FieldValue.serverTimestamp();
     }
+    consentStatus = getConsentStatus(base);
     tx.set(ref, base, { merge: true });
     tx.set(db.collection('stats').doc('global'), { userCount: FieldValue.increment(1) }, { merge: true });
     userDoc = { ...base, keys: base.keys };
   });
 
-  await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded });
-  return { ok: true, userId, created, dailyBonusAwarded, user: userDoc };
+  consentStatus = getConsentStatus(userDoc);
+  await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
+  return { ok: true, userId, created, dailyBonusAwarded, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
 }
 
 async function actionProfilePatch(db, req, actor) {
@@ -277,7 +378,61 @@ async function actionProfileAcceptConsent(db, req, actor) {
     legalVersion: consent.legalVersion || null,
     notificationsAccepted: Boolean(consent.notificationsAccepted),
   });
-  return { ok: true, userId, created, code: 'CONSENT_SAVED' };
+  return { ok: true, userId, created, profileReady: true, consentRequired: false, consentReason: 'accepted', code: 'CONSENT_SAVED' };
+}
+
+async function actionProfileConsentStatus(db, req, actor) {
+  const requestedId = safeUserId(req.body?.userId || req.body?.uid);
+  const email = safeString(req.body?.email, 200);
+  if ((requestedId && requestedId !== actor.userId && requestedId !== actor.uid) || email) assertOwner(actor);
+  const ref = requestedId
+    ? db.collection('users').doc(requestedId)
+    : (email ? await findUserRefForOwner(db, req) : db.collection('users').doc(actor.userId));
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: true, profileReady: false, profileExists: false, consentRequired: true, consentReason: 'profile_not_found', userId: ref.id };
+  const profile = snap.data() || {};
+  const status = getConsentStatus(profile);
+  return {
+    ok: true,
+    profileReady: true,
+    profileExists: true,
+    userId: ref.id,
+    provider: ref.id.startsWith('email:') ? 'email' : (ref.id.startsWith('tg_') ? 'telegram' : 'unknown'),
+    consentRequired: status.consentRequired,
+    consentReason: status.reason,
+    consentFormatVersion: status.formatVersion,
+    acceptedAt: status.acceptedAt || null,
+    lastLoginAt: profile.lastSeen || null,
+    onboardingStep: profile.onboardingDone ? 'done' : 'onboarding',
+    reasonWhyConsentScreenIsShown: status.consentRequired ? status.reason : 'not_shown',
+  };
+}
+
+async function actionProfileForceAcceptConsent(db, req, actor) {
+  assertOwner(actor);
+  const ref = await findUserRefForOwner(db, req);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Профиль пользователя не найден.'), { statusCode: 404, code: 'PROFILE_NOT_FOUND' });
+  const consent = {
+    termsAccepted: true,
+    privacyAccepted: true,
+    notificationsAccepted: boolFromLegacy(req.body?.notificationsAccepted),
+    legalVersion: Number(req.body?.legalVersion || 1),
+    docsVersion: safeString(req.body?.docsVersion || 'owner-rescue', 80) || 'owner-rescue',
+    rescue: true,
+  };
+  await ref.set({
+    consents: { ...consent, acceptedAt: FieldValue.serverTimestamp() },
+    consentAcceptedAt: FieldValue.serverTimestamp(),
+    consentDocsVersion: consent.docsVersion,
+    consentLegalVersion: consent.legalVersion,
+    legalVersion: consent.legalVersion,
+    notificationConsent: consent.notificationsAccepted,
+    consentRescuedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await audit(db, req, actor, 'profile:forceAcceptConsent', 'users', ref.id, 'success', { docsVersion: consent.docsVersion, legalVersion: consent.legalVersion });
+  return { ok: true, userId: ref.id, profileReady: true, consentRequired: false, consentReason: 'owner_rescue' };
 }
 
 async function actionProfileDelete(db, req, actor) {
@@ -656,6 +811,8 @@ async function routeAction(db, req, actor) {
   if (action === 'profile:sync') return actionProfileSync(db, req, actor);
   if (action === 'profile:update') return actionProfilePatch(db, req, actor);
   if (action === 'profile:acceptConsent') return actionProfileAcceptConsent(db, req, actor);
+  if (action === 'profile:consentStatus') return actionProfileConsentStatus(db, req, actor);
+  if (action === 'profile:forceAcceptConsent') return actionProfileForceAcceptConsent(db, req, actor);
   if (action === 'profile:delete') return actionProfileDelete(db, req, actor);
   if (action === 'favorites:toggle') return actionFavoritesToggle(db, req, actor);
   if (action === 'news:saved') return actionUserListSet(db, req, actor, 'savedNews', action);

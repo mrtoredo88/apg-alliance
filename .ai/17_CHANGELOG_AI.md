@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Миграция legacy-согласий и защита от повторного экрана документов
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** `profile:sync` теперь возвращает `profileReady`, `consentRequired`, причину и версию формата согласий. Backend распознаёт старые поля `consentAccepted`, `termsAccepted`, `privacyAccepted`, `acceptedAt` и автоматически нормализует их в новый `consents`. Добавлены owner-only actions `profile:consentStatus` и `profile:forceAcceptConsent` для диагностики и rescue застрявших профилей.
+**Почему:** Пользователи, которые уже принимали документы в старом формате, могли снова попадать на экран согласий, потому что frontend проверял только новую структуру `consents.*`.
+
+---
+
 ## [2026-07-08] Устойчивое завершение email-входа после документов
 **Коммит:** `локально`
 **Файлы:** `src/UserApp.jsx`, `src/ConsentScreen.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/17_CHANGELOG_AI.md`

@@ -321,9 +321,25 @@ async function safeLoad(label, promiseFactory, fallback, timeoutMs = 6500) {
 }
 
 function hasAcceptedCurrentLegal(data) {
-  return !!data?.consents?.termsAccepted
-    && !!data?.consents?.privacyAccepted
-    && Number(data?.consents?.legalVersion ?? data?.legalVersion ?? data?.consentLegalVersion ?? 0) >= LEGAL_VERSION;
+  const consents = data?.consents && typeof data.consents === 'object' ? data.consents : {};
+  const termsAccepted = !!(consents.termsAccepted
+    || data?.termsAccepted
+    || data?.acceptedTerms
+    || data?.userAgreementAccepted
+    || data?.consentAccepted);
+  const privacyAccepted = !!(consents.privacyAccepted
+    || data?.privacyAccepted
+    || data?.acceptedPrivacy
+    || data?.privacyPolicyAccepted
+    || data?.consentAccepted);
+  const acceptedAt = consents.acceptedAt
+    || data?.consentAcceptedAt
+    || data?.acceptedAt
+    || data?.termsAcceptedAt
+    || data?.privacyAcceptedAt;
+  const legacyAccepted = !!acceptedAt && data?.termsAccepted !== false && data?.privacyAccepted !== false;
+  const legalVersion = Number(consents.legalVersion ?? data?.legalVersion ?? data?.consentLegalVersion ?? data?.documentsVersion ?? LEGAL_VERSION);
+  return ((termsAccepted && privacyAccepted) || legacyAccepted) && (!Number.isFinite(legalVersion) || legalVersion >= LEGAL_VERSION);
 }
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
@@ -1634,17 +1650,23 @@ export function UserApp() {
         profile: emailUser,
       });
       const data = profileResult?.user || {};
+      const consentRequired = profileResult?.consentRequired !== undefined
+        ? !!profileResult.consentRequired
+        : !hasAcceptedCurrentLegal(data);
       traceAuthStage(profileResult?.created ? 'PROFILE_CREATED' : 'PROFILE_EXISTS', {
         provider: 'email',
         profileId: emailUser.id,
-        acceptedLegal: hasAcceptedCurrentLegal(data),
+        acceptedLegal: !consentRequired,
+        consentRequired,
+        consentReason: profileResult?.consentReason ?? null,
+        consentFormatVersion: profileResult?.consentFormatVersion ?? null,
       });
-      if (hasAcceptedCurrentLegal(data)) {
+      if (!consentRequired) {
         completeEmailLogin({
           ...emailUser,
           consents: data.consents,
-          consentDocsVersion: data.consentDocsVersion ?? data.consents.docsVersion,
-          legalVersion: data.legalVersion ?? data.consents.legalVersion,
+          consentDocsVersion: data.consentDocsVersion ?? data.consents?.docsVersion ?? CONSENT_DOCS_VERSION,
+          legalVersion: data.legalVersion ?? data.consents?.legalVersion ?? LEGAL_VERSION,
         });
         return;
       }
@@ -1656,7 +1678,7 @@ export function UserApp() {
       showToast('Ошибка входа: PROFILE_BOOTSTRAP_FAILED', 'error');
       return;
     }
-    traceAuthStage('CONSENTS_SCREEN', { provider: 'email', profileId: emailUser.id, documentsVersion: LEGAL_VERSION });
+    traceAuthStage('CONSENTS_SCREEN', { provider: 'email', profileId: emailUser.id, documentsVersion: LEGAL_VERSION, reason: 'consentRequired' });
     setConsentRequest({
       user: emailUser,
       mode: 'email',
