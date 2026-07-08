@@ -75,7 +75,7 @@ function EventModal({ event, onClose }) {
           <div style={{ ...APG2_PROFILE.glass, width: 72, height: 72, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event.emoji ?? '🎉'}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, lineHeight: '26px', flex: 1 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: APG2_PROFILE.text, lineHeight: '26px', flex: 1 }}>
             {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
             {event.title}
           </div>
@@ -86,30 +86,30 @@ function EventModal({ event, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {event.date && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: T.blue + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📅</div>
-              <span style={{ color: T.textPri, fontSize: 14 }}>{event.date}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(74,144,217,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📅</div>
+              <span style={{ color: APG2_PROFILE.text, fontSize: 14 }}>{event.date}</span>
             </div>
           )}
           {event.partner && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: T.gold + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🏪</div>
-              <span style={{ color: T.textPri, fontSize: 14 }}>{event.partner}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(201,168,76,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🏪</div>
+              <span style={{ color: APG2_PROFILE.text, fontSize: 14 }}>{event.partner}</span>
             </div>
           )}
           {event.address && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: T.green + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📍</div>
-              <span style={{ color: T.textPri, fontSize: 14 }}>{event.address}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(75,179,75,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📍</div>
+              <span style={{ color: APG2_PROFILE.text, fontSize: 14 }}>{event.address}</span>
             </div>
           )}
           {(event.priceClub || event.pricePublic) && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {event.priceClub && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, background: T.gold + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🗝️</div>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(201,168,76,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🗝️</div>
                   <div>
-                    <div style={{ fontSize: 10, color: T.textSec, fontWeight: 600 }}>Для клуба АПГ</div>
-                    <div style={{ fontSize: 14, color: T.gold, fontWeight: 700 }}>{event.priceClub}</div>
+                    <div style={{ fontSize: 10, color: APG2_PROFILE.textSoft, fontWeight: 600 }}>Для клуба АПГ</div>
+                    <div style={{ fontSize: 14, color: APG2_PROFILE.gold, fontWeight: 700 }}>{event.priceClub}</div>
                   </div>
                 </div>
               )}
@@ -117,8 +117,8 @@ function EventModal({ event, onClose }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>💰</div>
                   <div>
-                    <div style={{ fontSize: 10, color: T.textSec, fontWeight: 600 }}>Для всех</div>
-                    <div style={{ fontSize: 14, color: T.textPri, fontWeight: 700 }}>{event.pricePublic}</div>
+                    <div style={{ fontSize: 10, color: APG2_PROFILE.textSoft, fontWeight: 600 }}>Для всех</div>
+                    <div style={{ fontSize: 14, color: APG2_PROFILE.text, fontWeight: 700 }}>{event.pricePublic}</div>
                   </div>
                 </div>
               )}
@@ -131,8 +131,8 @@ function EventModal({ event, onClose }) {
           </div>
         )}
         {event.description && (
-          <div style={{ background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 14, padding: 14, marginBottom: 20, border: `1px solid ${T.border}` }}>
-            <RichText color={T.textSec} fontSize={14}>{event.description}</RichText>
+          <div style={{ ...APG2_PROFILE.glass, borderRadius: 18, padding: 15, marginBottom: 20 }}>
+            <RichText color={APG2_PROFILE.textSoft} fontSize={14}>{event.description}</RichText>
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -300,18 +300,8 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
 
   useEffect(() => {
     if (!selectedEvent) return;
-    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
     document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.top      = `-${scrollY}px`;
-    document.body.style.width    = '100%';
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top      = '';
-      document.body.style.width    = '';
-      window.scrollTo(0, scrollY);
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [selectedEvent]);
 
   const upcoming = events.filter(e => !isEventPast(e));

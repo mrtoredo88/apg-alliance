@@ -307,17 +307,16 @@ function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
   const totalCost  = count * ticketCost;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
-      <div style={{ width: '100%', maxWidth: 420, ...GLASS_STRONG, borderRadius: '28px 28px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px calc(32px + env(safe-area-inset-bottom, 0px))' }}>
+      <div style={{ width: '100%', maxWidth: 420, ...APG2_PROFILE.glass, borderRadius: '34px 34px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease', color: APG2_PROFILE.text }}>
         <div style={{ textAlign: 'center', fontSize: 48, marginBottom: 10 }}>{prize.emoji ?? '🎟️'}</div>
-        <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: T.textPri, marginBottom: 4 }}>{prize.name}</div>
-        <div style={{ textAlign: 'center', fontSize: 12, color: T.textSec, marginBottom: 24 }}>
+        <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: APG2_PROFILE.text, marginBottom: 4 }}>{prize.name}</div>
+        <div style={{ textAlign: 'center', fontSize: 12, color: APG2_PROFILE.textSoft, marginBottom: 24 }}>
           1 билет = {ticketCost} 🗝️ · Чем больше билетов — тем выше шанс
         </div>
 
-        {/* Выбор количества */}
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, color: T.textSec, textAlign: 'center', marginBottom: 12 }}>Количество билетов</div>
+          <div style={{ fontSize: 12, color: APG2_PROFILE.textSoft, textAlign: 'center', marginBottom: 12 }}>Количество билетов</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             {[1, 2, 3, 4, 5].map(n => {
               const canBuy = userKeys >= n * ticketCost;
@@ -329,9 +328,9 @@ function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
                   disabled={!canBuy}
                   style={{
                     width: 50, height: 50, borderRadius: 14,
-                    border: `2px solid ${sel ? '#9664FF' : T.border}`,
-                    background: sel ? 'rgba(150,100,255,0.15)' : T.chipBg,
-                    color: !canBuy ? T.textSec : sel ? '#9664FF' : T.textPri,
+                    border: `2px solid ${sel ? '#9664FF' : 'rgba(255,255,255,0.16)'}`,
+                    background: sel ? 'rgba(150,100,255,0.18)' : 'rgba(255,255,255,0.08)',
+                    color: !canBuy ? APG2_PROFILE.textMuted : sel ? '#9664FF' : APG2_PROFILE.text,
                     fontSize: 17, fontWeight: 700,
                     cursor: canBuy ? 'pointer' : 'default',
                     opacity: canBuy ? 1 : 0.35,
@@ -345,28 +344,22 @@ function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
           </div>
         </div>
 
-        {/* Итого */}
-        <div style={{ background: 'rgba(150,100,255,0.07)', border: '1px solid rgba(150,100,255,0.2)', borderRadius: 16, padding: '12px 16px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 13, color: T.textSec }}>
+        <div style={{ background: 'rgba(150,100,255,0.09)', border: '1px solid rgba(150,100,255,0.24)', borderRadius: 16, padding: '12px 16px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 13, color: APG2_PROFILE.textSoft }}>
             {count} билет{count === 1 ? '' : count < 5 ? 'а' : 'ов'} · останется {userKeys - totalCost} 🗝️
           </div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#9664FF' }}>{totalCost} 🗝️</div>
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={onCancel}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textPri, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-          >
-            Отмена
-          </button>
-          <button
+          <GlassButton onClick={onCancel} style={{ flex: 1 }}>Отмена</GlassButton>
+          <GlassButton
             onClick={() => onConfirm(count)}
             disabled={confirming || userKeys < totalCost}
-            style={{ flex: 1.5, padding: '14px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #9664FF, #7B4FD4)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: confirming ? 'default' : 'pointer', opacity: confirming ? 0.7 : 1 }}
+            style={{ flex: 1.5, background: 'linear-gradient(135deg, #9664FF, #7B4FD4)', color: '#fff', border: '1px solid rgba(150,100,255,0.4)' }}
           >
             {confirming ? 'Оформляем...' : '🎟️ Купить билеты'}
-          </button>
+          </GlassButton>
         </div>
       </div>
     </div>
@@ -377,29 +370,20 @@ function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
 
 function ConfirmModal({ prize, userKeys, onConfirm, onCancel, claiming }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
-      <div style={{ width: '100%', maxWidth: 420, ...GLASS_STRONG, borderRadius: '28px 28px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px calc(32px + env(safe-area-inset-bottom, 0px))' }}>
+      <div style={{ width: '100%', maxWidth: 420, ...APG2_PROFILE.glass, borderRadius: '34px 34px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease', color: APG2_PROFILE.text }}>
         <div style={{ textAlign: 'center', fontSize: 56, marginBottom: 14 }}>{prize.emoji ?? '🎁'}</div>
-        <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 800, color: T.textPri, marginBottom: 8 }}>{prize.name}</div>
-        <div style={{ textAlign: 'center', fontSize: 14, color: T.textSec, lineHeight: '22px', marginBottom: 22 }}>
-          Потратить <span style={{ color: T.gold, fontWeight: 700 }}>{prize.cost} 🗝️</span> на этот приз?
+        <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 800, color: APG2_PROFILE.text, marginBottom: 8 }}>{prize.name}</div>
+        <div style={{ textAlign: 'center', fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '22px', marginBottom: 22 }}>
+          Потратить <span style={{ color: APG2_PROFILE.gold, fontWeight: 700 }}>{prize.cost} 🗝️</span> на этот приз?
           <br />
           <span style={{ fontSize: 12 }}>Останется: {userKeys - prize.cost} ключей</span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={onCancel}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textPri, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-          >
-            Отмена
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={claiming}
-            style={{ flex: 1.5, padding: '14px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 14, fontWeight: 800, cursor: claiming ? 'default' : 'pointer', opacity: claiming ? 0.7 : 1 }}
-          >
+          <GlassButton onClick={onCancel} style={{ flex: 1 }}>Отмена</GlassButton>
+          <GlassButton onClick={onConfirm} disabled={claiming} tone="gold" style={{ flex: 1.5 }}>
             {claiming ? 'Обработка...' : 'Подтвердить →'}
-          </button>
+          </GlassButton>
         </div>
       </div>
     </div>
@@ -410,14 +394,14 @@ function ConfirmModal({ prize, userKeys, onConfirm, onCancel, claiming }) {
 
 function ClaimSuccessModal({ prize, onClose, partners = [], experts = [] }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
-      <div style={{ width: '100%', maxWidth: 420, ...GLASS_STRONG, borderRadius: '28px 28px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px calc(32px + env(safe-area-inset-bottom, 0px))' }}>
+      <div style={{ width: '100%', maxWidth: 420, ...APG2_PROFILE.glass, borderRadius: '34px 34px 0 0', padding: '28px 22px 22px', animation: 'fadeInUp 0.3s ease', color: APG2_PROFILE.text }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 64, marginBottom: 12, animation: 'float 2.5s ease-in-out infinite' }}>{prize.emoji ?? '🎁'}</div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: T.gold, marginBottom: 6 }}>Приз получен! 🎉</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: T.textPri, marginBottom: 16 }}>{prize.name}</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: APG2_PROFILE.gold, marginBottom: 6 }}>Приз получен! 🎉</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: APG2_PROFILE.text, marginBottom: 16 }}>{prize.name}</div>
           <div style={{ background: 'rgba(75,179,75,0.08)', border: '1px solid rgba(75,179,75,0.3)', borderRadius: 16, padding: '12px 16px' }}>
-            <div style={{ fontSize: 13, color: T.green, fontWeight: 600, lineHeight: '20px' }}>
+            <div style={{ fontSize: 13, color: '#4BB34B', fontWeight: 600, lineHeight: '20px' }}>
               Покажи этот экран сотруднику при получении
             </div>
           </div>
@@ -430,22 +414,17 @@ function ClaimSuccessModal({ prize, onClose, partners = [], experts = [] }) {
           const donorContact = prize.partnerContact ?? prize.partnerPhone;
           const isExpert = !prize.partnerId && !prize.partnerName && !!prize.expertId;
           return donorName ? (
-            <div style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 16, padding: '12px 16px', marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: T.textSec, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+            <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: '12px 16px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: APG2_PROFILE.textSoft, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
                 {isExpert ? '🎓 Эксперт' : '📍 Партнёр'}
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, marginBottom: donorContact ? 4 : 0 }}>{donorName}</div>
-              {donorContact && <div style={{ fontSize: 13, color: T.textSec }}>{donorContact}</div>}
+              <div style={{ fontSize: 14, fontWeight: 700, color: APG2_PROFILE.text, marginBottom: donorContact ? 4 : 0 }}>{donorName}</div>
+              {donorContact && <div style={{ fontSize: 13, color: APG2_PROFILE.textSoft }}>{donorContact}</div>}
             </div>
           ) : null;
         })()}
 
-        <button
-          onClick={onClose}
-          style={{ width: '100%', padding: '16px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}
-        >
-          Понятно
-        </button>
+        <GlassButton onClick={onClose} tone="gold" style={{ width: '100%' }}>Понятно</GlassButton>
       </div>
     </div>
   );

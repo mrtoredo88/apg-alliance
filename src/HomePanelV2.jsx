@@ -644,22 +644,18 @@ function EventModal({ event, onClose }) {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       background: 'rgba(0,0,0,0.75)', zIndex: 9999,
       display: 'flex', alignItems: 'flex-end',
-      backdropFilter: 'blur(4px)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
     }} onClick={onClose}>
       <div style={{
-        background: T.surface,
-        backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-        borderRadius: '24px 24px 0 0',
-        width: '100%', padding: '24px 20px 48px',
+        ...V2.glass,
+        borderRadius: '34px 34px 0 0',
+        width: '100%', padding: '24px 20px calc(48px + env(safe-area-inset-bottom, 0px))',
         maxHeight: '85vh', overflowY: 'auto',
-        border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
         borderBottom: 'none',
       }} onClick={e => e.stopPropagation()}>
 
-        {/* Ручка */}
-        <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '0 auto 20px' }} />
+        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.22)', borderRadius: 2, margin: '0 auto 20px' }} />
 
-        {/* Обложка события */}
         {eventImage && (
           <div style={{ margin: '-24px -20px 20px', overflow: 'hidden', borderRadius: '0' }}>
             <img src={eventImage} alt="" loading="lazy" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={e => e.target.style.display='none'} />
@@ -669,44 +665,40 @@ function EventModal({ event, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div style={{ fontSize: 52 }}>{event.emoji ?? '🎉'}</div>
           <button onClick={onClose} style={{
-            background: T.chipBg, border: 'none', borderRadius: '50%',
-            width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: T.textSec,
+            ...V2.glass, border: 'none', borderRadius: '50%',
+            width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: V2.textSoft,
           }}>✕</button>
         </div>
 
-        <div style={{ fontSize: 20, fontWeight: 700, color: T.textPri, marginBottom: 12, lineHeight: '26px' }}>
-          {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
+        <div style={{ fontSize: 20, fontWeight: 700, color: V2.text, marginBottom: 12, lineHeight: '26px' }}>
+          {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 10, fontWeight: 800, color: V2.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 5, padding: '2px 6px', marginRight: 7, verticalAlign: 'middle' }}>📌 Важно</span>}
           {event.title}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {event.date && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: T.blue + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📅</div>
-              <span style={{ color: T.textPri, fontSize: 14 }}>{event.date}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(74,144,217,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📅</div>
+              <span style={{ color: V2.text, fontSize: 14 }}>{event.date}</span>
             </div>
           )}
           {event.partner && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: T.gold + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🏪</div>
-              <span style={{ color: T.textPri, fontSize: 14 }}>{event.partner}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(201,168,76,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🏪</div>
+              <span style={{ color: V2.text, fontSize: 14 }}>{event.partner}</span>
             </div>
           )}
           {event.address && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: T.green + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📍</div>
-              <span style={{ color: T.textPri, fontSize: 14 }}>{event.address}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(75,179,75,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📍</div>
+              <span style={{ color: V2.text, fontSize: 14 }}>{event.address}</span>
             </div>
           )}
         </div>
 
         {event.description && (
-          <div style={{
-            background: T.chipBg, borderRadius: 14,
-            padding: 14, marginBottom: 20,
-            border: `1px solid ${T.border}`,
-          }}>
-            <RichText color={T.textSec} fontSize={14}>{event.description}</RichText>
+          <div style={{ ...V2.glass, borderRadius: 18, padding: 14, marginBottom: 20 }}>
+            <RichText color={V2.textSoft} fontSize={14}>{event.description}</RichText>
           </div>
         )}
 
@@ -723,7 +715,7 @@ function EventModal({ event, onClose }) {
           {event.socialUrl && (
             <button onClick={() => openUrl(event.socialUrl)} style={{
               width: '100%', padding: '15px 0', borderRadius: 14, border: 'none',
-              background: `linear-gradient(135deg, ${T.blue}, #2D6FBC)`,
+              background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)',
               color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
             }}>
               📲 Перейти к событию
@@ -731,18 +723,15 @@ function EventModal({ event, onClose }) {
           )}
           {event.linkUrl && event.linkLabel && (
             <button onClick={() => openUrl(event.linkUrl)} style={{
-              width: '100%', padding: '15px 0', borderRadius: 14, border: `1px solid ${T.border}`,
-              background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-              color: T.textPri, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              width: '100%', padding: '15px 0', borderRadius: 14,
+              ...V2.glass, color: V2.text, fontSize: 15, fontWeight: 600, cursor: 'pointer',
             }}>
               {event.linkLabel} →
             </button>
           )}
           <button onClick={onClose} style={{
             width: '100%', padding: '15px 0', borderRadius: 14,
-            border: `1px solid ${T.border}`,
-            background: T.chipBg, color: T.textSec,
-            fontSize: 15, fontWeight: 600, cursor: 'pointer',
+            ...V2.glass, color: V2.textSoft, fontSize: 15, fontWeight: 600, cursor: 'pointer',
           }}>
             Закрыть
           </button>
@@ -777,28 +766,27 @@ function EventCard({ event, onClick, index = 0, isDark = true }) {
     <div onClick={() => onClick(event)} style={{
       width: 220, flexShrink: 0, borderRadius: 20, overflow: 'hidden',
       background: grad, cursor: 'pointer',
-      border: `1px solid ${T.border}`,
+      border: '1px solid rgba(255,255,255,0.12)',
       position: 'relative',
       animation: 'fadeInUp 0.4s ease both',
       animationDelay: `${index * 0.08}s`,
     }}>
-      {/* Золотая полоска сверху */}
-      <div style={{ height: 2, background: `linear-gradient(90deg, ${T.gold}, transparent)` }} />
+      <div style={{ height: 2, background: `linear-gradient(90deg, ${V2.gold}, transparent)` }} />
 
       <div style={{ padding: '16px 14px 14px' }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>{event.emoji ?? '🎉'}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri, marginBottom: 6, lineHeight: '18px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: V2.text, marginBottom: 6, lineHeight: '18px' }}>
           {event.title}
         </div>
         {event.date && (
-          <div style={{ fontSize: 11, color: T.gold, fontWeight: 600, marginBottom: 2 }}>
+          <div style={{ fontSize: 11, color: V2.gold, fontWeight: 600, marginBottom: 2 }}>
             📅 {event.date}
           </div>
         )}
         {event.partner && (
-          <div style={{ fontSize: 11, color: T.textSec }}>📍 {event.partner}</div>
+          <div style={{ fontSize: 11, color: V2.textSoft }}>📍 {event.partner}</div>
         )}
-        <div style={{ marginTop: 10, fontSize: 11, color: T.gold, fontWeight: 700 }}>
+        <div style={{ marginTop: 10, fontSize: 11, color: V2.gold, fontWeight: 700 }}>
           Подробнее →
         </div>
       </div>
@@ -822,7 +810,7 @@ function PartnerLogo({ partner, size = 56 }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: Math.round(size * 0.38), fontWeight: 800,
         color: '#fff',
-        border: `1.5px solid ${T.border}`,
+        border: '1.5px solid rgba(255,255,255,0.12)',
       }}>
         {initial}
       </div>
@@ -832,7 +820,7 @@ function PartnerLogo({ partner, size = 56 }) {
     <img
       src={partner.logoUrl} alt={name} loading="lazy"
       onError={() => setFailed(true)}
-      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${T.border}`, display: 'block', flexShrink: 0 }}
+      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.12)', display: 'block', flexShrink: 0 }}
     />
   );
 }
@@ -896,9 +884,8 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         {partner.visitCount > 0 && (
           <div style={{
             position: 'absolute', bottom: -4, left: -4,
-            background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 8, padding: '1px 5px',
-            fontSize: 9, fontWeight: 700, color: T.textSec, lineHeight: '14px',
+            ...V2.glass, borderRadius: 8, padding: '1px 5px',
+            fontSize: 9, fontWeight: 700, color: V2.textSoft, lineHeight: '14px',
           }}>×{partner.visitCount}</div>
         )}
       </div>
@@ -1115,19 +1102,17 @@ function NewsModal({ item, onClose }) {
         onTouchEnd={onTouchEnd}
         onClick={e => e.stopPropagation()}
         style={{
-          background: T.surface,
-          backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-          borderRadius: '24px 24px 0 0',
+          ...V2.glass,
+          borderRadius: '34px 34px 0 0',
           width: '100%', maxHeight: '88vh',
-          border: '1px solid var(--c-header-border, rgba(255,255,255,0.1))', borderBottom: 'none',
+          borderBottom: 'none',
           transform: `translateY(${dragY}px)`,
           transition: isDragging ? 'none' : motionTransition(['transform'], 'modal', 'soft'),
           willChange: 'transform',
           display: 'flex', flexDirection: 'column',
         }}
       >
-        {/* Ручка — всегда активна для свайпа */}
-        <div style={{ width: 36, height: 4, background: T.border, borderRadius: 2, margin: '14px auto 6px', flexShrink: 0 }} />
+        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.22)', borderRadius: 2, margin: '14px auto 6px', flexShrink: 0 }} />
 
         {/* Скроллируемый контент */}
         <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
@@ -1137,9 +1122,9 @@ function NewsModal({ item, onClose }) {
           )}
           <div style={{ padding: '20px 20px 48px' }}>
             {!newsImage && item.emoji && <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{item.emoji}</div>}
-            <div style={{ fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
-            {dateStr && <div style={{ fontSize: 11, color: T.textSec, marginBottom: 14 }}>{dateStr}</div>}
-            <div style={{ fontSize: 15, color: T.textSec, lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: V2.text, lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
+            {dateStr && <div style={{ fontSize: 11, color: V2.textSoft, marginBottom: 14 }}>{dateStr}</div>}
+            <div style={{ fontSize: 15, color: V2.textSoft, lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
             {item.linkUrl && item.linkLabel && (
               <button
                 type="button"
@@ -1149,10 +1134,9 @@ function NewsModal({ item, onClose }) {
                   width: '100%',
                   marginTop: 24,
                   padding: '16px 18px',
-                  background: T.chipBg,
-                  border: `1px solid ${T.border}`,
+                  ...V2.glass,
                   borderRadius: 14,
-                  color: T.textPri,
+                  color: V2.text,
                   fontSize: 15,
                   fontWeight: 600,
                   textAlign: 'center',
@@ -1179,19 +1163,19 @@ function NewsWidget({ news = [], onOpenNews }) {
 
   return (
     <>
-      <div style={{ margin: '0 0 28px', ...GLASS_STRONG, borderRadius: 32, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
+      <div style={{ margin: '0 0 28px', ...V2.glowGlass, borderRadius: 32, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 16% 0%, rgba(244,217,140,0.13), transparent 34%)' }} />
         <div style={{ position: 'relative', padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 880, color: T.gold, letterSpacing: 1.7, textTransform: 'uppercase', marginBottom: 6 }}>✦ Новости АПГ</div>
-              <div style={{ color: T.textPri, fontSize: 22, lineHeight: '27px', fontWeight: 900 }}>Что нового в городе</div>
-              {freshCount > 0 && <div style={{ color: T.textSec, fontSize: 12, lineHeight: '17px', marginTop: 5 }}>{freshCount} новых материалов</div>}
+              <div style={{ fontSize: 11, fontWeight: 880, color: V2.gold, letterSpacing: 1.7, textTransform: 'uppercase', marginBottom: 6 }}>✦ Новости АПГ</div>
+              <div style={{ color: V2.text, fontSize: 22, lineHeight: '27px', fontWeight: 900 }}>Что нового в городе</div>
+              {freshCount > 0 && <div style={{ color: V2.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 5 }}>{freshCount} новых материалов</div>}
             </div>
             <button
               type="button"
               onClick={onOpenNews}
-              style={{ border: '1px solid rgba(201,168,76,0.28)', background: 'rgba(201,168,76,0.12)', color: T.gold, borderRadius: 999, minHeight: 36, padding: '0 13px', fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ border: '1px solid rgba(201,168,76,0.28)', background: 'rgba(201,168,76,0.12)', color: V2.gold, borderRadius: 999, minHeight: 36, padding: '0 13px', fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               Все новости →
             </button>
@@ -1212,24 +1196,24 @@ function NewsWidget({ news = [], onOpenNews }) {
                   onClick={() => setModal(item)}
                   {...pressMotion}
                   aria-label={`Открыть новость: ${getNewsTitle(item)}`}
-                  style={{ flex: '0 0 260px', minHeight: 304, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: T.textPri, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', fontFamily: 'inherit', ...horizontalSnapItem }}
+                  style={{ flex: '0 0 260px', minHeight: 304, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: V2.text, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', fontFamily: 'inherit', ...horizontalSnapItem }}
                 >
                   <span style={{ display: 'block', position: 'relative', height: 136, background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
                     {image && <img src={image} alt="" loading="lazy" decoding="async" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit }} />}
                     <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent, rgba(8,8,10,0.72))' }} />
-                    <span style={{ position: 'absolute', left: 12, top: 12, padding: '7px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.48)', border: '1px solid rgba(244,217,140,0.24)', color: T.gold, fontSize: 10.5, lineHeight: '13px', fontWeight: 850, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>{getNewsCategoryLabel(item)}</span>
+                    <span style={{ position: 'absolute', left: 12, top: 12, padding: '7px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.48)', border: '1px solid rgba(244,217,140,0.24)', color: V2.gold, fontSize: 10.5, lineHeight: '13px', fontWeight: 850, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>{getNewsCategoryLabel(item)}</span>
                     {isFreshNews(item) && <span style={{ position: 'absolute', left: 12, bottom: 12, padding: '6px 9px', borderRadius: 999, background: 'rgba(201,168,76,0.22)', border: '1px solid rgba(244,217,140,0.28)', color: '#FFF2B8', fontSize: 10.5, fontWeight: 870 }}>🆕 Новое</span>}
                     {hasNewsVideo(item) && <span style={{ position: 'absolute', right: 12, top: 12, width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(8,8,10,0.52)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff' }}>▶</span>}
                   </span>
                   <span style={{ display: 'grid', gap: 9, padding: 14 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: T.textSec, fontSize: 10.5, fontWeight: 720 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: V2.textSoft, fontSize: 10.5, fontWeight: 720 }}>
                       <span>{formatNewsDate(item)}</span>
                       <span>{getReadingMinutes(item)} мин</span>
-                      {isFreshNews(item) && <span style={{ color: T.gold }}>Новое</span>}
+                      {isFreshNews(item) && <span style={{ color: V2.gold }}>Новое</span>}
                     </span>
-                    <span style={{ color: T.textPri, fontSize: 17, lineHeight: '21px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
-                    <span style={{ color: T.textSec, fontSize: 12.5, lineHeight: '18px', fontWeight: 520, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(item) || 'Короткий материал АПГ. Откройте, чтобы узнать больше.'}</span>
-                    <span style={{ marginTop: 2, color: T.textSoft, fontSize: 11, fontWeight: 720 }}>{getNewsViews(item)} просмотров · ♥ {reactions} · 💬 {stats.comments}</span>
+                    <span style={{ color: V2.text, fontSize: 17, lineHeight: '21px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
+                    <span style={{ color: V2.textSoft, fontSize: 12.5, lineHeight: '18px', fontWeight: 520, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(item) || 'Короткий материал АПГ. Откройте, чтобы узнать больше.'}</span>
+                    <span style={{ marginTop: 2, color: V2.textMuted, fontSize: 11, fontWeight: 720 }}>{getNewsViews(item)} просмотров · ♥ {reactions} · 💬 {stats.comments}</span>
                   </span>
                 </button>
               );
@@ -1259,7 +1243,7 @@ function HeroBanner({ userKeys, userName, streak, counterPulse = false }) {
     <div style={{
       margin: '8px 16px',
       borderRadius: 28,
-      ...GLASS_STRONG,
+      ...V2.glowGlass,
       padding: '22px 20px 20px',
       position: 'relative', overflow: 'hidden',
       animation: 'fadeInUp 0.5s ease both',
@@ -1269,13 +1253,13 @@ function HeroBanner({ userKeys, userName, streak, counterPulse = false }) {
       <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}28, transparent 70%)`, pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative' }}>
-        <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10, opacity: 0.85 }}>
+        <div style={{ fontSize: 10, color: V2.gold, fontWeight: 700, letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 10, opacity: 0.85 }}>
           ✦ Альянс Партнёров Города
         </div>
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 13, color: T.textSec, fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: T.textPri, lineHeight: 1.15, letterSpacing: -0.5 }}>
+            <div style={{ fontSize: 13, color: V2.textSoft, fontWeight: 500, marginBottom: 2 }}>Добро пожаловать,</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: V2.text, lineHeight: 1.15, letterSpacing: -0.5 }}>
               {userName ?? 'участник'} 👋
             </div>
           </div>
@@ -1283,7 +1267,7 @@ function HeroBanner({ userKeys, userName, streak, counterPulse = false }) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.35)', borderRadius: 12, padding: '6px 10px', gap: 1 }}>
               <span style={{ fontSize: 18 }}>🔥</span>
               <span style={{ fontSize: 11, fontWeight: 800, color: '#FF8C42' }}>{streak}</span>
-              <span style={{ fontSize: 8, color: T.textSec, textTransform: 'uppercase', letterSpacing: 0.3 }}>дней</span>
+              <span style={{ fontSize: 8, color: V2.textSoft, textTransform: 'uppercase', letterSpacing: 0.3 }}>дней</span>
             </div>
           )}
         </div>
@@ -1304,34 +1288,32 @@ function HeroBanner({ userKeys, userName, streak, counterPulse = false }) {
                   display: 'inline-block',
                   animation: counterPulse ? 'keyCounterPulse 0.42s ease-out' : undefined,
                 }}>
-                  {userKeys} <span style={{ fontSize: 14, fontWeight: 700, color: T.goldL }}>🗝️</span>
+                  {userKeys} <span style={{ fontSize: 14, fontWeight: 700, color: V2.gold }}>🗝️</span>
                 </div>
-                <div style={{ fontSize: 11, color: T.textSec, marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: V2.textSoft, marginTop: 3 }}>
                   {nextLevel ? `До ${nextLevel.label}: ${toNext} ключей` : 'Максимальный уровень 👑'}
                 </div>
               </div>
             </div>
             {nextLevel && (
-              <div style={{ textAlign: 'center', background: T.chipBg, borderRadius: 10, padding: '6px 10px', border: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 9, color: T.textSec, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>следующий</div>
+              <div style={{ textAlign: 'center', ...V2.glass, borderRadius: 10, padding: '6px 10px' }}>
+                <div style={{ fontSize: 9, color: V2.textSoft, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>следующий</div>
                 <div style={{ fontSize: 16 }}>{nextLevel.emoji}</div>
-                <div style={{ fontSize: 9, color: T.textPri, fontWeight: 700 }}>{nextLevel.label}</div>
+                <div style={{ fontSize: 9, color: V2.text, fontWeight: 700 }}>{nextLevel.label}</div>
               </div>
             )}
           </div>
 
-          {/* Прогресс-бар */}
-          <div style={{ height: 8, background: T.border, borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ height: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
             <div style={{
               height: '100%', width: `${pct}%`,
-              background: `linear-gradient(90deg, ${level.color}, ${T.goldL})`,
+              background: `linear-gradient(90deg, ${level.color}, #E8C97A)`,
               borderRadius: 8, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
               boxShadow: `0 0 12px ${level.color}`,
             }} />
           </div>
 
-          {/* Подпись */}
-          <div style={{ fontSize: 12, color: T.textPri, textAlign: 'center', fontWeight: 600 }}>
+          <div style={{ fontSize: 12, color: V2.text, textAlign: 'center', fontWeight: 600 }}>
             {nextLevel
               ? `До ${nextLevel.emoji} ${nextLevel.label}: ещё ${toNext} ключей`
               : '👑 Максимальный уровень — вы Амбассадор АПГ!'}
