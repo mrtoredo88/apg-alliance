@@ -32,6 +32,31 @@ async function readPublicCollection(db, name, config) {
     .filter(item => !config.activeOnly || item.active !== false);
 }
 
+async function readPublicCollections(db, names, logger) {
+  const settled = await Promise.allSettled(names.map(async name => {
+    const rows = await readPublicCollection(db, name, PUBLIC_COLLECTIONS[name]);
+    return [name, rows];
+  }));
+  const data = {};
+  const errors = [];
+  settled.forEach((result, index) => {
+    const name = names[index];
+    if (result.status === 'fulfilled') {
+      const [key, rows] = result.value;
+      data[key] = rows;
+      return;
+    }
+    const error = result.reason;
+    errors.push({
+      name,
+      code: error?.code || null,
+      message: error?.message || String(error),
+    });
+  });
+  if (errors.length) logger.warn({ errors }, 'public-data partial failure');
+  return { data, errors };
+}
+
 export default async function publicDataRoutes(fastify) {
   fastify.get('/api/public-data', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
@@ -42,15 +67,17 @@ export default async function publicDataRoutes(fastify) {
         .map(item => item.trim())
         .filter(Boolean);
       const names = requested.length ? requested.filter(name => PUBLIC_COLLECTIONS[name]) : Object.keys(PUBLIC_COLLECTIONS);
-      const entries = await Promise.all(names.map(async name => [name, await readPublicCollection(db, name, PUBLIC_COLLECTIONS[name])]));
+      const { data, errors } = await readPublicCollections(db, names, request.log);
       const statsSnap = !requested.length || requested.includes('stats')
         ? await db.collection('stats').doc('global').get().catch(() => null)
         : null;
       return {
-        ok: true,
+        ok: errors.length === 0,
+        partial: errors.length > 0,
         source: 'backend',
+        errors,
         data: {
-          ...Object.fromEntries(entries),
+          ...data,
           ...(statsSnap?.exists ? { stats: { id: statsSnap.id, ...serializePublicValue(statsSnap.data()) } } : {}),
         },
       };

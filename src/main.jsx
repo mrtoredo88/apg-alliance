@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import vkBridge from './vk.js';
 import { App } from './App.jsx';
+import { installNetworkDiagnostics } from './networkDiagnostics.js';
 import './fonts.css';
 import './index.css';
 
@@ -18,6 +19,7 @@ if (_vkHash.includes('access_token=') && window.opener) {
   } catch {}
   setTimeout(() => window.close(), 300);
 } else {
+  installNetworkDiagnostics();
   vkBridge.send('VKWebAppInit').catch(() => {});
 
   createRoot(document.getElementById('root')).render(<App />);

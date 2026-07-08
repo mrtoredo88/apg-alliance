@@ -23,6 +23,7 @@ async function checkForUpdate() {
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
+const NetworkDiagnosticsPage = lazy(() => import('./NetworkDiagnosticsPage.jsx').then(m => ({ default: m.NetworkDiagnosticsPage })));
 
 const T = { bg: '#0F0F1A', gold: '#C9A84C' };
 
@@ -60,6 +61,16 @@ export function App() {
           <Route path="/telegram-helper" element={
             <Suspense fallback={<AppFallback label="Загрузка помощника..." />}>
               <AssistantMiniApp />
+            </Suspense>
+          } />
+          <Route path="/network-diagnostics" element={
+            <Suspense fallback={<AppFallback label="Проверяем сеть..." />}>
+              <NetworkDiagnosticsPage />
+            </Suspense>
+          } />
+          <Route path="/diag/network" element={
+            <Suspense fallback={<AppFallback label="Проверяем сеть..." />}>
+              <NetworkDiagnosticsPage />
             </Suspense>
           } />
           <Route path="/miniapp/help" element={

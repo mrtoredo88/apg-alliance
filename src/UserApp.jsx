@@ -250,8 +250,10 @@ async function fetchPublicBootstrap() {
       cache: 'no-store',
     })
       .then(({ response, payload }) => {
-        if (!response.ok || payload?.ok === false) throw new Error(payload?.error || 'public_data_failed');
-        return payload?.data || {};
+        const data = payload?.data || {};
+        if (!response.ok || (!Object.keys(data).length && payload?.ok === false)) throw new Error(payload?.error || 'public_data_failed');
+        if (payload?.partial) console.warn('[APG-DIAG] public-data partial', payload?.errors || []);
+        return data;
       })
       .catch(error => {
         publicBootstrapPromise = null;

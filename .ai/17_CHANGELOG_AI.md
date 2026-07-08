@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Диагностика запуска без VPN и устойчивый public-data
+**Коммит:** `локально`
+**Файлы:** `src/main.jsx`, `src/App.jsx`, `src/UserApp.jsx`, `src/networkDiagnostics.js`, `src/NetworkDiagnosticsPage.jsx`, `api/public-data.js`, `server/src/routes/public-data.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Добавлена скрытая страница `/#/network-diagnostics` с проверкой доступности myapg.ru, Yandex API, public-data, Firebase/Google, Yandex Storage, VK и Telegram без логирования секретов. Установлен безопасный runtime-лог fetch-запросов. `/api/public-data` теперь возвращает частичные данные через `Promise.allSettled`, чтобы одна проблемная коллекция не отправляла главную обратно в прямой Firestore fallback.
+**Почему:** Если приложение открывается только через VPN, нужно точно видеть недоступный домен на устройстве пользователя и убрать Firebase/Google из критичного пути загрузки публичной главной.
+
+---
+
 ## [2026-07-08] Защищённый вход админки и bootstrap Owner
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `api/admin-login.js`, `api/_admin-security.js`, `api/admin-security.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-login.js`, `server/src/routes/admin-security.js`, `server/src/server.js`, `server-shared/admin-password.js`, `scripts/bootstrap-owner.mjs`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/12_SECURITY.md`, `.ai/17_CHANGELOG_AI.md`
