@@ -343,6 +343,7 @@ function hasAcceptedCurrentLegal(data) {
 }
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
+const CONSENT_SCREEN_DISABLED_FOR_DEMO = true;
 const USER_AUTH_STORAGE_KEYS = [
   'apg_tg_user',
   'apg_email_user',
@@ -1039,7 +1040,7 @@ export function UserApp() {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const needsLegalConsent = !hasAcceptedCurrentLegal(data);
+        const needsLegalConsent = !CONSENT_SCREEN_DISABLED_FOR_DEMO && !hasAcceptedCurrentLegal(data);
         if (needsLegalConsent && isMounted.current) {
           setConsentRequest({
             user: userData,
@@ -1163,7 +1164,7 @@ export function UserApp() {
         if (isValidRef) setUserKeys(2);
         if (pendingConsents) {
           setShowOnboarding(true);
-        } else if (isRealUser && isMounted.current) {
+        } else if (!CONSENT_SCREEN_DISABLED_FOR_DEMO && isRealUser && isMounted.current) {
           setConsentRequest({
             user: userData,
             mode: 'gate',
@@ -1661,7 +1662,7 @@ export function UserApp() {
         consentReason: profileResult?.consentReason ?? null,
         consentFormatVersion: profileResult?.consentFormatVersion ?? null,
       });
-      if (!consentRequired) {
+      if (!consentRequired || CONSENT_SCREEN_DISABLED_FOR_DEMO) {
         completeEmailLogin({
           ...emailUser,
           consents: data.consents,
@@ -2883,7 +2884,7 @@ export function UserApp() {
             />
           )}
 
-          {consentRequest && (
+          {!CONSENT_SCREEN_DISABLED_FOR_DEMO && consentRequest && (
             <ConsentScreen
               user={consentRequest.user}
               loading={consentSaving}
@@ -2914,7 +2915,7 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !isScannerOpen && !consentRequest && <LokiAssistant />}
+          {splashDone && !isScannerOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant />}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>
