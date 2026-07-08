@@ -999,6 +999,10 @@ function SystemStatusPanel({ status, loading, onRefresh }) {
 function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
   const [queryText, setQueryText] = useState('');
   const [selectedRole, setSelectedRole] = useState('owner');
+  const [showCreate, setShowCreate] = useState(false);
+  const [adminForm, setAdminForm] = useState({
+    firstName: '', lastName: '', email: '', password: '', password2: '', position: '', photo: '', role: 'admin',
+  });
   const roles = security?.roles || {};
   const admins = Array.isArray(security?.admins) ? security.admins : [];
   const audit = Array.isArray(security?.audit) ? security.audit : [];
@@ -1009,6 +1013,20 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
   });
   const selectedPermissions = roles[selectedRole] || [];
   const canManage = ['owner', 'super_admin'].includes(security?.actor?.role);
+  const setAdminField = (key, value) => setAdminForm(prev => ({ ...prev, [key]: value }));
+  const submitAdmin = async () => {
+    if (!adminForm.email.trim() || !adminForm.password) {
+      alert('Укажите email и временный пароль администратора.');
+      return;
+    }
+    if (adminForm.password !== adminForm.password2) {
+      alert('Пароль и подтверждение не совпадают.');
+      return;
+    }
+    await onAction('admin:create', null, adminForm);
+    setAdminForm({ firstName: '', lastName: '', email: '', password: '', password2: '', position: '', photo: '', role: 'admin' });
+    setShowCreate(false);
+  };
 
   return (
     <div>
@@ -1027,6 +1045,35 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
         <StatTile label="Записей аудита" value={audit.length} icon="📜" color="#A78BFA" sub="adminActivity + security log" />
         <StatTile label="Управление" value={canManage ? 'Доступно' : 'Только просмотр'} icon="🔐" color={canManage ? '#4BB34B' : A.textSec} sub="owner / super_admin" />
       </div>
+
+      {canManage && (
+        <div style={s.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: showCreate ? 14 : 0 }}>
+            <div>
+              <h2 style={{ ...s.h2, margin: '0 0 4px' }}>Создать администратора</h2>
+              <div style={{ color: A.textSec, fontSize: 12 }}>Пароль сохраняется только в Firebase Auth. Для новых администраторов включается обязательная смена пароля.</div>
+            </div>
+            <button type="button" onClick={() => setShowCreate(v => !v)} style={{ ...s.btn, ...s.btnPri }}>{showCreate ? 'Скрыть' : '+ Администратор'}</button>
+          </div>
+          {showCreate && (
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 10 }}>
+                <input value={adminForm.firstName} onChange={e => setAdminField('firstName', e.target.value)} placeholder="Имя" style={{ ...s.input, marginBottom: 0 }} />
+                <input value={adminForm.lastName} onChange={e => setAdminField('lastName', e.target.value)} placeholder="Фамилия" style={{ ...s.input, marginBottom: 0 }} />
+                <input value={adminForm.email} onChange={e => setAdminField('email', e.target.value)} placeholder="Email / логин" style={{ ...s.input, marginBottom: 0 }} />
+                <select value={adminForm.role} onChange={e => setAdminField('role', e.target.value)} style={{ ...s.select, marginBottom: 0 }}>
+                  {Object.keys(roles).filter(role => ADMIN_ROLE_LABELS[role]).map(role => <option key={role} value={role}>{ADMIN_ROLE_LABELS[role]}</option>)}
+                </select>
+                <input type="password" value={adminForm.password} onChange={e => setAdminField('password', e.target.value)} placeholder="Временный пароль" style={{ ...s.input, marginBottom: 0 }} />
+                <input type="password" value={adminForm.password2} onChange={e => setAdminField('password2', e.target.value)} placeholder="Повтор пароля" style={{ ...s.input, marginBottom: 0 }} />
+                <input value={adminForm.position} onChange={e => setAdminField('position', e.target.value)} placeholder="Должность" style={{ ...s.input, marginBottom: 0 }} />
+                <input value={adminForm.photo} onChange={e => setAdminField('photo', e.target.value)} placeholder="Фото URL" style={{ ...s.input, marginBottom: 0 }} />
+              </div>
+              <button type="button" onClick={submitAdmin} disabled={loading} style={{ ...s.btn, ...s.btnPri, justifySelf: 'start', opacity: loading ? 0.55 : 1 }}>Создать учётную запись</button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ ...s.card }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
@@ -1077,9 +1124,12 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
                 <select disabled={!canManage || admin.role === 'owner'} value={admin.role} onChange={e => onAction('admin:updateRole', admin, { role: e.target.value })} style={{ ...s.select, marginBottom: 0, fontSize: 12, padding: '8px 9px' }}>
                   {Object.keys(roles).filter(role => ADMIN_ROLE_LABELS[role]).map(role => <option key={role} value={role}>{ADMIN_ROLE_LABELS[role]}</option>)}
                 </select>
-                <button type="button" disabled={!canManage} onClick={() => onAction(admin.status === 'active' ? 'admin:block' : 'admin:unblock', admin)} style={{ ...s.btn, ...(admin.status === 'active' ? s.btnDanger : s.btnGray), padding: '8px 9px', fontSize: 12 }}>{admin.status === 'active' ? 'Блок' : 'Разблок'}</button>
+                <button type="button" disabled={!canManage || admin.role === 'owner'} onClick={() => onAction(admin.status === 'active' ? 'admin:block' : 'admin:unblock', admin)} style={{ ...s.btn, ...(admin.status === 'active' ? s.btnDanger : s.btnGray), padding: '8px 9px', fontSize: 12 }}>{admin.status === 'active' ? 'Блок' : 'Разблок'}</button>
                 <button type="button" disabled={!canManage} onClick={() => onAction('admin:revokeSessions', admin)} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Сессии</button>
-                <button type="button" disabled={!canManage || !admin.email} onClick={() => onAction('admin:resetPassword', admin)} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Пароль</button>
+                <button type="button" disabled={!canManage || !admin.email} onClick={() => {
+                  const nextPassword = window.prompt('Введите новый временный пароль администратора. Он не будет сохранён в Firestore.');
+                  if (nextPassword) onAction('admin:updatePassword', admin, { password: nextPassword });
+                }} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Пароль</button>
               </div>
             </div>
           ))}
@@ -1523,30 +1573,50 @@ function AdminLoginGate({ onAllow }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [passkeySupported, setPasskeySupported] = useState(false);
+  const [pendingActor, setPendingActor] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPassword2, setNewPassword2] = useState('');
 
   useEffect(() => {
     setPasskeySupported(Boolean(window.PublicKeyCredential));
-    let cancelled = false;
-    adminSecurityRequest('status')
-      .then(data => {
-        if (!cancelled) onAllow(data.actor);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [onAllow]);
+  }, []);
 
   const check = async () => {
     setLoading(true);
     setError('');
     try {
-      if (login.trim() && password) {
-        await signInWithEmailAndPassword(auth, login.trim(), password);
+      if (!login.trim() || !password) {
+        throw new Error('Введите email администратора и пароль.');
       }
+      await signInWithEmailAndPassword(auth, login.trim(), password);
       const data = await adminSecurityRequest('status');
+      if (data.actor?.mustChangePassword) {
+        setPendingActor(data.actor);
+        setError('Перед входом нужно сменить временный пароль.');
+        return;
+      }
       onAllow(data.actor);
     } catch (e) {
       logError(e, 'AdminPanel.adminLogin');
       setError(e?.message || 'Не удалось войти в админку.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changeTemporaryPassword = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (!newPassword || newPassword !== newPassword2) {
+        throw new Error('Новый пароль и подтверждение не совпадают.');
+      }
+      await adminSecurityRequest('admin:selfChangePassword', { password: newPassword });
+      const data = await adminSecurityRequest('status');
+      onAllow(data.actor);
+    } catch (e) {
+      logError(e, 'AdminPanel.changeTemporaryPassword');
+      setError(e?.message || 'Не удалось сменить временный пароль.');
     } finally {
       setLoading(false);
     }
@@ -1557,8 +1627,7 @@ function AdminLoginGate({ onAllow }) {
     setError('');
     try {
       if (!window.PublicKeyCredential) throw new Error('Touch ID / Face ID недоступны в этом браузере.');
-      const data = await adminSecurityRequest('status');
-      onAllow(data.actor);
+      throw new Error('Быстрый вход будет включён после регистрации Passkey. Сейчас используйте email и пароль.');
     } catch (e) {
       setError(e?.message || 'Быстрый вход недоступен. Используйте email и пароль.');
     } finally {
@@ -1578,44 +1647,76 @@ function AdminLoginGate({ onAllow }) {
       }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
         <h2 style={{ color: '#F0F0F0', fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Вход в админку АПГ</h2>
-        <p style={{ color: 'rgba(240,240,240,0.45)', fontSize: 13, margin: '0 0 24px' }}>Firebase session, email/password и быстрый вход через Passkeys-ready слой.</p>
-        <input
-          type="text"
-          placeholder="Email или логин администратора"
-          value={login}
-          onChange={e => setLogin(e.target.value)}
-          style={{
-            width: '100%', padding: '13px 16px', borderRadius: 14, boxSizing: 'border-box',
-            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
-            color: '#F0F0F0', fontSize: 16, outline: 'none', marginBottom: 10,
-          }}
-        />
-        <div style={{ position: 'relative', marginBottom: 12 }}>
-          <input
-            type={show ? 'text' : 'password'}
-            placeholder="Пароль"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && check()}
-            style={{
-              width: '100%', padding: '13px 44px 13px 16px', borderRadius: 14, boxSizing: 'border-box',
-              border: error ? '1px solid #E64646' : '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.06)', color: '#F0F0F0', fontSize: 16, outline: 'none',
-              transition: 'border 0.2s',
-            }}
-          />
-          <button onClick={() => setShow(v => !v)} style={{
-            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-            background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0,
-          }}>{show ? '🙈' : '👁️'}</button>
-        </div>
+        <p style={{ color: 'rgba(240,240,240,0.45)', fontSize: 13, margin: '0 0 24px' }}>Вход только через подтверждённую учётную запись администратора.</p>
+        {pendingActor ? (
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ color: '#F0F0F0', fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Первый вход: задайте новый пароль для {pendingActor.name || pendingActor.uid}</div>
+            <input
+              type="password"
+              placeholder="Новый пароль"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              style={{
+                width: '100%', padding: '13px 16px', borderRadius: 14, boxSizing: 'border-box',
+                border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+                color: '#F0F0F0', fontSize: 16, outline: 'none', marginBottom: 10,
+              }}
+            />
+            <input
+              type="password"
+              placeholder="Повторите новый пароль"
+              value={newPassword2}
+              onChange={e => setNewPassword2(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && changeTemporaryPassword()}
+              style={{
+                width: '100%', padding: '13px 16px', borderRadius: 14, boxSizing: 'border-box',
+                border: error ? '1px solid #E64646' : '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.06)', color: '#F0F0F0', fontSize: 16, outline: 'none',
+                marginBottom: 12,
+              }}
+            />
+          </div>
+        ) : (
+          <>
+            <input
+              type="text"
+              placeholder="Email или логин администратора"
+              value={login}
+              onChange={e => setLogin(e.target.value)}
+              style={{
+                width: '100%', padding: '13px 16px', borderRadius: 14, boxSizing: 'border-box',
+                border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+                color: '#F0F0F0', fontSize: 16, outline: 'none', marginBottom: 10,
+              }}
+            />
+            <div style={{ position: 'relative', marginBottom: 12 }}>
+              <input
+                type={show ? 'text' : 'password'}
+                placeholder="Пароль"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && check()}
+                style={{
+                  width: '100%', padding: '13px 44px 13px 16px', borderRadius: 14, boxSizing: 'border-box',
+                  border: error ? '1px solid #E64646' : '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.06)', color: '#F0F0F0', fontSize: 16, outline: 'none',
+                  transition: 'border 0.2s',
+                }}
+              />
+              <button onClick={() => setShow(v => !v)} style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0,
+              }}>{show ? '🙈' : '👁️'}</button>
+            </div>
+          </>
+        )}
         {error && <p style={{ color: '#E64646', fontSize: 12, margin: '0 0 12px', lineHeight: '17px' }}>{error}</p>}
-        <button onClick={check} style={{
+        <button onClick={pendingActor ? changeTemporaryPassword : check} style={{
           width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', color: '#0F0F1A',
           fontSize: 15, fontWeight: 700, boxShadow: '0 4px 16px rgba(201,168,76,0.35)',
           opacity: loading ? 0.62 : 1,
-        }}>{loading ? 'Проверяем доступ...' : 'Войти'}</button>
+        }}>{loading ? 'Проверяем доступ...' : pendingActor ? 'Сменить пароль и войти' : 'Войти'}</button>
         <button type="button" onClick={quickLogin} disabled={!passkeySupported || loading} style={{
           width: '100%', padding: '12px 0', borderRadius: 14, cursor: passkeySupported ? 'pointer' : 'default',
           border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: passkeySupported ? '#F0F0F0' : 'rgba(240,240,240,0.34)',
@@ -2538,10 +2639,10 @@ export const AdminPanel = () => {
   }, [adminSession]);
 
   const runAdminSecurityAction = async (action, admin, extra = {}) => {
-    if (!admin?.id) return;
+    if (action !== 'admin:create' && !admin?.id) return;
     setAdminSecurityLoading(true);
     try {
-      await adminSecurityRequest(action, { adminId: admin.id, ...extra });
+      await adminSecurityRequest(action, { ...(admin?.id ? { adminId: admin.id } : {}), ...extra });
       await loadAdminSecurity();
     } catch (e) {
       logError(e, `AdminPanel.adminSecurity.${action}`);

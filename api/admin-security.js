@@ -25,8 +25,16 @@ function safeActor(actor) {
     name: actor.name,
     role: actor.role,
     authSource: actor.authSource,
+    mustChangePassword: Boolean(actor.mustChangePassword),
     permissions: ROLE_PERMISSIONS[actor.role] || [],
   };
+}
+
+function permissionForAction(action) {
+  if (action === 'status' || action === 'admin:selfChangePassword') return 'system:read';
+  if (action === 'audit:list') return 'audit:read';
+  if (action === 'overview') return 'admins:read';
+  return 'admins:read';
 }
 
 function getDeviceInfo(req) {
@@ -122,6 +130,40 @@ async function assertCanManage(actor, currentData, nextRole = '') {
   }
 }
 
+function requireStrongPassword(password) {
+  const value = String(password || '');
+  if (value.length < 10 || !/[A-ZА-Я]/.test(value) || !/[a-zа-я]/.test(value) || !/\d/.test(value)) {
+    const error = new Error('Пароль администратора должен быть не короче 10 символов и содержать буквы разного регистра и цифру.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
+}
+
+function cleanAdminPayload(body = {}) {
+  const firstName = String(body.firstName || '').trim();
+  const lastName = String(body.lastName || '').trim();
+  const email = String(body.email || body.login || '').trim().toLowerCase();
+  const role = normalizeRole(body.role || 'admin');
+  const permissions = Array.isArray(body.permissions) ? body.permissions.map(String) : ROLE_PERMISSIONS[role] || [];
+  const name = [firstName, lastName].filter(Boolean).join(' ') || String(body.name || '').trim() || email;
+  if (!email || !email.includes('@')) {
+    const error = new Error('Укажите корректный email администратора.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return {
+    firstName,
+    lastName,
+    email,
+    role,
+    permissions,
+    name,
+    position: String(body.position || '').trim(),
+    photo: String(body.photo || '').trim(),
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -132,11 +174,31 @@ export default async function handler(req, res) {
   const db = getAdminDb();
   try {
     const action = String(req.body?.action || 'status');
-    const actor = await requireAdminPermission(req, action === 'status' ? 'system:read' : action === 'audit:list' ? 'audit:read' : 'admins:read');
+    const actor = await requireAdminPermission(req, permissionForAction(action));
 
     if (action === 'status') {
       await writeSecurityLog(db, req, actor, 'admin-login', actor.userId, { source: 'admin-security.status' });
       return res.status(200).json({ ok: true, actor: safeActor(actor), roles: ROLE_PERMISSIONS, device: getDeviceInfo(req), passkeysSupported: true });
+    }
+
+    if (action === 'admin:selfChangePassword') {
+      await getAdminAuth().updateUser(actor.uid, { password: requireStrongPassword(req.body?.password) });
+      const { ref, snap } = await findAdminUserRef(db, actor.userId || actor.uid);
+      const patch = {
+        mustChangePassword: false,
+        passwordChangedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      await ref.set(patch, { merge: true });
+      await writeSecurityLog(db, req, actor, action, snap.id, { uid: actor.uid });
+      return res.status(200).json({ ok: true, id: snap.id });
+    }
+
+    if (actor.mustChangePassword) {
+      const error = new Error('Перед работой в админке необходимо сменить временный пароль.');
+      error.statusCode = 403;
+      error.code = 'PASSWORD_CHANGE_REQUIRED';
+      throw error;
     }
 
     if (action === 'overview') {
@@ -146,6 +208,61 @@ export default async function handler(req, res) {
 
     if (action === 'audit:list') {
       return res.status(200).json({ ok: true, audit: await listAudit(db) });
+    }
+
+    if (action === 'admin:create') {
+      const nextAdmin = cleanAdminPayload(req.body || {});
+      await assertCanManage(actor, { role: nextAdmin.role }, nextAdmin.role);
+      if (nextAdmin.role === 'owner' && actor.role !== 'owner') {
+        const error = new Error('Только Owner может создавать Owner.');
+        error.statusCode = 403;
+        throw error;
+      }
+      const password = requireStrongPassword(req.body?.password);
+      const auth = getAdminAuth();
+      const existingAuth = await auth.getUserByEmail(nextAdmin.email).catch(() => null);
+      if (existingAuth) {
+        const error = new Error('Пользователь с таким email уже существует.');
+        error.statusCode = 409;
+        throw error;
+      }
+      const existingProfile = await db.collection('users').where('email', '==', nextAdmin.email).limit(1).get();
+      if (!existingProfile.empty) {
+        const error = new Error('Профиль с таким email уже существует.');
+        error.statusCode = 409;
+        throw error;
+      }
+      const record = await auth.createUser({
+        email: nextAdmin.email,
+        password,
+        displayName: nextAdmin.name,
+        emailVerified: true,
+        disabled: false,
+      });
+      await auth.setCustomUserClaims(record.uid, { role: nextAdmin.role });
+      const profile = {
+        firebaseUid: record.uid,
+        authUid: record.uid,
+        email: nextAdmin.email,
+        login: nextAdmin.email,
+        name: nextAdmin.name,
+        firstName: nextAdmin.firstName,
+        lastName: nextAdmin.lastName,
+        position: nextAdmin.position,
+        photo: nextAdmin.photo,
+        role: nextAdmin.role,
+        userRole: nextAdmin.role,
+        roles: [nextAdmin.role],
+        adminPermissions: nextAdmin.permissions,
+        adminStatus: 'active',
+        mustChangePassword: nextAdmin.role !== 'owner',
+        createdBy: actor.userId,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      await db.collection('users').doc(record.uid).set(profile, { merge: true });
+      await writeSecurityLog(db, req, actor, action, record.uid, { email: nextAdmin.email, role: nextAdmin.role, mustChangePassword: profile.mustChangePassword });
+      return res.status(200).json({ ok: true, id: record.uid, admin: { ...profile, createdAt: null, updatedAt: null } });
     }
 
     const targetId = String(req.body?.adminId || req.body?.userId || '').trim();
@@ -170,8 +287,51 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, id: snap.id, patch });
     }
 
+    if (action === 'admin:updateProfile') {
+      await assertCanManage(actor, currentData);
+      const patch = {
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      for (const [key, field] of [['name', 'name'], ['firstName', 'firstName'], ['lastName', 'lastName'], ['position', 'position'], ['photo', 'photo'], ['login', 'login']]) {
+        if (Object.prototype.hasOwnProperty.call(req.body || {}, key)) patch[field] = String(req.body[key] || '').trim();
+      }
+      if (req.body?.email) {
+        const email = String(req.body.email || '').trim().toLowerCase();
+        if (!email.includes('@')) {
+          const error = new Error('Укажите корректный email администратора.');
+          error.statusCode = 400;
+          throw error;
+        }
+        await getAdminAuth().updateUser(String(currentData.firebaseUid || currentData.authUid || snap.id), { email }).catch(error => { throw error; });
+        patch.email = email;
+        patch.login = email;
+      }
+      await ref.set(patch, { merge: true });
+      await writeSecurityLog(db, req, actor, action, snap.id, { fields: Object.keys(patch).filter(key => key !== 'updatedAt') });
+      return res.status(200).json({ ok: true, id: snap.id, patch });
+    }
+
+    if (action === 'admin:updatePassword') {
+      await assertCanManage(actor, currentData);
+      const uid = String(currentData.firebaseUid || currentData.authUid || snap.id);
+      await getAdminAuth().updateUser(uid, { password: requireStrongPassword(req.body?.password) });
+      const patch = {
+        mustChangePassword: normalizeRole(currentData.role || currentData.userRole) !== 'owner',
+        passwordChangedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      await ref.set(patch, { merge: true });
+      await writeSecurityLog(db, req, actor, action, snap.id, { uid, mustChangePassword: patch.mustChangePassword });
+      return res.status(200).json({ ok: true, id: snap.id });
+    }
+
     if (['admin:block', 'admin:unblock', 'admin:disable', 'admin:deleteAccess'].includes(action)) {
       await assertCanManage(actor, currentData);
+      if (normalizeRole(currentData.role || currentData.userRole) === 'owner' && action !== 'admin:unblock') {
+        const error = new Error('Owner нельзя заблокировать, отключить или удалить через интерфейс.');
+        error.statusCode = 403;
+        throw error;
+      }
       const status = action === 'admin:unblock' ? 'active' : action === 'admin:disable' ? 'disabled' : action === 'admin:deleteAccess' ? 'access_removed' : 'blocked';
       const patch = { adminStatus: status, updatedAt: FieldValue.serverTimestamp() };
       if (status !== 'active') patch.forceLogoutAt = FieldValue.serverTimestamp();

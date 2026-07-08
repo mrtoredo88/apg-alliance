@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Защищённый вход админки и bootstrap Owner
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `api/_admin-security.js`, `api/admin-security.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-security.js`, `scripts/bootstrap-owner.mjs`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/12_SECURITY.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** security
+**Что изменено:** Убран автоматический вход в админку по старой Firebase-сессии без ввода email/password. Добавлено создание администраторов через Firebase Auth, смена временного пароля при первом входе, смена пароля администратору, защита `owner` от блокировки/понижения/удаления, серверная проверка `adminStatus`. Создан production owner через Firebase Admin bootstrap.
+**Почему:** Закрытие критической уязвимости доступа к админке и переход к полноценным персональным административным аккаунтам.
+
+---
+
 ## [2026-07-08] Admin RBAC и центр безопасности
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `api/_admin-security.js`, `api/admin-security.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-security.js`, `server/src/server.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/12_SECURITY.md`, `.ai/17_CHANGELOG_AI.md`

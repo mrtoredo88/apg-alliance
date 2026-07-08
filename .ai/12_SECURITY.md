@@ -89,10 +89,16 @@ function isOwner(userId) {
 
 **Endpoints:**
 - `/api/admin-actions` — защищённые news admin actions;
-- `/api/admin-security` — вход в админку, матрица прав, управление администраторами, журнал безопасности;
+- `/api/admin-security` — вход в админку, матрица прав, создание администраторов через Firebase Auth, обязательная смена временного пароля, управление администраторами, журнал безопасности;
 - `/api/system-status` — защищённый health/status для админки;
 - `/api/news-comments` — модерационные действия требуют роль `owner/admin/moderator`;
 - `/api/send-push` — принимает legacy secret или роль `push:*`.
+
+**Owner bootstrap:**
+- первый `owner` создаётся скриптом `scripts/bootstrap-owner.mjs` через Firebase Admin SDK;
+- пароль передаётся только при запуске скрипта и хранится только как Firebase Auth password hash;
+- в Firestore пишутся только `uid`, email/login, role/userRole/roles, `adminStatus`, permissions и audit-запись;
+- `owner` защищён от блокировки, удаления и случайного понижения через UI/API.
 
 ### Секреты в env vars
 

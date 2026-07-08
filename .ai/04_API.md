@@ -163,17 +163,21 @@
 **Auth:** `Authorization: Bearer <Firebase ID Token>` или `X-Firebase-Auth`.
 
 **Actions:**
-- `status` — проверить текущую Firebase-сессию и вернуть actor, роль, права и данные устройства.
+- `status` — проверить текущую Firebase-сессию и вернуть actor, роль, флаг `mustChangePassword`, права и данные устройства.
 - `overview` — список администраторов, матрица ролей и последние записи `adminActivity` / `adminSecurityLog`.
 - `audit:list` — журнал безопасности.
+- `admin:selfChangePassword` — сменить временный пароль текущего администратора и снять `mustChangePassword`.
+- `admin:create` — создать администратора в Firebase Auth и профиль `users/{uid}`; пароль не пишется в Firestore.
+- `admin:updateProfile` — изменить имя, email/login, должность или фото администратора.
 - `admin:updateRole` — изменить роль и custom claims; только `owner/super_admin`.
 - `admin:block`, `admin:unblock`, `admin:disable`, `admin:deleteAccess` — управление статусом доступа.
 - `admin:revokeSessions` — принудительно отозвать refresh tokens администратора.
+- `admin:updatePassword` — задать новый временный пароль администратора через Firebase Auth.
 - `admin:resetPassword` — сгенерировать Firebase reset password link для email администратора.
 
 **Роли:** `owner`, `super_admin`, `admin`, `editor`, `moderator`, `analyst`, `partner`, `expert`, `user`.
 
-**Логика:** все изменения пишутся в `adminSecurityLog` и `adminActivity`. `owner` нельзя случайно понизить или ограничить из-под `super_admin`. Биометрия в интерфейсе реализуется только через WebAuthn/Passkeys-ready слой: биометрические данные не попадают в АПГ.
+**Логика:** все изменения пишутся в `adminSecurityLog` и `adminActivity`. `owner` нельзя случайно понизить, заблокировать или ограничить из-под интерфейса. Новые администраторы, кроме `owner`, получают `mustChangePassword: true` и меняют временный пароль при первом входе. Биометрия в интерфейсе реализуется только через WebAuthn/Passkeys-ready слой: биометрические данные не попадают в АПГ.
 
 ---
 

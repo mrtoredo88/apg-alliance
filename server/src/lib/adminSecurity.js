@@ -64,6 +64,13 @@ export async function requireAdminPermission(request, permission) {
   const decoded = await getDbAuth().verifyIdToken(token);
   const claimRole = normalizeRole(decoded.role || decoded.userRole || (decoded.owner ? 'owner' : decoded.admin ? 'admin' : ''));
   const userRecord = await findUserByFirebaseUid(db, decoded.uid);
+  const adminStatus = String(userRecord?.data?.adminStatus || userRecord?.data?.status || 'active').toLowerCase();
+  if (userRecord?.data && adminStatus && adminStatus !== 'active') {
+    const error = new Error('Доступ администратора отключён.');
+    error.statusCode = 403;
+    error.role = normalizeRole(userRecord.data.role || userRecord.data.userRole || claimRole);
+    throw error;
+  }
   const userRole = normalizeRole(userRecord?.data?.role || userRecord?.data?.userRole || claimRole);
   const role = ROLE_ORDER.indexOf(claimRole) > ROLE_ORDER.indexOf(userRole) ? claimRole : userRole;
 
@@ -77,6 +84,7 @@ export async function requireAdminPermission(request, permission) {
   return {
     uid: decoded.uid,
     role,
+    mustChangePassword: Boolean(userRecord?.data?.mustChangePassword),
     userId: userRecord?.id || decoded.uid,
     name: userRecord?.data?.name || userRecord?.data?.firstName || userRecord?.data?.email || decoded.email || 'Администратор АПГ',
     authSource: userRecord?.source || 'claims',
