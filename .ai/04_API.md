@@ -156,6 +156,27 @@
 
 ---
 
+## POST /api/admin-security
+
+**Назначение:** Центр безопасности админки: проверка входа, роли, матрица прав, управление администраторами и журнал безопасности.
+
+**Auth:** `Authorization: Bearer <Firebase ID Token>` или `X-Firebase-Auth`.
+
+**Actions:**
+- `status` — проверить текущую Firebase-сессию и вернуть actor, роль, права и данные устройства.
+- `overview` — список администраторов, матрица ролей и последние записи `adminActivity` / `adminSecurityLog`.
+- `audit:list` — журнал безопасности.
+- `admin:updateRole` — изменить роль и custom claims; только `owner/super_admin`.
+- `admin:block`, `admin:unblock`, `admin:disable`, `admin:deleteAccess` — управление статусом доступа.
+- `admin:revokeSessions` — принудительно отозвать refresh tokens администратора.
+- `admin:resetPassword` — сгенерировать Firebase reset password link для email администратора.
+
+**Роли:** `owner`, `super_admin`, `admin`, `editor`, `moderator`, `analyst`, `partner`, `expert`, `user`.
+
+**Логика:** все изменения пишутся в `adminSecurityLog` и `adminActivity`. `owner` нельзя случайно понизить или ограничить из-под `super_admin`. Биометрия в интерфейсе реализуется только через WebAuthn/Passkeys-ready слой: биометрические данные не попадают в АПГ.
+
+---
+
 ## GET /api/system-status
 
 **Назначение:** Состояние системы для админки.

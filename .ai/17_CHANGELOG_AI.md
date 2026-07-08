@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Admin RBAC и центр безопасности
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `api/_admin-security.js`, `api/admin-security.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-security.js`, `server/src/server.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/12_SECURITY.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Добавлен `/api/admin-security`, server-side RBAC для ролей owner/super_admin/admin/editor/moderator/analyst/partner/expert/user, новый вход в админку через Firebase session/email+password и вкладка «Доступ» с матрицей прав, администраторами и журналом безопасности.
+**Почему:** Админке нужна профессиональная система доступа вместо локального парольного gate: роли и действия должны проверяться backend, а изменения доступа должны попадать в аудит.
+
+---
+
 ## [2026-07-08] Production smoke script для Chromium
 **Коммит:** `локально`
 **Файлы:** `package.json`, `scripts/prod-smoke.mjs`, `.ai/17_CHANGELOG_AI.md`

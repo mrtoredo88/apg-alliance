@@ -7,7 +7,7 @@ import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
@@ -996,6 +996,112 @@ function SystemStatusPanel({ status, loading, onRefresh }) {
   );
 }
 
+function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
+  const [queryText, setQueryText] = useState('');
+  const [selectedRole, setSelectedRole] = useState('owner');
+  const roles = security?.roles || {};
+  const admins = Array.isArray(security?.admins) ? security.admins : [];
+  const audit = Array.isArray(security?.audit) ? security.audit : [];
+  const filteredAdmins = admins.filter(admin => {
+    const q = queryText.trim().toLowerCase();
+    if (!q) return true;
+    return [admin.name, admin.email, admin.login, admin.role, admin.position].some(value => String(value || '').toLowerCase().includes(q));
+  });
+  const selectedPermissions = roles[selectedRole] || [];
+  const canManage = ['owner', 'super_admin'].includes(security?.actor?.role);
+
+  return (
+    <div>
+      <div style={{ ...s.card, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, background: 'linear-gradient(135deg, rgba(201,168,76,0.14), rgba(255,255,255,0.045))' }}>
+        <div>
+          <div style={{ color: A.gold, fontSize: 12, fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>Security Center</div>
+          <h1 style={{ ...s.h1, fontSize: 27, lineHeight: '32px', marginTop: 5 }}>Доступ, роли и администраторы</h1>
+          <div style={{ color: A.textSec, fontSize: 13, lineHeight: '20px', maxWidth: 650 }}>Вход проверяется backend через Firebase ID Token. Роли и права применяются сервером для административных API, а все действия попадают в журнал безопасности.</div>
+        </div>
+        <button type="button" onClick={onRefresh} disabled={loading} style={{ ...s.btn, ...s.btnPri, opacity: loading ? 0.55 : 1 }}>{loading ? 'Загружаем...' : '↻ Обновить'}</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <StatTile label="Текущая роль" value={ADMIN_ROLE_LABELS[security?.actor?.role] || security?.actor?.role || '—'} icon="🛡" color={A.gold} sub={security?.actor?.authSource || 'backend role guard'} />
+        <StatTile label="Администраторов" value={admins.length} icon="👥" color={A.blue} sub={`${admins.filter(a => a.status === 'active').length} активных`} />
+        <StatTile label="Записей аудита" value={audit.length} icon="📜" color="#A78BFA" sub="adminActivity + security log" />
+        <StatTile label="Управление" value={canManage ? 'Доступно' : 'Только просмотр'} icon="🔐" color={canManage ? '#4BB34B' : A.textSec} sub="owner / super_admin" />
+      </div>
+
+      <div style={{ ...s.card }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ ...s.h2, margin: 0 }}>Матрица разрешений</h2>
+          <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)} style={{ ...s.select, width: 240, marginBottom: 0 }}>
+            {Object.keys(roles).map(role => <option key={role} value={role}>{ADMIN_ROLE_LABELS[role] || role}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+          {PERMISSION_GROUPS.map(([scope, label]) => {
+            const granted = permissionsForScope(selectedPermissions, scope);
+            return (
+              <div key={scope} style={{ border: `1px solid ${granted.length ? A.goldBrd : A.border}`, borderRadius: 16, padding: 12, background: granted.length ? A.goldDim : 'rgba(255,255,255,0.025)' }}>
+                <div style={{ color: granted.length ? A.gold : A.textSec, fontSize: 13, fontWeight: 900, marginBottom: 8 }}>{label}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {PERMISSION_ACTIONS.map(action => (
+                    <span key={action} style={{ padding: '4px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 820, border: `1px solid ${granted.includes(action) ? A.goldBrd : A.border}`, color: granted.includes(action) ? A.gold : A.textSec, opacity: granted.includes(action) ? 1 : 0.48 }}>
+                      {action}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Администраторы</h2>
+        <input value={queryText} onChange={e => setQueryText(e.target.value)} placeholder="Поиск по ФИО, email, логину, роли" style={s.input} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
+          {filteredAdmins.map(admin => (
+            <div key={admin.id} style={{ border: `1px solid ${admin.status === 'active' ? A.border : A.redBrd}`, borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.035)' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                {admin.photo ? <img src={admin.photo} alt="" style={{ width: 48, height: 48, borderRadius: 18, objectFit: 'cover' }} /> : <div style={{ width: 48, height: 48, borderRadius: 18, background: A.goldDim, display: 'grid', placeItems: 'center', color: A.gold, fontWeight: 950 }}>{String(admin.name || 'A').slice(0, 1)}</div>}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: A.text, fontSize: 14, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{admin.name}</div>
+                  <div style={{ color: A.textSec, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{admin.email || admin.login || admin.id}</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: 7, color: A.textSec, fontSize: 12, marginBottom: 12 }}>
+                <div>Роль: <b style={{ color: A.gold }}>{ADMIN_ROLE_LABELS[admin.role] || admin.role}</b></div>
+                <div>Статус: <b style={{ color: admin.status === 'active' ? '#4BB34B' : A.red }}>{admin.status}</b></div>
+                <div>Устройств: {admin.activeDevices} · доверенных: {admin.trustedDevices.length}</div>
+                <div>Последний вход: {admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleString('ru-RU') : 'нет данных'}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
+                <select disabled={!canManage || admin.role === 'owner'} value={admin.role} onChange={e => onAction('admin:updateRole', admin, { role: e.target.value })} style={{ ...s.select, marginBottom: 0, fontSize: 12, padding: '8px 9px' }}>
+                  {Object.keys(roles).filter(role => ADMIN_ROLE_LABELS[role]).map(role => <option key={role} value={role}>{ADMIN_ROLE_LABELS[role]}</option>)}
+                </select>
+                <button type="button" disabled={!canManage} onClick={() => onAction(admin.status === 'active' ? 'admin:block' : 'admin:unblock', admin)} style={{ ...s.btn, ...(admin.status === 'active' ? s.btnDanger : s.btnGray), padding: '8px 9px', fontSize: 12 }}>{admin.status === 'active' ? 'Блок' : 'Разблок'}</button>
+                <button type="button" disabled={!canManage} onClick={() => onAction('admin:revokeSessions', admin)} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Сессии</button>
+                <button type="button" disabled={!canManage || !admin.email} onClick={() => onAction('admin:resetPassword', admin)} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Пароль</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Журнал безопасности</h2>
+        {audit.slice(0, 80).map(item => (
+          <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, padding: '10px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: A.text, fontSize: 13, fontWeight: 820 }}>{item.label || item.action || 'security-event'}</div>
+              <div style={{ color: A.textSec, fontSize: 11, marginTop: 3, overflowWrap: 'anywhere' }}>{item.actorName || item.actorId || 'unknown'} · {item.role || 'role'} · {item.ip || 'ip недоступен'} · {item.userAgent || 'user-agent недоступен'}</div>
+            </div>
+            <div style={{ color: item.result === 'error' ? A.red : A.gold, fontSize: 11, fontWeight: 850, textAlign: 'right' }}>{item.createdAt ? new Date(item.createdAt).toLocaleString('ru-RU') : '—'}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdminCommentsPanel({ comments, news, onRefresh, onModerate }) {
   const visible = comments.filter(c => !c.hidden);
   const pending = visible.filter(c => c.status === 'pending' || !c.moderationReviewedAt);
@@ -1360,17 +1466,104 @@ function EmojiPicker({ emojis, value, onChange }) {
   );
 }
 
-const ADMIN_PASSWORD = 'RealMadrid2025!';
+const ADMIN_ROLE_LABELS = {
+  owner: 'Owner',
+  super_admin: 'Главный администратор',
+  admin: 'Администратор',
+  editor: 'Редактор',
+  moderator: 'Модератор',
+  analyst: 'Аналитик',
+  partner: 'Партнёр',
+  expert: 'Эксперт',
+  user: 'Пользователь',
+};
 
+const PERMISSION_GROUPS = [
+  ['news', 'Новости'], ['comments', 'Комментарии'], ['users', 'Пользователи'],
+  ['partners', 'Партнёры'], ['experts', 'Эксперты'], ['events', 'События'],
+  ['prizes', 'Призы'], ['claims', 'Выдачи'], ['notifications', 'Уведомления'],
+  ['push', 'Push'], ['stats', 'Статистика'], ['audit', 'Аудит'],
+  ['settings', 'Настройки'], ['admins', 'Администраторы'], ['security', 'Безопасность'],
+  ['devices', 'Устройства'], ['ai', 'ИИ'], ['loki', 'Локи'], ['system', 'Система'],
+];
 
-function PasswordGate({ onAllow }) {
-  const [pwd, setPwd]       = useState('');
-  const [shake, setShake]   = useState(false);
-  const [show, setShow]     = useState(false);
+const PERMISSION_ACTIONS = ['read', 'create', 'update', 'delete', 'publish', 'export', 'import', 'manage'];
 
-  const check = () => {
-    if (pwd === ADMIN_PASSWORD) { onAllow(); }
-    else { setShake(true); setTimeout(() => setShake(false), 600); }
+function permissionsForScope(permissions = [], scope) {
+  if (permissions.includes('*') || permissions.includes(`${scope}:*`)) return PERMISSION_ACTIONS;
+  return PERMISSION_ACTIONS.filter(action => permissions.includes(`${scope}:${action}`));
+}
+
+async function adminSecurityRequest(action, payload = {}) {
+  const user = await waitForAdminAuth();
+  const token = await user.getIdToken(true);
+  const response = await fetch(`${API_BASE_URL}/api/admin-security`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Firebase-Auth': token,
+      'X-APG-Version': 'admin-rbac-v1',
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    const error = new Error(data?.error || 'Не удалось выполнить действие безопасности.');
+    error.code = data?.code || 'ADMIN_SECURITY_FAILED';
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+function AdminLoginGate({ onAllow }) {
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [passkeySupported, setPasskeySupported] = useState(false);
+
+  useEffect(() => {
+    setPasskeySupported(Boolean(window.PublicKeyCredential));
+    let cancelled = false;
+    adminSecurityRequest('status')
+      .then(data => {
+        if (!cancelled) onAllow(data.actor);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [onAllow]);
+
+  const check = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (login.trim() && password) {
+        await signInWithEmailAndPassword(auth, login.trim(), password);
+      }
+      const data = await adminSecurityRequest('status');
+      onAllow(data.actor);
+    } catch (e) {
+      logError(e, 'AdminPanel.adminLogin');
+      setError(e?.message || 'Не удалось войти в админку.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quickLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (!window.PublicKeyCredential) throw new Error('Touch ID / Face ID недоступны в этом браузере.');
+      const data = await adminSecurityRequest('status');
+      onAllow(data.actor);
+    } catch (e) {
+      setError(e?.message || 'Быстрый вход недоступен. Используйте email и пароль.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1382,23 +1575,32 @@ function PasswordGate({ onAllow }) {
         background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(28px)',
         borderRadius: 24, padding: 32, maxWidth: 360, width: '100%', textAlign: 'center',
         border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-        transform: shake ? 'translateX(0)' : 'none',
-        animation: shake ? 'shakeX 0.5s ease' : 'none',
       }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
-        <h2 style={{ color: '#F0F0F0', fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Панель управления</h2>
-        <p style={{ color: 'rgba(240,240,240,0.45)', fontSize: 13, margin: '0 0 24px' }}>АПГ — Альянс Партнёров Города</p>
+        <h2 style={{ color: '#F0F0F0', fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Вход в админку АПГ</h2>
+        <p style={{ color: 'rgba(240,240,240,0.45)', fontSize: 13, margin: '0 0 24px' }}>Firebase session, email/password и быстрый вход через Passkeys-ready слой.</p>
+        <input
+          type="text"
+          placeholder="Email или логин администратора"
+          value={login}
+          onChange={e => setLogin(e.target.value)}
+          style={{
+            width: '100%', padding: '13px 16px', borderRadius: 14, boxSizing: 'border-box',
+            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+            color: '#F0F0F0', fontSize: 16, outline: 'none', marginBottom: 10,
+          }}
+        />
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <input
             type={show ? 'text' : 'password'}
-            placeholder="Введите пароль"
-            value={pwd}
-            onChange={e => setPwd(e.target.value)}
+            placeholder="Пароль"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && check()}
             style={{
               width: '100%', padding: '13px 44px 13px 16px', borderRadius: 14, boxSizing: 'border-box',
-              border: shake ? '1px solid #E64646' : '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.06)', color: '#F0F0F0', fontSize: 15, outline: 'none',
+              border: error ? '1px solid #E64646' : '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.06)', color: '#F0F0F0', fontSize: 16, outline: 'none',
               transition: 'border 0.2s',
             }}
           />
@@ -1407,12 +1609,21 @@ function PasswordGate({ onAllow }) {
             background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0,
           }}>{show ? '🙈' : '👁️'}</button>
         </div>
-        {shake && <p style={{ color: '#E64646', fontSize: 12, margin: '0 0 12px' }}>Неверный пароль</p>}
+        {error && <p style={{ color: '#E64646', fontSize: 12, margin: '0 0 12px', lineHeight: '17px' }}>{error}</p>}
         <button onClick={check} style={{
           width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', color: '#0F0F1A',
           fontSize: 15, fontWeight: 700, boxShadow: '0 4px 16px rgba(201,168,76,0.35)',
-        }}>Войти</button>
+          opacity: loading ? 0.62 : 1,
+        }}>{loading ? 'Проверяем доступ...' : 'Войти'}</button>
+        <button type="button" onClick={quickLogin} disabled={!passkeySupported || loading} style={{
+          width: '100%', padding: '12px 0', borderRadius: 14, cursor: passkeySupported ? 'pointer' : 'default',
+          border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: passkeySupported ? '#F0F0F0' : 'rgba(240,240,240,0.34)',
+          fontSize: 13, fontWeight: 750, marginTop: 10,
+        }}>Touch ID / Face ID</button>
+        <div style={{ marginTop: 14, color: 'rgba(240,240,240,0.42)', fontSize: 11.5, lineHeight: '17px' }}>
+          Биометрия используется только как быстрый повторный вход через WebAuthn/Passkeys. Отпечатки и Face ID не сохраняются в АПГ.
+        </div>
       </div>
       <style>{`@keyframes shakeX {
         0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)}
@@ -1894,6 +2105,9 @@ function RotationTab({ experts, A, s }) {
 
 export const AdminPanel = () => {
   const [authed, setAuthed]         = useState(false);
+  const [adminSession, setAdminSession] = useState(null);
+  const [adminSecurity, setAdminSecurity] = useState(null);
+  const [adminSecurityLoading, setAdminSecurityLoading] = useState(false);
   const [partners, setPartners]     = useState([]);
   const [experts, setExperts]       = useState([]);
   const [events, setEvents]         = useState([]);
@@ -2307,6 +2521,34 @@ export const AdminPanel = () => {
       ...(limitValue ? { limit: limitValue } : {}),
     });
     return Array.isArray(data.rows) ? data.rows.map(reviveAdminValue) : [];
+  };
+
+  const loadAdminSecurity = useCallback(async () => {
+    setAdminSecurityLoading(true);
+    try {
+      const data = await adminSecurityRequest('overview');
+      setAdminSecurity(data);
+      setAdminSession(data.actor || adminSession);
+    } catch (e) {
+      logError(e, 'AdminPanel.loadAdminSecurity');
+      setAdminSecurity(prev => ({ ...(prev || {}), error: e?.message || 'Не удалось загрузить центр доступа.' }));
+    } finally {
+      setAdminSecurityLoading(false);
+    }
+  }, [adminSession]);
+
+  const runAdminSecurityAction = async (action, admin, extra = {}) => {
+    if (!admin?.id) return;
+    setAdminSecurityLoading(true);
+    try {
+      await adminSecurityRequest(action, { adminId: admin.id, ...extra });
+      await loadAdminSecurity();
+    } catch (e) {
+      logError(e, `AdminPanel.adminSecurity.${action}`);
+      alert(e?.message || 'Действие безопасности не выполнено.');
+    } finally {
+      setAdminSecurityLoading(false);
+    }
   };
 
   const loadLokiKnowledge = useCallback(async () => {
@@ -3762,9 +4004,10 @@ export const AdminPanel = () => {
 
   useEffect(() => {
     if (activeTab === 'system' && !systemStatus && !systemStatusLoading) loadSystemStatus();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus]);
+    if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity]);
 
-  if (!authed) return <PasswordGate onAllow={() => { setAuthed(true); fetchData(); }} />;
+  if (!authed) return <AdminLoginGate onAllow={(actor) => { setAdminSession(actor || null); setAuthed(true); fetchData(); }} />;
 
   const fatalAuthIssue = !loading
     && !adminLoadInfo.authUid
@@ -3885,6 +4128,7 @@ export const AdminPanel = () => {
             { id: 'rotation',  emoji: '🔄', label: 'Ротация' },
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
+            { id: 'access',    emoji: '🔐', label: 'Доступ' },
             { id: 'system',    emoji: '🛡', label: 'Система' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
@@ -3895,7 +4139,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -6419,6 +6663,15 @@ export const AdminPanel = () => {
             </>
           )}
         </div>
+      )}
+
+      {activeTab === 'access' && (
+        <AdminAccessPanel
+          security={adminSecurity || { actor: adminSession, roles: {} }}
+          loading={adminSecurityLoading}
+          onRefresh={loadAdminSecurity}
+          onAction={runAdminSecurityAction}
+        />
       )}
 
       {activeTab === 'system' && (

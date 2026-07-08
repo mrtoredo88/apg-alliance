@@ -3,15 +3,17 @@ import { getAdminAuth, getAdminDb } from './_firebase-admin.js';
 
 export const ROLE_PERMISSIONS = {
   owner: ['*'],
-  admin: ['news:*', 'comments:*', 'push:*', 'system:*', 'audit:*', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'settings:*', 'stats:*', 'claims:*', 'errors:*', 'maintenance:*'],
-  editor: ['news:*', 'partners:update', 'experts:update', 'events:*', 'banners:*', 'prizes:*', 'notifications:create', 'tasks:*', 'system:read'],
-  moderator: ['comments:*', 'news:update', 'news:delete', 'partners:update', 'experts:update', 'events:update', 'system:read'],
-  partner: [],
-  expert: [],
+  super_admin: ['news:*', 'comments:*', 'push:*', 'system:*', 'audit:*', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'settings:*', 'stats:*', 'claims:*', 'errors:*', 'maintenance:*', 'admins:*', 'security:*', 'devices:*', 'loki:*', 'ai:*'],
+  admin: ['news:*', 'comments:*', 'push:*', 'system:read', 'audit:read', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'stats:read', 'claims:*', 'errors:*', 'maintenance:read', 'loki:read', 'ai:read'],
+  editor: ['news:*', 'comments:read', 'comments:update', 'comments:delete', 'events:read', 'partners:read', 'experts:read', 'notifications:create', 'system:read', 'ai:*', 'loki:read'],
+  moderator: ['comments:*', 'users:read', 'users:update', 'news:read', 'news:update', 'system:read', 'audit:read'],
+  analyst: ['stats:read', 'audit:read', 'system:read', 'news:read', 'partners:read', 'experts:read', 'events:read', 'users:read', 'errors:read'],
+  partner: ['partnerCabinet:read', 'partnerCabinet:update'],
+  expert: ['expertCabinet:read', 'expertCabinet:update'],
   user: [],
 };
 
-const ROLE_ORDER = ['user', 'expert', 'partner', 'moderator', 'editor', 'admin', 'owner'];
+const ROLE_ORDER = ['user', 'expert', 'partner', 'analyst', 'moderator', 'editor', 'admin', 'super_admin', 'owner'];
 
 function normalizeRole(value) {
   const role = String(value || '').trim().toLowerCase();
