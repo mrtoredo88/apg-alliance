@@ -30,6 +30,36 @@ const CATEGORIES = [
 
 const EVENT_EMOJIS   = ['🎉','🎓','🍕','💆','🏋️','🎨','🎤','🤝','🎁','🌟','🎭','☕'];
 const NEWS_EMOJIS    = ['📢','🔥','🌟','🎁','📅','💡','🤝','🏆','🎉','📸','🗞️','✨'];
+const NOTIFICATION_CATEGORIES = [
+  ['news', 'Новости'],
+  ['events', 'События'],
+  ['partners', 'Новые партнёры'],
+  ['experts', 'Новые эксперты'],
+  ['raffles', 'Розыгрыши'],
+  ['prizes', 'Призы'],
+  ['offers', 'Акции'],
+  ['reminders', 'Напоминания'],
+  ['loki', 'Ответы Локи'],
+  ['achievements', 'Достижения'],
+  ['keys', 'Ключи'],
+  ['invites', 'Приглашения'],
+  ['updates', 'Обновления приложения'],
+  ['important', 'Важные объявления'],
+];
+const NOTIFICATION_TYPES = [
+  ['info', 'Информационное'],
+  ['important', 'Важное'],
+  ['offer', 'Акция'],
+  ['reminder', 'Напоминание'],
+  ['feature', 'Новая функция'],
+  ['system', 'Системное'],
+];
+const NOTIFICATION_PRIORITIES = [
+  ['low', 'Низкий'],
+  ['normal', 'Обычный'],
+  ['high', 'Высокий'],
+  ['critical', 'Критический'],
+];
 const CONTENT_CATEGORIES = [
   { id: 'economy',   label: 'Экономика',   color: '#6AABEC' },
   { id: 'society',   label: 'Общество',    color: '#A78BFA' },
@@ -2076,6 +2106,15 @@ export const AdminPanel = () => {
   const [ntEmoji, setNtEmoji]       = useState('🔔');
   const [ntTargetType, setNtTargetType] = useState('all');
   const [ntTargetValue, setNtTargetValue] = useState('');
+  const [ntCategory, setNtCategory] = useState('important');
+  const [ntType, setNtType] = useState('info');
+  const [ntPriority, setNtPriority] = useState('normal');
+  const [ntActionLabel, setNtActionLabel] = useState('Открыть');
+  const [ntDeepLink, setNtDeepLink] = useState('');
+  const [ntImageUrl, setNtImageUrl] = useState('');
+  const [ntScheduleMode, setNtScheduleMode] = useState('now');
+  const [ntScheduleAt, setNtScheduleAt] = useState('');
+  const [ntAudienceCity, setNtAudienceCity] = useState('');
   const [ntSendPush, setNtSendPush] = useState(true);
   const [ntPushResult, setNtPushResult] = useState(null);
 
@@ -2195,6 +2234,14 @@ export const AdminPanel = () => {
     if (!trimmed) return '';
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
     return `https://${trimmed}`;
+  };
+
+  const normalizeDeepLink = (val) => {
+    const trimmed = (val ?? '').trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('#') || trimmed.startsWith('/')) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    return `/#/${trimmed.replace(/^#?\/*/, '')}`;
   };
 
   const adminRequestHeaders = async (idempotencyKey = '') => {
@@ -3144,35 +3191,102 @@ export const AdminPanel = () => {
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
-  const resetNotifForm = () => { setNtTitle(''); setNtBody(''); setNtEmoji('🔔'); setNtTargetType('all'); setNtTargetValue(''); setNtPushResult(null); };
+  const resetNotifForm = () => {
+    setNtTitle(''); setNtBody(''); setNtEmoji('🔔'); setNtTargetType('all'); setNtTargetValue('');
+    setNtCategory('important'); setNtType('info'); setNtPriority('normal'); setNtActionLabel('Открыть');
+    setNtDeepLink(''); setNtImageUrl(''); setNtScheduleMode('now'); setNtScheduleAt(''); setNtAudienceCity('');
+    setNtPushResult(null);
+  };
+
+  const buildNotificationAudience = () => {
+    const value = Number(ntTargetValue) || 0;
+    if (ntTargetType === 'min_keys' || ntTargetType === 'max_keys') return { type: ntTargetType, value };
+    if (ntTargetType === 'inactive_days') return { type: 'inactive', inactiveDays: value || 14 };
+    if (ntTargetType === 'city') return { type: 'city', city: ntAudienceCity.trim() };
+    return { type: ntTargetType || 'all' };
+  };
+
+  const sendPushForNotification = async (notification, id, idempotencyKey = `push_${id}_${Date.now()}`) => {
+    const r = await fetch(`${API_BASE_URL}/api/send-push`, {
+      method: 'POST',
+      headers: await adminRequestHeaders(idempotencyKey),
+      body: JSON.stringify({
+        broadcast: true,
+        notificationId: id,
+        title: notification.title,
+        body: notification.body || undefined,
+        url: notification.deepLink || undefined,
+        tag: notification.tag || `apg-${notification.category || 'push'}`,
+        category: notification.category || 'important',
+        type: notification.type || 'info',
+        priority: notification.priority || 'normal',
+        imageUrl: notification.imageUrl || undefined,
+        actionLabel: notification.actionLabel || undefined,
+        audience: notification.audience || buildNotificationAudience(),
+      }),
+    });
+    const result = await r.json().catch(() => ({}));
+    if (!r.ok || result?.error) throw new Error(result?.error || 'Push не отправлен.');
+    return result;
+  };
 
   const sendNotif = async () => {
     if (!ntTitle.trim()) return;
+    const audience = buildNotificationAudience();
+    const scheduledAt = ntScheduleMode === 'date' && ntScheduleAt ? new Date(ntScheduleAt).toISOString()
+      : ntScheduleMode === '10m' ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
+      : ntScheduleMode === '1h' ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
+      : ntScheduleMode === 'tomorrow' ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      : null;
     const data = {
       title: ntTitle.trim(),
       body: ntBody.trim(),
       emoji: ntEmoji,
       targetType: ntTargetType,
+      category: ntCategory,
+      type: ntType,
+      priority: ntPriority,
+      actionLabel: ntActionLabel.trim(),
+      deepLink: normalizeDeepLink(ntDeepLink),
+      imageUrl: normalizeUrl(ntImageUrl),
+      audience,
+      scheduleMode: ntScheduleMode,
+      status: scheduledAt ? 'scheduled' : 'published',
+      source: 'admin',
+      pushStatus: ntSendPush && !scheduledAt ? 'pending' : scheduledAt ? 'scheduled' : 'disabled',
     };
+    if (scheduledAt) data.scheduledAt = scheduledAt;
     if (ntTargetType !== 'all' && ntTargetValue) data.targetValue = Number(ntTargetValue);
-    await runAdminEntityAction('notifications', 'create', { patch: data });
+    const created = await runAdminEntityAction('notifications', 'create', { patch: data });
 
-    if (ntSendPush) {
+    let finalPushResult = null;
+    if (ntSendPush && !scheduledAt) {
       try {
-        const r = await fetch(`${API_BASE_URL}/api/send-push`, {
-          method: 'POST',
-          headers: await adminRequestHeaders(`push_${Date.now()}`),
-          body: JSON.stringify({ broadcast: true, title: ntTitle.trim(), body: ntBody.trim() || undefined }),
-        });
-        const result = await r.json();
-        setNtPushResult(result.sent != null ? `Push: ${result.sent} доставлено` : 'Push: нет подписчиков');
-      } catch {
-        setNtPushResult('Push: ошибка отправки');
+        const result = await sendPushForNotification(data, created.id);
+        finalPushResult = result.sent != null ? `Push: ${result.sent} отправлено · ${result.failed ?? 0} ошибок · ${result.subscribers ?? 0} получателей` : 'Push: нет подписчиков';
+      } catch (e) {
+        logError(e, 'AdminPanel.sendNotif.push');
+        finalPushResult = `Push: ${e.message || 'ошибка отправки'}`;
       }
+    } else if (scheduledAt) {
+      finalPushResult = 'Уведомление запланировано. Автоматический исполнитель очереди будет подключён отдельным серверным шагом.';
     }
 
     resetNotifForm();
+    if (finalPushResult) setNtPushResult(finalPushResult);
     fetchData();
+  };
+
+  const repeatNotifPush = async (notification) => {
+    if (!notification?.id || !window.confirm('Повторить push-отправку этого уведомления?')) return;
+    try {
+      const result = await sendPushForNotification(notification, notification.id, `push_repeat_${notification.id}_${Date.now()}`);
+      setNtPushResult(`Повтор: ${result.sent ?? 0} отправлено · ${result.failed ?? 0} ошибок · ${result.subscribers ?? 0} получателей`);
+      fetchData();
+    } catch (e) {
+      logError(e, 'AdminPanel.repeatNotifPush');
+      window.alert(e.message || 'Не удалось повторить отправку.');
+    }
   };
 
   // ─── Кастомные задания ───────────────────────────────────────────────────────
@@ -5494,10 +5608,16 @@ export const AdminPanel = () => {
       {/* ── УВЕДОМЛЕНИЯ ── */}
       {activeTab === 'notifs' && (
         <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 14 }}>
+            <StatTile label="Всего уведомлений" value={notifs.length} icon="🔔" />
+            <StatTile label="Push отправлено" value={notifs.reduce((sum, n) => sum + (Number(n.pushStats?.sent) || 0), 0)} icon="📤" color="#4ade80" />
+            <StatTile label="Ошибок доставки" value={notifs.reduce((sum, n) => sum + (Number(n.pushStats?.failed) || 0), 0)} icon="⚠️" color="#f87171" />
+            <StatTile label="Открытия" value={notifs.reduce((sum, n) => sum + (Number(n.openedCount) || 0), 0)} icon="👁️" color="#38bdf8" />
+          </div>
           <div style={s.card}>
-            <h2 style={s.h2}>🔔 Отправить уведомление</h2>
+            <h2 style={s.h2}>🔔 Создать уведомление</h2>
             <p style={{ color: A.textSec, fontSize: 13, margin: '0 0 14px', lineHeight: '19px' }}>
-              Уведомление появится у всех пользователей в разделе «Уведомления» при следующем открытии приложения.
+              Уведомление появится в приложении, а при включённом Web Push уйдёт подписчикам с учётом категорий и аудитории.
             </p>
 
             <label style={s.label}>Заголовок *</label>
@@ -5506,22 +5626,78 @@ export const AdminPanel = () => {
             <label style={s.label}>Текст (необязательно)</label>
             <textarea style={s.textarea} placeholder="Подробности..." value={ntBody} onChange={e => setNtBody(e.target.value)} />
 
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
+              <div>
+                <label style={s.label}>Категория</label>
+                <select style={s.select} value={ntCategory} onChange={e => setNtCategory(e.target.value)}>
+                  {NOTIFICATION_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={s.label}>Тип</label>
+                <select style={s.select} value={ntType} onChange={e => setNtType(e.target.value)}>
+                  {NOTIFICATION_TYPES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={s.label}>Приоритет</label>
+                <select style={s.select} value={ntPriority} onChange={e => setNtPriority(e.target.value)}>
+                  {NOTIFICATION_PRIORITIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              </div>
+            </div>
+
             <label style={s.label}>Эмодзи</label>
             <EmojiPicker emojis={NEWS_EMOJIS} value={ntEmoji} onChange={setNtEmoji} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
+              <div>
+                <label style={s.label}>Кнопка действия</label>
+                <input style={s.input} placeholder="Читать" value={ntActionLabel} onChange={e => setNtActionLabel(e.target.value)} />
+              </div>
+              <div>
+                <label style={s.label}>Deep Link</label>
+                <input style={s.input} placeholder="/#/news или /#/partners" value={ntDeepLink} onChange={e => setNtDeepLink(e.target.value)} />
+              </div>
+            </div>
+
+            <label style={s.label}>Большое изображение</label>
+            <input style={s.input} placeholder="https://..." value={ntImageUrl} onChange={e => setNtImageUrl(e.target.value)} />
 
             <label style={s.label}>Аудитория</label>
             <select style={s.select} value={ntTargetType} onChange={e => setNtTargetType(e.target.value)}>
               <option value="all">👥 Все пользователи</option>
+              <option value="new">🆕 Только новые</option>
+              <option value="active">⚡ Только активные</option>
               <option value="min_keys">🔑 Ключей ≥ N (активные)</option>
               <option value="max_keys">🆕 Ключей &lt; N (новые/неактивные)</option>
               <option value="inactive_days">💤 Не заходили N дней</option>
+              <option value="partners">🤝 Партнёры</option>
+              <option value="experts">🎓 Эксперты</option>
+              <option value="admins">🛠 Администраторы</option>
+              <option value="city">🏙 Город</option>
             </select>
-            {ntTargetType !== 'all' && (
+            {['min_keys', 'max_keys', 'inactive_days'].includes(ntTargetType) && (
               <input
                 style={s.input} type="number" min="1"
                 placeholder={ntTargetType === 'inactive_days' ? 'Количество дней' : 'Количество ключей'}
                 value={ntTargetValue} onChange={e => setNtTargetValue(e.target.value)}
               />
+            )}
+            {ntTargetType === 'city' && (
+              <input style={s.input} placeholder="Зеленоград" value={ntAudienceCity} onChange={e => setNtAudienceCity(e.target.value)} />
+            )}
+
+            <label style={s.label}>Когда отправить</label>
+            <select style={s.select} value={ntScheduleMode} onChange={e => setNtScheduleMode(e.target.value)}>
+              <option value="now">Сразу</option>
+              <option value="10m">Через 10 минут</option>
+              <option value="1h">Через час</option>
+              <option value="tomorrow">Завтра</option>
+              <option value="date">Выбрать дату</option>
+            </select>
+            {ntScheduleMode === 'date' && (
+              <input style={s.input} type="datetime-local" value={ntScheduleAt} onChange={e => setNtScheduleAt(e.target.value)} />
             )}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0', cursor: 'pointer' }}>
@@ -5533,6 +5709,22 @@ export const AdminPanel = () => {
               />
               <span style={{ fontSize: 14, color: A.text }}>Отправить Web Push подписчикам</span>
             </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 10, margin: '12px 0 14px' }}>
+              {['Android', 'iPhone', 'Desktop', 'Telegram'].map(platform => (
+                <div key={platform} style={{ borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.045)', border: `1px solid ${A.border}` }}>
+                  <div style={{ fontSize: 10, color: A.textSec, fontWeight: 900, textTransform: 'uppercase', marginBottom: 8 }}>{platform}</div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: A.goldDim, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{ntEmoji}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: A.text, fontSize: 13, fontWeight: 900, lineHeight: '17px' }}>{ntTitle || 'Заголовок уведомления'}</div>
+                      <div style={{ color: A.textSec, fontSize: 11, lineHeight: '15px', marginTop: 3 }}>{ntBody || 'Текст уведомления будет виден здесь.'}</div>
+                      {ntActionLabel && <div style={{ color: A.gold, fontSize: 10, fontWeight: 900, marginTop: 6 }}>{ntActionLabel}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             <button style={{ ...s.btn, ...s.btnPri, width: '100%' }} onClick={sendNotif}>
               🔔 Опубликовать
@@ -5553,8 +5745,13 @@ export const AdminPanel = () => {
                 const dateStr = n.createdAt?.toDate
                   ? n.createdAt.toDate().toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                   : '';
+                const sent = Number(n.pushStats?.sent) || 0;
+                const failed = Number(n.pushStats?.failed) || 0;
+                const subscribers = Number(n.pushStats?.subscribers) || sent + failed;
+                const opened = Number(n.openedCount) || 0;
+                const ctr = sent ? Math.round((opened / sent) * 100) : 0;
                 return (
-                  <div key={n.id} style={s.row}>
+                  <div key={n.id} style={{ ...s.row, alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                       <div style={{ width: 40, height: 40, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{n.emoji ?? '🔔'}</div>
                       <div style={{ minWidth: 0 }}>
@@ -5564,9 +5761,19 @@ export const AdminPanel = () => {
                           {n.targetType && n.targetType !== 'all' && ` · 🎯 ${n.targetType}${n.targetValue ? ` ≥ ${n.targetValue}` : ''}`}
                           {n.body && ` · ${n.body.length > 40 ? n.body.slice(0, 40) + '…' : n.body}`}
                         </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: A.gold, background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 999, padding: '2px 7px' }}>{n.category || 'important'}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: A.textSec, background: A.chip, border: `1px solid ${A.border}`, borderRadius: 999, padding: '2px 7px' }}>{n.pushStatus || 'in-app'}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.24)', borderRadius: 999, padding: '2px 7px' }}>sent {sent}/{subscribers}</span>
+                          {failed > 0 && <span style={{ fontSize: 10, fontWeight: 800, color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.24)', borderRadius: 999, padding: '2px 7px' }}>failed {failed}</span>}
+                          <span style={{ fontSize: 10, fontWeight: 800, color: '#38bdf8', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.24)', borderRadius: 999, padding: '2px 7px' }}>CTR {ctr}%</span>
+                        </div>
                       </div>
                     </div>
-                    <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12, flexShrink: 0, marginLeft: 8 }} onClick={() => deleteNotif(n.id)}>🗑️</button>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                      <button style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }} onClick={() => repeatNotifPush(n)}>↻ Push</button>
+                      <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }} onClick={() => deleteNotif(n.id)}>🗑️</button>
+                    </div>
                   </div>
                 );
               })

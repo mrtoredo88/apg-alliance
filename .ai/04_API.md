@@ -496,10 +496,10 @@ Response: `{ "ok": true, "token": "firebaseCustomToken", "user": {...} }`
 
 ## POST /api/send-push
 
-**Назначение:** Отправить push-уведомление одному или всем пользователям.
+**Назначение:** Отправить push-уведомление одному пользователю или сегментированной аудитории.
 
 **Метод:** POST  
-**Auth:** `x-push-secret` header = `PUSH_SECRET` или `RAFFLE_SECRET`
+**Auth:** `x-push-secret` header = `PUSH_SECRET` / `RAFFLE_SECRET` или Firebase admin token с правом `push:*`
 
 **Single push:**
 ```json
@@ -508,7 +508,12 @@ Response: `{ "ok": true, "token": "firebaseCustomToken", "user": {...} }`
   "title": "Вы выиграли!",
   "body": "Приз ждёт вас",
   "url": "https://myapg.ru",
-  "tag": "raffle_win"
+  "tag": "raffle_win",
+  "notificationId": "notificationsDocId",
+  "category": "prizes",
+  "type": "important",
+  "priority": "high",
+  "actionLabel": "Открыть приз"
 }
 ```
 
@@ -517,14 +522,21 @@ Response: `{ "ok": true, "token": "firebaseCustomToken", "user": {...} }`
 {
   "broadcast": true,
   "title": "Новый партнёр!",
-  "body": "Открылась кофейня в центре"
+  "body": "Открылась кофейня в центре",
+  "category": "partners",
+  "type": "info",
+  "priority": "normal",
+  "url": "/#/partners",
+  "audience": { "type": "active" }
 }
 ```
 
 **Логика:**
 - Для single: читает `users/{userId}.fcmTokens`, отправляет FCM multicast
-- Для broadcast: читает всех пользователей с `notificationProvider === 'webpush'`, батчами по 500 токенов
+- Для broadcast: читает пользователей с включёнными уведомлениями и Web Push токенами, фильтрует по `notificationPreferences`, категории и аудитории (`all`, `new`, `active`, `inactive`, `partners`, `experts`, `admins`, `city`, `min_keys`, `max_keys`), отправляет батчами по 500 токенов
 - Удаляет невалидные токены из `users/{id}.fcmTokens`
+- Если передан `notificationId`, записывает в `notifications/{id}` поля `pushStatus`, `pushStats`, `pushSentAt`
+- Service Worker `public/sw.js` не кэширует приложение, но принимает `push` и открывает `data.url` / `fcmOptions.link`
 
 ---
 

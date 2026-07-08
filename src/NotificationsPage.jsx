@@ -7,6 +7,25 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
+const NOTIFICATION_CATEGORIES = [
+  ['news', 'Новости'],
+  ['events', 'События'],
+  ['partners', 'Новые партнёры'],
+  ['experts', 'Новые эксперты'],
+  ['raffles', 'Розыгрыши'],
+  ['prizes', 'Призы'],
+  ['offers', 'Акции'],
+  ['reminders', 'Напоминания'],
+  ['loki', 'Ответы Локи'],
+  ['achievements', 'Достижения'],
+  ['keys', 'Ключи'],
+  ['invites', 'Приглашения'],
+  ['updates', 'Обновления приложения'],
+  ['important', 'Важные объявления'],
+];
+
+const DEFAULT_NOTIFICATION_PREFERENCES = Object.fromEntries(NOTIFICATION_CATEGORIES.map(([id]) => [id, true]));
+
 function timeAgo(ts) {
   if (!ts) return '';
   const date = ts.toDate ? ts.toDate() : new Date(ts);
@@ -35,11 +54,15 @@ function matchesTarget(notif, userKeys, lastScanDate) {
   return true;
 }
 
-export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled, onEnableNotifications, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
+export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled, onEnableNotifications, notificationPreferences, onNotificationPreferencesChange, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
   const [allNotifications, setAllNotifications] = useState(propNotifications ?? []);
   const [loading, setLoading] = useState(!propNotifications);
   const [loadError, setLoadError] = useState(false);
   const [enabling, setEnabling] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [queryText, setQueryText] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [readAllAt, setReadAllAt] = useState(() => Number(localStorage.getItem('apg_notif_seen') || 0) || 0);
 
   useEffect(() => {
     if (propNotifications) {
@@ -58,18 +81,51 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
     return () => { cancelled = true; };
   }, [propNotifications]);
 
-  const notifications = allNotifications.filter(n => matchesTarget(n, userKeys, lastScanDate));
-
   const handleEnable = async () => {
     setEnabling(true);
     try { await onEnableNotifications(); } finally { setEnabling(false); }
   };
 
   const isUnread = (notif) => {
-    if (!lastSeenTs || !notif.createdAt) return true;
-    const seenDate = lastSeenTs.toDate ? lastSeenTs.toDate() : new Date(lastSeenTs);
+    if (!notif.createdAt) return true;
+    const seenDate = readAllAt ? new Date(readAllAt) : lastSeenTs?.toDate ? lastSeenTs.toDate() : lastSeenTs ? new Date(lastSeenTs) : null;
+    if (!seenDate) return true;
     const notifDate = notif.createdAt.toDate ? notif.createdAt.toDate() : new Date(notif.createdAt);
     return notifDate > seenDate;
+  };
+
+  const preferences = { ...DEFAULT_NOTIFICATION_PREFERENCES, ...(notificationPreferences || {}) };
+  const notifications = allNotifications
+    .filter(n => matchesTarget(n, userKeys, lastScanDate))
+    .filter(n => {
+      if (preferences.onlyCritical && !['critical', 'important'].includes(n.priority) && n.category !== 'important') return false;
+      const category = n.category || 'important';
+      if (preferences[category] === false) return false;
+      if (filter === 'unread' && !isUnread(n)) return false;
+      if (filter === 'archived' && !n.archived) return false;
+      if (filter !== 'all' && filter !== 'unread' && filter !== 'archived' && category !== filter) return false;
+      const q = queryText.trim().toLowerCase();
+      if (q && !`${n.title || ''} ${n.body || ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+  const updatePreference = async (key, value) => {
+    const next = key === 'all'
+      ? { ...DEFAULT_NOTIFICATION_PREFERENCES, onlyCritical: false }
+      : { ...preferences, [key]: value };
+    await onNotificationPreferencesChange?.(next);
+  };
+
+  const openNotification = (notif) => {
+    const url = notif.deepLink || notif.url || notif.actionUrl;
+    if (!url) return;
+    window.location.href = url;
+  };
+
+  const markAllRead = () => {
+    const now = Date.now();
+    localStorage.setItem('apg_notif_seen', String(now));
+    setReadAllAt(now);
   };
 
   if (variant === 'v2') {
@@ -90,11 +146,50 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
           </GlassCard>
         )}
         {notificationsEnabled && (
-          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
             <StatPill label="всего" value={notifications.length} tone="gold" />
             <StatPill label="новых" value={unreadCount} />
           </div>
         )}
+        <GlassCard style={{ borderRadius: 24, padding: 12, marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input
+              value={queryText}
+              onChange={e => setQueryText(e.target.value)}
+              placeholder="Поиск по уведомлениям"
+              style={{ flex: 1, minWidth: 0, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, borderRadius: 14, padding: '11px 12px', outline: 'none', fontSize: 14 }}
+            />
+            <button onClick={markAllRead} style={{ border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, borderRadius: 14, padding: '0 12px', fontSize: 12, fontWeight: 800 }}>✓ Все</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+            {[
+              ['all', 'Все'],
+              ['unread', 'Новые'],
+              ['archived', 'Архив'],
+              ...NOTIFICATION_CATEGORIES.slice(0, 7).map(([id, label]) => [id, label]),
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setFilter(id)} style={{ border: `1px solid ${filter === id ? APG2_PROFILE.gold : T.border}`, background: filter === id ? 'rgba(201,168,76,0.16)' : T.chipBg, color: filter === id ? APG2_PROFILE.gold : T.textPri, borderRadius: 999, padding: '8px 11px', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{label}</button>
+            ))}
+            <button onClick={() => setShowSettings(v => !v)} style={{ border: `1px solid ${showSettings ? APG2_PROFILE.gold : T.border}`, background: showSettings ? 'rgba(201,168,76,0.16)' : T.chipBg, color: showSettings ? APG2_PROFILE.gold : T.textPri, borderRadius: 999, padding: '8px 11px', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>⚙️ Настройки</button>
+          </div>
+          {showSettings && (
+            <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 14, background: T.chipBg, color: T.textPri, fontSize: 13, fontWeight: 800 }}>
+                Только критические
+                <input type="checkbox" checked={!!preferences.onlyCritical} onChange={e => updatePreference('onlyCritical', e.target.checked)} style={{ width: 18, height: 18, accentColor: APG2_PROFILE.gold }} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
+                {NOTIFICATION_CATEGORIES.map(([id, label]) => (
+                  <label key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 14, background: T.chipBg, color: T.textPri, fontSize: 12, fontWeight: 760 }}>
+                    {label}
+                    <input type="checkbox" checked={preferences[id] !== false} onChange={e => updatePreference(id, e.target.checked)} disabled={!!preferences.onlyCritical} style={{ width: 17, height: 17, accentColor: APG2_PROFILE.gold }} />
+                  </label>
+                ))}
+              </div>
+              <button onClick={() => updatePreference('all', true)} style={{ border: `1px solid ${APG2_PROFILE.gold}`, background: 'rgba(201,168,76,0.12)', color: APG2_PROFILE.gold, borderRadius: 14, padding: '11px 12px', fontSize: 13, fontWeight: 900 }}>Включить всё</button>
+            </div>
+          )}
+        </GlassCard>
         {loadError && <EmptyStateV2 icon="⚠️" title="Не удалось загрузить" text="Проверьте соединение и попробуйте снова." />}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{[1, 2, 3].map(i => <GlassCard key={i} style={{ height: 86, animation: 'shimmer 1.5s ease-in-out infinite' }} />)}</div>
@@ -112,6 +207,7 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
                   subtitle={n.body ?? timeAgo(n.createdAt)}
                   meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : timeAgo(n.createdAt)}
                   accent={unread ? APG2_PROFILE.gold : undefined}
+                  onClick={() => openNotification(n)}
                   style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }}
                 />
               );

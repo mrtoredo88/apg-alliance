@@ -23,9 +23,11 @@ if (_vkHash.includes('access_token=') && window.opener) {
   createRoot(document.getElementById('root')).render(<App />);
 
   if ('serviceWorker' in navigator) {
-    window.__swRegPromise = navigator.serviceWorker.getRegistrations()
-      .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
-      .then(() => ('caches' in window ? caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))) : null))
+    window.__swRegPromise = navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then((reg) => {
+        if ('caches' in window) caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
+        return reg;
+      })
       .catch(() => null);
   }
 

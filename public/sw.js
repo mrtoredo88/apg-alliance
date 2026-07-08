@@ -1,6 +1,4 @@
-// APG emergency service worker restore.
-// P0: clear stale PWA caches and unregister so the app loads directly from network.
-const RESTORE_VERSION = 'apg-p0-disable-sw-20260708';
+const SW_VERSION = 'apg-push-sw-20260708';
 
 async function clearAllCaches() {
   if (!self.caches) return;
@@ -14,13 +12,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    clearAllCaches()
-      .then(() => self.registration.unregister())
-      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
-      .then((clients) => Promise.all(clients.map((client) => client.navigate(client.url))))
-      .catch(() => null)
-  );
+  event.waitUntil(clearAllCaches().catch(() => null));
   self.clients.claim();
 });
 
@@ -29,11 +21,55 @@ self.addEventListener('message', (event) => {
   event.waitUntil(
     clearAllCaches().then(() => event.source?.postMessage?.({
       type: 'APG_SW_CACHE_CLEARED',
-      version: RESTORE_VERSION,
+      version: SW_VERSION,
     }))
   );
 });
 
 self.addEventListener('fetch', () => {
   return;
+});
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+  const notification = payload.notification || payload;
+  const data = payload.data || {};
+  const title = notification.title || data.title || 'АПГ';
+  const options = {
+    body: notification.body || data.body || '',
+    icon: notification.icon || '/192.png',
+    badge: notification.badge || '/32.png',
+    image: notification.image || data.image || undefined,
+    tag: notification.tag || data.tag || 'apg-push',
+    renotify: true,
+    data: {
+      url: data.url || notification.click_action || '/',
+      notificationId: data.notificationId || '',
+    },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification?.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        const absoluteUrl = new URL(targetUrl, self.location.origin).href;
+        const existing = clients.find((client) => client.url === absoluteUrl || client.url.startsWith(self.location.origin));
+        if (existing) {
+          existing.focus();
+          if ('navigate' in existing) return existing.navigate(absoluteUrl);
+          return undefined;
+        }
+        return self.clients.openWindow(absoluteUrl);
+      })
+      .catch(() => self.clients.openWindow('/'))
+  );
 });

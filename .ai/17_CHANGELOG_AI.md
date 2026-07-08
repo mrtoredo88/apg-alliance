@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Push notification center foundation
+**Коммит:** `локально`
+**Файлы:** `public/sw.js`, `src/main.jsx`, `src/UserApp.jsx`, `src/NotificationsPage.jsx`, `src/AdminPanel.jsx`, `api/send-push.js`, `server/src/routes/send-push.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Восстановлен push-capable service worker без app-shell кэша, расширен `/api/send-push` с категориями, аудиториями, приоритетами, deep link, диагностикой доставки и записью `pushStats` в уведомление. В админке вкладка «Рассылка» стала центром уведомлений с KPI, конструктором, предпросмотром и повторной отправкой; у пользователя появились настройки категорий уведомлений.
+**Почему:** Публикация новости не приводила к доставке push, потому что цепочка Web Push была неполной: service worker отключался, отправка не хранила историю доставки и не учитывала согласия/категории пользователей.
+
+---
+
 ## [2026-07-08] Loki city concierge foundation
 **Коммит:** `локально`
 **Файлы:** `src/loki/LokiRecommendationCenter.js`, `src/loki/core/modules/ConciergeEngine.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/loki/core/lokiUserMemory.js`, `src/LokiPage.jsx`, `src/AdminPanel.jsx`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`

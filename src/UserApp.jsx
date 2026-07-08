@@ -912,6 +912,8 @@ export function UserApp() {
           ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
           ...(data.linkedTelegram ? { linkedTelegram: data.linkedTelegram } : {}),
           ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
+          ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),
+          ...(data.notificationsEnabled !== undefined ? { notificationsEnabled: data.notificationsEnabled } : {}),
         }) : u);
         setUserKeys(keys);
         setFavorites(data.favorites ?? []);
@@ -1732,6 +1734,24 @@ export function UserApp() {
             fcmTokens: [token],
             notificationProvider: 'webpush',
             notificationsEnabled: true,
+            notificationConsent: true,
+            notificationPreferences: user?.notificationPreferences || {
+              news: true,
+              events: true,
+              partners: true,
+              experts: true,
+              raffles: true,
+              prizes: true,
+              offers: true,
+              reminders: true,
+              loki: true,
+              achievements: true,
+              keys: true,
+              invites: true,
+              updates: true,
+              important: true,
+              onlyCritical: false,
+            },
           },
         });
       }
@@ -1769,7 +1789,7 @@ export function UserApp() {
     if (isVK()) {
       localStorage.setItem('apg_notif_enabled', '1');
       setNotifEnabled(true);
-      if (uid) userAction('profile:update', { userId: uid, patch: { notificationsEnabled: true, notificationProvider: 'vk' } }).catch(() => {});
+      if (uid) userAction('profile:update', { userId: uid, patch: { notificationsEnabled: true, notificationConsent: true, notificationProvider: 'vk' } }).catch(() => {});
       showToast('🔔 Уведомления включены!', 'success');
       vkBridge.send('VKWebAppAllowNotifications').catch(() => {});
       return;
@@ -1778,6 +1798,16 @@ export function UserApp() {
     // Web / PWA — FCM Web Push (включая Telegram-пользователей)
     requestWebPushPermission();
   }, [user, showToast, requestWebPushPermission]);
+
+  const handleNotificationPreferencesChange = useCallback(async (preferences) => {
+    if (!user?.id) return;
+    setUser(prev => prev ? ({ ...prev, notificationPreferences: preferences }) : prev);
+    await userAction('profile:update', {
+      userId: String(user.id),
+      patch: { notificationPreferences: preferences },
+    });
+    showToast('✓ Настройки уведомлений сохранены', 'success');
+  }, [user, showToast]);
 
   useEffect(() => {
     if (!pendingNotificationPrompt || !user) return;
@@ -2545,6 +2575,8 @@ export function UserApp() {
                     notifications={notifications}
                     notificationsEnabled={notifEnabled}
                     onEnableNotifications={handleEnableNotifications}
+                    notificationPreferences={user?.notificationPreferences}
+                    onNotificationPreferencesChange={handleNotificationPreferencesChange}
                     lastSeenTs={lastSeenTs}
                     userKeys={userKeys}
                     lastScanDate={lastScanDate}
