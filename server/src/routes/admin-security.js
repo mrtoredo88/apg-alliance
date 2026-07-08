@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ROLE_PERMISSIONS, adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
+import { createPasswordRecord, requireStrongAdminPassword } from '../../../server-shared/admin-password.js';
 
 const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'editor', 'moderator', 'analyst']);
 const MANAGE_ROLES = new Set(['owner', 'super_admin']);
@@ -131,13 +132,7 @@ async function assertCanManage(actor, currentData, nextRole = '') {
 }
 
 function requireStrongPassword(password) {
-  const value = String(password || '');
-  if (value.length < 10 || !/[A-ZА-Я]/.test(value) || !/[a-zа-я]/.test(value) || !/\d/.test(value)) {
-    const error = new Error('Пароль администратора должен быть не короче 10 символов и содержать буквы разного регистра и цифру.');
-    error.statusCode = 400;
-    throw error;
-  }
-  return value;
+  return requireStrongAdminPassword(password);
 }
 
 function cleanAdminPayload(body = {}) {
@@ -177,8 +172,15 @@ export default async function adminSecurityRoutes(fastify) {
       }
 
       if (action === 'admin:selfChangePassword') {
-        await getDbAuth().updateUser(actor.uid, { password: requireStrongPassword(request.body?.password) });
+        const password = requireStrongPassword(request.body?.password);
+        await getDbAuth().updateUser(actor.uid, { password }).catch(() => {});
         const { ref, snap } = await findAdminUserRef(db, actor.userId || actor.uid);
+        await db.collection('adminCredentials').doc(actor.uid).set({
+          email: String(snap.data()?.email || '').trim().toLowerCase(),
+          password: createPasswordRecord(password),
+          updatedBy: actor.userId,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         const patch = {
           mustChangePassword: false,
           passwordChangedAt: FieldValue.serverTimestamp(),
@@ -235,6 +237,13 @@ export default async function adminSecurityRoutes(fastify) {
           disabled: false,
         });
         await auth.setCustomUserClaims(record.uid, { role: nextAdmin.role });
+        await db.collection('adminCredentials').doc(record.uid).set({
+          email: nextAdmin.email,
+          password: createPasswordRecord(password),
+          updatedBy: actor.userId,
+          updatedAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         const profile = {
           firebaseUid: record.uid,
           authUid: record.uid,
@@ -307,7 +316,14 @@ export default async function adminSecurityRoutes(fastify) {
       if (action === 'admin:updatePassword') {
         await assertCanManage(actor, currentData);
         const uid = String(currentData.firebaseUid || currentData.authUid || snap.id);
-        await getDbAuth().updateUser(uid, { password: requireStrongPassword(request.body?.password) });
+        const password = requireStrongPassword(request.body?.password);
+        await getDbAuth().updateUser(uid, { password }).catch(() => {});
+        await db.collection('adminCredentials').doc(uid).set({
+          email: String(currentData.email || '').trim().toLowerCase(),
+          password: createPasswordRecord(password),
+          updatedBy: actor.userId,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         const patch = {
           mustChangePassword: normalizeRole(currentData.role || currentData.userRole) !== 'owner',
           passwordChangedAt: FieldValue.serverTimestamp(),

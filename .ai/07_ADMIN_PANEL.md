@@ -92,7 +92,8 @@
 ## Вкладка «Доступ»
 
 - Backend: `/api/admin-security`
-- Вход требует явный email/password; старая Firebase-сессия не пропускает в админку автоматически
+- Вход требует явный email/password через `/api/admin-login`; старая Firebase-сессия не пропускает в админку автоматически
+- `/api/admin-login` проверяет scrypt-хеш пароля и выдаёт Firebase custom token, поэтому админка не зависит от включённого Firebase Password provider
 - Проверяет текущую Firebase-сессию администратора и роль через server-side guard
 - Показывает текущую роль, список администраторов, матрицу прав и журнал безопасности
 - Роли: owner, super_admin, admin, editor, moderator, analyst, partner, expert, user

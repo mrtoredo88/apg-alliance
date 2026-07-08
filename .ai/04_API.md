@@ -181,6 +181,22 @@
 
 ---
 
+## POST /api/admin-login
+
+**Назначение:** Серверный вход администратора по email/password, независимый от Firebase Password provider.
+
+**Auth:** публичный endpoint, но принимает только email/password администратора и не выдаёт данные без успешной проверки.
+
+**Body:**
+- `email` / `login`
+- `password`
+
+**Ответ:** `{ ok, customToken, actor }`. Клиент вызывает `signInWithCustomToken`, после чего все административные API работают только через Firebase ID Token.
+
+**Безопасность:** пароль сравнивается с scrypt-хешем в `adminCredentials/{uid}` через timing-safe compare. Сырой пароль не пишется в Firestore, логи или исходный код. Успешные и неуспешные попытки пишутся в `adminSecurityLog`.
+
+---
+
 ## GET /api/system-status
 
 **Назначение:** Состояние системы для админки.

@@ -7,7 +7,7 @@ import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
@@ -1566,6 +1566,25 @@ async function adminSecurityRequest(action, payload = {}) {
   return data;
 }
 
+async function adminLoginRequest(email, password) {
+  const response = await fetch(`${API_BASE_URL}/api/admin-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-APG-Version': 'admin-login-v1',
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false || !data?.customToken) {
+    const error = new Error(data?.error || 'Не удалось выполнить вход администратора.');
+    error.code = data?.code || 'ADMIN_LOGIN_FAILED';
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
 function AdminLoginGate({ onAllow }) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -1588,7 +1607,8 @@ function AdminLoginGate({ onAllow }) {
       if (!login.trim() || !password) {
         throw new Error('Введите email администратора и пароль.');
       }
-      await signInWithEmailAndPassword(auth, login.trim(), password);
+      const loginData = await adminLoginRequest(login.trim(), password);
+      await signInWithCustomToken(auth, loginData.customToken);
       const data = await adminSecurityRequest('status');
       if (data.actor?.mustChangePassword) {
         setPendingActor(data.actor);

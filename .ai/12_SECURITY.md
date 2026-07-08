@@ -88,6 +88,7 @@ function isOwner(userId) {
 - `partner`, `expert`, `user` — без административных прав.
 
 **Endpoints:**
+- `/api/admin-login` — публичная точка входа администратора, проверяет scrypt-хеш в `adminCredentials/{uid}` и выдаёт Firebase custom token;
 - `/api/admin-actions` — защищённые news admin actions;
 - `/api/admin-security` — вход в админку, матрица прав, создание администраторов через Firebase Auth, обязательная смена временного пароля, управление администраторами, журнал безопасности;
 - `/api/system-status` — защищённый health/status для админки;
@@ -96,7 +97,7 @@ function isOwner(userId) {
 
 **Owner bootstrap:**
 - первый `owner` создаётся скриптом `scripts/bootstrap-owner.mjs` через Firebase Admin SDK;
-- пароль передаётся только при запуске скрипта и хранится только как Firebase Auth password hash;
+- пароль передаётся только при запуске скрипта и хранится только как scrypt-хеш в `adminCredentials/{uid}` и, при включённом provider, как Firebase Auth password hash;
 - в Firestore пишутся только `uid`, email/login, role/userRole/roles, `adminStatus`, permissions и audit-запись;
 - `owner` защищён от блокировки, удаления и случайного понижения через UI/API.
 

@@ -4,6 +4,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { createPasswordRecord } from '../server-shared/admin-password.js';
 
 async function askMissing(credentials) {
   if (credentials.email && credentials.password) return credentials;
@@ -76,6 +77,14 @@ if (record) {
 }
 
 await auth.setCustomUserClaims(record.uid, { role: 'owner', owner: true });
+
+await db.collection('adminCredentials').doc(record.uid).set({
+  email: ownerEmail,
+  password: createPasswordRecord(ownerPassword),
+  updatedBy: 'bootstrap-script',
+  updatedAt: FieldValue.serverTimestamp(),
+  createdAt: FieldValue.serverTimestamp(),
+}, { merge: true });
 
 await db.collection('users').doc(record.uid).set({
   firebaseUid: record.uid,
