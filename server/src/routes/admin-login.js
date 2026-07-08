@@ -62,7 +62,7 @@ export default async function adminLoginRoutes(fastify) {
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
       await auth.updateUser(uid, { email, emailVerified: true, disabled: false }).catch(() => {});
-      await auth.setCustomUserClaims(uid, { role, owner: role === 'owner' });
+      await auth.setCustomUserClaims(uid, { role, owner: role === 'owner' }).catch(() => {});
       const customToken = await auth.createCustomToken(uid, { role, owner: role === 'owner' });
       await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       await log('success', { role, uid });

@@ -69,7 +69,7 @@ export default async function handler(req, res) {
       return fail(res, 401, 'INVALID_CREDENTIALS', 'Неверный email или пароль администратора.');
     }
     await auth.updateUser(uid, { email, emailVerified: true, disabled: false }).catch(() => {});
-    await auth.setCustomUserClaims(uid, { role, owner: role === 'owner' });
+    await auth.setCustomUserClaims(uid, { role, owner: role === 'owner' }).catch(() => {});
     const customToken = await auth.createCustomToken(uid, { role, owner: role === 'owner' });
     await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     await log('success', { role, uid });
