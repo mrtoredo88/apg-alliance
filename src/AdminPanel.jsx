@@ -4116,6 +4116,16 @@ export const AdminPanel = () => {
           acc[key] = (acc[key] || 0) + 1;
           return acc;
         }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const byAction = Object.entries(lokiAnalytics.reduce((acc, item) => {
+          const key = item.actionType || 'без действия';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const unansweredQuestions = lokiAnalytics
+          .filter(x => !x.success || x.intent === 'knowledge.unknown' || x.intent === 'partner.empty')
+          .map(x => String(x.query || '').trim())
+          .filter(Boolean)
+          .slice(0, 12);
         const popularQuestions = lokiAnalytics
           .map(x => String(x.query || '').trim())
           .filter(Boolean)
@@ -4160,6 +4170,24 @@ export const AdminPanel = () => {
                     <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{intent}</span>
                     <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
                   </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Переходы после рекомендаций</h2>
+                {byAction.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : byAction.map(([action, count]) => (
+                  <div key={action} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{action}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Непонятые вопросы</h2>
+                {unansweredQuestions.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Критичных пробелов пока нет.</p> : unansweredQuestions.map(q => (
+                  <button key={q} onClick={() => { setActiveTab('loki-knowledge'); setLkQuestion(q); setLkTitle(q.slice(0, 80)); }} style={{ ...s.row, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
+                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{q}</span>
+                    <span style={{ color: A.gold, fontSize: 11, fontWeight: 800 }}>добавить ответ</span>
+                  </button>
                 ))}
               </div>
             </div>

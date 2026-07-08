@@ -11,6 +11,8 @@ const QUICK_QUESTIONS = [
   'Что интересного сегодня?',
   'Куда сходить с детьми?',
   'Нужен хороший массаж',
+  'Что посоветуешь партнёру?',
+  'Что посоветуешь эксперту?',
 ];
 
 export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
@@ -55,6 +57,43 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
     } catch {}
   };
 
+  const renderLokiCard = (card, keyPrefix = 'card') => (
+    <GlassCard key={`${keyPrefix}-${card.id}`} onClick={() => runCardAction(card.action)} style={{ borderRadius: 24, padding: 0, overflow: 'hidden' }}>
+      {card.image && (
+        <div style={{ height: 126, backgroundImage: `url(${card.image})`, backgroundSize: 'cover', backgroundPosition: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }} />
+      )}
+      <div style={{ padding: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+          <GlassBadge tone="gold">{card.type === 'partner' ? 'Партнёр' : card.type === 'expert' ? 'Эксперт' : card.type === 'event' ? 'Событие' : card.type === 'news' ? 'Новость' : card.type === 'prize' ? 'Приз' : 'АПГ'}</GlassBadge>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820 }}>{card.label || 'Открыть'}</div>
+        </div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '20px', fontWeight: 900 }}>{card.title}</div>
+        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 5 }}>{card.reason || card.text}</div>
+        {!!card.meta?.length && (
+          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
+            {card.meta.map((line, idx) => (
+              <div key={`${card.id}-meta-${idx}`} style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px' }}>{line}</div>
+            ))}
+          </div>
+        )}
+        {!!card.actions?.length && (
+          <div style={{ display: 'flex', gap: 7, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }} onClick={e => e.stopPropagation()}>
+            {card.actions.map((act, idx) => (
+              <GlassButton
+                key={`${card.id}-action-${idx}`}
+                tone={idx === 0 ? 'gold' : 'default'}
+                onClick={() => act.href ? openHref(act.href) : runCardAction(act.action)}
+                style={{ minHeight: 34, borderRadius: 999, padding: '7px 10px', fontSize: 12, flex: '0 0 auto', color: idx === 0 ? '#17120a' : undefined }}
+              >
+                {act.label}
+              </GlassButton>
+            ))}
+          </div>
+        )}
+      </div>
+    </GlassCard>
+  );
+
   return (
     <GlassPanel>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -83,6 +122,26 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
         ))}
       </div>
 
+      {!!loki.recommendationFeed?.length && (
+        <GlassCard style={{ borderRadius: 28, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <GlassBadge tone="gold">Локи рекомендует</GlassBadge>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px' }}>персональная подборка</div>
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {loki.recommendationFeed.slice(0, 3).map(card => renderLokiCard(card, 'recommendation'))}
+          </div>
+        </GlassCard>
+      )}
+
+      {!!loki.scenarioCollections?.length && (
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 3, marginBottom: 12 }}>
+          {loki.scenarioCollections.slice(0, 6).map(collection => (
+            <GlassButton key={collection.id} onClick={() => ask(collection.title)} style={{ minHeight: 40, flex: '0 0 auto', borderRadius: 999, padding: '8px 12px' }}>{collection.title}</GlassButton>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
         {messages.slice(-8).map(item => {
           const user = item.from === 'user';
@@ -93,42 +152,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
               </div>
               {!!item.cards?.length && (
                 <div style={{ width: '100%', display: 'grid', gap: 8 }}>
-                  {item.cards.slice(0, 5).map(card => (
-                    <GlassCard key={`${item.id}-${card.id}`} onClick={() => runCardAction(card.action)} style={{ borderRadius: 24, padding: 0, overflow: 'hidden' }}>
-                      {card.image && (
-                        <div style={{ height: 126, backgroundImage: `url(${card.image})`, backgroundSize: 'cover', backgroundPosition: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }} />
-                      )}
-                      <div style={{ padding: 12 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                          <GlassBadge tone="gold">{card.type === 'partner' ? 'Партнёр' : card.type === 'expert' ? 'Эксперт' : card.type === 'event' ? 'Событие' : card.type === 'news' ? 'Новость' : 'АПГ'}</GlassBadge>
-                          <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820 }}>{card.label || 'Открыть'}</div>
-                        </div>
-                        <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '20px', fontWeight: 900 }}>{card.title}</div>
-                        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 5 }}>{card.text}</div>
-                        {!!card.meta?.length && (
-                          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
-                            {card.meta.map((line, idx) => (
-                              <div key={`${card.id}-meta-${idx}`} style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px' }}>{line}</div>
-                            ))}
-                          </div>
-                        )}
-                        {!!card.actions?.length && (
-                          <div style={{ display: 'flex', gap: 7, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }} onClick={e => e.stopPropagation()}>
-                            {card.actions.map((act, idx) => (
-                              <GlassButton
-                                key={`${card.id}-action-${idx}`}
-                                tone={idx === 0 ? 'gold' : 'default'}
-                                onClick={() => act.href ? openHref(act.href) : runCardAction(act.action)}
-                                style={{ minHeight: 34, borderRadius: 999, padding: '7px 10px', fontSize: 12, flex: '0 0 auto', color: idx === 0 ? '#17120a' : undefined }}
-                              >
-                                {act.label}
-                              </GlassButton>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </GlassCard>
-                  ))}
+                  {item.cards.slice(0, 5).map(card => renderLokiCard(card, item.id))}
                 </div>
               )}
             </div>

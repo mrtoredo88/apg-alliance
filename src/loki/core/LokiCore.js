@@ -1,5 +1,6 @@
 import { Navigator } from './modules/Navigator.js';
 import { ActionRouter } from './modules/ActionRouter.js';
+import { ConciergeEngine } from './modules/ConciergeEngine.js';
 import { PartnerExpert } from './modules/PartnerExpert.js';
 import { EventExpert } from './modules/EventExpert.js';
 import { RewardsExpert } from './modules/RewardsExpert.js';
@@ -18,6 +19,7 @@ import { buildPersonalRoute, buildSurprisePick } from '../LokiPlanner.js';
 
 const LOKI_MODULES = [
   ActionRouter,
+  ConciergeEngine,
   Navigator,
   KnowledgeExpert,
   PartnerExpert,
@@ -64,6 +66,8 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
       ...APG_KNOWLEDGE_BASE,
       custom: Array.isArray(appState.lokiKnowledge) ? appState.lokiKnowledge : [],
     },
+    memory,
+    userMemory,
     knowledgeHealth: validateApgKnowledgeBase(APG_KNOWLEDGE_BASE),
   };
   return MemoryEngine.enrich({ context: base, memory, userMemory });

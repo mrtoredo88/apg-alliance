@@ -21,6 +21,7 @@ import {
 } from './LokiEmotionEngine.js';
 import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from './core/lokiUserMemory.js';
 import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearning.js';
+import { buildInterestProfile, buildRecommendationFeed, buildScenarioCollections } from './LokiRecommendationCenter.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -514,6 +515,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     isHiddenOnPanel,
     lastEvent,
     history,
+    interestProfile: buildInterestProfile({ appState: { ...appState, user, activePanel }, memory, userMemory }),
+    recommendationFeed: buildRecommendationFeed({ appState: { ...appState, user, activePanel }, memory, userMemory, limit: 8 }),
+    scenarioCollections: buildScenarioCollections({ appState: { ...appState, user, activePanel }, memory, userMemory }).filter(item => item.cards.length),
     memory: memory ?? DEFAULT_LOKI_MEMORY,
     userMemory,
     message,
@@ -554,7 +558,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
-  }), [action, activePanel, anchor, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, userMemory, visible]);
+  }), [action, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

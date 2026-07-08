@@ -13,6 +13,7 @@ const CATEGORY_HINTS = [
 export const DEFAULT_LOKI_USER_MEMORY = {
   favoriteCategories: {},
   frequentIntents: {},
+  queryHours: {},
   lastQueries: [],
   updatedAt: null,
 };
@@ -42,12 +43,16 @@ export function learnFromLokiQuery(memory, query, result) {
   const text = String(query ?? '').toLowerCase().replace(/ё/g, 'е');
   const favoriteCategories = { ...(memory?.favoriteCategories ?? {}) };
   const frequentIntents = { ...(memory?.frequentIntents ?? {}) };
+  const queryHours = { ...(memory?.queryHours ?? {}) };
+  const hour = new Date().getHours();
+  const bucket = hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'day' : 'evening';
   for (const [category, words] of CATEGORY_HINTS) {
     if (words.some(word => text.includes(word))) favoriteCategories[category] = (favoriteCategories[category] ?? 0) + 1;
   }
   if (result?.intent) frequentIntents[result.intent] = (frequentIntents[result.intent] ?? 0) + 1;
+  queryHours[bucket] = (queryHours[bucket] ?? 0) + 1;
   const lastQueries = [text].filter(Boolean).concat(memory?.lastQueries ?? []).slice(0, 8);
-  const next = { favoriteCategories, frequentIntents, lastQueries };
+  const next = { favoriteCategories, frequentIntents, queryHours, lastQueries };
   saveLokiUserMemory(next);
   return { ...DEFAULT_LOKI_USER_MEMORY, ...next, updatedAt: new Date().toISOString() };
 }

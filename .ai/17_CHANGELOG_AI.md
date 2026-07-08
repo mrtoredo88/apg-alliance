@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Loki city concierge foundation
+**Коммит:** `локально`
+**Файлы:** `src/loki/LokiRecommendationCenter.js`, `src/loki/core/modules/ConciergeEngine.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/loki/core/lokiUserMemory.js`, `src/LokiPage.jsx`, `src/AdminPanel.jsx`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Добавлен единый Recommendation Center: персональный профиль интересов, персональная лента «Локи рекомендует», сценарные подборки («вечер», «с детьми», «кофейни», «спорт», «авто», «предприниматели») и первые советы для партнёров/экспертов. Loki Core получил модуль City Concierge, а админская аналитика Локи показывает непонятые вопросы и действия после рекомендаций.
+**Почему:** Локи должен развиваться из чат-помощника в городского консьержа, который помогает принимать решения и даёт единую основу рекомендаций для будущих разделов АПГ.
+
+---
+
 ## [2026-07-08] Loki Action Router и админская база знаний
 **Коммит:** `локально`
 **Файлы:** `src/loki/core/LokiCore.js`, `src/loki/core/modules/ActionRouter.js`, `src/loki/core/lokiCoreUtils.js`, `src/loki/core/modules/KnowledgeExpert.js`, `src/loki/lokiActionTypes.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `api/admin-actions.js`, `api/user-actions.js`, `api/public-data.js`, `server/src/routes/admin-actions.js`, `server/src/routes/user-actions.js`, `server/src/routes/public-data.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
