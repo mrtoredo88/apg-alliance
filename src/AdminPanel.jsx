@@ -709,28 +709,6 @@ function QuickInsightCard({ icon, title, text, sub, onClick }) {
   );
 }
 
-function AdminQuickActions({ setActiveTab, openNews, openPartner, openEvent, openPrize, openPush, openComments }) {
-  const actions = [
-    ['📢', 'Новость', openNews],
-    ['📸', 'Фото к новости', openNews],
-    ['🤝', 'Партнёр', openPartner],
-    ['📅', 'Событие', openEvent],
-    ['🎁', 'Приз', openPrize],
-    ['📣', 'Push', openPush],
-    ['💬', 'Комментарии', openComments],
-    ['🤖', 'Черновики ИИ', () => setActiveTab('ai-drafts')],
-  ];
-  return (
-    <div style={{ position: 'fixed', right: 18, bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))', zIndex: 850, display: 'grid', gap: 8, width: 178 }}>
-      {actions.map(([icon, label, onClick]) => (
-        <button key={label} type="button" onClick={onClick} style={{ ...s.btn, ...s.btnPri, minHeight: 40, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, boxShadow: '0 18px 46px rgba(0,0,0,0.34)', fontSize: 12.5 }}>
-          <span>{icon}</span><span>{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 const byPriorityDate = (a, b) => {
   const dp = (b.priority ?? 0) - (a.priority ?? 0);
   if (dp !== 0) return dp;
@@ -4183,6 +4161,63 @@ export const AdminPanel = () => {
     ...((q.includes('ии') || q.includes('ai') || q.includes('чернов')) ? [{ tab: 'ai-drafts', id: 'ai-drafts', label: 'Черновики ИИ', sub: 'Раздел подготовлен к V4.5', emoji: '🤖', typeName: 'Раздел' }] : []),
   ] : [];
   const isCompact = viewportWidth < 860;
+  const createActionGroups = {
+    dashboard: [
+      ['📢', 'Новость', () => { resetNewsForm(); setActiveTab('news'); setShowNewsModal(true); }],
+      ['🤝', 'Партнёр', () => { resetPartnerForm(); setActiveTab('partners'); setShowPartnerModal(true); }],
+      ['🧑‍💼', 'Эксперт', () => { resetExpertForm(); setActiveTab('experts'); setShowExpertModal(true); }],
+      ['🎉', 'Событие', () => { resetEventForm(); setActiveTab('events'); setShowEventModal(true); }],
+      ['🎁', 'Приз', () => { resetPrizeForm(); setActiveTab('prizes'); }],
+    ],
+    news: [
+      ['📢', 'Новость', () => { resetNewsForm(); setShowNewsModal(true); }],
+      ['📸', 'Фото к новости', () => { resetNewsForm(); setShowNewsModal(true); }],
+    ],
+    partners: [['🤝', 'Партнёр', () => { resetPartnerForm(); setShowPartnerModal(true); }]],
+    experts: [['🧑‍💼', 'Эксперт', () => { resetExpertForm(); setShowExpertModal(true); }]],
+    events: [['🎉', 'Событие', () => { resetEventForm(); setShowEventModal(true); }]],
+    prizes: [['🎁', 'Приз', () => { resetPrizeForm(); setActiveTab('prizes'); }]],
+    notifs: [['📣', 'Push', () => { setActiveTab('notifs'); }]],
+    'ai-drafts': [['🤖', 'Черновик ИИ', () => { setActiveTab('ai-drafts'); }]],
+  };
+  const createActions = createActionGroups[activeTab] || [];
+  const hasContextFilter = ['partners', 'experts', 'events', 'news'].includes(activeTab);
+  const runContextFilter = () => {
+    const filterMap = {
+      partners: [partnerLinksFilter, setPartnerLinksFilter],
+      experts: [expertLinksFilter, setExpertLinksFilter],
+      events: [eventLinksFilter, setEventLinksFilter],
+      news: [newsLinksFilter, setNewsLinksFilter],
+    };
+    const pair = filterMap[activeTab];
+    if (!pair) return;
+    pair[1](pair[0] === 'unverified' ? 'all' : 'unverified');
+  };
+  const exportCurrentTabCSV = () => {
+    const fileDate = new Date().toISOString().slice(0, 10);
+    const csvEscape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const datasets = {
+      users: [['ID', 'Имя', 'Email', 'Ключи'], adminMetrics.users.map(u => [u.id, userDisplayName(u), u.email || '', u.keys ?? 0])],
+      partners: [['ID', 'Название', 'Категория', 'Адрес'], partners.map(p => [p.id, p.name || '', p.category || '', p.address || ''])],
+      experts: [['ID', 'Имя', 'Специализация', 'Email'], experts.map(ex => [ex.id, ex.name || '', ex.specialization || '', ex.ownerEmail || ''])],
+      events: [['ID', 'Название', 'Дата', 'Активно'], events.map(e => [e.id, e.title || '', e.date || '', e.active !== false ? 'yes' : 'no'])],
+      news: [['ID', 'Заголовок', 'Категория', 'Статус'], news.map(n => [n.id, n.title || '', n.category || '', n.status || (n.active === false ? 'draft' : 'published')])],
+      prizes: [['ID', 'Название', 'Остаток', 'Активно'], prizes.map(p => [p.id, p.name || p.title || '', p.stock ?? '', p.active !== false ? 'yes' : 'no'])],
+      comments: [['ID', 'Пользователь', 'Текст', 'Скрыт'], newsComments.map(c => [c.id, c.userName || c.userId || '', c.text || '', c.hidden ? 'yes' : 'no'])],
+      moderation: [['ID', 'Пользователь', 'Текст', 'Статус'], newsComments.map(c => [c.id, c.userName || c.userId || '', c.text || '', c.status || ''])],
+      errors: [['ID', 'Сообщение', 'Экран', 'Решено'], errorLogs.map(e => [e.id, e.message || e.error || '', e.screen || e.source || '', e.resolved ? 'yes' : 'no'])],
+    };
+    const [header, rows] = datasets[activeTab] || datasets.news;
+    const csv = [header, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `apg_${activeTab}_${fileDate}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  };
   const adminPageStyle = {
     ...s.page,
     display: isCompact ? 'block' : 'flex',
@@ -4325,14 +4360,14 @@ export const AdminPanel = () => {
           )}
         </div>
 
-        {/* Тоггл "только непроверенные" */}
-        {['partners','experts','events','news'].includes(activeTab) && (() => {
+        {/* Фильтр */}
+        {hasContextFilter && (() => {
           const filterMap = { partners: [partnerLinksFilter, setPartnerLinksFilter], experts: [expertLinksFilter, setExpertLinksFilter], events: [eventLinksFilter, setEventLinksFilter], news: [newsLinksFilter, setNewsLinksFilter] };
-          const [curFilter, setCurFilter] = filterMap[activeTab];
+          const [curFilter] = filterMap[activeTab];
           return (
-            <button onClick={() => setCurFilter(v => v === 'unverified' ? 'all' : 'unverified')}
+            <button onClick={runContextFilter}
               style={{ padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${curFilter === 'unverified' ? '#f59e0b' : A.border}`, background: curFilter === 'unverified' ? 'rgba(245,158,11,0.12)' : 'transparent', color: curFilter === 'unverified' ? '#f59e0b' : A.textSec, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              ⚠ Не проверены
+              Фильтр{!isCompact && (curFilter === 'unverified' ? ': не проверены' : ': все')}
             </button>
           );
         })()}
@@ -4359,28 +4394,40 @@ export const AdminPanel = () => {
           </span>
         )}
 
-        {/* ➕ Добавить */}
-        <div style={{ position: 'relative', flexShrink: 0 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowAddDrop(false); }}>
-          <button onClick={() => { setShowAddDrop(v => !v); setShowToolsDrop(false); }}
-            style={{ ...s.btn, ...s.btnPri, padding: '8px 14px', fontSize: 13, whiteSpace: 'nowrap' }}>
-            ➕ Добавить ▾
-          </button>
-          {showAddDrop && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#1A1A2E', border: `1px solid ${A.border}`, borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', zIndex: 200, overflow: 'hidden', minWidth: 185 }}>
-              {[
-                ['🤝', 'Партнёра',  () => { resetPartnerForm(); setShowPartnerModal(true); setActiveTab('partners'); setShowAddDrop(false); }],
-                ['🧑‍💼', 'Эксперта', () => { resetExpertForm(); setShowExpertModal(true); setActiveTab('experts'); setShowAddDrop(false); }],
-                ['🎉', 'Событие',   () => { resetEventForm(); setActiveTab('events'); setShowEventModal(true); setShowAddDrop(false); }],
-                ['📢', 'Новость',   () => { resetNewsForm(); setActiveTab('news'); setShowNewsModal(true); setShowAddDrop(false); }],
-              ].map(([emoji, label, action], i, arr) => (
-                <button key={label} onClick={action}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', width: '100%', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${A.border}` : 'none', background: 'none', cursor: 'pointer', color: A.text, fontSize: 13, textAlign: 'left' }}>
-                  <span style={{ fontSize: 15 }}>{emoji}</span>{label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {createActions.length > 0 && (
+          <div style={{ position: 'relative', flexShrink: 0 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowAddDrop(false); }}>
+            <button onClick={() => { setShowAddDrop(v => !v); setShowToolsDrop(false); }}
+              style={{ ...s.btn, ...s.btnPri, padding: isCompact ? '8px 11px' : '8px 14px', minWidth: isCompact ? 40 : 'auto', minHeight: 38, fontSize: 13, whiteSpace: 'nowrap' }}>
+              {isCompact ? '＋' : '+ Создать ▾'}
+            </button>
+            {showAddDrop && (
+              <div style={isCompact
+                ? { position: 'fixed', left: 12, right: 12, bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))', background: '#1A1A2E', border: `1px solid ${A.border}`, borderRadius: 18, boxShadow: '0 18px 50px rgba(0,0,0,0.58)', zIndex: 900, overflow: 'hidden' }
+                : { position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#1A1A2E', border: `1px solid ${A.border}`, borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', zIndex: 200, overflow: 'hidden', minWidth: 190 }}>
+                {isCompact && <div style={{ padding: '12px 16px 8px', color: A.textSec, fontSize: 11, fontWeight: 850, textTransform: 'uppercase' }}>Создать</div>}
+                {createActions.map(([emoji, label, action], i, arr) => (
+                  <button key={label} onClick={() => { action(); setShowAddDrop(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isCompact ? '14px 16px' : '11px 16px', width: '100%', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${A.border}` : 'none', background: 'none', cursor: 'pointer', color: A.text, fontSize: 13, textAlign: 'left' }}>
+                    <span style={{ fontSize: 15 }}>{emoji}</span>{label}
+                  </button>
+                ))}
+                {isCompact && (
+                  <button type="button" onClick={() => setShowAddDrop(false)} style={{ display: 'block', width: '100%', padding: '13px 16px', border: 'none', borderTop: `1px solid ${A.border}`, background: 'rgba(255,255,255,0.04)', color: A.textSec, fontSize: 13 }}>
+                    Закрыть
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button type="button" onClick={fetchData} disabled={loading} style={{ ...s.btn, ...s.btnGray, padding: isCompact ? '8px 11px' : '8px 14px', minHeight: 38, fontSize: 13, opacity: loading ? 0.55 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {isCompact ? '↻' : 'Обновить'}
+        </button>
+
+        <button type="button" onClick={exportCurrentTabCSV} style={{ ...s.btn, ...s.btnGray, padding: isCompact ? '8px 11px' : '8px 14px', minHeight: 38, fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {isCompact ? '⇩' : 'Экспорт'}
+        </button>
 
         {/* 🔧 Инструменты */}
         <div style={{ position: 'relative', flexShrink: 0 }} tabIndex={-1} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setShowToolsDrop(false); }}>
@@ -6890,16 +6937,6 @@ export const AdminPanel = () => {
 
       <div style={{ height: 32 }} />
       </div>{/* end content */}
-
-      <AdminQuickActions
-        setActiveTab={setActiveTab}
-        openNews={() => { resetNewsForm(); setActiveTab('news'); setShowNewsModal(true); }}
-        openPartner={() => { resetPartnerForm(); setActiveTab('partners'); setShowPartnerModal(true); }}
-        openEvent={() => { resetEventForm(); setActiveTab('events'); setShowEventModal(true); }}
-        openPrize={() => { resetPrizeForm(); setActiveTab('prizes'); }}
-        openPush={() => setActiveTab('notifs')}
-        openComments={() => { setActiveTab('comments'); loadNewsComments(); }}
-      />
 
       <AdminQuickNewsEditor
         item={quickEditNews}
