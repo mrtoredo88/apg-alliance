@@ -3230,6 +3230,12 @@ export const AdminPanel = () => {
     return result;
   };
 
+  const formatPushResult = (prefix, result = {}) => {
+    const base = `${prefix}: ${result.sent ?? 0} отправлено · ${result.failed ?? 0} ошибок · ${result.subscribers ?? 0} получателей`;
+    const firstError = Array.isArray(result.errors) ? result.errors[0] : null;
+    return firstError?.code ? `${base} · ${firstError.code}` : base;
+  };
+
   const sendNotif = async () => {
     if (!ntTitle.trim()) return;
     const audience = buildNotificationAudience();
@@ -3263,7 +3269,7 @@ export const AdminPanel = () => {
     if (ntSendPush && !scheduledAt) {
       try {
         const result = await sendPushForNotification(data, created.id);
-        finalPushResult = result.sent != null ? `Push: ${result.sent} отправлено · ${result.failed ?? 0} ошибок · ${result.subscribers ?? 0} получателей` : 'Push: нет подписчиков';
+        finalPushResult = result.sent != null ? formatPushResult('Push', result) : 'Push: нет подписчиков';
       } catch (e) {
         logError(e, 'AdminPanel.sendNotif.push');
         finalPushResult = `Push: ${e.message || 'ошибка отправки'}`;
@@ -3281,7 +3287,7 @@ export const AdminPanel = () => {
     if (!notification?.id || !window.confirm('Повторить push-отправку этого уведомления?')) return;
     try {
       const result = await sendPushForNotification(notification, notification.id, `push_repeat_${notification.id}_${Date.now()}`);
-      setNtPushResult(`Повтор: ${result.sent ?? 0} отправлено · ${result.failed ?? 0} ошибок · ${result.subscribers ?? 0} получателей`);
+      setNtPushResult(formatPushResult('Повтор', result));
       fetchData();
     } catch (e) {
       logError(e, 'AdminPanel.repeatNotifPush');

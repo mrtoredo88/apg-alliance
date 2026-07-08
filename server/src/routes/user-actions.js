@@ -38,6 +38,18 @@ function stripUndefined(input = {}) {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
+function sanitizeWebPushSubscription(input = {}) {
+  const endpoint = safeString(input.endpoint, 2000);
+  const p256dh = safeString(input.keys?.p256dh, 500);
+  const auth = safeString(input.keys?.auth, 300);
+  if (!endpoint || !p256dh || !auth) return null;
+  return {
+    endpoint,
+    expirationTime: input.expirationTime || null,
+    keys: { p256dh, auth },
+  };
+}
+
 async function resolveActor(db, decoded) {
   const direct = await db.collection('users').doc(decoded.uid).get().catch(() => null);
   if (direct?.exists) return { uid: decoded.uid, userId: decoded.uid, user: direct.data() || {}, source: 'users.uid' };
@@ -183,7 +195,7 @@ async function actionProfileSync(db, req, actor) {
 
 async function actionProfilePatch(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
-  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup']);
+  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (allowed.has(key)) patch[key] = value;
@@ -196,6 +208,10 @@ async function actionProfilePatch(db, req, actor) {
   if (Array.isArray(req.body?.patch?.fcmTokens)) {
     const tokens = req.body.patch.fcmTokens.map(token => safeString(token, 500)).filter(Boolean).slice(0, 5);
     if (tokens.length) patch.fcmTokens = FieldValue.arrayUnion(...tokens);
+  }
+  if (Array.isArray(req.body?.patch?.webPushSubscriptions)) {
+    const subscriptions = req.body.patch.webPushSubscriptions.map(sanitizeWebPushSubscription).filter(Boolean).slice(0, 5);
+    if (subscriptions.length) patch.webPushSubscriptions = FieldValue.arrayUnion(...subscriptions);
   }
   if (!Object.keys(patch).length) throw Object.assign(new Error('Нет данных для сохранения.'), { statusCode: 400 });
   patch.updatedAt = FieldValue.serverTimestamp();

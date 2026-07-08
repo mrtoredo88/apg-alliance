@@ -23,6 +23,9 @@ yc serverless container revision deploy \
   --environment VK_SERVICE_TOKEN="$(get_env VK_SERVICE_TOKEN)" \
   --environment VK_USER_TOKEN="$(get_env VK_USER_TOKEN)" \
   --environment VK_GROUP_TOKEN="$(get_env VK_GROUP_TOKEN)" \
+  --environment WEB_PUSH_VAPID_PUBLIC_KEY="$(get_env WEB_PUSH_VAPID_PUBLIC_KEY)" \
+  --environment WEB_PUSH_VAPID_PRIVATE_KEY="$(get_env WEB_PUSH_VAPID_PRIVATE_KEY)" \
+  --environment WEB_PUSH_VAPID_SUBJECT="$(get_env WEB_PUSH_VAPID_SUBJECT)" \
   --environment YANDEX_EMAIL="$(get_env YANDEX_EMAIL)" \
   --environment YANDEX_EMAIL_PASS="$(get_env YANDEX_EMAIL_PASS)" \
   --environment POSTBOX_KEY_ID="$(get_env POSTBOX_KEY_ID)" \

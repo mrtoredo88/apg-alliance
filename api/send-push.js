@@ -12,6 +12,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import webpush from 'web-push';
 import { APP_URL } from './config.js';
 import { requireAdminPermission, writeAuditLog } from './_admin-security.js';
 
@@ -20,6 +21,14 @@ function initAdmin() {
     initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
   }
   return { db: getFirestore(), messaging: getMessaging() };
+}
+
+function initWebPush() {
+  const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) return { ok: false, error: 'WEB_PUSH_VAPID_ENV_MISSING' };
+  webpush.setVapidDetails(process.env.WEB_PUSH_VAPID_SUBJECT || `mailto:support@${new URL(APP_URL).hostname}`, publicKey, privateKey);
+  return { ok: true };
 }
 
 const DEFAULT_CATEGORIES = {
@@ -68,7 +77,7 @@ function userMatchesAudience(data = {}, audience = {}) {
   return true;
 }
 
-async function sendToTokens(messaging, db, tokens, userIds, title, body, url, tag, options = {}) {
+async function sendToFcmTokens(messaging, db, tokens, userIds, title, body, url, tag, options = {}) {
   if (!tokens.length) return { sent: 0, failed: 0, cleaned: 0 };
 
   const webpushNotification = {
@@ -137,6 +146,94 @@ async function sendToTokens(messaging, db, tokens, userIds, title, body, url, ta
   return { sent: result.successCount, failed: result.failureCount, cleaned, errors };
 }
 
+function buildPayload(title, body, url, tag, options = {}) {
+  return JSON.stringify({
+    notification: {
+      title,
+      body: body ?? '',
+      icon: `${APP_URL}/192.png`,
+      badge: `${APP_URL}/32.png`,
+      image: options.imageUrl || undefined,
+      tag: tag ?? 'apg-push',
+    },
+    data: {
+      title,
+      body: body ?? '',
+      url: url ?? APP_URL,
+      tag: tag ?? 'apg-push',
+      notificationId: options.notificationId ?? '',
+      category: options.category ?? 'important',
+      type: options.type ?? 'info',
+      priority: options.priority ?? 'normal',
+    },
+  });
+}
+
+function normalizeSubscription(input) {
+  const endpoint = String(input?.endpoint || '').trim();
+  const p256dh = String(input?.keys?.p256dh || '').trim();
+  const auth = String(input?.keys?.auth || '').trim();
+  if (!endpoint || !p256dh || !auth) return null;
+  return { endpoint, expirationTime: input.expirationTime || null, keys: { p256dh, auth } };
+}
+
+async function sendToWebPushSubscriptions(db, subscriptions, userIds, title, body, url, tag, options = {}) {
+  const normalized = subscriptions.map(normalizeSubscription);
+  const pairs = normalized.map((subscription, index) => ({ subscription, userId: userIds[index] })).filter(x => x.subscription);
+  if (!pairs.length) return { sent: 0, failed: 0, cleaned: 0, errors: [] };
+
+  const vapid = initWebPush();
+  if (!vapid.ok) {
+    return { sent: 0, failed: pairs.length, cleaned: 0, errors: [{ code: vapid.error, message: 'Native Web Push VAPID keys are not configured' }] };
+  }
+
+  const payload = buildPayload(title, body, url, tag, options);
+  let sent = 0;
+  let failed = 0;
+  const deadByUser = {};
+  const errors = [];
+
+  await Promise.all(pairs.map(async ({ subscription, userId }) => {
+    try {
+      await webpush.sendNotification(subscription, payload, {
+        TTL: options.priority === 'critical' ? 86400 : 21600,
+        urgency: options.priority === 'critical' ? 'high' : 'normal',
+      });
+      sent += 1;
+    } catch (e) {
+      failed += 1;
+      const code = e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error';
+      errors.push({ code, message: String(e.body || e.message || '').slice(0, 300) });
+      if (e.statusCode === 404 || e.statusCode === 410) {
+        deadByUser[userId] ??= [];
+        deadByUser[userId].push(subscription);
+      }
+    }
+  }));
+
+  await Promise.all(
+    Object.entries(deadByUser).map(([uid, dead]) =>
+      db.collection('users').doc(uid).update({
+        webPushSubscriptions: FieldValue.arrayRemove(...dead),
+      }).catch(() => {})
+    )
+  );
+
+  return { sent, failed, cleaned: Object.values(deadByUser).flat().length, errors: errors.slice(0, 12) };
+}
+
+function mergeStats(nativeStats, fcmStats, subscribers) {
+  return {
+    subscribers,
+    sent: Number(nativeStats.sent || 0) + Number(fcmStats.sent || 0),
+    failed: Number(nativeStats.failed || 0) + Number(fcmStats.failed || 0),
+    cleaned: Number(nativeStats.cleaned || 0) + Number(fcmStats.cleaned || 0),
+    native: nativeStats,
+    fcm: fcmStats,
+    errors: [...(nativeStats.errors || []), ...(fcmStats.errors || [])].slice(0, 20),
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const secret = req.headers['x-push-secret'];
@@ -163,15 +260,22 @@ export default async function handler(req, res) {
     if (userId && !broadcast) {
       const snap = await db.collection('users').doc(String(userId)).get();
       if (!snap.exists) return res.status(404).json({ error: 'user not found' });
-      const { fcmTokens = [] } = snap.data();
-      if (!fcmTokens.length) return res.json({ skipped: true, reason: 'no fcm tokens' });
+      const { fcmTokens = [], webPushSubscriptions = [] } = snap.data();
+      if (!fcmTokens.length && !webPushSubscriptions.length) return res.json({ skipped: true, reason: 'no push subscriptions', subscribers: 0, sent: 0, failed: 0 });
 
-      const stats = await sendToTokens(
+      const nativeStats = await sendToWebPushSubscriptions(
+        db,
+        webPushSubscriptions, webPushSubscriptions.map(() => String(userId)),
+        title, body, url, tag,
+        { notificationId, category, type, priority, imageUrl, actionLabel }
+      );
+      const fcmStats = await sendToFcmTokens(
         messaging, db,
         fcmTokens, fcmTokens.map(() => String(userId)),
         title, body, url, tag,
         { notificationId, category, type, priority, imageUrl, actionLabel }
       );
+      const stats = mergeStats(nativeStats, fcmStats, webPushSubscriptions.length + fcmTokens.length);
       if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
         pushStatus: stats.failed ? 'partial' : 'sent',
         pushStats: stats,
@@ -186,7 +290,9 @@ export default async function handler(req, res) {
       const snap = await db.collection('users').get();
 
       const tokens  = [];
-      const userIds = [];
+      const tokenUserIds = [];
+      const subscriptions = [];
+      const subscriptionUserIds = [];
       snap.docs.forEach(d => {
         const data = d.data() || {};
         const prefs = data.notificationPreferences || DEFAULT_CATEGORIES;
@@ -196,11 +302,15 @@ export default async function handler(req, res) {
         if (!userMatchesAudience(data, audience)) return;
         (data.fcmTokens ?? []).forEach(t => {
           tokens.push(t);
-          userIds.push(d.id);
+          tokenUserIds.push(d.id);
+        });
+        (data.webPushSubscriptions ?? []).forEach(s => {
+          subscriptions.push(s);
+          subscriptionUserIds.push(d.id);
         });
       });
 
-      if (!tokens.length) {
+      if (!tokens.length && !subscriptions.length) {
         const skipped = { skipped: true, reason: 'no matching webpush subscribers', subscribers: 0, sent: 0, failed: 0, cleaned: 0 };
         if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
           pushStatus: 'skipped',
@@ -210,24 +320,25 @@ export default async function handler(req, res) {
         return res.json(skipped);
       }
 
-      // FCM multicast — max 500 за раз
-      let total = { sent: 0, failed: 0, cleaned: 0, errors: [] };
+      let fcmTotal = { sent: 0, failed: 0, cleaned: 0, errors: [] };
       for (let i = 0; i < tokens.length; i += 500) {
         const chunk = tokens.slice(i, i + 500);
-        const ids   = userIds.slice(i, i + 500);
-        const s = await sendToTokens(messaging, db, chunk, ids, title, body, url, tag, { notificationId, category, type, priority, imageUrl, actionLabel });
-        total.sent    += s.sent;
-        total.failed  += s.failed;
-        total.cleaned += s.cleaned;
-        total.errors = [...(total.errors || []), ...(s.errors || [])].slice(0, 20);
+        const ids   = tokenUserIds.slice(i, i + 500);
+        const s = await sendToFcmTokens(messaging, db, chunk, ids, title, body, url, tag, { notificationId, category, type, priority, imageUrl, actionLabel });
+        fcmTotal.sent    += s.sent;
+        fcmTotal.failed  += s.failed;
+        fcmTotal.cleaned += s.cleaned;
+        fcmTotal.errors = [...(fcmTotal.errors || []), ...(s.errors || [])].slice(0, 20);
       }
+      const nativeTotal = await sendToWebPushSubscriptions(db, subscriptions, subscriptionUserIds, title, body, url, tag, { notificationId, category, type, priority, imageUrl, actionLabel });
+      const total = mergeStats(nativeTotal, fcmTotal, subscriptions.length + tokens.length);
       if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
         pushStatus: total.failed ? 'partial' : 'sent',
-        pushStats: { subscribers: tokens.length, ...total },
+        pushStats: total,
         pushSentAt: FieldValue.serverTimestamp(),
       }, { merge: true }).catch(() => {});
-      if (actor) await writeAuditLog(db, req, actor, 'push:broadcast', 'notifications', 'broadcast', { label: `Broadcast push: ${title}`, subscribers: tokens.length, sent: total.sent, failed: total.failed });
-      return res.json({ broadcast: true, subscribers: tokens.length, ...total });
+      if (actor) await writeAuditLog(db, req, actor, 'push:broadcast', 'notifications', 'broadcast', { label: `Broadcast push: ${title}`, subscribers: total.subscribers, sent: total.sent, failed: total.failed });
+      return res.json({ broadcast: true, ...total });
     }
 
     return res.status(400).json({ error: 'userId or broadcast required' });

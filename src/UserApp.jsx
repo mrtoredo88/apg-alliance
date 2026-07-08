@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
-import { APP_URL, API_BASE_URL } from './constants.js';
+import { APP_URL, API_BASE_URL, WEB_PUSH_VAPID_PUBLIC_KEY } from './constants.js';
 import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
 import '@vkontakte/vkui/dist/vkui.css';
@@ -8,7 +8,7 @@ import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js'
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
 import { confirmQrScan } from './rewardApi.js';
 import { userAction } from './userApi.js';
-import { db, auth, getMessagingIfSupported } from './firebase';
+import { db, auth } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   doc, getDoc,
@@ -56,6 +56,13 @@ function safeScrollTop() {
   } catch {
     try { window.scrollTo(0, 0); } catch {}
   }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
 function getQrErrorMessage(error) {
@@ -1707,34 +1714,35 @@ export function UserApp() {
     navigatePanel('notifications');
   }, [navigatePanel]);
 
-  const VAPID_KEY = 'BAWMFhQ-O6D25-j9s7I_y4kcNDfUMcnqHAdvDoFn-wY4GrMGrgB0I0tU_aPz_7jcr6X0vbkSs0Q1T6UsuyHR8r0';
-
-  const requestWebPushPermission = useCallback(async () => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      showToast('❌ Push не поддерживается в этом браузере', 'error');
+  const requestWebPushPermission = useCallback(async ({ silent = false } = {}) => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (!silent) showToast('❌ Push не поддерживается в этом браузере', 'error');
       return;
     }
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        showToast('❌ Разрешение не получено', 'error');
+        if (!silent) showToast('❌ Разрешение не получено', 'error');
         return;
       }
-      const { getToken }              = await import('firebase/messaging');
-      const msg = await getMessagingIfSupported();
-      if (!msg) { showToast('❌ Push не поддерживается', 'error'); return; }
-
       const swReg = await (window.__swRegPromise ?? navigator.serviceWorker.ready);
-      const token = await getToken(msg, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+      let subscription = await swReg.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await swReg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(WEB_PUSH_VAPID_PUBLIC_KEY),
+        });
+      }
 
-      if (token && user?.id) {
+      if (subscription && user?.id) {
         await userAction('profile:update', {
           userId: String(user.id),
           patch: {
-            fcmTokens: [token],
+            webPushSubscriptions: [subscription.toJSON()],
             notificationProvider: 'webpush',
             notificationsEnabled: true,
             notificationConsent: true,
+            webPushUpdatedAt: new Date().toISOString(),
             notificationPreferences: user?.notificationPreferences || {
               news: true,
               events: true,
@@ -1757,31 +1765,23 @@ export function UserApp() {
       }
       localStorage.setItem('apg_notif_enabled', '1');
       setNotifEnabled(true);
-      showToast('🔔 Уведомления включены!', 'success');
+      if (!silent) showToast('🔔 Уведомления включены!', 'success');
     } catch (e) {
       logError(e, 'UserApp.requestWebPushPermission');
-      showToast('❌ Не удалось включить уведомления', 'error');
+      if (!silent) showToast('❌ Не удалось включить уведомления', 'error');
     }
   }, [user, showToast]);
 
-  // Уведомления в foreground (приложение открыто)
   useEffect(() => {
-    if (isVK()) return;
-    let unsub = () => {};
-    (async () => {
-      try {
-        const { onMessage }             = await import('firebase/messaging');
-        const msg = await getMessagingIfSupported();
-        if (!msg) return;
-        unsub = onMessage(msg, payload => {
-          const title = payload.notification?.title ?? 'АПГ';
-          const body  = payload.notification?.body  ?? '';
-          showToast(`🔔 ${title}${body ? ': ' + body : ''}`);
-        });
-      } catch {}
-    })();
-    return () => unsub();
-  }, [showToast]);
+    if (isVK() || !user?.id) return;
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (user.notificationsEnabled !== true && localStorage.getItem('apg_notif_enabled') !== '1') return;
+    const syncKey = `apg_webpush_sync_${user.id}_${WEB_PUSH_VAPID_PUBLIC_KEY.slice(0, 12)}`;
+    if (sessionStorage.getItem(syncKey) === '1') return;
+    sessionStorage.setItem(syncKey, '1');
+    requestWebPushPermission({ silent: true });
+  }, [user, requestWebPushPermission]);
 
   const handleEnableNotifications = useCallback(() => {
     const uid = user ? String(user.id) : null;

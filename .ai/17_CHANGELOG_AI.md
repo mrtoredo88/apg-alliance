@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Native Web Push для iPhone/Safari PWA
+**Коммит:** `локально`
+**Файлы:** `src/constants.js`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `api/send-push.js`, `server/src/routes/send-push.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `server/deploy.sh`, `package.json`, `package-lock.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Клиентская регистрация push переведена с Firebase Messaging token на стандартный `PushManager.subscribe()` с VAPID public key. Backend теперь отправляет уведомления и на native Web Push subscriptions, и на legacy FCM tokens, сохраняет детальную статистику `native/fcm/errors` и показывает первый код ошибки в админке.
+**Почему:** iPhone/Safari/PWA не получали тестовые push через FCM Web SDK; при этом Firebase Auth/Firestore должны остаться без изменений, а старая FCM-доставка не должна сломаться для уже зарегистрированных пользователей.
+
+---
+
 ## [2026-07-08] Push notification center foundation
 **Коммит:** `локально`
 **Файлы:** `public/sw.js`, `src/main.jsx`, `src/UserApp.jsx`, `src/NotificationsPage.jsx`, `src/AdminPanel.jsx`, `api/send-push.js`, `server/src/routes/send-push.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
