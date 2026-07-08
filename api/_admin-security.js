@@ -4,7 +4,7 @@ import { getAdminAuth, getAdminDb } from './_firebase-admin.js';
 export const ROLE_PERMISSIONS = {
   owner: ['*'],
   super_admin: ['news:*', 'comments:*', 'push:*', 'system:*', 'audit:*', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'settings:*', 'stats:*', 'claims:*', 'errors:*', 'maintenance:*', 'admins:*', 'security:*', 'devices:*', 'loki:*', 'ai:*'],
-  admin: ['news:*', 'comments:*', 'push:*', 'system:read', 'audit:read', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'stats:read', 'claims:*', 'errors:*', 'maintenance:read', 'loki:read', 'ai:read'],
+  admin: ['news:*', 'comments:*', 'push:*', 'system:read', 'audit:read', 'partners:*', 'experts:*', 'events:*', 'banners:*', 'prizes:*', 'notifications:*', 'tasks:*', 'users:*', 'stats:read', 'claims:*', 'errors:*', 'maintenance:read', 'loki:read', 'ai:*'],
   editor: ['news:*', 'comments:read', 'comments:update', 'comments:delete', 'events:read', 'partners:read', 'experts:read', 'notifications:create', 'system:read', 'ai:*', 'loki:read'],
   moderator: ['comments:*', 'users:read', 'users:update', 'news:read', 'news:update', 'system:read', 'audit:read'],
   analyst: ['stats:read', 'audit:read', 'system:read', 'news:read', 'partners:read', 'experts:read', 'events:read', 'users:read', 'errors:read'],

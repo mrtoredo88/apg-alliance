@@ -94,6 +94,44 @@ const PARTNER_EMOJIS = ['🏪','💆','💄','🍽️','☕','🎓','🏋️','�
 const contentImageOf = (item) =>
   item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || '';
 
+const AI_IMPORT_TYPES = [
+  { id: 'partner', label: 'Партнёр', emoji: '🤝', resource: 'partners' },
+  { id: 'expert', label: 'Эксперт', emoji: '🧑‍💼', resource: 'experts' },
+  { id: 'event', label: 'Событие', emoji: '🎉', resource: 'events' },
+  { id: 'news', label: 'Новость', emoji: '📢', resource: 'news' },
+  { id: 'prize', label: 'Приз', emoji: '🎁', resource: 'prizes' },
+];
+
+const AI_IMPORT_STATUSES = [
+  ['new', 'Новая заявка'],
+  ['processed', 'Обработано ИИ'],
+  ['review', 'Требует проверки'],
+  ['missing', 'Не хватает данных'],
+  ['ready', 'Готово к публикации'],
+  ['published', 'Опубликовано'],
+  ['rejected', 'Отклонено'],
+];
+
+const AI_IMPORT_LABELS = {
+  title: ['Название', 'Заголовок', 'Имя и фамилия', 'Имя'],
+  category: ['Категория', 'Направление'],
+  shortDescription: ['Короткое описание', 'Короткий анонс', 'Коротко о себе'],
+  description: ['Подробное описание', 'Основной текст', 'Текст новости', 'Описание', 'О себе'],
+  address: ['Адрес', 'Место'],
+  phone: ['Телефон', 'Контакты'],
+  email: ['Email', 'Почта'],
+  website: ['Сайт', 'Ссылка', 'Как записаться', 'Ссылка на регистрацию'],
+  telegram: ['Telegram', 'Телеграм'],
+  vk: ['VK', 'ВК', 'ВКонтакте'],
+  instagram: ['Instagram'],
+  hours: ['График работы', 'Время'],
+  services: ['Услуги', 'Что предлагаете', 'Чем полезен', 'Программа'],
+  offer: ['Акция для пользователей АПГ', 'Акция', 'Бонус', 'Приз / бонус'],
+  cost: ['Стоимость', 'Стоимость / условия', 'Цена'],
+  date: ['Дата', 'Дата публикации', 'Дата розыгрыша'],
+  source: ['Источник', 'Автор', 'Организатор', 'Кто предоставляет'],
+};
+
 const ADMIN_LOAD_TIMEOUT_MS = 12000;
 const ADMIN_LOAD_RETRIES = 2;
 
@@ -461,6 +499,116 @@ function providerLabel(user) {
   if (raw.includes('expert')) return 'QR эксперта';
   if (raw.includes('web') || raw.includes('site')) return 'Сайт';
   return 'Прямая регистрация';
+}
+
+function aiImportTypeMeta(type) {
+  return AI_IMPORT_TYPES.find(item => item.id === type) || AI_IMPORT_TYPES[0];
+}
+
+function normalizeAiImportText(value) {
+  return String(value || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').trim();
+}
+
+function readAiImportLineValue(text, labels) {
+  const lines = String(text || '').split('\n').map(line => line.trim()).filter(Boolean);
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const direct = lines.find(line => new RegExp(`^${escaped}\\s*[:—-]\\s*`, 'i').test(line));
+    if (direct) return direct.replace(new RegExp(`^${escaped}\\s*[:—-]\\s*`, 'i'), '').trim();
+  }
+  return '';
+}
+
+function pickAiImportValue(text, key) {
+  return readAiImportLineValue(text, AI_IMPORT_LABELS[key] || []);
+}
+
+function firstMatch(text, regex) {
+  return String(text || '').match(regex)?.[0] || '';
+}
+
+function detectAiImportCategory(text, type) {
+  const q = String(text || '').toLowerCase();
+  if (q.includes('маник') || q.includes('ногт') || q.includes('салон') || q.includes('красот')) return 'beauty';
+  if (q.includes('кофе') || q.includes('кафе') || q.includes('ресторан') || q.includes('еда')) return 'food';
+  if (q.includes('трен') || q.includes('фитнес') || q.includes('спорт')) return 'sport';
+  if (q.includes('психолог') || q.includes('коуч') || q.includes('обуч')) return type === 'expert' ? 'psychology' : 'education';
+  if (q.includes('здоров') || q.includes('массаж') || q.includes('врач')) return 'health';
+  if (q.includes('афиша') || q.includes('концерт') || q.includes('театр') || q.includes('дет')) return type === 'news' ? 'culture' : 'entertainment';
+  return type === 'news' ? 'society' : 'other';
+}
+
+function buildAiImportTemplate(type) {
+  if (type === 'expert') return ['Имя и фамилия:', 'Направление:', 'Коротко о себе:', 'Чем полезен:', 'Услуги:', 'Опыт:', 'Формат работы:', 'Стоимость / условия:', 'Контакты:', 'Соцсети:', 'Фото:', 'Видео:', 'Акция для пользователей АПГ:'].join('\n');
+  if (type === 'event') return ['Название:', 'Дата:', 'Время:', 'Место:', 'Для кого:', 'Описание:', 'Программа:', 'Стоимость:', 'Как записаться:', 'Организатор:', 'Контакты:', 'Фото:'].join('\n');
+  if (type === 'news') return ['Заголовок:', 'Короткий анонс:', 'Основной текст:', 'Категория:', 'Источник:', 'Фото:', 'Ссылка:', 'Публиковать сразу или в черновик: черновик'].join('\n');
+  if (type === 'prize') return ['Название приза:', 'Кто предоставляет:', 'Описание:', 'Условия участия:', 'Количество победителей:', 'Дата розыгрыша:', 'Фото:', 'Связанный партнёр или эксперт:'].join('\n');
+  return ['Название:', 'Категория:', 'Короткое описание:', 'Подробное описание:', 'Адрес:', 'Телефон:', 'Сайт:', 'Telegram:', 'VK:', 'Instagram:', 'График работы:', 'Что предлагаете:', 'Акция для пользователей АПГ:', 'Что можно получить за ключи:', 'Фото/логотип:', 'Видео:'].join('\n');
+}
+
+function analyzeAiImportText(type, rawText, files = []) {
+  const text = normalizeAiImportText(rawText);
+  const title = pickAiImportValue(text, 'title') || text.split('\n').find(Boolean)?.slice(0, 90) || '';
+  const description = pickAiImportValue(text, 'description') || pickAiImportValue(text, 'services') || text.slice(0, 900);
+  const shortDescription = pickAiImportValue(text, 'shortDescription') || description.split(/[.!?]\s/)[0]?.slice(0, 160) || '';
+  const phone = pickAiImportValue(text, 'phone') || firstMatch(text, /(?:\+7|8)[\s(.-]*\d{3}[\s). -]*\d{3}[\s.-]*\d{2}[\s.-]*\d{2}/);
+  const email = pickAiImportValue(text, 'email') || firstMatch(text, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  const website = pickAiImportValue(text, 'website') || firstMatch(text, /https?:\/\/[^\s)]+/i);
+  const categoryRaw = pickAiImportValue(text, 'category');
+  const fields = {
+    title,
+    category: categoryRaw || detectAiImportCategory(text, type),
+    shortDescription,
+    description,
+    address: pickAiImportValue(text, 'address'),
+    phone,
+    email,
+    website,
+    telegram: pickAiImportValue(text, 'telegram') || firstMatch(text, /@[a-zA-Z0-9_]{5,}/),
+    vk: pickAiImportValue(text, 'vk'),
+    instagram: pickAiImportValue(text, 'instagram'),
+    hours: pickAiImportValue(text, 'hours'),
+    services: pickAiImportValue(text, 'services'),
+    offer: pickAiImportValue(text, 'offer'),
+    cost: pickAiImportValue(text, 'cost'),
+    date: pickAiImportValue(text, 'date'),
+    source: pickAiImportValue(text, 'source'),
+  };
+  const required = type === 'news' ? ['title', 'description'] : type === 'event' ? ['title', 'date', 'description'] : ['title', 'description'];
+  const missingFields = required.filter(key => !fields[key]);
+  const confidence = Math.max(42, Math.min(96, 58 + Object.values(fields).filter(Boolean).length * 4 - missingFields.length * 10 + (files.length ? 4 : 0)));
+  const fieldConfidence = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value ? Math.max(54, Math.min(98, confidence + (AI_IMPORT_LABELS[key]?.length || 1))) : 0]));
+  return {
+    type,
+    fields,
+    confidence,
+    fieldConfidence,
+    missingFields,
+    status: missingFields.length ? 'missing' : 'review',
+    suggestions: [
+      shortDescription ? null : 'Сгенерировать короткое описание',
+      fields.offer ? null : 'Уточнить акцию или бонус для пользователей АПГ',
+      fields.website || fields.telegram || fields.phone ? null : 'Добавить контакт для записи',
+      categoryRaw ? null : 'Проверить предложенную категорию',
+    ].filter(Boolean),
+  };
+}
+
+function aiImportDraftPatch(type, draft) {
+  const f = draft?.fields || {};
+  if (type === 'news') {
+    return { title: f.title || 'Черновик новости', text: f.description || f.shortDescription || 'Текст будет заполнен редактором.', fullText: f.description || f.shortDescription || 'Текст будет заполнен редактором.', summary: f.shortDescription || '', category: f.category || 'society', sourceName: f.source || 'ИИ-импорт', linkUrl: f.website || '', status: 'draft', active: false, commentsEnabled: true };
+  }
+  if (type === 'expert') {
+    return { name: f.title || 'Новый эксперт', specialization: f.category || f.services || 'Уточнить направление', category: detectAiImportCategory([f.category, f.description].join(' '), 'expert'), description: f.description || f.shortDescription || '', phone: f.phone || '', websiteUrl: f.website || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', offer: f.offer || '', active: false, status: 'draft', verified: false, keys: 1 };
+  }
+  if (type === 'event') {
+    return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', category: f.category || 'society', active: false, status: 'draft', priority: 0 };
+  }
+  if (type === 'prize') {
+    return { name: f.title || 'Новый приз', title: f.title || 'Новый приз', description: f.description || f.shortDescription || '', donorName: f.source || '', raffleDate: f.date || '', type: 'raffle', active: false, status: 'draft', cost: 0, stock: 1, emoji: '🎁' };
+  }
+  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', phone: f.phone || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', socialUrl: f.instagram || '', offer: f.offer || '', active: false, status: 'draft', emoji: '🏪' };
 }
 
 function StatTile({ label, value, icon, color = A.gold, sub }) {
@@ -1231,6 +1379,231 @@ function AdminUsersPanel({ users }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminAiImportPanel({ requests, loading, onAnalyze, onSaveRequest, onRefresh, onPublishDraft, onUpdateRequest }) {
+  const [type, setType] = useState('partner');
+  const [sourceText, setSourceText] = useState('');
+  const [sourceFiles, setSourceFiles] = useState([]);
+  const [draft, setDraft] = useState(null);
+  const [activeRequestId, setActiveRequestId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const activeRequest = requests.find(item => item.id === activeRequestId) || null;
+  const visibleRequests = [...requests].sort((a, b) => Number(toJsDate(b.createdAt || b.processedAt) || 0) - Number(toJsDate(a.createdAt || a.processedAt) || 0));
+  const meta = aiImportTypeMeta(type);
+
+  const runAnalyze = async () => {
+    if (!sourceText.trim() && sourceFiles.length === 0) {
+      setMessage('Добавьте текст заявки или загрузите TXT/JSON/CSV-файл.');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      const result = await onAnalyze(type, sourceText, sourceFiles);
+      setDraft(result);
+      setMessage(result.missingFields?.length ? 'Локи нашёл данные, но часть полей нужно уточнить.' : 'Локи разложил заявку по полям. Проверьте черновик.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveRequest = async () => {
+    if (!draft) {
+      setMessage('Сначала распознайте заявку.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const saved = await onSaveRequest({
+        type,
+        status: draft.status || 'review',
+        sourceText,
+        sourceFiles,
+        draft,
+      });
+      setActiveRequestId(saved?.id || '');
+      setMessage('Заявка сохранена в очередь проверки.');
+    } catch (e) {
+      setMessage(e.message || 'Не удалось сохранить заявку.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publishActive = async (request) => {
+    setBusy(true);
+    try {
+      await onPublishDraft(request);
+      setMessage('Черновик создан в нужном разделе. Проверьте и публикуйте вручную.');
+      await onRefresh();
+    } catch (e) {
+      setMessage(e.message || 'Не удалось создать черновик.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadTemplate = () => {
+    setSourceText(buildAiImportTemplate(type));
+    setDraft(null);
+    setMessage('Шаблон вставлен. Его можно отправить партнёру или заполнить прямо здесь.');
+  };
+
+  const copyTemplate = async () => {
+    const text = buildAiImportTemplate(type);
+    setSourceText(text);
+    await navigator.clipboard?.writeText(text).catch(() => {});
+    setMessage('Шаблон скопирован.');
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([buildAiImportTemplate(type)], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `apg_${type}_template.txt`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 80);
+  };
+
+  const handleFiles = async (event) => {
+    const files = Array.from(event.target.files || []);
+    const maxSize = 8 * 1024 * 1024;
+    const safeFiles = files.filter(file => file.size <= maxSize).slice(0, 8).map(file => ({
+      name: file.name,
+      type: file.type || 'unknown',
+      size: file.size,
+      lastModified: file.lastModified,
+    }));
+    setSourceFiles(safeFiles);
+    const readable = files.filter(file => /\.(txt|csv|json|md)$/i.test(file.name) || /^text\//.test(file.type)).slice(0, 3);
+    const textParts = [];
+    for (const file of readable) {
+      textParts.push(await file.text().catch(() => ''));
+    }
+    if (textParts.some(Boolean)) setSourceText(prev => [prev, ...textParts].filter(Boolean).join('\n\n'));
+    setMessage(readable.length ? 'Текст из файла добавлен.' : 'Файл прикреплён. Для PDF/DOCX/изображений вставьте распознанный текст заявки в поле.');
+  };
+
+  const previewDraft = activeRequest?.draft || draft;
+  const previewType = activeRequest?.type || type;
+  const previewFields = previewDraft?.fields || {};
+
+  return (
+    <div>
+      <div style={{ ...s.card, padding: 22, background: 'linear-gradient(135deg, rgba(201,168,76,0.12), rgba(255,255,255,0.04))' }}>
+        <div style={{ color: A.gold, fontSize: 12, fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>ИИ-импорт заявок</div>
+        <h1 style={{ ...s.h1, fontSize: 26, marginTop: 6 }}>Источник → Локи → Черновик → Редактор</h1>
+        <div style={{ color: A.textSec, fontSize: 14, lineHeight: '20px' }}>
+          Загружайте анкеты партнёров, экспертов, событий, новостей и призов. Автопубликации нет: система создаёт только черновик для проверки.
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 14 }}>
+        <div style={s.card}>
+          <h2 style={s.h2}>1. Данные заявки</h2>
+          <label style={s.label}>Тип заявки</label>
+          <select value={type} onChange={e => { setType(e.target.value); setDraft(null); }} style={s.select}>
+            {AI_IMPORT_TYPES.map(item => <option key={item.id} value={item.id}>{item.emoji} {item.label}</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <button type="button" onClick={loadTemplate} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Вставить шаблон</button>
+            <button type="button" onClick={copyTemplate} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Скопировать</button>
+            <button type="button" onClick={downloadTemplate} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Скачать TXT</button>
+          </div>
+          <label style={s.label}>Файл заявки</label>
+          <input type="file" multiple accept=".txt,.csv,.json,.md,.pdf,.doc,.docx,.xlsx,image/*" onChange={handleFiles} style={{ ...s.input, padding: 9 }} />
+          {sourceFiles.length > 0 && (
+            <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
+              {sourceFiles.map(file => (
+                <div key={`${file.name}-${file.size}`} style={{ color: A.textSec, fontSize: 11, lineHeight: '16px' }}>
+                  📎 {file.name} · {Math.round(file.size / 1024)} КБ · {file.type}
+                </div>
+              ))}
+            </div>
+          )}
+          <label style={s.label}>Исходный текст / сообщение</label>
+          <textarea value={sourceText} onChange={e => setSourceText(e.target.value)} placeholder={`Вставьте заявку: ${meta.label.toLowerCase()}, описание, контакты, акция...`} style={{ ...s.textarea, minHeight: 220 }} />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" disabled={busy} onClick={runAnalyze} style={{ ...s.btn, ...s.btnPri }}>{busy ? 'Обрабатываем...' : 'Распознать и заполнить'}</button>
+            <button type="button" disabled={busy || !draft} onClick={saveRequest} style={{ ...s.btn, ...s.btnGray, opacity: draft ? 1 : 0.5 }}>Сохранить заявку</button>
+          </div>
+          {message && <div style={{ marginTop: 12, color: message.includes('Не удалось') ? A.red : A.gold, fontSize: 12, lineHeight: '18px' }}>{message}</div>}
+        </div>
+
+        <div style={s.card}>
+          <h2 style={s.h2}>2. Проверка полей</h2>
+          {!previewDraft ? (
+            <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px' }}>После распознавания здесь появятся заполненные поля, confidence и список того, чего не хватает.</div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ color: A.text, fontSize: 14, fontWeight: 900 }}>{aiImportTypeMeta(previewType).emoji} {aiImportTypeMeta(previewType).label}</span>
+                <span style={{ color: confidenceTone(previewDraft.confidence).color, fontSize: 12, fontWeight: 900 }}>{confidenceTone(previewDraft.confidence).label}</span>
+              </div>
+              {Object.entries(previewFields).map(([key, value]) => value ? (
+                <div key={key} style={{ padding: '9px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ color: A.textSec, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>{key}</span>
+                    <span style={{ color: confidenceTone(previewDraft.fieldConfidence?.[key]).color, fontSize: 10, fontWeight: 850 }}>{previewDraft.fieldConfidence?.[key] || 0}%</span>
+                  </div>
+                  <div style={{ color: A.text, fontSize: 13, lineHeight: '19px', marginTop: 4, whiteSpace: 'pre-wrap' }}>{String(value)}</div>
+                </div>
+              ) : null)}
+              {previewDraft.missingFields?.length > 0 && (
+                <div style={{ marginTop: 12, padding: 12, borderRadius: 14, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.26)', color: '#facc15', fontSize: 12, lineHeight: '18px' }}>
+                  Не хватает: {previewDraft.missingFields.join(', ')}
+                </div>
+              )}
+              {previewDraft.suggestions?.length > 0 && (
+                <div style={{ marginTop: 12, display: 'grid', gap: 7 }}>
+                  {previewDraft.suggestions.map(item => <div key={item} style={{ color: A.textSec, fontSize: 12 }}>• {item}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ ...s.h2, margin: 0 }}>Все заявки ({requests.length})</h2>
+          <button type="button" onClick={onRefresh} style={{ ...s.btn, ...s.btnGray }}>{loading ? '...' : '↻ Обновить'}</button>
+        </div>
+        {visibleRequests.length === 0 ? (
+          <div style={{ color: A.textSec, fontSize: 13 }}>Очередь пуста. Создайте первую заявку через форму выше.</div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {visibleRequests.map(item => {
+              const itemMeta = aiImportTypeMeta(item.type);
+              const status = AI_IMPORT_STATUSES.find(([id]) => id === item.status)?.[1] || item.status || 'Новая заявка';
+              const isActive = activeRequestId === item.id;
+              return (
+                <div key={item.id} style={{ padding: 12, borderRadius: 16, background: isActive ? 'rgba(201,168,76,0.10)' : 'rgba(255,255,255,0.035)', border: `1px solid ${isActive ? A.goldBrd : A.border}` }}>
+                  <button type="button" onClick={() => setActiveRequestId(isActive ? '' : item.id)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, width: '100%', padding: 0, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: A.text, fontSize: 14, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemMeta.emoji} {item.draft?.fields?.title || item.title || item.id}</div>
+                      <div style={{ color: A.textSec, fontSize: 11, marginTop: 3 }}>{status} · {item.confidence || item.draft?.confidence || 0}% · {toJsDate(item.createdAt)?.toLocaleString('ru-RU') || 'без даты'}</div>
+                    </div>
+                    <span style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>{itemMeta.label}</span>
+                  </button>
+                  {isActive && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                      <button type="button" disabled={busy || item.status === 'published'} onClick={() => publishActive(item)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12, opacity: item.status === 'published' ? 0.5 : 1 }}>Создать черновик</button>
+                      <button type="button" onClick={() => onUpdateRequest(item.id, { status: 'rejected' })} style={{ ...s.btn, ...s.btnDanger, padding: '8px 11px', fontSize: 12 }}>Отклонить</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2360,8 +2733,10 @@ export const AdminPanel = () => {
   const [draggingNewsId, setDraggingNewsId] = useState('');
   const [lokiKnowledge, setLokiKnowledge] = useState([]);
   const [lokiAnalytics, setLokiAnalytics] = useState([]);
+  const [aiImportRequests, setAiImportRequests] = useState([]);
   const [lokiKnowledgeLoading, setLokiKnowledgeLoading] = useState(false);
   const [lokiAnalyticsLoading, setLokiAnalyticsLoading] = useState(false);
+  const [aiImportLoading, setAiImportLoading] = useState(false);
   const [editingLokiKnowledge, setEditingLokiKnowledge] = useState(null);
   const [lkTitle, setLkTitle] = useState('');
   const [lkQuestion, setLkQuestion] = useState('');
@@ -2672,6 +3047,17 @@ export const AdminPanel = () => {
     }
   }, []);
 
+  const loadAiImportRequests = useCallback(async () => {
+    setAiImportLoading(true);
+    try {
+      setAiImportRequests(await fetchAdminEntityList('aiImportRequests', 300));
+    } catch (e) {
+      logError(e, 'AdminPanel.loadAiImportRequests');
+    } finally {
+      setAiImportLoading(false);
+    }
+  }, []);
+
   const resetLokiKnowledgeForm = () => {
     setEditingLokiKnowledge(null);
     setLkTitle('');
@@ -2718,6 +3104,53 @@ export const AdminPanel = () => {
     if (!id) return;
     await runAdminEntityAction('lokiKnowledge', 'delete', { id });
     setLokiKnowledge(prev => prev.filter(item => item.id !== id));
+  };
+
+  const analyzeAiImportRequest = async (type, text, files) => analyzeAiImportText(type, text, files);
+
+  const saveAiImportRequest = async ({ type, status, sourceText, sourceFiles, draft }) => {
+    const meta = aiImportTypeMeta(type);
+    const patch = {
+      type,
+      typeLabel: meta.label,
+      title: draft?.fields?.title || 'Заявка без названия',
+      status: status || 'review',
+      source: 'admin-upload',
+      sourceText: String(sourceText || '').slice(0, 20000),
+      sourceFiles: Array.isArray(sourceFiles) ? sourceFiles : [],
+      draft,
+      confidence: Number(draft?.confidence || 0),
+      missingFields: Array.isArray(draft?.missingFields) ? draft.missingFields : [],
+    };
+    const result = await runAdminEntityAction('aiImportRequests', 'create', { patch, serverTimestampFields: ['processedAt'] });
+    const saved = { id: result.id, ...patch, createdAt: new Date().toISOString(), processedAt: new Date().toISOString() };
+    setAiImportRequests(prev => [saved, ...prev]);
+    return saved;
+  };
+
+  const updateAiImportRequest = async (id, patch) => {
+    if (!id) return;
+    await runAdminEntityAction('aiImportRequests', 'update', { id, patch });
+    setAiImportRequests(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
+  };
+
+  const publishAiImportDraft = async (request) => {
+    if (!request?.id) return;
+    const type = request.type || 'partner';
+    const patch = aiImportDraftPatch(type, request.draft);
+    let created = null;
+    if (type === 'news') {
+      created = await runAdminAction('news:create', { patch });
+    } else {
+      const resource = aiImportTypeMeta(type).resource;
+      created = await runAdminEntityAction(resource, 'create', { patch });
+    }
+    await updateAiImportRequest(request.id, {
+      status: 'published',
+      publishedResource: type === 'news' ? 'news' : aiImportTypeMeta(type).resource,
+      publishedId: created?.id || '',
+    });
+    fetchData();
   };
 
   const fetchData = async () => {
@@ -2786,6 +3219,7 @@ export const AdminPanel = () => {
         { name: 'expertReviews', label: 'Отзывы экспертов', load: () => fetchAdminEntityList('expertReviews', 200), optional: true },
         { name: 'raffleEntries', label: 'Участники розыгрышей', load: () => fetchAdminEntityList('raffleEntries', 500), optional: true },
         { name: 'guestSessions', label: 'Гостевые сессии', load: () => fetchAdminEntityList('guestSessions', 500), optional: true },
+        { name: 'aiImportRequests', label: 'ИИ-импорт заявок', load: () => fetchAdminEntityList('aiImportRequests', 300), optional: true },
       ];
       const results = await Promise.all(specs.map(readCollection));
       const commentsResult = await fetchAdminNewsComments()
@@ -2822,6 +3256,7 @@ export const AdminPanel = () => {
       apply('banners', setBanners);
       apply('newsComments', setNewsComments);
       apply('errorLogs', setErrorLogs);
+      apply('aiImportRequests', setAiImportRequests);
       setAdminMetrics(prev => ({
         users: byName.users?.ok ? byName.users.docs : prev.users,
         scans: byName.scans?.ok ? byName.scans.docs : prev.scans,
@@ -4104,7 +4539,8 @@ export const AdminPanel = () => {
   useEffect(() => {
     if (activeTab === 'system' && !systemStatus && !systemStatusLoading) loadSystemStatus();
     if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity]);
+    if (activeTab === 'ai-import' && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests]);
 
   if (!authed) return <AdminLoginGate onAllow={(actor) => { setAdminSession(actor || null); setAuthed(true); fetchData(); }} />;
 
@@ -4158,6 +4594,7 @@ export const AdminPanel = () => {
     ...prizes.filter(p => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'prizes', id: p.id, label: p.name || p.title, emoji: '🎁', typeName: 'Приз' })),
     ...newsComments.filter(c => String(c.text || '').toLowerCase().includes(q) || String(c.userName || '').toLowerCase().includes(q)).slice(0, 4).map(c => ({ tab: 'comments', id: c.id, label: c.text || 'Комментарий', sub: c.userName, emoji: '💬', typeName: 'Комментарий' })),
     ...errorLogs.filter(e => String(e.message || e.error || e.source || e.screen || e.userId || '').toLowerCase().includes(q)).slice(0, 4).map(e => ({ tab: 'errors', id: e.id, label: e.message || e.error || 'Ошибка приложения', sub: e.source || e.screen, emoji: '🐞', typeName: 'Ошибка' })),
+    ...aiImportRequests.filter(item => String(item.title || item.draft?.fields?.title || item.sourceText || '').toLowerCase().includes(q)).slice(0, 4).map(item => ({ tab: 'ai-import', id: item.id, label: item.title || item.draft?.fields?.title || 'Заявка', sub: aiImportTypeMeta(item.type).label, emoji: '📥', typeName: 'Заявка' })),
     ...((q.includes('ии') || q.includes('ai') || q.includes('чернов')) ? [{ tab: 'ai-drafts', id: 'ai-drafts', label: 'Черновики ИИ', sub: 'Раздел подготовлен к V4.5', emoji: '🤖', typeName: 'Раздел' }] : []),
   ] : [];
   const isCompact = viewportWidth < 860;
@@ -4179,6 +4616,7 @@ export const AdminPanel = () => {
     prizes: [['🎁', 'Приз', () => { resetPrizeForm(); setActiveTab('prizes'); }]],
     notifs: [['📣', 'Push', () => { setActiveTab('notifs'); }]],
     'ai-drafts': [['🤖', 'Черновик ИИ', () => { setActiveTab('ai-drafts'); }]],
+    'ai-import': [['📥', 'Заявка', () => { setActiveTab('ai-import'); }]],
   };
   const createActions = createActionGroups[activeTab] || [];
   const hasContextFilter = ['partners', 'experts', 'events', 'news'].includes(activeTab);
@@ -4206,6 +4644,7 @@ export const AdminPanel = () => {
       comments: [['ID', 'Пользователь', 'Текст', 'Скрыт'], newsComments.map(c => [c.id, c.userName || c.userId || '', c.text || '', c.hidden ? 'yes' : 'no'])],
       moderation: [['ID', 'Пользователь', 'Текст', 'Статус'], newsComments.map(c => [c.id, c.userName || c.userId || '', c.text || '', c.status || ''])],
       errors: [['ID', 'Сообщение', 'Экран', 'Решено'], errorLogs.map(e => [e.id, e.message || e.error || '', e.screen || e.source || '', e.resolved ? 'yes' : 'no'])],
+      'ai-import': [['ID', 'Тип', 'Заголовок', 'Статус', 'Confidence'], aiImportRequests.map(item => [item.id, item.type || '', item.title || item.draft?.fields?.title || '', item.status || '', item.confidence || item.draft?.confidence || 0])],
     };
     const [header, rows] = datasets[activeTab] || datasets.news;
     const csv = [header, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
@@ -4287,6 +4726,7 @@ export const AdminPanel = () => {
             { id: 'access',    emoji: '🔐', label: 'Доступ' },
             { id: 'system',    emoji: '🛡', label: 'Система' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
+            { id: 'ai-import', emoji: '📥', label: 'ИИ-импорт', count: aiImportRequests.filter(item => item.status !== 'published' && item.status !== 'rejected').length || undefined },
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
             { id: 'loki-knowledge', emoji: '🧠', label: 'База знаний Локи', count: lokiKnowledge.length || undefined },
             { id: 'loki-analytics', emoji: '📈', label: 'Аналитика Локи', count: lokiAnalytics.length || undefined },
@@ -4295,7 +4735,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'access') loadAdminSecurity(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -4563,6 +5003,18 @@ export const AdminPanel = () => {
 
       {activeTab === 'users' && (
         <AdminUsersPanel users={adminMetrics.users} />
+      )}
+
+      {activeTab === 'ai-import' && (
+        <AdminAiImportPanel
+          requests={aiImportRequests}
+          loading={aiImportLoading}
+          onAnalyze={analyzeAiImportRequest}
+          onSaveRequest={saveAiImportRequest}
+          onRefresh={loadAiImportRequests}
+          onPublishDraft={publishAiImportDraft}
+          onUpdateRequest={updateAiImportRequest}
+        />
       )}
 
       {activeTab === 'ai-drafts' && (
