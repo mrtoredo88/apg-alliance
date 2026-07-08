@@ -1389,7 +1389,7 @@ function AdminUsersPanel({ users }) {
   );
 }
 
-function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink }) {
+function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, canSeeLegal, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink }) {
   const [type, setType] = useState('partner');
   const [sourceText, setSourceText] = useState('');
   const [sourceFiles, setSourceFiles] = useState([]);
@@ -1736,9 +1736,70 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                     <span style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>{itemMeta.label}</span>
                   </button>
                   {isActive && (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                      <button type="button" disabled={busy || item.status === 'published'} onClick={() => publishActive(item)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12, opacity: item.status === 'published' ? 0.5 : 1 }}>Создать черновик</button>
-                      <button type="button" onClick={() => onUpdateRequest(item.id, { status: 'rejected' })} style={{ ...s.btn, ...s.btnDanger, padding: '8px 11px', fontSize: 12 }}>Отклонить</button>
+                    <div style={{ marginTop: 12 }}>
+                      {canSeeLegal && item.legalProfile && (
+                        <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+                          <div style={{ padding: 12, borderRadius: 16, background: 'rgba(201,168,76,0.08)', border: `1px solid ${A.goldBrd}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                              <div>
+                                <div style={{ color: A.gold, fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.8 }}>Юридическая карточка</div>
+                                <div style={{ color: A.text, fontSize: 15, fontWeight: 920, marginTop: 4 }}>{item.counterparty?.displayName || item.legalProfile.typeLabel || 'Контрагент'}</div>
+                              </div>
+                              <span style={{ color: item.legalCheck?.status === 'ready' ? '#4ade80' : '#facc15', fontSize: 12, fontWeight: 900 }}>
+                                {item.legalCheck?.status === 'ready' ? 'Готово' : 'Нужна проверка'} · {item.legalCheck?.score || 0}%
+                              </span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 12 }}>
+                              {[
+                                ['Тип', item.legalProfile.typeLabel],
+                                ['ИНН', item.legalProfile.fields?.inn],
+                                ['КПП', item.legalProfile.fields?.kpp],
+                                ['ОГРН / ОГРНИП', item.legalProfile.fields?.ogrn || item.legalProfile.fields?.ogrnip],
+                                ['Директор / ФИО', item.legalProfile.fields?.directorName || item.legalProfile.fields?.fio],
+                                ['Телефон', item.legalProfile.fields?.phone],
+                                ['Email', item.legalProfile.fields?.email],
+                                ['Банк', item.legalProfile.fields?.bank],
+                              ].filter(([, value]) => value).map(([label, value]) => (
+                                <div key={label} style={{ padding: 9, borderRadius: 12, background: 'rgba(255,255,255,0.045)', border: `1px solid ${A.border}` }}>
+                                  <div style={{ color: A.textSec, fontSize: 10, fontWeight: 850, textTransform: 'uppercase' }}>{label}</div>
+                                  <div style={{ color: A.text, fontSize: 12, lineHeight: '17px', marginTop: 3, overflowWrap: 'anywhere' }}>{String(value)}</div>
+                                </div>
+                              ))}
+                            </div>
+                            {item.legalCheck?.checks?.length > 0 && (
+                              <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
+                                {item.legalCheck.checks.map(check => (
+                                  <div key={check.id} style={{ color: check.ok ? '#86efac' : '#fde68a', fontSize: 12, lineHeight: '17px' }}>{check.ok ? '✓' : '!'} {check.label}: {check.message}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ padding: 12, borderRadius: 16, background: 'rgba(255,255,255,0.035)', border: `1px solid ${A.border}` }}>
+                            <div style={{ color: A.text, fontSize: 13, fontWeight: 900, marginBottom: 8 }}>Документы и CRM</div>
+                            {item.legalDocuments?.length ? (
+                              <div style={{ display: 'grid', gap: 6 }}>
+                                {item.legalDocuments.map((doc, index) => (
+                                  <a key={`${doc.url}-${index}`} href={doc.url} target="_blank" rel="noreferrer" style={{ color: A.gold, fontSize: 12, overflowWrap: 'anywhere' }}>{doc.documentLabel || 'Документ'} · {doc.name}</a>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ color: A.textSec, fontSize: 12 }}>Документы не прикреплены.</div>
+                            )}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginTop: 10 }}>
+                              {['Договоры', 'Счета', 'Акты', 'ЭДО', 'Комментарии'].map(label => (
+                                <div key={label} style={{ padding: 9, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: `1px solid ${A.border}`, color: A.textSec, fontSize: 11 }}>{label}: готово к подключению</div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {!canSeeLegal && item.legalRestricted && (
+                        <div style={{ marginBottom: 12, padding: 11, borderRadius: 14, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#facc15', fontSize: 12 }}>Юридическая карточка скрыта: нужны права owner/super_admin/admin.</div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button type="button" disabled={busy || item.status === 'published'} onClick={() => publishActive(item)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12, opacity: item.status === 'published' ? 0.5 : 1 }}>Создать черновик</button>
+                        <button type="button" onClick={() => onUpdateRequest(item.id, { status: 'rejected' })} style={{ ...s.btn, ...s.btnDanger, padding: '8px 11px', fontSize: 12 }}>Отклонить</button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -4796,6 +4857,7 @@ export const AdminPanel = () => {
   }
 
   const q = globalSearch.toLowerCase();
+  const canSeeLegalInAdmin = ['owner', 'super_admin', 'admin'].includes(String(adminSecurity?.actor?.role || adminSession?.role || '').toLowerCase());
   const searchResults = globalSearch.length > 1 ? [
     ...adminMetrics.users.filter(u => userDisplayName(u).toLowerCase().includes(q) || String(u.email ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase().includes(q)).slice(0, 4).map(u => ({ tab: 'users', id: u.id, label: userDisplayName(u), sub: providerLabel(u), emoji: '👤', typeName: 'Пользователь' })),
     ...partners.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 4).map(p => ({ tab: 'partners', id: p.id, label: p.name, sub: CATEGORIES.find(c => c.id === p.category)?.label, emoji: '🤝', typeName: 'Партнёр' })),
@@ -4806,7 +4868,19 @@ export const AdminPanel = () => {
     ...prizes.filter(p => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'prizes', id: p.id, label: p.name || p.title, emoji: '🎁', typeName: 'Приз' })),
     ...newsComments.filter(c => String(c.text || '').toLowerCase().includes(q) || String(c.userName || '').toLowerCase().includes(q)).slice(0, 4).map(c => ({ tab: 'comments', id: c.id, label: c.text || 'Комментарий', sub: c.userName, emoji: '💬', typeName: 'Комментарий' })),
     ...errorLogs.filter(e => String(e.message || e.error || e.source || e.screen || e.userId || '').toLowerCase().includes(q)).slice(0, 4).map(e => ({ tab: 'errors', id: e.id, label: e.message || e.error || 'Ошибка приложения', sub: e.source || e.screen, emoji: '🐞', typeName: 'Ошибка' })),
-    ...aiImportRequests.filter(item => String(item.title || item.draft?.fields?.title || item.sourceText || '').toLowerCase().includes(q)).slice(0, 4).map(item => ({ tab: 'ai-import', id: item.id, label: item.title || item.draft?.fields?.title || 'Заявка', sub: aiImportTypeMeta(item.type).label, emoji: '📥', typeName: 'Заявка' })),
+    ...aiImportRequests.filter(item => {
+      const legalText = canSeeLegalInAdmin ? [
+        item.legalProfile?.fields?.inn,
+        item.legalProfile?.fields?.fullName,
+        item.legalProfile?.fields?.shortName,
+        item.legalProfile?.fields?.directorName,
+        item.legalProfile?.fields?.fio,
+        item.legalProfile?.fields?.phone,
+        item.legalProfile?.fields?.email,
+        item.counterparty?.displayName,
+      ].filter(Boolean).join(' ') : '';
+      return String([item.title, item.draft?.fields?.title, item.sourceText, legalText].filter(Boolean).join(' ')).toLowerCase().includes(q);
+    }).slice(0, 4).map(item => ({ tab: 'ai-import', id: item.id, label: item.title || item.draft?.fields?.title || item.counterparty?.displayName || 'Заявка', sub: aiImportTypeMeta(item.type).label, emoji: '📥', typeName: 'Заявка' })),
     ...((q.includes('ии') || q.includes('ai') || q.includes('чернов')) ? [{ tab: 'ai-drafts', id: 'ai-drafts', label: 'Черновики ИИ', sub: 'Раздел подготовлен к V4.5', emoji: '🤖', typeName: 'Раздел' }] : []),
   ] : [];
   const isCompact = viewportWidth < 860;
@@ -5223,6 +5297,7 @@ export const AdminPanel = () => {
           publicLinks={publicFormLinks}
           loading={aiImportLoading}
           publicLinksLoading={publicFormLinksLoading}
+          canSeeLegal={canSeeLegalInAdmin}
           onAnalyze={analyzeAiImportRequest}
           onSaveRequest={saveAiImportRequest}
           onCreatePublicLink={createPublicFormLink}

@@ -4,7 +4,23 @@ import { request as httpsRequest } from 'https';
 const BUCKET = 'apg-photos';
 const HOST = 'storage.yandexcloud.net';
 const REGION = 'ru-central1';
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
+function extensionFor(contentType) {
+  if (contentType === 'image/webp') return 'webp';
+  if (contentType === 'image/png') return 'png';
+  if (contentType === 'application/pdf') return 'pdf';
+  if (contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx';
+  if (contentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx';
+  return 'jpg';
+}
 
 function hmac(key, data) {
   return createHmac('sha256', key).update(data).digest();
@@ -76,7 +92,7 @@ export default async function uploadPhotoRoutes(fastify) {
 
     const buffer = Buffer.from(data, 'base64');
     const timestamp = Date.now();
-    const ext = contentType === 'image/webp' ? 'webp' : contentType === 'image/png' ? 'png' : 'jpg';
+    const ext = extensionFor(contentType);
     const key = `${folder}/${timestamp}_${filename.replace(/[^a-z0-9._-]/gi, '_')}.${ext}`;
 
     try {

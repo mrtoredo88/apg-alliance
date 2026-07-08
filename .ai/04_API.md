@@ -154,9 +154,9 @@
 
 **Логика:** endpoint проверяет Firebase ID Token через Admin SDK, определяет роль по custom claims и документу пользователя (`users/{uid}`, `auth_map/{firebaseUid}`, `firebaseUid/authUid` fallback), проверяет permission matrix и только после этого меняет Firestore. Все операции пишут `adminActivity`, история новостей пишется в `newsChangeHistory`, повторная отправка с тем же `X-Idempotency-Key` возвращает сохранённый результат из `adminIdempotency`. Клиентская админка больше не выполняет прямые записи в Firestore для партнёров, экспертов, событий, баннеров, призов, уведомлений, заданий, пользователей, ошибок и выдачи призов; прямой Firestore SDK в админке используется только для чтения списков.
 
-**ИИ-импорт заявок:** ресурс `aiImportRequests` хранит исходный текст/метаданные файла, распознанные поля, confidence, недостающие поля и статус заявки. Публикации из заявки не выполняются автоматически: админка создаёт только черновик в целевом ресурсе после явного действия редактора.
+**ИИ-импорт заявок:** ресурс `aiImportRequests` хранит исходный текст/метаданные файла, распознанные поля, confidence, недостающие поля и статус заявки. Для публичных форм партнёров/экспертов/рекламодателей дополнительно хранит закрытые `legalProfile`, `legalDocuments`, `legalCheck`, `counterparty` и CRM-заготовку. Публикации из заявки не выполняются автоматически: админка создаёт только черновик в целевом ресурсе после явного действия редактора.
 
-**Публичные формы:** ресурс `publicFormLinks` хранит выданные администратором токен-ссылки для публичных анкет партнёров, экспертов, событий, новостей и призов. Заполненная публичная форма через `/api/public-submit` создаёт запись в `aiImportRequests` со статусом `processed` или `missing`; публикация остаётся ручным действием редактора.
+**Публичные формы:** ресурс `publicFormLinks` хранит выданные администратором токен-ссылки для публичных анкет партнёров, экспертов, событий, новостей и призов. Заполненная публичная форма через `/api/public-submit` создаёт запись в `aiImportRequests` со статусом `processed` или `missing`; публикация остаётся ручным действием редактора. Юридические реквизиты доступны через `/api/admin-actions` только ролям `owner`, `super_admin`, `admin`; остальным ролям backend вырезает закрытые поля.
 
 ---
 
@@ -193,13 +193,29 @@
   },
   "files": [
     { "name": "photo.jpg", "type": "image/jpeg", "size": 123456, "url": "https://storage.yandexcloud.net/..." }
+  ],
+  "legalProfile": {
+    "type": "company",
+    "typeLabel": "ООО / юридическое лицо",
+    "fields": {
+      "fullName": "ООО \"Вайбс\"",
+      "inn": "7701234567",
+      "kpp": "770101001",
+      "ogrn": "1027700123456",
+      "checkingAccount": "40702810000000000000",
+      "bik": "044525225",
+      "directorName": "Иванов Иван Иванович"
+    }
+  },
+  "legalDocuments": [
+    { "name": "card.pdf", "type": "application/pdf", "size": 123456, "url": "https://storage.yandexcloud.net/...", "documentType": "companyCard", "documentLabel": "Карточка предприятия" }
   ]
 }
 ```
 
-**POST response 200:** `{ "ok": true, "id": "aiImportRequestId", "status": "processed", "missingFields": [], "confidence": 88 }`.
+**POST response 200:** `{ "ok": true, "id": "aiImportRequestId", "status": "processed", "missingFields": [], "legalCheck": { "status": "needs_review", "score": 76 }, "confidence": 88 }`.
 
-**Логика:** backend ищет токен в `publicFormLinks`, проверяет статус/срок действия, нормализует ссылки, создаёт обработанную заявку в `aiImportRequests`, переносит фото как `sourceFiles`, затем закрывает ссылку статусом `submitted`. Повторная отправка по той же ссылке возвращает понятную ошибку и не создаёт дубль.
+**Логика:** backend ищет токен в `publicFormLinks`, проверяет статус/срок действия, нормализует ссылки, создаёт обработанную заявку в `aiImportRequests`, переносит фото как `sourceFiles`, нормализует юридическую карточку, проверяет ИНН/КПП/ОГРН/ОГРНИП/БИК/счета, формирует `counterparty` и CRM-заготовку, затем закрывает ссылку статусом `submitted`. Повторная отправка по той же ссылке возвращает понятную ошибку и не создаёт дубль.
 
 ---
 
@@ -343,7 +359,7 @@
 
 ## POST /api/upload-photo
 
-**Назначение:** Загрузить фото в Yandex Cloud S3.
+**Назначение:** Загрузить фото или документ в Yandex Cloud S3.
 
 **Метод:** POST  
 **Auth:** нет (полагается на то, что клиент авторизован в Firebase)  
@@ -360,8 +376,10 @@
 }
 ```
 
-**Allowed folders:** partners, experts, events, news, banners (любая строка, но client code использует эти)  
-**Allowed types:** image/jpeg, image/png, image/webp
+**Allowed content types:** `image/jpeg`, `image/png`, `image/webp`, `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+
+**Allowed folders:** partners, experts, events, news, banners, public-submissions (любая строка, но client code использует эти)  
+**Allowed types:** см. whitelist content types выше.
 
 **Response 200:**
 ```json

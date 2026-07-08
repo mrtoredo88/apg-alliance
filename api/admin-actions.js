@@ -45,6 +45,29 @@ const LIST_CONFIG = {
   publicFormLinks: { orderBy: ['createdAt', 'desc'], limit: 300 },
 };
 
+const LEGAL_ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin']);
+const LEGAL_PRIVATE_FIELDS = new Set(['legalProfile', 'legalDocuments', 'legalCheck', 'legalMissingFields', 'counterparty', 'crm', 'legalAdminComments']);
+
+function canAccessLegalData(actor) {
+  return LEGAL_ADMIN_ROLES.has(String(actor?.role || '').toLowerCase());
+}
+
+function stripLegalData(row) {
+  const next = { ...row };
+  LEGAL_PRIVATE_FIELDS.forEach(key => { delete next[key]; });
+  next.legalRestricted = true;
+  return next;
+}
+
+function assertLegalPatchAllowed(resource, patch, actor) {
+  if (resource !== 'aiImportRequests' || canAccessLegalData(actor)) return;
+  if (!Object.keys(patch || {}).some(key => LEGAL_PRIVATE_FIELDS.has(key))) return;
+  const error = new Error('Недостаточно прав для работы с юридическими данными.');
+  error.statusCode = 403;
+  error.code = 'LEGAL_DATA_FORBIDDEN';
+  throw error;
+}
+
 function cleanPatch(input = {}) {
   const patch = {};
   Object.entries(input || {}).forEach(([key, value]) => {
@@ -81,7 +104,7 @@ function serializeAdminValue(value) {
   return value;
 }
 
-async function handleEntityList(db, req) {
+async function handleEntityList(db, req, actor) {
   const resource = String(req.body?.resource || '').trim();
   const config = RESOURCE_CONFIG[resource];
   const listConfig = LIST_CONFIG[resource];
@@ -90,16 +113,17 @@ async function handleEntityList(db, req) {
     error.statusCode = 400;
     throw error;
   }
-  await requireAdminPermission(req, `${config.scope}:read`);
+  const reader = await requireAdminPermission(req, `${config.scope}:read`);
   let ref = db.collection(config.collection);
   if (listConfig.orderBy) ref = ref.orderBy(listConfig.orderBy[0], listConfig.orderBy[1]);
   const max = Math.min(Number(req.body?.limit || listConfig.limit || 200), listConfig.limit || 200, 1000);
   if (max > 0) ref = ref.limit(max);
   const snap = await ref.get();
+  const rows = snap.docs.map(doc => ({ id: doc.id, ...serializeAdminValue(doc.data() || {}) }));
   return {
     ok: true,
     resource,
-    rows: snap.docs.map(doc => ({ id: doc.id, ...serializeAdminValue(doc.data() || {}) })),
+    rows: resource === 'aiImportRequests' && !canAccessLegalData(actor || reader) ? rows.map(stripLegalData) : rows,
     count: snap.size,
   };
 }
@@ -268,6 +292,7 @@ async function handleEntityAction(db, req, actor) {
     await requireAdminPermission(req, `${config.scope}:create`);
     return runIdempotent(db, actor, idempotencyKey, async () => {
       const patch = withServerTimestamps(cleanEntityPatch(req.body?.patch), req.body?.serverTimestampFields || []);
+      assertLegalPatchAllowed(resource, patch, actor);
       const data = { ...patch, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
       const ref = await db.collection(config.collection).add(data);
       await writeAuditLog(db, req, actor, `${config.scope}:create`, config.collection, ref.id, { label: `Создан ${config.label}: ${patch.name || patch.title || ref.id}` });
@@ -288,6 +313,7 @@ async function handleEntityAction(db, req, actor) {
     return runIdempotent(db, actor, idempotencyKey, async () => {
       const increments = req.body?.increments || {};
       const patch = withServerTimestamps(cleanEntityPatch(req.body?.patch), req.body?.serverTimestampFields || []);
+      assertLegalPatchAllowed(resource, patch, actor);
       Object.entries(increments).forEach(([key, value]) => {
         patch[key] = FieldValue.increment(Number(value) || 0);
       });
@@ -311,6 +337,7 @@ async function handleEntityAction(db, req, actor) {
     await requireAdminPermission(req, `${config.scope}:update`);
     return runIdempotent(db, actor, idempotencyKey, async () => {
       const patch = withServerTimestamps(cleanEntityPatch(req.body?.patch), req.body?.serverTimestampFields || []);
+      assertLegalPatchAllowed(resource, patch, actor);
       await ref.set({ ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       await writeAuditLog(db, req, actor, `${config.scope}:set`, config.collection, id, { label: `Сохранён ${config.label}: ${id}`, fields: Object.keys(patch) });
       return { ok: true, resource, id, patch };

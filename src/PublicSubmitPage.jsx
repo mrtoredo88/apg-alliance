@@ -77,6 +77,87 @@ const FIELDS = {
   ],
 };
 
+const LEGAL_ENTITY_TYPES = {
+  company: 'ООО / юридическое лицо',
+  entrepreneur: 'ИП',
+  self_employed: 'Самозанятый',
+  individual: 'Физическое лицо',
+};
+
+const LEGAL_FIELDS = {
+  company: [
+    ['fullName', 'Полное наименование', 'text', 'ООО "..."'],
+    ['shortName', 'Краткое наименование', 'text', 'ООО "..."'],
+    ['inn', 'ИНН', 'text', '10 цифр'],
+    ['kpp', 'КПП', 'text', '9 цифр'],
+    ['ogrn', 'ОГРН', 'text', '13 цифр'],
+    ['legalAddress', 'Юридический адрес', 'textarea', 'Адрес из ЕГРЮЛ'],
+    ['actualAddress', 'Фактический адрес', 'textarea', 'Если отличается'],
+    ['checkingAccount', 'Расчётный счёт', 'text', '20 цифр'],
+    ['correspondentAccount', 'Корреспондентский счёт', 'text', '20 цифр'],
+    ['bik', 'БИК', 'text', '9 цифр'],
+    ['bank', 'Банк', 'text', 'Название банка'],
+    ['directorName', 'ФИО директора', 'text', 'Фамилия Имя Отчество'],
+    ['authorityBasis', 'Основание полномочий', 'text', 'Устав / доверенность'],
+    ['phone', 'Телефон', 'tel', '+7'],
+    ['email', 'Email', 'email', 'mail@example.ru'],
+    ['website', 'Сайт', 'url', 'site.ru'],
+  ],
+  entrepreneur: [
+    ['fio', 'ФИО', 'text', 'Фамилия Имя Отчество'],
+    ['inn', 'ИНН', 'text', '12 цифр'],
+    ['ogrnip', 'ОГРНИП', 'text', '15 цифр'],
+    ['address', 'Адрес', 'textarea', 'Адрес регистрации / связи'],
+    ['checkingAccount', 'Расчётный счёт', 'text', '20 цифр'],
+    ['bank', 'Банк', 'text', 'Название банка'],
+    ['bik', 'БИК', 'text', '9 цифр'],
+    ['phone', 'Телефон', 'tel', '+7'],
+    ['email', 'Email', 'email', 'mail@example.ru'],
+  ],
+  self_employed: [
+    ['fio', 'ФИО', 'text', 'Фамилия Имя Отчество'],
+    ['inn', 'ИНН', 'text', '12 цифр'],
+    ['phone', 'Телефон', 'tel', '+7'],
+    ['email', 'Email', 'email', 'mail@example.ru'],
+    ['address', 'Адрес', 'textarea', 'Для документов, если нужен'],
+    ['bank', 'Банк', 'text', 'Название банка'],
+    ['cardNumber', 'Номер карты (по желанию)', 'text', 'Если удобно'],
+    ['myTaxLink', 'Ссылка "Мой налог"', 'url', 'https://...'],
+    ['comment', 'Комментарий', 'textarea', 'Что важно для оформления'],
+  ],
+  individual: [
+    ['fio', 'ФИО', 'text', 'Фамилия Имя Отчество'],
+    ['phone', 'Телефон', 'tel', '+7'],
+    ['email', 'Email', 'email', 'mail@example.ru'],
+    ['birthDate', 'Дата рождения (необязательно)', 'date', ''],
+    ['address', 'Адрес (необязательно)', 'textarea', 'Для документов, если нужен'],
+    ['comment', 'Комментарий', 'textarea', 'Что важно для оформления'],
+  ],
+};
+
+const LEGAL_DOC_TYPES = [
+  ['companyCard', 'Карточка предприятия'],
+  ['extract', 'Выписка ЕГРЮЛ / ЕГРИП'],
+  ['certificate', 'Свидетельство'],
+  ['logo', 'Логотип'],
+  ['contract', 'Договор'],
+  ['presentation', 'Презентация'],
+  ['commercialOffer', 'Коммерческое предложение'],
+  ['priceList', 'Прайс-лист'],
+];
+
+const DOC_ACCEPT = '.pdf,.docx,.xlsx,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+const isAllowedDocument = (file) => {
+  const type = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  return /^image\/(jpeg|png)$/.test(type)
+    || type === 'application/pdf'
+    || type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    || type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    || /\.(pdf|docx|xlsx|jpe?g|png)$/i.test(name);
+};
+
 const S = {
   page: { minHeight: '100svh', background: 'linear-gradient(180deg,#f4f1e9 0%,#eceff5 52%,#f8f7f2 100%)', color: '#191713', fontFamily: 'Manrope, system-ui, -apple-system, sans-serif', padding: 'calc(18px + env(safe-area-inset-top,0px)) 14px calc(34px + env(safe-area-inset-bottom,0px))' },
   wrap: { width: '100%', maxWidth: 760, margin: '0 auto' },
@@ -86,6 +167,7 @@ const S = {
   textarea: { width: '100%', minHeight: 104, border: '1px solid rgba(25,23,19,0.12)', borderRadius: 16, background: 'rgba(255,255,255,0.72)', color: '#191713', font: 'inherit', fontSize: 16, outline: 'none', padding: 14, boxSizing: 'border-box', resize: 'vertical', lineHeight: '22px' },
   button: { minHeight: 50, border: 'none', borderRadius: 17, background: 'linear-gradient(135deg,#C9A84C,#E8C97A)', color: '#17120a', fontSize: 15, fontWeight: 900, padding: '0 18px', cursor: 'pointer', boxShadow: '0 12px 34px rgba(201,168,76,0.30)' },
   ghost: { minHeight: 44, border: '1px solid rgba(25,23,19,0.12)', borderRadius: 15, background: 'rgba(255,255,255,0.58)', color: '#191713', fontSize: 14, fontWeight: 820, padding: '0 14px', cursor: 'pointer' },
+  step: { display: 'inline-flex', alignItems: 'center', gap: 7, borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 900 },
 };
 
 function readSubmitRoute() {
@@ -114,11 +196,17 @@ function PublicField({ field, value, onChange }) {
 export function PublicSubmitPage() {
   const route = useMemo(readSubmitRoute, []);
   const [formInfo, setFormInfo] = useState(null);
+  const [step, setStep] = useState('public');
   const [fields, setFields] = useState({});
   const [files, setFiles] = useState([]);
+  const [legalType, setLegalType] = useState('');
+  const [legalFields, setLegalFields] = useState({});
+  const [legalDocuments, setLegalDocuments] = useState([]);
+  const [legalDocType, setLegalDocType] = useState('companyCard');
   const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [legalUploading, setLegalUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null);
   const [error, setError] = useState('');
@@ -126,6 +214,9 @@ export function PublicSubmitPage() {
   const type = formInfo?.type || route?.type || 'partner';
   const meta = TYPES[type] || TYPES.partner;
   const formFields = FIELDS[type] || FIELDS.partner;
+  const selectedLegalType = legalType || (type === 'expert' ? 'individual' : 'company');
+  const legalMeta = LEGAL_ENTITY_TYPES[selectedLegalType] || LEGAL_ENTITY_TYPES.company;
+  const legalFormFields = LEGAL_FIELDS[selectedLegalType] || LEGAL_FIELDS.company;
 
   useEffect(() => {
     if (!route?.token) {
@@ -148,6 +239,10 @@ export function PublicSubmitPage() {
 
   const setField = (name, value) => {
     setFields(prev => ({ ...prev, [name]: value }));
+  };
+
+  const setLegalField = (name, value) => {
+    setLegalFields(prev => ({ ...prev, [name]: value }));
   };
 
   const handleFiles = async (list) => {
@@ -174,13 +269,49 @@ export function PublicSubmitPage() {
     }
   };
 
-  const submit = async () => {
+  const handleLegalDocuments = async (list) => {
+    const incoming = Array.from(list || []).filter(isAllowedDocument).slice(0, Math.max(0, 12 - legalDocuments.length));
+    if (!incoming.length) return;
+    setLegalUploading(true);
+    setError('');
+    try {
+      const uploaded = [];
+      for (const file of incoming) {
+        if (file.size > 8 * 1024 * 1024) {
+          uploaded.push({ name: file.name, type: file.type, size: file.size, documentType: legalDocType, error: 'Файл больше 8 МБ' });
+          continue;
+        }
+        const url = await uploadPhoto(file, `public-submissions/${route.token}/legal`);
+        uploaded.push({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          url,
+          documentType: legalDocType,
+          documentLabel: LEGAL_DOC_TYPES.find(([id]) => id === legalDocType)?.[1] || 'Документ',
+        });
+      }
+      setLegalDocuments(prev => [...prev, ...uploaded]);
+    } catch (e) {
+      setError(e.message || 'Не удалось загрузить документ.');
+    } finally {
+      setLegalUploading(false);
+    }
+  };
+
+  const validatePublicStep = () => {
     const title = String(fields.title || '').trim();
     const description = String(fields.description || fields.shortDescription || '').trim();
     if (!title || !description) {
       setError('Заполните название и описание. Остальное можно уточнить позже.');
-      return;
+      return false;
     }
+    setError('');
+    return true;
+  };
+
+  const submit = async () => {
+    if (!validatePublicStep()) return;
     setSubmitting(true);
     setError('');
     try {
@@ -197,6 +328,16 @@ export function PublicSubmitPage() {
           token: route.token,
           fields: normalizedFields,
           files: files.filter(file => file.url).map(({ name, type, size, url, role }) => ({ name, type, size, url, role })),
+          legalProfile: {
+            type: selectedLegalType,
+            typeLabel: legalMeta,
+            fields: {
+              ...legalFields,
+              website: normalizeExternalUrl(legalFields.website),
+              myTaxLink: normalizeExternalUrl(legalFields.myTaxLink),
+            },
+          },
+          legalDocuments: legalDocuments.filter(file => file.url).map(({ name, type, size, url, documentType, documentLabel }) => ({ name, type, size, url, documentType, documentLabel })),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -263,46 +404,101 @@ export function PublicSubmitPage() {
           <div style={{ fontSize: 42, marginBottom: 8 }}>{meta.emoji}</div>
           <h1 style={{ margin: 0, fontSize: 30, lineHeight: '34px', fontWeight: 950 }}>{meta.title}</h1>
           <p style={{ margin: '12px 0 0', color: 'rgba(25,23,19,0.62)', fontSize: 15, lineHeight: '23px' }}>
-            Спасибо за интерес к проекту! Заполните небольшую анкету для {meta.label}. Это займёт 2-3 минуты.
+            Спасибо за интерес к проекту! Сначала заполните публичную карточку, затем реквизиты для оформления сотрудничества.
           </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+            <span style={{ ...S.step, background: step === 'public' ? 'rgba(201,168,76,0.20)' : 'rgba(25,23,19,0.06)', color: step === 'public' ? '#6b5316' : 'rgba(25,23,19,0.58)' }}>1 · Публичная информация</span>
+            <span style={{ ...S.step, background: step === 'legal' ? 'rgba(201,168,76,0.20)' : 'rgba(25,23,19,0.06)', color: step === 'legal' ? '#6b5316' : 'rgba(25,23,19,0.58)' }}>2 · Юридическая информация</span>
+          </div>
         </div>
 
         <div style={S.card}>
-          {formFields.map(field => (
-            <PublicField key={field[0]} field={field} value={fields[field[0]]} onChange={setField} />
-          ))}
-
-          <span style={S.label}>Фотографии и логотип</span>
-          <div
-            onDragEnter={e => { e.preventDefault(); setDragActive(true); }}
-            onDragOver={e => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={e => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
-            style={{ border: `1px dashed ${dragActive ? '#C9A84C' : 'rgba(25,23,19,0.22)'}`, borderRadius: 20, background: dragActive ? 'rgba(201,168,76,0.14)' : 'rgba(255,255,255,0.46)', padding: 18, textAlign: 'center' }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
-            <div style={{ fontSize: 14, fontWeight: 850 }}>Перетащите фото сюда или выберите с телефона</div>
-            <div style={{ color: 'rgba(25,23,19,0.54)', fontSize: 12, margin: '6px 0 12px' }}>JPG, PNG, WebP до 8 МБ, максимум 8 файлов</div>
-            <input type="file" multiple accept="image/*" capture="environment" onChange={e => handleFiles(e.target.files)} style={{ ...S.input, padding: 10, minHeight: 44 }} />
-          </div>
-
-          {files.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 10, marginTop: 12 }}>
-              {files.map((file, index) => (
-                <div key={`${file.name}-${index}`} style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(25,23,19,0.06)', border: '1px solid rgba(25,23,19,0.08)' }}>
-                  {file.preview || file.url ? <img src={file.preview || file.url} alt="" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block' }} /> : null}
-                  <div style={{ padding: 8, fontSize: 10, color: file.error ? '#b91c1c' : 'rgba(25,23,19,0.62)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.error || file.name}</div>
-                </div>
+          {step === 'public' ? (
+            <>
+              <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Публичная карточка</h2>
+              <div style={{ color: 'rgba(25,23,19,0.58)', fontSize: 13, lineHeight: '20px', marginBottom: 8 }}>Эти сведения редактор использует для карточки в приложении АПГ.</div>
+              {formFields.map(field => (
+                <PublicField key={field[0]} field={field} value={fields[field[0]]} onChange={setField} />
               ))}
-            </div>
+
+              <span style={S.label}>Фотографии и логотип</span>
+              <div
+                onDragEnter={e => { e.preventDefault(); setDragActive(true); }}
+                onDragOver={e => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={e => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
+                style={{ border: `1px dashed ${dragActive ? '#C9A84C' : 'rgba(25,23,19,0.22)'}`, borderRadius: 20, background: dragActive ? 'rgba(201,168,76,0.14)' : 'rgba(255,255,255,0.46)', padding: 18, textAlign: 'center' }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
+                <div style={{ fontSize: 14, fontWeight: 850 }}>Перетащите фото сюда или выберите с телефона</div>
+                <div style={{ color: 'rgba(25,23,19,0.54)', fontSize: 12, margin: '6px 0 12px' }}>JPG, PNG, WebP до 8 МБ, максимум 8 файлов</div>
+                <input type="file" multiple accept="image/*" capture="environment" onChange={e => handleFiles(e.target.files)} style={{ ...S.input, padding: 10, minHeight: 44 }} />
+              </div>
+
+              {files.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 10, marginTop: 12 }}>
+                  {files.map((file, index) => (
+                    <div key={`${file.name}-${index}`} style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(25,23,19,0.06)', border: '1px solid rgba(25,23,19,0.08)' }}>
+                      {file.preview || file.url ? <img src={file.preview || file.url} alt="" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block' }} /> : null}
+                      <div style={{ padding: 8, fontSize: 10, color: file.error ? '#b91c1c' : 'rgba(25,23,19,0.62)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.error || file.name}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {error && <div style={{ marginTop: 14, padding: 13, borderRadius: 16, background: 'rgba(220,38,38,0.10)', color: '#b91c1c', fontSize: 13, lineHeight: '19px' }}>{error}</div>}
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
+                <button type="button" onClick={() => { if (validatePublicStep()) { setStep('legal'); window.scrollTo({ top: 0, behavior: 'smooth' }); } }} disabled={uploading} style={{ ...S.button, opacity: uploading ? 0.55 : 1 }}>{uploading ? 'Загружаем фото...' : 'Продолжить'}</button>
+                <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={S.ghost}>Наверх</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Юридическая карточка</h2>
+              <div style={{ padding: 14, borderRadius: 18, background: 'rgba(201,168,76,0.13)', color: '#6b5316', fontSize: 13, lineHeight: '20px', margin: '10px 0 14px' }}>
+                Эти сведения не публикуются в приложении. Они используются только администрацией АПГ для оформления сотрудничества, договоров, ЭДО и внутренней CRM.
+              </div>
+
+              <label>
+                <span style={S.label}>Тип контрагента</span>
+                <select value={selectedLegalType} onChange={e => { setLegalType(e.target.value); setLegalFields({}); }} style={S.input}>
+                  {Object.entries(LEGAL_ENTITY_TYPES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              </label>
+
+              {legalFormFields.map(field => (
+                <PublicField key={field[0]} field={field} value={legalFields[field[0]]} onChange={setLegalField} />
+              ))}
+
+              <span style={S.label}>Документы</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 220px) 1fr', gap: 10, alignItems: 'center' }}>
+                <select value={legalDocType} onChange={e => setLegalDocType(e.target.value)} style={S.input}>
+                  {LEGAL_DOC_TYPES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+                <input type="file" multiple accept={DOC_ACCEPT} onChange={e => handleLegalDocuments(e.target.files)} style={{ ...S.input, padding: 10, minHeight: 44 }} />
+              </div>
+              <div style={{ color: 'rgba(25,23,19,0.54)', fontSize: 12, marginTop: 7 }}>PDF, DOCX, XLSX, JPG, PNG до 8 МБ, максимум 12 файлов.</div>
+
+              {legalDocuments.length > 0 && (
+                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                  {legalDocuments.map((file, index) => (
+                    <div key={`${file.name}-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: 10, borderRadius: 14, background: 'rgba(25,23,19,0.05)', border: '1px solid rgba(25,23,19,0.08)', color: file.error ? '#b91c1c' : 'rgba(25,23,19,0.72)', fontSize: 12 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.documentLabel || 'Документ'} · {file.error || file.name}</span>
+                      <span>{Math.round(Number(file.size || 0) / 1024)} КБ</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {error && <div style={{ marginTop: 14, padding: 13, borderRadius: 16, background: 'rgba(220,38,38,0.10)', color: '#b91c1c', fontSize: 13, lineHeight: '19px' }}>{error}</div>}
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
+                <button type="button" onClick={submit} disabled={submitting || uploading || legalUploading} style={{ ...S.button, opacity: submitting || uploading || legalUploading ? 0.55 : 1 }}>{legalUploading ? 'Загружаем документы...' : submitting ? 'Отправляем...' : 'Отправить заявку'}</button>
+                <button type="button" onClick={() => { setStep('public'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={S.ghost}>Назад</button>
+              </div>
+            </>
           )}
-
-          {error && <div style={{ marginTop: 14, padding: 13, borderRadius: 16, background: 'rgba(220,38,38,0.10)', color: '#b91c1c', fontSize: 13, lineHeight: '19px' }}>{error}</div>}
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-            <button type="button" onClick={submit} disabled={submitting || uploading} style={{ ...S.button, opacity: submitting || uploading ? 0.55 : 1 }}>{uploading ? 'Загружаем фото...' : submitting ? 'Отправляем...' : 'Отправить заявку'}</button>
-            <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={S.ghost}>Наверх</button>
-          </div>
         </div>
       </div>
     </div>

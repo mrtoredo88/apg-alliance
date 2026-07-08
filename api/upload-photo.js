@@ -5,7 +5,23 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const BUCKET = 'apg-photos';
 const ENDPOINT = 'https://storage.yandexcloud.net';
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
+function extensionFor(contentType) {
+  if (contentType === 'image/webp') return 'webp';
+  if (contentType === 'image/png') return 'png';
+  if (contentType === 'application/pdf') return 'pdf';
+  if (contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx';
+  if (contentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx';
+  return 'jpg';
+}
 
 let _client = null;
 function getClient() {
@@ -40,7 +56,7 @@ export default async function handler(req, res) {
 
   const buffer = Buffer.from(data, 'base64');
   const timestamp = Date.now();
-  const ext = contentType === 'image/webp' ? 'webp' : contentType === 'image/png' ? 'png' : 'jpg';
+  const ext = extensionFor(contentType);
   const key = `${folder}/${timestamp}_${filename.replace(/[^a-z0-9._-]/gi, '_')}.${ext}`;
 
   await getClient().send(new PutObjectCommand({

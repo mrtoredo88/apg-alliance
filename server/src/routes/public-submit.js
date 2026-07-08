@@ -59,6 +59,136 @@ function detectCategory(text, type) {
   return type === 'news' ? 'society' : 'other';
 }
 
+const LEGAL_ENTITY_TYPES = {
+  company: 'ООО / юридическое лицо',
+  entrepreneur: 'ИП',
+  self_employed: 'Самозанятый',
+  individual: 'Физическое лицо',
+};
+
+const LEGAL_REQUIRED_FIELDS = {
+  company: ['fullName', 'inn', 'kpp', 'ogrn', 'legalAddress', 'checkingAccount', 'correspondentAccount', 'bik', 'bank', 'directorName', 'phone', 'email'],
+  entrepreneur: ['fio', 'inn', 'ogrnip', 'address', 'checkingAccount', 'bank', 'bik', 'phone', 'email'],
+  self_employed: ['fio', 'inn', 'phone', 'email'],
+  individual: ['fio', 'phone', 'email'],
+};
+
+const LEGAL_FIELD_LIMITS = {
+  comment: 3000,
+  legalAddress: 1500,
+  actualAddress: 1500,
+  address: 1500,
+  authorityBasis: 800,
+};
+
+function digits(value) {
+  return cleanText(value, 80).replace(/\D/g, '');
+}
+
+function innChecksum(value) {
+  const inn = digits(value);
+  if (inn.length === 10) {
+    const weights = [2, 4, 10, 3, 5, 9, 4, 6, 8];
+    const check = weights.reduce((sum, weight, index) => sum + Number(inn[index]) * weight, 0) % 11 % 10;
+    return check === Number(inn[9]);
+  }
+  if (inn.length === 12) {
+    const weights11 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8];
+    const weights12 = [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8];
+    const check11 = weights11.reduce((sum, weight, index) => sum + Number(inn[index]) * weight, 0) % 11 % 10;
+    const check12 = weights12.reduce((sum, weight, index) => sum + Number(inn[index]) * weight, 0) % 11 % 10;
+    return check11 === Number(inn[10]) && check12 === Number(inn[11]);
+  }
+  return false;
+}
+
+function normalizeLegalProfile(raw) {
+  const type = LEGAL_ENTITY_TYPES[raw?.type] ? raw.type : 'company';
+  const fields = raw?.fields && typeof raw.fields === 'object' ? raw.fields : {};
+  const cleaned = {};
+  Object.entries(fields).forEach(([key, value]) => {
+    const max = LEGAL_FIELD_LIMITS[key] || 500;
+    cleaned[key] = cleanText(value, max);
+  });
+  ['inn', 'kpp', 'ogrn', 'ogrnip', 'bik', 'checkingAccount', 'correspondentAccount', 'cardNumber'].forEach(key => {
+    if (cleaned[key]) cleaned[key] = digits(cleaned[key]);
+  });
+  cleaned.email = cleanText(cleaned.email, 180).toLowerCase();
+  cleaned.website = normalizeUrl(cleaned.website);
+  cleaned.myTaxLink = normalizeUrl(cleaned.myTaxLink);
+  return { type, typeLabel: LEGAL_ENTITY_TYPES[type], fields: cleaned };
+}
+
+function analyzeLegalProfile(profile, documents) {
+  const fields = profile.fields || {};
+  const required = LEGAL_REQUIRED_FIELDS[profile.type] || [];
+  const missingFields = required.filter(key => !fields[key]);
+  const checks = [];
+  const addCheck = (id, label, ok, message = '') => checks.push({ id, label, ok, message });
+
+  if (fields.inn) addCheck('inn', 'ИНН', innChecksum(fields.inn), innChecksum(fields.inn) ? 'ИНН заполнен и прошёл контрольную проверку.' : 'Проверьте ИНН: контрольная сумма не совпадает.');
+  else addCheck('inn', 'ИНН', false, 'ИНН не заполнен.');
+
+  if (fields.kpp || profile.type === 'company') addCheck('kpp', 'КПП', profile.type !== 'company' || /^\d{9}$/.test(fields.kpp || ''), fields.kpp ? 'КПП заполнен.' : 'КПП нужен для ООО.');
+  if (fields.ogrn || profile.type === 'company') addCheck('ogrn', 'ОГРН', profile.type !== 'company' || /^\d{13}$/.test(fields.ogrn || ''), fields.ogrn ? 'ОГРН заполнен.' : 'ОГРН нужен для ООО.');
+  if (fields.ogrnip || profile.type === 'entrepreneur') addCheck('ogrnip', 'ОГРНИП', profile.type !== 'entrepreneur' || /^\d{15}$/.test(fields.ogrnip || ''), fields.ogrnip ? 'ОГРНИП заполнен.' : 'ОГРНИП нужен для ИП.');
+  if (fields.bik || ['company', 'entrepreneur'].includes(profile.type)) addCheck('bik', 'БИК', /^\d{9}$/.test(fields.bik || ''), fields.bik ? 'БИК заполнен.' : 'БИК не заполнен.');
+  if (fields.checkingAccount || ['company', 'entrepreneur'].includes(profile.type)) addCheck('checkingAccount', 'Расчётный счёт', /^\d{20}$/.test(fields.checkingAccount || ''), fields.checkingAccount ? 'Расчётный счёт заполнен.' : 'Расчётный счёт не заполнен.');
+  if (fields.correspondentAccount || profile.type === 'company') addCheck('correspondentAccount', 'Корреспондентский счёт', profile.type !== 'company' || /^\d{20}$/.test(fields.correspondentAccount || ''), fields.correspondentAccount ? 'Корреспондентский счёт заполнен.' : 'Корреспондентский счёт не заполнен.');
+  addCheck('documents', 'Документы', documents.length > 0, documents.length ? `Прикреплено документов: ${documents.length}.` : 'Документы не прикреплены.');
+
+  const failed = checks.filter(item => !item.ok).map(item => item.id);
+  return {
+    status: missingFields.length || failed.length ? 'needs_review' : 'ready',
+    score: Math.max(30, Math.min(100, 100 - missingFields.length * 8 - failed.length * 6)),
+    missingFields: [...new Set(missingFields)],
+    checks,
+    recommendations: [
+      missingFields.length ? `Заполнить: ${missingFields.join(', ')}` : '',
+      documents.length ? '' : 'Прикрепить карточку предприятия или подтверждающие документы.',
+      failed.includes('inn') ? 'Проверить ИНН перед подготовкой договора.' : '',
+    ].filter(Boolean),
+  };
+}
+
+function normalizeLegalDocuments(input) {
+  return Array.isArray(input) ? input.slice(0, 12).map(file => ({
+    name: cleanText(file.name, 180),
+    type: cleanText(file.type, 120),
+    size: Number(file.size || 0),
+    url: normalizeUrl(file.url),
+    documentType: cleanText(file.documentType, 60),
+    documentLabel: cleanText(file.documentLabel, 120),
+  })).filter(file => file.url && file.size > 0 && file.size <= 8 * 1024 * 1024) : [];
+}
+
+function buildCounterparty(type, draft, legalProfile, documents) {
+  const fields = legalProfile.fields || {};
+  return {
+    type: legalProfile.type,
+    typeLabel: legalProfile.typeLabel,
+    displayName: fields.shortName || fields.fullName || fields.fio || draft.fields.title || 'Контрагент АПГ',
+    publicName: draft.fields.title || '',
+    status: `${TYPES[type]?.label || 'Участник'} АПГ`,
+    inn: fields.inn || '',
+    kpp: fields.kpp || '',
+    ogrn: fields.ogrn || fields.ogrnip || '',
+    directorName: fields.directorName || '',
+    phone: fields.phone || '',
+    email: fields.email || '',
+    website: fields.website || '',
+    documentsCount: documents.length,
+    crmReady: true,
+    future: {
+      contracts: [],
+      invoices: [],
+      acts: [],
+      commercialOffers: [],
+      edo: { status: 'planned' },
+    },
+  };
+}
+
 function analyze(type, fields, files) {
   const sourceText = Object.entries(fields)
     .filter(([, value]) => cleanText(value))
@@ -164,6 +294,10 @@ export default async function publicSubmitRoutes(fastify) {
       })).filter(file => file.url && file.size <= 8 * 1024 * 1024) : [];
       const type = link.data.type;
       const draft = analyze(type, fields, files);
+      const legalDocuments = normalizeLegalDocuments(request.body?.legalDocuments);
+      const legalProfile = normalizeLegalProfile(request.body?.legalProfile);
+      const legalCheck = analyzeLegalProfile(legalProfile, legalDocuments);
+      const counterparty = buildCounterparty(type, draft, legalProfile, legalDocuments);
       const meta = TYPES[type];
       const sourceText = Object.entries(fields).map(([key, value]) => `${key}: ${cleanText(value, 4000)}`).join('\n');
       const now = FieldValue.serverTimestamp();
@@ -176,8 +310,26 @@ export default async function publicSubmitRoutes(fastify) {
         sourceText: sourceText.slice(0, 20000),
         sourceFiles: files,
         draft,
+        legalProfile,
+        legalDocuments,
+        legalCheck,
+        counterparty,
+        crm: {
+          lifecycleStage: 'new_public_submission',
+          responsible: 'admin',
+          comments: [],
+          interactions: [],
+          meetings: [],
+          tasks: [],
+          contracts: [],
+          invoices: [],
+          acts: [],
+          commercialOffers: [],
+          edo: { status: 'planned' },
+        },
         confidence: draft.confidence,
         missingFields: draft.missingFields,
+        legalMissingFields: legalCheck.missingFields,
         publicFormLinkId: link.id,
         publicTokenPrefix: token.slice(0, 6),
         submitter: {
@@ -197,7 +349,7 @@ export default async function publicSubmitRoutes(fastify) {
         submittedCount: FieldValue.increment(1),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-      return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, confidence: draft.confidence };
+      return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, legalCheck, confidence: draft.confidence };
     } catch (error) {
       request.log.error({ err: error?.message, code: error?.statusCode || 500 }, 'public-submit post failed');
       return reply.code(error?.statusCode || 500).send({ ok: false, error: error?.message || 'Не удалось обработать заявку.' });

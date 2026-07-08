@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Юридические карточки публичных заявок
+**Коммит:** `локально`
+**Файлы:** `src/PublicSubmitPage.jsx`, `src/AdminPanel.jsx`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `api/upload-photo.js`, `server/src/routes/upload-photo.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Публичная анкета стала двухшаговой: публичная карточка и закрытая юридическая карточка для ООО, ИП, самозанятых и физических лиц. Backend нормализует реквизиты, проверяет ИНН/КПП/ОГРН/ОГРНИП/БИК/счета, хранит документы, формирует `counterparty` и CRM-заготовку. Админка показывает юридические данные только ролям `owner`, `super_admin`, `admin`, а `/api/admin-actions` вырезает закрытые поля для остальных ролей.
+**Почему:** Нужно собирать не только данные для публикации, но и реквизиты для договоров, ЭДО, бухгалтерии и будущей CRM без риска показа юридических данных пользователям.
+
+---
+
 ## [2026-07-08] Публичные формы заявок АПГ
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/UserApp.jsx`, `src/PublicSubmitPage.jsx`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `server/src/server.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
