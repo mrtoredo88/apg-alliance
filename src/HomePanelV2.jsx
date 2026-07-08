@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { RichText } from './components/RichText.jsx';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
-import { Panel, Avatar, Button, HorizontalScroll } from '@vkontakte/vkui';
+import { Panel, Avatar, Button } from '@vkontakte/vkui';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
@@ -136,6 +136,25 @@ const GlassPanel = {
 const GlassHero = {
   ...V2.glowGlass,
   borderRadius: 42,
+};
+
+const horizontalSnapTrack = {
+  display: 'flex',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  WebkitOverflowScrolling: 'touch',
+  scrollSnapType: 'x mandatory',
+  scrollBehavior: 'smooth',
+  overscrollBehaviorX: 'contain',
+  overscrollBehaviorY: 'auto',
+  touchAction: 'pan-x',
+  scrollbarWidth: 'none',
+};
+
+const horizontalSnapItem = {
+  scrollSnapAlign: 'start',
+  scrollSnapStop: 'always',
+  touchAction: 'manipulation',
 };
 
 function getUserFirstName(user) {
@@ -487,42 +506,39 @@ function V2SecondScreen({
         </div>
       </div>
 
-      <div onTouchStart={e => e.stopPropagation()}>
-        <HorizontalScroll>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, padding: '0 18px 26px', scrollSnapType: 'x mandatory', scrollPaddingLeft: 18 }}>
+      <div data-apg-horizontal-scroll="true" onTouchStart={e => e.stopPropagation()}>
+          <div style={{ ...horizontalSnapTrack, alignItems: 'stretch', gap: 12, padding: '0 18px 26px', scrollPaddingLeft: 18 }}>
             {forYouCards.map((card, index) => (
               <button
                 key={`${card.label}-${index}`}
                 onClick={card.onClick}
                 {...pressMotion}
                 style={{
-                  width: index === 0 ? 246 : index === 1 ? 204 : 184,
-                  height: index === 0 ? 278 : index === 1 ? 244 : 214,
-                  flexShrink: 0, border: 'none', borderRadius: index === 0 ? 34 : 30,
+                  flex: '0 0 min(74vw, 244px)',
+                  height: 286,
+                  border: 'none', borderRadius: 32,
                   overflow: 'hidden', padding: 0, position: 'relative', textAlign: 'left', cursor: 'pointer',
+                  ...horizontalSnapItem,
                   ...GlassCard,
                   background: fallbackCardBg,
                   boxShadow: '0 26px 68px var(--apg2-elev-shadow, rgba(0,0,0,0.30)), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -24px 48px rgba(255,255,255,0.035)',
                   animation: 'fadeInUp 0.54s ease both',
                   animationDelay: `${index * 0.05}s`,
-                  scrollSnapAlign: 'start',
-                  scrollSnapStop: 'always',
                 }}
               >
                 {renderImageLayer(card.image, index === 0 ? 0.6 : 0.52)}
                 <div style={{ position: 'absolute', inset: 0, background: layerShade }} />
-                <div style={{ position: 'relative', zIndex: 1, height: '100%', padding: index === 0 ? 22 : 18, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ alignSelf: 'flex-start', ...GlassBadge, padding: '7px 11px' }}>
+                <div style={{ position: 'relative', zIndex: 1, height: '100%', padding: 18, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+                  <span style={{ alignSelf: 'flex-start', ...GlassBadge, padding: '7px 11px', minHeight: 30, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center' }}>
                     {card.label}
                   </span>
-                  <span style={{ marginTop: 'auto', marginBottom: index === 0 ? 16 : 10, alignSelf: 'stretch', padding: index === 0 ? '13px 15px' : '11px 13px', borderRadius: index === 0 ? 24 : 22, color: V2.text, fontSize: index === 0 ? 18 : 16, lineHeight: index === 0 ? '22px' : '20px', fontWeight: 780, textShadow: '0 10px 28px rgba(0,0,0,0.18)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.15))', backdropFilter: 'blur(36px) saturate(1.55)', WebkitBackdropFilter: 'blur(36px) saturate(1.55)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}>
-                    {card.title}
+                  <span style={{ marginTop: 'auto', alignSelf: 'stretch', minHeight: 76, maxHeight: 76, padding: '13px 14px', borderRadius: 24, color: V2.text, fontSize: 17, lineHeight: '21px', fontWeight: 800, textShadow: '0 10px 28px rgba(0,0,0,0.18)', overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.15))', backdropFilter: 'blur(36px) saturate(1.55)', WebkitBackdropFilter: 'blur(36px) saturate(1.55)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)', boxSizing: 'border-box', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.title}</span>
                   </span>
                 </div>
               </button>
             ))}
           </div>
-        </HorizontalScroll>
       </div>
 
       <div style={{ padding: '0 0 0' }}>
@@ -1181,7 +1197,7 @@ function NewsWidget({ news = [], onOpenNews }) {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', paddingBottom: 2, margin: '0 -16px', paddingLeft: 16, paddingRight: 16 }}>
+          <div data-apg-horizontal-scroll="true" style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, margin: '0 -16px', paddingLeft: 16, paddingRight: 16, scrollPaddingLeft: 16 }}>
             {items.map((item, index) => {
               const image = getNewsImage(item);
               const photo = getNewsPhotoItems(item)[0];
@@ -1196,7 +1212,7 @@ function NewsWidget({ news = [], onOpenNews }) {
                   onClick={() => setModal(item)}
                   {...pressMotion}
                   aria-label={`Открыть новость: ${getNewsTitle(item)}`}
-                  style={{ flex: '0 0 260px', minHeight: 304, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: T.textPri, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', scrollSnapAlign: 'start', fontFamily: 'inherit' }}
+                  style={{ flex: '0 0 260px', minHeight: 304, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: T.textPri, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', fontFamily: 'inherit', ...horizontalSnapItem }}
                 >
                   <span style={{ display: 'block', position: 'relative', height: 136, background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
                     {image && <img src={image} alt="" loading="lazy" decoding="async" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit }} />}
@@ -1817,17 +1833,15 @@ function V2FullHomeSections({
           </div>
 
           {topPartners.length > 3 && (
-            <div onTouchStart={e => e.stopPropagation()}>
-              <HorizontalScroll>
-                <div style={{ display: 'flex', gap: 10, paddingBottom: 2 }}>
+            <div data-apg-horizontal-scroll="true" onTouchStart={e => e.stopPropagation()}>
+                <div style={{ ...horizontalSnapTrack, gap: 10, paddingBottom: 2, scrollPaddingLeft: 2 }}>
                   {topPartners.slice(3).map((partner, index) => (
-                    <button key={partner.id ?? partner.name} onClick={() => onOpenPartner?.(partner)} {...pressMotion} style={{ ...GlassCard, width: 154, height: 112, flexShrink: 0, border: 'none', borderRadius: 26, padding: 13, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <button key={partner.id ?? partner.name} onClick={() => onOpenPartner?.(partner)} {...pressMotion} style={{ ...GlassCard, flex: '0 0 154px', height: 112, border: 'none', borderRadius: 26, padding: 13, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', ...horizontalSnapItem }}>
                       <span style={{ color: V2.textMuted, fontSize: 11, lineHeight: '14px', fontWeight: 650 }}>{partner.categoryLabel || 'АПГ'}</span>
                       <span style={{ color: V2.text, fontSize: 14, lineHeight: '18px', fontWeight: 780, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titleOf(partner, 'Партнер')}</span>
                     </button>
                   ))}
                 </div>
-              </HorizontalScroll>
             </div>
           )}
         </div>
@@ -1873,17 +1887,15 @@ function V2FullHomeSections({
         </div>
       ) : (
         <div onTouchStart={e => e.stopPropagation()} style={{ marginBottom: 34 }}>
-          <HorizontalScroll>
-            <div style={{ display: 'flex', gap: 12, paddingBottom: 2 }}>
+            <div data-apg-horizontal-scroll="true" style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, scrollPaddingLeft: 2 }}>
               {visibleReviews.map((review, index) => (
-                <div key={review.id ?? index} style={{ ...GlassCard, width: index === 0 ? 250 : 214, minHeight: 164, flexShrink: 0, borderRadius: 34, padding: 17, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', animation: 'fadeInUp 0.5s ease both', animationDelay: `${index * 0.04}s` }}>
+                <div key={review.id ?? index} style={{ ...GlassCard, flex: `0 0 ${index === 0 ? 250 : 214}px`, minHeight: 164, borderRadius: 34, padding: 17, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', animation: 'fadeInUp 0.5s ease both', animationDelay: `${index * 0.04}s`, ...horizontalSnapItem }}>
                   <span style={{ color: '#F4D98C', fontSize: 13, letterSpacing: 1 }}>{'★'.repeat(Math.max(1, Math.min(5, review.stars ?? 5)))}</span>
                   <span style={{ color: V2.text, fontSize: 15, lineHeight: '21px', fontWeight: 650, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{review.text || `Отзыв о ${review.partnerName || 'партнере АПГ'}`}</span>
                   <span style={{ color: V2.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{review.userName || 'Участник АПГ'} · {review.partnerName || 'АПГ'}</span>
                 </div>
               ))}
             </div>
-          </HorizontalScroll>
         </div>
       )}
 
