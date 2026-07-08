@@ -67,8 +67,8 @@ const LEGAL_ENTITY_TYPES = {
 };
 
 const LEGAL_REQUIRED_FIELDS = {
-  company: ['fullName', 'inn', 'kpp', 'ogrn', 'legalAddress', 'checkingAccount', 'correspondentAccount', 'bik', 'bank', 'directorName', 'phone', 'email'],
-  entrepreneur: ['fio', 'inn', 'ogrnip', 'address', 'checkingAccount', 'bank', 'bik', 'phone', 'email'],
+  company: ['fullName', 'inn', 'kpp', 'ogrn', 'legalAddress', 'checkingAccount', 'bank', 'bik', 'directorName'],
+  entrepreneur: ['fio', 'inn', 'ogrnip', 'checkingAccount', 'bank', 'bik'],
   self_employed: ['fio', 'inn', 'phone', 'email'],
   individual: ['fio', 'phone', 'email'],
 };
@@ -102,7 +102,7 @@ function innChecksum(value) {
   return false;
 }
 
-function normalizeLegalProfile(raw) {
+function normalizeLegalProfile(raw, publicFields = {}, cooperationPlan = 'not_now') {
   const type = LEGAL_ENTITY_TYPES[raw?.type] ? raw.type : 'company';
   const fields = raw?.fields && typeof raw.fields === 'object' ? raw.fields : {};
   const cleaned = {};
@@ -116,11 +116,26 @@ function normalizeLegalProfile(raw) {
   cleaned.email = cleanText(cleaned.email, 180).toLowerCase();
   cleaned.website = normalizeUrl(cleaned.website);
   cleaned.myTaxLink = normalizeUrl(cleaned.myTaxLink);
-  return { type, typeLabel: LEGAL_ENTITY_TYPES[type], fields: cleaned };
+  const provided = Boolean(raw?.expanded || Object.values(fields).some(value => cleanText(value)));
+  cleaned.inn = cleaned.inn || digits(publicFields.inn);
+  cleaned.phone = cleaned.phone || cleanText(publicFields.phone, 80);
+  cleaned.email = cleaned.email || cleanText(publicFields.email, 180).toLowerCase();
+  cleaned.contactName = cleaned.contactName || cleanText(publicFields.contactName, 160);
+  return { type, typeLabel: LEGAL_ENTITY_TYPES[type], cooperationPlan, provided, fields: cleaned };
 }
 
 function analyzeLegalProfile(profile, documents) {
   const fields = profile.fields || {};
+  if (!profile.provided && profile.cooperationPlan !== 'paid') {
+    return {
+      status: 'not_required',
+      statusLabel: 'Юридические данные не требуются',
+      score: 100,
+      missingFields: [],
+      checks: [],
+      recommendations: ['Партнёр размещает бесплатную карточку. Юридические данные сейчас не требуются.'],
+    };
+  }
   const required = LEGAL_REQUIRED_FIELDS[profile.type] || [];
   const missingFields = required.filter(key => !fields[key]);
   const checks = [];
@@ -139,14 +154,16 @@ function analyzeLegalProfile(profile, documents) {
 
   const failed = checks.filter(item => !item.ok).map(item => item.id);
   return {
-    status: missingFields.length || failed.length ? 'needs_review' : 'ready',
+    status: missingFields.length || failed.length ? 'partial' : 'contract_ready',
+    statusLabel: missingFields.length || failed.length ? 'Юридические данные заполнены частично' : 'Полностью готов к заключению договора',
     score: Math.max(30, Math.min(100, 100 - missingFields.length * 8 - failed.length * 6)),
     missingFields: [...new Set(missingFields)],
     checks,
     recommendations: [
       missingFields.length ? `Заполнить: ${missingFields.join(', ')}` : '',
-      documents.length ? '' : 'Прикрепить карточку предприятия или подтверждающие документы.',
+      documents.length || profile.type === 'self_employed' ? '' : 'Прикрепить карточку предприятия или подтверждающие документы.',
       failed.includes('inn') ? 'Проверить ИНН перед подготовкой договора.' : '',
+      profile.cooperationPlan === 'paid' ? 'Партнёр планирует платное сотрудничество. Рекомендуется довести реквизиты до статуса готовности к договору.' : '',
     ].filter(Boolean),
   };
 }
@@ -177,6 +194,8 @@ function buildCounterparty(type, draft, legalProfile, documents) {
     phone: fields.phone || '',
     email: fields.email || '',
     website: fields.website || '',
+    cooperationPlan: legalProfile.cooperationPlan || 'not_now',
+    cooperationStatus: legalProfile.cooperationPlan === 'paid' ? 'paid_planned' : 'free_card',
     documentsCount: documents.length,
     crmReady: true,
     future: {
@@ -207,6 +226,11 @@ function analyze(type, fields, files) {
     website: normalizeUrl(fields.website || fields.bookingUrl),
     telegram: normalizeUrl(fields.telegram, 'telegram'),
     vk: normalizeUrl(fields.vk, 'vk'),
+    inn: digits(fields.inn),
+    city: cleanText(fields.city),
+    video: normalizeUrl(fields.video),
+    newsInfo: cleanText(fields.newsInfo, 3000),
+    activities: cleanText(fields.activities, 3000),
     instagram: normalizeUrl(fields.instagram),
     hours: cleanText(fields.hours),
     services: cleanText(fields.services || fields.program),
@@ -216,7 +240,7 @@ function analyze(type, fields, files) {
     source: cleanText(fields.source || fields.organizer || fields.provider),
     comment: cleanText(fields.comment, 3000),
   };
-  const required = type === 'news' ? ['title', 'description'] : type === 'event' ? ['title', 'date', 'description'] : ['title', 'description'];
+  const required = type === 'news' ? ['title', 'description', 'inn', 'city'] : type === 'event' ? ['title', 'date', 'description', 'inn', 'city'] : ['title', 'description', 'inn', 'city'];
   const missingFields = required.filter(key => !draftFields[key]);
   if ((type === 'partner' || type === 'expert') && !draftFields.phone && !draftFields.website && !draftFields.telegram && !draftFields.vk) missingFields.push('contact');
   if ((type === 'partner' || type === 'expert') && !files.length) missingFields.push('photo');
@@ -293,9 +317,20 @@ export default async function handler(req, res) {
     const type = link.data.type;
     const draft = analyze(type, fields, files);
     const legalDocuments = normalizeLegalDocuments(req.body?.legalDocuments);
-    const legalProfile = normalizeLegalProfile(req.body?.legalProfile);
+    const cooperationPlan = cleanText(req.body?.cooperationPlan, 40) === 'paid' ? 'paid' : 'not_now';
+    const legalProfile = normalizeLegalProfile(req.body?.legalProfile, fields, cooperationPlan);
     const legalCheck = analyzeLegalProfile(legalProfile, legalDocuments);
     const counterparty = buildCounterparty(type, draft, legalProfile, legalDocuments);
+    const cooperationStatus = legalCheck.status === 'contract_ready'
+      ? 'contract_ready'
+      : legalCheck.status === 'partial'
+        ? 'legal_partial'
+        : cooperationPlan === 'paid'
+          ? 'legal_recommended'
+          : 'legal_not_required';
+    const lokiCooperationNote = cooperationPlan === 'paid'
+      ? 'Партнёр планирует платное сотрудничество. Рекомендуется запросить или проверить реквизиты для оформления документов.'
+      : 'Партнёр размещает бесплатную карточку. Юридические данные сейчас не требуются.';
     const meta = TYPES[type];
     const sourceText = Object.entries(fields).map(([key, value]) => `${key}: ${cleanText(value, 4000)}`).join('\n');
     const now = FieldValue.serverTimestamp();
@@ -308,6 +343,9 @@ export default async function handler(req, res) {
       sourceText: sourceText.slice(0, 20000),
       sourceFiles: files,
       draft,
+      cooperationPlan,
+      cooperationStatus,
+      lokiCooperationNote,
       legalProfile,
       legalDocuments,
       legalCheck,

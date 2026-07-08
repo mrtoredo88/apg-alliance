@@ -12,9 +12,11 @@ const TYPES = {
 };
 
 const COMMON_FIELDS = [
-  ['contactName', 'Ваше имя', 'text', 'Как к вам обращаться'],
+  ['contactName', 'Контактное лицо (ФИО)', 'text', 'Как к вам обращаться'],
   ['phone', 'Телефон', 'tel', '+7'],
   ['email', 'Email', 'email', 'mail@example.ru'],
+  ['inn', 'ИНН', 'text', '10 или 12 цифр'],
+  ['city', 'Город', 'text', 'Зеленоград'],
   ['website', 'Сайт / запись', 'url', 'site.ru'],
   ['vk', 'VK', 'text', 'vk.com/name или @name'],
   ['telegram', 'Telegram', 'text', '@name'],
@@ -31,6 +33,9 @@ const FIELDS = {
     ['offer', 'Акция для пользователей АПГ', 'textarea', 'Скидка, подарок или бонус'],
     ['gift', 'Подарок / бонус за ключи', 'textarea', 'Что пользователь может получить'],
     ['services', 'Услуги', 'textarea', 'Основные услуги или направления'],
+    ['video', 'Видео', 'url', 'Ссылка на видео, если есть'],
+    ['newsInfo', 'Новости', 'textarea', 'Что можно рассказать пользователям'],
+    ['activities', 'Мероприятия', 'textarea', 'События, мастер-классы, активности'],
     ...COMMON_FIELDS,
     ['comment', 'Комментарий', 'textarea', 'Что ещё важно знать редактору'],
   ],
@@ -42,6 +47,9 @@ const FIELDS = {
     ['services', 'Услуги / форматы работы', 'textarea', 'Консультации, группы, онлайн...'],
     ['cost', 'Стоимость / условия', 'text', 'Если можно указывать публично'],
     ['offer', 'Акция для пользователей АПГ', 'textarea', 'Скидка, бонус, бесплатная встреча'],
+    ['video', 'Видео', 'url', 'Ссылка на видео, если есть'],
+    ['newsInfo', 'Новости', 'textarea', 'Что можно рассказать пользователям'],
+    ['activities', 'Мероприятия', 'textarea', 'Встречи, эфиры, консультации'],
     ...COMMON_FIELDS,
     ['comment', 'Комментарий', 'textarea', 'Что ещё важно знать редактору'],
   ],
@@ -63,6 +71,11 @@ const FIELDS = {
     ['description', 'Текст новости', 'textarea', 'Факты, детали, цитаты'],
     ['category', 'Категория', 'text', 'АПГ, город, партнёры...'],
     ['source', 'Источник', 'text', 'Откуда информация'],
+    ['contactName', 'Контактное лицо (ФИО)', 'text', 'Кто отправляет материал'],
+    ['phone', 'Телефон', 'tel', '+7'],
+    ['email', 'Email', 'email', 'mail@example.ru'],
+    ['inn', 'ИНН', 'text', '10 или 12 цифр'],
+    ['city', 'Город', 'text', 'Зеленоград'],
     ['website', 'Ссылка на источник', 'url', 'https://...'],
     ['comment', 'Комментарий редактору', 'textarea', 'Что проверить перед публикацией'],
   ],
@@ -87,43 +100,29 @@ const LEGAL_ENTITY_TYPES = {
 const LEGAL_FIELDS = {
   company: [
     ['fullName', 'Полное наименование', 'text', 'ООО "..."'],
-    ['shortName', 'Краткое наименование', 'text', 'ООО "..."'],
     ['inn', 'ИНН', 'text', '10 цифр'],
     ['kpp', 'КПП', 'text', '9 цифр'],
     ['ogrn', 'ОГРН', 'text', '13 цифр'],
     ['legalAddress', 'Юридический адрес', 'textarea', 'Адрес из ЕГРЮЛ'],
     ['actualAddress', 'Фактический адрес', 'textarea', 'Если отличается'],
     ['checkingAccount', 'Расчётный счёт', 'text', '20 цифр'],
-    ['correspondentAccount', 'Корреспондентский счёт', 'text', '20 цифр'],
-    ['bik', 'БИК', 'text', '9 цифр'],
     ['bank', 'Банк', 'text', 'Название банка'],
+    ['bik', 'БИК', 'text', '9 цифр'],
     ['directorName', 'ФИО директора', 'text', 'Фамилия Имя Отчество'],
-    ['authorityBasis', 'Основание полномочий', 'text', 'Устав / доверенность'],
-    ['phone', 'Телефон', 'tel', '+7'],
-    ['email', 'Email', 'email', 'mail@example.ru'],
-    ['website', 'Сайт', 'url', 'site.ru'],
   ],
   entrepreneur: [
     ['fio', 'ФИО', 'text', 'Фамилия Имя Отчество'],
     ['inn', 'ИНН', 'text', '12 цифр'],
     ['ogrnip', 'ОГРНИП', 'text', '15 цифр'],
-    ['address', 'Адрес', 'textarea', 'Адрес регистрации / связи'],
     ['checkingAccount', 'Расчётный счёт', 'text', '20 цифр'],
     ['bank', 'Банк', 'text', 'Название банка'],
     ['bik', 'БИК', 'text', '9 цифр'],
-    ['phone', 'Телефон', 'tel', '+7'],
-    ['email', 'Email', 'email', 'mail@example.ru'],
   ],
   self_employed: [
     ['fio', 'ФИО', 'text', 'Фамилия Имя Отчество'],
     ['inn', 'ИНН', 'text', '12 цифр'],
     ['phone', 'Телефон', 'tel', '+7'],
     ['email', 'Email', 'email', 'mail@example.ru'],
-    ['address', 'Адрес', 'textarea', 'Для документов, если нужен'],
-    ['bank', 'Банк', 'text', 'Название банка'],
-    ['cardNumber', 'Номер карты (по желанию)', 'text', 'Если удобно'],
-    ['myTaxLink', 'Ссылка "Мой налог"', 'url', 'https://...'],
-    ['comment', 'Комментарий', 'textarea', 'Что важно для оформления'],
   ],
   individual: [
     ['fio', 'ФИО', 'text', 'Фамилия Имя Отчество'],
@@ -200,6 +199,8 @@ export function PublicSubmitPage() {
   const [fields, setFields] = useState({});
   const [files, setFiles] = useState([]);
   const [legalType, setLegalType] = useState('');
+  const [cooperationPlan, setCooperationPlan] = useState('not_now');
+  const [legalExpanded, setLegalExpanded] = useState(false);
   const [legalFields, setLegalFields] = useState({});
   const [legalDocuments, setLegalDocuments] = useState([]);
   const [legalDocType, setLegalDocType] = useState('companyCard');
@@ -243,6 +244,11 @@ export function PublicSubmitPage() {
 
   const setLegalField = (name, value) => {
     setLegalFields(prev => ({ ...prev, [name]: value }));
+  };
+
+  const setPlan = (value) => {
+    setCooperationPlan(value);
+    if (value === 'paid') setLegalExpanded(true);
   };
 
   const handleFiles = async (list) => {
@@ -302,8 +308,23 @@ export function PublicSubmitPage() {
   const validatePublicStep = () => {
     const title = String(fields.title || '').trim();
     const description = String(fields.description || fields.shortDescription || '').trim();
-    if (!title || !description) {
-      setError('Заполните название и описание. Остальное можно уточнить позже.');
+    const required = [
+      ['title', 'название'],
+      ['contactName', 'контактное лицо'],
+      ['phone', 'телефон'],
+      ['email', 'email'],
+      ['inn', 'ИНН'],
+      ['city', 'город'],
+      ['description', 'описание'],
+    ];
+    if (formFields.some(([name]) => name === 'category')) required.push(['category', 'категорию']);
+    const missing = required.filter(([key]) => key === 'description' ? !description : !String(fields[key] || '').trim()).map(([, label]) => label);
+    if (missing.length) {
+      setError(`Заполните обязательные поля: ${missing.join(', ')}.`);
+      return false;
+    }
+    if (!/^\d{10}$|^\d{12}$/.test(String(fields.inn || '').replace(/\D/g, ''))) {
+      setError('ИНН должен содержать 10 или 12 цифр.');
       return false;
     }
     setError('');
@@ -328,11 +349,17 @@ export function PublicSubmitPage() {
           token: route.token,
           fields: normalizedFields,
           files: files.filter(file => file.url).map(({ name, type, size, url, role }) => ({ name, type, size, url, role })),
+          cooperationPlan,
           legalProfile: {
             type: selectedLegalType,
             typeLabel: legalMeta,
+            expanded: legalExpanded,
             fields: {
               ...legalFields,
+              inn: legalFields.inn || fields.inn,
+              phone: legalFields.phone || fields.phone,
+              email: legalFields.email || fields.email,
+              contactName: fields.contactName,
               website: normalizeExternalUrl(legalFields.website),
               myTaxLink: normalizeExternalUrl(legalFields.myTaxLink),
             },
@@ -404,11 +431,11 @@ export function PublicSubmitPage() {
           <div style={{ fontSize: 42, marginBottom: 8 }}>{meta.emoji}</div>
           <h1 style={{ margin: 0, fontSize: 30, lineHeight: '34px', fontWeight: 950 }}>{meta.title}</h1>
           <p style={{ margin: '12px 0 0', color: 'rgba(25,23,19,0.62)', fontSize: 15, lineHeight: '23px' }}>
-            Спасибо за интерес к проекту! Сначала заполните публичную карточку, затем реквизиты для оформления сотрудничества.
+            Заполните короткую анкету для публикации карточки и связи. Юридические данные можно добавить позже, если понадобится договор, счёт, ЭДО или рекламное размещение.
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
-            <span style={{ ...S.step, background: step === 'public' ? 'rgba(201,168,76,0.20)' : 'rgba(25,23,19,0.06)', color: step === 'public' ? '#6b5316' : 'rgba(25,23,19,0.58)' }}>1 · Публичная информация</span>
-            <span style={{ ...S.step, background: step === 'legal' ? 'rgba(201,168,76,0.20)' : 'rgba(25,23,19,0.06)', color: step === 'legal' ? '#6b5316' : 'rgba(25,23,19,0.58)' }}>2 · Юридическая информация</span>
+            <span style={{ ...S.step, background: 'rgba(201,168,76,0.20)', color: '#6b5316' }}>1 · Основная информация</span>
+            <span style={{ ...S.step, background: 'rgba(25,23,19,0.06)', color: 'rgba(25,23,19,0.58)' }}>2 · Юридические данные по желанию</span>
           </div>
         </div>
 
@@ -446,10 +473,74 @@ export function PublicSubmitPage() {
                 </div>
               )}
 
+              <div style={{ marginTop: 18, padding: 14, borderRadius: 20, background: 'rgba(25,23,19,0.04)', border: '1px solid rgba(25,23,19,0.08)' }}>
+                <div style={{ fontSize: 15, fontWeight: 920, color: '#191713' }}>Планируете платное сотрудничество с АПГ?</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                  {[
+                    ['not_now', 'Пока нет'],
+                    ['paid', 'Да'],
+                  ].map(([id, label]) => (
+                    <button key={id} type="button" onClick={() => setPlan(id)} style={{ ...S.ghost, minHeight: 40, background: cooperationPlan === id ? 'rgba(201,168,76,0.18)' : S.ghost.background, borderColor: cooperationPlan === id ? 'rgba(201,168,76,0.42)' : 'rgba(25,23,19,0.12)' }}>{label}</button>
+                  ))}
+                </div>
+                <div style={{ color: 'rgba(25,23,19,0.58)', fontSize: 12, lineHeight: '18px', marginTop: 8 }}>
+                  {cooperationPlan === 'paid'
+                    ? 'Локи рекомендует заполнить юридические данные сразу, чтобы быстрее подготовить документы.'
+                    : 'Для бесплатной карточки юридические реквизиты сейчас не нужны. Их можно будет запросить позже.'}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14, borderRadius: 20, border: '1px solid rgba(25,23,19,0.10)', background: 'rgba(255,255,255,0.42)', overflow: 'hidden' }}>
+                <button type="button" onClick={() => setLegalExpanded(prev => !prev)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', padding: 15, cursor: 'pointer', textAlign: 'left' }}>
+                  <span>
+                    <span style={{ display: 'block', color: '#191713', fontSize: 15, fontWeight: 920 }}>Юридические данные (необязательно)</span>
+                    <span style={{ display: 'block', color: 'rgba(25,23,19,0.58)', fontSize: 12, lineHeight: '18px', marginTop: 3 }}>
+                      Эти сведения понадобятся только для договора, счёта, маркировки рекламы, ЭДО или других юридических процедур.
+                    </span>
+                  </span>
+                  <span style={{ flex: '0 0 auto', color: '#6b5316', fontSize: 13, fontWeight: 950 }}>{legalExpanded ? 'Свернуть' : '+ Заполнить'}</span>
+                </button>
+
+                {legalExpanded && (
+                  <div style={{ padding: '0 15px 15px' }}>
+                    <label>
+                      <span style={S.label}>Тип контрагента</span>
+                      <select value={selectedLegalType} onChange={e => { setLegalType(e.target.value); setLegalFields({}); }} style={S.input}>
+                        {Object.entries(LEGAL_ENTITY_TYPES).filter(([id]) => id !== 'individual' || type === 'expert').map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                      </select>
+                    </label>
+
+                    {legalFormFields.map(field => (
+                      <PublicField key={field[0]} field={field} value={legalFields[field[0]]} onChange={setLegalField} />
+                    ))}
+
+                    <span style={S.label}>Документы</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 220px) 1fr', gap: 10, alignItems: 'center' }}>
+                      <select value={legalDocType} onChange={e => setLegalDocType(e.target.value)} style={S.input}>
+                        {LEGAL_DOC_TYPES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                      </select>
+                      <input type="file" multiple accept={DOC_ACCEPT} onChange={e => handleLegalDocuments(e.target.files)} style={{ ...S.input, padding: 10, minHeight: 44 }} />
+                    </div>
+                    <div style={{ color: 'rgba(25,23,19,0.54)', fontSize: 12, marginTop: 7 }}>PDF, DOCX, XLSX, JPG, PNG до 8 МБ, максимум 12 файлов.</div>
+
+                    {legalDocuments.length > 0 && (
+                      <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                        {legalDocuments.map((file, index) => (
+                          <div key={`${file.name}-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: 10, borderRadius: 14, background: 'rgba(25,23,19,0.05)', border: '1px solid rgba(25,23,19,0.08)', color: file.error ? '#b91c1c' : 'rgba(25,23,19,0.72)', fontSize: 12 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.documentLabel || 'Документ'} · {file.error || file.name}</span>
+                            <span>{Math.round(Number(file.size || 0) / 1024)} КБ</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {error && <div style={{ marginTop: 14, padding: 13, borderRadius: 16, background: 'rgba(220,38,38,0.10)', color: '#b91c1c', fontSize: 13, lineHeight: '19px' }}>{error}</div>}
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-                <button type="button" onClick={() => { if (validatePublicStep()) { setStep('legal'); window.scrollTo({ top: 0, behavior: 'smooth' }); } }} disabled={uploading} style={{ ...S.button, opacity: uploading ? 0.55 : 1 }}>{uploading ? 'Загружаем фото...' : 'Продолжить'}</button>
+                <button type="button" onClick={submit} disabled={submitting || uploading || legalUploading} style={{ ...S.button, opacity: submitting || uploading || legalUploading ? 0.55 : 1 }}>{uploading ? 'Загружаем фото...' : legalUploading ? 'Загружаем документы...' : submitting ? 'Отправляем...' : 'Отправить заявку'}</button>
                 <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={S.ghost}>Наверх</button>
               </div>
             </>

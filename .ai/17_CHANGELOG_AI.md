@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Упрощённая юридическая карточка публичных заявок
+**Коммит:** `локально`
+**Файлы:** `src/PublicSubmitPage.jsx`, `src/AdminPanel.jsx`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Публичная анкета больше не заставляет проходить отдельный обязательный юридический шаг. Основная форма собирает данные для публикации, связи и обязательный ИНН; юридический блок свёрнут по умолчанию и раскрывается добровольно или при выборе платного сотрудничества. Backend хранит `cooperationPlan`, `cooperationStatus`, `lokiCooperationNote` и различает статусы `legal_not_required`, `legal_recommended`, `legal_partial`, `contract_ready`.
+**Почему:** Нужно не отпугивать новых партнёров и экспертов длинной бюрократической формой, но сохранить готовность к договорам, ЭДО, счетам, актам, маркировке рекламы и CRM.
+
+---
+
 ## [2026-07-08] Юридические карточки публичных заявок
 **Коммит:** `локально`
 **Файлы:** `src/PublicSubmitPage.jsx`, `src/AdminPanel.jsx`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `api/upload-photo.js`, `server/src/routes/upload-photo.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`

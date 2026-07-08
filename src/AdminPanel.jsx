@@ -1742,16 +1742,22 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                           <div style={{ padding: 12, borderRadius: 16, background: 'rgba(201,168,76,0.08)', border: `1px solid ${A.goldBrd}` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                               <div>
-                                <div style={{ color: A.gold, fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.8 }}>Юридическая карточка</div>
+                                <div style={{ color: A.gold, fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.8 }}>Карточка сотрудничества</div>
                                 <div style={{ color: A.text, fontSize: 15, fontWeight: 920, marginTop: 4 }}>{item.counterparty?.displayName || item.legalProfile.typeLabel || 'Контрагент'}</div>
                               </div>
-                              <span style={{ color: item.legalCheck?.status === 'ready' ? '#4ade80' : '#facc15', fontSize: 12, fontWeight: 900 }}>
-                                {item.legalCheck?.status === 'ready' ? 'Готово' : 'Нужна проверка'} · {item.legalCheck?.score || 0}%
+                              <span style={{ color: item.legalCheck?.status === 'contract_ready' ? '#60a5fa' : item.legalCheck?.status === 'not_required' ? '#facc15' : '#fb923c', fontSize: 12, fontWeight: 900 }}>
+                                {item.legalCheck?.statusLabel || (item.legalCheck?.status === 'contract_ready' ? 'Готов к договору' : item.legalCheck?.status === 'not_required' ? 'Не требуется' : 'Заполнено частично')} · {item.legalCheck?.score || 0}%
                               </span>
                             </div>
+                            {item.lokiCooperationNote && (
+                              <div style={{ marginTop: 10, padding: 10, borderRadius: 13, background: 'rgba(255,255,255,0.05)', color: A.textSec, fontSize: 12, lineHeight: '18px' }}>Локи: {item.lokiCooperationNote}</div>
+                            )}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 12 }}>
                               {[
+                                ['Статус', item.cooperationStatus],
+                                ['Сценарий', item.cooperationPlan === 'paid' ? 'Платное сотрудничество' : 'Пока бесплатная карточка'],
                                 ['Тип', item.legalProfile.typeLabel],
+                                ['Контактное лицо', item.legalProfile.fields?.contactName],
                                 ['ИНН', item.legalProfile.fields?.inn],
                                 ['КПП', item.legalProfile.fields?.kpp],
                                 ['ОГРН / ОГРНИП', item.legalProfile.fields?.ogrn || item.legalProfile.fields?.ogrnip],
