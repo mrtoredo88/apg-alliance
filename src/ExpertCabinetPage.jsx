@@ -10,6 +10,7 @@ import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPa
 import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
+import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 
 export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, onBack, onExpertUpdate }) {
   const [expert, setExpert]       = useState(initialExpert);
@@ -78,17 +79,31 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       alert('Некорректный формат номера телефона.\nПример: +7 (499) 123-45-67');
       return;
     }
+    const urlFields = [
+      ['Запись', fBooking, ''],
+      ['Сайт', fWebsite, ''],
+      ['VK', fVk, 'vk'],
+      ['Telegram', fTelegram, 'telegram'],
+      ['Max', fMax, 'max'],
+    ];
+    for (const [label, value, platform] of urlFields) {
+      const result = validateExternalUrl(value, platform ? { platform } : {});
+      if (!result.ok) {
+        alert(`${label}: ${result.error}`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       const data = {
         description:      fDesc.trim(),
         offer:            fOffer.trim(),
         phone:            phone,
-        bookingUrl:       fBooking.trim(),
-        websiteUrl:       fWebsite.trim(),
-        vkUrl:            fVk.trim(),
-        telegramUrl:      fTelegram.trim(),
-        maxUrl:           fMax.trim(),
+        bookingUrl:       normalizeExternalUrl(fBooking),
+        websiteUrl:       normalizeExternalUrl(fWebsite),
+        vkUrl:            normalizeExternalUrl(fVk, { platform: 'vk' }),
+        telegramUrl:      normalizeExternalUrl(fTelegram, { platform: 'telegram' }),
+        maxUrl:           normalizeExternalUrl(fMax, { platform: 'max' }),
         photo:            fPhoto.trim(),
       };
       await userAction('expert:profileUpdate', { id: expert.id, patch: data });

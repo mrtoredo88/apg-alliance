@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Нормализация внешних ссылок партнёров и экспертов
+**Коммит:** `локально`
+**Файлы:** `src/utils/externalUrls.js`, `src/vk.js`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Добавлен единый нормализатор внешних URL для VK, Telegram, WhatsApp, Instagram, YouTube, Rutube, Дзен, Max и сайтов. Карточки партнёров/экспертов и формы сохранения теперь приводят ссылки вроде `www.vk.com/vibes`, `vk.com/vibes`, `@vibes` и `vibes` к безопасному каноническому виду перед сохранением и открытием.
+**Почему:** VK-ссылка партнёра Vibes могла пересобираться как `https://vk.com/www.vk.com/...`, из-за чего открывалась страница VK с ошибкой «Такой страницы не существует».
+
+---
+
 ## [2026-07-08] ИИ-импорт заявок в админке
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `api/_admin-security.js`, `server/src/lib/adminSecurity.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`

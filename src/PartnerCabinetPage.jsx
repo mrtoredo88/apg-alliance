@@ -9,6 +9,7 @@ import { APG2_PROFILE, ContactCard, EmptyStateV2, GlassBadge, GlassButton, Glass
 import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
+import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -96,6 +97,11 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
       alert('Некорректный формат номера телефона.\nПример: +7 (999) 123-45-67');
       return;
     }
+    const socialResult = validateExternalUrl(fSocial);
+    if (!socialResult.ok) {
+      alert(`Соцсеть: ${socialResult.error}`);
+      return;
+    }
     setSaving(true);
     try {
       const data = {
@@ -103,7 +109,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
         offer:            fOffer.trim(),
         phone:            fPhone.trim(),
         hours:            fHours.trim(),
-        socialUrl:        fSocial.trim(),
+        socialUrl:        normalizeExternalUrl(fSocial),
         logoUrl:          fLogo.trim(),
       };
       await userAction('partner:profileUpdate', { id: partner.id, patch: data });

@@ -17,6 +17,7 @@ import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
+import { openNormalizedUrl } from './utils/externalUrls.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
@@ -269,14 +270,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const reviewCount = partner.reviewCount ?? reviews.length;
 
   const openVkGroup = () => {
-    if (!partner.vkGroupUrl) return;
-    let raw = partner.vkGroupUrl.trim();
-    // strip protocol if present, then rebuild properly
-    raw = raw.replace(/^https?:\/\//i, '');
-    // vk.me/slug → vk.com/slug
-    raw = raw.replace(/^vk\.me\//i, 'vk.com/');
-    const url = raw.startsWith('vk.com/') ? `https://${raw}` : `https://vk.com/${raw}`;
-    openUrl(url);
+    openNormalizedUrl(openUrl, partner.vkGroupUrl, { platform: 'vk' });
   };
   const handlePhone = () => {
     if (!partner.phone) return;
@@ -354,8 +348,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     const cta = [
       partner.phone && { label: phoneCopied ? 'Номер скопирован' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', onClick: handlePhone, tone: 'gold' },
       partner.address && { label: 'Маршрут', icon: '📍', onClick: handleMap },
-      !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openUrl(partner.bookingUrl), tone: 'gold' },
-      !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openUrl(partner.websiteUrl) },
+      !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openNormalizedUrl(openUrl, partner.bookingUrl), tone: 'gold' },
+      !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openNormalizedUrl(openUrl, partner.websiteUrl) },
       partner.vkGroupUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
@@ -803,7 +797,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             </div>
           )}
           {!isVK() && partner.bookingUrl && (
-            <button onClick={() => openUrl(partner.bookingUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:`0 4px 16px rgba(201,168,76,0.35)` }}>
+            <button onClick={() => openNormalizedUrl(openUrl, partner.bookingUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:`0 4px 16px rgba(201,168,76,0.35)` }}>
               📅 Записаться онлайн
             </button>
           )}
@@ -811,8 +805,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
           {!isVK() && partner.websiteUrl && partner.websiteUrl !== partner.vkGroupUrl && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.websiteUrl);
             return isVkLink
-              ? <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
-              : <button onClick={() => openUrl(partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
+              ? <button onClick={() => openNormalizedUrl(openUrl, partner.websiteUrl, { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
+              : <button onClick={() => openNormalizedUrl(openUrl, partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
           })()}
           {partner.vkGroupUrl && (
             <button onClick={openVkGroup} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
@@ -820,18 +814,18 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             </button>
           )}
           {!isVK() && partner.telegramCommunityUrl && (
-            <button onClick={() => openUrl(partner.telegramCommunityUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={() => openNormalizedUrl(openUrl, partner.telegramCommunityUrl, { platform: 'telegram' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               ✈️ Telegram
             </button>
           )}
           {!isVK() && partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && partner.socialUrl !== partner.websiteUrl && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.socialUrl);
             return isVkLink
-              ? <button onClick={() => openUrl(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
-              : <button onClick={() => openUrl(partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
+              ? <button onClick={() => openNormalizedUrl(openUrl, partner.socialUrl, { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
+              : <button onClick={() => openNormalizedUrl(openUrl, partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
           })()}
           {!isVK() && partner.maxCommunityUrl && (
-            <button onClick={() => openUrl(partner.maxCommunityUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={() => openNormalizedUrl(openUrl, partner.maxCommunityUrl, { platform: 'max' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               💬 Max
             </button>
           )}

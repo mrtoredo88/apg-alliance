@@ -11,6 +11,7 @@ import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
+import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -2917,11 +2918,14 @@ export const AdminPanel = () => {
     init();
   }, []);
 
-  const normalizeUrl = (val) => {
-    const trimmed = (val ?? '').trim();
-    if (!trimmed) return '';
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    return `https://${trimmed}`;
+  const normalizeUrl = (val, platform = '') => normalizeExternalUrl(val, platform ? { platform } : {});
+
+  const validateUrlFields = (fields) => {
+    for (const field of fields) {
+      const result = validateExternalUrl(field.value, field.platform ? { platform: field.platform } : {});
+      if (!result.ok) return `${field.label}: ${result.error}`;
+    }
+    return '';
   };
 
   const normalizeDeepLink = (val) => {
@@ -3344,6 +3348,14 @@ export const AdminPanel = () => {
   const saveExpert = async () => {
     if (!exName.trim()) { setExError('Укажите имя эксперта'); return; }
     if (!exSpec.trim()) { setExError('Укажите специализацию'); return; }
+    const urlError = validateUrlFields([
+      { label: 'VK', value: exVkUrl, platform: 'vk' },
+      { label: 'Запись', value: exBooking },
+      { label: 'Telegram', value: exTelegram, platform: 'telegram' },
+      { label: 'Сайт', value: exWebsite },
+      { label: 'Max', value: exMax, platform: 'max' },
+    ]);
+    if (urlError) { setExError(urlError); return; }
     setExError('');
     setExSaving(true);
     let finalExVideos = exVideos;
@@ -3359,13 +3371,13 @@ export const AdminPanel = () => {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
       category: exCategory,
       tier: exTier,
-      photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: exVkUrl.trim(),
-      bookingUrl: exBooking.trim(), keys: Number(exKeys) || 1,
+      photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: normalizeUrl(exVkUrl, 'vk'),
+      bookingUrl: normalizeUrl(exBooking), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
       ownerEmail: exOwnerEmail.trim().toLowerCase() || null,
-      telegramUrl: normalizeUrl(exTelegram),
+      telegramUrl: normalizeUrl(exTelegram, 'telegram'),
       websiteUrl: normalizeUrl(exWebsite),
-      maxUrl: normalizeUrl(exMax),
+      maxUrl: normalizeUrl(exMax, 'max'),
       coverPhoto: exCoverPhoto.trim(),
       gallery: exGallery,
       videos: finalExVideos,
@@ -3433,6 +3445,15 @@ export const AdminPanel = () => {
 
   const savePartner = async () => {
     if (!pName.trim()) return;
+    const urlError = validateUrlFields([
+      { label: 'Соцсеть', value: pSocial },
+      { label: 'VK', value: pVkGroup, platform: 'vk' },
+      { label: 'Запись', value: pBooking },
+      { label: 'Сайт', value: pWebsite },
+      { label: 'Telegram', value: pTelegramCom, platform: 'telegram' },
+      { label: 'Max', value: pMaxCom, platform: 'max' },
+    ]);
+    if (urlError) { alert(urlError); return; }
     let finalVideos = pVideos;
     if (pVideoUrl.trim()) {
       const parsed = parseVideoUrl(pVideoUrl);
@@ -3445,13 +3466,13 @@ export const AdminPanel = () => {
       emoji: pEmoji, logoUrl: pLogo.trim(),
       categoryLabel: CATEGORIES.find(c => c.id === pCategory)?.label ?? '',
       phone: pPhone.trim(), address: pAddress.trim(),
-      tier: pTier, hours: pHours.trim(), socialUrl: pSocial.trim(), vkGroupUrl: normalizeUrl(pVkGroup), offer: pOffer.trim(),
+      tier: pTier, hours: pHours.trim(), socialUrl: normalizeUrl(pSocial), vkGroupUrl: normalizeUrl(pVkGroup, 'vk'), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
       bookingUrl: normalizeUrl(pBooking),
       websiteUrl: normalizeUrl(pWebsite),
-      telegramCommunityUrl: normalizeUrl(pTelegramCom),
-      maxCommunityUrl: normalizeUrl(pMaxCom),
+      telegramCommunityUrl: normalizeUrl(pTelegramCom, 'telegram'),
+      maxCommunityUrl: normalizeUrl(pMaxCom, 'max'),
       coverPhoto: pCoverPhoto.trim(),
       gallery: pGallery,
       videos: finalVideos,

@@ -1,4 +1,5 @@
 import _vkBridge from '@vkontakte/vk-bridge';
+import { normalizeExternalUrl } from './utils/externalUrls.js';
 
 function getLaunchParams() {
   const params = new URLSearchParams(window.location.search);
@@ -146,7 +147,11 @@ export const vkWebLogin = () => new Promise((resolve, reject) => {
 // VK Bridge вызывается параллельно — для нативного Mini App контекста.
 export const openUrl = (url) => {
   if (!url) return;
-  const normalized = String(url).trim();
+  const original = String(url).trim();
+  const normalized = normalizeExternalUrl(original) || original;
+  if ((import.meta.env.DEV || new URLSearchParams(window.location.search).get('urlDebug') === '1') && original !== normalized) {
+    console.info('[APG URL]', { databaseUrl: original, normalizedUrl: normalized, openUrl: normalized });
+  }
 
   if (isVK() && /^https?:\/\//i.test(normalized)) {
     let host = '';

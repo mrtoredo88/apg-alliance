@@ -22,6 +22,7 @@ import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
+import { openNormalizedUrl } from './utils/externalUrls.js';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { motionTransition } from './motion.js';
 
@@ -297,10 +298,10 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
     ].filter(Boolean);
     const cta = [
       expert.phone && { label: 'Позвонить', icon: '📞', onClick: () => openUrl(`tel:${expert.phone}`), tone: 'gold' },
-      expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openUrl(expert.bookingUrl), tone: 'gold' },
-      !isVK() && expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openUrl(expert.websiteUrl) },
-      !isVK() && expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openUrl(expert.vkUrl) },
-      !isVK() && expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openUrl(expert.telegramUrl) },
+      expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openNormalizedUrl(openUrl, expert.bookingUrl), tone: 'gold' },
+      !isVK() && expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openNormalizedUrl(openUrl, expert.websiteUrl) },
+      !isVK() && expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' }) },
+      !isVK() && expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' }) },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
 
@@ -585,27 +586,27 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
               </button>
             )}
             {expert.bookingUrl && (
-              <button onClick={() => openUrl(expert.bookingUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 16px rgba(201,168,76,0.35)' }}>
+              <button onClick={() => openNormalizedUrl(openUrl, expert.bookingUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 16px rgba(201,168,76,0.35)' }}>
                 📅 Записаться онлайн
               </button>
             )}
             {!isVK() && expert.websiteUrl && (
-              <button onClick={() => openUrl(expert.websiteUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openNormalizedUrl(openUrl, expert.websiteUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🌐 Сайт
               </button>
             )}
             {!isVK() && expert.vkUrl && (
-              <button onClick={() => openUrl(expert.vkUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,#4A76A8,#2D5F8A)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,#4A76A8,#2D5F8A)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🔵 ВКонтакте
               </button>
             )}
             {!isVK() && expert.telegramUrl && (
-              <button onClick={() => openUrl(expert.telegramUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 ✈️ Telegram
               </button>
             )}
             {!isVK() && expert.maxUrl && (
-              <button onClick={() => openUrl(expert.maxUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openNormalizedUrl(openUrl, expert.maxUrl, { platform: 'max' })} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 💬 Max
               </button>
             )}
