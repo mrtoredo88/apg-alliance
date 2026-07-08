@@ -371,14 +371,76 @@ function traceAuthStage(stage, details = {}) {
   } catch {}
 }
 
+function logFinishLoginError(stage, targetUser, error, extra = {}) {
+  const payload = {
+    stage,
+    uid: auth.currentUser?.uid ?? null,
+    isAnonymous: auth.currentUser?.isAnonymous ?? null,
+    emailPresent: !!targetUser?.email,
+    profileId: targetUser?.id ?? null,
+    provider: targetUser?.authProvider ?? extra.provider ?? 'unknown',
+    documentsVersion: LEGAL_VERSION,
+    currentUserPresent: !!auth.currentUser,
+    environment: import.meta.env.MODE,
+    browser: navigator.userAgent,
+    errorCode: error?.code ?? null,
+    errorMessage: error?.message ?? String(error),
+    stack: String(error?.stack ?? '').slice(0, 1800),
+    ...extra,
+  };
+  console.error('FINISH LOGIN', payload);
+  traceAuthStage(stage, {
+    uid: payload.uid,
+    profileId: payload.profileId,
+    provider: payload.provider,
+    currentUserPresent: payload.currentUserPresent,
+    errorCode: payload.errorCode,
+    errorMessage: payload.errorMessage,
+  });
+}
+
 function getAuthErrorMessage(error) {
   const code = String(error?.code ?? '');
   const message = String(error?.message ?? '');
+  if (code === 'CONSENT_SAVE_FAILED') {
+    return 'Ошибка входа: CONSENT_SAVE_FAILED. Не удалось сохранить согласия, попробуйте ещё раз.';
+  }
+  if (code === 'PROFILE_BOOTSTRAP_FAILED') {
+    return 'Ошибка входа: PROFILE_BOOTSTRAP_FAILED. Не удалось подготовить профиль, попробуйте ещё раз.';
+  }
   if (code.includes('permission-denied') || message.includes('permission-denied')) {
     return 'Не удалось сохранить данные аккаунта из-за ограничений доступа. Мы уже записали ошибку, попробуйте ещё раз.';
   }
   if (!navigator.onLine) return 'Нет подключения к интернету. Проверьте сеть и попробуйте снова.';
   return 'Не удалось завершить вход. Попробуйте ещё раз или выберите другой способ авторизации.';
+}
+
+function waitForFirebaseUser(expectedUid, timeoutMs = 4200) {
+  if (auth.currentUser?.uid === expectedUid) return Promise.resolve(auth.currentUser);
+  return new Promise((resolve, reject) => {
+    let done = false;
+    let unsubscribe = () => {};
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      unsubscribe();
+      reject(Object.assign(new Error('auth_state_timeout'), { code: 'AUTH_STATE_TIMEOUT' }));
+    }, timeoutMs);
+    unsubscribe = onAuthStateChanged(auth, current => {
+      if (current?.uid !== expectedUid) return;
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve(current);
+    }, error => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      unsubscribe();
+      reject(error);
+    });
+  });
 }
 
 async function ensureOwnerAuthSession(userId, source = 'auth') {
@@ -1553,17 +1615,30 @@ export function UserApp() {
   const handleEmailAuthSuccess = useCallback(async (emailUser, authPayload = {}) => {
     if (!emailUser?.id) return;
     setConsentError('');
-    traceAuthStage('email_user_received', { userId: emailUser.id, hasToken: !!authPayload?.token });
+    traceAuthStage('AUTH_STARTED', { provider: 'email', profileId: emailUser.id, hasToken: !!authPayload?.token });
     try {
       if (authPayload?.token) {
         await signInWithCustomToken(auth, authPayload.token);
-        traceAuthStage('email_firebase_token_ready', { userId: emailUser.id, uid: auth.currentUser?.uid ?? null });
+        traceAuthStage('AUTH_SUCCESS', { provider: 'email', profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
       }
+      await waitForFirebaseUser(String(emailUser.id));
+      traceAuthStage('AUTH_STATE_READY', {
+        provider: 'email',
+        profileId: emailUser.id,
+        uid: auth.currentUser?.uid ?? null,
+        isAnonymous: auth.currentUser?.isAnonymous ?? null,
+      });
       await ensureOwnerAuthSession(emailUser.id, 'email');
-      traceAuthStage('email_owner_session_ready', { userId: emailUser.id, uid: auth.currentUser?.uid ?? null });
-      const snap = await getDoc(doc(db, 'users', String(emailUser.id)));
-      const data = snap.exists() ? snap.data() : null;
-      traceAuthStage('email_user_doc_loaded', { userId: emailUser.id, exists: snap.exists(), acceptedLegal: hasAcceptedCurrentLegal(data) });
+      const profileResult = await userAction('profile:sync', {
+        userId: String(emailUser.id),
+        profile: emailUser,
+      });
+      const data = profileResult?.user || {};
+      traceAuthStage(profileResult?.created ? 'PROFILE_CREATED' : 'PROFILE_EXISTS', {
+        provider: 'email',
+        profileId: emailUser.id,
+        acceptedLegal: hasAcceptedCurrentLegal(data),
+      });
       if (hasAcceptedCurrentLegal(data)) {
         completeEmailLogin({
           ...emailUser,
@@ -1575,19 +1650,13 @@ export function UserApp() {
       }
     } catch (e) {
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
-      console.error('FINISH LOGIN', {
-        stage: 'email_check_consents',
-        uid: auth.currentUser?.uid ?? null,
-        email: emailUser.email ?? null,
-        telegramId: emailUser.linkedTelegram?.tgId ?? null,
-        profileId: emailUser.id ?? null,
-        authProvider: emailUser.authProvider ?? 'email',
-        error: e?.message ?? String(e),
-        code: e?.code ?? null,
-      });
-      traceAuthStage('email_auth_error', { userId: emailUser.id, error: e?.message ?? String(e) });
-      setConsentError(getAuthErrorMessage(e));
+      const error = Object.assign(e instanceof Error ? e : new Error(String(e)), { code: e?.code || 'PROFILE_BOOTSTRAP_FAILED' });
+      logFinishLoginError('PROFILE_BOOTSTRAP_FAILED', emailUser, error, { provider: 'email' });
+      setConsentError(getAuthErrorMessage(error));
+      showToast('Ошибка входа: PROFILE_BOOTSTRAP_FAILED', 'error');
+      return;
     }
+    traceAuthStage('CONSENTS_SCREEN', { provider: 'email', profileId: emailUser.id, documentsVersion: LEGAL_VERSION });
     setConsentRequest({
       user: emailUser,
       mode: 'email',
@@ -1596,20 +1665,22 @@ export function UserApp() {
       badge: 'Первый вход',
       notificationsDefault: true,
     });
-  }, [completeEmailLogin]);
+  }, [completeEmailLogin, showToast]);
 
   const handleConsentAccept = useCallback(async ({ termsAccepted, privacyAccepted, notificationsAccepted }) => {
     const targetUser = consentRequest?.user;
     if (!targetUser?.id || !termsAccepted || !privacyAccepted || consentSaving) return;
     setConsentSaving(true);
     setConsentError('');
-    traceAuthStage('consent_accept_start', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
+    traceAuthStage('CONSENTS_SAVE_STARTED', {
+      profileId: targetUser.id,
+      mode: consentRequest?.mode ?? 'unknown',
+      currentUserPresent: !!auth.currentUser,
+      uid: auth.currentUser?.uid ?? null,
+      documentsVersion: LEGAL_VERSION,
+    });
     try {
       await ensureOwnerAuthSession(targetUser.id, consentRequest?.mode === 'email' ? 'email_consent' : 'legal_consent');
-      traceAuthStage('consent_owner_session_ready', { userId: targetUser.id, uid: auth.currentUser?.uid ?? null });
-      const userRef = doc(db, 'users', String(targetUser.id));
-      const existingSnap = await getDoc(userRef);
-      traceAuthStage('consent_user_doc_loaded', { userId: targetUser.id, exists: existingSnap.exists() });
       const consentPayload = {
         userId: String(targetUser.id),
         termsAccepted: true,
@@ -1620,33 +1691,32 @@ export function UserApp() {
         userAgreementUrl: CONSENT_DOCS.userAgreementUrl,
         privacyPolicyUrl: CONSENT_DOCS.privacyPolicyUrl,
       };
-      if (existingSnap.exists()) {
-        await userAction('profile:update', {
-          userId: String(targetUser.id),
-          serverConsentAt: true,
-          patch: {
-            consents: consentPayload,
-            consentDocsVersion: CONSENT_DOCS_VERSION,
-            consentLegalVersion: LEGAL_VERSION,
-            legalVersion: LEGAL_VERSION,
-            notificationConsent: !!notificationsAccepted,
-            ...(notificationsAccepted ? { notificationsRequestedAt: true } : {}),
-          },
-        });
-        traceAuthStage('consent_saved_firestore', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
-      } else {
-        localStorage.setItem('apg_pending_consents', JSON.stringify({
-          userId: String(targetUser.id),
-          consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
-          consentDocsVersion: CONSENT_DOCS_VERSION,
-          consentLegalVersion: LEGAL_VERSION,
-          notificationConsent: !!notificationsAccepted,
-        }));
-        traceAuthStage('consent_saved_pending', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
+      const result = await userAction('profile:acceptConsent', {
+        userId: String(targetUser.id),
+        profile: targetUser,
+        consent: consentPayload,
+      });
+      traceAuthStage('CONSENTS_SAVE_SUCCESS', {
+        profileId: targetUser.id,
+        mode: consentRequest?.mode ?? 'unknown',
+        created: !!result?.created,
+        documentsVersion: LEGAL_VERSION,
+      });
+      try {
+        localStorage.removeItem('apg_pending_consents');
+        if (notificationsAccepted) localStorage.setItem('apg_notif_consent', '1');
+      } catch (storageError) {
+        traceAuthStage('CONSENT_LOCAL_STORAGE_WARNING', { error: storageError?.message ?? String(storageError) });
       }
-      if (notificationsAccepted) localStorage.setItem('apg_notif_consent', '1');
       if (consentRequest.mode === 'email') {
-        if (notificationsAccepted) localStorage.setItem('apg_request_notification_after_login', '1');
+        if (notificationsAccepted) {
+          try {
+            localStorage.setItem('apg_request_notification_after_login', '1');
+          } catch (storageError) {
+            traceAuthStage('CONSENT_NOTIFICATION_STORAGE_WARNING', { error: storageError?.message ?? String(storageError) });
+          }
+        }
+        traceAuthStage('REDIRECT_HOME', { profileId: targetUser.id, mode: 'email' });
         completeEmailLogin({
           ...targetUser,
           consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
@@ -1664,22 +1734,17 @@ export function UserApp() {
       setConsentRequest(null);
       if (consentRequest.needsOnboarding) setShowOnboarding(true);
       if (notificationsAccepted) setPendingNotificationPrompt(true);
-      traceAuthStage('consent_flow_complete', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
+      traceAuthStage('ONBOARDING_COMPLETED', { profileId: targetUser.id, mode: consentRequest?.mode ?? 'unknown' });
     } catch (e) {
       logError(e, 'UserApp.handleConsentAccept');
-      console.error('FINISH LOGIN', {
-        stage: 'consent_accept',
-        uid: auth.currentUser?.uid ?? null,
-        email: targetUser.email ?? null,
-        telegramId: targetUser.linkedTelegram?.tgId ?? null,
-        profileId: targetUser.id ?? null,
-        authProvider: targetUser.authProvider ?? consentRequest?.mode ?? 'unknown',
-        error: e?.message ?? String(e),
-        code: e?.code ?? null,
+      const error = Object.assign(e instanceof Error ? e : new Error(String(e)), { code: e?.code || 'CONSENT_SAVE_FAILED' });
+      logFinishLoginError('CONSENTS_SAVE_FAILED', targetUser, error, {
+        provider: consentRequest?.mode ?? 'unknown',
+        profileExists: true,
+        documentsVersion: LEGAL_VERSION,
       });
-      traceAuthStage('consent_error', { userId: targetUser.id, mode: consentRequest?.mode ?? 'unknown', error: e?.message ?? String(e) });
-      setConsentError(getAuthErrorMessage(e));
-      showToast('Не удалось сохранить согласия. Ошибка записана, попробуйте ещё раз.', 'error');
+      setConsentError(getAuthErrorMessage(error));
+      showToast('Ошибка входа: CONSENT_SAVE_FAILED', 'error');
     } finally {
       if (mountedRef.current) setConsentSaving(false);
     }

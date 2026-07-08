@@ -193,7 +193,7 @@ export function ConsentScreen({
           </GlassButton>
           {onCancel && (
             <GlassButton onClick={onCancel} disabled={loading} style={{ width: '100%', minHeight: 46, color: APG2_PROFILE.textSoft }}>
-              Вернуться назад
+              {error ? 'Выйти и войти заново' : 'Вернуться назад'}
             </GlassButton>
           )}
         </div>

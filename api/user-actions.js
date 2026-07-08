@@ -220,6 +220,66 @@ async function actionProfilePatch(db, req, actor) {
   return { ok: true, userId, patch: req.body?.patch || {} };
 }
 
+async function actionProfileAcceptConsent(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const consent = req.body?.consent || {};
+  if (!consent.termsAccepted || !consent.privacyAccepted) {
+    throw Object.assign(new Error('Не приняты обязательные документы.'), { statusCode: 400, code: 'CONSENT_REQUIRED' });
+  }
+  const profile = stripUndefined(sanitizePublicProfile(req.body?.profile || {}));
+  if (profile.email) {
+    const normalizedEmail = safeString(profile.email, 200).toLowerCase();
+    if (userId.startsWith('email:') && normalizedEmail === userId.slice(6).toLowerCase()) {
+      profile.email = normalizedEmail;
+    } else {
+      delete profile.email;
+      delete profile.emailVerified;
+    }
+  }
+  const ref = db.collection('users').doc(userId);
+  let created = false;
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    created = !snap.exists;
+    const patch = {
+      ...(created ? {
+        keys: 0,
+        favorites: [],
+        scannedPartners: {},
+        savedNews: [],
+        readLaterNews: [],
+        newsReactions: {},
+        newsSubscriptions: {},
+        completedTasks: [],
+        streak: 0,
+        scanDates: [],
+        registeredEvents: [],
+        onboardingDone: false,
+        registeredAt: FieldValue.serverTimestamp(),
+      } : {}),
+      ...profile,
+      consents: { ...consent, acceptedAt: FieldValue.serverTimestamp() },
+      consentAcceptedAt: FieldValue.serverTimestamp(),
+      consentDocsVersion: consent.docsVersion || null,
+      consentLegalVersion: consent.legalVersion || null,
+      legalVersion: consent.legalVersion || null,
+      notificationConsent: Boolean(consent.notificationsAccepted),
+      lastSeen: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (consent.notificationsAccepted) patch.notificationsRequestedAt = FieldValue.serverTimestamp();
+    tx.set(ref, patch, { merge: true });
+    if (created) tx.set(db.collection('stats').doc('global'), { userCount: FieldValue.increment(1) }, { merge: true });
+  });
+  await audit(db, req, actor, 'profile:acceptConsent', 'users', userId, 'success', {
+    created,
+    docsVersion: consent.docsVersion || null,
+    legalVersion: consent.legalVersion || null,
+    notificationsAccepted: Boolean(consent.notificationsAccepted),
+  });
+  return { ok: true, userId, created, code: 'CONSENT_SAVED' };
+}
+
 async function actionProfileDelete(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   await db.collection('users').doc(userId).delete();
@@ -595,6 +655,7 @@ async function routeAction(db, req, actor) {
   if (action === 'auth:linkUser') return actionAuthLink(db, req, actor);
   if (action === 'profile:sync') return actionProfileSync(db, req, actor);
   if (action === 'profile:update') return actionProfilePatch(db, req, actor);
+  if (action === 'profile:acceptConsent') return actionProfileAcceptConsent(db, req, actor);
   if (action === 'profile:delete') return actionProfileDelete(db, req, actor);
   if (action === 'favorites:toggle') return actionFavoritesToggle(db, req, actor);
   if (action === 'news:saved') return actionUserListSet(db, req, actor, 'savedNews', action);

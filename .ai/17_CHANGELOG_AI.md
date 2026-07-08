@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Устойчивое завершение email-входа после документов
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `src/ConsentScreen.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Экран документов теперь показывается только после завершённой Firebase Auth и backend `profile:sync`. Сохранение согласий переведено в отдельное backend-действие `profile:acceptConsent` с transaction/merge, без прямого клиентского чтения Firestore на этапе `Продолжить`.
+**Почему:** В production вход доходил до документов, но мог падать на сохранении профиля/согласий из-за гонки auth/profile state или отсутствующего документа пользователя. Документы должны быть этапом onboarding после успешной авторизации, а не частью незавершённого входа.
+
+---
+
 ## [2026-07-08] Safe bootstrap и lite-диагностика без React
 **Коммит:** `локально`
 **Файлы:** `index.html`, `public/network-diagnostics-lite`, `src/App.jsx`, `src/main.jsx`, `src/ErrorBoundary.jsx`, `deploy-frontend.sh`, `.ai/17_CHANGELOG_AI.md`
