@@ -182,12 +182,23 @@ function isInteractiveGestureTarget(target) {
 
 function getPullStartState(event, activePanel, pullRefreshing) {
   const touch = event.touches?.[0];
+  const target = event.target instanceof Element ? event.target : null;
   if (!touch) return { active: false, reason: 'no_touch' };
   if (!PULL_REFRESH_PANELS.has(activePanel)) return { active: false, reason: 'panel_disabled' };
   if (pullRefreshing) return { active: false, reason: 'refreshing' };
+  if (target?.closest?.('[data-apg-pull-disabled]')) return { active: false, reason: 'pull_disabled_zone' };
   if (isInteractiveGestureTarget(event.target)) return { active: false, reason: 'interactive_target' };
 
   const scrollParent = getScrollableGestureParent(event.target);
+  const scrollRoot = scrollParent?.getAttribute?.('data-apg-scroll-root') || '';
+  if (activePanel === 'news' && scrollRoot !== 'news-feed') {
+    return {
+      active: false,
+      reason: 'nested_news_scroll',
+      scrollParentTag: scrollRoot || scrollParent?.tagName || 'window',
+      startScrollTop: scrollParent ? scrollParent.scrollTop : window.scrollY || document.documentElement.scrollTop || 0,
+    };
+  }
   const innerScrollTop = scrollParent ? scrollParent.scrollTop : 0;
   const pageScrollTop = window.scrollY || document.documentElement.scrollTop || 0;
   const startTop = scrollParent ? innerScrollTop : pageScrollTop;
@@ -1710,6 +1721,7 @@ export function UserApp() {
   const handleSwipeStart = useCallback((e) => {
     const touch = e.touches[0];
     const pullState = getPullStartState(e, activePanel, pullRefreshing);
+    setPullDistance(0);
     swipeTouchX.current = touch.clientX;
     swipeTouchY.current = touch.clientY;
     edgeSwipeRef.current = touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);

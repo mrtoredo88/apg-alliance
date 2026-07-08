@@ -56,7 +56,7 @@ const inputStyle = {
   color: APG2_PROFILE.text,
   outline: 'none',
   fontFamily: 'inherit',
-  fontSize: 14,
+  fontSize: 16,
   fontWeight: 720,
   padding: '0 16px',
   boxSizing: 'border-box',
@@ -137,6 +137,26 @@ function sortDiscussionComments(comments, sort) {
   });
 }
 
+function getNewsArticleScrollRoot() {
+  return document.querySelector('[data-apg-scroll-root="news-article"]');
+}
+
+function blurActiveComposer(ref) {
+  ref.current?.blur?.();
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+}
+
+function restoreNewsArticleScroll(scrollTop) {
+  if (!Number.isFinite(scrollTop)) return;
+  const restore = () => {
+    const root = getNewsArticleScrollRoot();
+    if (root) root.scrollTop = scrollTop;
+  };
+  requestAnimationFrame(restore);
+  window.setTimeout(restore, 80);
+}
+
 function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, children }) {
   const photo = getNewsPhotoItems(item)[0] || { url: getNewsImage(item) };
   const image = photo?.url || '';
@@ -196,7 +216,7 @@ function Lightbox({ photos = [], initial = 0, onClose }) {
   };
   if (!safePhotos.length) return null;
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 15000, background: 'rgba(3,3,5,0.94)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gridTemplateRows: 'auto 1fr auto', padding: 'calc(var(--safe-top, 0px) + 12px) 14px calc(18px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
+    <div data-apg-pull-disabled="true" style={{ position: 'fixed', inset: 0, zIndex: 15000, background: 'rgba(3,3,5,0.94)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gridTemplateRows: 'auto 1fr auto', padding: 'calc(var(--safe-top, 0px) + 12px) 14px calc(18px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
         <span style={{ fontSize: 13, fontWeight: 800 }}>{safeIdx + 1} / {safePhotos.length}</span>
         <button type="button" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22 }}>×</button>
@@ -533,6 +553,7 @@ function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, onPin, o
 
 function CommentsPanel({ item, user, onToast }) {
   const newsId = String(item?.id || '');
+  const composerRef = useRef(null);
   const [comments, setComments] = useState([]);
   const [sort, setSort] = useState('new');
   const [text, setText] = useState('');
@@ -597,6 +618,7 @@ function CommentsPanel({ item, user, onToast }) {
       onToast?.('Авторизуйтесь, чтобы оставить комментарий.', 'info');
       return;
     }
+    const articleScrollTop = getNewsArticleScrollRoot()?.scrollTop ?? 0;
     setSending(true);
     setError('');
     try {
@@ -618,6 +640,8 @@ function CommentsPanel({ item, user, onToast }) {
       }
       setText('');
       setReplyTo(null);
+      blurActiveComposer(composerRef);
+      restoreNewsArticleScroll(articleScrollTop);
       if (draftKey) localStorage.removeItem(draftKey);
     } catch (e) {
       logError(e, 'NewsPage.comments.submit');
@@ -698,7 +722,7 @@ function CommentsPanel({ item, user, onToast }) {
   };
 
   return (
-    <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16 }}>
+    <GlassCard data-apg-pull-disabled="true" style={{ marginTop: 18, borderRadius: 30, padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 920 }}>Комментарии</div>
@@ -719,7 +743,7 @@ function CommentsPanel({ item, user, onToast }) {
               <button type="button" onClick={cancelComposerMode} style={{ border: 'none', background: 'transparent', color: APG2_PROFILE.gold, fontWeight: 840 }}>Отмена</button>
             </div>
           )}
-          <textarea value={text} onChange={e => setText(e.target.value)} placeholder={editing ? 'Обновите комментарий' : replyTo ? 'Напишите ответ' : 'Напишите комментарий'} maxLength={900} style={{ ...inputStyle, minHeight: 82, height: 82, resize: 'vertical', paddingTop: 13, lineHeight: '20px' }} />
+          <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} placeholder={editing ? 'Обновите комментарий' : replyTo ? 'Напишите ответ' : 'Напишите комментарий'} maxLength={900} style={{ ...inputStyle, minHeight: 82, height: 82, resize: 'vertical', paddingTop: 13, lineHeight: '22px' }} />
           <GlassButton onClick={submit} disabled={sending || !text.trim()} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a', opacity: sending || !text.trim() ? 0.58 : 1 }}>{sending ? 'Отправляем...' : editing ? 'Сохранить' : 'Отправить'}</GlassButton>
         </div>
       ) : (
@@ -952,9 +976,9 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+    <div data-apg-pull-disabled="true" style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: `${progress * 100}%`, background: 'linear-gradient(90deg, #9F7932, #F4D98C, #FFF0B8)', boxShadow: '0 0 18px rgba(244,217,140,0.44)', zIndex: 2, transition: 'width 80ms linear' }} />
-      <div ref={scrollRef} data-apg-scroll-root="news-article" onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y' }}>
+      <div ref={scrollRef} data-apg-scroll-root="news-article" data-apg-pull-disabled="true" onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', touchAction: 'pan-y' }}>
         <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(110px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
           <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, transform: headerHidden ? 'translateY(calc(-100% - 18px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
             <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 22, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>←</button>
