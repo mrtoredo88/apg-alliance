@@ -3908,18 +3908,6 @@ export const AdminPanel = () => {
           serviceQRValue:  created.id,
         },
       }).catch(() => {});
-      // Уведомляем webpush-подписчиков о новом партнёре
-      fetch(`${API_BASE_URL}/api/send-push`, {
-        method: 'POST',
-        headers: await adminRequestHeaders(`new_partner_push_${Date.now()}`),
-        body: JSON.stringify({
-          broadcast: true,
-          title: `🏪 Новый партнёр АПГ: ${data.name}`,
-          body: data.offer ? `🎁 ${data.offer}` : 'Открой страницу партнёра в приложении',
-          url: APP_URL,
-          tag: 'new-partner',
-        }),
-      }).catch(() => {});
     }
     resetPartnerForm();
     await fetchData();
@@ -6122,6 +6110,31 @@ export const AdminPanel = () => {
                   </div>
                 )}
 
+                {partnerConnection.wizard && (
+                  <div style={{ padding: 14, borderRadius: 18, border: `1px solid ${A.goldBrd}`, background: A.goldDim, marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: A.gold }}>{partnerConnection.wizard.title || 'Подключение партнёра'}</div>
+                        <div style={{ fontSize: 11, color: A.textSec, marginTop: 2 }}>
+                          Шаг {partnerConnection.wizard.currentStep || 1} из {partnerConnection.wizard.totalSteps || 5}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 24, fontWeight: 950, color: A.gold }}>{partnerConnection.wizard.percent || 0}%</div>
+                    </div>
+                    <div style={{ height: 9, borderRadius: 999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden', marginBottom: 10 }}>
+                      <div style={{ width: `${partnerConnection.wizard.percent || 0}%`, height: '100%', borderRadius: 999, background: A.gold }} />
+                    </div>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {(partnerConnection.wizard.steps || []).map(step => (
+                        <div key={step.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: step.done ? '#bbf7d0' : A.textSec }}>
+                          <span>{step.done ? '✅' : '⚠'} {step.label}</span>
+                          <span style={{ flexShrink: 0 }}>{step.done ? 'готово' : 'требует внимания'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 720 ? '1fr' : '160px 1fr', gap: 12, marginBottom: 14 }}>
                   <div style={{ padding: 14, borderRadius: 16, border: `1px solid ${A.border}`, background: A.chip }}>
                     <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>Готовность карточки</div>
@@ -6134,7 +6147,7 @@ export const AdminPanel = () => {
                   <div style={{ padding: 14, borderRadius: 16, border: `1px solid ${A.border}`, background: A.chip }}>
                     {partnerConnection.lifecycleStatus && (
                       <div style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: 999, background: A.goldDim, color: A.gold, fontSize: 11, fontWeight: 850, marginBottom: 8 }}>
-                        {partnerConnection.lifecycleStatus === 'published' ? 'Опубликовано' : partnerConnection.lifecycleStatus === 'ready_to_publish' ? 'Готово к публикации' : 'Этап подключения'}
+                        {partnerConnection.lifecycleStatus === 'verified_partner' ? 'Проверенный партнёр' : partnerConnection.lifecycleStatus === 'published' ? 'Опубликовано' : partnerConnection.lifecycleStatus === 'ready_to_publish' ? 'Готово к публикации' : 'Этап подключения'}
                       </div>
                     )}
                     {partnerConnection.userFound ? (
@@ -6159,6 +6172,24 @@ export const AdminPanel = () => {
                     )}
                   </div>
                 </div>
+
+                {partnerConnection.readiness?.checks?.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: A.text, marginBottom: 8 }}>Проверка готовности карточки</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 720 ? '1fr' : '1fr 1fr', gap: 8 }}>
+                      {partnerConnection.readiness.checks.map(item => (
+                        <button
+                          key={item.key}
+                          style={{ ...s.btn, ...s.btnGray, justifyContent: 'space-between', textAlign: 'left', fontSize: 12, borderColor: item.ok ? 'rgba(74,222,128,0.28)' : A.border }}
+                          onClick={() => !item.ok && focusPartnerRecommendation(item.action)}
+                        >
+                          <span>{item.ok ? '✅' : '⚠'} {item.label}</span>
+                          <span style={{ color: item.ok ? '#4ade80' : A.textSec }}>{item.ok ? 'заполнено' : 'исправить'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {partnerConnection.recommendations?.length > 0 && (
                   <div style={{ marginBottom: 14 }}>
@@ -6218,6 +6249,20 @@ export const AdminPanel = () => {
                     >
                       🚀 Опубликовать в каталог
                     </button>
+                  )}
+                  {['published', 'card_active'].includes(partnerConnection.lifecycleStatus) && (
+                    <button
+                      disabled={partnerConnectionLoading}
+                      style={{ ...s.btn, ...s.btnPri, opacity: partnerConnectionLoading ? 0.65 : 1 }}
+                      onClick={() => handlePartnerConnectionAction('partner:mark-verified')}
+                    >
+                      ✔ Проверенный партнёр АПГ
+                    </button>
+                  )}
+                  {partnerConnection.lifecycleStatus === 'verified_partner' && (
+                    <div style={{ padding: '9px 12px', borderRadius: 12, border: '1px solid rgba(74,222,128,0.28)', background: 'rgba(74,222,128,0.09)', color: '#bbf7d0', fontSize: 13, fontWeight: 800 }}>
+                      ✔ Проверенный партнёр АПГ
+                    </div>
                   )}
                   {partnerConnection.userFound ? (
                     <>

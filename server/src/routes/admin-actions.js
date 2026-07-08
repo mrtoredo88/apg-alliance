@@ -150,8 +150,10 @@ function buildPartnerReadiness(partner = {}) {
   const photosCount = [partner.logoUrl, partner.coverPhoto, ...(Array.isArray(partner.gallery) ? partner.gallery : [])].filter(Boolean).length;
   const checks = [
     { key: 'logo', label: 'Добавить логотип', ok: Boolean(partner.logoUrl), action: 'edit_media' },
+    { key: 'cover', label: 'Добавить обложку', ok: Boolean(partner.coverPhoto), action: 'edit_media' },
     { key: 'photos', label: 'Загрузить минимум три фотографии', ok: photosCount >= 3, action: 'edit_media' },
     { key: 'description', label: 'Заполнить описание компании', ok: String(partner.description || '').trim().length >= 80, action: 'edit_description' },
+    { key: 'shortDescription', label: 'Добавить короткое описание', ok: Boolean(String(partner.shortDescription || partner.offer || '').trim()), action: 'edit_description' },
     { key: 'category', label: 'Выбрать категорию', ok: Boolean(partner.category && partner.category !== 'other'), action: 'edit_category' },
     { key: 'address', label: 'Указать адрес', ok: Boolean(String(partner.address || '').trim()), action: 'edit_contacts' },
     { key: 'phone', label: 'Указать телефон', ok: Boolean(String(partner.phone || '').trim()), action: 'edit_contacts' },
@@ -159,7 +161,6 @@ function buildPartnerReadiness(partner = {}) {
     { key: 'links', label: 'Добавить хотя бы одну соцсеть или сайт', ok: Boolean(partner.websiteUrl || partner.vkGroupUrl || partner.socialUrl || partner.telegramCommunityUrl), action: 'edit_links' },
     { key: 'offer', label: 'Добавить первую акцию', ok: Boolean(String(partner.offer || '').trim()), action: 'edit_offer' },
     { key: 'coordinates', label: 'Поставить координаты на карте', ok: partner.latitude != null && partner.longitude != null, action: 'edit_map' },
-    { key: 'cover', label: 'Добавить обложку', ok: Boolean(partner.coverPhoto), action: 'edit_media' },
     { key: 'publicationConsent', label: 'Подтвердить согласие на публикацию', ok: Boolean(partner.publicationConsentAccepted), action: 'edit_publication' },
   ];
   const missing = checks.filter(item => !item.ok).map(({ key, label, action }) => ({ key, label, action }));
@@ -171,12 +172,34 @@ function buildPartnerReadiness(partner = {}) {
   ];
   return {
     percent,
+    checks: checks.map(({ key, label, ok, action }) => ({ key, label, ok, action })),
     missing,
     recommendations: launchMissing.map(item => ({ ...item, severity: item.severity || (item.key === 'publicationConsent' ? 'warning' : 'info') })),
     readyForReview: percent >= PARTNER_PUBLICATION_MIN_PERCENT,
     readyForPublish: percent >= PARTNER_PUBLICATION_MIN_PERCENT && Boolean(partner.publicationConsentAccepted),
     minPercent: PARTNER_PUBLICATION_MIN_PERCENT,
     photosCount,
+  };
+}
+
+function buildPartnerPublicationWizard(partner = {}, readiness = buildPartnerReadiness(partner)) {
+  const launchActions = buildPartnerLaunchActions(partner);
+  const published = Boolean(partner.catalogPublished || partner.lifecycleStatus === 'published' || partner.active === true);
+  const launchDone = launchActions.filter(item => item.done).length;
+  const steps = [
+    { key: 'card', label: 'Карточка создана', done: Boolean(partner.id || partner.name) },
+    { key: 'owner', label: 'Владелец подключён', done: Boolean(partner.ownerId || partner.partnerCabinetEnabled) },
+    { key: 'readiness', label: `Карточка готова минимум на ${readiness.minPercent}%`, done: readiness.readyForPublish },
+    { key: 'publish', label: 'Партнёр опубликован', done: published },
+    { key: 'launch', label: 'Стартовые действия запущены', done: published && launchDone >= 2 },
+  ];
+  const doneCount = steps.filter(item => item.done).length;
+  return {
+    title: 'Подключение партнёра',
+    currentStep: Math.min(doneCount + (doneCount < steps.length ? 1 : 0), steps.length),
+    totalSteps: steps.length,
+    percent: Math.round((doneCount / steps.length) * 100),
+    steps,
   };
 }
 
@@ -205,6 +228,38 @@ function buildPartnerLaunchActions(partner = {}) {
     { key: 'share', label: 'Поделиться карточкой', action: 'share_partner', done: Boolean(partner.firstShareAt) },
     { key: 'review', label: 'Пригласить оставить первый отзыв', action: 'invite_review', done: Boolean(partner.firstReviewInviteAt) },
   ];
+}
+
+async function createPartnerWelcomeNewsDraft(db, request, actor, partner) {
+  if (partner.firstNewsCreatedAt || partner.firstNewsId) return { created: false, id: partner.firstNewsId || '' };
+  const title = `В АПГ появился новый партнёр: ${partner.name}`;
+  const text = [
+    `В каталоге АПГ появился новый партнёр — ${partner.name}.`,
+    '',
+    partner.description || 'Скоро расскажем подробнее о предложениях и возможностях партнёра.',
+    '',
+    partner.offer ? `Специальное предложение для участников АПГ: ${partner.offer}` : '',
+  ].filter(Boolean).join('\n');
+  const data = {
+    title,
+    text,
+    summary: partner.offer || `Новый партнёр АПГ: ${partner.name}`,
+    sourceName: partner.name,
+    source: 'partner_launch',
+    partnerId: partner.id,
+    category: partner.category || 'partners',
+    imageUrl: partner.coverPhoto || partner.logoUrl || '',
+    coverPhoto: partner.coverPhoto || partner.logoUrl || '',
+    active: false,
+    status: 'draft',
+    commentsEnabled: true,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const ref = await db.collection('news').add(data);
+  await writeHistory(db, actor, ref.id, 'create', null, data);
+  await writeAuditLog(db, request, actor, 'create', 'news', ref.id, { label: `Авточерновик новости партнёра: ${partner.name}` });
+  return { created: true, id: ref.id };
 }
 
 async function findUserByEmail(db, email) {
@@ -338,15 +393,16 @@ async function handlePartnerOnboardingAction(db, request, actor) {
   if (action === 'partner:onboarding-check') {
     if (!email) {
       const lifecycleStatus = partnerLifecycleStatus(partner, readiness);
+      const wizard = buildPartnerPublicationWizard(partner, readiness);
       const patch = {
         connectionStatus: 'created',
         connectionStatusLabel: PARTNER_STATUS_LABELS.created,
         lifecycleStatus,
         lifecycleStatusLabel: PARTNER_STATUS_LABELS[lifecycleStatus],
-        partnerOnboarding: { readiness, recommendations: readiness.recommendations, launchActions: buildPartnerLaunchActions(partner), lastCheckedAt: new Date().toISOString(), emailRequired: true },
+        partnerOnboarding: { readiness, recommendations: readiness.recommendations, launchActions: buildPartnerLaunchActions(partner), wizard, lastCheckedAt: new Date().toISOString(), emailRequired: true },
       };
       await updatePartnerOnboarding(db, request, actor, id, patch, partnerEvent(actor, 'partner_created', 'Карточка создана, email владельца не указан'));
-      return { ok: true, partnerId: id, email: '', userFound: false, connectionStatus: 'created', lifecycleStatus, readiness, recommendations: readiness.recommendations, launchActions: buildPartnerLaunchActions(partner) };
+      return { ok: true, partnerId: id, email: '', userFound: false, connectionStatus: 'created', lifecycleStatus, readiness, recommendations: readiness.recommendations, launchActions: buildPartnerLaunchActions(partner), wizard };
     }
     if (!isValidEmail(email)) {
       const error = new Error('Укажите корректный email владельца.');
@@ -358,6 +414,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
     const conflicts = await findPartnerConflicts(db, id, email, user?.id || '');
     const status = conflicts.length ? 'conflict' : (partner.ownerId && user?.id && partner.ownerId === user.id ? 'cabinet_linked' : 'email_specified');
     const lifecycleStatus = partnerLifecycleStatus({ ...partner, connectionStatus: status }, readiness);
+    const wizard = buildPartnerPublicationWizard({ ...partner, connectionStatus: status }, readiness);
     const token = partner.partnerInvite?.token || randomBytes(18).toString('hex');
     const inviteLink = createInviteLink(token);
     const patch = {
@@ -372,12 +429,13 @@ async function handlePartnerOnboardingAction(db, request, actor) {
         readiness,
         recommendations: readiness.recommendations,
         launchActions: buildPartnerLaunchActions(partner),
+        wizard,
         lastCheckedAt: new Date().toISOString(),
         userCheck: { userFound: Boolean(user), userId: user?.id || null, conflicts },
       },
     };
     await updatePartnerOnboarding(db, request, actor, id, patch, partnerEvent(actor, 'email_added', `Email владельца указан: ${email}`, { email, userFound: Boolean(user), conflictsCount: conflicts.length }));
-    return { ok: true, partnerId: id, email, userFound: Boolean(user), user: publicUserSummary(user), conflicts, connectionStatus: status, lifecycleStatus, inviteLink, readiness, recommendations: readiness.recommendations, launchActions: buildPartnerLaunchActions(partner) };
+    return { ok: true, partnerId: id, email, userFound: Boolean(user), user: publicUserSummary(user), conflicts, connectionStatus: status, lifecycleStatus, inviteLink, readiness, recommendations: readiness.recommendations, launchActions: buildPartnerLaunchActions(partner), wizard };
   }
 
   if (action === 'partner:bind-owner') {
@@ -400,6 +458,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
       const nextPartner = { ...partner, ownerId: user.id, ownerEmail: email, connectionEmail: email };
       const nextReadiness = buildPartnerReadiness(nextPartner);
       const lifecycleStatus = partnerLifecycleStatus({ ...nextPartner, connectionStatus: 'cabinet_linked' }, nextReadiness);
+      const wizard = buildPartnerPublicationWizard({ ...nextPartner, connectionStatus: 'cabinet_linked' }, nextReadiness);
       await updatePartnerOnboarding(db, request, actor, id, {
         ownerId: user.id,
         ownerEmail: email,
@@ -409,7 +468,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
         connectionStatusLabel: nextReadiness.percent >= 100 ? PARTNER_STATUS_LABELS.card_active : PARTNER_STATUS_LABELS.cabinet_linked,
         lifecycleStatus,
         lifecycleStatusLabel: PARTNER_STATUS_LABELS[lifecycleStatus],
-        partnerOnboarding: { readiness: nextReadiness, recommendations: nextReadiness.recommendations, launchActions: buildPartnerLaunchActions(nextPartner), lastCheckedAt: new Date().toISOString(), linkedUserId: user.id },
+        partnerOnboarding: { readiness: nextReadiness, recommendations: nextReadiness.recommendations, launchActions: buildPartnerLaunchActions(nextPartner), wizard, lastCheckedAt: new Date().toISOString(), linkedUserId: user.id },
       }, partnerEvent(actor, 'cabinet_linked', `Кабинет партнёра привязан к пользователю ${email}`, { email, userId: user.id }));
       await db.collection('users').doc(user.id).set({
         partnerId: id,
@@ -419,7 +478,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
         role: user.role && user.role !== 'user' ? user.role : 'partner',
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-      return { ok: true, partnerId: id, user: publicUserSummary(user), connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked', lifecycleStatus, readiness: nextReadiness, launchActions: buildPartnerLaunchActions(nextPartner) };
+      return { ok: true, partnerId: id, user: publicUserSummary(user), connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked', lifecycleStatus, readiness: nextReadiness, launchActions: buildPartnerLaunchActions(nextPartner), wizard };
     });
   }
 
@@ -475,7 +534,10 @@ async function handlePartnerOnboardingAction(db, request, actor) {
       }
       const now = new Date();
       const newPartnerUntil = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-      const launchActions = buildPartnerLaunchActions({ ...latest, newPartnerUntil });
+      const welcomeNews = await createPartnerWelcomeNewsDraft(db, request, actor, { ...latest, id });
+      const publishedPartner = { ...latest, id, newPartnerUntil, firstNewsCreatedAt: latest.firstNewsCreatedAt || (welcomeNews.id ? now.toISOString() : null), firstNewsId: latest.firstNewsId || welcomeNews.id || '' };
+      const launchActions = buildPartnerLaunchActions(publishedPartner);
+      const wizard = buildPartnerPublicationWizard({ ...publishedPartner, catalogPublished: true, active: true, lifecycleStatus: 'published' }, latestReadiness);
       await updatePartnerOnboarding(db, request, actor, id, {
         active: true,
         catalogPublished: true,
@@ -489,15 +551,18 @@ async function handlePartnerOnboardingAction(db, request, actor) {
         connectionStatusLabel: latest.ownerId ? PARTNER_STATUS_LABELS.card_active : (PARTNER_STATUS_LABELS[latest.connectionStatus] || PARTNER_STATUS_LABELS.created),
         publishedAt: FieldValue.serverTimestamp(),
         firstPublishedAt: latest.firstPublishedAt || FieldValue.serverTimestamp(),
+        firstNewsCreatedAt: latest.firstNewsCreatedAt || (welcomeNews.id ? FieldValue.serverTimestamp() : null),
+        firstNewsId: latest.firstNewsId || welcomeNews.id || '',
         newPartnerUntil,
         partnerOnboarding: {
           ...(latest.partnerOnboarding || {}),
           readiness: latestReadiness,
           recommendations: latestReadiness.recommendations,
           launchActions,
+          wizard,
           lastPublishedAt: now.toISOString(),
         },
-      }, partnerEvent(actor, 'catalog_published', 'Партнёр опубликован в каталоге', { readinessPercent: latestReadiness.percent, newPartnerUntil }));
+      }, partnerEvent(actor, 'catalog_published', 'Партнёр опубликован в каталоге', { readinessPercent: latestReadiness.percent, newPartnerUntil, welcomeNewsId: welcomeNews.id || '' }));
       return {
         ok: true,
         partnerId: id,
@@ -505,8 +570,50 @@ async function handlePartnerOnboardingAction(db, request, actor) {
         lifecycleStatus: 'published',
         readiness: latestReadiness,
         launchActions,
+        wizard,
         newPartnerUntil,
+        welcomeNews,
       };
+    });
+  }
+
+  if (action === 'partner:mark-verified') {
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const latestSnap = await ref.get();
+      const latest = { id, ...(latestSnap.data() || {}) };
+      if (!latest.catalogPublished && latest.active !== true) {
+        const error = new Error('Сначала опубликуйте партнёра в каталоге.');
+        error.statusCode = 400;
+        error.code = 'PARTNER_NOT_PUBLISHED';
+        throw error;
+      }
+      const latestReadiness = buildPartnerReadiness(latest);
+      if (!latest.ownerId || !latest.phone || !latest.publicationConsentAccepted) {
+        const error = new Error('Для статуса проверенного партнёра нужны владелец, контакты и согласие на публикацию.');
+        error.statusCode = 400;
+        error.code = 'PARTNER_VERIFICATION_REQUIREMENTS';
+        throw error;
+      }
+      const nextPartner = { ...latest, verifiedPartner: true, verified: true, lifecycleStatus: 'verified_partner' };
+      const wizard = buildPartnerPublicationWizard(nextPartner, latestReadiness);
+      const launchActions = buildPartnerLaunchActions(nextPartner);
+      await updatePartnerOnboarding(db, request, actor, id, {
+        verifiedPartner: true,
+        verified: true,
+        verifiedAt: FieldValue.serverTimestamp(),
+        verifiedBy: actor.uid,
+        lifecycleStatus: 'verified_partner',
+        lifecycleStatusLabel: PARTNER_STATUS_LABELS.verified_partner,
+        partnerOnboarding: {
+          ...(latest.partnerOnboarding || {}),
+          readiness: latestReadiness,
+          recommendations: latestReadiness.recommendations,
+          launchActions,
+          wizard,
+          verifiedAt: new Date().toISOString(),
+        },
+      }, partnerEvent(actor, 'verified_partner', 'Партнёру присвоен статус “Проверенный партнёр АПГ”', { readinessPercent: latestReadiness.percent }));
+      return { ok: true, partnerId: id, lifecycleStatus: 'verified_partner', readiness: latestReadiness, launchActions, wizard };
     });
   }
 
@@ -517,7 +624,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
       connectionStatusLabel: email ? PARTNER_STATUS_LABELS.email_specified : PARTNER_STATUS_LABELS.created,
       lifecycleStatus,
       lifecycleStatusLabel: PARTNER_STATUS_LABELS[lifecycleStatus],
-      partnerOnboarding: { ...(partner.partnerOnboarding || {}), reminderDeferredAt: new Date().toISOString(), readiness, launchActions: buildPartnerLaunchActions(partner) },
+      partnerOnboarding: { ...(partner.partnerOnboarding || {}), reminderDeferredAt: new Date().toISOString(), readiness, launchActions: buildPartnerLaunchActions(partner), wizard: buildPartnerPublicationWizard(partner, readiness) },
     }, partnerEvent(actor, 'remind_later', 'Подключение владельца отложено', { email }));
     return { ok: true, partnerId: id, connectionStatus: email ? 'email_specified' : 'created' };
   }

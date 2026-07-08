@@ -149,6 +149,12 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const publicQRScans  = partner.publicQRScans ?? 0;
   const viewCount      = partner.viewCount ?? 0;
   const favoritesCount = partner.favoritesCount ?? 0;
+  const routeClicks    = partner.routeClicks ?? partner.mapRouteClicks ?? 0;
+  const websiteClicks  = partner.websiteClicks ?? partner.siteClicks ?? 0;
+  const vkClicks       = partner.vkClicks ?? partner.vkGroupClicks ?? 0;
+  const telegramClicks = partner.telegramClicks ?? 0;
+  const phoneClicks    = partner.phoneClicks ?? 0;
+  const qrOpens        = partner.qrOpenCount ?? partner.qrOpens ?? 0;
   const avgRating      = partner.avgRating ?? 0;
   const ratingCount    = partner.reviewCount ?? reviews.length;
   const conversionPct  = viewCount > 0 ? Math.round((totalVisits / viewCount) * 100) : 0;
@@ -185,7 +191,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
             badges={[partner.verifiedPartner || partner.lifecycleStatus === 'verified_partner' ? 'Проверенный' : partner.featured ? 'Партнер дня' : 'Запуск', avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : `${ratingCount} отзывов`].filter(Boolean)}
           />
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 16 }}>
-            {[['launch', 'Старт'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Публикации'], ['docs', 'Документы']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -208,8 +214,17 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                 </div>
               </GlassCard>
               <GlassCard style={{ borderRadius: 30, marginTop: 12 }}>
-                <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850, marginBottom: 6 }}>Локи · помощник партнёра</div>
-                <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '22px', fontWeight: 760 }}>Сегодня можно улучшить карточку: добавить фото, проверить контакты и подготовить первую публикацию.</div>
+                <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850, marginBottom: 6 }}>Локи · персональный менеджер</div>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '22px', fontWeight: 760 }}>
+                  За последние дни карточку посмотрели {viewCount} раз. Чтобы увеличить интерес пользователей, рекомендую закрыть ближайший пункт чек-листа и подготовить первую публикацию.
+                </div>
+                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                  {launchState.checks.filter(item => !item.done).slice(0, 3).map(item => (
+                    <button key={item.key} onClick={() => setActiveTab(item.tab)} style={{ border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: APG2_PROFILE.text, borderRadius: 18, padding: '10px 12px', textAlign: 'left', fontSize: 13, fontWeight: 780 }}>
+                      Выполнить: {item.label}
+                    </button>
+                  ))}
+                </div>
               </GlassCard>
             </GlassSection>
           )}
@@ -233,6 +248,12 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                     <StatPill label="публичный QR" value={publicQRScans} />
                     <StatPill label="просмотров" value={viewCount} />
                     <StatPill label="в избранном" value={favoritesCount} />
+                    <StatPill label="маршрутов" value={routeClicks} />
+                    <StatPill label="переходов на сайт" value={websiteClicks} />
+                    <StatPill label="VK" value={vkClicks} />
+                    <StatPill label="Telegram" value={telegramClicks} />
+                    <StatPill label="звонков" value={phoneClicks} />
+                    <StatPill label="открытий QR" value={qrOpens} />
                   </div>
                   {(avgRating > 0 || ratingCount > 0) && (
                     <GlassCard style={{ marginTop: 12, borderRadius: 30 }}>
@@ -254,8 +275,44 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
           )}
 
           {activeTab === 'publications' && (
-            <GlassSection title="Публикации">
-              <EmptyStateV2 icon="📰" title="Редакционный раздел готовится" text="Здесь будут новости, акции, мероприятия, подарки и черновики партнёра." />
+            <GlassSection title="Контент">
+              <div style={{ display: 'grid', gap: 10 }}>
+                {[
+                  ['📰', 'Новости', 'Расскажите о запуске, обновлении услуг или важном событии.'],
+                  ['🎁', 'Акции', 'Добавьте специальное предложение для участников АПГ.'],
+                  ['📅', 'Мероприятия', 'Пригласите пользователей на встречу, мастер-класс или открытый день.'],
+                  ['🏆', 'Призы', 'Подготовьте подарок или бонус для активности пользователей.'],
+                  ['✍️', 'Черновики', 'Материалы, которые можно доработать перед публикацией.'],
+                ].map(([icon, title, text]) => (
+                  <GlassCard key={title} style={{ borderRadius: 24, display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 18, background: APG2_PROFILE.goldSoft, display: 'grid', placeItems: 'center', fontSize: 22 }}>{icon}</div>
+                    <div>
+                      <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 850 }}>{title}</div>
+                      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 3 }}>{text}</div>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+          )}
+
+          {activeTab === 'reviews' && (
+            <GlassSection title="Отзывы">
+              {reviews.length === 0 ? (
+                <EmptyStateV2 icon="⭐" title="Отзывов пока нет" text="После запуска карточки здесь появятся отзывы, оценки, жалобы и ответы партнёра." />
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {reviews.map(review => (
+                    <GlassCard key={review.id} style={{ borderRadius: 24 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                        <div style={{ color: APG2_PROFILE.text, fontSize: 14, fontWeight: 850 }}>{review.userName || 'Участник АПГ'}</div>
+                        <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850 }}><Stars rating={review.rating || 0} /></div>
+                      </div>
+                      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>{review.text || 'Без текста'}</div>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
             </GlassSection>
           )}
 

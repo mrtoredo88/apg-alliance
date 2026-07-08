@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Мастер публикации и запуск партнёра
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Мастер подключения партнёра получил 5-шаговый progress, полный чек-лист readiness, backend-автосоздание черновика приветственной новости при публикации, отдельное действие `partner:mark-verified` и обновлённый кабинет партнёра с разделами “Старт”, “Аналитика”, “Контент”, “Отзывы”, “Документы”. Автоматический push при создании черновика партнёра отключён: push теперь остаётся launch-рекомендацией после публикации.
+**Почему:** После создания и привязки карточки партнёра нужно завершать весь цикл запуска: проверить готовность, опубликовать, подготовить продвижение, дать партнёру полезный кабинет и только потом присваивать доверенный статус.
+
+---
+
 ## [2026-07-08] Жизненный цикл публикации партнёра
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `api/email-auth.js`, `server/src/routes/email-auth.js`, `api/public-data.js`, `server/src/routes/public-data.js`, `.ai/17_CHANGELOG_AI.md`
