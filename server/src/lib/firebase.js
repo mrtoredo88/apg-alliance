@@ -2,6 +2,7 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { getAuth } from 'firebase-admin/auth';
+import { readFileSync } from 'node:fs';
 
 function getAdminApp() {
   const existing = getApps();
@@ -9,7 +10,8 @@ function getAdminApp() {
 
   // Приоритет 1: GOOGLE_APPLICATION_CREDENTIALS — путь к файлу внутри контейнера
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return initializeApp();
+    const serviceAccount = JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
+    return initializeApp({ credential: cert(serviceAccount) });
   }
 
   // Приоритет 2: FIREBASE_SERVICE_ACCOUNT — JSON-строка (локальная разработка)
