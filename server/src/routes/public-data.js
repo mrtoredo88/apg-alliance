@@ -29,7 +29,8 @@ async function readPublicCollection(db, name, config) {
   const snap = await ref.get();
   return snap.docs
     .map(doc => ({ id: doc.id, ...serializePublicValue(doc.data()) }))
-    .filter(item => !config.activeOnly || item.active !== false);
+    .filter(item => !config.activeOnly || item.active !== false)
+    .filter(item => config.collection !== 'partners' || item.catalogPublished !== false);
 }
 
 async function readPublicCollections(db, names, logger) {

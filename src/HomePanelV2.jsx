@@ -1724,6 +1724,9 @@ function V2FullHomeSections({
     featuredPartner && featuredPartner.id !== partnerOfMonth?.id ? featuredPartner : null,
     ...partners.filter(p => p.id !== partnerOfMonth?.id && p.id !== featuredPartner?.id),
   ].filter(Boolean).slice(0, 6);
+  const newPartners = partners
+    .filter(p => p.newPartnerUntil && new Date(p.newPartnerUntil).getTime() > Date.now())
+    .slice(0, 6);
   const visibleReviews = recentReviews.slice(0, 4);
   const visibleEvents = events.slice(0, 5);
   const keyGoal = Math.max(10, Math.ceil((userKeys + 1) / 10) * 10);
@@ -1789,6 +1792,32 @@ function V2FullHomeSections({
           </button>
         ))}
       </div>
+
+      {newPartners.length > 0 && (
+        <div style={{ marginBottom: 34 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14, gap: 16 }}>
+            <div>
+              <div style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 790 }}>Новые партнёры</div>
+              <div style={{ color: V2.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Свежие места в АПГ</div>
+            </div>
+            <span style={{ ...GlassBadge }}>14 дней</span>
+          </div>
+          <div data-apg-horizontal-scroll="true" onTouchStart={e => e.stopPropagation()}>
+            <div style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, scrollPaddingLeft: 2 }}>
+              {newPartners.map(partner => (
+                <button key={partner.id ?? partner.name} onClick={() => onOpenPartner?.(partner)} {...pressMotion} style={{ ...GlassCard, flex: '0 0 196px', height: 142, border: 'none', borderRadius: 30, padding: 14, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden', ...horizontalSnapItem }}>
+                  {imageLayer(imageOf(partner), 0.28)}
+                  <span style={{ position: 'relative', zIndex: 1, ...GlassBadge, alignSelf: 'flex-start' }}>Новое</span>
+                  <span style={{ position: 'relative', zIndex: 1 }}>
+                    <span style={{ color: V2.text, fontSize: 16, lineHeight: '20px', fontWeight: 820, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titleOf(partner, 'Партнер')}</span>
+                    {partner.offer && <span style={{ display: 'block', color: V2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.offer}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16, gap: 16 }}>
         <div>

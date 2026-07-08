@@ -74,6 +74,8 @@ async function attachPendingPartnerInvites(db, email, userId) {
       partnerCabinetEnabled: true,
       connectionStatus: 'registration_completed',
       connectionStatusLabel: 'Регистрация завершена',
+      lifecycleStatus: 'card_setup',
+      lifecycleStatusLabel: 'Карточка оформляется',
       partnerConnectionEvents: FieldValue.arrayUnion({
         type: 'registration_completed',
         label: `Партнёр зарегистрировался по приглашению: ${normalizedEmail}`,

@@ -31,11 +31,32 @@ export function StatCard({ icon, label, value, sub, color }) {
   );
 }
 
+function getPartnerLaunchState(partner = {}) {
+  const photosCount = [partner.logoUrl, partner.coverPhoto, ...(Array.isArray(partner.gallery) ? partner.gallery : [])].filter(Boolean).length;
+  const checks = [
+    { key: 'logo', label: 'загрузить логотип', done: Boolean(partner.logoUrl), tab: 'edit' },
+    { key: 'photos', label: 'добавить фотографии', done: photosCount >= 3, tab: 'edit' },
+    { key: 'offer', label: 'создать первую акцию', done: Boolean(String(partner.offer || '').trim()), tab: 'edit' },
+    { key: 'news', label: 'разместить первую новость', done: Boolean(partner.firstNewsCreatedAt), tab: 'publications' },
+    { key: 'event', label: 'создать мероприятие', done: Boolean(partner.firstEventCreatedAt), tab: 'publications' },
+    { key: 'contacts', label: 'проверить контакты', done: Boolean(partner.phone && partner.hours && (partner.socialUrl || partner.vkGroupUrl || partner.websiteUrl || partner.telegramCommunityUrl)), tab: 'edit' },
+    { key: 'verified', label: 'получить бейдж “Проверенный”', done: Boolean(partner.verifiedPartner || partner.lifecycleStatus === 'verified_partner'), tab: 'launch' },
+    { key: 'share', label: 'поделиться карточкой', done: Boolean(partner.firstShareAt), tab: 'launch' },
+    { key: 'clients', label: 'пригласить первых клиентов', done: Boolean(partner.firstReviewInviteAt || partner.publicQRScans > 0 || partner.totalVisits > 0), tab: 'qr' },
+  ];
+  const doneCount = checks.filter(item => item.done).length;
+  return {
+    checks,
+    percent: Math.round((doneCount / checks.length) * 100),
+    doneCount,
+  };
+}
+
 export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, onBack, onPartnerUpdate }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState('launch');
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -131,6 +152,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const avgRating      = partner.avgRating ?? 0;
   const ratingCount    = partner.reviewCount ?? reviews.length;
   const conversionPct  = viewCount > 0 ? Math.round((totalVisits / viewCount) * 100) : 0;
+  const launchState    = getPartnerLaunchState(partner);
+  const lifecycleLabel = partner.lifecycleStatusLabel || partner.connectionStatusLabel || (partner.catalogPublished ? 'Опубликовано' : 'Карточка оформляется');
 
   const inputStyle = {
     width: '100%', padding: '11px 13px', borderRadius: 12,
@@ -156,16 +179,40 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
             image={partner.coverPhoto || fLogo}
             title={partner.name}
             subtitle={partner.categoryLabel || partner.address}
-            status="Партнер"
+            status={lifecycleLabel}
             description={partner.offer || partner.description}
             avatar={fLogo ? <img src={fLogo} alt="" style={{ width: 64, height: 64, borderRadius: 24, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.24)' }} /> : <GlassBadge tone="gold">{partner.emoji ?? '🏪'}</GlassBadge>}
-            badges={[partner.featured ? 'Партнер дня' : 'Проверенный', avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : `${ratingCount} отзывов`].filter(Boolean)}
+            badges={[partner.verifiedPartner || partner.lifecycleStatus === 'verified_partner' ? 'Проверенный' : partner.featured ? 'Партнер дня' : 'Запуск', avgRating > 0 ? `★ ${avgRating.toFixed(1)}` : `${ratingCount} отзывов`].filter(Boolean)}
           />
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 16 }}>
-            {[['stats', 'Статистика'], ['qr', 'QR'], ['edit', 'Карточка']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Публикации'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
+
+          {activeTab === 'launch' && (
+            <GlassSection title="Начнём работу">
+              <GlassCard tone="gold" style={{ borderRadius: 32 }}>
+                <div style={{ color: '#17120a', fontSize: 24, lineHeight: '29px', fontWeight: 930, marginBottom: 6 }}>Добро пожаловать!</div>
+                <div style={{ color: 'rgba(23,18,10,0.72)', fontSize: 14, lineHeight: '20px', marginBottom: 14 }}>Ваш кабинет готов на {launchState.percent}%. Локи будет подсказывать следующий полезный шаг.</div>
+                <div style={{ height: 10, borderRadius: 999, background: 'rgba(23,18,10,0.14)', overflow: 'hidden', marginBottom: 14 }}>
+                  <div style={{ width: `${launchState.percent}%`, height: '100%', borderRadius: 999, background: '#17120a' }} />
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {launchState.checks.map(item => (
+                    <button key={item.key} onClick={() => setActiveTab(item.tab)} style={{ border: 0, borderRadius: 18, padding: '11px 12px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: item.done ? 'rgba(23,18,10,0.12)' : 'rgba(255,255,255,0.34)', color: '#17120a', fontWeight: 820 }}>
+                      <span>{item.done ? '✓' : '☐'} {item.label}</span>
+                      <span style={{ fontSize: 11, opacity: 0.68 }}>{item.done ? 'готово' : 'Сделать'}</span>
+                    </button>
+                  ))}
+                </div>
+              </GlassCard>
+              <GlassCard style={{ borderRadius: 30, marginTop: 12 }}>
+                <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850, marginBottom: 6 }}>Локи · помощник партнёра</div>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '22px', fontWeight: 760 }}>Сегодня можно улучшить карточку: добавить фото, проверить контакты и подготовить первую публикацию.</div>
+              </GlassCard>
+            </GlassSection>
+          )}
 
           {expert && (
             <GlassSection title="Ссылка эксперта">
@@ -203,6 +250,18 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
               <GlassCard style={{ borderRadius: 32 }}>
                 <PartnerQRSection partner={partner} />
               </GlassCard>
+            </GlassSection>
+          )}
+
+          {activeTab === 'publications' && (
+            <GlassSection title="Публикации">
+              <EmptyStateV2 icon="📰" title="Редакционный раздел готовится" text="Здесь будут новости, акции, мероприятия, подарки и черновики партнёра." />
+            </GlassSection>
+          )}
+
+          {activeTab === 'docs' && (
+            <GlassSection title="Документы">
+              <EmptyStateV2 icon="📄" title="Документы и реквизиты" text="Договоры, счета и юридическая информация будут доступны после подключения документооборота." />
             </GlassSection>
           )}
 

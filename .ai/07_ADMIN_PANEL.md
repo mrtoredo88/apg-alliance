@@ -102,6 +102,7 @@
 - Статусы карточки сотрудничества: `legal_not_required`, `legal_recommended`, `legal_partial`, `contract_ready`, в интерфейсе отображаются как “юридические данные не требуются”, “рекомендуется заполнить”, “заполнены частично”, “готов к договору”
 - Поиск в админке умеет находить заявки по ИНН, названию, директору, телефону и email, если роль имеет доступ к юридической карточке
 - После создания/сохранения партнёра с email запускается мастер подключения: `/api/admin-actions` actions `partner:onboarding-check`, `partner:bind-owner`, `partner:send-invite`, `partner:remind-later` проверяют пользователя по `emailIndex/users`, защищают от повторной привязки, пишут `connectionStatus`, `partnerOnboarding`, `partnerInvite`, `partnerConnectionEvents` и выдают доступ к партнёрскому кабинету
+- Pipeline запуска партнёра продолжается action `partner:publish-catalog`: backend проверяет readiness минимум 80%, обязательное `publicationConsentAccepted`, публикует `catalogPublished:true`, `active:true`, `searchable:true`, `mapVisible:true`, `lokiVisible:true`, ставит `newPartnerUntil` на 14 дней и сохраняет launch-рекомендации Локи
 - Очередь заявок партнёров, экспертов, событий, новостей и призов
 - Админ выбирает тип заявки, вставляет текст или загружает TXT/CSV/JSON/MD-файл
 - PDF/DOCX/XLSX/изображения можно прикрепить как метаданные заявки; распознавание содержимого подключается следующим шагом через OCR/parser

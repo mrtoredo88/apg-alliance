@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Жизненный цикл публикации партнёра
+**Коммит:** `локально`
+**Файлы:** `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `api/email-auth.js`, `server/src/routes/email-auth.js`, `api/public-data.js`, `server/src/routes/public-data.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** Подключение партнёра расширено до pipeline запуска: черновик, подключение владельца, оформление карточки, готовность к публикации, публикация в каталог, новые партнёры на 14 дней и launch-чеклист. Админка получила кнопку “Опубликовать в каталог”, публикационный readiness gate 80% с обязательным согласием, действия Локи после публикации и автосоздание приветственной новости. Кабинет партнёра теперь открывается со стартового чек-листа, а публичный каталог скрывает новые `catalogPublished:false` черновики.
+**Почему:** После привязки кабинета процесс всё ещё обрывался до фактического запуска партнёра в экосистеме АПГ.
+
+---
+
 ## [2026-07-08] Мастер подключения партнёра после ИИ-импорта
 **Коммит:** `локально`
 **Файлы:** `src/AdminPanel.jsx`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `api/email-auth.js`, `server/src/routes/email-auth.js`, `.ai/17_CHANGELOG_AI.md`

@@ -955,15 +955,28 @@ export function UserApp() {
       const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap, lkSnap] = _loadResult;
 
       if (!isMounted.current) return;
-      const freshPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const freshPartners = pSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => item.catalogPublished !== false);
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
       if (userData && isMounted.current) {
         const owned = freshPartners.find(p =>
+          (p.ownerId && String(p.ownerId) === String(userData.id)) ||
           (p.ownerEmail && userData.email && p.ownerEmail.toLowerCase() === userData.email.toLowerCase()) ||
           (p.vkOwnerId && String(p.vkOwnerId) === String(userData.id))
         );
-        setOwnedPartner(owned ?? null);
+        if (owned) {
+          setOwnedPartner(owned);
+        } else if (userData.partnerId) {
+          getDoc(doc(db, 'partners', String(userData.partnerId)))
+            .then(snap => {
+              if (snap.exists() && isMounted.current) setOwnedPartner({ id: snap.id, ...snap.data() });
+            })
+            .catch(() => setOwnedPartner(null));
+        } else {
+          setOwnedPartner(null);
+        }
       }
 
       const freshEvents = eSnap.docs

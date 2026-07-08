@@ -2884,6 +2884,7 @@ export const AdminPanel = () => {
   const [pOffer, setPOffer] = useState('');
   const [pStampTarget, setPStampTarget] = useState('');
   const [pOwnerEmail, setPOwnerEmail] = useState('');
+  const [pPublicationConsent, setPPublicationConsent] = useState(false);
   const [pBooking, setPBooking]           = useState('');
   const [pWebsite, setPWebsite]           = useState('');
   const [pTelegramCom, setPTelegramCom]   = useState('');
@@ -3677,6 +3678,7 @@ export const AdminPanel = () => {
     setPName(''); setPDesc(''); setPCategory('other'); setPEmoji('🏪'); setPLogo('');
     setPTier('start'); setPPhone(''); setPAddress(''); setPHours(''); setPSocial(''); setPVkGroup(''); setPOffer('');
     setPStampTarget(''); setPOwnerEmail('');
+    setPPublicationConsent(false);
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
@@ -3692,6 +3694,7 @@ export const AdminPanel = () => {
     setPTier(p.tier ?? 'start'); setPAddress(p.address ?? ''); setPHours(p.hours ?? ''); setPSocial(p.socialUrl ?? ''); setPVkGroup(p.vkGroupUrl ?? '');
     setPOffer(p.offer ?? ''); setPStampTarget(p.stampTarget ? String(p.stampTarget) : '');
     setPOwnerEmail(p.ownerEmail ?? '');
+    setPPublicationConsent(Boolean(p.publicationConsentAccepted));
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
     setPTelegramCom(p.telegramCommunityUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? '');
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
@@ -3771,9 +3774,76 @@ export const AdminPanel = () => {
       setActiveTab('news');
       return;
     }
+    if (action === 'send_push') {
+      setPartnerConnection(null);
+      setActiveTab('notifications');
+      return;
+    }
+    if (action === 'create_event') {
+      setPartnerConnection(null);
+      resetEventForm();
+      setEPartner(partner?.name || '');
+      setEPartnerId(partner?.id || '');
+      setShowEventModal(true);
+      setActiveTab('events');
+      return;
+    }
+    if (action === 'create_prize') {
+      setPartnerConnection(null);
+      resetPrizeForm();
+      setPrPartnerId(partner?.id || '');
+      setPrDonorType('partner');
+      setActiveTab('prizes');
+      return;
+    }
     if (partner) {
       setPartnerConnection(null);
       startEditPartner(partner);
+    }
+  };
+
+  const createPartnerWelcomeNewsDraft = async () => {
+    const partner = partners.find(item => item.id === partnerConnection?.partnerId);
+    if (!partner) return;
+    setPartnerConnectionLoading(true);
+    try {
+      const title = `В АПГ появился новый партнёр: ${partner.name}`;
+      const text = [
+        `В каталоге АПГ появился новый партнёр — ${partner.name}.`,
+        '',
+        partner.description || 'Скоро расскажем подробнее о предложениях и возможностях партнёра.',
+        '',
+        partner.offer ? `Специальное предложение для участников АПГ: ${partner.offer}` : '',
+      ].filter(Boolean).join('\n');
+      const created = await runAdminAction('news:create', {
+        patch: {
+          title,
+          text,
+          summary: partner.offer || `Новый партнёр АПГ: ${partner.name}`,
+          sourceName: partner.name,
+          category: partner.category || 'partners',
+          imageUrl: partner.coverPhoto || partner.logoUrl || '',
+          active: false,
+          status: 'draft',
+          commentsEnabled: true,
+        },
+        idempotencyKey: `partner_welcome_news_${partner.id}_${Date.now()}`,
+      });
+      await runAdminEntityAction('partners', 'update', {
+        id: partner.id,
+        patch: { firstNewsCreatedAt: new Date().toISOString(), firstNewsId: created.id || '' },
+      });
+      setPartnerConnection(prev => ({
+        ...prev,
+        actionDone: 'partner:create-welcome-news',
+        launchActions: (prev?.launchActions || []).map(item => item.key === 'welcome_news' ? { ...item, done: true } : item),
+      }));
+      await fetchData();
+    } catch (error) {
+      logError(error, 'AdminPanel.createPartnerWelcomeNewsDraft');
+      setPartnerConnection(prev => ({ ...prev, error: error.message || 'Не удалось создать приветственную новость.', code: error.code || 'WELCOME_NEWS_FAILED' }));
+    } finally {
+      setPartnerConnectionLoading(false);
     }
   };
 
@@ -3803,6 +3873,8 @@ export const AdminPanel = () => {
       tier: pTier, hours: pHours.trim(), socialUrl: normalizeUrl(pSocial), vkGroupUrl: normalizeUrl(pVkGroup, 'vk'), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
+      publicationConsentAccepted: pPublicationConsent,
+      publicationConsentAcceptedAt: pPublicationConsent ? (editingPartner?.publicationConsentAcceptedAt || new Date().toISOString()) : null,
       bookingUrl: normalizeUrl(pBooking),
       websiteUrl: normalizeUrl(pWebsite),
       telegramCommunityUrl: normalizeUrl(pTelegramCom, 'telegram'),
@@ -3817,7 +3889,16 @@ export const AdminPanel = () => {
     if (editingPartner) {
       await runAdminEntityAction('partners', 'update', { id: editingPartner.id, patch: data });
     } else {
-      const created = await runAdminEntityAction('partners', 'create', { patch: data });
+      const created = await runAdminEntityAction('partners', 'create', {
+        patch: {
+          ...data,
+          active: false,
+          catalogPublished: false,
+          status: 'draft',
+          lifecycleStatus: 'draft',
+          lifecycleStatusLabel: 'Черновик',
+        },
+      });
       savedPartnerId = created.id;
       // Persist QR values on the doc so they're always queryable
       runAdminEntityAction('partners', 'update', {
@@ -5995,6 +6076,19 @@ export const AdminPanel = () => {
                   </div>
                 </div>
 
+                <div
+                  onClick={() => setPPublicationConsent(v => !v)}
+                  style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: pPublicationConsent ? 'rgba(74,222,128,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${pPublicationConsent ? 'rgba(74,222,128,0.35)' : A.border}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12, cursor: 'pointer' }}
+                >
+                  <input type="checkbox" checked={pPublicationConsent} onChange={e => setPPublicationConsent(e.target.checked)} onClick={e => e.stopPropagation()} style={{ marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: pPublicationConsent ? '#4ade80' : A.text }}>Согласие на публикацию карточки</div>
+                    <div style={{ fontSize: 11, color: A.textSec, lineHeight: '16px', marginTop: 4 }}>
+                      Подтверждает, что данные можно показывать пользователям АПГ в каталоге, поиске, на карте и в рекомендациях Локи.
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={savePartner}>
                     {editingPartner ? '💾 Сохранить' : '➕ Добавить'}
@@ -6032,11 +6126,17 @@ export const AdminPanel = () => {
                   <div style={{ padding: 14, borderRadius: 16, border: `1px solid ${A.border}`, background: A.chip }}>
                     <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>Готовность карточки</div>
                     <div style={{ fontSize: 30, fontWeight: 900, color: A.gold }}>{partnerConnection.readiness?.percent ?? 0}%</div>
+                    <div style={{ fontSize: 10, color: A.textSec, marginTop: 3 }}>минимум {partnerConnection.readiness?.minPercent ?? 80}% для публикации</div>
                     <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 8 }}>
                       <div style={{ width: `${partnerConnection.readiness?.percent ?? 0}%`, height: '100%', background: A.gold, borderRadius: 99 }} />
                     </div>
                   </div>
                   <div style={{ padding: 14, borderRadius: 16, border: `1px solid ${A.border}`, background: A.chip }}>
+                    {partnerConnection.lifecycleStatus && (
+                      <div style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: 999, background: A.goldDim, color: A.gold, fontSize: 11, fontWeight: 850, marginBottom: 8 }}>
+                        {partnerConnection.lifecycleStatus === 'published' ? 'Опубликовано' : partnerConnection.lifecycleStatus === 'ready_to_publish' ? 'Готово к публикации' : 'Этап подключения'}
+                      </div>
+                    )}
                     {partnerConnection.userFound ? (
                       <>
                         <div style={{ fontSize: 14, fontWeight: 800, color: A.text, marginBottom: 4 }}>Найден зарегистрированный пользователь</div>
@@ -6078,6 +6178,30 @@ export const AdminPanel = () => {
                   </div>
                 )}
 
+                {partnerConnection.lifecycleStatus === 'published' && (
+                  <div style={{ border: '1px solid rgba(74,222,128,0.28)', background: 'rgba(74,222,128,0.09)', borderRadius: 14, padding: '10px 12px', color: '#bbf7d0', fontSize: 13, lineHeight: '18px', marginBottom: 12 }}>
+                    Партнёр опубликован в каталоге, появится в поиске, на карте, в категории и в подборке “Новые партнёры” на 14 дней.
+                  </div>
+                )}
+
+                {partnerConnection.launchActions?.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: A.text, marginBottom: 8 }}>Запуск партнёра</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 720 ? '1fr' : '1fr 1fr', gap: 8 }}>
+                      {partnerConnection.launchActions.map(item => (
+                        <button
+                          key={item.key}
+                          style={{ ...s.btn, ...s.btnGray, justifyContent: 'space-between', textAlign: 'left', fontSize: 12, opacity: item.done ? 0.72 : 1 }}
+                          onClick={() => item.action === 'create_news' ? createPartnerWelcomeNewsDraft() : focusPartnerRecommendation(item.action)}
+                        >
+                          <span>{item.done ? '✓ ' : '· '}{item.label}</span>
+                          <span style={{ color: item.done ? '#4ade80' : A.textSec }}>{item.done ? 'готово' : 'Сделать'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {partnerConnection.inviteLink && !partnerConnection.userFound && (
                   <div style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${A.border}`, background: 'rgba(255,255,255,0.04)', fontSize: 12, color: A.textSec, wordBreak: 'break-all', marginBottom: 12 }}>
                     {partnerConnection.inviteLink}
@@ -6085,6 +6209,16 @@ export const AdminPanel = () => {
                 )}
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {partnerConnection.readiness?.readyForReview && partnerConnection.lifecycleStatus !== 'published' && (
+                    <button
+                      disabled={partnerConnectionLoading || !partnerConnection.readiness?.readyForPublish}
+                      style={{ ...s.btn, ...s.btnPri, opacity: partnerConnectionLoading || !partnerConnection.readiness?.readyForPublish ? 0.6 : 1 }}
+                      onClick={() => handlePartnerConnectionAction('partner:publish-catalog')}
+                      title={!partnerConnection.readiness?.readyForPublish ? 'Нужно подтвердить согласие на публикацию и закрыть обязательные поля' : 'Опубликовать партнёра'}
+                    >
+                      🚀 Опубликовать в каталог
+                    </button>
+                  )}
                   {partnerConnection.userFound ? (
                     <>
                       <button disabled={partnerConnectionLoading} style={{ ...s.btn, ...s.btnPri, opacity: partnerConnectionLoading ? 0.65 : 1 }} onClick={() => handlePartnerConnectionAction('partner:bind-owner')}>
@@ -6194,9 +6328,9 @@ export const AdminPanel = () => {
                             {isCheckedRecently(p.linksCheckedAt)
                               ? <span title="Ссылки проверены" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓ок</span>
                               : <span title="Ссылки не проверены" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
-                            {p.connectionStatusLabel && (
+                            {(p.lifecycleStatusLabel || p.connectionStatusLabel) && (
                               <span title="Статус подключения партнёра" style={{ fontSize: 10, color: p.connectionStatus === 'cabinet_linked' || p.connectionStatus === 'card_active' ? '#4ade80' : A.gold, fontWeight: 800, flexShrink: 0 }}>
-                                {p.connectionStatusLabel}
+                                {p.lifecycleStatusLabel || p.connectionStatusLabel}
                               </span>
                             )}
                           </div>
@@ -6245,10 +6379,10 @@ export const AdminPanel = () => {
                           {p.ownerId && <span style={{ color: '#4ade80' }}>🔗 кабинет привязан</span>}
                         </div>
 
-                        {(p.connectionStatusLabel || p.partnerOnboarding?.readiness) && (
+                        {(p.lifecycleStatusLabel || p.connectionStatusLabel || p.partnerOnboarding?.readiness) && (
                           <div style={{ border: `1px solid ${A.border}`, background: A.chip, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                              <span style={{ fontSize: 12, fontWeight: 800, color: A.text }}>🤝 {p.connectionStatusLabel || 'Подключение партнёра'}</span>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: A.text }}>🤝 {p.lifecycleStatusLabel || p.connectionStatusLabel || 'Подключение партнёра'}</span>
                               <button
                                 style={{ ...s.btn, ...s.btnGray, padding: '4px 10px', fontSize: 11 }}
                                 onClick={e => { e.stopPropagation(); openPartnerConnectionWizard(p.id, p.ownerEmail || p.connectionEmail || '', 'manual'); }}
