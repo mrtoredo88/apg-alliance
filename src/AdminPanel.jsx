@@ -2900,6 +2900,8 @@ export const AdminPanel = () => {
   const [bulkGeoRunning, setBulkGeoRunning] = useState(false);
   const [bulkGeoResult, setBulkGeoResult]   = useState(null);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [partnerConnection, setPartnerConnection] = useState(null);
+  const [partnerConnectionLoading, setPartnerConnectionLoading] = useState(false);
   const [expandedPartnerId, setExpandedPartnerId] = useState(null);
   const [showExpertModal, setShowExpertModal]   = useState(false);
   const [expandedExpertId, setExpandedExpertId] = useState(null);
@@ -3700,6 +3702,81 @@ export const AdminPanel = () => {
     setShowPartnerModal(true);
   };
 
+  const openPartnerConnectionWizard = async (partnerId, email, source = 'save') => {
+    if (!partnerId) return;
+    setPartnerConnectionLoading(true);
+    try {
+      const result = await runAdminAction('partner:onboarding-check', {
+        partnerId,
+        email,
+        source,
+        idempotencyKey: `partner_onboarding_check_${partnerId}_${Date.now()}`,
+      });
+      setPartnerConnection(result);
+    } catch (error) {
+      logError(error, 'AdminPanel.openPartnerConnectionWizard');
+      setPartnerConnection({
+        ok: false,
+        partnerId,
+        email,
+        error: error.message || 'Не удалось проверить подключение партнёра.',
+        code: error.code || 'PARTNER_ONBOARDING_CHECK_FAILED',
+      });
+    } finally {
+      setPartnerConnectionLoading(false);
+    }
+  };
+
+  const handlePartnerConnectionAction = async (action) => {
+    if (!partnerConnection?.partnerId) return;
+    setPartnerConnectionLoading(true);
+    try {
+      const result = await runAdminAction(action, {
+        partnerId: partnerConnection.partnerId,
+        email: partnerConnection.email,
+        idempotencyKey: `${action}_${partnerConnection.partnerId}_${Date.now()}`,
+      });
+      setPartnerConnection(prev => ({ ...prev, ...result, actionDone: action }));
+      await fetchData();
+    } catch (error) {
+      logError(error, `AdminPanel.${action}`);
+      setPartnerConnection(prev => ({
+        ...prev,
+        error: error.message || 'Действие не выполнено.',
+        code: error.code || 'PARTNER_CONNECTION_ACTION_FAILED',
+      }));
+    } finally {
+      setPartnerConnectionLoading(false);
+    }
+  };
+
+  const copyPartnerInviteLink = async () => {
+    const link = partnerConnection?.inviteLink;
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setPartnerConnection(prev => ({ ...prev, copied: true }));
+    } catch {
+      setPartnerConnection(prev => ({ ...prev, error: 'Не удалось скопировать ссылку автоматически. Скопируйте её вручную.' }));
+    }
+  };
+
+  const focusPartnerRecommendation = (action) => {
+    const partner = partners.find(item => item.id === partnerConnection?.partnerId);
+    if (action === 'create_news') {
+      setPartnerConnection(null);
+      resetNewsForm();
+      setNSourceName(partner?.name || '');
+      setShowNewsModal(true);
+      setActiveTab('news');
+      return;
+    }
+    if (partner) {
+      setPartnerConnection(null);
+      startEditPartner(partner);
+    }
+  };
+
   const savePartner = async () => {
     if (!pName.trim()) return;
     const urlError = validateUrlFields([
@@ -3736,10 +3813,12 @@ export const AdminPanel = () => {
       latitude:  pLat.trim() ? parseFloat(pLat) : null,
       longitude: pLon.trim() ? parseFloat(pLon) : null,
     };
+    let savedPartnerId = editingPartner?.id || '';
     if (editingPartner) {
       await runAdminEntityAction('partners', 'update', { id: editingPartner.id, patch: data });
     } else {
       const created = await runAdminEntityAction('partners', 'create', { patch: data });
+      savedPartnerId = created.id;
       // Persist QR values on the doc so they're always queryable
       runAdminEntityAction('partners', 'update', {
         id: created.id,
@@ -3762,7 +3841,8 @@ export const AdminPanel = () => {
       }).catch(() => {});
     }
     resetPartnerForm();
-    fetchData();
+    await fetchData();
+    if (savedPartnerId) openPartnerConnectionWizard(savedPartnerId, data.ownerEmail, editingPartner ? 'update' : 'create');
   };
 
   const deletePartner = async (id) => {
@@ -5925,6 +6005,116 @@ export const AdminPanel = () => {
             </div>
           )}
 
+          {partnerConnection && (
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
+              onClick={e => { if (e.target === e.currentTarget && !partnerConnectionLoading) setPartnerConnection(null); }}
+            >
+              <div style={{ ...s.card, width: '100%', maxWidth: 680, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <h2 style={{ ...s.h2, margin: 0 }}>🤝 Подключение партнёра</h2>
+                    <div style={{ fontSize: 12, color: A.textSec, marginTop: 4 }}>
+                      {partnerConnection.email ? `Email: ${partnerConnection.email}` : 'Email владельца пока не указан'}
+                    </div>
+                  </div>
+                  <button disabled={partnerConnectionLoading} onClick={() => setPartnerConnection(null)} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+                </div>
+
+                {partnerConnection.error && (
+                  <div style={{ border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.1)', borderRadius: 14, padding: '10px 12px', color: '#fecaca', fontSize: 13, marginBottom: 12 }}>
+                    {partnerConnection.error}
+                    {partnerConnection.code && <span style={{ opacity: 0.7 }}> · {partnerConnection.code}</span>}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 720 ? '1fr' : '160px 1fr', gap: 12, marginBottom: 14 }}>
+                  <div style={{ padding: 14, borderRadius: 16, border: `1px solid ${A.border}`, background: A.chip }}>
+                    <div style={{ fontSize: 11, color: A.textSec, marginBottom: 6 }}>Готовность карточки</div>
+                    <div style={{ fontSize: 30, fontWeight: 900, color: A.gold }}>{partnerConnection.readiness?.percent ?? 0}%</div>
+                    <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 8 }}>
+                      <div style={{ width: `${partnerConnection.readiness?.percent ?? 0}%`, height: '100%', background: A.gold, borderRadius: 99 }} />
+                    </div>
+                  </div>
+                  <div style={{ padding: 14, borderRadius: 16, border: `1px solid ${A.border}`, background: A.chip }}>
+                    {partnerConnection.userFound ? (
+                      <>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: A.text, marginBottom: 4 }}>Найден зарегистрированный пользователь</div>
+                        <div style={{ fontSize: 13, color: A.textSec, lineHeight: '18px' }}>
+                          {partnerConnection.user?.name || partnerConnection.user?.email || 'Пользователь АПГ'} уже есть в системе. Можно привязать кабинет к этой карточке.
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: A.text, marginBottom: 4 }}>Пользователь ещё не зарегистрирован</div>
+                        <div style={{ fontSize: 13, color: A.textSec, lineHeight: '18px' }}>
+                          Отправьте приглашение или скопируйте персональную ссылку регистрации. После регистрации доступ к кабинету будет выдан автоматически.
+                        </div>
+                      </>
+                    )}
+                    {partnerConnection.conflicts?.length > 0 && (
+                      <div style={{ marginTop: 10, fontSize: 12, color: '#fbbf24' }}>
+                        ⚠ Найдены возможные конфликты: {partnerConnection.conflicts.map(c => c.name || c.partnerId).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {partnerConnection.recommendations?.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: A.text, marginBottom: 8 }}>Локи рекомендует дальше</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {partnerConnection.recommendations.map(item => (
+                        <button
+                          key={item.key}
+                          style={{ ...s.btn, ...s.btnGray, justifyContent: 'space-between', textAlign: 'left', fontSize: 13 }}
+                          onClick={() => focusPartnerRecommendation(item.action)}
+                        >
+                          <span>{item.severity === 'warning' ? '⚠ ' : '✓ '}{item.label}</span>
+                          <span style={{ color: A.textSec }}>Открыть</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {partnerConnection.inviteLink && !partnerConnection.userFound && (
+                  <div style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${A.border}`, background: 'rgba(255,255,255,0.04)', fontSize: 12, color: A.textSec, wordBreak: 'break-all', marginBottom: 12 }}>
+                    {partnerConnection.inviteLink}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {partnerConnection.userFound ? (
+                    <>
+                      <button disabled={partnerConnectionLoading} style={{ ...s.btn, ...s.btnPri, opacity: partnerConnectionLoading ? 0.65 : 1 }} onClick={() => handlePartnerConnectionAction('partner:bind-owner')}>
+                        {partnerConnectionLoading ? '⏳ Привязываем...' : '🔗 Привязать кабинет'}
+                      </button>
+                      <button style={{ ...s.btn, ...s.btnGray }} onClick={() => { setActiveTab('users'); setPartnerConnection(null); }}>
+                        👤 Посмотреть пользователей
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button disabled={partnerConnectionLoading || !partnerConnection.email} style={{ ...s.btn, ...s.btnPri, opacity: partnerConnectionLoading || !partnerConnection.email ? 0.65 : 1 }} onClick={() => handlePartnerConnectionAction('partner:send-invite')}>
+                        {partnerConnectionLoading ? '⏳ Отправляем...' : '📧 Отправить приглашение'}
+                      </button>
+                      <button disabled={!partnerConnection.inviteLink} style={{ ...s.btn, ...s.btnGray, opacity: partnerConnection.inviteLink ? 1 : 0.5 }} onClick={copyPartnerInviteLink}>
+                        {partnerConnection.copied ? '✓ Ссылка скопирована' : '🔗 Скопировать ссылку'}
+                      </button>
+                      <button disabled={partnerConnectionLoading} style={{ ...s.btn, ...s.btnGray }} onClick={() => handlePartnerConnectionAction('partner:remind-later')}>
+                        ⏳ Напомнить позже
+                      </button>
+                    </>
+                  )}
+                  <button disabled={partnerConnectionLoading} style={{ ...s.btn, ...s.btnGray, marginLeft: 'auto' }} onClick={() => setPartnerConnection(null)}>
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Список партнёров ── */}
           <div style={s.card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -6004,11 +6194,17 @@ export const AdminPanel = () => {
                             {isCheckedRecently(p.linksCheckedAt)
                               ? <span title="Ссылки проверены" style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, flexShrink: 0 }}>✓ок</span>
                               : <span title="Ссылки не проверены" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
+                            {p.connectionStatusLabel && (
+                              <span title="Статус подключения партнёра" style={{ fontSize: 10, color: p.connectionStatus === 'cabinet_linked' || p.connectionStatus === 'card_active' ? '#4ade80' : A.gold, fontWeight: 800, flexShrink: 0 }}>
+                                {p.connectionStatusLabel}
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: 12, color: A.textSec }}>
                             {CATEGORIES.find(c => c.id === p.category)?.emoji} {CATEGORIES.find(c => c.id === p.category)?.label ?? 'Другое'}
                             {p.offer && ' · 🎁'}
                             {p.tier !== 'start' && ` · ${p.tier === 'alliance' ? '🤝' : '⭐'}`}
+                            {p.partnerOnboarding?.readiness?.percent != null && ` · ${p.partnerOnboarding.readiness.percent}%`}
                           </div>
                         </div>
                       </div>
@@ -6046,7 +6242,27 @@ export const AdminPanel = () => {
                           {p.hours    && <span>🕐 {p.hours}</span>}
                           {p.address  && <span>📍 {p.address}</span>}
                           {p.ownerEmail && <span>📧 {p.ownerEmail}</span>}
+                          {p.ownerId && <span style={{ color: '#4ade80' }}>🔗 кабинет привязан</span>}
                         </div>
+
+                        {(p.connectionStatusLabel || p.partnerOnboarding?.readiness) && (
+                          <div style={{ border: `1px solid ${A.border}`, background: A.chip, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: A.text }}>🤝 {p.connectionStatusLabel || 'Подключение партнёра'}</span>
+                              <button
+                                style={{ ...s.btn, ...s.btnGray, padding: '4px 10px', fontSize: 11 }}
+                                onClick={e => { e.stopPropagation(); openPartnerConnectionWizard(p.id, p.ownerEmail || p.connectionEmail || '', 'manual'); }}
+                              >
+                                Продолжить
+                              </button>
+                            </div>
+                            {p.partnerOnboarding?.readiness?.percent != null && (
+                              <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                                <div style={{ width: `${p.partnerOnboarding.readiness.percent}%`, height: '100%', borderRadius: 99, background: A.gold }} />
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <AdminQRMaterialsSection entity={p} type="partner" />
 

@@ -48,6 +48,53 @@ function normalizeTgId(value) {
   return raw.startsWith('tg_') ? raw : `tg_${raw}`;
 }
 
+async function attachPendingPartnerInvites(db, email, userId) {
+  const normalizedEmail = safeString(email, 200).toLowerCase();
+  if (!normalizedEmail || !userId) return;
+  const snap = await db.collection('partnerInvites').where('email', '==', normalizedEmail).limit(10).get().catch(() => null);
+  if (!snap || snap.empty) return;
+  const pending = snap.docs.filter(doc => ['sent', 'prepared'].includes(String(doc.data()?.status || '')));
+  await Promise.all(pending.map(async inviteDoc => {
+    const invite = inviteDoc.data() || {};
+    const partnerId = safeString(invite.partnerId, 160);
+    if (!partnerId) return;
+    await db.collection('partners').doc(partnerId).set({
+      ownerId: userId,
+      ownerEmail: normalizedEmail,
+      connectionEmail: normalizedEmail,
+      partnerCabinetEnabled: true,
+      connectionStatus: 'registration_completed',
+      connectionStatusLabel: 'Регистрация завершена',
+      partnerConnectionEvents: FieldValue.arrayUnion({
+        type: 'registration_completed',
+        label: `Партнёр зарегистрировался по приглашению: ${normalizedEmail}`,
+        at: new Date().toISOString(),
+        actorUid: userId,
+        actorId: userId,
+        actorName: normalizedEmail,
+      }),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await db.collection('users').doc(userId).set({
+      partnerId,
+      partnerCabinetIds: FieldValue.arrayUnion(partnerId),
+      partnerCabinetEnabled: true,
+      role: 'partner',
+      linkedPartnerAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await inviteDoc.ref.set({ status: 'accepted', acceptedBy: userId, acceptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    await db.collection('partnerConnectionEvents').add({
+      partnerId,
+      type: 'registration_completed',
+      label: `Партнёр зарегистрировался по приглашению: ${normalizedEmail}`,
+      email: normalizedEmail,
+      userId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }));
+}
+
 async function getActor(req, db) {
   const token = getBearerToken(req);
   if (!token) {
@@ -435,6 +482,7 @@ async function resolveEmailUser(db, email, ref) {
   });
 
   await db.collection('emailIndex').doc(email).set({ userId, createdAt: FieldValue.serverTimestamp() });
+  await attachPendingPartnerInvites(db, email, userId).catch(() => {});
 
   if (isValidRef) {
     db.collection('users').doc(ref).update({

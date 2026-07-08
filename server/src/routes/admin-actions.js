@@ -1,6 +1,9 @@
+import { randomBytes } from 'node:crypto';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
+import { APP_URL } from '../lib/config.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt']);
 const RESOURCE_CONFIG = {
@@ -47,6 +50,18 @@ const LIST_CONFIG = {
 
 const LEGAL_ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin']);
 const LEGAL_PRIVATE_FIELDS = new Set(['legalProfile', 'legalDocuments', 'legalCheck', 'legalMissingFields', 'counterparty', 'crm', 'legalAdminComments']);
+const PARTNER_STATUS_LABELS = {
+  draft: 'Черновик',
+  created: 'Создано',
+  email_specified: 'Email указан',
+  invitation_sent: 'Приглашение отправлено',
+  registration_completed: 'Регистрация завершена',
+  cabinet_linked: 'Кабинет привязан',
+  card_active: 'Карточка активна',
+  conflict: 'Требует проверки',
+};
+
+let partnerSes = null;
 
 function canAccessLegalData(actor) {
   return LEGAL_ADMIN_ROLES.has(String(actor?.role || '').toLowerCase());
@@ -102,6 +117,304 @@ function serializeAdminValue(value) {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serializeAdminValue(item)]));
   }
   return value;
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function partnerEvent(actor, type, label, extra = {}) {
+  return {
+    type,
+    label,
+    at: new Date().toISOString(),
+    actorUid: actor?.uid || 'system',
+    actorId: actor?.userId || actor?.uid || 'system',
+    actorName: actor?.name || 'АПГ',
+    ...extra,
+  };
+}
+
+function buildPartnerReadiness(partner = {}) {
+  const photosCount = [partner.logoUrl, partner.coverPhoto, ...(Array.isArray(partner.gallery) ? partner.gallery : [])].filter(Boolean).length;
+  const checks = [
+    { key: 'owner', label: 'Пригласить владельца', ok: Boolean(partner.ownerId), action: 'invite_owner' },
+    { key: 'logo', label: 'Добавить логотип', ok: Boolean(partner.logoUrl), action: 'edit_media' },
+    { key: 'photos', label: 'Загрузить минимум три фотографии', ok: photosCount >= 3, action: 'edit_media' },
+    { key: 'hours', label: 'Настроить график работы', ok: Boolean(String(partner.hours || '').trim()), action: 'edit_contacts' },
+    { key: 'links', label: 'Проверить ссылки на социальные сети', ok: Boolean(partner.websiteUrl || partner.vkGroupUrl || partner.socialUrl || partner.telegramCommunityUrl), action: 'edit_links' },
+    { key: 'offer', label: 'Добавить первую акцию', ok: Boolean(String(partner.offer || '').trim()), action: 'edit_offer' },
+    { key: 'news', label: 'Создать приветственную новость', ok: Boolean(partner.firstNewsCreatedAt), action: 'create_news' },
+    { key: 'description', label: 'Заполнить описание компании', ok: String(partner.description || '').trim().length >= 80, action: 'edit_description' },
+  ];
+  const missing = checks.filter(item => !item.ok).map(({ key, label, action }) => ({ key, label, action }));
+  const percent = Math.round(((checks.length - missing.length) / checks.length) * 100);
+  return {
+    percent,
+    missing,
+    recommendations: missing.map(item => ({ ...item, severity: item.key === 'owner' ? 'warning' : 'info' })),
+    readyForReview: percent >= 100,
+  };
+}
+
+async function findUserByEmail(db, email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  const indexSnap = await db.collection('emailIndex').doc(normalized).get().catch(() => null);
+  const candidates = [];
+  if (indexSnap?.exists && indexSnap.data()?.userId) candidates.push(String(indexSnap.data().userId));
+  candidates.push(`email:${normalized}`);
+  for (const id of [...new Set(candidates)]) {
+    const snap = await db.collection('users').doc(id).get().catch(() => null);
+    if (snap?.exists) return { id: snap.id, ...serializeAdminValue(snap.data() || {}) };
+  }
+  const byEmail = await db.collection('users').where('email', '==', normalized).limit(1).get().catch(() => null);
+  if (byEmail && !byEmail.empty) return { id: byEmail.docs[0].id, ...serializeAdminValue(byEmail.docs[0].data() || {}) };
+  const byLinkedEmail = await db.collection('users').where('linkedEmail', '==', normalized).limit(1).get().catch(() => null);
+  if (byLinkedEmail && !byLinkedEmail.empty) return { id: byLinkedEmail.docs[0].id, ...serializeAdminValue(byLinkedEmail.docs[0].data() || {}) };
+  return null;
+}
+
+async function findPartnerConflicts(db, partnerId, email, userId = '') {
+  const conflicts = [];
+  if (userId) {
+    const ownerSnap = await db.collection('partners').where('ownerId', '==', userId).limit(5).get().catch(() => null);
+    ownerSnap?.docs?.forEach(doc => {
+      if (doc.id !== partnerId) conflicts.push({ partnerId: doc.id, field: 'ownerId', name: doc.data()?.name || '' });
+    });
+  }
+  if (email) {
+    for (const field of ['ownerEmail', 'connectionEmail']) {
+      const snap = await db.collection('partners').where(field, '==', email).limit(5).get().catch(() => null);
+      snap?.docs?.forEach(doc => {
+        if (doc.id !== partnerId) conflicts.push({ partnerId: doc.id, field, name: doc.data()?.name || '' });
+      });
+    }
+  }
+  return conflicts.filter((item, index, arr) => arr.findIndex(x => x.partnerId === item.partnerId && x.field === item.field) === index);
+}
+
+async function updatePartnerOnboarding(db, request, actor, partnerId, patch, event) {
+  const ref = db.collection('partners').doc(partnerId);
+  const payload = { ...patch, updatedAt: FieldValue.serverTimestamp() };
+  if (event) payload.partnerConnectionEvents = FieldValue.arrayUnion(event);
+  await ref.set(payload, { merge: true });
+  if (event) {
+    await db.collection('partnerConnectionEvents').add({
+      partnerId,
+      ...event,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await writeAuditLog(db, request, actor, 'partners:onboarding', 'partners', partnerId, { label: event?.label || 'Обновлён сценарий подключения партнёра', status: patch.connectionStatus || null });
+}
+
+function publicUserSummary(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email || user.linkedEmail || '',
+    name: user.name || user.displayName || user.firstName || user.email || '',
+    role: user.role || 'user',
+  };
+}
+
+function createInviteLink(token) {
+  return `${APP_URL}/?partner_invite=${encodeURIComponent(token)}`;
+}
+
+function getPartnerSes() {
+  if (partnerSes) return partnerSes;
+  partnerSes = new SESv2Client({
+    endpoint: 'https://postbox.cloud.yandex.net',
+    region: 'ru-central1',
+    credentials: {
+      accessKeyId: process.env.POSTBOX_KEY_ID,
+      secretAccessKey: process.env.POSTBOX_SECRET,
+    },
+  });
+  return partnerSes;
+}
+
+async function sendPartnerInviteEmail(email, partner, inviteLink) {
+  if (!process.env.POSTBOX_KEY_ID || !process.env.POSTBOX_SECRET) {
+    return { sent: false, status: 'email_not_configured' };
+  }
+  await getPartnerSes().send(new SendEmailCommand({
+    FromEmailAddress: 'noreply@myapg.ru',
+    Destination: { ToAddresses: [email] },
+    Content: {
+      Simple: {
+        Subject: { Data: 'Для вас подготовлен кабинет партнёра в АПГ', Charset: 'UTF-8' },
+        Body: {
+          Text: {
+            Data: [
+              `Для вас подготовлен кабинет партнёра в АПГ${partner?.name ? `: ${partner.name}` : ''}.`,
+              '',
+              'Завершите регистрацию по ссылке, чтобы получить доступ к управлению своей карточкой, публикации новостей, мероприятий и просмотру статистики.',
+              '',
+              inviteLink,
+            ].join('\n'),
+            Charset: 'UTF-8',
+          },
+        },
+      },
+    },
+  }));
+  return { sent: true, status: 'sent' };
+}
+
+async function handlePartnerOnboardingAction(db, request, actor) {
+  const action = String(request.body?.action || '').trim();
+  const id = String(request.body?.partnerId || request.body?.id || '').trim();
+  const idempotencyKey = String(request.headers['x-idempotency-key'] || request.body?.idempotencyKey || '').trim();
+  if (!id) {
+    const error = new Error('Не указан партнёр.');
+    error.statusCode = 400;
+    throw error;
+  }
+  await requireAdminPermission(request, action === 'partner:onboarding-check' ? 'partners:read' : 'partners:update');
+  const ref = db.collection('partners').doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const error = new Error('Партнёр не найден.');
+    error.statusCode = 404;
+    throw error;
+  }
+  const partner = { id, ...(snap.data() || {}) };
+  const email = normalizeEmail(request.body?.email || partner.ownerEmail || partner.connectionEmail);
+  const readiness = buildPartnerReadiness(partner);
+
+  if (action === 'partner:onboarding-check') {
+    if (!email) {
+      const patch = {
+        connectionStatus: 'created',
+        connectionStatusLabel: PARTNER_STATUS_LABELS.created,
+        partnerOnboarding: { readiness, recommendations: readiness.recommendations, lastCheckedAt: new Date().toISOString(), emailRequired: true },
+      };
+      await updatePartnerOnboarding(db, request, actor, id, patch, partnerEvent(actor, 'partner_created', 'Карточка создана, email владельца не указан'));
+      return { ok: true, partnerId: id, email: '', userFound: false, connectionStatus: 'created', readiness, recommendations: readiness.recommendations };
+    }
+    if (!isValidEmail(email)) {
+      const error = new Error('Укажите корректный email владельца.');
+      error.statusCode = 400;
+      error.code = 'INVALID_OWNER_EMAIL';
+      throw error;
+    }
+    const user = await findUserByEmail(db, email);
+    const conflicts = await findPartnerConflicts(db, id, email, user?.id || '');
+    const status = conflicts.length ? 'conflict' : (partner.ownerId && user?.id && partner.ownerId === user.id ? 'cabinet_linked' : 'email_specified');
+    const token = partner.partnerInvite?.token || randomBytes(18).toString('hex');
+    const inviteLink = createInviteLink(token);
+    const patch = {
+      ownerEmail: email,
+      connectionEmail: email,
+      connectionStatus: status,
+      connectionStatusLabel: PARTNER_STATUS_LABELS[status],
+      partnerInvite: { ...(partner.partnerInvite || {}), token, link: inviteLink, status: partner.partnerInvite?.status || 'prepared', updatedAt: new Date().toISOString() },
+      partnerOnboarding: {
+        readiness,
+        recommendations: readiness.recommendations,
+        lastCheckedAt: new Date().toISOString(),
+        userCheck: { userFound: Boolean(user), userId: user?.id || null, conflicts },
+      },
+    };
+    await updatePartnerOnboarding(db, request, actor, id, patch, partnerEvent(actor, 'email_added', `Email владельца указан: ${email}`, { email, userFound: Boolean(user), conflictsCount: conflicts.length }));
+    return { ok: true, partnerId: id, email, userFound: Boolean(user), user: publicUserSummary(user), conflicts, connectionStatus: status, inviteLink, readiness, recommendations: readiness.recommendations };
+  }
+
+  if (action === 'partner:bind-owner') {
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const user = await findUserByEmail(db, email);
+      if (!user?.id) {
+        const error = new Error('Пользователь с этим email ещё не зарегистрирован.');
+        error.statusCode = 404;
+        error.code = 'USER_NOT_FOUND';
+        throw error;
+      }
+      const conflicts = await findPartnerConflicts(db, id, email, user.id);
+      if (conflicts.length && !request.body?.confirmConflict) {
+        const error = new Error('Этот пользователь или email уже привязан к другой карточке.');
+        error.statusCode = 409;
+        error.code = 'PARTNER_OWNER_CONFLICT';
+        error.conflicts = conflicts;
+        throw error;
+      }
+      const nextPartner = { ...partner, ownerId: user.id, ownerEmail: email, connectionEmail: email };
+      const nextReadiness = buildPartnerReadiness(nextPartner);
+      await updatePartnerOnboarding(db, request, actor, id, {
+        ownerId: user.id,
+        ownerEmail: email,
+        connectionEmail: email,
+        partnerCabinetEnabled: true,
+        connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked',
+        connectionStatusLabel: nextReadiness.percent >= 100 ? PARTNER_STATUS_LABELS.card_active : PARTNER_STATUS_LABELS.cabinet_linked,
+        partnerOnboarding: { readiness: nextReadiness, recommendations: nextReadiness.recommendations, lastCheckedAt: new Date().toISOString(), linkedUserId: user.id },
+      }, partnerEvent(actor, 'cabinet_linked', `Кабинет партнёра привязан к пользователю ${email}`, { email, userId: user.id }));
+      await db.collection('users').doc(user.id).set({
+        partnerId: id,
+        partnerCabinetIds: FieldValue.arrayUnion(id),
+        partnerCabinetEnabled: true,
+        linkedPartnerAt: FieldValue.serverTimestamp(),
+        role: user.role && user.role !== 'user' ? user.role : 'partner',
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { ok: true, partnerId: id, user: publicUserSummary(user), connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked', readiness: nextReadiness };
+    });
+  }
+
+  if (action === 'partner:send-invite') {
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      if (!email || !isValidEmail(email)) {
+        const error = new Error('Укажите корректный email для приглашения.');
+        error.statusCode = 400;
+        error.code = 'INVALID_OWNER_EMAIL';
+        throw error;
+      }
+      const token = partner.partnerInvite?.token || randomBytes(18).toString('hex');
+      const inviteLink = createInviteLink(token);
+      await db.collection('partnerInvites').doc(token).set({
+        token,
+        partnerId: id,
+        email,
+        status: 'sent',
+        createdBy: actor.uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      let delivery = { sent: false, status: 'not_attempted' };
+      try {
+        delivery = await sendPartnerInviteEmail(email, partner, inviteLink);
+      } catch (error) {
+        delivery = { sent: false, status: 'email_failed', error: String(error?.message || error).slice(0, 400) };
+      }
+      await updatePartnerOnboarding(db, request, actor, id, {
+        ownerEmail: email,
+        connectionEmail: email,
+        connectionStatus: 'invitation_sent',
+        connectionStatusLabel: PARTNER_STATUS_LABELS.invitation_sent,
+        partnerInvite: { token, link: inviteLink, status: delivery.status, sentAt: new Date().toISOString(), delivery },
+      }, partnerEvent(actor, 'invitation_sent', `Приглашение партнёру отправлено: ${email}`, { email, deliveryStatus: delivery.status }));
+      return { ok: true, partnerId: id, email, inviteLink, delivery, connectionStatus: 'invitation_sent' };
+    });
+  }
+
+  if (action === 'partner:remind-later') {
+    await updatePartnerOnboarding(db, request, actor, id, {
+      connectionStatus: email ? 'email_specified' : 'created',
+      connectionStatusLabel: email ? PARTNER_STATUS_LABELS.email_specified : PARTNER_STATUS_LABELS.created,
+      partnerOnboarding: { ...(partner.partnerOnboarding || {}), reminderDeferredAt: new Date().toISOString(), readiness },
+    }, partnerEvent(actor, 'remind_later', 'Подключение владельца отложено', { email }));
+    return { ok: true, partnerId: id, connectionStatus: email ? 'email_specified' : 'created' };
+  }
+
+  const error = new Error('Неизвестное действие подключения партнёра.');
+  error.statusCode = 400;
+  throw error;
 }
 
 async function handleEntityList(db, request, actor) {
@@ -357,7 +670,9 @@ export default async function adminActionsRoutes(fastify) {
       const action = String(request.body?.action || '');
       return action.startsWith('entity:')
         ? await handleEntityAction(db, request, actor)
-        : await handleNewsAction(db, request, actor);
+        : action.startsWith('partner:')
+          ? await handlePartnerOnboardingAction(db, request, actor)
+          : await handleNewsAction(db, request, actor);
     } catch (error) {
       try {
         await writeAuditLog(db, request, { uid: 'unknown', userId: 'unknown', role: 'unknown' }, String(request.body?.action || 'admin-action'), 'unknown', request.body?.id || '', { error: String(error?.message || error) }, 'error');
