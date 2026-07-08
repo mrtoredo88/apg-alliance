@@ -202,6 +202,8 @@ function Lightbox({ photos = [], initial = 0, onClose }) {
         <button type="button" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22 }}>×</button>
       </div>
       <div
+        data-apg-scroll-root="news-lightbox"
+        data-apg-gesture-ignore="true"
         onDoubleClick={() => setZoom(v => !v)}
         onTouchStart={e => {
           startXRef.current = e.touches[0].clientX;
@@ -216,7 +218,7 @@ function Lightbox({ photos = [], initial = 0, onClose }) {
           }
           if (Math.abs(dx) > 52) go(dx > 0 ? -1 : 1);
         }}
-        style={{ minHeight: 0, overflow: zoom ? 'auto' : 'hidden', display: 'grid', placeItems: 'center' }}
+        style={{ minHeight: 0, overflow: zoom ? 'auto' : 'hidden', display: 'grid', placeItems: 'center', touchAction: zoom ? 'pan-x pan-y' : 'pan-y' }}
       >
         <img src={safePhotos[safeIdx]} alt="" style={{ maxWidth: zoom ? 'none' : '100%', maxHeight: zoom ? 'none' : '100%', width: zoom ? '165%' : 'auto', height: 'auto', objectFit: 'contain', borderRadius: zoom ? 0 : 20, transition: 'width 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))' }} />
       </div>
@@ -248,7 +250,7 @@ function PhotoCarousel({ photos = [], onOpen }) {
         <button type="button" onClick={() => go(1)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(8,8,10,0.52)', color: '#fff', fontSize: 22 }}>›</button>
         <div style={{ position: 'absolute', left: '50%', bottom: 10, transform: 'translateX(-50%)', padding: '6px 10px', borderRadius: 999, background: 'rgba(8,8,10,0.54)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 780 }}>{safeIdx + 1} / {safePhotos.length}</div>
       </div>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }}>
+      <div data-apg-gesture-ignore="true" style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2, touchAction: 'pan-x' }}>
         {safePhotos.map((photo, index) => (
           <button key={`${photo}-${index}`} type="button" onClick={() => setIdx(index)} style={{ flex: '0 0 58px', height: 50, borderRadius: 14, padding: 0, overflow: 'hidden', border: index === safeIdx ? '2px solid rgba(215,184,106,0.72)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.15)', background: 'transparent' }}>
             <img src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -952,7 +954,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: `${progress * 100}%`, background: 'linear-gradient(90deg, #9F7932, #F4D98C, #FFF0B8)', boxShadow: '0 0 18px rgba(244,217,140,0.44)', zIndex: 2, transition: 'width 80ms linear' }} />
-      <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div ref={scrollRef} data-apg-scroll-root="news-article" onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y' }}>
         <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(110px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
           <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, transform: headerHidden ? 'translateY(calc(-100% - 18px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
             <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 22, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>←</button>
@@ -1193,7 +1195,7 @@ export function NewsPage({
   const handleShare = (item) => shareNewsItem(item, onToast);
 
   return (
-    <div ref={pageRef} onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(108px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
+    <div ref={pageRef} data-apg-scroll-root="news-feed" onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(108px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
       <div style={{ width: '100%', maxWidth: 920, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <button type="button" onClick={onBack} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 22 }}>←</button>

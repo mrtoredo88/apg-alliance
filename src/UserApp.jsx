@@ -144,6 +144,64 @@ initErrorLogger();
 
 const SWIPE_TABS = ['home', 'offers', 'experts', 'profile'];
 const PULL_REFRESH_PANELS = new Set(['home', 'offers', 'experts', 'events', 'news']);
+const PULL_START_TOP_PX = 2;
+const PULL_HORIZONTAL_CANCEL_PX = 44;
+const PULL_ACTIVATE_DY_PX = 16;
+const PULL_TRIGGER_DY_PX = 118;
+
+function isGestureDebugEnabled() {
+  try {
+    return new URLSearchParams(window.location.search).get('gestureDebug') === '1'
+      || window.localStorage?.getItem('apg_gesture_debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function logGestureDebug(stage, details = {}) {
+  if (!isGestureDebugEnabled()) return;
+  console.info('[APG gesture]', stage, details);
+}
+
+function getScrollableGestureParent(target) {
+  let node = target instanceof Element ? target : null;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = window.getComputedStyle(node);
+    const overflowY = style.overflowY;
+    const canScroll = /(auto|scroll|overlay)/.test(overflowY) && node.scrollHeight > node.clientHeight + 2;
+    if (canScroll || node.hasAttribute('data-apg-scroll-root')) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function isInteractiveGestureTarget(target) {
+  const node = target instanceof Element ? target : null;
+  return Boolean(node?.closest?.('button,a,input,textarea,select,[role="button"],[data-apg-gesture-ignore]'));
+}
+
+function getPullStartState(event, activePanel, pullRefreshing) {
+  const touch = event.touches?.[0];
+  if (!touch) return { active: false, reason: 'no_touch' };
+  if (!PULL_REFRESH_PANELS.has(activePanel)) return { active: false, reason: 'panel_disabled' };
+  if (pullRefreshing) return { active: false, reason: 'refreshing' };
+  if (isInteractiveGestureTarget(event.target)) return { active: false, reason: 'interactive_target' };
+
+  const scrollParent = getScrollableGestureParent(event.target);
+  const innerScrollTop = scrollParent ? scrollParent.scrollTop : 0;
+  const pageScrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+  const startTop = scrollParent ? innerScrollTop : pageScrollTop;
+  const active = startTop <= PULL_START_TOP_PX;
+
+  return {
+    active,
+    reason: active ? 'ready' : 'not_at_top',
+    scrollParentTag: scrollParent?.getAttribute?.('data-apg-scroll-root') || scrollParent?.tagName || 'window',
+    startScrollTop: startTop,
+    startPageScrollTop: pageScrollTop,
+    startInnerScrollTop: innerScrollTop,
+  };
+}
 
 function isLocalHost() {
   const h = window.location.hostname;
@@ -1647,18 +1705,32 @@ export function UserApp() {
   const swipeTouchX  = useRef(null);
   const swipeTouchY  = useRef(null);
   const edgeSwipeRef = useRef(false);
-  const pullTouchRef = useRef({ active: false, startY: 0, startX: 0 });
+  const pullTouchRef = useRef({ active: false, startY: 0, startX: 0, started: false, reason: 'init' });
 
   const handleSwipeStart = useCallback((e) => {
     const touch = e.touches[0];
+    const pullState = getPullStartState(e, activePanel, pullRefreshing);
     swipeTouchX.current = touch.clientX;
     swipeTouchY.current = touch.clientY;
     edgeSwipeRef.current = touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);
     pullTouchRef.current = {
-      active: window.scrollY <= 2 && PULL_REFRESH_PANELS.has(activePanel) && !pullRefreshing,
+      active: pullState.active,
       startY: touch.clientY,
       startX: touch.clientX,
+      started: false,
+      reason: pullState.reason,
+      scrollParentTag: pullState.scrollParentTag,
+      startScrollTop: pullState.startScrollTop,
     };
+    logGestureDebug('touchstart', {
+      panel: activePanel,
+      pullActive: pullState.active,
+      reason: pullState.reason,
+      scrollParent: pullState.scrollParentTag,
+      startScrollTop: pullState.startScrollTop,
+      pageScrollTop: pullState.startPageScrollTop,
+      innerScrollTop: pullState.startInnerScrollTop,
+    });
   }, [activePanel, pullRefreshing]);
 
   const handleSwipeMove = useCallback((e) => {
@@ -1667,9 +1739,16 @@ export function UserApp() {
     const touch = e.touches[0];
     const dy = touch.clientY - pull.startY;
     const dx = touch.clientX - pull.startX;
-    if (Math.abs(dx) > 46 || dy < 0) {
+    if (Math.abs(dx) > PULL_HORIZONTAL_CANCEL_PX || dy < 0) {
+      pullTouchRef.current = { ...pull, active: false, reason: Math.abs(dx) > PULL_HORIZONTAL_CANCEL_PX ? 'horizontal_cancel' : 'upward_cancel' };
       setPullDistance(0);
+      logGestureDebug('pull_cancel', { reason: pullTouchRef.current.reason, dx, dy });
       return;
+    }
+    if (dy < PULL_ACTIVATE_DY_PX) return;
+    if (!pull.started) {
+      pullTouchRef.current = { ...pull, started: true };
+      logGestureDebug('pull_started', { dx, dy, scrollParent: pull.scrollParentTag, startScrollTop: pull.startScrollTop });
     }
     setPullDistance(Math.min(86, Math.round(dy * 0.42)));
   }, [pullRefreshing]);
@@ -1683,7 +1762,7 @@ export function UserApp() {
     swipeTouchX.current = null;
     swipeTouchY.current = null;
     edgeSwipeRef.current = false;
-    pullTouchRef.current = { active: false, startY: 0, startX: 0 };
+    pullTouchRef.current = { active: false, startY: 0, startX: 0, started: false, reason: 'end' };
 
     if (wasEdgeSwipe && dx > 72 && Math.abs(dy) < 76) {
       haptic('light');
@@ -1692,10 +1771,12 @@ export function UserApp() {
       return;
     }
 
-    if (pull.active && dy > 118 && Math.abs(dx) < 54) {
+    if (pull.active && pull.started && dy > PULL_TRIGGER_DY_PX && Math.abs(dx) < 54) {
+      logGestureDebug('pull_refresh', { dx, dy, scrollParent: pull.scrollParentTag, startScrollTop: pull.startScrollTop });
       triggerPullRefresh();
       return;
     }
+    if (pull.active) logGestureDebug('pull_release_without_refresh', { started: pull.started, dx, dy, reason: pull.reason });
     setPullDistance(0);
 
     // Только горизонтальные свайпы > 90px при вертикальном сдвиге < 60px

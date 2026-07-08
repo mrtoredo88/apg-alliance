@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Исправление жестов и скролла в новостях
+**Коммит:** `локально`
+**Файлы:** `src/UserApp.jsx`, `src/NewsPage.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Глобальный pull-to-refresh теперь учитывает внутренние scroll-контейнеры и активируется только если жест начался в настоящем верхе scroll-зоны. Лента, статья и lightbox новостей помечены как самостоятельные gesture/scroll roots с `touchAction: pan-y` и `overscrollBehaviorY: contain`.
+**Почему:** В разделе новостей `window.scrollY` оставался около нуля при прокрутке внутренней ленты, из-за чего глобальный pull-to-refresh ошибочно мешал обычному вертикальному скроллу вверх.
+
+---
+
 ## [2026-07-08] Native Web Push для iPhone/Safari PWA
 **Коммит:** `локально`
 **Файлы:** `src/constants.js`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `api/send-push.js`, `server/src/routes/send-push.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `server/deploy.sh`, `package.json`, `package-lock.json`, `.ai/17_CHANGELOG_AI.md`
