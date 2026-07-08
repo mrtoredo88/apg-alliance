@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-08] Production smoke script для Chromium
+**Коммит:** `локально`
+**Файлы:** `package.json`, `scripts/prod-smoke.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:** Добавлена команда `npm run smoke:prod`, которая открывает production через Playwright Chromium, проверяет `version.json`, React root, критические UI-маркеры и console/page errors.
+**Почему:** Headless Chromium стабильно падает внутри macOS sandbox с `MachPort permission denied`; отдельная команда позволяет запускать production smoke сразу вне sandbox без длинного `node -e`.
+
+---
+
 ## [2026-07-08] Hotfix скролла статьи новости и iOS zoom комментариев
 **Коммит:** `локально`
 **Файлы:** `src/UserApp.jsx`, `src/NewsPage.jsx`, `.ai/17_CHANGELOG_AI.md`
