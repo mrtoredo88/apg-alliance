@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { RichText } from './components/RichText.jsx';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
-import { Panel, Avatar, Button } from '@vkontakte/vkui';
+import { Panel } from '@vkontakte/vkui';
 import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';

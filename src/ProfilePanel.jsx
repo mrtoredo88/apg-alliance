@@ -7,7 +7,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { signInWithCustomToken } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
-import { T } from './design.js';
 import { APP_URL, API_BASE_URL } from './constants.js';
 import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
@@ -1018,7 +1017,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {/* Кастомный хедер */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: T.headerBg, backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
+        background: 'rgba(8,8,20,0.72)', backdropFilter: 'blur(36px) saturate(2)', WebkitBackdropFilter: 'blur(36px) saturate(2)',
         borderBottom: '1px solid var(--c-header-border, rgba(255,255,255,0.1))',
         boxShadow: 'inset 0 -1px 0 var(--c-border, rgba(0,0,0,0.12))',
         padding: '0 16px',
