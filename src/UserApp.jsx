@@ -855,16 +855,25 @@ export function UserApp() {
     try {
     // Firebase Auth и vkBridge — параллельно
     vkBridge.send('VKWebAppInit');
-    const authReady = auth.currentUser
-      ? Promise.resolve().then(() => console.log('[APG-DIAG] auth=cached'))
-      : Promise.race([
-          signInAnonymously(auth),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), 1800)),
-        ]).then(() => {
-          console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
-        }).catch((e) => {
-          console.warn(`[APG-DIAG] auth=fail ${e.code ?? e.message} ${Math.round(performance.now() - _diagT0)}ms`);
-        });
+    const authReady = new Promise(resolve => {
+      let unsub = () => {};
+      unsub = onAuthStateChanged(auth, (user) => {
+        unsub();
+        if (user) {
+          console.log('[APG-DIAG] auth=restored');
+          resolve();
+        } else {
+          Promise.race([
+            signInAnonymously(auth),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), 1800)),
+          ]).then(() => {
+            console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
+          }).catch((e) => {
+            console.warn(`[APG-DIAG] auth=fail ${e.code ?? e.message} ${Math.round(performance.now() - _diagT0)}ms`);
+          }).finally(resolve);
+        }
+      });
+    });
 
     const [, userData] = await Promise.all([
       authReady,

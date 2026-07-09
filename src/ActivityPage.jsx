@@ -108,7 +108,11 @@ export function ActivityPage({ nav, variant = 'v2', userId, onBack }) {
         setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
         logError(e, 'ActivityPage.fetchActivity');
-        setLoadError(true);
+        if (e?.code === 'permission-denied') {
+          setItems([]);
+        } else {
+          setLoadError(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -128,7 +132,7 @@ export function ActivityPage({ nav, variant = 'v2', userId, onBack }) {
         {loading ? (
           <EmptyStateV2 icon="✦" title="Загружаем историю" text="Собираем последние действия в вашем профиле." />
         ) : loadError ? (
-          <EmptyStateV2 icon="⚠️" title="Ошибка загрузки" text="Не удалось загрузить историю. Проверьте соединение." />
+          <EmptyStateV2 icon="⚠️" title="Не удалось загрузить" text="Произошла ошибка при загрузке истории. Попробуйте перезапустить приложение." />
         ) : items.length === 0 ? (
           <EmptyStateV2 icon="📍" title="История пока пустая" text="Сканируйте QR у партнеров, добавляйте избранное и выполняйте задания." />
         ) : (
@@ -180,7 +184,7 @@ export function ActivityPage({ nav, variant = 'v2', userId, onBack }) {
             <div style={{ fontSize: 48 }}>⚠️</div>
             <div>
               <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Ошибка загрузки</div>
-              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Не удалось загрузить историю. Проверьте соединение и попробуйте снова.</div>
+              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Произошла ошибка при загрузке. Попробуйте перезапустить приложение.</div>
             </div>
           </div>
         ) : items.length === 0 ? (
