@@ -197,6 +197,17 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
 
   const showMessage = useCallback((eventType, payload = {}) => {
     if (!settings.enabled) return;
+    if (settings.mode === 'on_demand') {
+      const ALWAYS_ALLOWED = [
+        LOKI_EVENTS.CHARACTER_TAP,
+        LOKI_EVENTS.BRAIN_RESPONSE,
+        LOKI_EVENTS.APP_ERROR,
+        LOKI_EVENTS.USER_LOGIN,
+        LOKI_EVENTS.KEY_RECEIVED,
+        LOKI_EVENTS.ACHIEVEMENT_UNLOCKED,
+      ];
+      if (!ALWAYS_ALLOWED.includes(eventType)) return;
+    }
     const config = getBehaviorForEvent(eventType);
     const priority = payload.priority ?? config.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL;
     if (shouldLokiStayQuiet({ eventType, priority, emotionalState })) return;
@@ -209,7 +220,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       return;
     }
     displayMessage(eventType, item.payload);
-  }, [card, displayMessage, emotionalState, message, visible]);
+  }, [card, displayMessage, emotionalState, message, settings, visible]);
 
   useEffect(() => subscribeLoki(showMessage), [showMessage]);
 
