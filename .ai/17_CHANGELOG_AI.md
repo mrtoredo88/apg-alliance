@@ -15,6 +15,21 @@
 
 ---
 
+## [2026-07-10] fix: E1-E5 — отзывы эксперта, toast-уведомления, убраны alert()
+**Коммит:** `26b03430`
+**Файлы:** `src/ExpertCabinetPage.jsx`, `src/PartnerCabinetPage.jsx`, `src/UserApp.jsx`
+**Тип:** fix
+**Что изменено:**
+- E1: ExpertCabinetPage читал отзывы из неправильной подколлекции `experts/{id}/reviews`. Исправлено на правильный путь: `expertReviews` (where expertId == id) — теперь эксперт видит реальные отзывы.
+- E2: handlePrizeClaim теперь показывает toast при ошибке (auth error / server error) вместо молчалого отката ключей.
+- E3: handleRaffleEnter теперь показывает toast при ошибке (auth error / server error) вместо молчалого отката ключей.
+- E4: handleEventRegister теперь показывает toast при ошибке как в ветке регистрации, так и в ветке отмены.
+- E5: Все alert() в PartnerCabinetPage и ExpertCabinetPage заменены на onToast (передаётся из UserApp.jsx как showToast).
+**Почему:** Эксперты не видели ни одного отзыва клиентов (данные хранились не там, где читались). Пользователи не получали обратной связи при ошибках транзакций. alert() блокирует UI и некорректно работает в VK Mini App.
+**Статус деплоя:** Frontend ✓ задеплоен (version: 26b03430).
+
+---
+
 ## [2026-07-10] fix: security — Firestore rules + Telegram auth consistency (P6, P1)
 **Коммит:** `dfcfd8de`
 **Файлы:** `firestore.rules`, `api/verify-telegram.js`, `server/src/routes/verify-telegram.js`
