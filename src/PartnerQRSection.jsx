@@ -3,10 +3,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { APP_URL } from './constants.js';
 import { T } from './design.js';
 
-const POSTER_TEMPLATES = [
-  { id: '1', label: 'Макет 1', url: '/qr-poster-template.jpg' },
-  { id: '2', label: 'Макет 2', url: '/qr-poster-template-2-v2.jpg' },
-];
+const POSTER_TEMPLATE_URL = '/qr-poster-template-v3.jpg';
 
 function triggerDownload(dataUrl, filename) {
   const a = document.createElement('a');
@@ -176,7 +173,7 @@ function detectWhiteRegion(ctx, W, H) {
   return findCluster(0.97) || findCluster(0.80);
 }
 
-async function buildPoster(entityName, qrDataUrl, templateUrl) {
+async function buildPoster(entityName, qrDataUrl) {
   const offscreen = document.createElement('canvas');
   const ctx = offscreen.getContext('2d');
 
@@ -239,7 +236,7 @@ async function buildPoster(entityName, qrDataUrl, templateUrl) {
       resolve(await drawQRFallback(W, H));
     };
 
-    tmpl.src = templateUrl || POSTER_TEMPLATES[0].url;
+    tmpl.src = POSTER_TEMPLATE_URL;
   });
 }
 
@@ -251,7 +248,6 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
   const [tab, setTab]             = useState('qr1');
   const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
-  const [posterTemplateId, setPosterTemplateId] = useState('1');
   const [pdfPreview, setPdfPreview] = useState(null);
   const [pdfOptions, setPdfOptions] = useState({ format: 'A4', orientation: 'portrait', marginMm: 6, quality: 100 });
   const [copied, setCopied]       = useState(null);
@@ -291,12 +287,11 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
     if (!qrUrl) return;
     setPosterLoading(true);
     try {
-      const tmpl = POSTER_TEMPLATES.find(t => t.id === posterTemplateId) || POSTER_TEMPLATES[0];
-      const url = await buildPoster(entityName, qrUrl, tmpl.url);
+      const url = await buildPoster(entityName, qrUrl);
       setPosterUrl(url);
     } catch {}
     finally { setPosterLoading(false); }
-  }, [getCanvasDataUrl, entityName, posterTemplateId]);
+  }, [getCanvasDataUrl, entityName]);
 
   const TABS = [
     { id: 'qr1',    label: qr1.tabLabel },
@@ -437,22 +432,8 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
           <div ref={qr1WrapRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', top: -9999 }}>
             <QRCodeCanvas value={qr1.value} size={200} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            {POSTER_TEMPLATES.map(t => (
-              <button
-                key={t.id}
-                onClick={() => { setPosterTemplateId(t.id); setPosterUrl(null); }}
-                style={{
-                  flex: 1, padding: '7px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  fontSize: 11, fontWeight: 700,
-                  background: posterTemplateId === t.id ? T.gold : T.chipBg,
-                  color: posterTemplateId === t.id ? '#0F0F1A' : T.textSec,
-                }}
-              >{t.label}</button>
-            ))}
-          </div>
           <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px', marginBottom: 10 }}>
-            Фирменный плакат с публичным QR — выберите макет выше.
+            Фирменный плакат АПГ с публичным QR-кодом — готов к размещению и печати.
           </div>
           {!posterUrl ? (
             <button onClick={handleGeneratePoster} disabled={posterLoading}
@@ -463,7 +444,7 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
             <>
               <img src={posterUrl} alt="Плакат" style={{ width: '100%', borderRadius: 12, marginBottom: 10, display: 'block' }} />
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <button style={btnBase} onClick={() => triggerDownload(posterUrl, `poster-${entityId}-m${posterTemplateId}.png`)}>⬇️ PNG</button>
+                <button style={btnBase} onClick={() => triggerDownload(posterUrl, `poster-${entityId}.png`)}>⬇️ PNG</button>
                 <button style={btnGold} onClick={() => openPdfPreview({ imageUrl: posterUrl, title: `Плакат — ${entityName}`, type: 'poster' })}>🖨️ PDF</button>
               </div>
               <button onClick={() => setPosterUrl(null)} style={{ ...btnBase, width: '100%', fontSize: 11 }}>↺ Перегенерировать</button>
