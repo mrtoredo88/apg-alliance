@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] fix: security — Firestore rules + Telegram auth consistency (P6, P1)
+**Коммит:** `dfcfd8de`
+**Файлы:** `firestore.rules`, `api/verify-telegram.js`, `server/src/routes/verify-telegram.js`
+**Тип:** fix
+**Что изменено:**
+- P6: Firestore Rules — заблокированы прямые клиентские записи (allow write: if false) на 15 коллекциях: partners, experts, events, news, prizes, notifications, customTasks, reviews, expertReviews, partners/{id}/reviews, stats, scans, prizeClaims, raffleEntries, guestSessions, errorLogs, telegramAuthSessions. Добавлено правило lokiKnowledge (allow read: if true; allow write: if false). Правила задеплоены в Firebase.
+- P1: verify-telegram.js (оба варианта) — добавлена проверка tgLinks/{tg_id} перед созданием custom token, аналогично telegram-auth-check.js. Устранён сценарий дублирования аккаунтов при входе через Login Widget.
+**Почему:** любой анонимный Firebase-пользователь мог напрямую писать в контент-коллекции через Firestore SDK; два потока Telegram давали разный результат для пользователя с привязанным email.
+**Статус деплоя:** Firestore Rules ✓ задеплоены. verify-telegram.js ✓ задеплоен на Vercel (но Vercel не используется в prod). Fastify (Yandex Cloud) — временная ошибка инфраструктуры YC при деплое контейнера; код зафиксирован в git, нужно повторить деплой позже.
+
+---
+
 ## [2026-07-10] fix: аудит надёжности авторизации — 6 исправлений (C1–C4, P3, P5)
 **Коммит:** `0d2b306a`
 **Файлы:** `src/UserApp.jsx`, `src/userApi.js`
