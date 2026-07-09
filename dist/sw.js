@@ -1,130 +1,75 @@
-// APG Service Worker — cache-first for static, pass-through for Firebase
-const CACHE = 'apg-v2';
+const SW_VERSION = 'apg-push-sw-20260708';
 
-const PRECACHE = [
-  '/',
-  '/manifest.json',
-  '/192.png',
-  '/512.png',
-  '/180.png',
-];
+async function clearAllCaches() {
+  if (!self.caches) return;
+  const keys = await caches.keys();
+  await Promise.all(keys.map((key) => caches.delete(key)));
+}
 
-// Hosts to never cache — always fetch live
-const BYPASS_HOSTS = [
-  'firestore.googleapis.com',
-  'firebase.googleapis.com',
-  'identitytoolkit.googleapis.com',
-  'securetoken.googleapis.com',
-  'firebaseinstallations.googleapis.com',
-  'fcmregistrations.googleapis.com',
-  'vk.com',
-  'vkontakte.ru',
-  'api.vk.com',
-];
-
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((cache) =>
-      cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' })))
-    )
-  );
+self.addEventListener('install', (event) => {
+  event.waitUntil(clearAllCaches());
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
-  );
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clearAllCaches().catch(() => null));
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
-  const { request } = e;
-
-  // Only handle GET
-  if (request.method !== 'GET') return;
-
-  const url = new URL(request.url);
-
-  // Pass through cross-origin or bypass hosts
-  if (url.origin !== self.location.origin) {
-    if (BYPASS_HOSTS.some((h) => url.hostname.includes(h))) return;
-    // Other cross-origin (CDN, etc.) — also skip
-    return;
-  }
-
-  // Navigation requests — browser handles natively (avoids redirect overhead in Lighthouse)
-  if (request.mode === 'navigate') return;
-
-  // Pass through Vite HMR / dev server events
-  if (url.pathname.startsWith('/@')) return;
-
-  e.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const hit = await cache.match(request);
-      if (hit) return hit;
-
-      try {
-        const res = await fetch(request);
-        // Cache successful same-origin responses (assets, pages)
-        if (res.ok && res.status < 400) {
-          cache.put(request, res.clone());
-        }
-        return res;
-      } catch {
-        // Offline fallback for navigation requests
-        if (request.mode === 'navigate') {
-          const fallback = await cache.match('/');
-          if (fallback) return fallback;
-        }
-        return new Response('Нет соединения', { status: 503 });
-      }
-    })
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'APG_CLEAR_SW_CACHE') return;
+  event.waitUntil(
+    clearAllCaches().then(() => event.source?.postMessage?.({
+      type: 'APG_SW_CACHE_CLEARED',
+      version: SW_VERSION,
+    }))
   );
 });
 
-// ─── Web Push (FCM) ───────────────────────────────────────────────────────────
+self.addEventListener('fetch', () => {
+  return;
+});
 
-self.addEventListener('push', e => {
-  if (!e.data) return;
+self.addEventListener('push', (event) => {
   let payload = {};
-  try { payload = e.data.json(); } catch { return; }
-
-  const n     = payload.notification ?? {};
-  const data  = payload.data ?? {};
-  const title = n.title ?? 'АПГ';
-  const body  = n.body  ?? '';
-
-  e.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon:              '/192.png',
-      badge:             '/32.png',
-      image:             '/logo.webp',
-      data,
-      tag:               data.tag ?? 'apg-push',
-      renotify:          true,
-      requireInteraction: false,
-      actions: [
-        { action: 'open', title: '🏙️ Открыть приложение' },
-      ],
-    })
-  );
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+  const notification = payload.notification || payload;
+  const data = payload.data || {};
+  const title = notification.title || data.title || 'АПГ';
+  const options = {
+    body: notification.body || data.body || '',
+    icon: notification.icon || '/192.png',
+    badge: notification.badge || '/32.png',
+    image: notification.image || data.image || undefined,
+    tag: notification.tag || data.tag || 'apg-push',
+    renotify: true,
+    data: {
+      url: data.url || notification.click_action || '/',
+      notificationId: data.notificationId || '',
+    },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  const url = e.notification.data?.url ?? '/';
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) {
-        if (new URL(c.url).origin === self.location.origin && 'focus' in c) {
-          return c.focus();
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification?.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        const absoluteUrl = new URL(targetUrl, self.location.origin).href;
+        const existing = clients.find((client) => client.url === absoluteUrl || client.url.startsWith(self.location.origin));
+        if (existing) {
+          existing.focus();
+          if ('navigate' in existing) return existing.navigate(absoluteUrl);
+          return undefined;
         }
-      }
-      return self.clients.openWindow(url);
-    })
+        return self.clients.openWindow(absoluteUrl);
+      })
+      .catch(() => self.clients.openWindow('/'))
   );
 });

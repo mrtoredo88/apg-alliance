@@ -1,11 +1,13 @@
 {
   "name": "АПГ — Альянс Партнёров Города",
-  "short_name": "--------",
+  "short_name": "АПГ",
   "description": "Программа лояльности для жителей Зеленограда — открывай местный бизнес, копи ключи, получай награды",
-  "start_url": "/",
+  "id": "/#/",
+  "start_url": "/#/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#3C3489",
+  "background_color": "#111113",
+  "theme_color": "#111113",
   "orientation": "portrait",
   "lang": "ru",
   "icons": [
