@@ -35,6 +35,7 @@ export async function userAction(action, payload = {}) {
     const error = new Error(data.error || 'Не удалось выполнить действие.');
     error.code = data.code;
     error.status = response.status;
+    if (response.status === 401 || response.status === 403) error.isAuthError = true;
     throw error;
   }
   return data;

@@ -524,7 +524,6 @@ function LazyFallback() {
 
 export function UserApp() {
   const appStartTime                            = useRef(Date.now());
-  const lastHapticAtRef                         = useRef(0);
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
   const claimingPrizeRef                        = useRef(false);
@@ -584,6 +583,7 @@ export function UserApp() {
   const [consentRequest, setConsentRequest]         = useState(null);
   const [consentSaving, setConsentSaving]       = useState(false);
   const [consentError, setConsentError]         = useState('');
+  const [consentReloginNeeded, setConsentReloginNeeded] = useState(false);
   const [pendingNotificationPrompt, setPendingNotificationPrompt] = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
@@ -663,27 +663,6 @@ export function UserApp() {
       window.history.replaceState({}, '', url.toString());
     }).catch(() => {});
   }, [verifyEmailToken]);
-
-  const haptic = useCallback((style = 'light') => {
-    const now = Date.now();
-    if (now - lastHapticAtRef.current < 70) return;
-    lastHapticAtRef.current = now;
-
-    if (isVK()) {
-      vkBridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
-      return;
-    }
-
-    const patterns = {
-      light: 8,
-      medium: [12, 18, 10],
-      heavy: [18, 22, 16],
-      success: [10, 20, 24],
-    };
-    try {
-      navigator.vibrate?.(patterns[style] ?? patterns.light);
-    } catch {}
-  }, []);
 
   const navigatePanel = useCallback((id, { replace = false, direction = 'forward' } = {}) => {
     if (!id) return;
@@ -938,7 +917,7 @@ export function UserApp() {
         let needsHardRelogin = false;
         await Promise.race([
           ensureOwnerAuthSession(userData.id, ownerSource),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('owner_auth_timeout')), 2400)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('owner_auth_timeout')), 5000)),
         ]).catch(error => {
           traceAuthStage('owner_session_deferred', { source: ownerSource, userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
           console.warn(`[APG-DIAG] owner-auth=deferred ${error?.code ?? error?.message ?? String(error)}`);
@@ -1156,9 +1135,13 @@ export function UserApp() {
 
         // Ежедневный бонус: +1 ключ за первый вход каждый день
         if (data.lastBonusDate !== todayKey) {
-          userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } }).catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
-          setUserKeys(keys + 1);
-          if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+          userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } })
+            .then(() => {
+              if (!isMounted.current) return;
+              setUserKeys(prev => prev + 1);
+              if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+            })
+            .catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
         } else {
           userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } }).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
         }
@@ -1282,7 +1265,6 @@ export function UserApp() {
 
   const toggleFavorite = useCallback(async (partnerId) => {
     if (!user) return;
-    haptic('light');
     const prev = favorites;
     const isAdding = !favorites.includes(partnerId);
     const next = isAdding
@@ -1292,8 +1274,13 @@ export function UserApp() {
     try {
       const result = await userAction('favorites:toggle', { userId: String(user.id), partnerId });
       if (Array.isArray(result.favorites)) setFavorites(result.favorites);
-    } catch { setFavorites(prev); }
-  }, [user, favorites, partners, haptic]);
+    } catch (e) {
+      setFavorites(prev);
+      console.error('[APG-FAVORITES] toggle error', { partnerId, userId: String(user.id), errorCode: e?.code, errorStatus: e?.status, isAuthError: e?.isAuthError });
+      logError(e, 'UserApp.toggleFavorite');
+      showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось обновить избранное.', 'error');
+    }
+  }, [user, favorites, showToast]);
 
   const canWriteUserNewsState = useCallback(() => {
     if (!user || String(user.id).startsWith('guest_')) {
@@ -1461,7 +1448,6 @@ export function UserApp() {
       if (result.subjectType === 'expert' && result.subjectId) {
         setScannedExperts(prev => ({ ...prev, [result.subjectId]: result.visitCount ?? ((Number(prev[result.subjectId]) || 0) + 1) }));
       }
-      haptic(awardedKeys > 0 ? 'success' : 'medium');
       if (awardedKeys > 0) {
         setUserKeys(prev => prev + awardedKeys);
         setKeyBurst({ amount: awardedKeys, id: Date.now() });
@@ -1485,7 +1471,7 @@ export function UserApp() {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, experts, streak, haptic, showToast]);
+  }, [user, enrichedPartners, experts, streak, showToast]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -1818,8 +1804,17 @@ export function UserApp() {
         profileExists: true,
         documentsVersion: LEGAL_VERSION,
       });
-      setConsentError(getAuthErrorMessage(error));
-      showToast('Ошибка входа: CONSENT_SAVE_FAILED', 'error');
+      if (e?.code === 'STRONG_IDENTITY_REQUIRED') {
+        const uid = String(targetUser.id);
+        if (uid.startsWith('email:')) localStorage.removeItem('apg_email_user');
+        if (uid.startsWith('tg_')) localStorage.removeItem('apg_tg_user');
+        signOut(auth).catch(() => {});
+        setConsentError('Сессия истекла. Нажмите «Выйти и войти заново».');
+        setConsentReloginNeeded(true);
+      } else {
+        setConsentError(getAuthErrorMessage(error));
+        showToast('Ошибка входа: CONSENT_SAVE_FAILED', 'error');
+      }
     } finally {
       if (mountedRef.current) setConsentSaving(false);
     }
@@ -1919,7 +1914,6 @@ export function UserApp() {
     pullTouchRef.current = { active: false, startY: 0, startX: 0, started: false, reason: 'end' };
 
     if (wasEdgeSwipe && dx > 72 && Math.abs(dy) < 76) {
-      haptic('light');
       goBackPanel();
       setPullDistance(0);
       return;
@@ -1937,9 +1931,9 @@ export function UserApp() {
     if (wasEdgeSwipe || Math.abs(dx) < 90 || Math.abs(dy) > 60) return;
     const idx = SWIPE_TABS.indexOf(activePanel);
     if (idx === -1) return;          // не на основном табе
-    if (dx < 0 && idx < SWIPE_TABS.length - 1) { haptic('light'); goPanel(SWIPE_TABS[idx + 1]); }
-    if (dx > 0 && idx > 0)                      { haptic('light'); goPanel(SWIPE_TABS[idx - 1]); }
-  }, [activePanel, goBackPanel, goPanel, haptic, triggerPullRefresh]);
+    if (dx < 0 && idx < SWIPE_TABS.length - 1) { goPanel(SWIPE_TABS[idx + 1]); }
+    if (dx > 0 && idx > 0)                      { goPanel(SWIPE_TABS[idx - 1]); }
+  }, [activePanel, goBackPanel, goPanel, triggerPullRefresh]);
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
@@ -2293,7 +2287,7 @@ export function UserApp() {
       )}
       {TABS.map((tab, i) => {
         if (i === 2) return (
-          <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { haptic('medium'); setIsScannerOpen(true); }}
+          <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { setIsScannerOpen(true); }}
             style={{ flex: 1, background: isScannerOpen ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isScannerOpen ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isScannerOpen ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 0, position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
               width: 42, height: 42, marginTop: 0, borderRadius: 18,
@@ -2316,7 +2310,7 @@ export function UserApp() {
             ref={node => { tabSlotRefs.current[i] = node; }}
             data-apg-tab-slot={tab.id}
             aria-label={`Открыть раздел ${tab.label}`}
-            onClick={() => { haptic('light'); goPanel(tab.id); }}
+            onClick={() => { goPanel(tab.id); }}
             style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
@@ -2983,7 +2977,11 @@ export function UserApp() {
               notificationsDefault={consentRequest.notificationsDefault}
               error={consentError}
               onAccept={handleConsentAccept}
-              onCancel={consentRequest.mode === 'email' ? () => {
+              onCancel={consentReloginNeeded ? () => {
+                setConsentError('');
+                setConsentReloginNeeded(false);
+                setConsentRequest(null);
+              } : consentRequest.mode === 'email' ? () => {
                 if (consentSaving) return;
                 setConsentError('');
                 setConsentRequest(null);
