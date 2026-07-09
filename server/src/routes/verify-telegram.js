@@ -66,11 +66,14 @@ export default async function verifyTelegramRoutes(fastify) {
       await userRef.update(profilePatch);
     }
 
-    const token = await getDbAuth().createCustomToken(uid);
+    // Если Telegram привязан к email-аккаунту — возвращаем токен для него
+    const linkSnap = await db.collection('tgLinks').doc(uid).get();
+    const targetUserId = linkSnap.exists ? String(linkSnap.data().userId || uid) : uid;
+    const token = await getDbAuth().createCustomToken(targetUserId);
     return {
       ok: true,
       token,
-      user: { id: uid, first_name, last_name: last_name ?? '', photo_200: photo_url ?? null },
+      user: { id: targetUserId, first_name, last_name: last_name ?? '', photo_200: photo_url ?? null },
     };
   });
 }

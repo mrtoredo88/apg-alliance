@@ -97,10 +97,13 @@ export default async function handler(req, res) {
     await userRef.update(profilePatch);
   }
 
-  const token = await getAuth(app).createCustomToken(uid);
+  // Если Telegram привязан к email-аккаунту — возвращаем токен для него
+  const linkSnap = await db.collection('tgLinks').doc(uid).get();
+  const targetUserId = linkSnap.exists ? String(linkSnap.data().userId || uid) : uid;
+  const token = await getAuth(app).createCustomToken(targetUserId);
   return res.status(200).json({
     ok: true,
     token,
-    user: { id: uid, first_name, last_name: last_name ?? '', photo_200: photo_url ?? null },
+    user: { id: targetUserId, first_name, last_name: last_name ?? '', photo_200: photo_url ?? null },
   });
 }
