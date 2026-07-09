@@ -935,13 +935,24 @@ export function UserApp() {
 
       if (!isGuest) {
         const ownerSource = userData.authProvider || (userData.email ? 'email_restore' : String(userData.id).startsWith('tg_') ? 'telegram_restore' : 'vk');
+        let needsHardRelogin = false;
         await Promise.race([
           ensureOwnerAuthSession(userData.id, ownerSource),
           new Promise((_, reject) => setTimeout(() => reject(new Error('owner_auth_timeout')), 2400)),
         ]).catch(error => {
           traceAuthStage('owner_session_deferred', { source: ownerSource, userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
           console.warn(`[APG-DIAG] owner-auth=deferred ${error?.code ?? error?.message ?? String(error)}`);
+          if (error?.code === 'STRONG_IDENTITY_REQUIRED') needsHardRelogin = true;
         });
+
+        if (needsHardRelogin && isMounted.current) {
+          const _uid = String(userData.id);
+          if (_uid.startsWith('email:')) localStorage.removeItem('apg_email_user');
+          if (_uid.startsWith('tg_')) localStorage.removeItem('apg_tg_user');
+          await signOut(auth).catch(() => {});
+          window.location.reload();
+          return;
+        }
       }
 
       const emptySnap = { docs: [] };
@@ -1534,11 +1545,20 @@ export function UserApp() {
       if (!result.awarded) setUserKeys(prev => prev - reward);
       showLokiMessage(LOKI_EVENTS.ACHIEVEMENT_UNLOCKED, { taskId, reward });
     } catch (e) {
+      console.error('[APG-CLAIM] error', {
+        taskId, reward, userId: String(user.id),
+        authUid: auth.currentUser?.uid ?? null,
+        isAnon: auth.currentUser?.isAnonymous ?? null,
+        errorCode: e?.code ?? null,
+        errorStatus: e?.status ?? null,
+        errorMessage: e?.message ?? String(e),
+      });
       logError(e, 'UserApp.handleClaim');
       showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'task_claim' });
       setCompletedTasks(prev => prev.filter(id => id !== taskId));
       setUserKeys(prev => prev - reward);
-      showToast('Ошибка при сохранении. Попробуйте ещё раз.');
+      const isAuthMismatch = e?.status === 401 || e?.status === 403;
+      showToast(isAuthMismatch ? 'Требуется повторный вход. Перезапустите приложение.' : 'Ошибка при сохранении. Попробуйте ещё раз.');
     }
   }, [user, showToast]);
 
