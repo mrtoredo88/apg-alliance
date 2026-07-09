@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { EventsCalendar } from './EventsCalendar.jsx';
 import { QRCodeCanvas } from 'qrcode.react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
@@ -5210,6 +5211,7 @@ export const AdminPanel = () => {
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
+            { id: 'events-center', emoji: '📅', label: 'Центр событий', count: events.length },
             { id: 'news',      emoji: '📢', label: 'Новости',   count: news.length },
             { id: 'banners',   emoji: '📣', label: 'Реклама',   count: banners.filter(b => b.active && getBannerStatus(b) === 'active').length || undefined },
             { id: 'notifs',    emoji: '🔔', label: 'Рассылка' },
@@ -6527,10 +6529,8 @@ export const AdminPanel = () => {
         </>
       )}
 
-      {/* ── СОБЫТИЯ ── */}
-      {activeTab === 'events' && (
-        <>
-          {showEventModal && (
+      {/* ── СОБЫТИЕ: форма (общая для вкладок "События" и "Центр событий") ── */}
+      {showEventModal && (activeTab === 'events' || activeTab === 'events-center') && (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }}
               onClick={e => { if (e.target === e.currentTarget) resetEventForm(); }}>
               <div style={{ ...s.card, width: '100%', maxWidth: 620, flexShrink: 0 }}>
@@ -6695,8 +6695,11 @@ export const AdminPanel = () => {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
+      {/* ── СОБЫТИЯ ── */}
+      {activeTab === 'events' && (
+        <>
           <div style={s.card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div>
@@ -6762,6 +6765,16 @@ export const AdminPanel = () => {
             }
           </div>
         </>
+      )}
+
+      {/* ── ЦЕНТР СОБЫТИЙ ── */}
+      {activeTab === 'events-center' && (
+        <EventsCalendar
+          events={events}
+          A={A}
+          onEventClick={ev => startEditEvent(ev)}
+          onCreateEvent={() => { resetEventForm(); setShowEventModal(true); }}
+        />
       )}
 
       {/* ── НОВОСТИ ── */}
