@@ -40,18 +40,18 @@ const V2 = {
   gold: 'var(--apg2-gold, #D6B766)',
   goldMetal: 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 67%, #F4D98C 100%)',
   glass: {
-    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.09), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.105), rgba(255,255,255,0.032))',
+    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.12), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.42), rgba(255,255,255,0.18))',
     backdropFilter: 'blur(62px) saturate(1.72)',
     WebkitBackdropFilter: 'blur(62px) saturate(1.72)',
-    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.16))',
-    boxShadow: '0 20px 58px var(--apg2-elev-shadow, rgba(0,0,0,0.27)), inset 0 1.5px 0 rgba(255,255,255,0.24), inset 0 -18px 42px rgba(255,255,255,0.035)',
+    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.26))',
+    boxShadow: '0 20px 58px var(--apg2-elev-shadow, rgba(0,0,0,0.27)), inset 0 1.5px 0 rgba(255,255,255,0.38), inset 0 -18px 42px rgba(255,255,255,0.06)',
   },
   glowGlass: {
-    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.18), transparent 38%), radial-gradient(circle at 84% 12%, rgba(255,255,255,0.13), transparent 30%), linear-gradient(145deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04))',
+    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.22), transparent 38%), radial-gradient(circle at 84% 12%, rgba(255,255,255,0.18), transparent 30%), linear-gradient(145deg, rgba(255,255,255,0.46), rgba(255,255,255,0.22))',
     backdropFilter: 'blur(76px) saturate(1.82)',
     WebkitBackdropFilter: 'blur(76px) saturate(1.82)',
-    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.24))',
-    boxShadow: '0 42px 104px var(--apg2-elev-shadow, rgba(0,0,0,0.38)), 0 0 74px rgba(216,184,103,0.13), inset 0 2px 0 rgba(255,255,255,0.32), inset 0 -42px 86px rgba(255,255,255,0.055)',
+    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.34))',
+    boxShadow: '0 42px 104px var(--apg2-elev-shadow, rgba(0,0,0,0.38)), 0 0 74px rgba(216,184,103,0.13), inset 0 2px 0 rgba(255,255,255,0.44), inset 0 -42px 86px rgba(255,255,255,0.08)',
   },
   goldGlass: {
     background: 'radial-gradient(circle at 32% 0%, rgba(255,240,184,0.36), transparent 44%), linear-gradient(135deg, rgba(244,217,140,0.32), rgba(159,121,50,0.11))',
@@ -88,14 +88,14 @@ const GlassButton = {
   minHeight: 48,
   padding: '0 23px',
   borderRadius: 999,
-  background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.25), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.055))',
-  border: '1px solid rgba(255,255,255,0.23)',
+  background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.40), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.38), rgba(255,255,255,0.18))',
+  border: '1px solid rgba(255,255,255,0.32)',
   color: V2.text,
   fontSize: 14,
   fontWeight: 760,
   backdropFilter: V2.glass.backdropFilter,
   WebkitBackdropFilter: V2.glass.WebkitBackdropFilter,
-  boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.26), inset 0 -14px 28px rgba(255,255,255,0.035), 0 14px 34px var(--apg2-elev-shadow, rgba(0,0,0,0.18))',
+  boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.40), inset 0 -14px 28px rgba(255,255,255,0.06), 0 14px 34px var(--apg2-elev-shadow, rgba(0,0,0,0.18))',
   transition: motionTransition(['transform', 'box-shadow'], 'base'),
 };
 
@@ -116,11 +116,11 @@ const GlassBadge = {
   color: V2.text,
   fontSize: 11,
   fontWeight: 720,
-  background: 'radial-gradient(circle at 35% 0%, rgba(255,255,255,0.22), transparent 58%), rgba(255,255,255,0.10)',
-  border: '1px solid rgba(255,255,255,0.20)',
+  background: 'radial-gradient(circle at 35% 0%, rgba(255,255,255,0.36), transparent 58%), rgba(255,255,255,0.24)',
+  border: '1px solid rgba(255,255,255,0.28)',
   backdropFilter: V2.glass.backdropFilter,
   WebkitBackdropFilter: V2.glass.WebkitBackdropFilter,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.23), 0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.36), 0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))',
 };
 
 const GlassSection = {
@@ -739,58 +739,6 @@ function EventModal({ event, onClose }) {
     </div>
   );
   return createPortal(modal, document.body);
-}
-
-// ─── Карточка события ─────────────────────────────────────────────────────────
-
-function EventCard({ event, onClick, index = 0, isDark = true }) {
-  const gradientsDark = [
-    'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
-    'linear-gradient(135deg, #1a3a1a, #2d6a3a)',
-    'linear-gradient(135deg, #3a1a1a, #7a3030)',
-    'linear-gradient(135deg, #2a1a3a, #5a2d7a)',
-    'linear-gradient(135deg, #1a3a3a, #2d7a6a)',
-  ];
-  const gradientsLight = [
-    'linear-gradient(135deg, rgba(74,144,217,0.12), rgba(74,144,217,0.06))',
-    'linear-gradient(135deg, rgba(75,179,75,0.12), rgba(75,179,75,0.06))',
-    'linear-gradient(135deg, rgba(230,70,70,0.12), rgba(230,70,70,0.06))',
-    'linear-gradient(135deg, rgba(142,68,173,0.12), rgba(142,68,173,0.06))',
-    'linear-gradient(135deg, rgba(26,188,156,0.12), rgba(26,188,156,0.06))',
-  ];
-  const gradients = isDark ? gradientsDark : gradientsLight;
-  const grad = gradients[(event.id?.charCodeAt(0) ?? 0) % gradients.length];
-
-  return (
-    <div onClick={() => onClick(event)} style={{
-      width: 220, flexShrink: 0, borderRadius: 20, overflow: 'hidden',
-      background: grad, cursor: 'pointer',
-      border: '1px solid rgba(255,255,255,0.12)',
-      position: 'relative',
-      animation: 'fadeInUp 0.4s ease both',
-      animationDelay: `${index * 0.08}s`,
-    }}>
-      <div style={{ height: 2, background: `linear-gradient(90deg, ${V2.gold}, transparent)` }} />
-
-      <div style={{ padding: '16px 14px 14px' }}>
-        <div style={{ fontSize: 32, marginBottom: 10 }}>{event.emoji ?? '🎉'}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: V2.text, marginBottom: 6, lineHeight: '18px' }}>
-          {event.title}
-        </div>
-        {event.date && (
-          <div style={{ fontSize: 11, color: V2.gold, fontWeight: 600, marginBottom: 2 }}>
-            📅 {event.date}
-          </div>
-        )}
-        {event.partner && (
-          <div style={{ fontSize: 11, color: V2.textSoft }}>📍 {event.partner}</div>
-        )}
-        <div style={{ marginTop: 10, fontSize: 11, color: V2.gold, fontWeight: 700 }}>
-          Подробнее →
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Логотип партнёра с fallback на инициалы ────────────────────────────────
@@ -1512,424 +1460,6 @@ function SkeletonHome() {
         </div>
       </div>
     </div>
-  );
-}
-
-// ─── Закрытые мероприятия ─────────────────────────────────────────────────────
-
-function calcTimeLeft(dateStr) {
-  if (!dateStr) return null;
-  const diff = new Date(dateStr).getTime() - Date.now();
-  if (diff <= 0) return null;
-  return {
-    days:    Math.floor(diff / 86400000),
-    hours:   Math.floor((diff % 86400000) / 3600000),
-    minutes: Math.floor((diff % 3600000) / 60000),
-    seconds: Math.floor((diff % 60000) / 1000),
-  };
-}
-
-function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
-  const [timeLeft, setTimeLeft] = useState(() => calcTimeLeft(event.eventDate));
-
-  useEffect(() => {
-    if (!event.eventDate) return;
-    const id = setInterval(() => setTimeLeft(calcTimeLeft(event.eventDate)), 1000);
-    return () => clearInterval(id);
-  }, [event.eventDate]);
-
-  const minKeys = event.minKeys ?? 0;
-  const hasEnough = minKeys === 0 || userKeys >= minKeys;
-  const isFull = event.maxParticipants > 0 && (event.registeredCount ?? 0) >= event.maxParticipants;
-  const isPast = timeLeft === null && !!event.eventDate;
-  const need = minKeys - userKeys;
-
-  return (
-    <div style={{ margin: '16px 16px 0', ...V2.goldGlass, borderRadius: 24, padding: '18px 18px 16px' }}>
-      {/* Заголовок */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 26, flexShrink: 0 }}>{event.emoji ?? '🎉'}</span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: V2.gold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>✦ Следующее мероприятие АПГ</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: V2.text, lineHeight: '19px' }}>
-              {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: V2.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 4, padding: '1px 5px', marginRight: 5, verticalAlign: 'middle' }}>📌</span>}
-              {event.title}
-            </div>
-          </div>
-        </div>
-        {isRegistered && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#4BB34B', background: 'rgba(75,179,75,0.09)', border: '1px solid rgba(75,179,75,0.25)', borderRadius: 10, padding: '4px 9px', flexShrink: 0 }}>✓ Записан</div>
-        )}
-      </div>
-
-      {/* Таймер обратного отсчёта */}
-      {!isPast && event.eventDate && timeLeft && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
-          {[
-            { v: timeLeft.days,    l: 'дн'  },
-            { v: timeLeft.hours,   l: 'ч'   },
-            { v: timeLeft.minutes, l: 'мин' },
-            { v: timeLeft.seconds, l: 'сек' },
-          ].map(({ v, l }) => (
-            <div key={l} style={{ flex: 1, ...V2.glass, borderRadius: 14, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: V2.text, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(v).padStart(2, '0')}</div>
-              <div style={{ fontSize: 9, color: V2.textSoft, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isPast && (
-        <div style={{ fontSize: 12, color: V2.textSoft, textAlign: 'center', marginBottom: 12 }}>Мероприятие состоялось</div>
-      )}
-
-      {/* Прогресс ключей */}
-      {minKeys > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 11, color: V2.textSoft }}>Прогресс к порогу</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: hasEnough ? '#4BB34B' : V2.gold }}>
-              {Math.min(userKeys, minKeys)} / {minKeys} 🗝️
-            </span>
-          </div>
-          <div style={{ height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', borderRadius: 3,
-              width: `${Math.min((userKeys / minKeys) * 100, 100)}%`,
-              background: hasEnough
-                ? 'linear-gradient(90deg, #4BB34B, #6ECC6E)'
-                : `linear-gradient(90deg, ${V2.gold}, #E8C97A)`,
-              transition: 'width 0.5s ease',
-            }} />
-          </div>
-        </div>
-      )}
-
-      {/* Кнопка */}
-      {isRegistered ? (
-        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: '1px solid rgba(75,179,75,0.25)', background: 'rgba(75,179,75,0.07)', color: '#4BB34B', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-          ✓ Я записан — отменить?
-        </button>
-      ) : isFull ? (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: V2.textSoft, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
-          Мест нет
-        </div>
-      ) : isPast ? null : hasEnough ? (
-        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #D6B766, #E8C97A)', color: '#0F0F1A', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
-          Я иду! 🎉
-        </button>
-      ) : (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: V2.textSoft, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-          Нужно ещё {need} {need === 1 ? 'ключ' : need < 5 ? 'ключа' : 'ключей'} 🗝️
-        </div>
-      )}
-
-      {/* Дата, место и поделиться */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-        <div style={{ fontSize: 11, color: V2.textSoft }}>
-          {event.date && `📅 ${event.date}`}{event.address && ` · ${event.address}`}
-        </div>
-        <button
-          onClick={async () => {
-            const text = `🔒 Закрытое мероприятие АПГ: «${event.title}»${event.date ? ` — ${event.date}` : ''}. Нужно ${minKeys} ключей АПГ для входа!`;
-            if (navigator.share) {
-              try { await navigator.share({ title: 'АПГ', text, url: APP_URL }); return; } catch (err) { if (err.name === 'AbortError') return; }
-            }
-            vkBridge.send('VKWebAppShare', { link: APP_URL, text }).catch(() => {});
-          }}
-          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: V2.textSoft, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
-        >
-          ↗ Поделиться
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Основной компонент ───────────────────────────────────────────────────────
-
-const VK_APP_URL = 'https://vk.com/app54601851';
-
-function openVKApp() {
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  if (isAndroid) {
-    window.location.href =
-      'intent://vk.com/app54601851#Intent;scheme=https;package=com.vkontakte.android;' +
-      'S.browser_fallback_url=' + encodeURIComponent(VK_APP_URL) + ';end';
-    return;
-  }
-  window.location.href = VK_APP_URL;
-}
-
-function V2FullHomeSections({
-  user,
-  partners,
-  events,
-  recentReviews,
-  favorites,
-  userKeys,
-  completedTasks,
-  referralCount,
-  scannedCount,
-  streak,
-  userRank,
-  userCount,
-  joinedGroup,
-  partnerOfMonth,
-  featuredPartner,
-  taskPreview,
-  nextPrivateEvent,
-  registeredEventIds,
-  onOpenPartner,
-  onToggleFavorite,
-  onOpenEvents,
-  onOpenTasks,
-  onOpenRewards,
-  onOpenLeaderboard,
-  onOpenNearby,
-  onOpenMap,
-  onShare,
-  onJoinGroup,
-  onOpenForPartners,
-  onOpenReference,
-  onOpenLoki,
-  onEventRegister,
-  onSelectEvent,
-}) {
-  const imageOf = (item) => item?.imageUrl || item?.coverPhoto || item?.logoUrl || item?.photoUrl || item?.photo || item?.image || '';
-  const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || fallback).trim();
-  const firstName = user?.first_name || user?.firstName || user?.name?.split(' ')?.[0] || 'участник';
-  const topPartners = [
-    partnerOfMonth,
-    featuredPartner && featuredPartner.id !== partnerOfMonth?.id ? featuredPartner : null,
-    ...partners.filter(p => p.id !== partnerOfMonth?.id && p.id !== featuredPartner?.id),
-  ].filter(Boolean).slice(0, 6);
-  const newPartners = partners
-    .filter(p => p.newPartnerUntil && new Date(p.newPartnerUntil).getTime() > Date.now())
-    .slice(0, 6);
-  const visibleReviews = recentReviews.slice(0, 4);
-  const visibleEvents = events.slice(0, 5);
-  const keyGoal = Math.max(10, Math.ceil((userKeys + 1) / 10) * 10);
-  const keyProgress = Math.min(100, Math.round((userKeys / keyGoal) * 100));
-  const keysLeft = Math.max(0, keyGoal - userKeys);
-  const quickActions = [
-    { icon: '◌', label: 'Локи', sub: 'помощник АПГ', onClick: onOpenLoki },
-    { icon: '⌕', label: 'Справочник', sub: 'быстрые ответы', onClick: onOpenReference },
-    { icon: '✦', label: 'Получить ключ', sub: 'Скан QR у партнера', onClick: onOpenTasks },
-    { icon: '⌖', label: 'Рядом со мной', sub: 'Места поблизости', onClick: onOpenNearby || onOpenMap },
-    { icon: '◆', label: 'Розыгрыши', sub: 'Подарки недели', onClick: onOpenRewards },
-    { icon: '◷', label: 'Все события', sub: visibleEvents.length ? `${visibleEvents.length} в афише` : 'Афиша города', onClick: onOpenEvents },
-  ];
-  const fallbackBg = 'radial-gradient(circle at 22% 12%, rgba(244,217,140,0.26), transparent 36%), radial-gradient(circle at 86% 78%, rgba(82,54,102,0.16), transparent 42%), linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025))';
-  const imageLayer = (image, opacity = 0.5) => image ? (
-    <img src={image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity, filter: 'saturate(1.08) contrast(1.04)' }} />
-  ) : (
-    <div style={{ position: 'absolute', inset: 0, background: fallbackBg }}>
-      <div style={{ position: 'absolute', width: 120, height: 120, borderRadius: 44, right: -28, top: 18, border: '1px solid rgba(244,217,140,0.18)', transform: 'rotate(-18deg)' }} />
-      <div style={{ position: 'absolute', width: 70, height: 70, borderRadius: 26, left: 22, bottom: 24, background: V2.goldMetal, opacity: 0.16, filter: 'blur(5px)' }} />
-    </div>
-  );
-
-  return (
-    <section style={{
-      padding: '10px 22px 180px',
-      background: 'radial-gradient(circle at 8% 14%, rgba(244,217,140,0.085), transparent 30%), radial-gradient(circle at 92% 48%, rgba(82,54,102,0.13), transparent 38%), linear-gradient(180deg, #0F1011 0%, #121217 48%, #0D0E10 100%)',
-      overflow: 'hidden',
-    }}>
-      <div style={{ ...GlassCard, borderRadius: 38, border: 'none', padding: 18, marginBottom: 14, background: 'radial-gradient(circle at 12% 0%, rgba(244,217,140,0.16), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.11), rgba(255,255,255,0.035))', animation: 'fadeInUp 0.5s ease both' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, marginBottom: 18 }}>
-          <div>
-            <div style={{ color: V2.text, fontSize: 22, lineHeight: '27px', fontWeight: 800 }}>До следующей награды</div>
-            <div style={{ color: V2.textMuted, fontSize: 13, lineHeight: '18px', marginTop: 5 }}>{firstName}, осталось {keysLeft} {keysLeft === 1 ? 'ключ' : keysLeft < 5 ? 'ключа' : 'ключей'}</div>
-          </div>
-          <div style={{ width: 58, height: 58, borderRadius: 23, background: V2.goldMetal, color: '#18130A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, fontWeight: 900, boxShadow: '0 18px 42px rgba(216,184,103,0.20), inset 0 1px 0 rgba(255,255,255,0.42)' }}>{userKeys}</div>
-        </div>
-        <button
-          onClick={onOpenTasks}
-          {...pressMotion}
-          style={{ width: '100%', border: 'none', padding: 0, background: 'none', textAlign: 'left', cursor: 'pointer' }}
-        >
-          <span style={{ display: 'block', height: 10, borderRadius: 99, background: 'rgba(255,255,255,0.09)', overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.09)' }}>
-            <span style={{ display: 'block', height: '100%', width: `${keyProgress}%`, borderRadius: 99, background: V2.goldMetal, boxShadow: '0 0 28px rgba(244,217,140,0.28)', transition: 'width 0.5s ease' }} />
-          </span>
-          <span style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', color: V2.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 650 }}>
-            <span>{userKeys} ключей сейчас</span>
-            <span>{keyGoal} цель</span>
-          </span>
-        </button>
-      </div>
-
-      <div style={{ color: V2.text, fontSize: 27, lineHeight: '32px', fontWeight: 790, marginBottom: 16 }}>Быстрые действия</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 34 }}>
-        {quickActions.map((action, index) => (
-          <button key={action.label} onClick={action.onClick} {...pressMotion} style={{ ...GlassCard, border: 'none', borderRadius: 32, padding: 16, minHeight: 132, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: index === 0 ? 'radial-gradient(circle at 25% 0%, rgba(244,217,140,0.18), transparent 42%), linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.035))' : GlassCard.background, animation: 'fadeInUp 0.48s ease both', animationDelay: `${0.08 + index * 0.035}s` }}>
-            <span style={{ width: 42, height: 42, borderRadius: 18, background: V2.goldMetal, color: '#18130A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900, boxShadow: '0 14px 30px rgba(216,184,103,0.16), inset 0 1px 0 rgba(255,255,255,0.34)' }}>{action.icon}</span>
-            <span>
-              <span style={{ display: 'block', color: V2.text, fontSize: 17, lineHeight: '21px', fontWeight: 810, marginBottom: 5 }}>{action.label}</span>
-              <span style={{ display: 'block', color: V2.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 560 }}>{action.sub}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {newPartners.length > 0 && (
-        <div style={{ marginBottom: 34 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14, gap: 16 }}>
-            <div>
-              <div style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 790 }}>Новые партнёры</div>
-              <div style={{ color: V2.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Свежие места в АПГ</div>
-            </div>
-            <span style={{ ...GlassBadge }}>14 дней</span>
-          </div>
-          <div data-apg-horizontal-scroll="true" onTouchStart={e => e.stopPropagation()}>
-            <div style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, scrollPaddingLeft: 2 }}>
-              {newPartners.map(partner => (
-                <button key={partner.id ?? partner.name} onClick={() => onOpenPartner?.(partner)} {...pressMotion} style={{ ...GlassCard, flex: '0 0 196px', height: 142, border: 'none', borderRadius: 30, padding: 14, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden', ...horizontalSnapItem }}>
-                  {imageLayer(imageOf(partner), 0.28)}
-                  <span style={{ position: 'relative', zIndex: 1, ...GlassBadge, alignSelf: 'flex-start' }}>Новое</span>
-                  <span style={{ position: 'relative', zIndex: 1 }}>
-                    <span style={{ color: V2.text, fontSize: 16, lineHeight: '20px', fontWeight: 820, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titleOf(partner, 'Партнер')}</span>
-                    {partner.offer && <span style={{ display: 'block', color: V2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.offer}</span>}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16, gap: 16 }}>
-        <div>
-          <div style={{ color: V2.text, fontSize: 27, lineHeight: '32px', fontWeight: 790 }}>Партнер дня</div>
-          <div style={{ color: V2.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Места, которые стоит открыть</div>
-        </div>
-        <button onClick={onOpenNearby || onOpenMap} style={{ ...GlassButton, minHeight: 38, padding: '0 15px', fontSize: 12, border: 'none', cursor: 'pointer' }}>Рядом</button>
-      </div>
-
-      {topPartners.length === 0 ? (
-        <div style={{ ...GlassCard, borderRadius: 38, padding: 22, minHeight: 160, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: fallbackBg, marginBottom: 34 }}>
-          <span style={{ ...GlassBadge, alignSelf: 'flex-start' }}>Скоро</span>
-          <span>
-            <span style={{ display: 'block', color: V2.text, fontSize: 22, lineHeight: '27px', fontWeight: 790 }}>Партнеры появятся здесь</span>
-            <span style={{ display: 'block', color: V2.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 7 }}>Мы готовим подборку мест АПГ.</span>
-          </span>
-        </div>
-      ) : (
-        <div style={{ marginBottom: 34 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.08fr 0.92fr', gap: 12, marginBottom: 12 }}>
-            <button onClick={() => onOpenPartner?.(topPartners[0])} {...pressMotion} style={{ ...GlassCard, minHeight: 270, border: 'none', borderRadius: 38, overflow: 'hidden', position: 'relative', padding: 0, cursor: 'pointer', textAlign: 'left', background: fallbackBg }}>
-              {imageLayer(imageOf(topPartners[0]), 0.55)}
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,14,16,0.06), rgba(14,14,16,0.34) 42%, rgba(14,14,16,0.88))' }} />
-              <div style={{ position: 'relative', zIndex: 1, minHeight: 270, padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <span style={{ ...GlassBadge, alignSelf: 'flex-start' }}>{topPartners[0].partnerOfMonth ? 'Партнер месяца' : 'Рекомендуем'}</span>
-                <span>
-                  <span style={{ color: V2.text, fontSize: 24, lineHeight: '29px', fontWeight: 810, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textShadow: '0 12px 30px rgba(0,0,0,0.48)' }}>{titleOf(topPartners[0], 'Партнер АПГ')}</span>
-                  {topPartners[0].offer && <span style={{ display: 'block', color: V2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topPartners[0].offer}</span>}
-                </span>
-              </div>
-            </button>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {topPartners.slice(1, 3).map((partner, index) => (
-                <button key={partner.id ?? partner.name} onClick={() => onOpenPartner?.(partner)} {...pressMotion} style={{ ...GlassCard, border: 'none', borderRadius: 30, minHeight: 129, padding: 14, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
-                  {imageLayer(imageOf(partner), 0.24)}
-                  <span style={{ position: 'relative', zIndex: 1, color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 11, lineHeight: '15px', fontWeight: 820 }}>{index === 0 ? 'Акция' : 'Место'}</span>
-                  <span style={{ position: 'relative', zIndex: 1, color: V2.text, fontSize: 16, lineHeight: '20px', fontWeight: 790, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titleOf(partner, 'Партнер')}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {topPartners.length > 3 && (
-            <div data-apg-horizontal-scroll="true" onTouchStart={e => e.stopPropagation()}>
-                <div style={{ ...horizontalSnapTrack, gap: 10, paddingBottom: 2, scrollPaddingLeft: 2 }}>
-                  {topPartners.slice(3).map((partner, index) => (
-                    <button key={partner.id ?? partner.name} onClick={() => onOpenPartner?.(partner)} {...pressMotion} style={{ ...GlassCard, flex: '0 0 154px', height: 112, border: 'none', borderRadius: 26, padding: 13, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', ...horizontalSnapItem }}>
-                      <span style={{ color: V2.textMuted, fontSize: 11, lineHeight: '14px', fontWeight: 650 }}>{partner.categoryLabel || 'АПГ'}</span>
-                      <span style={{ color: V2.text, fontSize: 14, lineHeight: '18px', fontWeight: 780, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titleOf(partner, 'Партнер')}</span>
-                    </button>
-                  ))}
-                </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {nextPrivateEvent && (
-        <button onClick={() => onSelectEvent?.(nextPrivateEvent)} {...pressMotion} style={{ ...GlassCard, width: '100%', border: 'none', borderRadius: 38, minHeight: 150, padding: 18, marginBottom: 34, cursor: 'pointer', textAlign: 'left', display: 'grid', gridTemplateColumns: '72px 1fr', gap: 15, alignItems: 'center', background: fallbackBg }}>
-          <span style={{ width: 68, height: 96, borderRadius: 26, ...V2.goldGlass, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#1C1609' }}>
-            <span style={{ fontSize: 18, fontWeight: 900 }}>VIP</span>
-            <span style={{ fontSize: 10, fontWeight: 850, marginTop: 5 }}>{registeredEventIds.includes(nextPrivateEvent.id) ? 'вы идете' : 'закрытое'}</span>
-          </span>
-          <span style={{ minWidth: 0 }}>
-            <span style={{ ...GlassBadge, display: 'inline-flex', marginBottom: 10 }}>Закрытое событие</span>
-            <span style={{ color: V2.text, fontSize: 20, lineHeight: '25px', fontWeight: 810, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titleOf(nextPrivateEvent, 'Событие АПГ')}</span>
-          </span>
-        </button>
-      )}
-
-      <div style={{ color: V2.text, fontSize: 27, lineHeight: '32px', fontWeight: 790, marginBottom: 16 }}>Задания и бонусы</div>
-      <div style={{ display: 'grid', gridTemplateColumns: taskPreview.length > 1 ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 34 }}>
-        {(taskPreview.length ? taskPreview : [{ id: 'keys-empty', title: 'Сканируйте QR у партнеров', reward: 1, emoji: '◎', ready: false }]).slice(0, 2).map((task, index) => (
-          <button key={task.id ?? task.title} onClick={onOpenTasks} {...pressMotion} style={{ ...GlassCard, border: 'none', borderRadius: 32, minHeight: 146, padding: 17, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: task.ready ? 'radial-gradient(circle at 22% 12%, rgba(244,217,140,0.22), transparent 38%), linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.032))' : GlassCard.background }}>
-            <span style={{ fontSize: 25, lineHeight: '28px' }}>{task.emoji || '✦'}</span>
-            <span>
-              <span style={{ color: V2.text, fontSize: 17, lineHeight: '22px', fontWeight: 790, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{task.title}</span>
-              <span style={{ display: 'block', color: task.ready ? V2.gold : V2.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 720, marginTop: 8 }}>{task.ready ? 'Можно забрать' : `+${task.reward ?? 1} ключ`}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16, gap: 16 }}>
-        <div>
-          <div style={{ color: V2.text, fontSize: 27, lineHeight: '32px', fontWeight: 790 }}>Отзывы</div>
-          <div style={{ color: V2.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Живые впечатления участников</div>
-        </div>
-      </div>
-
-      {visibleReviews.length === 0 ? (
-        <div style={{ ...GlassCard, borderRadius: 36, padding: 20, minHeight: 136, marginBottom: 34, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <span style={{ ...GlassBadge, alignSelf: 'flex-start' }}>Скоро</span>
-          <span style={{ color: V2.text, fontSize: 19, lineHeight: '24px', fontWeight: 780 }}>Отзывы появятся после первых визитов</span>
-        </div>
-      ) : (
-        <div onTouchStart={e => e.stopPropagation()} style={{ marginBottom: 34 }}>
-            <div data-apg-horizontal-scroll="true" style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, scrollPaddingLeft: 2 }}>
-              {visibleReviews.map((review, index) => (
-                <div key={review.id ?? index} style={{ ...GlassCard, flex: `0 0 ${index === 0 ? 250 : 214}px`, minHeight: 164, borderRadius: 34, padding: 17, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', animation: 'fadeInUp 0.5s ease both', animationDelay: `${index * 0.04}s`, ...horizontalSnapItem }}>
-                  <span style={{ color: '#F4D98C', fontSize: 13, letterSpacing: 1 }}>{'★'.repeat(Math.max(1, Math.min(5, review.stars ?? 5)))}</span>
-                  <span style={{ color: V2.text, fontSize: 15, lineHeight: '21px', fontWeight: 650, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{review.text || `Отзыв о ${review.partnerName || 'партнере АПГ'}`}</span>
-                  <span style={{ color: V2.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{review.userName || 'Участник АПГ'} · {review.partnerName || 'АПГ'}</span>
-                </div>
-              ))}
-            </div>
-        </div>
-      )}
-
-      {!joinedGroup && (
-        <button onClick={onJoinGroup} {...pressMotion} style={{ ...GlassCard, width: '100%', border: 'none', borderRadius: 36, padding: 18, minHeight: 122, marginBottom: 14, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ width: 54, height: 54, borderRadius: 22, background: V2.goldMetal, color: '#18130A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, flexShrink: 0 }}>АПГ</span>
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: 'block', color: V2.text, fontSize: 18, lineHeight: '23px', fontWeight: 800 }}>Вступить в сообщество</span>
-            <span style={{ display: 'block', color: V2.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 4 }}>Новости, акции и +1 ключ за подписку</span>
-          </span>
-        </button>
-      )}
-
-      {userCount > 0 && (
-        <button onClick={onOpenForPartners} {...pressMotion} style={{ ...GlassCard, width: '100%', border: 'none', borderRadius: 32, padding: 17, minHeight: 84, textAlign: 'left', cursor: onOpenForPartners ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <span style={{ color: V2.text, fontSize: 16, lineHeight: '21px', fontWeight: 780 }}>Уже {userCount.toLocaleString('ru')} жителей в АПГ</span>
-          <span style={{ color: 'transparent', background: V2.goldMetal, WebkitBackgroundClip: 'text', backgroundClip: 'text', fontSize: 20, fontWeight: 900 }}>→</span>
-        </button>
-      )}
-
-      <div style={{ textAlign: 'center', padding: '30px 0 0', color: V2.textMuted, fontSize: 11, lineHeight: '16px', letterSpacing: 1.2, textTransform: 'uppercase' }}>
-        АПГ 2.0 · Зеленоград
-      </div>
-    </section>
   );
 }
 

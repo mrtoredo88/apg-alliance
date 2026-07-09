@@ -51,8 +51,8 @@ const inputStyle = {
   width: '100%',
   height: 48,
   borderRadius: 20,
-  border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)',
-  background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)',
+  border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.26)',
+  background: 'rgba(var(--apg2-glass-a,255,255,255),0.22)',
   color: APG2_PROFILE.text,
   outline: 'none',
   fontFamily: 'inherit',
@@ -188,7 +188,7 @@ function NewsImage({ item, height = 210, radius = 28, mode = 'card', onOpen, chi
   return (
     <div
       onClick={onOpen}
-      style={{ position: 'relative', height, borderRadius: radius, overflow: 'hidden', background: 'radial-gradient(circle at 24% 18%, rgba(215,184,106,0.22), transparent 38%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.10), rgba(var(--apg2-glass-a,255,255,255),0.03))', cursor: onOpen ? 'zoom-in' : 'inherit' }}
+      style={{ position: 'relative', height, borderRadius: radius, overflow: 'hidden', background: 'radial-gradient(circle at 24% 18%, rgba(215,184,106,0.22), transparent 38%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.30), rgba(var(--apg2-glass-a,255,255,255),0.14))', cursor: onOpen ? 'zoom-in' : 'inherit' }}
     >
       {image && (
         <>
@@ -279,7 +279,7 @@ function PhotoCarousel({ photos = [], onOpen }) {
 
   return (
     <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 12, overflow: 'hidden' }}>
-      <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>
+      <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.22)' }}>
         <button type="button" onClick={() => onOpen?.(safeIdx)} style={{ width: '100%', padding: 0, border: 'none', background: '#08080a', display: 'block', cursor: 'zoom-in' }}>
           <img src={safePhotos[safeIdx]} alt="" loading="lazy" style={{ width: '100%', maxHeight: 430, objectFit: 'contain', display: 'block' }} />
         </button>
@@ -352,7 +352,7 @@ function ContentBlocks({ blocks = [] }) {
             ? { border: '1px solid rgba(215,184,106,0.30)', background: 'rgba(215,184,106,0.10)', mark: '✓' }
             : type === 'faq'
               ? { border: '1px solid rgba(96,165,250,0.30)', background: 'rgba(96,165,250,0.08)', mark: '?' }
-              : { border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', mark: '“' };
+              : { border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.24)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.20)', mark: '”' };
         return (
           <GlassCard key={index} style={{ borderRadius: 26, padding: 16, border: tone.border, background: tone.background }}>
             <div style={{ display: 'grid', gridTemplateColumns: '34px 1fr', gap: 12, alignItems: 'start' }}>
@@ -444,7 +444,7 @@ function ArticleHeader({ item, wordCount }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ padding: '8px 12px', borderRadius: 999, background: 'rgba(215,184,106,0.14)', border: '1px solid rgba(215,184,106,0.28)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900 }}>{getNewsCategoryLabel(item)}</span>
         {badges.map(([emoji, label]) => (
-          <span key={`${emoji}-${label}`} style={{ padding: '8px 11px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', color: APG2_PROFILE.text, fontSize: 11.5, fontWeight: 820 }}>{emoji} {label}</span>
+          <span key={`${emoji}-${label}`} style={{ padding: '8px 11px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.22)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.28)', color: APG2_PROFILE.text, fontSize: 11.5, fontWeight: 820 }}>{emoji} {label}</span>
         ))}
       </div>
       <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: '1.08', fontWeight: 950, letterSpacing: 0 }}>{title}</h1>
@@ -469,7 +469,7 @@ function ArticleHeader({ item, wordCount }) {
           ['Реакции', String(reactions)],
           ['Комментарии', String(stats.comments)],
         ].map(([label, value]) => (
-          <div key={label} style={{ minHeight: 58, borderRadius: 18, padding: '10px 11px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', boxSizing: 'border-box' }}>
+          <div key={label} style={{ minHeight: 58, borderRadius: 18, padding: '10px 11px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.20)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.26)', boxSizing: 'border-box' }}>
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', fontWeight: 720 }}>{label}</div>
             <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 880, marginTop: 4 }}>{value}</div>
           </div>

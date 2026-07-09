@@ -58,7 +58,7 @@ export function ApgHealthPage({ nav = 'health', partners = [], experts = [], eve
       .then(snap => setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
       .catch(() => {})
       .finally(() => setLoadingLogs(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const devInfo = getDeviceInfo();
   const online  = navigator.onLine;

@@ -152,8 +152,8 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
   const v2InputStyle = {
     width: '100%', padding: '13px 14px', borderRadius: 18,
-    border: '1px solid rgba(255,255,255,0.16)',
-    background: 'rgba(255,255,255,0.07)', color: APG2_PROFILE.text,
+    border: '1px solid rgba(255,255,255,0.24)',
+    background: 'rgba(255,255,255,0.20)', color: APG2_PROFILE.text,
     fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
   };
 

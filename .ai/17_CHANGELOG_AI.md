@@ -15,6 +15,45 @@
 
 ---
 
+## [2026-07-09] Loki UX — финальная полировка, блокировка всех авто-триггеров в on_demand
+**Коммит:** `dc91545f`
+**Файлы:** `src/loki/LokiProvider.jsx`
+**Тип:** fix
+**Что изменено:** Добавлен mode-фильтр внутри showMessage (единственная точка входа для всех событий через lokiBus). В режиме on_demand разрешены только CHARACTER_TAP, BRAIN_RESPONSE, APP_ERROR, USER_LOGIN, KEY_RECEIVED, ACHIEVEMENT_UNLOCKED. Заблокированы все навигационные триггеры (PARTNER_OPENED, EVENT_OPENED, PRIZE_OPENED, PROFILE_OPENED, REFERENCE_OPENED, MAP_OPENED, VK_ENTRY, VK_EXTERNAL_LINK). Добавлен settings в deps useCallback для корректной реакции на смену режима.
+**Почему:** Предыдущие фикс (эффекты в LokiProvider) не перекрывал showLokiMessage-вызовы из UserApp.goPanel и VK entry — они проходили через lokiBus минуя mode-проверку.
+
+---
+
+## [2026-07-09] Loki UX — система режимов помощника, «Только по запросу» по умолчанию
+**Коммит:** `c8362e23`
+**Файлы:** `src/loki/lokiState.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`
+**Тип:** feat
+**Что изменено:** Добавлен LOKI_MODES enum (on_demand/minimal/standard/active) и поле mode в DEFAULT_LOKI_SETTINGS. В LokiProvider RETURN_VISIT активируется только для standard/active; USER_IDLE пропускается для on_demand, задержка 90с для minimal; Observer пропускается для on_demand, только HIGH-приоритет для minimal. Убран авто-триггер daily_visit на LokiPage. Добавлен селектор режима в нижней части LokiPage с 4 кнопками.
+**Почему:** пользователи жаловались на навязчивость Локи — попапы при каждом переходе между разделами. Новая философия: Локи молчит пока пользователь не спросит.
+
+---
+
+## [2026-07-09] Glass readability pass — увеличение непрозрачности glass-карточек
+**Коммит:** pending
+**Файлы:** `src/index.css`, `src/design.js`, `src/HomePanelV2.jsx`, `src/components/Apg2ProfileGlass.jsx`, `src/NewsPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/PartnerCabinetPage.jsx`
+**Тип:** fix
+**Что изменено:** белый overlay в glass-карточках поднят с 0.05-0.15 до 0.20-0.46. Изменены токены GLASS/GLASS_STRONG в design.js, V2.glass/glowGlass в HomePanelV2, APG2_PROFILE.glass в Apg2ProfileGlass, CSS-переменные --c-surface и --apg2-glass-border в dark-теме index.css, inline-стили в NewsPage/ExpertCabinetPage/PartnerCabinetPage.
+**Почему:** текст на карточках плохо читался из-за чрезмерно тёмного glass overlay; backdrop-filter и border оставлены без изменений.
+
+---
+
+## [2026-07-09] Premium UI Pass — унификация токенов APG2/V2 по всему приложению
+**Коммит:** `eab89de9`
+**Файлы:** `src/EventsPage.jsx`, `src/RewardsPage.jsx`, `src/HomePanelV2.jsx`
+**Тип:** refactor
+**Что изменено:**
+- EventsPage: исправлен scroll-lock (убран `position:fixed; top:-scrollY` → `overflow:hidden` только); EventModal переведён с `T.*` → `APG2_PROFILE.*` (текст, иконки, описание)
+- RewardsPage: ConfirmModal, TicketSheet, ClaimSuccessModal — контейнеры с `GLASS_STRONG` → `APG2_PROFILE.glass`, `borderRadius: '34px'`, safe-area padding; кнопки → `GlassButton`; все `T.*` → `APG2_PROFILE.*`
+- HomePanelV2: EventModal (detail sheet) → `V2.glass`, borderRadius 34px, safe-area; EventCard mini-tiles → `V2.*` токены; PartnerLogo border → rgba; NewsDetailSheet (swipe sheet) → `V2.glass`; NewsWidget контейнер → `V2.glowGlass`; News-карточки горизонтальной ленты → `V2.*`; Welcome-карточка пользователя → `V2.glowGlass` вместо `GLASS_STRONG`
+**Почему:** Унификация визуального языка — удаление смеси устаревших `T.*`/`GLASS_STRONG` в активных v2-компонентах, переход на `APG2_PROFILE`/`V2.*` токены
+
+---
+
 ## [2026-07-09] Fix: смещение экрана при открытии карточки эксперта
 **Коммит:** `5868846b`
 **Файлы:** `src/ExpertsPage.jsx`, `src/EventsPage.jsx`, `src/components/Apg2ProfileGlass.jsx`

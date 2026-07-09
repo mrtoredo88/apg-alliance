@@ -21,19 +21,19 @@ export const T = {
 };
 
 export const GLASS = {
-  background:          'var(--c-surface, rgba(255,255,255,0.07))',
+  background:          'var(--c-surface, rgba(255,255,255,0.28))',
   backdropFilter:      'blur(28px) saturate(1.8)',
   WebkitBackdropFilter:'blur(28px) saturate(1.8)',
-  border:              '1px solid var(--c-border, rgba(255,255,255,0.13))',
-  boxShadow:           '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08)',
+  border:              '1px solid var(--c-border, rgba(255,255,255,0.22))',
+  boxShadow:           '0 8px 32px rgba(0,0,0,0.2), inset 0 1.5px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(0,0,0,0.08)',
 };
 
 export const GLASS_STRONG = {
-  background:          'var(--c-surface, rgba(255,255,255,0.08))',
+  background:          'var(--c-surface, rgba(255,255,255,0.34))',
   backdropFilter:      'blur(48px) saturate(2)',
   WebkitBackdropFilter:'blur(48px) saturate(2)',
-  border:              '1px solid var(--c-border, rgba(255,255,255,0.16))',
-  boxShadow:           '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.1)',
+  border:              '1px solid var(--c-border, rgba(255,255,255,0.26))',
+  boxShadow:           '0 16px 48px rgba(0,0,0,0.28), inset 0 2px 0 rgba(255,255,255,0.40), inset 0 -1px 0 rgba(0,0,0,0.1)',
 };
 
 export const GLASS_GOLD = {
