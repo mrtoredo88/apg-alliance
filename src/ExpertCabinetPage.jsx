@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { Stars, StatCard } from './PartnerCabinetPage.jsx';
@@ -29,7 +29,7 @@ function getExpertReadyState(expert = {}) {
   return { checks, percent: Math.round((doneCount / checks.length) * 100), doneCount };
 }
 
-export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, onBack, onExpertUpdate }) {
+export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, onBack, onExpertUpdate, onToast }) {
   const [expert, setExpert]       = useState(initialExpert);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -56,7 +56,8 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     Promise.all([
       getDoc(doc(db, 'experts', initialExpert.id)),
       getDocs(query(
-        collection(db, 'experts', initialExpert.id, 'reviews'),
+        collection(db, 'expertReviews'),
+        where('expertId', '==', initialExpert.id),
         orderBy('createdAt', 'desc'),
         limit(20),
       )).catch(() => ({ docs: [] })),
@@ -80,12 +81,12 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) { alert('Файл слишком большой. Максимум 1 МБ.'); e.target.value = ''; return; }
+    if (file.size > 1024 * 1024) { onToast?.('Файл слишком большой. Максимум 1 МБ.', 'error'); e.target.value = ''; return; }
     setUploading(true);
     try {
       const url = await uploadPhoto(file, `experts/${expert.id}`);
       setFPhoto(url);
-    } catch { alert('Ошибка загрузки фото'); }
+    } catch { onToast?.('Ошибка загрузки фото', 'error'); }
     setUploading(false);
   };
 
@@ -93,7 +94,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     if (!expert?.id) return;
     const phone = fPhone.trim();
     if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) {
-      alert('Некорректный формат номера телефона.\nПример: +7 (499) 123-45-67');
+      onToast?.('Некорректный номер телефона. Пример: +7 (499) 123-45-67', 'error');
       return;
     }
     const urlFields = [
@@ -106,7 +107,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     for (const [label, value, platform] of urlFields) {
       const result = validateExternalUrl(value, platform ? { platform } : {});
       if (!result.ok) {
-        alert(`${label}: ${result.error}`);
+        onToast?.(`${label}: ${result.error}`, 'error');
         return;
       }
     }
@@ -129,7 +130,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       onExpertUpdate?.(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { alert('Ошибка сохранения'); }
+    } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
     setSaving(false);
   };
 

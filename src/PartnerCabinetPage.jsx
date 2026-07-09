@@ -52,7 +52,7 @@ function getPartnerLaunchState(partner = {}) {
   };
 }
 
-export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, onBack, onPartnerUpdate }) {
+export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, onBack, onPartnerUpdate, onToast }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -99,7 +99,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 1024 * 1024) {
-      alert('Файл слишком большой. Максимум 1 МБ.');
+      onToast?.('Файл слишком большой. Максимум 1 МБ.', 'error');
       e.target.value = '';
       return;
     }
@@ -107,7 +107,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     try {
       const url = await uploadPhoto(file, `partners/${partner.id}`);
       setFLogo(url);
-    } catch { alert('Ошибка загрузки фото'); }
+    } catch { onToast?.('Ошибка загрузки фото', 'error'); }
     setUploading(false);
   };
 
@@ -115,12 +115,12 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     if (!partner?.id) return;
     const phone = fPhone.trim();
     if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) {
-      alert('Некорректный формат номера телефона.\nПример: +7 (999) 123-45-67');
+      onToast?.('Некорректный номер телефона. Пример: +7 (999) 123-45-67', 'error');
       return;
     }
     const socialResult = validateExternalUrl(fSocial);
     if (!socialResult.ok) {
-      alert(`Соцсеть: ${socialResult.error}`);
+      onToast?.(`Соцсеть: ${socialResult.error}`, 'error');
       return;
     }
     setSaving(true);
@@ -139,7 +139,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
       onPartnerUpdate?.(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { alert('Ошибка сохранения'); }
+    } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
     setSaving(false);
   };
 

@@ -1574,12 +1574,13 @@ export function UserApp() {
       return true;
     } catch (e) {
       logError(e, 'UserApp.handlePrizeClaim');
-      setUserKeys(prev => prev + prize.cost); // откат при ошибке
+      setUserKeys(prev => prev + prize.cost);
+      showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось получить приз. Попробуйте ещё раз.', 'error');
       return false;
     } finally {
       claimingPrizeRef.current = false;
     }
-  }, [user, userKeys]);
+  }, [user, userKeys, showToast]);
 
   const handleRaffleEnter = useCallback(async (prize, ticketCount) => {
     if (!user || !prize) return false;
@@ -1602,11 +1603,12 @@ export function UserApp() {
     } catch (e) {
       logError(e, 'UserApp.handleRaffleEnter');
       setUserKeys(prev => prev + cost);
+      showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось купить билет. Попробуйте ещё раз.', 'error');
       return false;
     } finally {
       claimingPrizeRef.current = false;
     }
-  }, [user, userKeys]);
+  }, [user, userKeys, showToast]);
 
   // ─── Мероприятия ────────────────────────────────────────────────────────────
 
@@ -1627,6 +1629,7 @@ export function UserApp() {
         logError(e, 'UserApp.handleEventUnregister');
         setRegisteredEventIds(prev => [...prev, eventId]);
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
+        showToast('Не удалось отменить запись. Попробуйте ещё раз.', 'error');
       }
     } else {
       if (event.isPrivate && userKeys < (event.minKeys ?? 0)) {
@@ -1654,6 +1657,7 @@ export function UserApp() {
         logError(e, 'UserApp.handleEventRegister');
         setRegisteredEventIds(prev => prev.filter(id => id !== eventId));
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount ?? 1) - 1) } : e));
+        showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось записаться. Попробуйте ещё раз.', 'error');
       }
     }
   }, [user, userKeys, registeredEventIds, setEvents, showToast]);
@@ -2752,6 +2756,7 @@ export function UserApp() {
                     partner={ownedPartner}
                     expert={ownedExpert}
                     onBack={goBackPanel}
+                    onToast={showToast}
                     onPartnerUpdate={(updated) => {
                       setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
                       setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
@@ -2766,6 +2771,7 @@ export function UserApp() {
                     variant="v2"
                     expert={ownedExpert}
                     onBack={goBackPanel}
+                    onToast={showToast}
                     onExpertUpdate={(updated) => {
                       setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
                       setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
