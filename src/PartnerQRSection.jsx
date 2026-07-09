@@ -5,7 +5,7 @@ import { T } from './design.js';
 
 const POSTER_TEMPLATES = [
   { id: '1', label: 'Макет 1', url: '/qr-poster-template.jpg' },
-  { id: '2', label: 'Макет 2', url: '/qr-poster-template-2.jpg' },
+  { id: '2', label: 'Макет 2', url: '/qr-poster-template-2-v2.jpg' },
 ];
 
 function triggerDownload(dataUrl, filename) {
