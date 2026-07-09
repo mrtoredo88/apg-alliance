@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-09] fix: «Ошибка при сохранении» при получении наград — тихий 403 из-за несоответствия Firebase UID
+**Коммит:** `bb82a555`
+**Файлы:** `src/UserApp.jsx`
+**Тип:** fix
+**Что изменено:** Обнаружен корень проблемы: при открытии приложения email-пользователем без Firebase-сессии в IndexedDB (новый браузер, сброс хранилища) `ensureOwnerAuthSession` бросал `STRONG_IDENTITY_REQUIRED`, но ошибка поглощалась. `auth.currentUser` оставался анонимным → backend отклонял `task:claim` с 403. Теперь при `STRONG_IDENTITY_REQUIRED` очищаем `apg_email_user`/`apg_tg_user` из localStorage, делаем `signOut` и `reload` — пользователь попадает в гостевой режим и переходит к email-логину. В `handleClaim` добавлено `console.error` с деталями (taskId, userId, authUid, isAnon, code, status) и отдельный текст тоста для 401/403.
+**Почему:** `STRONG_IDENTITY_REQUIRED` молча проглатывался → сессия оставалась анонимной → все write-действия через backend падали с 403 «Нельзя менять данные другого пользователя».
+
+---
+
 ## [2026-07-09] fix: восстановление сценария согласий и уведомлений
 **Коммит:** `5546cfd8`
 **Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/AdminPanel.jsx`

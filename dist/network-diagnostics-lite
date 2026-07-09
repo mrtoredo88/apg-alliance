@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>АПГ — диагностика сети</title>
+  <style>
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#11111f,#080812);color:#f0f0f0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:calc(env(safe-area-inset-top,0px) + 18px) 14px calc(env(safe-area-inset-bottom,0px) + 24px)}
+    main{max-width:880px;margin:0 auto;display:grid;gap:14px}
+    .card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:16px;box-shadow:0 14px 46px rgba(0,0,0,.22)}
+    h1{font-size:26px;line-height:1.12;margin:7px 0 8px}
+    .eyebrow{font-size:12px;font-weight:900;letter-spacing:0;color:#C9A84C;text-transform:uppercase}
+    p{margin:0;color:rgba(240,240,240,.68);font-size:14px;line-height:1.5}
+    button,a.button{display:block;width:100%;border:0;border-radius:14px;padding:13px 14px;font-size:15px;font-weight:850;text-align:center;text-decoration:none}
+    button{background:linear-gradient(135deg,#C9A84C,#E8C97A);color:#111}
+    a.button{margin-top:10px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);color:#f0f0f0}
+    .grid{display:grid;gap:10px}
+    .row{display:grid;gap:8px;border-bottom:1px solid rgba(255,255,255,.11);padding:0 0 11px}
+    .row:last-child{border-bottom:0;padding-bottom:0}
+    .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .name{font-size:15px;font-weight:850}
+    .url{font-size:12px;color:rgba(240,240,240,.46);word-break:break-all;margin-top:3px}
+    .badge{flex-shrink:0;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:850;border:1px solid rgba(255,255,255,.16)}
+    .ok{color:#4BB34B;border-color:rgba(75,179,75,.55);background:rgba(75,179,75,.13)}
+    .bad{color:#E64646;border-color:rgba(230,70,70,.55);background:rgba(230,70,70,.12)}
+    .warn{color:#E8C97A;border-color:rgba(201,168,76,.55);background:rgba(201,168,76,.12)}
+    .meta{font-size:12px;line-height:1.45;color:rgba(240,240,240,.56);word-break:break-word}
+    pre{white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.45;color:rgba(240,240,240,.62);margin:0}
+  </style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <div class="eyebrow">APG Lite Diagnostics</div>
+    <h1>Диагностика сети</h1>
+    <p>Эта страница не использует React, Firebase, Google, внешние шрифты и сторонние скрипты. Откройте её без VPN: первый красный пункт обычно показывает точку отказа.</p>
+    <div style="margin-top:14px">
+      <button id="run">Проверить ещё раз</button>
+      <a class="button" href="/?no-sw=1">Открыть приложение без service worker</a>
+      <a class="button" href="/">Открыть обычное приложение</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="name" style="margin-bottom:10px">Устройство</div>
+    <pre id="runtime"></pre>
+  </section>
+
+  <section class="card">
+    <div class="name" style="margin-bottom:10px">Проверки</div>
+    <div id="checks" class="grid"></div>
+  </section>
+
+  <section class="card">
+    <div class="name" style="margin-bottom:10px">Bootstrap trace</div>
+    <pre id="trace">Пока нет данных.</pre>
+  </section>
+</main>
+
+<script>
+(function(){
+  var API = 'https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net';
+  var targets = [
+    { id:'site', name:'myapg.ru / index.html', url:'/', mode:'same', required:true },
+    { id:'version', name:'version.json', url:'/version.json?_=' + Date.now(), mode:'same', required:true },
+    { id:'manifest', name:'manifest.json', url:'/manifest.json?_=' + Date.now(), mode:'same', required:false },
+    { id:'sw', name:'service worker file', url:'/sw.js?_=' + Date.now(), mode:'same', required:false },
+    { id:'api-health', name:'Yandex API /health', url:API + '/health', mode:'cors', required:true },
+    { id:'public-data', name:'Yandex API /api/public-data', url:API + '/api/public-data?resources=partners,experts,news,events', mode:'cors', required:true },
+    { id:'firebase-auth', name:'Firebase Auth domain', url:'https://project-apg-bbfc8.firebaseapp.com/__/auth/handler', mode:'no-cors', required:false },
+    { id:'identitytoolkit', name:'Google Identity Toolkit', url:'https://identitytoolkit.googleapis.com/', mode:'no-cors', required:false },
+    { id:'firestore', name:'Firestore API', url:'https://firestore.googleapis.com/', mode:'no-cors', required:false },
+    { id:'gstatic', name:'Google Static', url:'https://www.gstatic.com/firebasejs/', mode:'no-cors', required:false },
+    { id:'yandex-storage', name:'Yandex Object Storage', url:'https://storage.yandexcloud.net/', mode:'no-cors', required:true },
+    { id:'telegram', name:'Telegram script host', url:'https://telegram.org/js/telegram-web-app.js', mode:'no-cors', required:false }
+  ];
+
+  function runtimeInfo(){
+    var standalone = false;
+    try { standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch(e) {}
+    return {
+      href: location.href,
+      online: navigator.onLine,
+      standalone: standalone,
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform,
+      connection: navigator.connection ? {
+        effectiveType: navigator.connection.effectiveType,
+        downlink: navigator.connection.downlink,
+        rtt: navigator.connection.rtt,
+        saveData: navigator.connection.saveData
+      } : null
+    };
+  }
+
+  function safeTrace(){
+    try {
+      return sessionStorage.getItem('apg_boot_trace') || localStorage.getItem('apg_boot_trace') || 'Нет сохранённого trace. Если основной экран белый, обновите его один раз и вернитесь сюда.';
+    } catch(e) {
+      return 'Trace недоступен: ' + e.message;
+    }
+  }
+
+  function row(target, state){
+    var badgeClass = state.ok ? 'ok' : (target.required ? 'bad' : 'warn');
+    var text = state.pending ? 'Проверяем' : (state.ok ? 'Доступен' : (state.timeout ? 'Таймаут' : 'Недоступен'));
+    return '<div class="row"><div class="top"><div><div class="name">' + target.name + '</div><div class="url">' + target.url + '</div></div><div class="badge ' + badgeClass + '">' + text + '</div></div><div class="meta">status: ' + (state.status || 0) + ' · ' + (state.ms || 0) + ' ms' + (state.error ? ' · ' + state.error : '') + '</div></div>';
+  }
+
+  function render(results){
+    document.getElementById('runtime').textContent = JSON.stringify(runtimeInfo(), null, 2);
+    document.getElementById('trace').textContent = safeTrace();
+    document.getElementById('checks').innerHTML = targets.map(function(target){
+      return row(target, results[target.id] || { pending:true });
+    }).join('');
+  }
+
+  function check(target){
+    var started = Date.now();
+    var controller = window.AbortController ? new AbortController() : null;
+    var timer = controller ? setTimeout(function(){ controller.abort(); }, 7000) : null;
+    return fetch(target.url, {
+      cache: 'no-store',
+      mode: target.mode === 'no-cors' ? 'no-cors' : 'cors',
+      signal: controller ? controller.signal : undefined
+    }).then(function(response){
+      if (timer) clearTimeout(timer);
+      return {
+        ok: target.mode === 'no-cors' ? true : response.ok,
+        status: response.status || (response.type === 'opaque' ? 'opaque' : 0),
+        ms: Date.now() - started
+      };
+    }).catch(function(error){
+      if (timer) clearTimeout(timer);
+      return {
+        ok: false,
+        status: 0,
+        ms: Date.now() - started,
+        timeout: error && error.name === 'AbortError',
+        error: (error && (error.name + ': ' + error.message)) || String(error)
+      };
+    });
+  }
+
+  function run(){
+    var results = {};
+    render(results);
+    targets.reduce(function(promise, target){
+      return promise.then(function(){
+        return check(target).then(function(result){
+          results[target.id] = result;
+          render(results);
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  document.getElementById('run').addEventListener('click', run);
+  window.addEventListener('online', run);
+  window.addEventListener('offline', run);
+  run();
+})();
+</script>
+</body>
+</html>
