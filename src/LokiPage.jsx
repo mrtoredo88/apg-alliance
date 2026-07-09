@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel } from './components/Apg2ProfileGlass.jsx';
 import { useLoki } from './loki/LokiProvider.jsx';
 import { isVK } from './vk.js';
@@ -21,15 +21,6 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
   const [messages, setMessages] = useState(() => ([
     { id: 'hello', from: 'loki', text: isVK() ? 'Привет! Я Локи. Теперь я живу и здесь, в VK. Помогу тебе открыть АПГ быстрее.' : 'Привет! Я Локи. Помогу тебе быстрее разобраться в АПГ.' },
   ]));
-
-  useEffect(() => {
-    loki.showMessage?.('daily_visit', {
-      message: isVK()
-        ? 'Я рядом в VK Mini App. Можно спросить про ключи, партнёров, события или призы.'
-        : 'Я рядом. Спроси меня про АПГ обычными словами.',
-      source: 'loki_page',
-    });
-  }, []);
 
   const ask = async (text) => {
     const question = String(text || '').trim();
@@ -169,6 +160,27 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
         <GlassButton onClick={onOpenReference}>Справочник</GlassButton>
         <GlassButton onClick={() => onOpenPanel?.('nearby')}>Что рядом?</GlassButton>
       </div>
+
+      <GlassCard style={{ borderRadius: 28, padding: 14, marginTop: 12 }}>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 720, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Режим помощника</div>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {[
+            { key: 'on_demand', label: 'Только по запросу (рекомендуется)' },
+            { key: 'minimal', label: 'Минимум подсказок' },
+            { key: 'standard', label: 'Стандартный' },
+            { key: 'active', label: 'Активный помощник' },
+          ].map(({ key, label }) => (
+            <GlassButton
+              key={key}
+              tone={loki.settings?.mode === key ? 'gold' : 'default'}
+              onClick={() => loki.setMode?.(key)}
+              style={{ minHeight: 44, borderRadius: 16, padding: '10px 14px', textAlign: 'left' }}
+            >
+              {label}
+            </GlassButton>
+          ))}
+        </div>
+      </GlassCard>
     </GlassPanel>
   );
 }

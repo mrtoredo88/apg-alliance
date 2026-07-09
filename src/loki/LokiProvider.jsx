@@ -259,21 +259,23 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
 
   useEffect(() => {
     if (!settings.enabled || !user) return;
+    if (settings.mode !== 'standard' && settings.mode !== 'active') return;
     const dayKey = new Date().toLocaleDateString('sv');
     if (hasLokiDailyVisit(userId, dayKey)) return;
     if (!hasSeenLokiGreeting(userId)) return;
     markLokiDailyVisit(userId, dayKey);
     const t = setTimeout(() => showMessage(LOKI_EVENTS.RETURN_VISIT, { dayKey }), 4200);
     return () => clearTimeout(t);
-  }, [settings.enabled, showMessage, user, userId]);
+  }, [settings.enabled, settings.mode, showMessage, user, userId]);
 
   useEffect(() => {
-    if (!settings.enabled) return;
+    if (!settings.enabled || settings.mode === 'on_demand') return;
+    const delay = settings.mode === 'minimal' ? 90000 : 52000;
     const resetIdle = () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         if (document.visibilityState === 'visible') showMessage(LOKI_EVENTS.USER_IDLE);
-      }, 52000);
+      }, delay);
     };
     resetIdle();
     window.addEventListener('pointerdown', resetIdle, { passive: true });
@@ -285,7 +287,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       window.removeEventListener('keydown', resetIdle);
       window.removeEventListener('scroll', resetIdle);
     };
-  }, [settings.enabled, showMessage]);
+  }, [settings.enabled, settings.mode, showMessage]);
 
   useEffect(() => {
     const markUserAction = () => { lastUserActionAtRef.current = Date.now(); };
@@ -347,7 +349,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   }, [activePanel]);
 
   useEffect(() => {
-    if (!settings.enabled || !user || !appState) return;
+    if (!settings.enabled || !user || !appState || settings.mode === 'on_demand') return;
     if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
     observerTimerRef.current = setTimeout(() => {
       const recommendation = evaluateLokiObserver({
@@ -358,12 +360,14 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         lastUserActionAt: lastUserActionAtRef.current,
         lastPanelChangeAt: lastPanelChangeAtRef.current,
       });
-      if (recommendation) showMessage(recommendation.eventType, recommendation.payload);
+      if (!recommendation) return;
+      if (settings.mode === 'minimal' && recommendation.payload?.priority < LOKI_MESSAGE_PRIORITY.HIGH) return;
+      showMessage(recommendation.eventType, recommendation.payload);
     }, 9000);
     return () => {
       if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
     };
-  }, [activePanel, appState, history, memory, settings.enabled, showMessage, user, userMemory]);
+  }, [activePanel, appState, history, memory, settings.enabled, settings.mode, showMessage, user, userMemory]);
 
   const handleCharacterTap = useCallback(() => {
     const tapAction = getRandomLokiAction(TAP_ACTIONS);
@@ -558,6 +562,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
+    setMode: (mode) => persistSettings({ ...settings, mode }),
   }), [action, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;

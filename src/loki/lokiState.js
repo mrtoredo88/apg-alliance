@@ -2,18 +2,28 @@ export const LOKI_STORAGE_KEY = 'apg_loki_settings_v1';
 export const LOKI_GREETING_KEY = 'apg_loki_greeting_seen_v1';
 export const LOKI_DAILY_KEY = 'apg_loki_daily_visit_v1';
 
+export const LOKI_MODES = {
+  ON_DEMAND: 'on_demand',
+  MINIMAL: 'minimal',
+  STANDARD: 'standard',
+  ACTIVE: 'active',
+};
+
 export const DEFAULT_LOKI_SETTINGS = {
   enabled: true,
   hiddenPanels: [],
   bubbleEnabled: true,
+  mode: 'on_demand',
 };
 
 export function normalizeLokiSettings(value) {
   const settings = value && typeof value === 'object' ? value : {};
+  const validModes = ['on_demand', 'minimal', 'standard', 'active'];
   return {
     ...DEFAULT_LOKI_SETTINGS,
     ...settings,
     hiddenPanels: Array.isArray(settings.hiddenPanels) ? settings.hiddenPanels.filter(Boolean) : [],
+    mode: validModes.includes(settings.mode) ? settings.mode : 'on_demand',
   };
 }
 
