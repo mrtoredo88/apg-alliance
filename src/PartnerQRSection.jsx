@@ -3,10 +3,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { APP_URL } from './constants.js';
 import { T } from './design.js';
 
-const POSTER_QR_CX = 0.5;
-const POSTER_QR_CY = 0.72;
-const POSTER_QR_W  = 0.30;
-const POSTER_TEMPLATE_URL = '/qr-poster-template.png';
+const POSTER_TEMPLATE_URL = '/qr-poster-template.jpg';
 
 function triggerDownload(dataUrl, filename) {
   const a = document.createElement('a');
@@ -93,39 +90,78 @@ function openPrintDocument(html) {
 
 function detectWhiteRegion(ctx, W, H) {
   const data = ctx.getImageData(0, 0, W, H).data;
-  const GRID = 32, step = 3;
+  const GRID = 32, step = 2;
   const cW = W / GRID, cH = H / GRID;
-  let minCx = W, minCy = H, maxCx = 0, maxCy = 0, found = false;
 
-  for (let gy = 0; gy < GRID; gy++) {
-    for (let gx = 0; gx < GRID; gx++) {
-      let white = 0, total = 0;
-      const x0 = Math.floor(gx * cW), x1 = Math.floor((gx + 1) * cW);
-      const y0 = Math.floor(gy * cH), y1 = Math.floor((gy + 1) * cH);
-      for (let y = y0; y < y1; y += step) {
-        for (let x = x0; x < x1; x += step) {
-          const i = (y * W + x) * 4;
-          if (data[i + 3] > 200) {
-            total++;
-            if (data[i] > 230 && data[i + 1] > 230 && data[i + 2] > 230) white++;
+  const findCluster = (threshold) => {
+    const pct = new Float32Array(GRID * GRID);
+    for (let gy = 0; gy < GRID; gy++) {
+      for (let gx = 0; gx < GRID; gx++) {
+        const x0 = Math.floor(gx * cW), x1 = Math.floor((gx + 1) * cW);
+        const y0 = Math.floor(gy * cH), y1 = Math.floor((gy + 1) * cH);
+        let white = 0, total = 0;
+        for (let y = y0; y < y1; y += step) {
+          for (let x = x0; x < x1; x += step) {
+            const i = (y * W + x) * 4;
+            if (data[i + 3] > 200) {
+              total++;
+              if (data[i] > 230 && data[i + 1] > 230 && data[i + 2] > 230) white++;
+            }
+          }
+        }
+        pct[gy * GRID + gx] = total > 0 ? white / total : 0;
+      }
+    }
+
+    const visited = new Uint8Array(GRID * GRID);
+    let bestCells = null;
+
+    for (let start = 0; start < GRID * GRID; start++) {
+      if (pct[start] < threshold || visited[start]) continue;
+      const queue = [start];
+      visited[start] = 1;
+      const cells = [start];
+      let qi = 0;
+      while (qi < queue.length) {
+        const idx = queue[qi++];
+        const gy = (idx / GRID) | 0, gx = idx % GRID;
+        const nbrs = [
+          gy > 0 ? idx - GRID : -1,
+          gy < GRID - 1 ? idx + GRID : -1,
+          gx > 0 ? idx - 1 : -1,
+          gx < GRID - 1 ? idx + 1 : -1,
+        ];
+        for (const ni of nbrs) {
+          if (ni >= 0 && !visited[ni] && pct[ni] >= threshold) {
+            visited[ni] = 1;
+            queue.push(ni);
+            cells.push(ni);
           }
         }
       }
-      if (total > 0 && white / total >= 0.7) {
-        const cx = (gx + 0.5) * cW, cy = (gy + 0.5) * cH;
-        if (cx < minCx) minCx = cx;
-        if (cx > maxCx) maxCx = cx;
-        if (cy < minCy) minCy = cy;
-        if (cy > maxCy) maxCy = cy;
-        found = true;
-      }
+      if (!bestCells || cells.length > bestCells.length) bestCells = cells;
     }
-  }
 
-  if (!found) return null;
-  const w = maxCx - minCx, h = maxCy - minCy;
-  if (w < W * 0.05 || h < H * 0.05) return null;
-  return { cx: (minCx + maxCx) / 2, cy: (minCy + maxCy) / 2, w, h };
+    if (!bestCells || bestCells.length < 4) return null;
+    let minGx = GRID, maxGx = 0, minGy = GRID, maxGy = 0;
+    for (const idx of bestCells) {
+      const gy = (idx / GRID) | 0, gx = idx % GRID;
+      if (gx < minGx) minGx = gx;
+      if (gx > maxGx) maxGx = gx;
+      if (gy < minGy) minGy = gy;
+      if (gy > maxGy) maxGy = gy;
+    }
+    const w = (maxGx - minGx + 1) * cW;
+    const h = (maxGy - minGy + 1) * cH;
+    if (w < W * 0.05 || h < H * 0.05) return null;
+    return {
+      cx: ((minGx + maxGx + 1) / 2) * cW,
+      cy: ((minGy + maxGy + 1) / 2) * cH,
+      w, h,
+    };
+  };
+
+  return findCluster(0.97) || findCluster(0.80);
 }
 
 async function buildPoster(entityName, qrDataUrl) {
@@ -140,10 +176,10 @@ async function buildPoster(entityName, qrDataUrl) {
   });
 
   const drawQRFallback = (W, H) => {
-    const size = Math.round(W * POSTER_QR_W);
-    const cx = W * POSTER_QR_CX;
-    const cy = H * POSTER_QR_CY;
-    const pad = Math.round(size * 0.07);
+    const size = Math.round(Math.min(W, H) * 0.30);
+    const cx = W * 0.5;
+    const cy = H * 0.65;
+    const pad = Math.round(size * 0.10);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(Math.round(cx - size / 2) - pad, Math.round(cy - size / 2) - pad, size + pad * 2, size + pad * 2);
     return placeQR(cx, cy, size);
@@ -159,7 +195,7 @@ async function buildPoster(entityName, qrDataUrl) {
       ctx.drawImage(tmpl, 0, 0);
       const region = detectWhiteRegion(ctx, offscreen.width, offscreen.height);
       if (region) {
-        const size = Math.round(Math.min(region.w, region.h) * 0.82);
+        const size = Math.round(Math.min(region.w, region.h) * 0.80);
         resolve(await placeQR(region.cx, region.cy, size));
       } else {
         resolve(await drawQRFallback(offscreen.width, offscreen.height));
