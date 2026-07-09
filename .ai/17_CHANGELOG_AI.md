@@ -15,8 +15,17 @@
 
 ---
 
+## [2026-07-09] fix: восстановление сценария согласий и уведомлений
+**Коммит:** `5546cfd8`
+**Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/AdminPanel.jsx`
+**Тип:** fix
+**Что изменено:** CONSENT_SCREEN_DISABLED_FOR_DEMO=false — экран согласий включён для всех. Новые email-пользователи: ConsentScreen → push-разрешение. Старые без согласий: экран при следующем входе. ProfilePanel: карточка «Уведомления отключены» с кнопкой; при blocked — инструкция. Убрана красная ошибка «Разрешение не получено». AdminPanel→Пользователи: статистика согласий + фильтры + бейджи.
+**Почему:** CONSENT_SCREEN_DISABLED_FOR_DEMO был оставлен true после демо-сессии.
+
+---
+
 ## [2026-07-09] fix: экран Активности — race condition auth + permission-denied как empty state
-**Коммит:** TBD
+**Коммит:** `36865a25`
 **Файлы:** `src/UserApp.jsx`, `src/ActivityPage.jsx`
 **Тип:** fix
 **Что изменено:** 1) `UserApp.jsx`: заменена синхронная проверка `auth.currentUser` на `onAuthStateChanged`-based инициализацию — теперь Firebase сессия восстанавливается из IndexedDB до решения о `signInAnonymously`, что исправляет уничтожение кастомной сессии email-пользователей. 2) `ActivityPage.jsx`: ошибка `permission-denied` от Firestore обрабатывается как пустое состояние (не как сетевая ошибка); текст ошибки убран "Проверьте соединение" и заменён корректным.
