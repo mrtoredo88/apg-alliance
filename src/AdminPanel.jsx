@@ -1354,36 +1354,85 @@ function ModerationPanel({ news, comments, onOpenNews, onOpenComments }) {
 
 function AdminUsersPanel({ users }) {
   const [queryText, setQueryText] = useState('');
+  const [consentFilter, setConsentFilter] = useState('all');
+
+  const withConsents = users.filter(u => u.consents?.termsAccepted && u.consents?.privacyAccepted);
+  const withoutConsents = users.filter(u => !u.consents?.termsAccepted || !u.consents?.privacyAccepted);
+  const pushEnabled = users.filter(u => u.notificationsEnabled || u.notificationConsent);
+  const pushDenied = users.filter(u => !u.notificationsEnabled && !u.notificationConsent);
+
   const filtered = users
     .filter(user => {
       const q = queryText.toLowerCase();
-      return !q || userDisplayName(user).toLowerCase().includes(q) || String(user.email || '').toLowerCase().includes(q) || String(user.id || '').toLowerCase().includes(q);
+      const textMatch = !q || userDisplayName(user).toLowerCase().includes(q) || String(user.email || '').toLowerCase().includes(q) || String(user.id || '').toLowerCase().includes(q);
+      if (!textMatch) return false;
+      if (consentFilter === 'no-consent') return !user.consents?.termsAccepted || !user.consents?.privacyAccepted;
+      if (consentFilter === 'with-consent') return user.consents?.termsAccepted && user.consents?.privacyAccepted;
+      if (consentFilter === 'push-on') return user.notificationsEnabled || user.notificationConsent;
+      if (consentFilter === 'push-off') return !user.notificationsEnabled && !user.notificationConsent;
+      return true;
     })
     .sort((a, b) => Number(toJsDate(b.registeredAt || b.createdAt) || 0) - Number(toJsDate(a.registeredAt || a.createdAt) || 0));
+
+  const statItems = [
+    { label: 'Всего', value: users.length, color: A.text },
+    { label: 'Принято согласие', value: withConsents.length, color: A.green },
+    { label: 'Без согласия', value: withoutConsents.length, color: A.red },
+    { label: 'Push разрешён', value: pushEnabled.length, color: A.green },
+    { label: 'Push запрещён', value: pushDenied.length, color: A.textSec },
+  ];
+
+  const filterBtns = [
+    { id: 'all', label: 'Все' },
+    { id: 'no-consent', label: '⚠️ Без согласия' },
+    { id: 'with-consent', label: '✓ Приняли' },
+    { id: 'push-on', label: '🔔 Push вкл' },
+    { id: 'push-off', label: '🔕 Push выкл' },
+  ];
+
   return (
     <div>
       <div style={s.card}>
         <h2 style={s.h2}>👥 Пользователи</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, marginBottom: 14 }}>
+          {statItems.map(st => (
+            <div key={st.label} style={{ background: A.chip, borderRadius: 14, padding: '10px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: st.color }}>{st.value}</div>
+              <div style={{ fontSize: 10.5, color: A.textSec, marginTop: 3, lineHeight: '14px' }}>{st.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          {filterBtns.map(f => (
+            <button key={f.id} onClick={() => setConsentFilter(f.id)} style={{ ...s.btn, ...(consentFilter === f.id ? s.btnPri : s.btnGray), padding: '5px 10px', fontSize: 12 }}>{f.label}</button>
+          ))}
+        </div>
         <input value={queryText} onChange={e => setQueryText(e.target.value)} placeholder="Поиск по имени, email или id" style={s.input} />
         <div style={{ color: A.textSec, fontSize: 12 }}>{filtered.length} из {users.length}</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 12 }}>
-        {filtered.slice(0, 120).map(user => (
-          <div key={user.id} style={{ ...s.card, marginBottom: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: A.text, fontSize: 15, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userDisplayName(user)}</div>
-                <div style={{ color: A.textSec, fontSize: 11.5, marginTop: 3 }}>{providerLabel(user)}</div>
+        {filtered.slice(0, 120).map(user => {
+          const hasConsent = user.consents?.termsAccepted && user.consents?.privacyAccepted;
+          const hasPush = user.notificationsEnabled || user.notificationConsent;
+          return (
+            <div key={user.id} style={{ ...s.card, marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: A.text, fontSize: 15, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userDisplayName(user)}</div>
+                  <div style={{ color: A.textSec, fontSize: 11.5, marginTop: 3 }}>{providerLabel(user)}</div>
+                </div>
+                <div style={{ color: A.gold, fontWeight: 950 }}>{Number(user.keys || 0)} 🗝</div>
               </div>
-              <div style={{ color: A.gold, fontWeight: 950 }}>{Number(user.keys || 0)} 🗝</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                <span style={{ padding: '4px 8px', borderRadius: 999, background: hasConsent ? 'rgba(75,179,75,0.12)' : 'rgba(230,70,70,0.12)', color: hasConsent ? A.green : A.red, fontSize: 10.5, fontWeight: 750 }}>{hasConsent ? '✓ согласие' : '⚠ без согласия'}</span>
+                <span style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: hasPush ? A.green : A.textSec, fontSize: 10.5, fontWeight: 750 }}>{hasPush ? '🔔 push вкл' : '🔕 push выкл'}</span>
+                {['role', 'email', 'telegramId'].map(key => user[key] ? (
+                  <span key={key} style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
+                ) : null)}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-              {['role', 'email', 'telegramId'].map(key => user[key] ? (
-                <span key={key} style={{ padding: '5px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
-              ) : null)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

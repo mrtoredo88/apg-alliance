@@ -345,7 +345,7 @@ function hasAcceptedCurrentLegal(data) {
 }
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
-const CONSENT_SCREEN_DISABLED_FOR_DEMO = true;
+const CONSENT_SCREEN_DISABLED_FOR_DEMO = false;
 const USER_AUTH_STORAGE_KEYS = [
   'apg_tg_user',
   'apg_email_user',
@@ -1937,7 +1937,7 @@ export function UserApp() {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        if (!silent) showToast('❌ Разрешение не получено', 'error');
+        if (!silent) showToast('🔔 Включите уведомления в настройках браузера', 'info');
         return;
       }
       const swReg = await (window.__swRegPromise ?? navigator.serviceWorker.ready);
@@ -2010,7 +2010,11 @@ export function UserApp() {
       return;
     }
 
-    // Web / PWA — FCM Web Push (включая Telegram-пользователей)
+    if ('Notification' in window && Notification.permission === 'denied') {
+      showToast('🔔 Разрешение заблокировано. Откройте настройки браузера и включите уведомления для этого сайта.', 'info');
+      return;
+    }
+
     requestWebPushPermission();
   }, [user, showToast, requestWebPushPermission]);
 
