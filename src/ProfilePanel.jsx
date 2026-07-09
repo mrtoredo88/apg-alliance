@@ -7,7 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { signInWithCustomToken } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 
-import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
+import { T } from './design.js';
 import { APP_URL, API_BASE_URL } from './constants.js';
 import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
@@ -57,13 +57,13 @@ function EmailVerifyBanner({ userId }) {
     <div style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 12, padding: '10px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ fontSize: 16, flexShrink: 0 }}>📬</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: T.gold, fontWeight: 600, lineHeight: '16px' }}>Подтвердите адрес почты</div>
-        <div style={{ fontSize: 11, color: T.textSec, lineHeight: '15px' }}>Письмо уже отправлено при входе</div>
+        <div style={{ fontSize: 12, color: APG2.gold, fontWeight: 600, lineHeight: '16px' }}>Подтвердите адрес почты</div>
+        <div style={{ fontSize: 11, color: APG2.textSoft, lineHeight: '15px' }}>Письмо уже отправлено при входе</div>
       </div>
       <button
         onClick={resend}
         disabled={loading || sent}
-        style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: `1px solid rgba(201,168,76,0.35)`, background: 'none', color: sent ? T.textSec : T.gold, fontSize: 11, fontWeight: 700, cursor: sent ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
+        style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: `1px solid rgba(201,168,76,0.35)`, background: 'none', color: sent ? APG2.textSoft : APG2.gold, fontSize: 11, fontWeight: 700, cursor: sent ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
       >
         {sent ? '✓ Отправлено' : loading ? '...' : 'Отправить ещё раз'}
       </button>
@@ -94,11 +94,11 @@ const ACHIEVEMENTS = [
 function AchievementBadge({ a, unlocked }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 76, gap: 6, opacity: unlocked ? 1 : 0.3, filter: unlocked ? 'none' : 'grayscale(1)' }}>
-      <div style={{ width: 52, height: 52, borderRadius: 16, background: unlocked ? a.color + '20' : T.chipBg, border: `2px solid ${unlocked ? a.color + '60' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, position: 'relative' }}>
+      <div style={{ width: 52, height: 52, borderRadius: 16, background: unlocked ? a.color + '20' : 'rgba(255,255,255,0.08)', border: `2px solid ${unlocked ? a.color + '60' : 'rgba(255,255,255,0.12)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, position: 'relative' }}>
         {a.emoji}
         {unlocked && <div style={{ position: 'absolute', bottom: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</div>}
       </div>
-      <span style={{ fontSize: 10, color: unlocked ? T.textPri : T.textSec, fontWeight: unlocked ? 700 : 400, textAlign: 'center', lineHeight: '13px' }}>{a.title}</span>
+      <span style={{ fontSize: 10, color: unlocked ? APG2.text : APG2.textSoft, fontWeight: unlocked ? 700 : 400, textAlign: 'center', lineHeight: '13px' }}>{a.title}</span>
     </div>
   );
 }
@@ -229,12 +229,12 @@ function FaqSection() {
 
   return (
     <div style={{ padding: '16px 16px 0' }}>
-      <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Частые вопросы</div>
-      <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+      <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Частые вопросы</div>
+      <div style={{ ...APG2.glass, borderRadius: 24, overflow: 'hidden' }}>
         {FAQ_ITEMS.map((item, i) => {
           const isOpen = openIndex === i;
           return (
-            <div key={i} style={{ borderBottom: i < FAQ_ITEMS.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+            <div key={i} style={{ borderBottom: i < FAQ_ITEMS.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none' }}>
               <button
                 onClick={() => setOpenIndex(isOpen ? null : i)}
                 style={{
@@ -243,16 +243,16 @@ function FaqSection() {
                   cursor: 'pointer', textAlign: 'left',
                 }}
               >
-                <span style={{ fontSize: 14, color: T.textPri, fontWeight: 600, lineHeight: '20px' }}>{item.q}</span>
+                <span style={{ fontSize: 14, color: APG2.text, fontWeight: 600, lineHeight: '20px' }}>{item.q}</span>
                 <span style={{
-                  fontSize: 16, color: T.gold, flexShrink: 0,
+                  fontSize: 16, color: APG2.gold, flexShrink: 0,
                   transform: isOpen ? 'rotate(45deg)' : 'none',
                   transition: 'transform 0.25s ease',
                 }}>✦</span>
               </button>
               {isOpen && (
                 <div style={{ padding: '0 16px 14px' }}>
-                  <p style={{ margin: 0, fontSize: 13, color: T.textSec, lineHeight: '20px', whiteSpace: 'pre-wrap' }}>{item.a}</p>
+                  <p style={{ margin: 0, fontSize: 13, color: APG2.textSoft, lineHeight: '20px', whiteSpace: 'pre-wrap' }}>{item.a}</p>
                 </div>
               )}
             </div>
@@ -265,18 +265,18 @@ function FaqSection() {
 
 function FavoriteCard({ partner, onOpen, onRemove }) {
   return (
-    <div style={{ background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+    <div style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
       {partner.logoUrl
         ? <Avatar size={44} src={partner.logoUrl} />
-        : <div style={{ width: 44, height: 44, borderRadius: '50%', background: T.gold + '18', border: `2px solid ${T.gold}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
+        : <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(201,168,76,0.09)', border: '2px solid rgba(201,168,76,0.27)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
       }
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.name}</div>
-        {partner.categoryLabel && <div style={{ fontSize: 11, color: T.gold, marginTop: 2 }}>{partner.categoryLabel}</div>}
+        <div style={{ fontSize: 13, fontWeight: 700, color: APG2.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.name}</div>
+        {partner.categoryLabel && <div style={{ fontSize: 11, color: APG2.gold, marginTop: 2 }}>{partner.categoryLabel}</div>}
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={() => onOpen(partner)} style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Открыть</button>
-        <button onClick={() => onRemove(partner.id)} style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textSec, fontSize: 12, cursor: 'pointer' }}>✕</button>
+        <button onClick={() => onOpen(partner)} style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Открыть</button>
+        <button onClick={() => onRemove(partner.id)} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: APG2.textSoft, fontSize: 12, cursor: 'pointer' }}>✕</button>
       </div>
     </div>
   );
@@ -292,16 +292,16 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(201,168,76,0.04) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${level.color}18, transparent 70%)`, pointerEvents: 'none' }} />
 
-        <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16, opacity: 0.8 }}>✦ АПГ — Альянс Партнёров Зеленограда</div>
+        <div style={{ fontSize: 10, color: APG2.gold, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16, opacity: 0.8 }}>✦ АПГ — Альянс Партнёров Зеленограда</div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
           {user?.photo_200
-            ? <img src={user.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.gold}88`, objectFit: 'cover', flexShrink: 0 }} />
-            : <div style={{ width: 56, height: 56, borderRadius: '50%', background: T.gold + '20', border: `2px solid ${T.gold}60`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>👤</div>
+            ? <img src={user.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid rgba(201,168,76,0.53)', objectFit: 'cover', flexShrink: 0 }} />
+            : <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(201,168,76,0.12)', border: '2px solid rgba(201,168,76,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>👤</div>
           }
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>{name}</div>
-            <div style={{ fontSize: 13, color: T.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.label}</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: APG2.text, lineHeight: 1.2 }}>{name}</div>
+            <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 600, marginTop: 3 }}>{level.emoji} {level.label}</div>
           </div>
         </div>
 
@@ -312,10 +312,10 @@ function ShareModal({ user, userKeys, streak, scannedCount, completedTasks, unlo
             { emoji: '🏪', value: scannedCount,      label: 'партнёров' },
             { emoji: '🏆', value: unlockedAchievements, label: 'наград' },
           ].map(s => (
-            <div key={s.label} style={{ background: T.chipBg, borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: `1px solid ${T.border}` }}>
+            <div key={s.label} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ fontSize: 18 }}>{s.emoji}</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: T.gold, lineHeight: 1.2 }}>{s.value}</div>
-              <div style={{ fontSize: 9, color: T.textSec, lineHeight: '12px', marginTop: 2 }}>{s.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: APG2.gold, lineHeight: 1.2 }}>{s.value}</div>
+              <div style={{ fontSize: 9, color: APG2.textSoft, lineHeight: '12px', marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -349,22 +349,22 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>🔥 Активность — 30 дней</div>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>🔥 Активность — 30 дней</div>
         {streak > 0 && <div style={{ fontSize: 11, color: '#FF8C42', fontWeight: 700, background: 'rgba(255,100,0,0.1)', border: '1px solid rgba(255,100,0,0.25)', padding: '3px 10px', borderRadius: 20 }}>{streak} дн. подряд</div>}
       </div>
-      <div style={{ ...GLASS, borderRadius: 20, padding: '14px 12px' }}>
+      <div style={{ ...APG2.glass, borderRadius: 20, padding: '14px 12px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 4 }}>
           {cells.map(c => (
             <div key={c.key} title={c.key} style={{
               aspectRatio: '1', borderRadius: 6,
               background: c.active
-                ? `linear-gradient(135deg, ${T.gold}, ${T.goldL})`
+                ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
                 : c.isToday
                   ? 'rgba(201,168,76,0.15)'
-                  : T.chipBg,
-              border: c.isToday ? `1px solid ${T.gold}60` : '1px solid transparent',
+                  : 'rgba(255,255,255,0.08)',
+              border: c.isToday ? '1px solid rgba(201,168,76,0.38)' : '1px solid transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 8, color: c.active ? '#0F0F1A' : T.textSec,
+              fontSize: 8, color: c.active ? '#0F0F1A' : APG2.textSoft,
               fontWeight: c.active ? 800 : 400,
             }}>
               {c.active ? '✓' : c.dayNum}
@@ -373,12 +373,12 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
         </div>
         <div style={{ display: 'flex', gap: 12, marginTop: 10, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})` }} />
-            <span style={{ fontSize: 10, color: T.textSec }}>Посещение</span>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)' }} />
+            <span style={{ fontSize: 10, color: APG2.textSoft }}>Посещение</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: T.chipBg, border: `1px solid ${T.gold}60` }} />
-            <span style={{ fontSize: 10, color: T.textSec }}>Сегодня</span>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(201,168,76,0.38)' }} />
+            <span style={{ fontSize: 10, color: APG2.textSoft }}>Сегодня</span>
           </div>
         </div>
       </div>
@@ -990,7 +990,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {achievementToast && (
         <div style={{
           position: 'fixed', top: 60, left: 16, right: 16, zIndex: 700,
-          background: T.chipBg,
+          background: 'rgba(255,255,255,0.08)',
           backdropFilter: 'blur(48px) saturate(2)',
           WebkitBackdropFilter: 'blur(48px) saturate(2)',
           border: `1px solid ${achievementToast.color}60`,
@@ -1008,10 +1008,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             {achievementToast.emoji}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>✦ Новое достижение!</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>{achievementToast.title}</div>
+            <div style={{ fontSize: 10, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>✦ Новое достижение!</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: APG2.text }}>{achievementToast.title}</div>
           </div>
-          <button onClick={dismissToast} style={{ background: 'none', border: 'none', color: T.textSec, fontSize: 20, cursor: 'pointer', padding: 4, flexShrink: 0 }}>✕</button>
+          <button onClick={dismissToast} style={{ background: 'none', border: 'none', color: APG2.textSoft, fontSize: 20, cursor: 'pointer', padding: 4, flexShrink: 0 }}>✕</button>
         </div>
       )}
 
@@ -1024,7 +1024,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         padding: '0 16px',
         display: 'flex', alignItems: 'center', height: 52,
       }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: T.textPri }}>✦ Профиль</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: APG2.text }}>✦ Профиль</div>
       </div>
 
       {/* ── Вход (гостевой режим) ── */}
@@ -1032,8 +1032,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <div style={{ margin: '14px 16px 0', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(74,144,217,0.3)', background: isDark ? 'rgba(74,144,217,0.08)' : 'rgba(74,144,217,0.06)' }}>
           <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, marginBottom: 3 }}>Войдите в АПГ</div>
-              <div style={{ fontSize: 12, color: T.textSec }}>чтобы сохранить прогресс и ключи</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: APG2.text, marginBottom: 3 }}>Войдите в АПГ</div>
+              <div style={{ fontSize: 12, color: APG2.textSoft }}>чтобы сохранить прогресс и ключи</div>
             </div>
 
             {/* Email — первичный способ входа */}
@@ -1050,12 +1050,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-                  <span style={{ fontSize: 11, color: T.textSec, fontWeight: 600 }}>или</span>
+                  <span style={{ fontSize: 11, color: APG2.textSoft, fontWeight: 600 }}>или</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
                   {tgLoading
-                    ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: T.textSec, fontSize: 14, padding: '12px 0' }}>
+                    ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: APG2.textSoft, fontSize: 14, padding: '12px 0' }}>
                         <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                         Создаём сессию...
                       </div>
@@ -1086,24 +1086,24 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {/* ── Привязка Telegram для email-пользователей ── */}
       {!isVK() && user && String(user.id).startsWith('email:') && (
         <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px', overflow: 'hidden' }}>
-          <div style={{ fontSize: 12, color: T.textSec, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
+          <div style={{ fontSize: 12, color: APG2.textSoft, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: user.emailVerified === false ? 8 : 10, minWidth: 0 }}>
-            <span style={{ fontSize: 13, color: T.textPri, flexShrink: 0 }}>✉️ Email</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
+            <span style={{ fontSize: 13, color: APG2.text, flexShrink: 0 }}>✉️ Email</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: APG2.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4BB34B', fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
           </div>
           {user.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
           {user.linkedTelegram
             ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 13, color: T.textPri }}>✈️ Telegram</span>
-                <span style={{ fontSize: 11, color: T.textSec }}>{user.linkedTelegram.firstName}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px' }}>✓ привязан</span>
+                <span style={{ fontSize: 13, color: APG2.text }}>✈️ Telegram</span>
+                <span style={{ fontSize: 11, color: APG2.textSoft }}>{user.linkedTelegram.firstName}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4BB34B', fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px' }}>✓ привязан</span>
               </div>
             : tgStep === 'linked'
-              ? <div style={{ fontSize: 13, color: T.green, fontWeight: 600, textAlign: 'center', padding: '6px 0' }}>✓ Telegram привязан!</div>
+              ? <div style={{ fontSize: 13, color: '#4BB34B', fontWeight: 600, textAlign: 'center', padding: '6px 0' }}>✓ Telegram привязан!</div>
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {tgLoading
-                    ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSec, fontSize: 13, padding: '6px 0' }}>
+                    ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: APG2.textSoft, fontSize: 13, padding: '6px 0' }}>
                         <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#26A8EA', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                         Создаём сессию...
                       </div>
@@ -1129,21 +1129,21 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {/* ── Привязка Email для Telegram-пользователей ── */}
       {!isVK() && user && String(user.id).startsWith('tg_') && (
         <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px', overflow: 'hidden' }}>
-          <div style={{ fontSize: 12, color: T.textSec, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
+          <div style={{ fontSize: 12, color: APG2.textSoft, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
 
           {/* Telegram — основной */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: T.textPri, flexShrink: 0 }}>✈️ Telegram</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.first_name}{user.last_name ? ' ' + user.last_name : ''}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
+            <span style={{ fontSize: 13, color: APG2.text, flexShrink: 0 }}>✈️ Telegram</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: APG2.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.first_name}{user.last_name ? ' ' + user.last_name : ''}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4BB34B', fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
           </div>
 
           {/* Email */}
           {(user.linkedEmail || linkEmailDone)
             ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 13, color: T.textPri, flexShrink: 0 }}>✉️ Email</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.linkedEmail ?? linkEmailValue}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: T.green, fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ привязан</span>
+                <span style={{ fontSize: 13, color: APG2.text, flexShrink: 0 }}>✉️ Email</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: APG2.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.linkedEmail ?? linkEmailValue}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4BB34B', fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ привязан</span>
               </div>
             : showLinkEmail
               ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1155,11 +1155,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     onChange={e => { setLinkEmailValue(e.target.value); setLinkEmailError(''); }}
                     onKeyDown={e => e.key === 'Enter' && handleLinkEmail()}
                     placeholder="Ваш email"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 11, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textPri, fontSize: 16, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 11, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: APG2.text, fontSize: 16, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
                   />
                   {linkEmailError && <div style={{ fontSize: 12, color: '#E64646' }}>{linkEmailError}</div>}
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => { setShowLinkEmail(false); setLinkEmailError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 11, background: 'none', border: `1px solid ${T.border}`, color: T.textSec, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
+                    <button onClick={() => { setShowLinkEmail(false); setLinkEmailError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 11, background: 'none', border: '1px solid rgba(255,255,255,0.12)', color: APG2.textSoft, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
                     <button
                       onClick={handleLinkEmail}
                       disabled={linkEmailLoading || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkEmailValue)}
@@ -1205,8 +1205,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               {/* Строка: аватар + имя/город/уровень + ключи */}
               <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 18 }}>
                 {/* Аватар */}
-                <div style={{ width: 72, height: 72, borderRadius: '50%', padding: 2.5, background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, flexShrink: 0 }}>
-                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: T.surface }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', padding: 2.5, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', flexShrink: 0 }}>
+                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#101012' }}>
                     {safeUser.photo_200
                       ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#C9A84C', background: 'rgba(201,168,76,0.12)' }}>
@@ -1218,10 +1218,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
                 {/* Имя + город + уровень */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri, lineHeight: 1.2, marginBottom: 2 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: APG2.text, lineHeight: 1.2, marginBottom: 2 }}>
                     {safeUser.displayName || [safeUser.first_name, safeUser.last_name].filter(Boolean).join(' ') || 'Участник АПГ'}
                   </div>
-                  <div style={{ fontSize: 11, color: T.textSec, marginBottom: 8 }}>Участник АПГ · Зеленоград</div>
+                  <div style={{ fontSize: 11, color: APG2.textSoft, marginBottom: 8 }}>Участник АПГ · Зеленоград</div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: level.color + '22', border: `1px solid ${level.color}55`, borderRadius: 16, padding: '4px 10px' }}>
                     <span style={{ fontSize: 13 }}>{level.emoji}</span>
                     <span style={{ fontSize: 11, color: level.color, fontWeight: 700 }}>{level.label}</span>
@@ -1230,16 +1230,16 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
                 {/* Счётчик ключей */}
                 <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: isDark ? '#fff' : T.textPri, lineHeight: 1, letterSpacing: -1 }}>{userKeys}</div>
-                  <div style={{ fontSize: 10, color: T.goldL, fontWeight: 700, marginTop: 3 }}>🗝️ ключей</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: isDark ? '#fff' : APG2.text, lineHeight: 1, letterSpacing: -1 }}>{userKeys}</div>
+                  <div style={{ fontSize: 10, color: '#E8C97A', fontWeight: 700, marginTop: 3 }}>🗝️ ключей</div>
                 </div>
               </div>
 
               {/* Прогресс */}
               <div style={{ height: 7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)', borderRadius: 7, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg, ${level.color}, ${T.goldL})`, borderRadius: 7, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)', boxShadow: `0 0 12px ${level.color}` }} />
+                <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg, ${level.color}, #E8C97A)`, borderRadius: 7, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)', boxShadow: `0 0 12px ${level.color}` }} />
               </div>
-              <div style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : T.textSec, textAlign: 'center', fontWeight: 600 }}>
+              <div style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : APG2.textSoft, textAlign: 'center', fontWeight: 600 }}>
                 {nextLevel
                   ? `До «${nextLevel.label}» ${nextLevel.emoji}: ещё ${toNext} ключей`
                   : '👑 Максимальный уровень — вы Амбассадор АПГ!'}
@@ -1251,13 +1251,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── Статистика ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Статистика</div>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Статистика</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           {stats.map(s => (
-            <div key={s.label} style={{ ...GLASS, borderRadius: 20, padding: '14px 8px', textAlign: 'center' }}>
+            <div key={s.label} style={{ ...APG2.glass, borderRadius: 20, padding: '14px 8px', textAlign: 'center' }}>
               <div style={{ fontSize: 22, marginBottom: 6 }}>{s.emoji}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: T.textPri }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: T.textSec, marginTop: 3 }}>{s.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: APG2.text }}>{s.value}</div>
+              <div style={{ fontSize: 10, color: APG2.textSoft, marginTop: 3 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -1269,9 +1269,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         const received = lastBonusDate === todayKey;
         return (
           <div style={{ padding: '12px 16px 0' }}>
-            <div style={{ ...GLASS, borderRadius: 16, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ ...APG2.glass, borderRadius: 16, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 16 }}>🗝️</span>
-              <span style={{ fontSize: 13, color: received ? T.green : T.textSec, fontWeight: received ? 600 : 400 }}>
+              <span style={{ fontSize: 13, color: received ? '#4BB34B' : APG2.textSoft, fontWeight: received ? 600 : 400 }}>
                 {received ? '+1 ключ за вход · Сегодня получен ✓' : '+1 ключ за вход · Зайди завтра'}
               </span>
             </div>
@@ -1281,8 +1281,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── Путь участника ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Путь участника</div>
-        <div style={{ ...GLASS, borderRadius: 24, padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Путь участника</div>
+        <div style={{ ...APG2.glass, borderRadius: 24, padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
           {LEVELS.map((lvl, i) => {
             const isReached  = userKeys >= lvl.min;
             const isCurrent  = level.id === lvl.id;
@@ -1293,15 +1293,15 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 {!isLast && (
                   <div style={{
                     position: 'absolute', left: 19, top: 40, width: 2, height: 'calc(100% - 12px)',
-                    background: isReached ? lvl.color + '60' : T.border,
+                    background: isReached ? lvl.color + '60' : 'rgba(255,255,255,0.12)',
                     transition: 'background 0.4s ease',
                   }} />
                 )}
                 {/* Иконка уровня */}
                 <div style={{
                   width: 40, height: 40, borderRadius: 14, flexShrink: 0,
-                  background: isReached ? lvl.color + '22' : T.chipBg,
-                  border: `2px solid ${isReached ? lvl.color + '80' : T.border}`,
+                  background: isReached ? lvl.color + '22' : 'rgba(255,255,255,0.08)',
+                  border: `2px solid ${isReached ? lvl.color + '80' : 'rgba(255,255,255,0.12)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: isReached ? 18 : 16,
                   filter: isReached ? 'none' : 'grayscale(1)',
@@ -1314,15 +1314,15 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 {/* Текст */}
                 <div style={{ flex: 1, paddingBottom: isLast ? 0 : 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: isReached ? T.textPri : T.textSec }}>{lvl.label}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: isReached ? APG2.text : APG2.textSoft }}>{lvl.label}</span>
                     {isCurrent && (
                       <span style={{ fontSize: 9, fontWeight: 700, color: lvl.color, background: lvl.color + '20', border: `1px solid ${lvl.color}50`, borderRadius: 8, padding: '2px 7px', textTransform: 'uppercase', letterSpacing: 0.5 }}>сейчас</span>
                     )}
                     {isReached && !isCurrent && (
-                      <span style={{ fontSize: 12, color: T.green }}>✓</span>
+                      <span style={{ fontSize: 12, color: '#4BB34B' }}>✓</span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 2 }}>
                     {lvl.min === 0 ? 'Стартовый уровень' : `от ${lvl.min} ключей`}
                   </div>
                 </div>
@@ -1338,12 +1338,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {/* ── Достижения ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Достижения</div>
-          <div style={{ fontSize: 11, color: T.textSec, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>{unlockedCount}/{achievements.length}</div>
+          <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Достижения</div>
+          <div style={{ fontSize: 11, color: APG2.textSoft, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)' }}>{unlockedCount}/{achievements.length}</div>
         </div>
 
         {unlockedCount === 0
-          ? <div style={{ ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          ? <div style={{ ...APG2.glass, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
               <div style={{ animation: 'float 3.5s ease-in-out infinite' }}>
                 <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                   <path d="M28 17 H62 V46 C62 62 45 72 45 72 C45 72 28 62 28 46 Z" fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.26)" strokeWidth="1.5"/>
@@ -1360,11 +1360,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </svg>
               </div>
               <div>
-                <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Достижения заперты</div>
-                <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Сканируй QR-коды партнёров — так появятся первые достижения</div>
+                <div style={{ color: APG2.text, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Достижения заперты</div>
+                <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>Сканируй QR-коды партнёров — так появятся первые достижения</div>
               </div>
             </div>
-          : <div style={{ ...GLASS, borderRadius: 24, padding: 16 }}>
+          : <div style={{ ...APG2.glass, borderRadius: 24, padding: 16 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 {achievements.map(a => <AchievementBadge key={a.id} a={a} unlocked={a.unlocked} />)}
               </div>
@@ -1375,12 +1375,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {/* ── Избранное ── */}
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Избранное</div>
-          {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: T.textSec, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: `1px solid ${T.border}` }}>{favoritePartners.length}</div>}
+          <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Избранное</div>
+          {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: APG2.textSoft, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)' }}>{favoritePartners.length}</div>}
         </div>
 
         {favoritePartners.length === 0
-          ? <div style={{ ...GLASS, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          ? <div style={{ ...APG2.glass, borderRadius: 24, padding: '28px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
               <div style={{ animation: 'float 4s ease-in-out infinite' }}>
                 <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
                   <path d="M45 72 C45 72 14 51 14 31 C14 21 22 14 32 14 C37 14 42 17 45 23 C48 17 53 14 58 14 C68 14 76 21 76 31 C76 51 45 72 45 72 Z" fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.26)" strokeWidth="1.5"/>
@@ -1395,8 +1395,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </svg>
               </div>
               <div>
-                <div style={{ color: T.textPri, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Список пуст</div>
-                <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Добавляй партнёров в избранное — они появятся здесь</div>
+                <div style={{ color: APG2.text, fontWeight: 700, fontSize: 15, marginBottom: 5 }}>Список пуст</div>
+                <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>Добавляй партнёров в избранное — они появятся здесь</div>
               </div>
             </div>
           : <div>{favoritePartners.map(p => <FavoriteCard key={p.id} partner={p} onOpen={onOpenPartner} onRemove={onToggleFavorite} />)}</div>
@@ -1409,29 +1409,29 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         if (!myEvents.length) return null;
         return (
           <div style={{ padding: '16px 16px 0' }}>
-            <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Мои мероприятия</div>
-            <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Мои мероприятия</div>
+            <div style={{ ...APG2.glass, borderRadius: 24, overflow: 'hidden' }}>
               {myEvents.map((event, i) => {
                 const isPast = event.eventDate ? new Date(event.eventDate).getTime() < Date.now() : false;
                 return (
-                  <div key={event.id} style={{ padding: '14px 16px', borderBottom: i < myEvents.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div key={event.id} style={{ padding: '14px 16px', borderBottom: i < myEvents.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                       width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                      background: isPast ? T.chipBg : 'rgba(201,168,76,0.12)',
-                      border: `1px solid ${isPast ? T.border : 'rgba(201,168,76,0.3)'}`,
+                      background: isPast ? 'rgba(255,255,255,0.08)' : 'rgba(201,168,76,0.12)',
+                      border: `1px solid ${isPast ? 'rgba(255,255,255,0.12)' : 'rgba(201,168,76,0.3)'}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                     }}>
                       {event.emoji ?? '🎉'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</div>
-                      {event.date && <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>📅 {event.date}</div>}
+                      <div style={{ fontSize: 14, fontWeight: 700, color: APG2.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</div>
+                      {event.date && <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 2 }}>📅 {event.date}</div>}
                     </div>
                     <div style={{
                       fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, flexShrink: 0,
-                      background: isPast ? T.chipBg : T.green + '12',
-                      color: isPast ? T.textSec : T.green,
-                      border: `1px solid ${isPast ? T.border : T.green + '40'}`,
+                      background: isPast ? 'rgba(255,255,255,0.08)' : 'rgba(75,179,75,0.07)',
+                      color: isPast ? APG2.textSoft : '#4BB34B',
+                      border: `1px solid ${isPast ? 'rgba(255,255,255,0.12)' : 'rgba(75,179,75,0.25)'}`,
                     }}>
                       {isPast ? 'Прошло' : 'Иду ✓'}
                     </div>
@@ -1445,31 +1445,31 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── Реферальная программа ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Пригласить друга</div>
-        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Пригласить друга</div>
+        <div style={{ ...APG2.glass, borderRadius: 24, overflow: 'hidden' }}>
 
           {/* Статистика */}
           {referralCount > 0 && (
-            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 16 }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.12)', display: 'flex', gap: 16 }}>
               <div style={{ textAlign: 'center', flex: 1 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: T.textPri }}>{referralCount}</div>
-                <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: APG2.text }}>{referralCount}</div>
+                <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 2 }}>
                   {referralCount === 1 ? 'друг' : referralCount < 5 ? 'друга' : 'друзей'} пришло
                 </div>
               </div>
-              <div style={{ width: 1, background: T.border }} />
+              <div style={{ width: 1, background: 'rgba(255,255,255,0.12)' }} />
               <div style={{ textAlign: 'center', flex: 1 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: T.gold }}>{referralCount * 2} 🗝️</div>
-                <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>заработано</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: APG2.gold }}>{referralCount * 2} 🗝️</div>
+                <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 2 }}>заработано</div>
               </div>
             </div>
           )}
 
           {/* QR-код */}
           {user?.id && (
-            <div style={{ padding: '16px', borderBottom: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 13, color: T.textSec, textAlign: 'center', lineHeight: '18px' }}>
-                Покажи QR другу — он сканирует и вы оба получаете <span style={{ color: T.gold, fontWeight: 700 }}>+2 🗝️</span>
+            <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 13, color: APG2.textSoft, textAlign: 'center', lineHeight: '18px' }}>
+                Покажи QR другу — он сканирует и вы оба получаете <span style={{ color: APG2.gold, fontWeight: 700 }}>+2 🗝️</span>
               </div>
               <div style={{ background: '#fff', borderRadius: 16, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                 <QRCodeSVG
@@ -1480,7 +1480,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   level="M"
                 />
               </div>
-              <div style={{ fontSize: 11, color: T.textSec, textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: APG2.textSoft, textAlign: 'center' }}>
                 твой личный код · ID {user.id}
               </div>
             </div>
@@ -1491,7 +1491,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             <button onClick={() => setShowShareModal(true)} style={{ flex: 1, padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #4A90D9, #2D6FBC)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               📤 Поделиться
             </button>
-            <button onClick={onOpenReferral} style={{ flex: 1, padding: '12px 0', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}`, color: T.textPri, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <button onClick={onOpenReferral} style={{ flex: 1, padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', color: APG2.text, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               Подробнее ›
             </button>
           </div>
@@ -1519,11 +1519,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   : ownedPartner.emoji ?? '🏪'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: T.gold, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 }}>Мой кабинет</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ownedPartner.name}</div>
-                <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>Статистика · Редактирование карточки</div>
+                <div style={{ fontSize: 11, color: APG2.gold, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 }}>Мой кабинет</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: APG2.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ownedPartner.name}</div>
+                <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 1 }}>Статистика · Редактирование карточки</div>
               </div>
-              <div style={{ color: T.gold, fontSize: 20, flexShrink: 0 }}>›</div>
+              <div style={{ color: APG2.gold, fontSize: 20, flexShrink: 0 }}>›</div>
             </div>
           </button>
         </div>
@@ -1548,8 +1548,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: '#4A90D9', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 }}>Кабинет эксперта</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ownedExpert.name}</div>
-                <div style={{ fontSize: 11, color: T.textSec, marginTop: 1 }}>Статистика · QR-коды · Редактирование</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: APG2.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ownedExpert.name}</div>
+                <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 1 }}>Статистика · QR-коды · Редактирование</div>
               </div>
               <div style={{ color: '#4A90D9', fontSize: 20, flexShrink: 0 }}>›</div>
             </div>
@@ -1559,8 +1559,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── Настройки ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Настройки</div>
-        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Настройки</div>
+        <div style={{ ...APG2.glass, borderRadius: 24, overflow: 'hidden' }}>
           {[
             { icon: '◌', label: 'Локи АПГ',          action: onOpenLoki,             right: 'помощник' },
             { icon: '⌕', label: 'Справочник',        action: onOpenReference,        right: null },
@@ -1568,18 +1568,18 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
-            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
-              <span style={{ fontSize: 15, color: T.textPri, fontWeight: 500 }}>{item.label}</span>
+              <span style={{ fontSize: 15, color: APG2.text, fontWeight: 500 }}>{item.label}</span>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {item.right && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: T.green, background: T.green + '18', padding: '3px 8px', borderRadius: 10 }}>{item.right}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#4BB34B', background: 'rgba(75,179,75,0.09)', padding: '3px 8px', borderRadius: 10 }}>{item.right}</span>
                 )}
-                <span style={{ color: T.textSec, fontSize: 16 }}>›</span>
+                <span style={{ color: APG2.textSoft, fontSize: 16 }}>›</span>
               </div>
             </button>
           ))}
-          <div style={{ borderTop: `1px solid ${T.border}` }}>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
             <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
           </div>
         </div>
@@ -1590,48 +1590,48 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── Поддержка ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Поддержка</div>
-        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Поддержка</div>
+        <div style={{ ...APG2.glass, borderRadius: 24, overflow: 'hidden' }}>
           {[
             {
               icon: '⌕',
               label: 'Открыть справочник',
               sub: 'Ключи, QR, призы и роли АПГ',
               action: onOpenReference,
-              color: T.gold,
+              color: APG2.gold,
             },
             {
               icon: '💬',
               label: 'Написать нам',
               sub: 'Ответим в течение дня',
               action: handleWriteAdmin,
-              color: T.blue,
+              color: '#4A90D9',
             },
             {
               icon: '🏪',
               label: 'Предложить партнёра',
               sub: 'Знаете крутое место в Зеленограде?',
               action: handleWriteAdmin,
-              color: T.green,
+              color: '#4BB34B',
             },
             {
               icon: '🐞',
               label: 'Сообщить об ошибке',
               sub: 'Поможем разобраться',
               action: handleWriteAdmin,
-              color: T.red,
+              color: '#E64646',
             },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
             <button key={item.label} onClick={item.action}
-              style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+              style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: item.color + '18', border: `1px solid ${item.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                 {item.icon}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, color: T.textPri, fontWeight: 600 }}>{item.label}</div>
-                <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>{item.sub}</div>
+                <div style={{ fontSize: 14, color: APG2.text, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 2 }}>{item.sub}</div>
               </div>
-              <span style={{ color: T.textSec, fontSize: 16 }}>›</span>
+              <span style={{ color: APG2.textSoft, fontSize: 16 }}>›</span>
             </button>
           ))}
         </div>
@@ -1639,16 +1639,16 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── О приложении ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ О приложении</div>
-        <div style={{ ...GLASS, borderRadius: 24, overflow: 'hidden' }}>
+        <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ О приложении</div>
+        <div style={{ ...APG2.glass, borderRadius: 24, overflow: 'hidden' }}>
           {/* Лого + название */}
-          <div style={{ padding: '18px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: `linear-gradient(135deg, ${T.gold}30, ${T.goldL}18)`, border: `1px solid ${T.gold}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>🗝️</div>
+          <div style={{ padding: '18px 16px', borderBottom: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg, rgba(201,168,76,0.19), rgba(232,201,122,0.09))', border: '1px solid rgba(201,168,76,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>🗝️</div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri }}>АПГ — Альянс Партнёров</div>
-              <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>Программа лояльности Зеленограда</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: APG2.text }}>АПГ — Альянс Партнёров</div>
+              <div style={{ fontSize: 11, color: APG2.textSoft, marginTop: 2 }}>Программа лояльности Зеленограда</div>
             </div>
-            <div style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: T.gold, background: T.gold + '15', border: `1px solid ${T.gold}30`, borderRadius: 8, padding: '4px 8px', flexShrink: 0 }}>v1.0</div>
+            <div style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: APG2.gold, background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.19)', borderRadius: 8, padding: '4px 8px', flexShrink: 0 }}>v1.0</div>
           </div>
           {/* Строки */}
           {[
@@ -1656,9 +1656,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { label: 'Город',        value: 'Зеленоград' },
             { label: 'Разработчик',  value: 'АПГ Team' },
           ].map((row, i, arr) => (
-            <div key={row.label} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: T.textSec }}>{row.label}</span>
-              <span style={{ fontSize: 13, color: T.textPri, fontWeight: 600 }}>{row.value}</span>
+            <div key={row.label} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: APG2.textSoft }}>{row.label}</span>
+              <span style={{ fontSize: 13, color: APG2.text, fontWeight: 600 }}>{row.value}</span>
             </div>
           ))}
         </div>
@@ -1669,13 +1669,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <div style={{ padding: '16px 16px 0' }}>
           <button
             onClick={() => { window.location.hash = '/admin-app'; }}
-            style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.gold}44`, background: T.gold + '15', color: T.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: '1px solid rgba(201,168,76,0.27)', background: 'rgba(201,168,76,0.08)', color: APG2.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
             ⚙️ Администрирование
           </button>
           <button
             onClick={onOpenHealth}
-            style={{ width: '100%', marginTop: 8, padding: '14px 0', borderRadius: 16, border: `1px solid rgba(201,168,76,0.30)`, background: 'rgba(201,168,76,0.07)', color: T.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+            style={{ width: '100%', marginTop: 8, padding: '14px 0', borderRadius: 16, border: `1px solid rgba(201,168,76,0.30)`, background: 'rgba(201,168,76,0.07)', color: APG2.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
             🩺 APG Health
           </button>
@@ -1687,25 +1687,25 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <div style={{ padding: '16px 16px 0' }}>
           <button
             onClick={handleInstall}
-            style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.green}44`, background: T.green + '15', color: T.green, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: '1px solid rgba(75,179,75,0.27)', background: 'rgba(75,179,75,0.08)', color: '#4BB34B', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
             📲 Добавить на экран телефона
           </button>
           {showIosHint && (
-            <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 14, background: T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 13, color: T.textSec, lineHeight: '20px' }}>
+            <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ fontSize: 13, color: APG2.textSoft, lineHeight: '20px' }}>
                 <div style={{ marginBottom: 8 }}>Чтобы установить приложение на iPhone / iPad:</div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>1️⃣</span>
-                  <span>Нажмите кнопку <strong style={{ color: T.textPri }}>Поделиться</strong> <span style={{ fontSize: 16 }}>⬆️</span> внизу Safari</span>
+                  <span>Нажмите кнопку <strong style={{ color: APG2.text }}>Поделиться</strong> <span style={{ fontSize: 16 }}>⬆️</span> внизу Safari</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>2️⃣</span>
-                  <span>Выберите <strong style={{ color: T.textPri }}>«На экран "Домой"»</strong></span>
+                  <span>Выберите <strong style={{ color: APG2.text }}>«На экран "Домой"»</strong></span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>3️⃣</span>
-                  <span>Нажмите <strong style={{ color: T.textPri }}>«Добавить»</strong></span>
+                  <span>Нажмите <strong style={{ color: APG2.text }}>«Добавить»</strong></span>
                 </div>
               </div>
             </div>
@@ -1715,7 +1715,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {/* ── Выход ── */}
       <div style={{ padding: '16px 16px 0' }}>
-        <button onClick={onLogout} style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: `1px solid ${T.red}44`, background: T.red + '15', color: T.red, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={onLogout} style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: '1px solid rgba(230,70,70,0.27)', background: 'rgba(230,70,70,0.08)', color: '#E64646', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Выйти из аккаунта
         </button>
       </div>
@@ -1724,7 +1724,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       <div style={{ padding: '8px 16px 0' }}>
         <button
           onClick={() => setShowDeleteConfirm(true)}
-          style={{ width: '100%', padding: '12px 0', borderRadius: 16, border: 'none', background: 'none', color: T.textSec, opacity: 0.45, fontSize: 13, fontWeight: 500, cursor: 'pointer', letterSpacing: 0.2 }}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 16, border: 'none', background: 'none', color: APG2.textSoft, opacity: 0.45, fontSize: 13, fontWeight: 500, cursor: 'pointer', letterSpacing: 0.2 }}
         >
           Удалить профиль
         </button>
@@ -1754,7 +1754,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
             <div style={{
               width: 64, height: 64, borderRadius: 22,
-              background: T.red + '18', border: `1px solid ${T.red}44`,
+              background: 'rgba(230,70,70,0.09)', border: '1px solid rgba(230,70,70,0.27)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
             }}>🗑️</div>
           </div>
@@ -1763,7 +1763,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             Это действие нельзя отменить.
           </div>
 
-          <div style={{ background: 'rgba(230,70,70,0.07)', border: `1px solid ${T.red}30`, borderRadius: 18, padding: '12px 14px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ background: 'rgba(230,70,70,0.07)', border: '1px solid rgba(230,70,70,0.19)', borderRadius: 18, padding: '12px 14px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
               { emoji: '🗝️', text: `${userKeys} ключей` },
               { emoji: '⭐', text: `${favorites.length} избранных заведений` },
@@ -1789,7 +1789,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               disabled={isDeleting}
               style={{
                 flex: 1, minHeight: 46, padding: '11px 14px', borderRadius: APG2.radius.button,
-                border: `1px solid ${T.red}55`, background: T.red,
+                border: '1px solid rgba(230,70,70,0.33)', background: '#E64646',
                 color: '#fff', fontSize: 13.5, lineHeight: '18px', fontWeight: 760,
                 fontFamily: 'inherit', cursor: isDeleting ? 'default' : 'pointer',
                 opacity: isDeleting ? 0.58 : 1,

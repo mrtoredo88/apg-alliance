@@ -4,7 +4,6 @@ import { RichText } from './components/RichText.jsx';
 import { TASKS } from './tasks.js';
 import { getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { Panel, Avatar, Button } from '@vkontakte/vkui';
-import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
@@ -836,7 +835,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
 
   return (
     <div style={{
-      ...GLASS,
+      ...V2.glass,
       borderRadius: 20, padding: 16, textAlign: 'center',
       display: 'flex', flexDirection: 'column', gap: 10,
       position: 'relative', overflow: 'hidden',
@@ -849,7 +848,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         <div style={{
           position: 'absolute', top: 10, left: 10,
           width: 8, height: 8, borderRadius: '50%',
-          background: T.gold, boxShadow: `0 0 6px ${T.gold}`,
+          background: V2.gold, boxShadow: `0 0 6px ${V2.gold}`,
         }} />
       )}
       {/* NEW бейдж */}
@@ -864,8 +863,8 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
       {partner.offer && (
         <div style={{
           position: 'absolute', top: 8, right: 8,
-          background: T.green + '22', border: `1px solid ${T.green}55`,
-          borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: T.green,
+          background: 'rgba(75,179,75,0.13)', border: '1px solid rgba(75,179,75,0.33)',
+          borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#4BB34B',
         }}>🎁 акция</div>
       )}
 
@@ -873,11 +872,11 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         <PartnerLogo partner={partner} size={56} />
         <button onClick={() => onToggleFavorite(partner.id)} style={{
           position: 'absolute', top: -4, right: -4,
-          background: isFavorite ? T.red : T.chipBg,
-          border: `1px solid ${isFavorite ? T.red : T.border}`,
+          background: isFavorite ? '#E64646' : 'rgba(255,255,255,0.08)',
+          border: `1px solid ${isFavorite ? '#E64646' : 'rgba(255,255,255,0.12)'}`,
           borderRadius: '50%', width: 22, height: 22,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', fontSize: 10, padding: 0, color: isFavorite ? '#fff' : T.textPri,
+          cursor: 'pointer', fontSize: 10, padding: 0, color: isFavorite ? '#fff' : V2.text,
         }}>
           {isFavorite ? '♥' : '♡'}
         </button>
@@ -891,7 +890,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
       </div>
 
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textPri, lineHeight: '16px', marginBottom: 3 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: V2.text, lineHeight: '16px', marginBottom: 3 }}>
           {partner.name ?? 'Партнёр'}
         </div>
         {partner.avgRating > 0 ? (
@@ -899,10 +898,10 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
             <span style={{ fontSize: 11, color: '#FFD700', letterSpacing: 0.5 }}>
               {'★'.repeat(Math.round(partner.avgRating))}{'☆'.repeat(5 - Math.round(partner.avgRating))}
             </span>
-            <span style={{ fontSize: 10, color: T.textSec }}>{partner.avgRating.toFixed(1)}</span>
+            <span style={{ fontSize: 10, color: V2.textSoft }}>{partner.avgRating.toFixed(1)}</span>
           </div>
         ) : partner.categoryLabel ? (
-          <div style={{ fontSize: 10, color: T.gold }}>
+          <div style={{ fontSize: 10, color: V2.gold }}>
             {CATEGORIES.find(c => c.id === partner.category)?.emoji} {partner.categoryLabel}
           </div>
         ) : null}
@@ -915,11 +914,11 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
         return (
           <div style={{ width: '100%', marginBottom: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 9, color: done ? T.gold : T.textSec, fontWeight: 700 }}>🎟️ Штамп</span>
-              <span style={{ fontSize: 9, color: done ? T.gold : T.textSec, fontWeight: 700 }}>{filled}/{partner.stampTarget}</span>
+              <span style={{ fontSize: 9, color: done ? V2.gold : V2.textSoft, fontWeight: 700 }}>🎟️ Штамп</span>
+              <span style={{ fontSize: 9, color: done ? V2.gold : V2.textSoft, fontWeight: 700 }}>{filled}/{partner.stampTarget}</span>
             </div>
-            <div style={{ height: 4, borderRadius: 2, background: T.border, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: done ? T.gold : 'rgba(201,168,76,0.5)', transition: 'width 0.3s' }} />
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: done ? V2.gold : 'rgba(201,168,76,0.5)', transition: 'width 0.3s' }} />
             </div>
           </div>
         );
@@ -927,7 +926,7 @@ function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 
 
       <button onClick={() => onOpen(partner)} style={{
         width: '100%', padding: '9px 0', borderRadius: 12, border: 'none',
-        background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+        background: 'linear-gradient(135deg, #D6B766, #E8C97A)',
         color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer',
         marginTop: 'auto',
       }}>
@@ -947,7 +946,7 @@ function FeaturedPartnerCard({ partner, onOpen }) {
       }}>
         <div style={{
           borderRadius: 24,
-          ...GLASS_GOLD,
+          ...V2.goldGlass,
           padding: '14px 16px',
           display: 'flex', alignItems: 'center', gap: 14,
         }}>
@@ -961,15 +960,15 @@ function FeaturedPartnerCard({ partner, onOpen }) {
               <span style={{ fontSize: 9, fontWeight: 800, color: '#FFD700', letterSpacing: 1.2, textTransform: 'uppercase' }}>⭐ Партнёр дня</span>
               <span style={{ fontSize: 10, fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, padding: '1px 6px' }}>+2 🗝️</span>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>{partner.name}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: V2.text, lineHeight: 1.2 }}>{partner.name}</div>
             {partner.offer && (
-              <div style={{ fontSize: 12, color: T.textSec, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 12, color: V2.textSoft, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 🎁 {partner.offer}
               </div>
             )}
           </div>
 
-          <div style={{ fontSize: 18, color: T.textSec, flexShrink: 0 }}>›</div>
+          <div style={{ fontSize: 18, color: V2.textSoft, flexShrink: 0 }}>›</div>
         </div>
       </button>
     </div>
@@ -1010,17 +1009,17 @@ function PartnerOfMonthCard({ partner, onOpen }) {
             }}>🏆</div>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, fontWeight: 800, color: T.gold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: V2.gold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3 }}>
               🏆 Партнёр месяца
             </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: 1.2 }}>{partner.name}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: V2.text, lineHeight: 1.2 }}>{partner.name}</div>
             {reason && (
-              <div style={{ fontSize: 12, color: T.textSec, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 12, color: V2.textSoft, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {reason}
               </div>
             )}
           </div>
-          <div style={{ fontSize: 18, color: T.textSec, flexShrink: 0 }}>›</div>
+          <div style={{ fontSize: 18, color: V2.textSoft, flexShrink: 0 }}>›</div>
         </div>
       </button>
     </div>
@@ -1284,7 +1283,7 @@ function HeroBanner({ userKeys, userName, streak, counterPulse = false }) {
               <div>
                 <div style={{ fontSize: 11, color: level.color, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{level.label}</div>
                 <div style={{
-                  fontSize: 22, fontWeight: 900, color: T.textPri, lineHeight: 1, letterSpacing: -0.5,
+                  fontSize: 22, fontWeight: 900, color: V2.text, lineHeight: 1, letterSpacing: -0.5,
                   display: 'inline-block',
                   animation: counterPulse ? 'keyCounterPulse 0.42s ease-out' : undefined,
                 }}>
@@ -1347,7 +1346,7 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
   const flameSize = streak >= 30 ? 28 : streak >= 7 ? 24 : 20;
 
   return (
-    <div style={{ margin: '10px 16px 0', borderRadius: 24, padding: '14px 16px', background: T.chipBg, backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', border: '1px solid rgba(255,100,0,0.22)', boxShadow: '0 8px 28px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 14, animation: 'fadeInUp 0.4s ease both' }}>
+    <div style={{ margin: '10px 16px 0', borderRadius: 24, padding: '14px 16px', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(28px) saturate(1.8)', WebkitBackdropFilter: 'blur(28px) saturate(1.8)', border: '1px solid rgba(255,100,0,0.22)', boxShadow: '0 8px 28px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 14, animation: 'fadeInUp 0.4s ease both' }}>
       {/* Иконка пламени */}
       <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,100,0,0.15)', border: '1px solid rgba(255,100,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: flameSize, flexShrink: 0 }}>
         🔥
@@ -1367,8 +1366,8 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
               width: state === 'done' ? 18 : 16,
               height: state === 'done' ? 18 : 16,
               borderRadius: '50%',
-              background: state === 'done' ? 'linear-gradient(135deg, #FF8C42, #FF4500)' : state === 'today' ? 'rgba(255,140,66,0.2)' : T.border,
-              border: state === 'today' ? '2px dashed rgba(255,140,66,0.6)' : state === 'done' ? '2px solid rgba(255,140,66,0.6)' : `1px solid ${T.border}`,
+              background: state === 'done' ? 'linear-gradient(135deg, #FF8C42, #FF4500)' : state === 'today' ? 'rgba(255,140,66,0.2)' : 'rgba(255,255,255,0.12)',
+              border: state === 'today' ? '2px dashed rgba(255,140,66,0.6)' : state === 'done' ? '2px solid rgba(255,140,66,0.6)' : '1px solid rgba(255,255,255,0.12)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 9, transition: 'all 0.3s',
               boxShadow: state === 'done' ? '0 0 6px rgba(255,140,66,0.4)' : 'none',
@@ -1380,7 +1379,7 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
 
         {/* Подсказка */}
         {scannedToday
-          ? <div style={{ fontSize: 11, color: T.textSec }}>{nextMilestone ? `До задания «${nextMilestone} дней»: ещё ${daysLeft}` : '🏆 Рекорд! Так держать!'}</div>
+          ? <div style={{ fontSize: 11, color: V2.textSoft }}>{nextMilestone ? `До задания «${nextMilestone} дней»: ещё ${daysLeft}` : '🏆 Рекорд! Так держать!'}</div>
           : <div style={{ fontSize: 11, color: '#FF8C42', fontWeight: 600 }}>Посети партнёра сегодня, чтобы не потерять серию</div>
         }
       </div>
@@ -1399,17 +1398,17 @@ function StreakWidget({ streak, lastScanDate, onOpenTasks }) {
 
 function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, onOpenRewards, userRank }) {
   const actions = [
-    { icon: '🗓️', label: 'События',               color: T.blue,    onClick: onOpenEvents },
+    { icon: '🗓️', label: 'События',               color: '#4A90D9', onClick: onOpenEvents },
     { icon: '✦',  label: 'Задания',               color: '#9B7EDF', onClick: onOpenTasks },
-    { icon: '🏆', label: 'Рейтинг', rank: userRank, color: T.gold,    onClick: onOpenLeaderboard },
-    { icon: '🎁', label: 'Призы',                 color: T.green,   onClick: onOpenRewards },
+    { icon: '🏆', label: 'Рейтинг', rank: userRank, color: V2.gold,   onClick: onOpenLeaderboard },
+    { icon: '🎁', label: 'Призы',                 color: '#4BB34B', onClick: onOpenRewards },
   ];
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '0 16px' }}>
       {actions.map((a) => (
         <button key={a.label} onClick={a.onClick} style={{
-          ...GLASS,
+          ...V2.glass,
           borderRadius: 20, padding: '13px 4px',
           cursor: 'pointer', display: 'flex', flexDirection: 'column',
           alignItems: 'center', gap: 7, position: 'relative',
@@ -1423,11 +1422,11 @@ function QuickActions({ onShare, onOpenLeaderboard, onOpenEvents, onOpenTasks, o
           }}>
             {a.icon}
           </div>
-          <span style={{ color: T.textSec, fontSize: 10, fontWeight: 600 }}>{a.label}</span>
+          <span style={{ color: V2.textSoft, fontSize: 10, fontWeight: 600 }}>{a.label}</span>
           {a.rank != null && (
             <div style={{
               position: 'absolute', top: 6, right: 6,
-              background: T.gold, borderRadius: 8, padding: '1px 5px',
+              background: V2.gold, borderRadius: 8, padding: '1px 5px',
               fontSize: 9, fontWeight: 800, color: '#0F0F1A', lineHeight: '14px',
             }}>#{a.rank}</div>
           )}
@@ -1466,7 +1465,7 @@ function Skel({ w = '100%', h = 16, radius = 8, style: extra = {} }) {
   return (
     <div style={{
       width: w, height: h, borderRadius: radius, flexShrink: 0,
-      background: `linear-gradient(90deg, ${T.border} 0%, rgba(201,168,76,0.08) 50%, ${T.border} 100%)`,
+      background: 'linear-gradient(90deg, rgba(255,255,255,0.12) 0%, rgba(201,168,76,0.08) 50%, rgba(255,255,255,0.12) 100%)',
       backgroundSize: '200% 100%',
       animation: 'shimmer 1.5s ease-in-out infinite',
       ...extra,
@@ -1478,11 +1477,11 @@ function SkeletonHome() {
   return (
     <div>
       {/* Hero */}
-      <div style={{ margin: '8px 16px', borderRadius: 24, ...GLASS, padding: '22px 20px' }}>
+      <div style={{ margin: '8px 16px', borderRadius: 24, ...V2.glass, padding: '22px 20px' }}>
         <Skel h={11} w={140} radius={6} style={{ marginBottom: 10 }} />
         <Skel h={26} w={190} radius={8} style={{ marginBottom: 4 }} />
         <Skel h={18} w={110} radius={8} style={{ marginBottom: 18 }} />
-        <div style={{ background: T.chipBg, borderRadius: 14, padding: '12px 14px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '12px 14px' }}>
           <Skel h={14} w={160} radius={6} style={{ marginBottom: 10 }} />
           <Skel h={5} radius={3} />
         </div>
@@ -1491,7 +1490,7 @@ function SkeletonHome() {
       {/* QuickActions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '12px 16px' }}>
         {[0, 1, 2, 3].map(i => (
-          <div key={i} style={{ ...GLASS, borderRadius: 16, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div key={i} style={{ ...V2.glass, borderRadius: 16, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <Skel w={38} h={38} radius={12} />
             <Skel w={32} h={10} radius={5} />
           </div>
@@ -1503,7 +1502,7 @@ function SkeletonHome() {
         <Skel h={18} w={140} radius={8} style={{ marginBottom: 12 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[0, 1, 2, 3].map(i => (
-            <div key={i} style={{ ...GLASS, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <div key={i} style={{ ...V2.glass, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
               <Skel w={56} h={56} radius={28} />
               <Skel h={13} w={80} radius={6} />
               <Skel h={10} w={56} radius={5} />
@@ -1546,21 +1545,21 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
   const need = minKeys - userKeys;
 
   return (
-    <div style={{ margin: '16px 16px 0', ...GLASS_GOLD, borderRadius: 24, padding: '18px 18px 16px' }}>
+    <div style={{ margin: '16px 16px 0', ...V2.goldGlass, borderRadius: 24, padding: '18px 18px 16px' }}>
       {/* Заголовок */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 26, flexShrink: 0 }}>{event.emoji ?? '🎉'}</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: T.gold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>✦ Следующее мероприятие АПГ</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: T.textPri, lineHeight: '19px' }}>
-              {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: T.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 4, padding: '1px 5px', marginRight: 5, verticalAlign: 'middle' }}>📌</span>}
+            <div style={{ fontSize: 10, fontWeight: 700, color: V2.gold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>✦ Следующее мероприятие АПГ</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: V2.text, lineHeight: '19px' }}>
+              {(event.priority ?? 0) >= 8 && <span style={{ fontSize: 9, fontWeight: 800, color: V2.gold, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 4, padding: '1px 5px', marginRight: 5, verticalAlign: 'middle' }}>📌</span>}
               {event.title}
             </div>
           </div>
         </div>
         {isRegistered && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: T.green, background: T.green + '18', border: `1px solid ${T.green}40`, borderRadius: 10, padding: '4px 9px', flexShrink: 0 }}>✓ Записан</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#4BB34B', background: 'rgba(75,179,75,0.09)', border: '1px solid rgba(75,179,75,0.25)', borderRadius: 10, padding: '4px 9px', flexShrink: 0 }}>✓ Записан</div>
         )}
       </div>
 
@@ -1573,34 +1572,34 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
             { v: timeLeft.minutes, l: 'мин' },
             { v: timeLeft.seconds, l: 'сек' },
           ].map(({ v, l }) => (
-            <div key={l} style={{ flex: 1, ...GLASS, borderRadius: 14, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: T.textPri, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(v).padStart(2, '0')}</div>
-              <div style={{ fontSize: 9, color: T.textSec, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{l}</div>
+            <div key={l} style={{ flex: 1, ...V2.glass, borderRadius: 14, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: V2.text, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(v).padStart(2, '0')}</div>
+              <div style={{ fontSize: 9, color: V2.textSoft, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{l}</div>
             </div>
           ))}
         </div>
       )}
 
       {isPast && (
-        <div style={{ fontSize: 12, color: T.textSec, textAlign: 'center', marginBottom: 12 }}>Мероприятие состоялось</div>
+        <div style={{ fontSize: 12, color: V2.textSoft, textAlign: 'center', marginBottom: 12 }}>Мероприятие состоялось</div>
       )}
 
       {/* Прогресс ключей */}
       {minKeys > 0 && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 11, color: T.textSec }}>Прогресс к порогу</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: hasEnough ? T.green : T.gold }}>
+            <span style={{ fontSize: 11, color: V2.textSoft }}>Прогресс к порогу</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: hasEnough ? '#4BB34B' : V2.gold }}>
               {Math.min(userKeys, minKeys)} / {minKeys} 🗝️
             </span>
           </div>
-          <div style={{ height: 6, background: T.border, borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
             <div style={{
               height: '100%', borderRadius: 3,
               width: `${Math.min((userKeys / minKeys) * 100, 100)}%`,
               background: hasEnough
-                ? `linear-gradient(90deg, ${T.green}, #6ECC6E)`
-                : `linear-gradient(90deg, ${T.gold}, ${T.goldL})`,
+                ? 'linear-gradient(90deg, #4BB34B, #6ECC6E)'
+                : `linear-gradient(90deg, ${V2.gold}, #E8C97A)`,
               transition: 'width 0.5s ease',
             }} />
           </div>
@@ -1609,26 +1608,26 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
 
       {/* Кнопка */}
       {isRegistered ? (
-        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: `1px solid ${T.green}40`, background: T.green + '12', color: T.green, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: '1px solid rgba(75,179,75,0.25)', background: 'rgba(75,179,75,0.07)', color: '#4BB34B', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
           ✓ Я записан — отменить?
         </button>
       ) : isFull ? (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textSec, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: V2.textSoft, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
           Мест нет
         </div>
       ) : isPast ? null : hasEnough ? (
-        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+        <button onClick={() => onRegister(event)} style={{ width: '100%', padding: '12px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #D6B766, #E8C97A)', color: '#0F0F1A', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
           Я иду! 🎉
         </button>
       ) : (
-        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: T.chipBg, border: `1px solid ${T.border}`, color: T.textSec, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+        <div style={{ width: '100%', padding: '12px 0', borderRadius: 14, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: V2.textSoft, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
           Нужно ещё {need} {need === 1 ? 'ключ' : need < 5 ? 'ключа' : 'ключей'} 🗝️
         </div>
       )}
 
       {/* Дата, место и поделиться */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-        <div style={{ fontSize: 11, color: T.textSec }}>
+        <div style={{ fontSize: 11, color: V2.textSoft }}>
           {event.date && `📅 ${event.date}`}{event.address && ` · ${event.address}`}
         </div>
         <button
@@ -1639,7 +1638,7 @@ function PrivateEventCard({ event, userKeys, isRegistered, onRegister }) {
             }
             vkBridge.send('VKWebAppShare', { link: APP_URL, text }).catch(() => {});
           }}
-          style={{ background: T.chipBg, border: `1px solid ${T.border}`, borderRadius: 10, padding: '5px 10px', fontSize: 11, color: T.textSec, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '5px 10px', fontSize: 11, color: V2.textSoft, cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
         >
           ↗ Поделиться
         </button>
@@ -2084,12 +2083,12 @@ export function HomePanelV2({
         {(pullY > 12 || isRefreshing) && (
           <>
             <span style={{
-              fontSize: 18, display: 'inline-block', color: T.gold, lineHeight: 1,
+              fontSize: 18, display: 'inline-block', color: V2.gold, lineHeight: 1,
               animation: isRefreshing ? 'spin 0.7s linear infinite' : 'none',
               transform: isRefreshing ? 'none' : `rotate(${Math.min((pullY / PULL_TRIGGER) * 180, 180)}deg)`,
               transition: isRefreshing ? 'none' : 'transform 0.15s',
             }}>↻</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: T.gold }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: V2.gold }}>
               {isRefreshing ? 'Обновление...' : pullY >= PULL_TRIGGER ? 'Отпустите' : 'Потяните вниз'}
             </span>
           </>
@@ -2120,11 +2119,11 @@ export function HomePanelV2({
               </svg>
             </div>
             <div>
-              <div style={{ color: T.textPri, fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Нет подключения</div>
-              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px', marginBottom: 20 }}>Проверьте интернет и попробуйте снова</div>
+              <div style={{ color: V2.text, fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Нет подключения</div>
+              <div style={{ color: V2.textSoft, fontSize: 13, lineHeight: '19px', marginBottom: 20 }}>Проверьте интернет и попробуйте снова</div>
               <button onClick={onRetry} style={{
                 padding: '13px 36px', borderRadius: 14, border: 'none',
-                background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
+                background: 'linear-gradient(135deg, #D6B766, #E8C97A)',
                 color: '#0F0F1A', fontSize: 14, fontWeight: 700, cursor: 'pointer',
               }}>Повторить</button>
             </div>
