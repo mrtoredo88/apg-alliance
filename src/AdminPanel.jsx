@@ -3117,6 +3117,11 @@ export const AdminPanel = () => {
       } catch (e) {}
       try {
         await waitForAdminAuth(noteAdminAuthStage);
+        const statusData = await adminSecurityRequest('status');
+        if (statusData?.actor && !statusData.actor.mustChangePassword) {
+          setAdminSession(statusData.actor);
+          setAuthed(true);
+        }
         await fetchData();
       } catch (e) {
         logError(e, 'AdminPanel.initAuth');
