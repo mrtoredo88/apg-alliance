@@ -2594,7 +2594,7 @@ export function UserApp() {
         <AppRoot>
           <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
           <div
-            style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
+            style={{ maxWidth: 480, margin: '0 auto', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}
             onTouchMove={handleSwipeMove}
             onTouchEnd={handleSwipeEnd}
