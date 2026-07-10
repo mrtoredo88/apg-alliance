@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GLASS, GLASS_GOLD } from './design.js';
 import { motionTransition } from './motion.js';
-import { logError } from './errorLogger.js';
 
 const A = {
   text: '#F0F0F0',
@@ -857,79 +856,6 @@ function exportParticipantsCSV(event, participants) {
   }, 120);
 }
 
-function missingEventFields(event) {
-  if (!event) return ['event'];
-  return [
-    'cover',
-    'gallery',
-    'partner',
-    'expert',
-    'registrations',
-    'checklist',
-    'promotionPlan',
-    'emoji',
-    'status',
-    'category',
-    'analytics',
-    'participants',
-    'description',
-    'location',
-  ].filter((field) => {
-    if (field === 'cover') return !eventImage(event);
-    if (field === 'partner') return !(event?.partner || event?.partnerName || event?.partnerId);
-    if (field === 'expert') return !(event?.expert || event?.expertName || event?.expertId);
-    if (field === 'registrations') return event?.registeredCount == null && event?.registrationsCount == null;
-    if (field === 'checklist') return !event?.opsChecklist && !event?.checklist;
-    if (field === 'participants') return !Array.isArray(event?.participants);
-    if (field === 'location') return !(event?.address || event?.location);
-    return event?.[field] == null || event?.[field] === '';
-  });
-}
-
-class EventDetailSheetErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
-
-  componentDidCatch(error, info) {
-    logError(error, `EventDetailSheet.render.${this.props.eventId || 'unknown'}`);
-    console.error('[APG-EVENT-SHEET] render failed', {
-      eventId: this.props.eventId,
-      missingFields: this.props.missingFields,
-      error,
-      componentStack: info?.componentStack,
-    });
-  }
-
-  componentDidUpdate(prevProps) {
-    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
-      this.setState({ error: null });
-    }
-  }
-
-  render() {
-    if (!this.state.error) return this.props.children;
-    return (
-      <section style={{ ...SECTION, textAlign: 'center', padding: 22 }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>⚠️</div>
-        <h3 style={{ margin: '0 0 8px', color: A.text, fontSize: 18, fontWeight: 900 }}>Не удалось открыть мероприятие</h3>
-        <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginBottom: 16 }}>
-          Мы уже записали ошибку в лог. Можно попробовать открыть карточку ещё раз или закрыть окно.
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <button type="button" onClick={() => this.setState({ error: null })} style={{ ...BUTTON, background: A.gold, color: '#1A1208' }}>Повторить</button>
-          <button type="button" onClick={this.props.onClose} style={{ ...BUTTON, background: 'rgba(255,255,255,0.09)', color: A.text, border: `1px solid ${A.border}` }}>Закрыть</button>
-        </div>
-      </section>
-    );
-  }
-}
-
 export function EventDetailSheet({
   open = false,
   event = null,
@@ -953,7 +879,6 @@ export function EventDetailSheet({
   const [visible, setVisible] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
-  const missingFields = useMemo(() => missingEventFields(event), [event]);
 
   useEffect(() => {
     if (open) {
@@ -968,15 +893,6 @@ export function EventDetailSheet({
       return () => clearTimeout(timer);
     }
   }, [open, visible]);
-
-  useEffect(() => {
-    if (!open || !event) return;
-    console.info('[APG-EVENT-SHEET] open', {
-      eventId: event?.id || null,
-      event,
-      missingFields,
-    });
-  }, [open, event, missingFields]);
 
   if (!visible || !event) return null;
 
@@ -1007,7 +923,7 @@ export function EventDetailSheet({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 1001,
+        zIndex: 12000,
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
@@ -1041,12 +957,6 @@ export function EventDetailSheet({
       >
         <div style={{ height: 7, width: 44, borderRadius: 99, background: 'rgba(255,255,255,0.35)', margin: '14px auto 0' }} />
         <div style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-          <EventDetailSheetErrorBoundary
-            eventId={event?.id}
-            missingFields={missingFields}
-            resetKey={event?.id || String(open)}
-            onClose={handleClose}
-          >
           <HeroSection event={event} status={status} statusTone={statusTone} />
           {isAdminRole && <QualitySection event={event} partnerName={partnerName} expertName={expertName} />}
           {isAdminRole && <PreparationSection event={event} partnerName={partnerName} expertName={expertName} />}
@@ -1113,7 +1023,6 @@ export function EventDetailSheet({
             onRequestChanges={onRequestChanges}
             onReject={onReject}
           />
-          </EventDetailSheetErrorBoundary>
         </div>
       </div>
     </div>
