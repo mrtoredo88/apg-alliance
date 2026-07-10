@@ -1362,3 +1362,11 @@
 **Файлы:** `src/EventDetailSheet.jsx`
 
 **Что изменено:** Добавлен `onTouchMove` для bottom sheet: если пользователь протягивает карточку вниз больше чем на 110px, вызывается штатное закрытие. `onTouchEnd` оставлен как дополнительный fallback.
+
+## 2026-07-10 — EventDetailSheet pointer swipe support
+
+**Задача:** Touch-only обработчик свайпа вниз не закрывал карточку в production QA через браузерные pointer/touch события.
+
+**Файлы:** `src/EventDetailSheet.jsx`
+
+**Что изменено:** Добавлена параллельная обработка `pointerdown/pointermove/pointerup` для не-mouse указателей. При движении вниз больше чем на 110px карточка закрывается штатным `handleClose`. Touch fallback сохранён.

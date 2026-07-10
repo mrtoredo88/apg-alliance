@@ -879,6 +879,7 @@ export function EventDetailSheet({
   const [visible, setVisible] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
+  const [pointerStartY, setPointerStartY] = useState(null);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
 
   useEffect(() => {
@@ -946,6 +947,14 @@ export function EventDetailSheet({
     }
   };
 
+  const handlePointerMove = (pointerEvent) => {
+    if (pointerStartY == null || pointerEvent.pointerType === 'mouse') return;
+    if (pointerEvent.clientY - pointerStartY > 110) {
+      setPointerStartY(null);
+      handleClose();
+    }
+  };
+
   return (
     <div
       style={{
@@ -986,6 +995,12 @@ export function EventDetailSheet({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => setTouchStartY(null)}
+        onPointerDown={(event) => {
+          if (event.pointerType !== 'mouse') setPointerStartY(event.clientY);
+        }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={() => setPointerStartY(null)}
+        onPointerCancel={() => setPointerStartY(null)}
       >
         <div style={{ height: 7, width: 44, borderRadius: 99, background: 'rgba(255,255,255,0.35)', margin: '14px auto 0' }} />
         <div style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
