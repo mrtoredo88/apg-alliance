@@ -692,6 +692,120 @@ async function actionEventToggle(db, req, actor) {
   return { ok: true, registeredEvents };
 }
 
+function inferPartnerAiDraft(message = {}, profile = {}) {
+  const text = safeString(message.text, MAX_TEXT);
+  const rawTypes = Array.isArray(message.types) ? message.types.map(item => safeString(item, 60)).filter(Boolean) : [];
+  const title = safeString(message.title, 180) || safeString(text.split(/[.!?\n]/)[0], 120) || 'Черновик партнёра';
+  const description = safeString(message.description || text, MAX_TEXT);
+  return {
+    text,
+    types: [...new Set(rawTypes)].filter(type => ['event', 'news', 'promotion', 'push', 'poster', 'task', 'keys'].includes(type)).slice(0, 7),
+    title,
+    description,
+    date: safeString(message.date, 40),
+    time: safeString(message.time, 40),
+    place: safeString(message.place || profile.address, 300),
+    linkUrl: safeString(message.linkUrl || profile.websiteUrl || profile.socialUrl, 1000),
+    rewardKeys: Math.max(0, Math.min(1000, Number(message.rewardKeys || 0))),
+  };
+}
+
+async function actionPartnerAiDraft(db, req, actor) {
+  const partnerId = safeString(req.body?.partnerId || req.body?.profileId, 180);
+  const profile = await assertOwnedProfile(db, actor, 'partner', partnerId);
+  const draft = inferPartnerAiDraft(req.body?.draft || req.body?.message || {}, profile);
+  if (!draft.text) throw Object.assign(new Error('Опишите идею для AI-помощника.'), { statusCode: 400 });
+  if (!draft.types.length) throw Object.assign(new Error('Не выбрано ни одного действия.'), { statusCode: 400 });
+
+  const base = {
+    partnerId: profile.id,
+    partner: safeString(profile.name, 220),
+    partnerName: safeString(profile.name, 220),
+    source: 'partner_ai',
+    proposalSource: 'partner_ai',
+    proposalAuthorType: 'partner',
+    proposalAuthorId: actor.userId,
+    proposalAuthorUid: actor.uid,
+    proposalAuthorName: safeString(actor.user?.displayName || actor.user?.name || actor.user?.email || profile.name || 'Партнёр', 220),
+    submittedByUserId: actor.userId,
+    submittedByName: safeString(actor.user?.displayName || actor.user?.name || actor.user?.email || profile.name || 'Партнёр', 220),
+    submittedProfileId: profile.id,
+    submittedProfileName: safeString(profile.name, 220),
+    moderationStatus: 'pending_review',
+    status: 'pending_review',
+    active: false,
+    published: false,
+    aiInput: draft.text,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    submittedAt: FieldValue.serverTimestamp(),
+  };
+
+  const created = [];
+  for (const type of draft.types) {
+    if (type === 'event') {
+      const ref = await db.collection('events').add({
+        ...base,
+        title: draft.title,
+        description: draft.description,
+        date: draft.date,
+        time: draft.time,
+        address: draft.place,
+        location: draft.place,
+        linkUrl: draft.linkUrl,
+        socialUrl: draft.linkUrl,
+        emoji: '🎉',
+        submissionStatus: 'pending_review',
+        registeredCount: 0,
+      });
+      created.push({ type, id: ref.id, collection: 'events' });
+    } else if (type === 'news' || type === 'promotion') {
+      const ref = await db.collection('news').add({
+        ...base,
+        title: type === 'promotion' ? `Акция: ${draft.title}` : draft.title,
+        text: draft.description,
+        description: draft.description,
+        category: type === 'promotion' ? 'promotions' : 'partners',
+        contentType: type,
+        source: 'partner_ai',
+      });
+      created.push({ type, id: ref.id, collection: 'news' });
+    } else if (type === 'push') {
+      const ref = await db.collection('notifications').add({
+        ...base,
+        title: draft.title,
+        body: draft.description,
+        text: draft.description,
+        type: 'partner_push',
+        target: 'moderation',
+      });
+      created.push({ type, id: ref.id, collection: 'notifications' });
+    } else if (type === 'poster') {
+      const ref = await db.collection('aiDrafts').add({
+        ...base,
+        title: draft.title,
+        prompt: draft.description,
+        draftType: 'poster',
+        status: 'pending_review',
+      });
+      created.push({ type, id: ref.id, collection: 'aiDrafts' });
+    } else if (type === 'task' || type === 'keys') {
+      const ref = await db.collection('customTasks').add({
+        ...base,
+        title: type === 'keys' ? `Ключи: ${draft.title}` : draft.title,
+        description: draft.description,
+        reward: draft.rewardKeys || (type === 'keys' ? 1 : 0),
+        rewardKeys: draft.rewardKeys || (type === 'keys' ? 1 : 0),
+        taskType: type === 'keys' ? 'partner_keys' : 'partner_task',
+      });
+      created.push({ type, id: ref.id, collection: 'customTasks' });
+    }
+  }
+
+  await audit(db, req, actor, 'partner:aiDraft', 'partners', profile.id, 'success', { types: draft.types, created: created.length });
+  return { ok: true, created, status: 'pending_review' };
+}
+
 async function actionReviewPartner(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
@@ -847,6 +961,8 @@ async function routeAction(db, req, actor) {
   if (action === 'prize:claim') return actionPrizeClaim(db, req, actor);
   if (action === 'raffle:enter') return actionRaffleEnter(db, req, actor);
   if (action === 'event:toggle') return actionEventToggle(db, req, actor);
+  if (action === 'event:propose') return actionEventPropose(db, req, actor);
+  if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');

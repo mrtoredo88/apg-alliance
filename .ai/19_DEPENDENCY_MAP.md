@@ -91,11 +91,11 @@
 ## Partners
 
 - Кто использует: `UserApp` panels `offers`, `partner`, `nearby`, `map`, `profile`; Loki `OPEN_PARTNER` and `OPEN_PARTNERS`; route `/partner/:id`; AdminPanel partners tab.
-- Что использует он: `PartnerPage`, `PartnerCabinetPage`, `PartnerQRSection`, partner cards in lists, VK Bridge, Firestore reviews subcollection, share helpers.
+- Что использует он: `PartnerPage`, `PartnerCabinetPage`, `PartnerQRSection`, Partner AI helper inside cabinet, partner cards in lists, VK Bridge, Firestore reviews subcollection, share helpers.
 - Provider ему необходимы: VKUI/root providers from `UserApp`; no direct Loki provider requirement.
 - API вызывает: user actions for favorites/reviews/scans through `UserApp` helpers; photo/upload/admin actions through admin/cabinet flows.
-- Firestore коллекции использует: `partners`, `partners/{id}/reviews`, `reviews`, `users`, `scans`, `partnerConnectionEvents`, `partnerInvites` depending on caller/backend flow.
-- Backend endpoint использует: `/api/user-actions`, `/api/admin-actions`, `/api/email-auth`, `/api/upload-photo`, `/api/public-submit` depending on partner flow.
+- Firestore коллекции использует: `partners`, `partners/{id}/reviews`, `reviews`, `users`, `scans`, `partnerConnectionEvents`, `partnerInvites`, plus `events`, `news`, `notifications`, `aiDrafts`, `customTasks` for Partner AI moderation drafts depending on caller/backend flow.
+- Backend endpoint использует: `/api/user-actions` including `partner:profileUpdate`, `event:propose`, `partner:aiDraft`; `/api/admin-actions`, `/api/email-auth`, `/api/upload-photo`, `/api/public-submit` depending on partner flow.
 - Глобальные состояния изменяет: `activePartner`, favorites, scanned partner ids, visit counts, owned partner/cabinet state.
 - Маршруты его открывают: `/partner/:id`, internal panel `partner`, offers/nearby/map/profile navigation, Loki partner actions.
 - BottomSheet связаны: none confirmed as shared bottom sheet; partner page uses modal/portal overlays.

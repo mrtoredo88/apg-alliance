@@ -54,6 +54,162 @@ function getPartnerLaunchState(partner = {}) {
   };
 }
 
+function nextWeekdayDate(targetDay) {
+  const date = new Date();
+  const current = date.getDay();
+  const diff = (targetDay + 7 - current) % 7 || 7;
+  date.setDate(date.getDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function analyzePartnerAiText(text = '', partner = {}) {
+  const source = String(text || '').trim();
+  const lower = source.toLowerCase();
+  const types = new Set();
+  if (/(дегустац|мастер|класс|встреч|лекц|вебинар|мероприят|провести|приглашаем|открыти[ея])/.test(lower)) types.add('event');
+  if (/(нов|открываем|филиал|запуск|расскаж|обнов|важн|анонс)/.test(lower)) types.add('news');
+  if (/(скидк|акци|спец|промо|бонус|подар|сегодня)/.test(lower)) types.add('promotion');
+  if (/(push|пуш|уведом|напомн|сообщить)/.test(lower)) types.add('push');
+  if (/(афиш|плакат|баннер|постер|визуал)/.test(lower)) types.add('poster');
+  if (/(задан|челлендж|приди|сделай|отметь|отзыв)/.test(lower)) types.add('task');
+  if (/(ключ|ключи|бонус)/.test(lower)) types.add('keys');
+  if (!types.size) {
+    types.add('news');
+    if (/(пятниц|суббот|воскрес|сегодня|завтра|мастер|дегустац)/.test(lower)) types.add('event');
+  }
+  let date = '';
+  if (lower.includes('сегодня')) date = new Date().toISOString().slice(0, 10);
+  else if (lower.includes('завтра')) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    date = d.toISOString().slice(0, 10);
+  } else if (lower.includes('пятниц')) date = nextWeekdayDate(5);
+  else if (lower.includes('суббот')) date = nextWeekdayDate(6);
+  else if (lower.includes('воскрес')) date = nextWeekdayDate(0);
+  const timeMatch = lower.match(/(?:в|к)\s*(\d{1,2})(?::(\d{2}))?/);
+  const title = source.split(/[.!?\n]/)[0]?.trim() || 'Идея партнёра';
+  return {
+    title: title.length > 90 ? `${title.slice(0, 87).trim()}...` : title,
+    description: source,
+    types: Array.from(types),
+    date,
+    time: timeMatch ? `${String(timeMatch[1]).padStart(2, '0')}:${timeMatch[2] || '00'}` : '',
+    place: partner.address || '',
+    linkUrl: partner.websiteUrl || partner.socialUrl || '',
+    rewardKeys: lower.includes('ключ') ? 1 : 0,
+  };
+}
+
+function PartnerAiAssistant({ partner, onToast, onDraftCreated }) {
+  const [text, setText] = useState('');
+  const [analysis, setAnalysis] = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const actionMeta = {
+    event: ['Создать событие', 'Черновик мероприятия попадёт в Центр событий.'],
+    news: ['Создать новость', 'Черновик новости попадёт на модерацию.'],
+    promotion: ['Создать акцию', 'Акция будет оформлена как черновик публикации.'],
+    push: ['Создать push', 'Уведомление будет ждать проверки администратора.'],
+    poster: ['Создать афишу', 'Заявка попадёт в AI Editor / афиши.'],
+    task: ['Добавить задание', 'Черновик задания будет создан для модерации.'],
+    keys: ['Добавить ключи', 'Ключи будут оформлены через черновик задания.'],
+  };
+  const inputStyle = {
+    width: '100%',
+    minHeight: 118,
+    borderRadius: 24,
+    border: '1px solid rgba(255,255,255,0.24)',
+    background: 'rgba(255,255,255,0.16)',
+    color: APG2_PROFILE.text,
+    padding: 14,
+    fontSize: 15,
+    lineHeight: '21px',
+    boxSizing: 'border-box',
+    outline: 'none',
+    resize: 'vertical',
+    fontFamily: 'inherit',
+  };
+
+  const runAnalysis = () => {
+    const next = analyzePartnerAiText(text, partner);
+    if (!next.description) {
+      onToast?.('Опишите идею: акция, событие, новость или задача.', 'info');
+      return;
+    }
+    setAnalysis(next);
+    setSelected(next.types);
+  };
+
+  const toggle = (type) => {
+    setSelected(prev => prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type]);
+  };
+
+  const createDrafts = async () => {
+    if (!analysis || !selected.length) return;
+    setSaving(true);
+    try {
+      const result = await userAction('partner:aiDraft', {
+        partnerId: partner.id,
+        draft: { ...analysis, types: selected },
+      });
+      onToast?.(`Создано черновиков: ${result.created?.length || 0}. Они отправлены на модерацию.`, 'success');
+      onDraftCreated?.(result.created || []);
+      setText('');
+      setAnalysis(null);
+      setSelected([]);
+    } catch (error) {
+      onToast?.(error.message || 'Не удалось создать черновики.', 'error');
+    }
+    setSaving(false);
+  };
+
+  return (
+    <GlassSection title="AI-помощник">
+      <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <GlassBadge tone="gold">Partner AI</GlassBadge>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px' }}>создаёт только черновики</div>
+        </div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 930, marginBottom: 8 }}>Расскажите, что происходит у вас</div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', marginBottom: 12 }}>
+          Например: «В пятницу будет дегустация», «Сегодня скидка», «Открываем новый филиал», «Хотим провести мастер-класс».
+        </div>
+        <textarea style={inputStyle} value={text} onChange={e => setText(e.target.value)} placeholder="Напишите свободным текстом..." />
+        <GlassButton tone="gold" onClick={runAnalysis} style={{ marginTop: 10, color: '#17120a' }}>Проанализировать</GlassButton>
+      </GlassCard>
+
+      {analysis && (
+        <GlassCard style={{ borderRadius: 32 }}>
+          <GlassBadge>AI понял идею</GlassBadge>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 900, marginTop: 10 }}>{analysis.title}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', marginTop: 6 }}>
+            {analysis.date ? `Дата: ${analysis.date}` : 'Дата не распознана автоматически'}{analysis.time ? ` · ${analysis.time}` : ''}
+          </div>
+          <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
+            {Object.entries(actionMeta).map(([type, [title, help]]) => {
+              const active = selected.includes(type);
+              const suggested = analysis.types.includes(type);
+              return (
+                <button key={type} onClick={() => toggle(type)} style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 12, display: 'grid', gridTemplateColumns: '28px 1fr', gap: 10, alignItems: 'center', textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit', cursor: 'pointer', border: active ? '1px solid rgba(215,184,106,0.58)' : APG2_PROFILE.glass.border }}>
+                  <span style={{ width: 28, height: 28, borderRadius: 12, display: 'grid', placeItems: 'center', background: active ? APG2_PROFILE.gold : 'rgba(255,255,255,0.10)', color: active ? '#17120a' : APG2_PROFILE.textSoft, fontWeight: 920 }}>{active ? '✓' : suggested ? '•' : '+'}</span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 860 }}>{title}</span>
+                    <span style={{ display: 'block', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 2 }}>{help}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <GlassCard style={{ borderRadius: 24, marginTop: 12, background: 'rgba(215,184,106,0.12)' }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '19px', fontWeight: 760 }}>AI не публикует автоматически. Все выбранные материалы будут созданы как черновики и попадут на модерацию АПГ.</div>
+          </GlassCard>
+          <GlassButton tone="gold" disabled={saving || !selected.length} onClick={createDrafts} style={{ marginTop: 12, color: '#17120a' }}>{saving ? 'Создаём черновики...' : 'Создать выбранные черновики'}</GlassButton>
+        </GlassCard>
+      )}
+    </GlassSection>
+  );
+}
+
 export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, events = [], onBack, onPartnerUpdate, onEventCreated, onToast }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
@@ -223,6 +379,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
             {[
               { icon: '📷', label: 'Фото',     action: () => setActiveTab('edit') },
               { icon: '🎁', label: 'Акция',     action: () => setActiveTab('edit') },
+              { icon: '🤖', label: 'AI',        action: () => setActiveTab('ai') },
               { icon: '📅', label: 'Календарь', action: () => setActiveTab('calendar') },
               { icon: '📲', label: 'QR-код',    action: () => setActiveTab('qr') },
               { icon: '🌐', label: 'Карточка',  action: () => window.open(shareLink('partner', partner.id), '_blank') },
@@ -242,7 +399,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* Навигация по вкладкам */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['launch', 'Старт'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -373,6 +530,16 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
               events={events}
               onToast={onToast}
               onEventCreated={onEventCreated}
+            />
+          )}
+
+          {activeTab === 'ai' && (
+            <PartnerAiAssistant
+              partner={partner}
+              onToast={onToast}
+              onDraftCreated={() => {
+                setPartner(prev => prev ? { ...prev, lastPartnerAiDraftAt: new Date().toISOString() } : prev);
+              }}
             />
           )}
 

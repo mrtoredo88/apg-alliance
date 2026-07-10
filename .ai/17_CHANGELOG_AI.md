@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: APG Partner AI в кабинете партнёра
+**Коммит:** `pending`
+**Файлы:** `src/PartnerCabinetPage.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлена вкладка `AI-помощник` в кабинет партнёра.
+- Помощник анализирует свободный текст и предлагает создать черновики события, новости, акции, push, афиши, задания или ключей.
+- Добавлен backend action `partner:aiDraft`, который создаёт только `pending_review` drafts в существующих коллекциях: `events`, `news`, `notifications`, `aiDrafts`, `customTasks`.
+**Почему:** Партнёр должен быстро превращать идею в набор материалов для АПГ, но публикация и модерация остаются за системой/администрацией.
+
+---
+
 ## [2026-07-10] feat: APG Context Engine для Локи
 **Коммит:** `pending`
 **Файлы:** `src/loki/core/context/ContextEngine.js`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/21_LOKI_CORE.md`
