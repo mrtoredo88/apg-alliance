@@ -948,7 +948,7 @@ export function EventDetailSheet({
   };
 
   const handlePointerMove = (pointerEvent) => {
-    if (pointerStartY == null || pointerEvent.pointerType === 'mouse') return;
+    if (pointerStartY == null) return;
     if (pointerEvent.clientY - pointerStartY > 110) {
       setPointerStartY(null);
       handleClose();
@@ -996,7 +996,7 @@ export function EventDetailSheet({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => setTouchStartY(null)}
         onPointerDown={(event) => {
-          if (event.pointerType !== 'mouse') setPointerStartY(event.clientY);
+          setPointerStartY(event.clientY);
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={() => setPointerStartY(null)}

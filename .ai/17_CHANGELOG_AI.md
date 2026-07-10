@@ -1370,3 +1370,11 @@
 **Файлы:** `src/EventDetailSheet.jsx`
 
 **Что изменено:** Добавлена параллельная обработка `pointerdown/pointermove/pointerup` для не-mouse указателей. При движении вниз больше чем на 110px карточка закрывается штатным `handleClose`. Touch fallback сохранён.
+
+## 2026-07-10 — EventDetailSheet drag close QA alignment
+
+**Задача:** Production QA должна проверять закрытие карточки события drag/swipe вниз тем же pointer-сценарием, который доступен в браузере.
+
+**Файлы:** `src/EventDetailSheet.jsx`
+
+**Что изменено:** Pointer drag вниз больше чем на 110px теперь работает для всех pointer types, включая mouse. Обычный клик не закрывает карточку, нужен именно заметный drag вниз.
