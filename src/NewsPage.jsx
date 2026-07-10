@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
@@ -8,6 +8,7 @@ import { API_BASE_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { auth } from './firebase.js';
 import { shareLink } from './utils/shareLink.js';
+import { useLoki } from './loki/LokiProvider.jsx';
 import {
   NEWS_CATEGORIES,
   areNewsCommentsEnabled,
@@ -88,6 +89,44 @@ const horizontalSnapItem = {
 function getNewsDeepLink(item) {
   const id = getCanonicalNewsId(item);
   return shareLink('news', id);
+}
+
+function arrayOfIds(...values) {
+  return values.flatMap(value => {
+    if (Array.isArray(value)) return value;
+    if (value) return [value];
+    return [];
+  }).filter(Boolean).map(value => String(value));
+}
+
+function buildNewsLokiContext(item) {
+  const id = getCanonicalNewsId(item);
+  const title = getNewsTitle(item);
+  const text = getNewsText(item);
+  return {
+    type: 'news',
+    newsId: id,
+    title,
+    article: {
+      id,
+      title,
+      text,
+      summary: String(item?.summary || item?.subtitle || '').trim(),
+      category: getNewsCategory(item),
+      categoryLabel: getNewsCategoryLabel(item),
+      source: String(item?.source || 'apg'),
+      sourceName: String(item?.sourceName || ''),
+      url: getNewsDeepLink(item),
+      date: getNewsDate(item)?.toISOString?.() || null,
+      readingMinutes: getReadingMinutes(item),
+      partnerId: item?.partnerId || '',
+      expertId: item?.expertId || '',
+      eventId: item?.eventId || '',
+    },
+    partnerIds: arrayOfIds(item?.partnerIds, item?.partnerId, item?.relatedPartnerIds, item?.linkedPartnerIds),
+    expertIds: arrayOfIds(item?.expertIds, item?.expertId, item?.relatedExpertIds, item?.linkedExpertIds),
+    eventIds: arrayOfIds(item?.eventIds, item?.eventId, item?.relatedEventIds, item?.linkedEventIds),
+  };
 }
 
 function getSmartBadges(item) {
@@ -903,6 +942,7 @@ function NewsCard({ item, index, onOpen, onShare, saved, later }) {
 }
 
 function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, onSubscribe, saved, later, reaction, subscriptions, user, onToast, onOpenLoki }) {
+  const loki = useLoki();
   const [progress, setProgress] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showArticleTop, setShowArticleTop] = useState(false);
@@ -933,6 +973,14 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
     role: user?.role || '',
   }), [user]);
   const commentsContainerRef = useRef(null);
+  const lokiContext = useMemo(() => buildNewsLokiContext(item), [item]);
+  const openLokiForArticle = useCallback(() => {
+    if (typeof loki.openContextExperience === 'function') {
+      loki.openContextExperience(lokiContext);
+      return;
+    }
+    onOpenLoki?.(lokiContext);
+  }, [loki, lokiContext, onOpenLoki]);
 
   const sendEngagement = (action, extra = {}) => {
     if (!articleId) return;
@@ -1065,7 +1113,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
               </div>
             )}
 
-            <LokiArticleBanner wordCount={wordCount} onOpenLoki={onOpenLoki} />
+            <LokiArticleBanner wordCount={wordCount} onOpenLoki={openLokiForArticle} />
 
             {DIVIDER}
 

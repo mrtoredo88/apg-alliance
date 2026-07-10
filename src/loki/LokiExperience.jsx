@@ -12,6 +12,18 @@ const QUICK_ACTIONS = [
   { label: '📰 Что нового?', text: 'Что нового?' },
 ];
 
+const NEWS_QUICK_ACTIONS = [
+  { label: '📄 Кратко', text: 'Кратко перескажи новость' },
+  { label: '🎯 Главное', text: 'Что главное в этой новости?' },
+  { label: '👶 Простыми словами', text: 'Объясни простыми словами' },
+  { label: '💼 Для бизнеса', text: 'Что это значит для бизнеса?' },
+  { label: '👨 Для жителей', text: 'Что это значит для жителей?' },
+  { label: '📅 События', text: 'Есть ли связанные события?' },
+  { label: '🏢 Партнёры', text: 'Какие партнёры участвуют?' },
+  { label: '👤 Эксперты', text: 'Какие эксперты могут помочь?' },
+  { label: '📰 Похожие', text: 'Похожие новости' },
+];
+
 function getShortTitle(value) {
   return String(value || 'АПГ').trim().slice(0, 48);
 }
@@ -26,6 +38,26 @@ function getLokiVoice() {
   } catch {
     return null;
   }
+}
+
+function getContextKey(context) {
+  if (!context) return '';
+  return `${context.type || 'context'}:${context.newsId || context.id || context.title || ''}`;
+}
+
+function buildInitialConversation(loki) {
+  const context = loki.activeContext || loki.memory?.lastContext || null;
+  if (context?.type === 'news') {
+    return [{
+      id: `context-news-${context.newsId || Date.now()}`,
+      from: 'loki',
+      text: context.initialAnswer || `Мы обсуждали новость «${context.title || 'АПГ'}». Продолжим?`,
+      cards: [],
+    }];
+  }
+  return [
+    { id: 'welcome', from: 'loki', text: 'Я рядом. Скажи, что хочешь сделать в АПГ.', cards: [] },
+  ];
 }
 
 function LokiAvatar({ thinking, listening, speaking }) {
@@ -61,13 +93,21 @@ function ResultCard({ card, onOpen }) {
 export function LokiExperience({ loki }) {
   const [input, setInput] = useState('');
   const [voiceState, setVoiceState] = useState('idle');
-  const [conversation, setConversation] = useState(() => ([
-    { id: 'welcome', from: 'loki', text: 'Я рядом. Скажи, что хочешь сделать в АПГ.', cards: [] },
-  ]));
+  const [conversation, setConversation] = useState(() => buildInitialConversation(loki));
   const scrollerRef = useRef(null);
   const recognitionRef = useRef(null);
 
   const visibleCards = useMemo(() => conversation.flatMap(item => item.cards || []).slice(-6), [conversation]);
+  const contextKey = getContextKey(loki.activeContext || loki.memory?.lastContext || null);
+  const activeNewsContext = (loki.activeContext || loki.memory?.lastContext || null)?.type === 'news' ? (loki.activeContext || loki.memory?.lastContext) : null;
+  const quickActions = activeNewsContext ? NEWS_QUICK_ACTIONS : QUICK_ACTIONS;
+  const contextTitle = activeNewsContext?.title || activeNewsContext?.article?.title || '';
+  const summaryToSpeak = activeNewsContext?.initialAnswer || conversation.find(item => item.from === 'loki')?.text || '';
+
+  useEffect(() => {
+    setConversation(buildInitialConversation(loki));
+    setInput('');
+  }, [contextKey]);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
@@ -188,12 +228,21 @@ export function LokiExperience({ loki }) {
         <div ref={scrollerRef} style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'grid', alignContent: 'start', gap: 12, paddingBottom: 4 }}>
           <LokiAvatar thinking={loki.brainThinking || voiceState === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND} listening={voiceState === 'listening'} speaking={voiceState === 'speaking'} />
           <div style={{ textAlign: 'center', display: 'grid', gap: 5 }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 900 }}>Что сделаем?</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>{voiceState === 'listening' ? 'Слушаю внимательно...' : voiceState === 'speaking' ? 'Отвечаю голосом и показываю результат.' : 'Можно написать или сказать обычными словами. Я покажу результат, а не длинную инструкцию.'}</div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 900 }}>{activeNewsContext ? 'Обсуждаем новость' : 'Что сделаем?'}</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>{voiceState === 'listening' ? 'Слушаю внимательно...' : voiceState === 'speaking' ? 'Отвечаю голосом и показываю результат.' : activeNewsContext ? `Контекст: «${getShortTitle(contextTitle)}». Можно задавать вопросы прямо по статье.` : 'Можно написать или сказать обычными словами. Я покажу результат, а не длинную инструкцию.'}</div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 4px', scrollbarWidth: 'none' }}>
-            {QUICK_ACTIONS.map(item => (
+            {activeNewsContext && (
+              <button
+                type="button"
+                onClick={() => speak(summaryToSpeak)}
+                style={{ ...APG2_PROFILE.glass, minHeight: 42, flex: '0 0 auto', borderRadius: 999, padding: '0 13px', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.24)', fontSize: 12.5, lineHeight: '16px', fontWeight: 820, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              >
+                ▶ Прослушать
+              </button>
+            )}
+            {quickActions.map(item => (
               <button
                 key={item.label}
                 type="button"
@@ -251,7 +300,7 @@ export function LokiExperience({ loki }) {
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Например: пицца, массаж, куда сходить?"
+            placeholder={activeNewsContext ? 'Спроси по этой новости...' : 'Например: пицца, массаж, куда сходить?'}
             autoComplete="off"
             style={{ minWidth: 0, height: 44, border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontSize: 15, fontWeight: 650, fontFamily: 'inherit' }}
           />

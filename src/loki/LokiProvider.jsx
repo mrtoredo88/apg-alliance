@@ -7,7 +7,7 @@ import { subscribeLoki } from './lokiBus.js';
 import { LOKI_ACTIONS, TAP_ACTIONS, getBehaviorForEvent, getNextMicroDelay, getRandomLokiAction, shouldUseNightAction } from './lokiBehavior.js';
 import { DEFAULT_LOKI_MEMORY, loadLokiMemory, saveLokiMemory } from './lokiMemory.js';
 import { getLokiSuggestion } from './lokiSuggestions.js';
-import { LOKI_MESSAGE_PRIORITY, normalizeLokiActionRequest } from './lokiActionTypes.js';
+import { LOKI_APP_ACTIONS, LOKI_MESSAGE_PRIORITY, createLokiAction, normalizeLokiActionRequest } from './lokiActionTypes.js';
 import { evaluateLokiObserver } from './LokiObserver.js';
 import { addLokiHistoryItem, loadLokiHistory, markLokiHistoryItem, saveLokiHistory } from './lokiHistory.js';
 import { askLokiBrain } from './LokiBrain.js';
@@ -47,6 +47,159 @@ function isLokiDebugEnabled() {
   }
 }
 
+function safeString(value) {
+  return String(value ?? '').trim();
+}
+
+function stripText(value) {
+  return safeString(value).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function truncateText(value, limit = 1200) {
+  const text = stripText(value);
+  return text.length > limit ? `${text.slice(0, limit).trim()}...` : text;
+}
+
+function toArray(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).map(item => String(item));
+  if (value) return [String(value)];
+  return [];
+}
+
+function splitSentences(value) {
+  return stripText(value)
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map(item => item.trim())
+    .filter(item => item.length > 24);
+}
+
+function normalizeLokiContext(context) {
+  if (!context || typeof context !== 'object') return null;
+  const type = safeString(context.type);
+  if (type !== 'news') return { ...context, type };
+  const article = context.article && typeof context.article === 'object' ? context.article : {};
+  const newsId = safeString(context.newsId || article.id || context.id);
+  const title = safeString(context.title || article.title || 'Эта новость');
+  const text = truncateText(article.text || context.text || article.description || context.description, 4200);
+  const summary = truncateText(article.summary || context.summary, 900);
+  const next = {
+    type: 'news',
+    newsId,
+    title,
+    article: {
+      id: newsId,
+      title,
+      text,
+      summary,
+      category: safeString(article.category || context.category),
+      categoryLabel: safeString(article.categoryLabel || context.categoryLabel),
+      source: safeString(article.source || context.source || 'apg'),
+      sourceName: safeString(article.sourceName || context.sourceName),
+      url: safeString(article.url || context.url),
+      date: article.date || context.date || null,
+      readingMinutes: Number(article.readingMinutes || context.readingMinutes || 0),
+    },
+    partnerIds: toArray(context.partnerIds || article.partnerIds || article.partnerId || context.partnerId),
+    expertIds: toArray(context.expertIds || article.expertIds || article.expertId || context.expertId),
+    eventIds: toArray(context.eventIds || article.eventIds || article.eventId || context.eventId),
+    openedAt: new Date().toISOString(),
+  };
+  return { ...next, initialAnswer: buildNewsContextAnswer(next, 'кратко перескажи новость')?.text || '' };
+}
+
+function findItemsByIds(items = [], ids = []) {
+  const lookup = new Set(ids.map(String));
+  return (Array.isArray(items) ? items : []).filter(item => lookup.has(String(item?.id ?? '')));
+}
+
+function titleOf(item, fallback) {
+  return safeString(item?.title || item?.name || item?.displayName || fallback);
+}
+
+function buildNewsSummaryBullets(context) {
+  const article = context?.article ?? {};
+  const basis = article.summary || article.text || context?.title || '';
+  const sentences = splitSentences(basis);
+  if (!sentences.length) return ['В новости пока мало текста, но я могу помочь разобрать её по заголовку и связанным данным.'];
+  return sentences.slice(0, 3).map(sentence => sentence.length > 170 ? `${sentence.slice(0, 167).trim()}...` : sentence);
+}
+
+function buildNewsContextAnswer(context, text, appState = {}) {
+  if (!context || context.type !== 'news') return null;
+  const query = safeString(text).toLowerCase();
+  const article = context.article ?? {};
+  const bullets = buildNewsSummaryBullets(context);
+  const title = safeString(context.title || article.title || 'эта новость');
+  const partnerRows = findItemsByIds(appState?.partners, context.partnerIds);
+  const expertRows = findItemsByIds(appState?.experts, context.expertIds);
+  const eventRows = findItemsByIds(appState?.events, context.eventIds);
+  const similarNews = (Array.isArray(appState?.news) ? appState.news : [])
+    .filter(item => String(item?.id ?? '') !== String(context.newsId ?? '') && safeString(item?.category || item?.type) === safeString(article.category))
+    .slice(0, 3);
+
+  if (query.includes('событ')) {
+    return {
+      intent: 'context.news.events',
+      text: eventRows.length
+        ? `К этой новости я вижу связанные события:\n${eventRows.map(item => `• ${titleOf(item, 'Мероприятие')}`).join('\n')}`
+        : 'Я не вижу привязанных событий у этой новости. Если событие есть в тексте, можно открыть афишу и проверить его вручную.',
+      cards: eventRows.map(item => ({ id: item.id, title: titleOf(item, 'Мероприятие'), text: safeString(item?.date || item?.address || 'Связанное событие'), label: 'Открыть', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: item.id }) })),
+    };
+  }
+
+  if (query.includes('партн')) {
+    return {
+      intent: 'context.news.partners',
+      text: partnerRows.length
+        ? `В новости участвуют партнёры:\n${partnerRows.map(item => `• ${titleOf(item, 'Партнёр АПГ')}`).join('\n')}`
+        : 'У этой новости пока нет явно привязанных партнёров.',
+      cards: partnerRows.map(item => ({ id: item.id, title: titleOf(item, 'Партнёр АПГ'), text: safeString(item?.category || item?.address || 'Партнёр АПГ'), label: 'Открыть', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: item.id }) })),
+    };
+  }
+
+  if (query.includes('эксперт')) {
+    return {
+      intent: 'context.news.experts',
+      text: expertRows.length
+        ? `По теме новости могут быть полезны эксперты:\n${expertRows.map(item => `• ${titleOf(item, 'Эксперт')}`).join('\n')}`
+        : 'У этой новости пока нет явно привязанных экспертов.',
+      cards: expertRows.map(item => ({ id: item.id, title: titleOf(item, 'Эксперт'), text: safeString(item?.specialization || item?.category || 'Эксперт АПГ'), label: 'Открыть экспертов', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EXPERTS, { expertId: item.id }) })),
+    };
+  }
+
+  if (query.includes('похож') || query.includes('ещё') || query.includes('друг')) {
+    return {
+      intent: 'context.news.similar',
+      text: similarNews.length
+        ? `Нашёл похожие материалы по теме «${article.categoryLabel || article.category || 'новости'}».`
+        : 'Похожих материалов по этой теме пока не нашёл.',
+      cards: similarNews.map(item => ({ id: item.id, title: titleOf(item, 'Новость'), text: truncateText(item?.summary || item?.text || item?.description, 120), label: 'Читать', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: item.id }) })),
+    };
+  }
+
+  if (query.includes('бизнес')) {
+    return {
+      intent: 'context.news.business',
+      text: `Если смотреть на новость «${title}» с точки зрения бизнеса:\n• это повод оценить спрос и интерес жителей;\n• можно подумать о партнёрстве, акции или событии вокруг темы;\n• если тема близка вашей сфере, стоит использовать её в коммуникации с клиентами.`,
+      cards: [],
+    };
+  }
+
+  if (query.includes('жител') || query.includes('прост') || query.includes('реб')) {
+    return {
+      intent: 'context.news.residents',
+      text: `Простыми словами: ${bullets[0]}\n\nДля жителей это означает: стоит обратить внимание на тему новости, потому что она может дать полезное место, событие, услугу или городскую возможность внутри АПГ.`,
+      cards: [],
+    };
+  }
+
+  return {
+    intent: 'context.news.summary',
+    text: `Я прочитал эту новость.\n\nЕсли кратко:\n${bullets.map(item => `• ${item}`).join('\n')}\n\nГлавная мысль: ${bullets[0]}\n\nДля жителей это означает: можно быстро понять суть и, если нужно, перейти к связанным партнёрам, экспертам или событиям.\n\nХотите рассказать подробнее или ответить на вопросы?`,
+    cards: [],
+  };
+}
+
 export function LokiProvider({ children, user, activePanel, appActions, appState }) {
   const [settings, setSettings] = useState(() => loadLokiSettings());
   const [memory, setMemory] = useState(() => loadLokiMemory());
@@ -59,6 +212,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const [card, setCard] = useState(null);
   const [brainThinking, setBrainThinking] = useState(false);
   const [experienceOpen, setExperienceOpen] = useState(false);
+  const [activeContext, setActiveContext] = useState(() => loadLokiMemory().activeContext ?? loadLokiMemory().lastContext ?? null);
   const [anchor, setAnchor] = useState('home');
   const [action, setAction] = useState(LOKI_ACTIONS.IDLE);
   const [dismissed, setDismissed] = useState(false);
@@ -465,9 +619,32 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setBrainThinking(true);
     setEmotion('thinking');
     setAction(LOKI_ACTIONS.LOOK_AROUND);
-    updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text });
+    updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text, activeContext });
     try {
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, userMemory, history, debug: isLokiDebugEnabled() });
+      const contextResult = buildNewsContextAnswer(activeContext, text, appState);
+      if (contextResult) {
+        setBrainThinking(false);
+        setEmotion('helper');
+        setAction(LOKI_ACTIONS.LISTEN);
+        updateMemory({
+          lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: contextResult.text, payload: { cards: contextResult.cards } },
+          lastConversation: { userText: text, answer: contextResult.text, action: null },
+          lastPanel: activePanel,
+          activeContext,
+          lastContext: activeContext,
+          inDialog: true,
+        });
+        updateHistory(prev => addLokiHistoryItem(prev, {
+          kind: 'brain',
+          eventType: LOKI_EVENTS.BRAIN_RESPONSE,
+          text: contextResult.text,
+          card: contextResult.card,
+          priority: LOKI_MESSAGE_PRIORITY.HIGH,
+          panel: activePanel,
+        }));
+        return { card: null, ...contextResult };
+      }
+      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel, activeContext }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() });
       setBrainThinking(false);
       setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
       setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
@@ -511,10 +688,35 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activePanel, appState, executeAction, history, memory, settings.enabled, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, executeAction, history, memory, settings.enabled, showMessage, updateHistory, updateMemory, user, userMemory]);
+
+  const openContextExperience = useCallback((context) => {
+    const normalized = normalizeLokiContext(context);
+    if (!normalized) {
+      setExperienceOpen(true);
+      setVisible(false);
+      setDismissed(false);
+      updateMemory({ inDialog: true, lastPanel: activePanel });
+      return;
+    }
+    setActiveContext(normalized);
+    setExperienceOpen(true);
+    setVisible(false);
+    setDismissed(false);
+    setAction(LOKI_ACTIONS.LISTEN);
+    setEmotion('helper');
+    updateMemory({
+      activeContext: normalized,
+      lastContext: normalized,
+      inDialog: true,
+      lastPanel: activePanel,
+      lastConversation: normalized.type === 'news' ? { userText: 'Пересказать новость', answer: normalized.initialAnswer, action: null } : undefined,
+    });
+  }, [activePanel, updateMemory]);
 
   const value = useMemo(() => ({
     action,
+    activeContext,
     activePanel,
     anchor,
     askBrain,
@@ -545,13 +747,15 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setExperienceOpen(true);
       setVisible(false);
       setDismissed(false);
-      updateMemory({ inDialog: true, lastPanel: activePanel });
+      if (!activeContext && memory?.lastContext) setActiveContext(memory.lastContext);
+      updateMemory({ inDialog: true, lastPanel: activePanel, activeContext: activeContext ?? memory?.lastContext ?? null });
     },
+    openContextExperience,
     closeExperience: () => {
       setExperienceOpen(false);
       setAction(LOKI_ACTIONS.WAVE);
       setEmotion('happy');
-      updateMemory({ inDialog: false, lastPanel: activePanel });
+      updateMemory({ inDialog: false, lastPanel: activePanel, activeContext, lastContext: activeContext ?? memory?.lastContext ?? null });
     },
     hide: () => {
       if (activeHistoryIdRef.current) {
@@ -574,7 +778,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
     setMode: (mode) => persistSettings({ ...settings, mode }),
-  }), [action, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
+  }), [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }
