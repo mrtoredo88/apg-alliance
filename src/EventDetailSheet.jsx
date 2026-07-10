@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motionTransition } from './motion.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
@@ -955,6 +955,7 @@ export function EventDetailSheet({
   const [isClosing, setIsClosing] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
   const [pointerStartY, setPointerStartY] = useState(null);
+  const contentRef = useRef(null);
   const detailEvent = useMemo(() => normalizeDetailEvent(event, partners, experts), [event, partners, experts]);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
 
@@ -982,6 +983,13 @@ export function EventDetailSheet({
       delete document.body.dataset.apgEventSheetOpen;
     };
   }, [open, event?.id]);
+
+  useEffect(() => {
+    if (!open || !detailEvent?.id) return;
+    requestAnimationFrame(() => {
+      if (contentRef.current) contentRef.current.scrollTop = 0;
+    });
+  }, [open, detailEvent?.id]);
 
   if (!visible || !detailEvent) return null;
 
@@ -1094,7 +1102,7 @@ export function EventDetailSheet({
         onPointerCancel={() => setPointerStartY(null)}
       >
         <div style={{ height: 6, width: 46, borderRadius: 99, background: 'rgba(var(--apg2-glass-a,255,255,255),0.34)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)', margin: '12px auto 0' }} />
-        <div style={{ overflowY: 'auto', padding: '16px 10px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 14, flex: 1, boxSizing: 'border-box' }}>
+        <div ref={contentRef} style={{ overflowY: 'auto', padding: '16px 10px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 14, flex: 1, boxSizing: 'border-box' }}>
           <HeroSection event={detailEvent} status={status} statusTone={statusTone} />
           {isAdminRole && <QualitySection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
           {isAdminRole && <PreparationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
