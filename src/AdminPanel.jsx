@@ -1443,6 +1443,144 @@ function AdminUsersPanel({ users }) {
   );
 }
 
+function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck, onGrant }) {
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  const summary = data?.summary || {};
+  const filtered = rows.filter(row => {
+    if (filter === 'all') return true;
+    if (filter === 'pending') return row.status === 'pending_registration';
+    if (filter === 'registered') return row.registrationComplete;
+    if (filter === 'errors') return ['grant_error', 'error', 'link_missing'].includes(row.status);
+    if (filter === 'granted') return row.status === 'granted';
+    return true;
+  });
+  const statusLabel = {
+    pending_registration: 'Ожидает регистрации',
+    link_missing: 'Нет привязки',
+    grant_error: 'Ошибка начисления',
+    error: 'Ошибка',
+    granted: 'Начислено',
+  };
+  const statusColor = {
+    pending_registration: A.textSec,
+    link_missing: A.gold,
+    grant_error: A.red,
+    error: A.red,
+    granted: '#4BB34B',
+  };
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+        <div>
+          <h1 style={s.h1}>🔗 Реферальная система</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: A.textSec, lineHeight: '18px' }}>
+            Пригласивший → приглашённый → регистрация → привязка → начисление.
+          </p>
+        </div>
+        <button style={{ ...s.btn, ...s.btnPri, opacity: loading ? 0.7 : 1 }} disabled={loading} onClick={onCheck}>
+          {loading ? 'Проверяем...' : 'Проверить реферальную систему'}
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
+        {[
+          ['Всего цепочек', summary.total ?? rows.length, A.text],
+          ['Регистрация завершена', summary.registrationComplete ?? 0, A.blue],
+          ['Ошибки начисления', summary.grantErrors ?? 0, A.red],
+          ['Начислено', summary.granted ?? 0, '#4BB34B'],
+        ].map(([label, value, color]) => (
+          <div key={label} style={{ ...s.card, marginBottom: 0, border: `1px solid ${color}30` }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...s.card, marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          {[
+            ['all', 'Все'],
+            ['pending', 'Ожидают регистрации'],
+            ['registered', 'Регистрация завершена'],
+            ['errors', 'Ошибка начисления'],
+            ['granted', 'Начислено'],
+          ].map(([id, label]) => (
+            <button key={id} onClick={() => onFilter(id)} style={{ ...s.btn, ...(filter === id ? s.btnPri : s.btnGray), padding: '8px 12px', fontSize: 12 }}>
+              {label}
+            </button>
+          ))}
+          <button onClick={onLoad} disabled={loading} style={{ ...s.btn, ...s.btnGray, marginLeft: 'auto', padding: '8px 12px', fontSize: 12 }}>
+            ↻ Пересчитать цепочку
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: A.textSec, lineHeight: '18px' }}>
+          Временная запись приглашения сейчас хранится как URL/localStorage до регистрации. Сервер показывает подтверждённые цепочки из users.referredBy, referralBonusGranted и referralRewardedUsers.
+        </div>
+      </div>
+
+      {loading && !rows.length ? (
+        <div style={s.card}>Загружаем реферальную систему...</div>
+      ) : filtered.length === 0 ? (
+        <div style={s.card}>Записей по выбранному фильтру нет.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {filtered.map(row => (
+            <div key={row.id} style={{ ...s.card, marginBottom: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: A.textSec, marginBottom: 4 }}>Пригласивший</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: A.text }}>{row.referrer?.name || 'Не указан'}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, lineHeight: '16px' }}>{row.referrer?.telegram || 'Telegram не указан'} · {row.referrer?.email || 'Email не указан'}</div>
+                  <div style={{ fontSize: 10, color: A.textSec, marginTop: 3 }}>ID: {row.referrer?.id || '—'}</div>
+                </div>
+                <div style={{ color: A.gold, fontWeight: 900 }}>→</div>
+                <div>
+                  <div style={{ fontSize: 11, color: A.textSec, marginBottom: 4 }}>Приглашённый</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: A.text }}>{row.invited?.name || 'Не указан'}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, lineHeight: '16px' }}>{row.invited?.telegram || 'Telegram не указан'} · {row.invited?.email || 'Email не указан'}</div>
+                  <div style={{ fontSize: 10, color: A.textSec, marginTop: 3 }}>ID: {row.invited?.id || '—'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
+                {[
+                  ['Регистрация', row.registrationComplete ? 'Да' : 'Нет'],
+                  ['Привязка', row.linked ? 'Да' : 'Нет'],
+                  ['Начисление', row.granted ? 'Да' : 'Нет'],
+                  ['Ключи', row.keysGranted || 0],
+                  ['Дата', row.registeredAt ? new Date(row.registeredAt).toLocaleDateString('ru-RU') : '—'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: A.chip, borderRadius: 12, padding: 10, border: `1px solid ${A.border}` }}>
+                    <div style={{ fontSize: 10, color: A.textSec }}>{label}</div>
+                    <div style={{ fontSize: 13, color: A.text, fontWeight: 800, marginTop: 3 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12 }}>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: statusColor[row.status] || A.text, background: `${statusColor[row.status] || A.text}18`, borderRadius: 999, padding: '5px 9px' }}>
+                    {statusLabel[row.status] || row.status}
+                  </span>
+                  <div style={{ fontSize: 12, color: A.textSec, marginTop: 8, lineHeight: '17px' }}>{row.reason}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12 }} onClick={() => alert(JSON.stringify(row, null, 2))}>Открыть лог</button>
+                  <button
+                    style={{ ...s.btn, ...s.btnPri, padding: '8px 10px', fontSize: 12, opacity: row.granted || !row.registrationComplete || !row.referrer?.id ? 0.5 : 1 }}
+                    disabled={row.granted || !row.registrationComplete || !row.referrer?.id}
+                    onClick={() => onGrant(row)}
+                  >
+                    Повторить начисление
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, canSeeLegal, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink }) {
   const [type, setType] = useState('partner');
   const [sourceText, setSourceText] = useState('');
@@ -3005,6 +3143,9 @@ export const AdminPanel = () => {
   const [lokiAnalytics, setLokiAnalytics] = useState([]);
   const [aiImportRequests, setAiImportRequests] = useState([]);
   const [publicFormLinks, setPublicFormLinks] = useState([]);
+  const [referralAudit, setReferralAudit] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [referralFilter, setReferralFilter] = useState('all');
   const [lokiKnowledgeLoading, setLokiKnowledgeLoading] = useState(false);
   const [lokiAnalyticsLoading, setLokiAnalyticsLoading] = useState(false);
   const [aiImportLoading, setAiImportLoading] = useState(false);
@@ -3276,6 +3417,42 @@ export const AdminPanel = () => {
     });
     return Array.isArray(data.rows) ? data.rows.map(reviveAdminValue) : [];
   };
+
+  const loadReferralAudit = useCallback(async (action = 'referrals:audit') => {
+    setReferralLoading(true);
+    try {
+      const data = await runAdminAction(action, { idempotencyKey: `${action}_${Date.now()}` });
+      setReferralAudit(data);
+      return data;
+    } catch (e) {
+      logError(e, 'AdminPanel.loadReferralAudit');
+      setReferralAudit({ ok: false, rows: [], summary: {}, error: e.message || 'Не удалось проверить реферальную систему.' });
+      return null;
+    } finally {
+      setReferralLoading(false);
+    }
+  }, []);
+
+  const grantReferralFromAudit = useCallback(async (row) => {
+    if (!row?.referrer?.id || !row?.invited?.id) return;
+    const ok = window.confirm(`Начислить реферальные ключи для цепочки ${row.referrer.id} → ${row.invited.id}?`);
+    if (!ok) return;
+    setReferralLoading(true);
+    try {
+      await runAdminAction('referrals:grant', {
+        referrerId: row.referrer.id,
+        invitedUserId: row.invited.id,
+        reason: `admin_retry_from_referral_panel:${row.reason || row.status}`,
+        idempotencyKey: `referral_grant_${row.referrer.id}_${row.invited.id}_${Date.now()}`,
+      });
+      await loadReferralAudit('referrals:recalculate');
+    } catch (e) {
+      logError(e, 'AdminPanel.grantReferralFromAudit');
+      alert(e.message || 'Не удалось начислить реферальные ключи.');
+    } finally {
+      setReferralLoading(false);
+    }
+  }, [loadReferralAudit]);
 
   const loadAdminSecurity = useCallback(async () => {
     setAdminSecurityLoading(true);
@@ -5179,7 +5356,8 @@ export const AdminPanel = () => {
     if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
     if (activeTab === 'ai-import' && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
     if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks]);
+    if (activeTab === 'referrals' && !referralAudit && !referralLoading) loadReferralAudit();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit]);
 
   if (!authed) return <AdminLoginGate onAllow={(actor) => { setAdminSession(actor || null); setAuthed(true); fetchData(); }} />;
 
@@ -5381,6 +5559,7 @@ export const AdminPanel = () => {
             { id: 'moderation', emoji: '🚦', label: 'Модерация', count: newsComments.filter(c => !c.hidden && (c.status === 'pending' || !c.moderationReviewedAt)).length || undefined },
             { id: 'comments', emoji: '💬', label: 'Комментарии', count: newsComments.filter(c => !c.hidden).length || undefined },
             { id: 'users', emoji: '👥', label: 'Пользователи', count: adminMetrics.users.length || undefined },
+            { id: 'referrals', emoji: '🔗', label: 'Рефералы', count: referralAudit?.summary?.grantErrors || undefined },
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
@@ -5405,7 +5584,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'access') loadAdminSecurity(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -5673,6 +5852,18 @@ export const AdminPanel = () => {
 
       {activeTab === 'users' && (
         <AdminUsersPanel users={adminMetrics.users} />
+      )}
+
+      {activeTab === 'referrals' && (
+        <ReferralSystemPanel
+          data={referralAudit}
+          loading={referralLoading}
+          filter={referralFilter}
+          onFilter={setReferralFilter}
+          onLoad={() => loadReferralAudit('referrals:recalculate')}
+          onCheck={() => loadReferralAudit('referrals:check')}
+          onGrant={grantReferralFromAudit}
+        />
       )}
 
       {activeTab === 'ai-import' && (

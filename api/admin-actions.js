@@ -124,6 +124,134 @@ function serializeAdminValue(value) {
   return value;
 }
 
+function referralUserName(user = {}) {
+  return String(user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.linkedEmail || user.id || '').trim() || 'Без имени';
+}
+
+function referralTelegram(user = {}) {
+  const linked = user.linkedTelegram || {};
+  return linked.username ? `@${String(linked.username).replace(/^@/, '')}` : (linked.tgId || user.telegramId || user.tgId || (String(user.id || '').startsWith('tg_') ? user.id : ''));
+}
+
+function referralEmail(user = {}) {
+  return user.email || user.linkedEmail || (String(user.id || '').startsWith('email:') ? String(user.id).slice(6) : '');
+}
+
+function referralRegistered(user = {}) {
+  return Boolean(user.registeredAt || user.createdAt || user.lastSeen) && !String(user.id || '').startsWith('guest_');
+}
+
+function buildReferralRow(invitedId, invited = {}, referrerId = '', referrer = null) {
+  const effectiveReferrerId = String(referrerId || invited.referredBy || invited.referralBonusGrantedTo || '').trim();
+  const referrerRewardedUsers = Array.isArray(referrer?.referralRewardedUsers) ? referrer.referralRewardedUsers.map(String) : [];
+  const registrationComplete = referralRegistered({ ...invited, id: invitedId });
+  const linked = Boolean(effectiveReferrerId && invited.referredBy === effectiveReferrerId);
+  const granted = invited.referralBonusGranted === true || referrerRewardedUsers.includes(invitedId);
+  let status = 'pending_registration';
+  let reason = '';
+  if (!registrationComplete) reason = 'Пользователь ещё не завершил регистрацию.';
+  else if (!effectiveReferrerId) { status = 'link_missing'; reason = 'Нет referrerId: серверной записи приглашения не было, восстановить цепочку автоматически нельзя.'; }
+  else if (!referrer) { status = 'error'; reason = 'Пригласивший пользователь не найден.'; }
+  else if (invited.referredBy && invited.referredBy !== effectiveReferrerId) { status = 'error'; reason = 'У приглашённого указан другой пригласивший.'; }
+  else if (!linked) { status = 'link_missing'; reason = 'Регистрация завершена, но referredBy не установлен.'; }
+  else if (!granted) { status = 'grant_error'; reason = 'Связь есть, но referralBonusGranted/referralRewardedUsers не подтверждают начисление.'; }
+  else { status = 'granted'; reason = 'Начисление подтверждено.'; }
+  return {
+    id: `${effectiveReferrerId || 'missing'}__${invitedId}`,
+    referrer: referrer ? { id: effectiveReferrerId, name: referralUserName({ ...referrer, id: effectiveReferrerId }), telegram: referralTelegram({ ...referrer, id: effectiveReferrerId }), email: referralEmail({ ...referrer, id: effectiveReferrerId }), keys: Number(referrer.keys || 0), referralCount: Number(referrer.referralCount || 0) } : { id: effectiveReferrerId, name: effectiveReferrerId || 'Не указан', telegram: '', email: '', keys: 0, referralCount: 0 },
+    invited: { id: invitedId, name: referralUserName({ ...invited, id: invitedId }), telegram: referralTelegram({ ...invited, id: invitedId }), email: referralEmail({ ...invited, id: invitedId }), keys: Number(invited.keys || 0) },
+    registrationComplete,
+    linked,
+    granted,
+    keysGranted: granted ? 2 : 0,
+    status,
+    reason,
+    registeredAt: serializeAdminValue(invited.registeredAt || invited.createdAt || null),
+    referralBonusGrantedAt: serializeAdminValue(invited.referralBonusGrantedAt || null),
+    referralBackfilledAt: serializeAdminValue(invited.referralBackfilledAt || null),
+  };
+}
+
+async function buildReferralAudit(db) {
+  const usersSnap = await db.collection('users').limit(1500).get();
+  const users = new Map(usersSnap.docs.map(doc => [doc.id, { id: doc.id, ...(doc.data() || {}) }]));
+  const rows = new Map();
+  users.forEach((user, userId) => {
+    if (user.referredBy || user.referralBonusGranted || user.referralBonusGrantedTo) {
+      const referrerId = String(user.referredBy || user.referralBonusGrantedTo || '').trim();
+      rows.set(`${referrerId || 'missing'}__${userId}`, buildReferralRow(userId, user, referrerId, users.get(referrerId) || null));
+    }
+  });
+  users.forEach((referrer, referrerId) => {
+    (Array.isArray(referrer.referralRewardedUsers) ? referrer.referralRewardedUsers : []).forEach(rawInvitedId => {
+      const invitedId = String(rawInvitedId || '').trim();
+      if (!invitedId || rows.has(`${referrerId}__${invitedId}`)) return;
+      rows.set(`${referrerId}__${invitedId}`, buildReferralRow(invitedId, users.get(invitedId) || {}, referrerId, referrer));
+    });
+  });
+  const list = [...rows.values()].sort((a, b) => String(b.registeredAt || '').localeCompare(String(a.registeredAt || '')));
+  return {
+    rows: list,
+    summary: {
+      total: list.length,
+      pendingRegistration: list.filter(row => row.status === 'pending_registration').length,
+      registrationComplete: list.filter(row => row.registrationComplete).length,
+      linkMissing: list.filter(row => row.status === 'link_missing').length,
+      grantErrors: list.filter(row => row.status === 'grant_error' || row.status === 'error').length,
+      granted: list.filter(row => row.status === 'granted').length,
+    },
+    generatedAt: new Date().toISOString(),
+    temporaryInvitationStorage: 'client_url_localStorage_only',
+  };
+}
+
+async function grantReferralCompensation(db, req, actor) {
+  const referrerId = String(req.body?.referrerId || '').trim();
+  const invitedUserId = String(req.body?.invitedUserId || req.body?.newUserId || '').trim();
+  const reason = String(req.body?.reason || 'admin_referral_compensation').trim().slice(0, 500);
+  if (!referrerId || !invitedUserId || referrerId === invitedUserId) throw Object.assign(new Error('Укажите корректных пригласившего и приглашённого.'), { statusCode: 400 });
+  await requireAdminPermission(req, 'users:update');
+  const referrerRef = db.collection('users').doc(referrerId);
+  const invitedRef = db.collection('users').doc(invitedUserId);
+  const result = await db.runTransaction(async tx => {
+    const [referrerSnap, invitedSnap] = await Promise.all([tx.get(referrerRef), tx.get(invitedRef)]);
+    if (!referrerSnap.exists) throw Object.assign(new Error('Пригласивший пользователь не найден.'), { statusCode: 404 });
+    if (!invitedSnap.exists) throw Object.assign(new Error('Приглашённый пользователь не найден.'), { statusCode: 404 });
+    const invited = invitedSnap.data() || {};
+    if (invited.referredBy && invited.referredBy !== referrerId) throw Object.assign(new Error('У приглашённого уже указан другой пригласивший.'), { statusCode: 409 });
+    if (invited.referralBonusGranted === true) return { ok: true, alreadyGranted: true, referrerId, invitedUserId };
+    tx.set(invitedRef, {
+      referredBy: referrerId,
+      referralBonusGranted: true,
+      referralBonusGrantedTo: referrerId,
+      referralBonusGrantedAt: FieldValue.serverTimestamp(),
+      referralCompensatedAt: FieldValue.serverTimestamp(),
+      referralCompensationReason: reason,
+      keys: invited.referredBy ? FieldValue.increment(0) : FieldValue.increment(2),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(referrerRef, { keys: FieldValue.increment(2), referralCount: FieldValue.increment(1), referralRewardedUsers: FieldValue.arrayUnion(invitedUserId), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    tx.set(db.collection('referralCompensations').doc(`${referrerId}__${invitedUserId}`), {
+      referrerId, invitedUserId, reason, keysToReferrer: 2, keysToInvited: invited.referredBy ? 0 : 2, actorUid: actor.uid, actorUserId: actor.userId, createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { ok: true, alreadyGranted: false, referrerId, invitedUserId };
+  });
+  await writeAuditLog(db, req, actor, 'referrals:grant', 'users', invitedUserId, { label: `Реферальная компенсация: ${referrerId} -> ${invitedUserId}`, reason, alreadyGranted: result.alreadyGranted });
+  return result;
+}
+
+async function handleReferralAction(db, req, actor) {
+  const action = String(req.body?.action || '').trim();
+  await requireAdminPermission(req, 'users:read');
+  if (action === 'referrals:audit' || action === 'referrals:check' || action === 'referrals:recalculate') {
+    const audit = await buildReferralAudit(db);
+    await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary });
+    return { ok: true, ...audit };
+  }
+  if (action === 'referrals:grant') return grantReferralCompensation(db, req, actor);
+  throw Object.assign(new Error('Неизвестное действие реферальной системы.'), { statusCode: 400 });
+}
+
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -991,6 +1119,8 @@ export default async function handler(req, res) {
       ? await handleEntityAction(db, req, actor)
       : action.startsWith('event:')
         ? await handleEventModerationAction(db, req, actor)
+      : action.startsWith('referrals:')
+        ? await handleReferralAction(db, req, actor)
       : action.startsWith('partner:')
         ? await handlePartnerOnboardingAction(db, req, actor)
         : await handleNewsAction(db, req, actor);

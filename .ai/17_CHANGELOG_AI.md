@@ -1635,3 +1635,11 @@
 **Файлы:** `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `api/user-actions.js`, `scripts/backfill-referral.mjs`, `.ai/17_CHANGELOG_AI.md`
 
 **Что изменено:** Начисление реферального бонуса перенесено в серверный `profile:sync` и выполняется транзакционно для новых и уже созданных Telegram-профилей. Existing-user sync теперь передаёт pending referral на backend. Добавлен безопасный idempotent backfill-скрипт для реально неначисленных приглашений.
+
+## 2026-07-10 — Referral system admin audit panel
+
+**Задача:** Расширить production-аудит реферальной системы, добавить административный раздел контроля цепочек и безопасные действия восстановления начисления.
+
+**Файлы:** `src/AdminPanel.jsx`, `server/src/routes/admin-actions.js`, `api/admin-actions.js`, `.ai/17_CHANGELOG_AI.md`
+
+**Что изменено:** В `admin-actions` добавлены действия `referrals:audit`, `referrals:check`, `referrals:recalculate`, `referrals:grant`. В админке добавлена вкладка «Рефералы» с фильтрами, статусами регистрации/привязки/начисления, причинами ошибок, пересчётом цепочки и защищённой кнопкой повторного начисления. Для реального Telegram-кейса сохранён production-документ компенсации в `referralCompensations`.
