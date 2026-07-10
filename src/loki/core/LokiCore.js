@@ -44,33 +44,36 @@ function nowMs() {
 }
 
 export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {}) {
+  const sourceState = appState?.__lokiContext ? appState.appState ?? {} : appState;
+  const contextUser = appState?.__lokiContext ? appState.user ?? sourceState.user : sourceState.user;
   const base = {
     user: {
-      name: appState.user?.first_name || appState.user?.name || null,
-      keys: Number(appState.userKeys ?? 0),
-      completedTasks: appState.completedTasks ?? [],
-      favorites: appState.favorites ?? [],
+      name: appState.profile?.name || contextUser?.first_name || contextUser?.name || null,
+      keys: Number(appState.keys?.balance ?? sourceState.userKeys ?? 0),
+      completedTasks: appState.tasks?.completedIds ?? sourceState.completedTasks ?? [],
+      favorites: appState.favorites?.ids ?? sourceState.favorites ?? [],
       city: 'Зеленоград',
-      currentPanel: appState.activePanel,
-      lastScanDate: appState.lastScanDate ?? null,
+      currentPanel: appState.currentScreen?.id ?? sourceState.activePanel,
+      lastScanDate: appState.keys?.lastScanDate ?? sourceState.lastScanDate ?? null,
     },
     apg: {
-      partners: appState.partners ?? [],
-      experts: appState.experts ?? [],
-      events: appState.events ?? [],
-      news: appState.news ?? [],
-      tasks: appState.customTasks ?? [],
-      notifications: appState.notifications ?? [],
+      partners: sourceState.partners ?? [],
+      experts: sourceState.experts ?? [],
+      events: sourceState.events ?? [],
+      news: sourceState.news ?? [],
+      tasks: sourceState.customTasks ?? [],
+      notifications: sourceState.notifications ?? [],
       prizesKnown: false,
     },
+    contextEngine: appState?.__lokiContext ? appState : null,
     knowledge: {
       ...APG_KNOWLEDGE_BASE,
-      custom: Array.isArray(appState.lokiKnowledge) ? appState.lokiKnowledge : [],
+      custom: Array.isArray(sourceState.lokiKnowledge) ? sourceState.lokiKnowledge : [],
     },
     memory: {
       ...memory,
-      activeContext: appState.activeContext ?? memory?.activeContext ?? memory?.lastContext ?? null,
-      lastContext: appState.activeContext ?? memory?.lastContext ?? null,
+      activeContext: sourceState.activeContext ?? appState.memory?.activeContext ?? memory?.activeContext ?? memory?.lastContext ?? null,
+      lastContext: sourceState.activeContext ?? appState.memory?.lastContext ?? memory?.lastContext ?? null,
     },
     userMemory,
     knowledgeHealth: validateApgKnowledgeBase(APG_KNOWLEDGE_BASE),

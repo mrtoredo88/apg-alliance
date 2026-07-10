@@ -149,6 +149,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - `src/loki/LokiExperience.jsx`
 - `src/LokiPage.jsx`
 - `src/loki/core/LokiCore.js`
+- `src/loki/core/context/ContextEngine.js`
 - `src/loki/core/brain/BrainLayer.js`
 - `src/loki/core/brain/lokiScenarios.js`
 
@@ -157,6 +158,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - глобальный provider;
 - floating assistant;
 - Loki Home AI Dashboard;
+- Context Engine как единый слой состояния приложения для Локи;
 - полноэкранный опыт `LokiExperience`;
 - action routing через `LOKI_APP_ACTIONS`;
 - память в localStorage;

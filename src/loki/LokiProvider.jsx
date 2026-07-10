@@ -22,6 +22,7 @@ import {
 import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from './core/lokiUserMemory.js';
 import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearning.js';
 import { buildInterestProfile, buildRecommendationFeed, buildScenarioCollections } from './LokiRecommendationCenter.js';
+import { buildLokiContext } from './core/context/ContextEngine.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -667,7 +668,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setBrainThinking(true);
     }, 1000);
     try {
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel }, memory, userMemory, history, debug: isLokiDebugEnabled() });
+      const lokiContext = buildLokiContext({ appState, user, activePanel, memory, userMemory });
+      const result = await askLokiBrain({ text, appState: lokiContext, memory, userMemory, history, debug: isLokiDebugEnabled() });
       clearTimeout(thinkingTimer);
       setBrainThinking(false);
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
@@ -723,7 +725,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         }));
         return { card: null, ...contextResult };
       }
-      const result = await askLokiBrain({ text, appState: { ...appState, user, activePanel, activeContext }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() });
+      const lokiContext = buildLokiContext({ appState: { ...appState, activeContext }, user, activePanel, memory: { ...memory, activeContext }, userMemory });
+      const result = await askLokiBrain({ text, appState: lokiContext, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() });
       setBrainThinking(false);
       setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
       setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
@@ -794,9 +797,10 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   }, [activePanel, updateMemory]);
 
   const value = useMemo(() => {
-    const state = { ...appState, user, activePanel };
+    const lokiContext = buildLokiContext({ appState, user, activePanel, memory, userMemory });
+    const state = lokiContext.appState;
     const interestProfile = buildInterestProfile({ appState: state, memory, userMemory });
-    const recommendationFeed = buildRecommendationFeed({ appState: state, memory, userMemory, limit: 8 });
+    const recommendationFeed = lokiContext.recommendations?.feed?.slice(0, 8) ?? buildRecommendationFeed({ appState: state, memory, userMemory, limit: 8 });
     const scenarioCollections = buildScenarioCollections({ appState: state, memory, userMemory }).filter(item => item.cards.length);
     const dashboard = buildLokiHomeDashboard({ appState: state, user, recommendationFeed });
     return {
@@ -819,6 +823,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     lastEvent,
     history,
     interestProfile,
+    lokiContext,
     recommendationFeed,
     scenarioCollections,
     memory: memory ?? DEFAULT_LOKI_MEMORY,

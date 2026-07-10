@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: APG Context Engine для Локи
+**Коммит:** `pending`
+**Файлы:** `src/loki/core/context/ContextEngine.js`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/21_LOKI_CORE.md`
+**Тип:** feat
+**Что изменено:**
+- Создан `buildLokiContext()` — единый слой сбора состояния АПГ для Локи.
+- `LokiProvider` передаёт в ядро Локи Context Engine object вместо разрозненного чтения `appState`.
+- `LokiCore` поддерживает новый контекст и сохраняет совместимость со старыми модулями через `context.appState`.
+**Почему:** Локи и будущие AI-модули должны получать состояние приложения через один стабильный интерфейс, без прямого чтения данных из разных частей приложения.
+
+---
+
 ## [2026-07-10] feat: Loki Home AI Dashboard
 **Коммит:** `pending`
 **Файлы:** `src/LokiPage.jsx`, `src/loki/LokiProvider.jsx`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/21_LOKI_CORE.md`

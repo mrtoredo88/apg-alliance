@@ -70,6 +70,34 @@ Every Brain Layer response follows this structure:
 
 The legacy modules remain as fallback for narrow commands and old scenarios.
 
+## Context Engine
+
+`src/loki/core/context/ContextEngine.js` provides the single application context for Loki.
+
+Public method:
+
+```js
+buildLokiContext({ appState, user, activePanel, memory, userMemory })
+```
+
+The Context Engine does not make decisions. It only collects and normalizes existing APG state:
+
+- user and profile;
+- current screen;
+- location placeholder;
+- favorites;
+- tasks and achievements;
+- keys;
+- events today;
+- recommendation inputs;
+- active promotions;
+- top news;
+- notifications;
+- future extension points for weather, calendar, conversation history, geo and AI modules;
+- legacy `appState` for backward compatibility.
+
+Loki Core receives this context object and reads legacy data through `context.appState` when old modules require it.
+
 ## Loki Home
 
 `src/LokiPage.jsx` is no longer a chat-first screen. It is the Loki Home AI Dashboard.
