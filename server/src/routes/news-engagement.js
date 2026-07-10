@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
+import { ECONOMY_VERSION, getEconomyReward } from '../../../server-shared/economy-engine.js';
 
 function safeId(value, fallback = '') {
   return String(value || fallback).trim().slice(0, 180);
@@ -90,6 +91,40 @@ async function trackRead(db, body) {
       'analytics.completedReads': FieldValue.increment(1),
       'analytics.lastCompletedAt': FieldValue.serverTimestamp(),
     }, { merge: true });
+    if (user.id && !user.id.startsWith('guest')) {
+      const reward = getEconomyReward('news_read');
+      const rewardId = `${newsId}_${user.id}`.replace(/[/#?[\\\]]/g, '_');
+      const rewardRef = db.collection('newsReadRewards').doc(rewardId);
+      const userRef = db.collection('users').doc(user.id);
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(rewardRef);
+        if (snap.exists) return;
+        tx.set(rewardRef, {
+          newsId,
+          userId: user.id,
+          keys: reward.keys,
+          reputation: reward.reputation,
+          economyVersion: ECONOMY_VERSION,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        tx.set(userRef, {
+          keys: FieldValue.increment(reward.keys),
+          reputation: FieldValue.increment(reward.reputation),
+          economyVersion: ECONOMY_VERSION,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        tx.set(userRef.collection('activity').doc(), {
+          type: 'news_read',
+          icon: '📰',
+          text: `Новость прочитана: +${reward.keys} ключ`,
+          keys: reward.keys,
+          reputation: reward.reputation,
+          newsId,
+          economyVersion: ECONOMY_VERSION,
+          ts: FieldValue.serverTimestamp(),
+        });
+      });
+    }
   }
   return { ok: true };
 }

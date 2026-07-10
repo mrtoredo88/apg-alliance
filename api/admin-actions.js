@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from './_firebase-admin.js';
 import { adminError, requireAdminPermission, writeAuditLog } from './_admin-security.js';
 import { APP_URL } from './config.js';
+import { ECONOMY_VERSION, economyMigrationPatch } from '../server-shared/economy-engine.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt']);
 const RESOURCE_CONFIG = {
@@ -68,6 +69,74 @@ const PARTNER_STATUS_LABELS = {
 };
 const PARTNER_PUBLICATION_MIN_PERCENT = 80;
 const AUTOMATION_SOURCE_LIMIT = 30;
+
+function adminMillis(value) {
+  if (!value) return 0;
+  if (value.toDate) return value.toDate().getTime();
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function avgNumber(rows, field) {
+  if (!rows.length) return 0;
+  return Math.round(rows.reduce((sum, row) => sum + Number(row[field] || 0), 0) / rows.length * 10) / 10;
+}
+
+async function handleEconomyAction(db, req, actor) {
+  const action = String(req.body?.action || '').trim();
+  await requireAdminPermission(req, action === 'economy:analytics' ? 'stats:read' : 'users:update');
+  const [usersSnap, entriesSnap, claimsSnap, scansSnap, expertScansSnap, tasksSnap] = await Promise.all([
+    db.collection('users').limit(2000).get(),
+    db.collection('raffleEntries').limit(1000).get().catch(() => ({ docs: [] })),
+    db.collection('prizeClaims').limit(1000).get().catch(() => ({ docs: [] })),
+    db.collection('scans').limit(1000).get().catch(() => ({ docs: [] })),
+    db.collection('expertScans').limit(1000).get().catch(() => ({ docs: [] })),
+    db.collection('customTasks').limit(500).get().catch(() => ({ docs: [] })),
+  ]);
+  const users = usersSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  if (action === 'economy:backfill') {
+    let updated = 0;
+    const batch = db.batch();
+    users.filter(user => user.economyVersion !== ECONOMY_VERSION).slice(0, 400).forEach(user => {
+      batch.set(db.collection('users').doc(user.id), economyMigrationPatch(user), { merge: true });
+      updated += 1;
+    });
+    if (updated) await batch.commit();
+    await writeAuditLog(db, req, actor, action, 'users', 'economy', { label: 'Backfill APG Economy 1.0', updated });
+    return { ok: true, updated, economyVersion: ECONOMY_VERSION };
+  }
+  const now = Date.now();
+  const oneDay = 86400000;
+  const activeSince = days => users.filter(user => adminMillis(user.lastSeen || user.updatedAt || user.registeredAt) >= now - days * oneDay).length;
+  const entries = entriesSnap.docs.map(doc => doc.data() || {});
+  const claims = claimsSnap.docs.map(doc => doc.data() || {});
+  const scans = scansSnap.docs.map(doc => doc.data() || {});
+  const expertScans = expertScansSnap.docs.map(doc => doc.data() || {});
+  const taskCount = tasksSnap.docs.length;
+  const rewardPopularity = {};
+  claims.forEach(claim => {
+    const id = claim.prizeId || 'unknown';
+    rewardPopularity[id] = (rewardPopularity[id] || 0) + 1;
+  });
+  const ticketExchanges = users.reduce((sum, user) => sum + Number(user.tickets || 0), 0) + entries.reduce((sum, entry) => sum + Number(entry.ticketsCount || 0), 0);
+  return {
+    ok: true,
+    economyVersion: ECONOMY_VERSION,
+    metrics: {
+      dau: activeSince(1),
+      wau: activeSince(7),
+      mau: activeSince(30),
+      retention: users.length ? Math.round(activeSince(7) / users.length * 1000) / 10 : 0,
+      averageKeys: avgNumber(users, 'keys'),
+      averageTickets: avgNumber(users, 'tickets'),
+      ticketExchanges,
+      rewardPopularity,
+      partnerVisitConversion: users.length ? Math.round(scans.length / users.length * 1000) / 10 : 0,
+      expertVisitConversion: users.length ? Math.round(expertScans.length / users.length * 1000) / 10 : 0,
+      taskConversion: users.length && taskCount ? Math.round(users.reduce((sum, user) => sum + (Array.isArray(user.completedTasks) ? user.completedTasks.length : 0), 0) / (users.length * taskCount) * 1000) / 10 : 0,
+    },
+  };
+}
 
 const AUTOMATION_EVENT_LABELS = {
   partner_created: 'Создан партнёр',
@@ -1599,6 +1668,8 @@ export default async function handler(req, res) {
         ? await handleTelegramAuthAdminAction(db, req, actor)
       : action.startsWith('automation:')
         ? await handleAutomationAction(db, req, actor)
+      : action.startsWith('economy:')
+        ? await handleEconomyAction(db, req, actor)
       : action.startsWith('ai-profile:')
         ? await handleAiProfileAction(db, req, actor)
       : action.startsWith('partner:')

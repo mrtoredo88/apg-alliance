@@ -6,6 +6,7 @@ import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import { logError } from './errorLogger.js';
+import { calculateTicketExchange, getReputationStatus, normalizeOpportunityType } from './economyEngine.js';
 
 // ─── Таймер обратного отсчёта ─────────────────────────────────────────────────
 
@@ -266,18 +267,18 @@ function PrizeCardV2({ prize, userKeys, onClaim, isClaimed, index }) {
   );
 }
 
-function RaffleCardV2({ prize, userKeys, myEntry, counts, onEnter, index }) {
+function RaffleCardV2({ prize, userTickets, myEntry, counts, onEnter, index }) {
   const left = useCountdown(prize.raffleDate);
   const myTickets = myEntry?.ticketsCount ?? 0;
   const ended = !left || !!prize.winner;
-  const canEnter = !ended && userKeys >= (prize.ticketCost ?? 0);
+  const canEnter = !ended;
   return (
     <GlassCard style={{ borderRadius: 34, padding: 18, minHeight: 190, position: 'relative', overflow: 'hidden', animation: `fadeInUp 0.34s ease ${index * 0.04}s both` }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 82% 10%,rgba(150,100,255,0.22),transparent 36%), radial-gradient(circle at 16% 92%,rgba(215,184,106,0.12),transparent 34%)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
           <GlassBadge tone="gold">Розыгрыш</GlassBadge>
-          <GlassBadge>{prize.ticketCost ?? 0} 🗝️ / билет</GlassBadge>
+          <GlassBadge>{userTickets} 🎟️ на балансе</GlassBadge>
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
           <div style={{ fontSize: 46, lineHeight: 1 }}>{prize.emoji ?? '🎟️'}</div>
@@ -292,7 +293,7 @@ function RaffleCardV2({ prize, userKeys, myEntry, counts, onEnter, index }) {
           <StatPill label="моих" value={myTickets} tone={myTickets ? 'gold' : 'glass'} />
         </div>
         <GlassButton onClick={() => canEnter && onEnter(prize)} tone={canEnter ? 'gold' : 'glass'} style={{ width: '100%', opacity: canEnter ? 1 : 0.62, color: canEnter ? '#17120a' : APG2_PROFILE.text }}>
-          {ended ? (prize.winner ? `Победитель: ${prize.winner.userName ?? 'определен'}` : 'Розыгрыш завершен') : canEnter ? (myTickets ? 'Купить еще билеты' : 'Участвовать') : 'Недостаточно ключей'}
+          {ended ? (prize.winner ? `Победитель: ${prize.winner.userName ?? 'определен'}` : 'Розыгрыш завершен') : myTickets ? 'Добавить билеты' : 'Участвовать билетами'}
         </GlassButton>
       </div>
     </GlassCard>
@@ -301,10 +302,11 @@ function RaffleCardV2({ prize, userKeys, myEntry, counts, onEnter, index }) {
 
 // ─── Шит выбора билетов ───────────────────────────────────────────────────────
 
-function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
+function TicketSheet({ prize, userKeys, userTickets = 0, onConfirm, onCancel, confirming }) {
   const [count, setCount] = useState(1);
-  const ticketCost = prize.ticketCost ?? 0;
-  const totalCost  = count * ticketCost;
+  const missingTickets = Math.max(0, count - userTickets);
+  const exchange = calculateTicketExchange(missingTickets || 1);
+  const totalCost = missingTickets ? exchange.keyCost : 0;
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px calc(32px + env(safe-area-inset-bottom, 0px))' }}>
@@ -312,14 +314,15 @@ function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
         <div style={{ textAlign: 'center', fontSize: 48, marginBottom: 10 }}>{prize.emoji ?? '🎟️'}</div>
         <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: APG2_PROFILE.text, marginBottom: 4 }}>{prize.name}</div>
         <div style={{ textAlign: 'center', fontSize: 12, color: APG2_PROFILE.textSoft, marginBottom: 24 }}>
-          1 билет = {ticketCost} 🗝️ · Чем больше билетов — тем выше шанс
+          Розыгрыши используют только билеты. 1 билет = {exchange.exchangeRateKeys} 🗝️ при обмене.
         </div>
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 12, color: APG2_PROFILE.textSoft, textAlign: 'center', marginBottom: 12 }}>Количество билетов</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             {[1, 2, 3, 4, 5].map(n => {
-              const canBuy = userKeys >= n * ticketCost;
+              const needTickets = Math.max(0, n - userTickets);
+              const canBuy = needTickets === 0 || userKeys >= calculateTicketExchange(needTickets).keyCost;
               const sel    = count === n;
               return (
                 <button
@@ -346,19 +349,19 @@ function TicketSheet({ prize, userKeys, onConfirm, onCancel, confirming }) {
 
         <div style={{ background: 'rgba(150,100,255,0.09)', border: '1px solid rgba(150,100,255,0.24)', borderRadius: 16, padding: '12px 16px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 13, color: APG2_PROFILE.textSoft }}>
-            {count} билет{count === 1 ? '' : count < 5 ? 'а' : 'ов'} · останется {userKeys - totalCost} 🗝️
+            {count} билет{count === 1 ? '' : count < 5 ? 'а' : 'ов'} · на балансе {userTickets} 🎟️
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#9664FF' }}>{totalCost} 🗝️</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#9664FF' }}>{missingTickets ? `${totalCost} 🗝️` : '0 🗝️'}</div>
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
           <GlassButton onClick={onCancel} style={{ flex: 1 }}>Отмена</GlassButton>
           <GlassButton
-            onClick={() => onConfirm(count)}
+            onClick={() => onConfirm(count, missingTickets)}
             disabled={confirming || userKeys < totalCost}
             style={{ flex: 1.5, background: 'linear-gradient(135deg, #9664FF, #7B4FD4)', color: '#fff', border: '1px solid rgba(150,100,255,0.4)' }}
           >
-            {confirming ? 'Оформляем...' : '🎟️ Купить билеты'}
+            {confirming ? 'Оформляем...' : missingTickets ? 'Обменять и участвовать' : 'Участвовать'}
           </GlassButton>
         </div>
       </div>
@@ -432,7 +435,7 @@ function ClaimSuccessModal({ prize, onClose, partners = [], experts = [] }) {
 
 // ─── Главная страница наград ──────────────────────────────────────────────────
 
-export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, onBack, onClaim, onRaffleEnter, partners = [], experts = [] }) {
+export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, userTickets = 0, userReputation = 0, onBack, onClaim, onExchangeTickets, onRaffleEnter, partners = [], experts = [] }) {
   const [prizes, setPrizes]               = useState([]);
   const [myClaims, setMyClaims]           = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -520,10 +523,14 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, o
     } finally { setClaiming(false); }
   };
 
-  const handleEnterRaffle = async (ticketCount) => {
+  const handleEnterRaffle = async (ticketCount, missingTickets = 0) => {
     if (!raffleSheet || !onRaffleEnter) return;
     setEnteringRaffle(true);
     try {
+      if (missingTickets > 0) {
+        const exchanged = await onExchangeTickets?.(missingTickets);
+        if (!exchanged) return;
+      }
       const success = await onRaffleEnter(raffleSheet, ticketCount);
       if (success) {
         const prizeId = raffleSheet.id;
@@ -549,17 +556,28 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, o
 
   const claimedIds = useMemo(() => new Set(myClaims.map(c => c.prizeId)), [myClaims]);
 
-  const purchasePrizes = useMemo(() => prizes.filter(p => !p.type || p.type === 'purchase'), [prizes]);
+  const purchasePrizes = useMemo(() => prizes.filter(p => normalizeOpportunityType(p) !== 'raffle'), [prizes]);
   const rafflePrizes   = useMemo(() => prizes.filter(p => p.type === 'raffle'), [prizes]);
 
   if (variant === 'v2') {
+    const reputationStatus = getReputationStatus(userReputation);
     return (
       <GlassPanel>
-        <ScreenHeader title="Призы" subtitle={`Баланс: ${userKeys} ключей`} kicker="Награды АПГ" onBack={onBack} />
+        <ScreenHeader title="Магазин возможностей" subtitle={`${userKeys} ключей · ${userTickets} билетов`} kicker="APG Economy 1.0" onBack={onBack} />
         <GlassCard tone="gold" style={{ borderRadius: 36, padding: 20, marginBottom: 18 }}>
           <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 760, marginBottom: 4 }}>Доступно для обмена</div>
           <div style={{ color: '#17120a', fontSize: 44, lineHeight: '46px', fontWeight: 940 }}>{userKeys} <span style={{ fontSize: 24 }}>🗝️</span></div>
-          <div style={{ color: 'rgba(20,15,8,0.66)', fontSize: 13, lineHeight: '18px', marginTop: 10 }}>Ключи превращаются в подарки, участия в розыгрышах и маленькие городские радости.</div>
+          <div style={{ color: 'rgba(20,15,8,0.66)', fontSize: 13, lineHeight: '18px', marginTop: 10 }}>Ключи открывают возможности. Розыгрыши используют билеты, а репутация растёт и не тратится.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+            <div style={{ background: 'rgba(255,255,255,0.26)', borderRadius: 18, padding: 10 }}>
+              <div style={{ color: 'rgba(20,15,8,0.58)', fontSize: 11, fontWeight: 800 }}>Билеты</div>
+              <div style={{ color: '#17120a', fontSize: 22, fontWeight: 920 }}>{userTickets} 🎟️</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.26)', borderRadius: 18, padding: 10 }}>
+              <div style={{ color: 'rgba(20,15,8,0.58)', fontSize: 11, fontWeight: 800 }}>Репутация</div>
+              <div style={{ color: '#17120a', fontSize: 18, fontWeight: 920 }}>{reputationStatus.label}</div>
+            </div>
+          </div>
         </GlassCard>
         {loadError && <EmptyStateV2 icon="⚠️" title="Не удалось загрузить призы" text="Проверьте соединение и попробуйте снова." />}
         {loading ? (
@@ -571,12 +589,12 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, o
             {rafflePrizes.length > 0 && (
               <GlassSection title="Розыгрыши">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-                  {rafflePrizes.map((prize, i) => <RaffleCardV2 key={prize.id} prize={prize} userKeys={userKeys} myEntry={myRaffleEntries[prize.id]} counts={raffleCounts[prize.id]} onEnter={p => setRaffleSheet(p)} index={i} />)}
+                  {rafflePrizes.map((prize, i) => <RaffleCardV2 key={prize.id} prize={prize} userTickets={userTickets} myEntry={myRaffleEntries[prize.id]} counts={raffleCounts[prize.id]} onEnter={p => setRaffleSheet(p)} index={i} />)}
                 </div>
               </GlassSection>
             )}
             {purchasePrizes.length > 0 && (
-              <GlassSection title="Обменять ключи">
+              <GlassSection title="Возможности за ключи">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                   {purchasePrizes.map((prize, i) => <PrizeCardV2 key={prize.id} prize={prize} userKeys={userKeys} onClaim={p => setConfirmPrize(p)} isClaimed={claimedIds.has(prize.id)} index={i} />)}
                 </div>
@@ -602,7 +620,7 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, o
         )}
         {confirmPrize && <ConfirmModal prize={confirmPrize} userKeys={userKeys} onConfirm={handleConfirmClaim} onCancel={() => !claiming && setConfirmPrize(null)} claiming={claiming} />}
         {claimedPrize && <ClaimSuccessModal prize={claimedPrize} onClose={() => setClaimedPrize(null)} partners={partners} experts={experts} />}
-        {raffleSheet && <TicketSheet prize={raffleSheet} userKeys={userKeys} onConfirm={handleEnterRaffle} onCancel={() => !enteringRaffle && setRaffleSheet(null)} confirming={enteringRaffle} />}
+        {raffleSheet && <TicketSheet prize={raffleSheet} userKeys={userKeys} userTickets={userTickets} onConfirm={handleEnterRaffle} onCancel={() => !enteringRaffle && setRaffleSheet(null)} confirming={enteringRaffle} />}
       </GlassPanel>
     );
   }

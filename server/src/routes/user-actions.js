@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
+import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 
 const MAX_TEXT = 4000;
 
@@ -239,30 +240,41 @@ async function actionProfileSync(db, req, actor) {
       const referrerSnap = referrerRef ? await tx.get(referrerRef) : null;
       const patch = { ...profile, lastSeen: FieldValue.serverTimestamp() };
       let keyIncrement = 0;
+      let reputationIncrement = 0;
       consentStatus = getConsentStatus(before);
       const consentMigration = buildConsentMigrationPatch(consentStatus);
       if (consentMigration) Object.assign(patch, consentMigration);
+      Object.assign(patch, economyMigrationPatch(before));
       if (before.lastBonusDate !== todayKey) {
-        keyIncrement += 1;
+        const reward = getEconomyReward('daily_activity');
+        keyIncrement += reward.keys;
+        reputationIncrement += reward.reputation;
         patch.lastBonusDate = todayKey;
         dailyBonusAwarded = true;
       }
       if (referrerSnap?.exists) {
+        const reward = getEconomyReward('referral');
         referralBonusAwarded = true;
-        keyIncrement += canAttachReferral ? 2 : 0;
+        keyIncrement += canAttachReferral ? reward.keys : 0;
+        reputationIncrement += canAttachReferral ? reward.reputation : 0;
         patch.referredBy = refId;
         patch.referralBonusGranted = true;
         patch.referralBonusGrantedTo = refId;
         patch.referralBonusGrantedAt = FieldValue.serverTimestamp();
         tx.set(referrerRef, {
-          keys: FieldValue.increment(2),
+          keys: FieldValue.increment(reward.keys),
+          reputation: FieldValue.increment(reward.reputation),
+          economyVersion: ECONOMY_VERSION,
           referralCount: FieldValue.increment(1),
           referralRewardedUsers: FieldValue.arrayUnion(userId),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       }
       if (keyIncrement > 0) patch.keys = FieldValue.increment(keyIncrement);
+      if (reputationIncrement > 0) patch.reputation = FieldValue.increment(reputationIncrement);
       tx.set(ref, patch, { merge: true });
+      const newReputation = Number(before.reputation || before.keys || 0) + reputationIncrement;
+      const reputationStatus = getReputationStatus(newReputation);
       userDoc = {
         ...before,
         ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null)),
@@ -282,6 +294,11 @@ async function actionProfileSync(db, req, actor) {
         } : {}),
         lastBonusDate: patch.lastBonusDate || before.lastBonusDate,
         keys: Number(before.keys || 0) + keyIncrement,
+        tickets: Number(before.tickets || 0),
+        reputation: newReputation,
+        reputationStatus: reputationStatus.id,
+        reputationStatusLabel: reputationStatus.label,
+        economyVersion: ECONOMY_VERSION,
       };
       return;
     }
@@ -291,8 +308,16 @@ async function actionProfileSync(db, req, actor) {
     const referrerSnap = referrerRef ? await tx.get(referrerRef) : null;
     const shouldGrantReferral = !!referrerSnap?.exists;
     referralBonusAwarded = shouldGrantReferral;
+    const referralReward = getEconomyReward('referral');
+    const baseReputation = shouldGrantReferral ? referralReward.reputation : 0;
+    const baseStatus = getReputationStatus(baseReputation);
     const base = {
-      keys: shouldGrantReferral ? 2 : 0,
+      keys: shouldGrantReferral ? referralReward.keys : 0,
+      tickets: 0,
+      reputation: baseReputation,
+      reputationStatus: baseStatus.id,
+      reputationStatusLabel: baseStatus.label,
+      economyVersion: ECONOMY_VERSION,
       favorites: [],
       scannedPartners: {},
       savedNews: [],
@@ -326,7 +351,9 @@ async function actionProfileSync(db, req, actor) {
     tx.set(ref, base, { merge: true });
     if (shouldGrantReferral) {
       tx.set(referrerRef, {
-        keys: FieldValue.increment(2),
+        keys: FieldValue.increment(referralReward.keys),
+        reputation: FieldValue.increment(referralReward.reputation),
+        economyVersion: ECONOMY_VERSION,
         referralCount: FieldValue.increment(1),
         referralRewardedUsers: FieldValue.arrayUnion(userId),
         updatedAt: FieldValue.serverTimestamp(),
@@ -636,13 +663,16 @@ async function actionTaskClaim(db, req, actor) {
     }
     completedTasks = [...before, taskId];
     awarded = true;
-    tx.set(userRef, { completedTasks, keys: FieldValue.increment(reward), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    const economyReward = getEconomyReward('task_complete', reward);
+    tx.set(userRef, { completedTasks, keys: FieldValue.increment(economyReward.keys), reputation: FieldValue.increment(economyReward.reputation), economyVersion: ECONOMY_VERSION, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.set(userRef.collection('activity').doc(), {
       type: 'task',
       icon: '✅',
-      text: `Задание выполнено: +${reward} ключей`,
-      keys: reward,
+      text: `Задание выполнено: +${economyReward.keys} ключей`,
+      keys: economyReward.keys,
+      reputation: economyReward.reputation,
       taskId,
+      economyVersion: ECONOMY_VERSION,
       ts: FieldValue.serverTimestamp(),
     });
   });
@@ -700,32 +730,62 @@ async function actionRaffleEnter(db, req, actor) {
   const prize = req.body?.prize || {};
   const prizeId = safeString(prize.id, 160);
   const ticketCount = Math.max(1, Math.min(100, Number(req.body?.ticketCount || 1)));
-  const cost = ticketCount * Math.max(0, Number(prize.ticketCost || 0));
-  if (!prizeId || !cost) throw Object.assign(new Error('Некорректный розыгрыш.'), { statusCode: 400 });
+  if (!prizeId || !ticketCount) throw Object.assign(new Error('Некорректный розыгрыш.'), { statusCode: 400 });
   const userRef = db.collection('users').doc(userId);
   const entryRef = db.collection('raffleEntries').doc(`${prizeId}_${userId}`);
   await db.runTransaction(async tx => {
     const snap = await tx.get(userRef);
-    if (Number(snap.data()?.keys || 0) < cost) throw Object.assign(new Error('Недостаточно ключей.'), { statusCode: 400 });
-    tx.set(userRef, { keys: FieldValue.increment(-cost), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    if (Number(snap.data()?.tickets || 0) < ticketCount) throw Object.assign(new Error('Недостаточно билетов.'), { statusCode: 400 });
+    tx.set(userRef, { tickets: FieldValue.increment(-ticketCount), economyVersion: ECONOMY_VERSION, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.set(entryRef, {
       prizeId,
       userId,
       userName: safeString(req.body?.userName || 'Участник АПГ', 200),
       userPhoto: safeString(req.body?.userPhoto, 1000) || null,
       ticketsCount: FieldValue.increment(ticketCount),
+      economyVersion: ECONOMY_VERSION,
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     tx.set(userRef.collection('activity').doc(), {
       type: 'raffle_enter',
       icon: safeString(prize.emoji || '🎟️', 20),
-      text: `Участие в розыгрыше: ${safeString(prize.name, 200)} (−${cost} ключей)`,
+      text: `Участие в розыгрыше: ${safeString(prize.name, 200)} (−${ticketCount} билетов)`,
+      tickets: -ticketCount,
+      economyVersion: ECONOMY_VERSION,
       ts: FieldValue.serverTimestamp(),
     });
   });
-  await audit(db, req, actor, 'raffle:enter', 'prizes', prizeId, 'success', { ticketCount, cost });
+  await audit(db, req, actor, 'raffle:enter', 'prizes', prizeId, 'success', { ticketCount });
   return { ok: true };
+}
+
+async function actionEconomyExchangeTickets(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const exchange = calculateTicketExchange(req.body?.ticketCount || req.body?.tickets || 1);
+  const userRef = db.collection('users').doc(userId);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(userRef);
+    const keys = Number(snap.data()?.keys || 0);
+    if (keys < exchange.keyCost) throw Object.assign(new Error('Недостаточно ключей для обмена.'), { statusCode: 400 });
+    tx.set(userRef, {
+      keys: FieldValue.increment(-exchange.keyCost),
+      tickets: FieldValue.increment(exchange.tickets),
+      economyVersion: ECONOMY_VERSION,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(userRef.collection('activity').doc(), {
+      type: 'ticket_exchange',
+      icon: '🎟️',
+      text: `Обмен: ${exchange.keyCost} ключей → ${exchange.tickets} билетов`,
+      keys: -exchange.keyCost,
+      tickets: exchange.tickets,
+      economyVersion: ECONOMY_VERSION,
+      ts: FieldValue.serverTimestamp(),
+    });
+  });
+  await audit(db, req, actor, 'economy:exchangeTickets', 'users', userId, 'success', exchange);
+  return { ok: true, ...exchange };
 }
 
 async function actionEventToggle(db, req, actor) {
@@ -894,10 +954,35 @@ async function actionReviewPartner(db, req, actor) {
     createdAt: FieldValue.serverTimestamp(),
   };
   const partnerRef = db.collection('partners').doc(partnerId);
+  const partnerReviewRef = partnerRef.collection('reviews').doc(userId);
+  const publicReviewRef = db.collection('reviews').doc(`${partnerId}_${userId}`);
+  const existingReview = await partnerReviewRef.get();
   await Promise.all([
-    partnerRef.collection('reviews').doc(userId).set(reviewData, { merge: true }),
-    db.collection('reviews').doc(`${partnerId}_${userId}`).set({ ...reviewData, partnerId, partnerName: safeString(req.body?.partnerName, 200) }, { merge: true }),
+    partnerReviewRef.set(reviewData, { merge: true }),
+    publicReviewRef.set({ ...reviewData, partnerId, partnerName: safeString(req.body?.partnerName, 200) }, { merge: true }),
   ]);
+  if (!existingReview.exists) {
+    const reward = getEconomyReward('review');
+    const userRef = db.collection('users').doc(userId);
+    await Promise.all([
+      userRef.set({
+        keys: FieldValue.increment(reward.keys),
+        reputation: FieldValue.increment(reward.reputation),
+        economyVersion: ECONOMY_VERSION,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true }),
+      userRef.collection('activity').add({
+        type: 'review',
+        icon: '⭐',
+        text: `Отзыв о партнёре: +${reward.keys} ключа`,
+        keys: reward.keys,
+        reputation: reward.reputation,
+        partnerId,
+        economyVersion: ECONOMY_VERSION,
+        ts: FieldValue.serverTimestamp(),
+      }),
+    ]);
+  }
   const snap = await partnerRef.collection('reviews').get();
   const list = snap.docs.map(d => d.data() || {});
   const avgRating = list.length ? Math.round(list.reduce((sum, r) => sum + Number(r.stars || 0), 0) / list.length * 10) / 10 : 0;
@@ -922,7 +1007,31 @@ async function actionReviewExpert(db, req, actor) {
     text: safeString(req.body?.text, MAX_TEXT),
     createdAt: FieldValue.serverTimestamp(),
   };
-  await db.collection('expertReviews').doc(reviewId).set(reviewData, { merge: true });
+  const reviewRef = db.collection('expertReviews').doc(reviewId);
+  const existingReview = await reviewRef.get();
+  await reviewRef.set(reviewData, { merge: true });
+  if (!existingReview.exists) {
+    const reward = getEconomyReward('review');
+    const userRef = db.collection('users').doc(userId);
+    await Promise.all([
+      userRef.set({
+        keys: FieldValue.increment(reward.keys),
+        reputation: FieldValue.increment(reward.reputation),
+        economyVersion: ECONOMY_VERSION,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true }),
+      userRef.collection('activity').add({
+        type: 'review',
+        icon: '⭐',
+        text: `Отзыв об эксперте: +${reward.keys} ключа`,
+        keys: reward.keys,
+        reputation: reward.reputation,
+        expertId,
+        economyVersion: ECONOMY_VERSION,
+        ts: FieldValue.serverTimestamp(),
+      }),
+    ]);
+  }
   const snap = await db.collection('expertReviews').where('expertId', '==', expertId).get();
   const list = snap.docs.map(d => d.data() || {});
   const avgRating = list.length ? Math.round(list.reduce((sum, r) => sum + Number(r.rating || 0), 0) / list.length * 10) / 10 : 0;
@@ -1033,6 +1142,7 @@ async function routeAction(db, req, actor) {
   if (action === 'task:claim') return actionTaskClaim(db, req, actor);
   if (action === 'prize:claim') return actionPrizeClaim(db, req, actor);
   if (action === 'raffle:enter') return actionRaffleEnter(db, req, actor);
+  if (action === 'economy:exchangeTickets') return actionEconomyExchangeTickets(db, req, actor);
   if (action === 'event:toggle') return actionEventToggle(db, req, actor);
   if (action === 'event:propose') return actionEventPropose(db, req, actor);
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);

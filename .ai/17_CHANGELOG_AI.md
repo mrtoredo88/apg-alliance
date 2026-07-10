@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: APG Economy 1.0
+**Коммит:** `pending`
+**Файлы:** `server-shared/economy-engine.js`, `src/economyEngine.js`, `src/UserApp.jsx`, `src/RewardsPage.jsx`, `src/AdminPanel.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `api/news-engagement.js`, `server/src/routes/news-engagement.js`, `api/news-comments.js`, `server/src/routes/news-comments.js`, `server-shared/reward-service.js`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Создана отдельная подсистема APG Economy 1.0 с централизованными весами начислений ключей и репутации.
+- Добавлены билеты как отдельный баланс, обмен ключей на билеты и участие в розыгрышах только билетами.
+- Магазин наград переведён в магазин возможностей, добавлены репутационные статусы, season-ready конфигурация и backend-аналитика экономики.
+**Почему:** Ключи должны быть не целью, а способом открывать возможности; экономика должна мотивировать реальные действия пользователя и управляться через единый Economy Engine.
+
+---
+
 ## [2026-07-10] feat: AI Profile Layer для партнёров и экспертов
 **Коммит:** `pending`
 **Файлы:** `src/aiProfile.js`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/loki/core/context/ContextEngine.js`, `src/loki/core/brain/BrainLayer.js`, `src/loki/core/modules/PartnerExpert.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`

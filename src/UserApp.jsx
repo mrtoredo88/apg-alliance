@@ -7,6 +7,7 @@ import vkBridge, { isVK } from './vk.js';
 import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js';
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
 import { confirmQrScan } from './rewardApi.js';
+import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
 import { db, auth } from './firebase';
 import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -613,6 +614,8 @@ export function UserApp() {
 
   const [user, setUser]                         = useState(null);
   const [userKeys, setUserKeys]                 = useState(0);
+  const [userTickets, setUserTickets]           = useState(0);
+  const [userReputation, setUserReputation]     = useState(0);
   const [favorites, setFavorites]               = useState([]);
   const [scannedPartnerIds, setScannedPartnerIds] = useState({});
   const [completedTasks, setCompletedTasks]     = useState([]);
@@ -1144,6 +1147,9 @@ export function UserApp() {
           }
         }
         const keys = data.keys ?? 0;
+        const tickets = Number(data.tickets || 0);
+        const reputation = Number(data.reputation || data.keys || 0);
+        const reputationStatus = data.reputationStatusLabel ? { label: data.reputationStatusLabel } : getReputationStatus(reputation);
         setUser(u => u ? ({
           ...u,
           ...(data.displayName ? { displayName: data.displayName } : {}),
@@ -1155,6 +1161,8 @@ export function UserApp() {
           ...(data.notificationsEnabled !== undefined ? { notificationsEnabled: data.notificationsEnabled } : {}),
         }) : u);
         setUserKeys(keys);
+        setUserTickets(tickets);
+        setUserReputation(reputation);
         setFavorites(data.favorites ?? []);
         setSavedNews(Array.isArray(data.savedNews) ? data.savedNews.map(String) : []);
         setReadLaterNews(Array.isArray(data.readLaterNews) ? data.readLaterNews.map(String) : []);
@@ -1206,6 +1214,7 @@ export function UserApp() {
           if (!result?.referralBonusAwarded || !isMounted.current) return;
           localStorage.removeItem('apg_pending_ref');
           setUserKeys(prev => prev + 2);
+          setUserReputation(prev => prev + 8);
           setTimeout(() => {
             if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
           }, 1200);
@@ -1216,7 +1225,8 @@ export function UserApp() {
           userAction('profile:sync', syncExistingPayload)
             .then(result => {
               if (!isMounted.current) return;
-              setUserKeys(prev => prev + 1);
+	              setUserKeys(prev => prev + 1);
+	              setUserReputation(prev => prev + 1);
               if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
               return result;
             })
@@ -1622,11 +1632,13 @@ export function UserApp() {
     let captured;
     setCompletedTasks(prev => { captured = [...prev, taskId]; return captured; });
     setUserKeys(prev => prev + reward);
+    setUserReputation(prev => prev + 5);
     try {
       const uid = String(user.id);
       const result = await userAction('task:claim', { userId: uid, taskId, reward });
       if (Array.isArray(result.completedTasks)) setCompletedTasks(result.completedTasks);
       if (!result.awarded) setUserKeys(prev => prev - reward);
+      if (!result.awarded) setUserReputation(prev => Math.max(0, prev - 5));
       showLokiMessage(LOKI_EVENTS.ACHIEVEMENT_UNLOCKED, { taskId, reward });
     } catch (e) {
       console.error('[APG-CLAIM] error', {
@@ -1641,6 +1653,7 @@ export function UserApp() {
       showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'task_claim' });
       setCompletedTasks(prev => prev.filter(id => id !== taskId));
       setUserKeys(prev => prev - reward);
+      setUserReputation(prev => Math.max(0, prev - 5));
       const isAuthMismatch = e?.status === 401 || e?.status === 403;
       showToast(isAuthMismatch ? 'Требуется повторный вход. Перезапустите приложение.' : 'Ошибка при сохранении. Попробуйте ещё раз.');
     }
@@ -1680,13 +1693,26 @@ export function UserApp() {
     }
   }, [user, userKeys, showToast]);
 
+  const handleExchangeTickets = useCallback(async (ticketCount) => {
+    if (!user) return false;
+    try {
+      const uid = String(user.id);
+      const result = await userAction('economy:exchangeTickets', { userId: uid, ticketCount });
+      setUserKeys(prev => prev - Number(result.keyCost || 0));
+      setUserTickets(prev => prev + Number(result.tickets || 0));
+      return true;
+    } catch (e) {
+      logError(e, 'UserApp.handleExchangeTickets');
+      showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : (e?.message || 'Не удалось обменять ключи на билеты.'), 'error');
+      return false;
+    }
+  }, [user, showToast]);
+
   const handleRaffleEnter = useCallback(async (prize, ticketCount) => {
     if (!user || !prize) return false;
-    const cost = ticketCount * (prize.ticketCost ?? 0);
-    if (userKeys < cost) return false;
     if (claimingPrizeRef.current) return false;
     claimingPrizeRef.current = true;
-    setUserKeys(prev => prev - cost);
+    setUserTickets(prev => prev - ticketCount);
     try {
       const uid = String(user.id);
       const userName = user.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : 'Участник АПГ';
@@ -1700,13 +1726,13 @@ export function UserApp() {
       return true;
     } catch (e) {
       logError(e, 'UserApp.handleRaffleEnter');
-      setUserKeys(prev => prev + cost);
+      setUserTickets(prev => prev + ticketCount);
       showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось купить билет. Попробуйте ещё раз.', 'error');
       return false;
     } finally {
       claimingPrizeRef.current = false;
     }
-  }, [user, userKeys, showToast]);
+  }, [user, userTickets, showToast]);
 
   // ─── Мероприятия ────────────────────────────────────────────────────────────
 
@@ -2608,7 +2634,10 @@ export function UserApp() {
     scannedCount: Object.keys(scannedPartnerIds).length,
     unreadCount,
     registeredEventIds,
-    userRank,
+	    userRank,
+	    userTickets,
+	    userReputation,
+	    reputationStatus: getReputationStatus(userReputation),
     customTasks,
     experts,
     appearance,
@@ -2935,10 +2964,13 @@ export function UserApp() {
                   <RewardsPage
                     nav="rewards"
                     variant="v2"
-                    user={user} userKeys={userKeys}
-                    onBack={goBackPanel}
-                    onClaim={handlePrizeClaim}
-                    onRaffleEnter={handleRaffleEnter}
+	                    user={user} userKeys={userKeys}
+	                    userTickets={userTickets}
+	                    userReputation={userReputation}
+	                    onBack={goBackPanel}
+	                    onClaim={handlePrizeClaim}
+	                    onExchangeTickets={handleExchangeTickets}
+	                    onRaffleEnter={handleRaffleEnter}
                     partners={partners}
                     experts={experts}
                   />

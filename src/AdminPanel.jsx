@@ -5266,6 +5266,7 @@ export const AdminPanel = () => {
       stock: prStock !== '' ? Number(prStock) : null,
       active: prActive,
       type: prType,
+      opportunityType: prType === 'purchase' ? 'reward' : prType,
       partnerId: prDonorType === 'partner' ? (prPartnerId || null) : null,
       expertId:  prDonorType === 'expert'  ? (prExpertId  || null) : null,
     };
@@ -8208,16 +8209,23 @@ export const AdminPanel = () => {
 
             <label style={s.label}>Тип приза</label>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {['purchase', 'raffle'].map(t => (
+              {[
+                ['purchase', '🛒 Покупка'],
+                ['discount', '🏷️ Скидка'],
+                ['certificate', '🎫 Сертификат'],
+                ['raffle', '🎟️ Розыгрыш'],
+                ['closed_event', '🔒 Закрытое мероприятие'],
+                ['exclusive', '✨ Эксклюзив'],
+              ].map(([t, label]) => (
                 <button key={t} onClick={() => setPrType(t)} style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: prType === t ? A.gold : 'rgba(255,255,255,0.1)', color: prType === t ? '#000' : A.text, transition: 'background 0.2s' }}>
-                  {t === 'purchase' ? '🛒 Покупка' : '🎟️ Розыгрыш'}
+                  {label}
                 </button>
               ))}
             </div>
 
             {prType === 'raffle' && (
               <>
-                <label style={s.label}>Стоимость одного билета (ключей)</label>
+                <label style={s.label}>Лимит билетов на пользователя (опционально)</label>
                 <input style={s.input} type="number" min="1" placeholder="5" value={prTicketCost} onChange={e => setPrTicketCost(e.target.value)} />
 
                 <label style={s.label}>Дата и время розыгрыша</label>

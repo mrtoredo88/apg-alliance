@@ -172,6 +172,20 @@
 - Portal используются: нет.
 - Критические зависимости: parity между `api/` и `server/src/routes/`, admin permissions `ai:read`/`ai:update`, отсутствие автопубликации, идемпотентность recommendation id, совместимость со старыми документами.
 
+## APG Economy
+
+- Кто использует: `UserApp`, `RewardsPage`, `AdminPanel`, backend `user-actions`, `admin-actions`, `news-engagement`, `news-comments`, `reward-service`, `raffle-draw`.
+- Что использует он: `server-shared/economy-engine.js` на backend и `src/economyEngine.js` на frontend.
+- Provider ему необходимы: специальных React Provider нет; frontend получает балансы через состояние `UserApp`.
+- API вызывает: frontend вызывает `/api/user-actions` для `economy:exchangeTickets`, `raffle:enter`, `task:claim`, отзывов и других защищённых действий; админка вызывает `/api/admin-actions` для `economy:analytics` и `economy:backfill`.
+- Firestore коллекции использует: `users`, `users/{id}/activity`, `raffleEntries`, `prizeClaims`, `prizes`, `newsReadRewards`, `newsReadEvents`, `newsComments`, `scans`, `expertScans`, `customTasks`, `adminAuditLogs`.
+- Backend endpoint использует: `/api/user-actions`, `/api/admin-actions`, `/api/news-engagement`, `/api/news-comments`, `/api/raffle-draw`.
+- Глобальные состояния изменяет: `userKeys`, `userTickets`, `userReputation`, `reputationStatus`, optimistic state in `UserApp`.
+- Маршруты его открывают: профиль/награды через пользовательскую навигацию, админская аналитика через `AdminPanel`.
+- BottomSheet связаны: `RewardsPage` ticket exchange/raffle sheet.
+- Portal используются: специальных portal для Economy Engine нет; UI наследует существующие overlay-механики `RewardsPage`.
+- Критические зависимости: сохранность существующих `users.keys`, idempotent rewards, transaction safety for ticket exchange/raffles, parity between Vercel `api/` and Fastify/Yandex `server/src/routes/`.
+
 ## Firebase
 
 - Кто использует: `UserApp`, `AdminPanel`, `NewsPage` auth token usage, `PartnerPage`, `ExpertsPage`, `ProfilePanel`, backend routes through Firebase Admin SDK.
@@ -261,6 +275,7 @@
 - `UserApp`: центральный runtime shell; от него зависят данные пользователя, panel navigation, public data loading, push, Loki app state/actions, most user screens.
 - `Firebase`: общий источник Auth, Firestore data и Messaging; используется frontend and backend sides.
 - `Backend API`: защищённые изменения, admin actions, comments, auth, push, upload, Telegram, VK sync and analytics depend on it.
+- `APG Economy`: центральный слой ключей, билетов, репутации, розыгрышей и наград; ошибки здесь напрямую влияют на доверие пользователей.
 - `LokiProvider`: required for contextual assistant and any `useLoki` consumer; also changes navigation through `appActions`.
 - `App` routing layer: owns BrowserRouter, top-level routes, lazy chunk boundaries and update/version check.
 - `EventDetailSheet`: shared by user events and admin events center; portal and data compatibility are critical.

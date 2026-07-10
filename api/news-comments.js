@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from './_firebase-admin.js';
 import { requireAdminPermission, writeAuditLog } from './_admin-security.js';
+import { ECONOMY_VERSION, getEconomyReward } from '../server-shared/economy-engine.js';
 
 const MAX_TEXT = 900;
 
@@ -169,6 +170,24 @@ export default async function handler(req, res) {
         updatedAt: FieldValue.serverTimestamp(),
       });
       await updateNewsCommentCount(db, newsId, 1);
+      const reward = getEconomyReward('comment');
+      await db.collection('users').doc(user.id).set({
+        keys: FieldValue.increment(reward.keys),
+        reputation: FieldValue.increment(reward.reputation),
+        economyVersion: ECONOMY_VERSION,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      await db.collection('users').doc(user.id).collection('activity').add({
+        type: 'comment',
+        icon: '💬',
+        text: `Комментарий: +${reward.keys} ключа`,
+        keys: reward.keys,
+        reputation: reward.reputation,
+        newsId,
+        commentId: ref.id,
+        economyVersion: ECONOMY_VERSION,
+        ts: FieldValue.serverTimestamp(),
+      });
       const created = await ref.get();
       return res.status(200).json({ ok: true, comment: serializeComment(created) });
     }

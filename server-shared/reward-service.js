@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
+import { ECONOMY_VERSION, getEconomyReward } from './economy-engine.js';
 
 const TOKEN_PREFIX = 'apg:visit:v1:';
 const TOKEN_TTL_MS = 60_000;
@@ -243,15 +244,20 @@ async function awardVisitTransaction(db, context) {
     const newStreak = alreadyToday ? (user.streak ?? 0) : (lastScanDate === yesterdayKey ? (user.streak ?? 0) + 1 : 1);
     const previousDates = Array.isArray(user.scanDates) ? user.scanDates : [];
     const scanDates = previousDates.includes(dateKey) ? previousDates : [...previousDates.slice(-89), dateKey];
-    const keyBonus = alreadyAwarded ? 0 : (context.subjectType === 'expert' ? Number(subject.keys ?? 1) : (subject.featured || subject.partnerOfMonth ? 2 : 1));
+    const baseReward = getEconomyReward(context.subjectType === 'expert' ? 'expert_visit' : 'partner_visit');
+    const partnerBoost = Math.max(1, Math.min(5, Number(subject.keyMultiplier || subject.keysMultiplier || (subject.featured || subject.partnerOfMonth ? 2 : 1)) || 1));
+    const configuredKeys = Number(subject.keys || subject.visitKeys || 0);
+    const keyBonus = alreadyAwarded ? 0 : Math.max(0, configuredKeys || Math.round(baseReward.keys * partnerBoost));
+    const reputationBonus = alreadyAwarded ? 0 : baseReward.reputation;
     const newCount = prevCount + 1;
 
     const userUpdate = {
       lastScanDate: dateKey,
       streak: newStreak,
       scanDates,
-      [`visitCounts.${context.subjectId}`]: FieldValue.increment(1),
-      updatedAt: FieldValue.serverTimestamp(),
+	      [`visitCounts.${context.subjectId}`]: FieldValue.increment(1),
+	      economyVersion: ECONOMY_VERSION,
+	      updatedAt: FieldValue.serverTimestamp(),
     };
     if (context.subjectType === 'expert') {
       userUpdate[`scannedExperts.${context.subjectId}`] = FieldValue.increment(1);
@@ -259,6 +265,7 @@ async function awardVisitTransaction(db, context) {
       userUpdate[`scannedPartners.${context.subjectId}`] = true;
     }
     if (keyBonus > 0) userUpdate.keys = FieldValue.increment(keyBonus);
+    if (reputationBonus > 0) userUpdate.reputation = FieldValue.increment(reputationBonus);
 
     tx.update(userRef, userUpdate);
     tx.update(context.subject.ref, { totalVisits: FieldValue.increment(1) });
@@ -269,31 +276,38 @@ async function awardVisitTransaction(db, context) {
       partnerId: context.subjectType === 'partner' ? context.subjectId : null,
       expertId: context.subjectType === 'expert' ? context.subjectId : null,
       source: context.source,
-      isNew: !alreadyAwarded,
-      keysAwarded: keyBonus,
-      monthKey: monthKeyFromToday(dateKey),
+	      isNew: !alreadyAwarded,
+	      keysAwarded: keyBonus,
+	      reputationAwarded: reputationBonus,
+	      economyVersion: ECONOMY_VERSION,
+	      monthKey: monthKeyFromToday(dateKey),
       scannedBy: context.scannerUserId,
       scannedAt: FieldValue.serverTimestamp(),
     });
     tx.set(activityRef, {
       type: context.subjectType === 'expert' ? 'expert_scan' : 'scan',
       icon: keyBonus > 1 ? '⭐' : keyBonus > 0 ? '🔑' : '🔥',
-      text: keyBonus > 0
-        ? `Посещён: ${subject.name ?? 'АПГ'}${keyBonus > 1 ? ' (бонус × 2)' : ''}`
-        : `Визит отмечен: ${subject.name ?? 'АПГ'}`,
-      ts: FieldValue.serverTimestamp(),
+	      text: keyBonus > 0
+	        ? `Посещён: ${subject.name ?? 'АПГ'}${keyBonus > 1 ? ' (бонус × 2)' : ''}`
+	        : `Визит отмечен: ${subject.name ?? 'АПГ'}`,
+	      keys: keyBonus,
+	      reputation: reputationBonus,
+	      economyVersion: ECONOMY_VERSION,
+	      ts: FieldValue.serverTimestamp(),
     });
     if (context.tokenRef) {
       tx.update(context.tokenRef, {
         used: true,
         usedAt: FieldValue.serverTimestamp(),
-        usedBy: context.scannerUserId,
-        keysAwarded: keyBonus,
-      });
+	        usedBy: context.scannerUserId,
+	        keysAwarded: keyBonus,
+	        reputationAwarded: reputationBonus,
+	      });
     }
 
     return {
-      awardedKeys: keyBonus,
+	      awardedKeys: keyBonus,
+	      awardedReputation: reputationBonus,
       alreadyAwarded,
       streak: newStreak,
       scanDates,
@@ -366,8 +380,10 @@ export async function awardVisit(db, { qrValue, scannerUserId }) {
       userId: context.userId,
       subjectType: context.subjectType,
       subjectId: context.subjectId,
-      keysAwarded: result.awardedKeys,
-      alreadyAwarded: result.alreadyAwarded,
+	      keysAwarded: result.awardedKeys,
+	      reputationAwarded: result.awardedReputation,
+	      economyVersion: ECONOMY_VERSION,
+	      alreadyAwarded: result.alreadyAwarded,
     });
     return {
       ok: true,
