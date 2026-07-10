@@ -8,6 +8,7 @@ import vkBridge, { openUrl } from './vk.js';
 import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
 import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsPhotoItems, getNewsReactionsTotal, getNewsStats, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
+import { buildAdaptiveHomeData } from './interestEngine.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -404,6 +405,7 @@ function V2SecondScreen({
   onOpenRewards,
   onOpenNews,
   onOpenNewsItem,
+  interestProfile,
 }) {
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
@@ -1351,6 +1353,7 @@ export function HomePanelV2({
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
   counterPulse = false,
+  interestProfile = null,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1405,6 +1408,7 @@ export function HomePanelV2({
 
   const featuredPartner   = partners.find(p => p.featured === true) ?? null;
   const partnerOfMonth    = partners.find(p => p.partnerOfMonth === true) ?? null;
+  const adaptiveHome = useMemo(() => buildAdaptiveHomeData({ partners, experts, events, news, interestProfile }), [partners, experts, events, news, interestProfile]);
 
   const nextPrivateEvent = useMemo(() => {
     const privates = events.filter(e => e.isPrivate);
@@ -1466,7 +1470,7 @@ export function HomePanelV2({
       <V2FirstScreen
         user={user}
         userKeys={userKeys}
-        events={events}
+        events={adaptiveHome.events}
         featuredPartner={featuredPartner}
         partnerOfMonth={partnerOfMonth}
         unreadCount={unreadCount}
@@ -1543,12 +1547,13 @@ export function HomePanelV2({
           <>
             <V2SecondScreen
               user={user}
-              partners={partners}
-              experts={experts}
-              events={events}
-              news={news}
+              partners={adaptiveHome.partners}
+              experts={adaptiveHome.experts}
+              events={adaptiveHome.events}
+              news={adaptiveHome.news}
               featuredPartner={featuredPartner}
               partnerOfMonth={partnerOfMonth}
+              interestProfile={adaptiveHome.interestProfile}
               onOpenPartner={onOpenPartner}
               onOpenEvents={onOpenEvents}
               onOpenExperts={onOpenExperts}

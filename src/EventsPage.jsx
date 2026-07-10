@@ -514,7 +514,7 @@ function EventsCalendarView({ events, selectedDay, onSelectDay, onOpenEvent }) {
   );
 }
 
-export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister }) {
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
@@ -554,6 +554,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
 
   const toggleFilter = (id) => setFilters(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   const openEventSheet = (event) => {
+    onEventOpen?.(event);
     setSelectedEvent(event);
   };
 

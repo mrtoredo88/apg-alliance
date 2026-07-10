@@ -160,6 +160,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - floating assistant;
 - Loki Home AI Dashboard;
 - Context Engine как единый слой состояния приложения для Локи;
+- Interest Profile из Adaptive APG в контексте Локи;
 - полноэкранный опыт `LokiExperience`;
 - action routing через `LOKI_APP_ACTIONS`;
 - память в localStorage;
@@ -176,6 +177,24 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - Firebase Auth;
 - Firebase Messaging при поддержке браузера;
 - Firebase Admin SDK на backend.
+
+## Adaptive APG
+
+Ключевые файлы:
+
+- `src/interestEngine.js`
+- `src/UserApp.jsx`
+- `src/HomePanelV2.jsx`
+- `src/loki/core/context/ContextEngine.js`
+- `src/loki/LokiRecommendationCenter.js`
+
+Подтверждённые возможности:
+
+- вычисление интересов пользователя без явного опроса;
+- постепенное изменение весов категорий;
+- хранение `interestProfile` внутри существующего документа пользователя;
+- адаптивная сортировка данных главной страницы без изменения дизайна;
+- передача Interest Profile в Context Engine Локи.
 
 ## Backend
 

@@ -21,12 +21,12 @@
 ## UserApp
 
 - Кто использует: `App` на маршрутах `/`, `/news`, `/news/:id`, `/events`, `/event/:id`, `/partner/:id`, `/expert/:id`, `/experts`, `/submit/:type/:token`.
-- Что использует он: VKUI `ConfigProvider`, `AdaptivityProvider`, `AppRoot`, `View`, `Panel`, lazy screens, Firebase client SDK, VK Bridge, `LokiProvider`, `LokiAssistant`, `createPortal` для tab bar и overlay элементов.
+- Что использует он: VKUI `ConfigProvider`, `AdaptivityProvider`, `AppRoot`, `View`, `Panel`, lazy screens, Firebase client SDK, VK Bridge, `LokiProvider`, `LokiAssistant`, Interest Engine, `createPortal` для tab bar и overlay элементов.
 - Provider ему необходимы: получает routing context от `BrowserRouter`; внутри создаёт VKUI providers и `LokiProvider`.
 - API вызывает: `/api/public-data`, `/api/vk-news`, `/api/email-auth`, backend user actions through imported helpers, static `/manifest.json`.
 - Firestore коллекции использует: `auth_map`, `partners`, `events`, `news`, `notifications`, `reviews`, `customTasks`, `experts`, `stats`, `lokiKnowledge`, `users`, `prizes`.
 - Backend endpoint использует: `/api/public-data`, `/api/vk-news`, `/api/email-auth`; user-action calls идут через `userApi.js`.
-- Глобальные состояния изменяет: `activePanel`, user/session state, favorites, registered events, notifications, PWA push subscription state, localStorage caches, `window.__swRegPromise` usage.
+- Глобальные состояния изменяет: `activePanel`, user/session state, favorites, registered events, notifications, `interestProfile`, PWA push subscription state, localStorage caches, `window.__swRegPromise` usage.
 - Маршруты его открывают: `/`, `/news`, `/news/:id`, `/events`, `/event/:id`, `/partner/:id`, `/expert/:id`, `/experts`, `/submit/:type/:token`.
 - BottomSheet связаны: открывает event detail indirectly через `EventsPage`; scanner and user overlays are connected inside shell.
 - Portal используются: tab bar portal to `document.body`, key burst/offline overlays inside shell, downstream portals from child screens.
@@ -68,7 +68,7 @@
 - API вызывает: `/api/news-engagement`, `/api/news-comments`.
 - Firestore коллекции использует: `newsComments`, `news`, `newsCommentBlocks` through backend; client receives `news` from `UserApp`.
 - Backend endpoint использует: `GET/POST /api/news-comments`, `POST /api/news-engagement`.
-- Глобальные состояния изменяет: selected article state, local article scroll cache in localStorage, Loki `activeContext` through `openContextExperience`, user engagement counters through backend.
+- Глобальные состояния изменяет: selected article state, local article scroll cache in localStorage, Loki `activeContext` through `openContextExperience`, user engagement counters through backend, Interest Profile signals through `UserApp` callbacks.
 - Маршруты его открывают: `/news`, `/news/:id`, internal panel `news`, Loki `OPEN_NEWS`, home/news cards.
 - BottomSheet связаны: none confirmed; article reader is a portal overlay, not a bottom sheet.
 - Portal используются: selected `ArticleView` portal to `document.body`, lightbox/share related portals inside article flow.
@@ -82,7 +82,7 @@
 - API вызывает: user registration flows are delegated through callbacks from `UserApp`; admin moderation/patching is delegated through `AdminPanel` backend actions.
 - Firestore коллекции использует: events data passed from `UserApp`; admin center reads/writes `events` through AdminPanel/backend; user actions endpoint touches `events` for registration/proposals.
 - Backend endpoint использует: through callers, primarily `/api/user-actions` and `/api/admin-actions` for protected mutations.
-- Глобальные состояния изменяет: selected event state, pending Loki event target via `UserApp`, admin selected event sheet state, registered event ids via user action callbacks.
+- Глобальные состояния изменяет: selected event state, pending Loki event target via `UserApp`, admin selected event sheet state, registered event ids via user action callbacks, Interest Profile signals on event open/register.
 - Маршруты его открывают: `/events`, `/event/:id`, internal panel `events`, Loki event actions.
 - BottomSheet связаны: `EventDetailSheet` for user event card and admin event center.
 - Portal используются: `EventDetailSheet` portals to `document.body`.
@@ -96,7 +96,7 @@
 - API вызывает: user actions for favorites/reviews/scans through `UserApp` helpers; photo/upload/admin actions through admin/cabinet flows.
 - Firestore коллекции использует: `partners`, `partners/{id}/reviews`, `reviews`, `users`, `scans`, `partnerConnectionEvents`, `partnerInvites`, plus `events`, `news`, `notifications`, `aiDrafts`, `customTasks` for Partner AI moderation drafts depending on caller/backend flow.
 - Backend endpoint использует: `/api/user-actions` including `partner:profileUpdate`, `event:propose`, `partner:aiDraft`; `/api/admin-actions`, `/api/email-auth`, `/api/upload-photo`, `/api/public-submit` depending on partner flow.
-- Глобальные состояния изменяет: `activePartner`, favorites, scanned partner ids, visit counts, owned partner/cabinet state.
+- Глобальные состояния изменяет: `activePartner`, favorites, scanned partner ids, visit counts, owned partner/cabinet state, Interest Profile signals on partner open/favorite.
 - Маршруты его открывают: `/partner/:id`, internal panel `partner`, offers/nearby/map/profile navigation, Loki partner actions.
 - BottomSheet связаны: none confirmed as shared bottom sheet; partner page uses modal/portal overlays.
 - Portal используются: partner share/toast portals and modal portals in `PartnerPage`.
@@ -110,7 +110,7 @@
 - API вызывает: user actions for reviews and expert-related mutations through backend helpers; admin actions through AdminPanel.
 - Firestore коллекции использует: `experts`, `expertReviews`, `expertRotation`, `users` through owner/cabinet flows.
 - Backend endpoint использует: `/api/user-actions`, `/api/admin-actions`, `/api/expert-rotation`, `/api/upload-photo` depending on flow.
-- Глобальные состояния изменяет: selected/open expert target, owned expert/cabinet state, expert review/rating state.
+- Глобальные состояния изменяет: selected/open expert target, owned expert/cabinet state, expert review/rating state, Interest Profile signals on expert open.
 - Маршруты его открывают: `/experts`, `/expert/:id`, internal panel `experts`, profile cabinet actions, Loki experts action.
 - BottomSheet связаны: none confirmed as shared bottom sheet.
 - Portal используются: expert detail/contact/review portals in `ExpertsPage`.
@@ -119,7 +119,7 @@
 ## Loki
 
 - Кто использует: `UserApp` wraps user shell in `LokiProvider`; `LokiAssistant`, `LokiPage`, `NewsPage`, and profile/home callbacks use Loki entry points; `AdminPanel` manages Loki knowledge/editor separately.
-- Что использует он: `LokiProvider`, `LokiAssistant`, `LokiExperience`, `LokiCore`, `ContextEngine`, `BrainLayer`, scenario registry, Loki modules, `LOKI_APP_ACTIONS`, app `appState`, app `appActions`, localStorage memory.
+- Что использует он: `LokiProvider`, `LokiAssistant`, `LokiExperience`, `LokiCore`, `ContextEngine`, `BrainLayer`, scenario registry, Loki modules, `LOKI_APP_ACTIONS`, Interest Profile from Adaptive APG, app `appState`, app `appActions`, localStorage memory.
 - Provider ему необходимы: `LokiProvider` is the required provider for `useLoki` consumers.
 - API вызывает: `/api/user-actions` through `userAction('loki:analytics')`; AdminPanel calls `/api/loki-editor` for editorial/AI tooling.
 - Firestore коллекции использует: `lokiKnowledge` from `UserApp`, `lokiAnalytics` through backend, `aiSources`, `aiDrafts`, `aiEditorRuns`, `aiEditorActivity`, `config/lokiEditor` through editor backend.
@@ -129,6 +129,20 @@
 - BottomSheet связаны: none confirmed; `LokiExperience` is fullscreen portal overlay.
 - Portal используются: `LokiAssistant` renders `LokiExperience` via `createPortal(..., document.body)`.
 - Критические зависимости: `LokiProvider` placement, `ContextEngine` contract, `appActions` contract, Brain Layer scenario/action contract, localStorage memory schema, z-index/portal stacking above article and event overlays, `appState` freshness.
+
+## Adaptive APG
+
+- Кто использует: `UserApp`, `HomePanelV2`, `LokiRecommendationCenter`, `ContextEngine`.
+- Что использует он: `src/interestEngine.js`, existing user profile state, existing public data arrays for partners, experts, events and news.
+- Provider ему необходимы: отдельный provider не требуется; данные проходят через `UserApp` props and Loki `appState`.
+- API вызывает: сохраняет `interestProfile` через existing `/api/user-actions` action `profile:update`.
+- Firestore коллекции использует: `users` document field `interestProfile`; новых коллекций не создаёт.
+- Backend endpoint использует: `/api/user-actions`.
+- Глобальные состояния изменяет: `interestProfile` в `UserApp`, persisted `users/{userId}.interestProfile`.
+- Маршруты его открывают: напрямую не открывается; действует внутри `/`, `/news`, `/events`, `/experts`, `/partner/:id`.
+- BottomSheet связаны: влияет на ранжирование событий, которые открываются через `EventDetailSheet`, но не меняет sheet.
+- Portal используются: напрямую нет.
+- Критические зависимости: backward-compatible profile shape, safe category fallbacks, throttled persistence, no new source of truth outside user profile.
 
 ## Firebase
 

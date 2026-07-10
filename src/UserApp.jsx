@@ -26,6 +26,7 @@ import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
+import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -636,6 +637,7 @@ export function UserApp() {
   const [readLaterNews, setReadLaterNews]       = useState([]);
   const [newsReactions, setNewsReactions]       = useState({});
   const [newsSubscriptions, setNewsSubscriptions] = useState({});
+  const [interestProfile, setInterestProfile]   = useState(null);
   const [notifications, setNotifications]       = useState([]);
   const [customTasks, setCustomTasks]           = useState([]);
   const [lokiKnowledge, setLokiKnowledge]       = useState([]);
@@ -1158,6 +1160,7 @@ export function UserApp() {
         setReadLaterNews(Array.isArray(data.readLaterNews) ? data.readLaterNews.map(String) : []);
         setNewsReactions(data.newsReactions && typeof data.newsReactions === 'object' ? data.newsReactions : {});
         setNewsSubscriptions(data.newsSubscriptions && typeof data.newsSubscriptions === 'object' ? data.newsSubscriptions : {});
+        setInterestProfile(data.interestProfile && typeof data.interestProfile === 'object' ? data.interestProfile : null);
         setScannedPartnerIds(data.scannedPartners ?? {});
         setCompletedTasks(data.completedTasks ?? []);
         setStreak(data.streak ?? 0);
@@ -1298,15 +1301,34 @@ export function UserApp() {
   }, [activePanel, handleRefresh, pullRefreshing]);
 
   const toastTimerRef = useRef(null);
+  const interestPersistRef = useRef({ timer: null, lastSavedAt: 0 });
   useEffect(() => () => {
     mountedRef.current = false;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (interestPersistRef.current.timer) clearTimeout(interestPersistRef.current.timer);
   }, []);
   const showToast = useCallback((msg, type = 'info') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ msg, type });
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const recordInterest = useCallback((event) => {
+    if (!user || String(user.id).startsWith('guest_')) return;
+    setInterestProfile(prev => {
+      const next = mergeInterestEvent(prev, event);
+      const now = Date.now();
+      const save = () => {
+        interestPersistRef.current.lastSavedAt = Date.now();
+        userAction('profile:update', { userId: String(user.id), patch: { interestProfile: next } })
+          .catch(e => logError(e, 'UserApp.interestProfile.persist'));
+      };
+      if (interestPersistRef.current.timer) clearTimeout(interestPersistRef.current.timer);
+      const wait = Math.max(1200, 5000 - (now - interestPersistRef.current.lastSavedAt));
+      interestPersistRef.current.timer = setTimeout(save, wait);
+      return next;
+    });
+  }, [user]);
 
   // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -1329,6 +1351,8 @@ export function UserApp() {
       ? [...favorites, partnerId]
       : favorites.filter(id => id !== partnerId);
     setFavorites(next);
+    const partner = enrichedPartners.find(p => p.id === partnerId);
+    if (partner) recordInterest({ type: isAdding ? 'favorite_add' : 'favorite_remove', itemType: 'partner', item: partner });
     try {
       const result = await userAction('favorites:toggle', { userId: String(user.id), partnerId });
       if (Array.isArray(result.favorites)) setFavorites(result.favorites);
@@ -1338,7 +1362,7 @@ export function UserApp() {
       logError(e, 'UserApp.toggleFavorite');
       showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось обновить избранное.', 'error');
     }
-  }, [user, favorites, showToast]);
+  }, [user, favorites, showToast, enrichedPartners, recordInterest]);
 
   const canWriteUserNewsState = useCallback(() => {
     if (!user || String(user.id).startsWith('guest_')) {
@@ -1354,6 +1378,7 @@ export function UserApp() {
     const prev = savedNews;
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
     setSavedNews(next);
+    recordInterest({ type: 'saved_news', itemType: 'news', item });
     try {
       await userAction('news:saved', { userId: String(user.id), values: next });
       showToast(next.includes(id) ? 'Новость сохранена.' : 'Новость убрана из сохранённых.', 'success');
@@ -1362,7 +1387,7 @@ export function UserApp() {
       logError(e, 'UserApp.toggleSavedNews');
       showToast('Не удалось сохранить новость. Попробуйте ещё раз.', 'error');
     }
-  }, [canWriteUserNewsState, savedNews, showToast, user]);
+  }, [canWriteUserNewsState, savedNews, showToast, user, recordInterest]);
 
   const toggleReadLaterNews = useCallback(async (item) => {
     const id = getCanonicalNewsId(item);
@@ -1541,9 +1566,10 @@ export function UserApp() {
 
   const openPartner = useCallback((partner) => {
     setActivePartner(partner);
+    recordInterest({ type: 'partner_open', itemType: 'partner', item: partner });
     showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { id: partner?.id, partnerName: partner?.name });
     navigatePanel('partner');
-  }, [navigatePanel]);
+  }, [navigatePanel, recordInterest]);
 
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
@@ -1701,6 +1727,7 @@ export function UserApp() {
       }
       const next = [...registeredEventIds, eventId];
       setRegisteredEventIds(next);
+      recordInterest({ type: 'event_registration', itemType: 'event', item: event });
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       try {
         const result = await userAction('event:toggle', {
@@ -1719,7 +1746,7 @@ export function UserApp() {
         showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось записаться. Попробуйте ещё раз.', 'error');
       }
     }
-  }, [user, userKeys, registeredEventIds, setEvents, showToast]);
+  }, [user, userKeys, registeredEventIds, setEvents, showToast, recordInterest]);
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
@@ -2390,6 +2417,11 @@ export function UserApp() {
     </div>
   );
 
+  const adaptiveInterestProfile = useMemo(() => buildInterestProfile({
+    profile: interestProfile,
+    appState: { partners: enrichedPartners, experts, events, news, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
+  }), [enrichedPartners, events, experts, favorites, interestProfile, news, readLaterNews, registeredEventIds, savedNews, userKeys]);
+
   const lokiAppState = useMemo(() => ({
     activePanel,
     user,
@@ -2402,12 +2434,15 @@ export function UserApp() {
     experts,
     userKeys,
     favorites,
+    savedNews,
+    readLaterNews,
+    interestProfile: adaptiveInterestProfile,
     lastScanDate,
     unreadCount,
     registeredEventIds,
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
-  }), [activePanel, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, lokiKnowledge, news, notifications, registeredEventIds, unreadCount, user, userKeys]);
+  }), [activePanel, adaptiveInterestProfile, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, registeredEventIds, savedNews, unreadCount, user, userKeys]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -2549,6 +2584,7 @@ export function UserApp() {
     partners: enrichedPartners,
     events,
     news,
+    interestProfile: adaptiveInterestProfile,
     recentReviews,
     loading,
     error,
@@ -2577,6 +2613,7 @@ export function UserApp() {
     onOpenNotifications: openNotifications,
     onOpenNews: (itemOrId) => {
       const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
+      if (typeof itemOrId === 'object') recordInterest({ type: 'news_open', itemType: 'news', item: itemOrId });
       if (targetId && targetId !== 'undefined' && targetId !== 'null') {
         setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
       }
@@ -2584,6 +2621,7 @@ export function UserApp() {
     },
     onOpenNewsItem: (itemOrId) => {
       const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
+      if (typeof itemOrId === 'object') recordInterest({ type: 'news_open', itemType: 'news', item: itemOrId });
       if (targetId && targetId !== 'undefined' && targetId !== 'null') {
         setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
       }
@@ -2788,6 +2826,7 @@ export function UserApp() {
                     initialEventTarget={pendingLokiEventTarget}
                     registeredEventIds={registeredEventIds}
                     onEventRegister={handleEventRegister}
+                    onEventOpen={(event) => recordInterest({ type: 'event_open', itemType: 'event', item: event })}
                   />
                 </Suspense>
               </Panel>
@@ -2904,6 +2943,7 @@ export function UserApp() {
                     onBack={goBackPanel}
                     isActive={activePanel === 'experts'}
                     initialExpertId={pendingExpertId}
+                    onExpertOpen={(expert) => recordInterest({ type: 'expert_open', itemType: 'expert', item: expert })}
                     onScan={() => setIsScannerOpen(true)}
                   />
                 </Suspense>

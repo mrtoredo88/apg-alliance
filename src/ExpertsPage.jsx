@@ -778,17 +778,21 @@ const FILTERS = [
 
 const CATEGORY_FILTERS = [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES];
 
-export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan }) {
+export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [rotation, setRotation] = useState({});
+  const openExpert = (expert) => {
+    onExpertOpen?.(expert);
+    setSelected(expert);
+  };
 
   useEffect(() => {
     if (!initialExpertId || !experts.length || selected) return;
     const e = experts.find(e => e.id === initialExpertId);
-    if (e) setSelected(e);
+    if (e) openExpert(e);
   }, [initialExpertId, experts]);
 
   useEffect(() => {
@@ -875,7 +879,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             <GlassSection title="В топе недели">
               <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()}>
                 {topExperts.map(e => (
-                  <button key={e.id} onClick={() => setSelected(e)} style={{ ...APG2.glass, width: 144, minHeight: 132, flexShrink: 0, borderRadius: 26, padding: 12, color: APG2.text, textAlign: 'left', cursor: 'pointer' }}>
+                  <button key={e.id} onClick={() => openExpert(e)} style={{ ...APG2.glass, width: 144, minHeight: 132, flexShrink: 0, borderRadius: 26, padding: 12, color: APG2.text, textAlign: 'left', cursor: 'pointer' }}>
                     <ExpertAvatar expert={e} size={48} />
                     <div style={{ marginTop: 10, fontSize: 14, lineHeight: '18px', fontWeight: 800, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{e.name}</div>
                     <div style={{ marginTop: 5, color: APG2.gold, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.specialization}</div>
@@ -893,7 +897,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
               </GlassCard>
             ) : (
               <div style={{ display: 'grid', gap: 12 }}>
-                {filtered.map(expert => <ExpertCardV2 key={expert.id} expert={expert} onClick={setSelected} isTop={topIds.has(expert.id)} />)}
+                {filtered.map(expert => <ExpertCardV2 key={expert.id} expert={expert} onClick={openExpert} isTop={topIds.has(expert.id)} />)}
               </div>
             )}
           </GlassSection>
@@ -958,7 +962,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             <div style={{ fontSize: 13, fontWeight: 700, color: T.textSec, marginBottom: 10, letterSpacing: 0.3, textTransform: 'uppercase' }}>🌟 В топе на этой неделе</div>
             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }} onTouchStart={e => e.stopPropagation()}>
               {topExperts.map(e => (
-                <div key={e.id} onClick={() => setSelected(e)} style={{ flexShrink: 0, width: 140, background: 'rgba(201,168,76,0.08)', border: '1.5px solid rgba(201,168,76,0.35)', borderRadius: 20, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' }}>
+                <div key={e.id} onClick={() => openExpert(e)} style={{ flexShrink: 0, width: 140, background: 'rgba(201,168,76,0.08)', border: '1.5px solid rgba(201,168,76,0.35)', borderRadius: 20, padding: '14px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' }}>
                   <ExpertAvatar expert={e} size={56} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.textPri, lineHeight: '16px', marginBottom: 3 }}>{e.name}</div>
@@ -991,7 +995,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
               {filtered.length} {filtered.length === 1 ? 'эксперт' : filtered.length < 5 ? 'эксперта' : 'экспертов'}
             </div>
             {filtered.map((expert, i) => (
-              <ExpertCard key={expert.id} expert={expert} index={i} onClick={setSelected} isTop={topIds.has(expert.id)} />
+              <ExpertCard key={expert.id} expert={expert} index={i} onClick={openExpert} isTop={topIds.has(expert.id)} />
             ))}
           </div>
         )}

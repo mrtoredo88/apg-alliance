@@ -1,6 +1,9 @@
 import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
 import { makeResultCard, normalizeText, toMillis } from './core/lokiCoreUtils.js';
 import { buildLearningSnapshot, scoreItemByLearning } from './LokiLearning.js';
+import { buildInterestProfile, scoreItemForInterests } from '../interestEngine.js';
+
+export { buildInterestProfile };
 
 const SCENARIOS = [
   {
@@ -94,62 +97,31 @@ function upcomingScore(item = {}) {
   return 1;
 }
 
-export function buildInterestProfile({ appState = {}, memory = {}, userMemory = {} } = {}) {
-  const learning = buildLearningSnapshot({ appState, memory, userMemory });
-  const favoriteCategories = Object.entries(userMemory.favoriteCategories ?? {})
-    .sort((a, b) => Number(b[1] ?? 0) - Number(a[1] ?? 0))
-    .slice(0, 6)
-    .map(([id, score]) => ({ id, score }));
-  const frequentIntents = Object.entries(userMemory.frequentIntents ?? {})
-    .sort((a, b) => Number(b[1] ?? 0) - Number(a[1] ?? 0))
-    .slice(0, 6)
-    .map(([id, score]) => ({ id, score }));
-  const frequentScreens = Object.entries(learning.screens ?? {})
-    .sort((a, b) => Number(b[1] ?? 0) - Number(a[1] ?? 0))
-    .slice(0, 6)
-    .map(([id, score]) => ({ id, score }));
-  const hour = new Date().getHours();
-  const timeBucket = hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'day' : 'evening';
-  const activeTimeBuckets = Object.entries(userMemory.queryHours ?? {})
-    .sort((a, b) => Number(b[1] ?? 0) - Number(a[1] ?? 0))
-    .map(([id, score]) => ({ id, score }));
-  return {
-    favoriteCategories,
-    frequentIntents,
-    frequentScreens,
-    activeTimeBuckets,
-    timeBucket,
-    topCategories: learning.topCategories ?? [],
-    keys: Number(appState.userKeys ?? 0),
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function rankPartners(partners = [], learning = {}) {
+function rankPartners(partners = [], learning = {}, interestProfile = null) {
   return partners
     .map(item => ({
       item,
-      score: scoreItemByLearning(item, learning) + freshnessScore(item) + (hasOffer(item) ? 3 : 0) + (item.featured ? 1.5 : 0) + Number(item.viewCount || 0) / 100,
+      score: scoreItemByLearning(item, learning) + scoreItemForInterests(item, interestProfile, 'partner') * 0.35 + freshnessScore(item) + (hasOffer(item) ? 3 : 0) + (item.featured ? 1.5 : 0) + Number(item.viewCount || 0) / 100,
     }))
     .sort((a, b) => b.score - a.score);
 }
 
-function rankEvents(events = [], learning = {}) {
+function rankEvents(events = [], learning = {}, interestProfile = null) {
   return events
-    .map(item => ({ item, score: scoreItemByLearning(item, learning) + upcomingScore(item) + (item.featured ? 1 : 0) }))
+    .map(item => ({ item, score: scoreItemByLearning(item, learning) + scoreItemForInterests(item, interestProfile, 'event') * 0.35 + upcomingScore(item) + (item.featured ? 1 : 0) }))
     .filter(row => row.score > -1)
     .sort((a, b) => b.score - a.score);
 }
 
-function rankNews(news = [], learning = {}) {
+function rankNews(news = [], learning = {}, interestProfile = null) {
   return news
-    .map(item => ({ item, score: scoreItemByLearning(item, learning) + freshnessScore(item) + Number(item.priority || 0) / 2 }))
+    .map(item => ({ item, score: scoreItemByLearning(item, learning) + scoreItemForInterests(item, interestProfile, 'news') * 0.35 + freshnessScore(item) + Number(item.priority || 0) / 2 }))
     .sort((a, b) => b.score - a.score);
 }
 
-function rankExperts(experts = [], learning = {}) {
+function rankExperts(experts = [], learning = {}, interestProfile = null) {
   return experts
-    .map(item => ({ item, score: scoreItemByLearning(item, learning) + freshnessScore(item) + Number(item.avgRating || 0) + (item.verified ? 1 : 0) }))
+    .map(item => ({ item, score: scoreItemByLearning(item, learning) + scoreItemForInterests(item, interestProfile, 'expert') * 0.35 + freshnessScore(item) + Number(item.avgRating || 0) + (item.verified ? 1 : 0) }))
     .sort((a, b) => b.score - a.score);
 }
 
@@ -168,11 +140,12 @@ function recommendationCard(item, type) {
 
 export function buildRecommendationFeed({ appState = {}, memory = {}, userMemory = {}, limit = 12 } = {}) {
   const learning = buildLearningSnapshot({ appState, memory, userMemory });
+  const interestProfile = buildInterestProfile({ profile: appState.interestProfile, appState, memory, userMemory });
   const rows = [
-    ...rankPartners(appState.partners, learning).slice(0, 5).map(row => ({ ...row, type: 'partner', reason: hasOffer(row.item) ? 'Есть актуальное предложение.' : 'Похоже на твои интересы.' })),
-    ...rankEvents(appState.events, learning).slice(0, 4).map(row => ({ ...row, type: 'event', reason: 'Подходит по времени и интересам.' })),
-    ...rankExperts(appState.experts, learning).slice(0, 4).map(row => ({ ...row, type: 'expert', reason: 'Эксперт может быть полезен по твоим интересам.' })),
-    ...rankNews(appState.news, learning).slice(0, 4).map(row => ({ ...row, type: 'news', reason: 'Свежий материал в ленте АПГ.' })),
+    ...rankPartners(appState.partners, learning, interestProfile).slice(0, 5).map(row => ({ ...row, type: 'partner', reason: hasOffer(row.item) ? 'Есть актуальное предложение.' : 'Похоже на твои интересы.' })),
+    ...rankEvents(appState.events, learning, interestProfile).slice(0, 4).map(row => ({ ...row, type: 'event', reason: 'Подходит по времени и интересам.' })),
+    ...rankExperts(appState.experts, learning, interestProfile).slice(0, 4).map(row => ({ ...row, type: 'expert', reason: 'Эксперт может быть полезен по твоим интересам.' })),
+    ...rankNews(appState.news, learning, interestProfile).slice(0, 4).map(row => ({ ...row, type: 'news', reason: 'Свежий материал в ленте АПГ.' })),
     ...(appState.userKeys > 0 ? (appState.prizes ?? []).slice(0, 2).map(item => ({ item, type: 'prize', score: 2, reason: 'Можно проверить, хватает ли ключей.' })) : []),
   ]
     .filter(row => row.item?.id)
@@ -188,12 +161,13 @@ export function buildRecommendationFeed({ appState = {}, memory = {}, userMemory
 
 export function buildScenarioCollections({ appState = {}, memory = {}, userMemory = {} } = {}) {
   const learning = buildLearningSnapshot({ appState, memory, userMemory });
+  const interestProfile = buildInterestProfile({ profile: appState.interestProfile, appState, memory, userMemory });
   return SCENARIOS.map(scenario => {
-    const partners = rankPartners(appState.partners, learning)
+    const partners = rankPartners(appState.partners, learning, interestProfile)
       .filter(row => textMatches(row.item, scenario.partnerWords))
       .slice(0, 2)
       .map(row => recommendationCard(row.item, 'partner'));
-    const events = rankEvents(appState.events, learning)
+    const events = rankEvents(appState.events, learning, interestProfile)
       .filter(row => textMatches(row.item, scenario.eventWords))
       .slice(0, 1)
       .map(row => recommendationCard(row.item, 'event'));
@@ -216,12 +190,13 @@ export function findScenarioForQuery(query, collections = []) {
 export function buildEventCompanion({ event = null, appState = {}, memory = {}, userMemory = {} } = {}) {
   if (!event) return [];
   const learning = buildLearningSnapshot({ appState, memory, userMemory });
+  const interestProfile = buildInterestProfile({ profile: appState.interestProfile, appState, memory, userMemory });
   const eventText = itemText(event);
-  const partners = rankPartners(appState.partners, learning)
+  const partners = rankPartners(appState.partners, learning, interestProfile)
     .filter(row => eventText && itemText(row.item).split(/\s+/).some(word => word.length > 4 && eventText.includes(word)))
     .slice(0, 2)
     .map(row => ({ ...recommendationCard(row.item, 'partner'), reason: 'Может дополнить мероприятие.' }));
-  const events = rankEvents(appState.events, learning)
+  const events = rankEvents(appState.events, learning, interestProfile)
     .filter(row => row.item.id !== event.id)
     .slice(0, 2)
     .map(row => ({ ...recommendationCard(row.item, 'event'), reason: 'Похожее мероприятие.' }));

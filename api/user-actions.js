@@ -296,7 +296,7 @@ async function actionProfileSync(db, req, actor) {
 
 async function actionProfilePatch(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
-  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt']);
+  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (allowed.has(key)) patch[key] = value;

@@ -71,7 +71,7 @@ VK Mini App: основная платформа; используется VK Br
 ### Локи
 
 - Статус: работает.
-- Краткое описание: AI Platform внутри приложения, Loki Home AI Dashboard, `LokiProvider`, `LokiAssistant`, `LokiExperience`, Context Engine, Brain Layer, сценарии, рекомендации лучшего решения, действия по приложению, контекст новости через `activeContext`.
+- Краткое описание: AI Platform внутри приложения, Loki Home AI Dashboard, `LokiProvider`, `LokiAssistant`, `LokiExperience`, Context Engine, Brain Layer, сценарии, рекомендации лучшего решения, действия по приложению, контекст новости через `activeContext`, Interest Profile из Adaptive APG.
 - Уровень готовности: production, активно развивается.
 
 ### Push
@@ -89,8 +89,14 @@ VK Mini App: основная платформа; используется VK Br
 ### ИИ
 
 - Статус: реализовано частично.
-- Краткое описание: Локи как пользовательская AI Platform, AI/import/admin инструменты, база знаний Локи, контекстные сценарии для новостей и сценарный Brain Layer.
+- Краткое описание: Локи как пользовательская AI Platform, AI/import/admin инструменты, база знаний Локи, контекстные сценарии для новостей, сценарный Brain Layer и Adaptive APG для персонализации рекомендаций.
 - Уровень готовности: beta/production feature, активно развивается.
+
+### Adaptive APG
+
+- Статус: реализовано.
+- Краткое описание: Interest Engine определяет интересы по действиям пользователя, хранит `interestProfile` в документе пользователя, Adaptive Feed меняет порядок рекомендаций на главной без изменения UI, Локи получает тот же Interest Profile через Context Engine.
+- Уровень готовности: production, требует накопления пользовательских сигналов.
 
 ## Production
 

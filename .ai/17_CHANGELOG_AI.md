@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: Adaptive APG personalization
+**Коммит:** `pending`
+**Файлы:** `src/interestEngine.js`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/EventsPage.jsx`, `src/ExpertsPage.jsx`, `src/loki/LokiRecommendationCenter.js`, `src/loki/core/context/ContextEngine.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`
+**Тип:** feat
+**Что изменено:**
+- Создан общий Interest Engine для автоматического определения интересов пользователя по действиям.
+- Главная страница получает Adaptive Feed: существующие карточки и блоки используют персонально отсортированные данные без изменения дизайна.
+- Локи получает тот же Interest Profile через Context Engine и использует его в recommendation feed.
+**Почему:** АПГ должен постепенно становиться персональным для каждого пользователя без ручного выбора интересов и без новой параллельной архитектуры.
+
+---
+
 ## [2026-07-10] feat: APG Partner AI в кабинете партнёра
 **Коммит:** `pending`
 **Файлы:** `src/PartnerCabinetPage.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`

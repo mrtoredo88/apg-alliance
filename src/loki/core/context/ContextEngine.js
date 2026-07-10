@@ -1,4 +1,5 @@
 import { buildRecommendationFeed } from '../../LokiRecommendationCenter.js';
+import { buildInterestProfile } from '../../../interestEngine.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -57,7 +58,8 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
   const notifications = cleanList(appState.notifications);
   const favorites = cleanList(appState.favorites).map(String);
   const completedTasks = cleanList(appState.completedTasks).map(String);
-  const recommendationFeed = buildRecommendationFeed({ appState: { ...appState, partners, experts, events, news, customTasks: tasks, notifications, user, activePanel }, memory, userMemory, limit: 12 });
+  const interestProfile = buildInterestProfile({ profile: appState.interestProfile, appState: { ...appState, partners, experts, events, news, favorites, registeredEventIds: appState.registeredEventIds }, memory, userMemory });
+  const recommendationFeed = buildRecommendationFeed({ appState: { ...appState, partners, experts, events, news, customTasks: tasks, notifications, user, activePanel, interestProfile }, memory, userMemory, limit: 12 });
   const recommendedEvents = recommendationFeed.filter(item => item.type === 'event');
   const partnerRecommendations = recommendationFeed.filter(item => item.type === 'partner');
   const expertRecommendations = recommendationFeed.filter(item => item.type === 'expert');
@@ -110,6 +112,7 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
     recommendations: {
       feed: recommendationFeed,
     },
+    interestProfile,
     activePromotions,
     topNews,
     notifications,
@@ -139,6 +142,7 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
       notifications,
       favorites,
       completedTasks,
+      interestProfile,
     },
   };
 }
