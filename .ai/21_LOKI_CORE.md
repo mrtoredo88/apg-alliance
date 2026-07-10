@@ -15,6 +15,8 @@ Memory Engine enriches context
   ↓
 APG Knowledge Base adds world knowledge
   ↓
+Brain Layer detects scenario, context and best action
+  ↓
 Capability modules are checked in order
   ↓
 Selected module returns a grounded result
@@ -39,8 +41,34 @@ Loki Actions execute navigation or app action
 | `ProfileExpert` | User profile, account, favorites, settings |
 | `RecommendationEngine` | Personal recommendations based on already loaded data |
 | `MemoryEngine` | Conversation/user context enrichment only |
+| `BrainLayer` | AI Platform layer: scenario detection, context-aware recommendation, action planning |
 | `ObserverModule` | Documents the proactive observer layer; runtime observer remains `LokiObserver.js` |
 | `PersonalityEngine` | Tone, brevity, emotion, final response shape |
+
+## Brain Layer
+
+`src/loki/core/brain/BrainLayer.js` is the primary decision layer for Loki.
+
+It runs before the legacy capability modules and turns Loki from a chat-style assistant into an APG decision platform:
+
+- detects user intent through scenario matching instead of a single keyword branch;
+- uses 50+ scenarios from `src/loki/core/brain/lokiScenarios.js`;
+- combines runtime context: time of day, day of week, current screen, dialog history, interests and local memory;
+- chooses the best partner, event, expert or news item instead of returning a plain list;
+- explains why the choice is best;
+- returns app actions through `LOKI_APP_ACTIONS`.
+
+Every Brain Layer response follows this structure:
+
+```text
+Понял задачу
+Анализ
+Лучшее решение
+Почему
+Дальше
+```
+
+The legacy modules remain as fallback for narrow commands and old scenarios.
 
 ## Extension Contract
 

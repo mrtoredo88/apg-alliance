@@ -9,6 +9,8 @@ export const MemoryEngine = {
         lastMessage: memory?.lastMessage ?? null,
         lastConversation: memory?.lastConversation ?? null,
         lastPanel: memory?.lastPanel ?? context.user.currentPanel ?? null,
+        activeContext: memory?.activeContext ?? null,
+        lastContext: memory?.lastContext ?? null,
         preferences: memory?.preferences ?? {},
       },
       userMemory: userMemory ?? {},

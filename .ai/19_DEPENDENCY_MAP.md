@@ -119,16 +119,16 @@
 ## Loki
 
 - Кто использует: `UserApp` wraps user shell in `LokiProvider`; `LokiAssistant`, `LokiPage`, `NewsPage`, and profile/home callbacks use Loki entry points; `AdminPanel` manages Loki knowledge/editor separately.
-- Что использует он: `LokiProvider`, `LokiAssistant`, `LokiExperience`, `LokiCore`, Loki modules, `LOKI_APP_ACTIONS`, app `appState`, app `appActions`, localStorage memory.
+- Что использует он: `LokiProvider`, `LokiAssistant`, `LokiExperience`, `LokiCore`, `BrainLayer`, scenario registry, Loki modules, `LOKI_APP_ACTIONS`, app `appState`, app `appActions`, localStorage memory.
 - Provider ему необходимы: `LokiProvider` is the required provider for `useLoki` consumers.
 - API вызывает: `/api/user-actions` through `userAction('loki:analytics')`; AdminPanel calls `/api/loki-editor` for editorial/AI tooling.
 - Firestore коллекции использует: `lokiKnowledge` from `UserApp`, `lokiAnalytics` through backend, `aiSources`, `aiDrafts`, `aiEditorRuns`, `aiEditorActivity`, `config/lokiEditor` through editor backend.
 - Backend endpoint использует: `/api/user-actions`, `/api/loki-editor`.
-- Глобальные состояния изменяет: Loki memory in localStorage, `activeContext`, `lastContext`, `experienceOpen`, assistant visibility, history, user memory, app navigation via `appActions`.
+- Глобальные состояния изменяет: Loki memory in localStorage, `activeContext`, `lastContext`, `experienceOpen`, assistant visibility, history, user memory, app navigation via `appActions`; Brain Layer reads runtime context and returns action plans but does not mutate React state directly.
 - Маршруты его открывают: internal panel `loki`; floating assistant is mounted globally inside `UserApp`; contextual opening from news does not change route.
 - BottomSheet связаны: none confirmed; `LokiExperience` is fullscreen portal overlay.
 - Portal используются: `LokiAssistant` renders `LokiExperience` via `createPortal(..., document.body)`.
-- Критические зависимости: `LokiProvider` placement, `appActions` contract, localStorage memory schema, z-index/portal stacking above article and event overlays, `appState` freshness.
+- Критические зависимости: `LokiProvider` placement, `appActions` contract, Brain Layer scenario/action contract, localStorage memory schema, z-index/portal stacking above article and event overlays, `appState` freshness.
 
 ## Firebase
 

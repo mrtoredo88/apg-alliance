@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: Локи переведён на Brain Layer и сценарную AI Platform
+**Коммит:** `pending`
+**Файлы:** `src/loki/core/brain/BrainLayer.js`, `src/loki/core/brain/lokiScenarios.js`, `src/loki/core/LokiCore.js`, `src/loki/core/modules/MemoryEngine.js`, `src/loki/core/modules/PersonalityEngine.js`, `src/loki/lokiActionTypes.js`, `src/UserApp.jsx`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/21_LOKI_CORE.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Brain Layer для определения сценария, контекста, выбора лучшего варианта и генерации action-плана.
+- Создана сценарная база из 50+ сценариев по городским, событийным, партнёрским, экспертным, семейным, бизнес- и APG-задачам.
+- Добавлены действия Локи для добавления партнёра в избранное и начала регистрации на событие через существующую навигацию.
+**Почему:** Локи должен работать как интеллектуальное ядро АПГ, помогая принимать решение внутри контекста приложения, а не отвечать списком или уводить пользователя в отдельный чат.
+
+---
+
 ## [2026-07-10] fix: убран двойной paddingBottom под навигацией (все GlassPanel-страницы)
 **Коммит:** `47b94b09`
 **Файлы:** `src/UserApp.jsx`

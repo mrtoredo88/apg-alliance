@@ -16,6 +16,7 @@ import { emptyResult, includesAny, normalizeText } from './lokiCoreUtils.js';
 import { APG_KNOWLEDGE_BASE, validateApgKnowledgeBase } from '../knowledge/index.js';
 import { explainLastRecommendation } from '../LokiIntelligence.js';
 import { buildPersonalRoute, buildSurprisePick } from '../LokiPlanner.js';
+import { runBrainLayer } from './brain/BrainLayer.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -66,7 +67,11 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
       ...APG_KNOWLEDGE_BASE,
       custom: Array.isArray(appState.lokiKnowledge) ? appState.lokiKnowledge : [],
     },
-    memory,
+    memory: {
+      ...memory,
+      activeContext: appState.activeContext ?? memory?.activeContext ?? memory?.lastContext ?? null,
+      lastContext: appState.activeContext ?? memory?.lastContext ?? null,
+    },
     userMemory,
     knowledgeHealth: validateApgKnowledgeBase(APG_KNOWLEDGE_BASE),
   };
@@ -103,6 +108,14 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (intelligenceResult) {
     const shaped = PersonalityEngine.shape({ result: intelligenceResult, context, selectedModule: { id: 'lokiIntelligence' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'lokiIntelligence', totalMs: Math.round(nowMs() - start), trace } } : shaped;
+  }
+
+  const brainStart = nowMs();
+  const brainResult = runBrainLayer({ query, context, history, debug });
+  trace.push({ module: 'brainLayer', ms: Math.round(nowMs() - brainStart), decision: brainResult?.intent ?? 'skipped' });
+  if (brainResult) {
+    const shaped = PersonalityEngine.shape({ result: brainResult, context, selectedModule: { id: 'brainLayer' } });
+    return debug ? { ...shaped, debug: { provider, selectedModule: 'brainLayer', totalMs: Math.round(nowMs() - start), trace, brain: brainResult.debugBrain ?? brainResult.brain } } : shaped;
   }
 
   let selected = null;

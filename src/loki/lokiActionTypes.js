@@ -18,6 +18,8 @@ export const LOKI_APP_ACTIONS = {
   OPEN_SETTINGS: 'openSettings',
   OPEN_REFERENCE: 'openReference',
   OPEN_LOKI: 'openLoki',
+  ADD_FAVORITE_PARTNER: 'addFavoritePartner',
+  START_EVENT_REGISTRATION: 'startEventRegistration',
 };
 
 export const LOKI_MESSAGE_PRIORITY = {
@@ -47,6 +49,8 @@ export const LOKI_ACTION_LABELS = {
   [LOKI_APP_ACTIONS.OPEN_SETTINGS]: 'Настройки',
   [LOKI_APP_ACTIONS.OPEN_REFERENCE]: 'Справочник',
   [LOKI_APP_ACTIONS.OPEN_LOKI]: 'Спросить Локи',
+  [LOKI_APP_ACTIONS.ADD_FAVORITE_PARTNER]: 'В избранное',
+  [LOKI_APP_ACTIONS.START_EVENT_REGISTRATION]: 'К регистрации',
 };
 
 export function createLokiAction(type, payload = {}) {

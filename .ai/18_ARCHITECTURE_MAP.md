@@ -149,6 +149,8 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - `src/loki/LokiExperience.jsx`
 - `src/LokiPage.jsx`
 - `src/loki/core/LokiCore.js`
+- `src/loki/core/brain/BrainLayer.js`
+- `src/loki/core/brain/lokiScenarios.js`
 
 Подтверждённые возможности:
 
@@ -157,7 +159,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - полноэкранный опыт `LokiExperience`;
 - action routing через `LOKI_APP_ACTIONS`;
 - память в localStorage;
-- рекомендации и сценарии;
+- Brain Layer: сценарии, контекст, рекомендация лучшего варианта и план действия;
 - контекст новости через `activeContext` и `lastContext`.
 
 ## Firebase

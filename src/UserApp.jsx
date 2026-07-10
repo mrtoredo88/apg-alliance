@@ -2442,7 +2442,19 @@ export function UserApp() {
     [LOKI_APP_ACTIONS.OPEN_SETTINGS]: () => goPanel('profile'),
     [LOKI_APP_ACTIONS.OPEN_REFERENCE]: () => goPanel('reference'),
     [LOKI_APP_ACTIONS.OPEN_LOKI]: () => goPanel('loki'),
-  }), [enrichedPartners, goPanel, openNotifications, openPartner]);
+    [LOKI_APP_ACTIONS.ADD_FAVORITE_PARTNER]: async ({ partnerId, id } = {}) => {
+      const targetId = partnerId ?? id;
+      const partner = targetId ? enrichedPartners.find(p => p.id === targetId && isNotArchived(p)) : null;
+      if (targetId && !favorites.includes(targetId)) await toggleFavorite(targetId);
+      if (partner) openPartner(partner);
+      else goPanel('offers');
+    },
+    [LOKI_APP_ACTIONS.START_EVENT_REGISTRATION]: ({ eventId, id } = {}) => {
+      const targetId = eventId ?? id;
+      if (targetId) setPendingLokiEventTarget({ id: targetId, nonce: Date.now(), action: 'register' });
+      goPanel('events');
+    },
+  }), [enrichedPartners, favorites, goPanel, openNotifications, openPartner, toggleFavorite]);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
