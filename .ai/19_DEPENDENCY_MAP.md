@@ -158,6 +158,20 @@
 - Portal используются: нет.
 - Критические зависимости: стабильный metadata contract, backward compatibility со старыми документами, отсутствие сайд-эффектов, не дублировать recommendation logic вне graph service.
 
+## APG Automation Platform
+
+- Кто использует: `AdminPanel` через вкладку «Автоматизация»; будущие AI/Loki modules могут читать рекомендации как источник действий.
+- Что использует он: `api/admin-actions.js`, `server/src/routes/admin-actions.js`, существующие коллекции сущностей и admin audit.
+- Provider ему необходимы: React provider не требуется; доступ идёт через существующую административную авторизацию.
+- API вызывает: `/api/admin-actions` с действиями `automation:audit`, `automation:refresh`, `automation:confirm`, `automation:dismiss`.
+- Firestore коллекции использует: читает `partners`, `experts`, `events`, `news`, `users`, `prizes`; пишет `automationRecommendations`; при подтверждении создаёт черновики в `news`, `notifications`, `customTasks`; пишет `adminActivity`.
+- Backend endpoint использует: общий admin endpoint `/api/admin-actions`.
+- Глобальные состояния изменяет: локальное состояние `automationAudit`, `automationLoading`, `automationFilter` в `AdminPanel`; persisted state рекомендаций и черновиков в Firestore.
+- Маршруты его открывают: `/admin` и `/admin-app`, вкладка `automation`.
+- BottomSheet связаны: напрямую нет.
+- Portal используются: нет.
+- Критические зависимости: parity между `api/` и `server/src/routes/`, admin permissions `ai:read`/`ai:update`, отсутствие автопубликации, идемпотентность recommendation id, совместимость со старыми документами.
+
 ## Firebase
 
 - Кто использует: `UserApp`, `AdminPanel`, `NewsPage` auth token usage, `PartnerPage`, `ExpertsPage`, `ProfilePanel`, backend routes through Firebase Admin SDK.

@@ -67,6 +67,29 @@ const PARTNER_STATUS_LABELS = {
   conflict: 'Требует проверки',
 };
 const PARTNER_PUBLICATION_MIN_PERCENT = 80;
+const AUTOMATION_SOURCE_LIMIT = 30;
+
+const AUTOMATION_EVENT_LABELS = {
+  partner_created: 'Создан партнёр',
+  expert_created: 'Создан эксперт',
+  event_created: 'Создано мероприятие',
+  news_created: 'Создана новость',
+  promotion_created: 'Создана акция',
+  user_registered: 'Зарегистрирован пользователь',
+  prize_created: 'Создан приз',
+  event_completed: 'Завершено мероприятие',
+};
+
+const AUTOMATION_ACTION_LABELS = {
+  poster_draft: 'Предложить афишу',
+  news_draft: 'Предложить новость',
+  push_draft: 'Предложить push',
+  loki_recommendation: 'Предложить рекомендации Локи',
+  task_draft: 'Предложить задание',
+  keys_suggestion: 'Предложить количество ключей',
+  onboarding_check: 'Проверить оформление',
+  followup_news: 'Предложить итоговую новость',
+};
 
 let partnerSes = null;
 
@@ -106,6 +129,139 @@ function cleanEntityPatch(input = {}) {
     patch[key] = value;
   });
   return patch;
+}
+
+function safeAutomationText(value, fallback = '') {
+  return String(value ?? fallback).trim();
+}
+
+function automationDateMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function automationTitle(type, item = {}) {
+  return safeAutomationText(item.title || item.name || item.displayName || item.email || item.id, AUTOMATION_EVENT_LABELS[type] || type);
+}
+
+function automationSourceKey(eventType, itemId) {
+  return `${eventType}:${itemId}`;
+}
+
+function automationRecommendationId(sourceKey, actionId) {
+  return `${sourceKey}:${actionId}`.replace(/[^a-zA-Z0-9:_-]/g, '_').slice(0, 240);
+}
+
+function makeAutomationAction(eventType, item, actionId, priority = 'normal', payload = {}) {
+  const sourceId = String(item.id || '').trim();
+  const sourceKey = automationSourceKey(eventType, sourceId);
+  const title = automationTitle(eventType, item);
+  return {
+    id: automationRecommendationId(sourceKey, actionId),
+    sourceKey,
+    sourceType: eventType,
+    sourceId,
+    sourceTitle: title,
+    eventLabel: AUTOMATION_EVENT_LABELS[eventType] || eventType,
+    actionId,
+    actionLabel: AUTOMATION_ACTION_LABELS[actionId] || actionId,
+    status: 'pending',
+    priority,
+    payload,
+  };
+}
+
+function buildAutomationActionsForSource(eventType, item = {}) {
+  const title = automationTitle(eventType, item);
+  if (!item?.id) return [];
+  if (eventType === 'partner_created') {
+    return [
+      makeAutomationAction(eventType, item, 'onboarding_check', 'high', { note: 'Проверить карточку партнёра перед публикацией.' }),
+      makeAutomationAction(eventType, item, 'news_draft', 'normal', { title: `Новый партнёр АПГ: ${title}`, text: `В АПГ появился новый партнёр: ${title}. Подготовьте короткую новость и расскажите, чем он полезен жителям.`, status: 'draft', active: false, sourceName: 'APG Automation' }),
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'normal', { note: 'Добавить партнёра в рекомендации Локи после проверки карточки.' }),
+    ];
+  }
+  if (eventType === 'expert_created') {
+    return [
+      makeAutomationAction(eventType, item, 'news_draft', 'normal', { title: `Новый эксперт АПГ: ${title}`, text: `В АПГ появился эксперт: ${title}. Подготовьте новость-знакомство и объясните, с какими вопросами к нему можно обратиться.`, status: 'draft', active: false, sourceName: 'APG Automation' }),
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'normal', { note: 'Добавить эксперта в сценарии рекомендаций Локи.' }),
+    ];
+  }
+  if (eventType === 'event_created') {
+    return [
+      makeAutomationAction(eventType, item, 'poster_draft', 'high', { note: 'Подготовить афишу мероприятия.' }),
+      makeAutomationAction(eventType, item, 'news_draft', 'normal', { title: `Анонс: ${title}`, text: `Подготовьте анонс мероприятия «${title}» для ленты новостей АПГ.`, status: 'draft', active: false, eventId: item.id, sourceName: 'APG Automation' }),
+      makeAutomationAction(eventType, item, 'push_draft', 'normal', { title: `Мероприятие: ${title}`, body: 'Подготовьте push-анонс для заинтересованных пользователей.', status: 'draft', active: false, eventId: item.id, category: 'events' }),
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'normal', { note: 'Предложить мероприятие в рекомендациях Локи.' }),
+      makeAutomationAction(eventType, item, 'task_draft', 'low', { title: `Посетить мероприятие «${title}»`, description: 'Черновик задания для участников АПГ.', rewardKeys: 1, active: false, status: 'draft', eventId: item.id }),
+      makeAutomationAction(eventType, item, 'keys_suggestion', 'low', { suggestedKeys: 1, reason: 'Базовая награда за участие в мероприятии.' }),
+    ];
+  }
+  if (eventType === 'news_created') {
+    return [
+      makeAutomationAction(eventType, item, 'push_draft', 'normal', { title, body: 'Подготовьте push для важной новости.', status: 'draft', active: false, newsId: item.id, category: 'news' }),
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'low', { note: 'Добавить новость в контекстные рекомендации Локи.' }),
+    ];
+  }
+  if (eventType === 'promotion_created') {
+    return [
+      makeAutomationAction(eventType, item, 'news_draft', 'normal', { title: `Акция: ${title}`, text: `Подготовьте новость об акции партнёра «${title}».`, status: 'draft', active: false, sourceName: 'APG Automation' }),
+      makeAutomationAction(eventType, item, 'push_draft', 'normal', { title: `Акция: ${title}`, body: 'Подготовьте push по акции для релевантной аудитории.', status: 'draft', active: false, category: 'offers' }),
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'normal', { note: 'Предложить акцию пользователям через Локи.' }),
+    ];
+  }
+  if (eventType === 'user_registered') {
+    return [
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'low', { note: 'Показать новичку первые полезные сценарии Локи.' }),
+      makeAutomationAction(eventType, item, 'keys_suggestion', 'low', { suggestedKeys: 1, reason: 'Приветственный бонус после регистрации.' }),
+    ];
+  }
+  if (eventType === 'prize_created') {
+    return [
+      makeAutomationAction(eventType, item, 'news_draft', 'normal', { title: `Новый приз в АПГ: ${title}`, text: `Подготовьте новость о новом призе «${title}» и условиях получения.`, status: 'draft', active: false, sourceName: 'APG Automation' }),
+      makeAutomationAction(eventType, item, 'push_draft', 'low', { title: `Новый приз: ${title}`, body: 'Подготовьте push о новом призе.', status: 'draft', active: false, category: 'prizes' }),
+    ];
+  }
+  if (eventType === 'event_completed') {
+    return [
+      makeAutomationAction(eventType, item, 'followup_news', 'normal', { title: `Как прошло мероприятие: ${title}`, text: `Подготовьте итоговую новость по мероприятию «${title}».`, status: 'draft', active: false, eventId: item.id, sourceName: 'APG Automation' }),
+      makeAutomationAction(eventType, item, 'loki_recommendation', 'low', { note: 'Обновить рекомендации Локи после завершения мероприятия.' }),
+    ];
+  }
+  return [];
+}
+
+function isPastAutomationEvent(event = {}) {
+  const raw = event.date || event.startDate || event.datetime || event.startsAt;
+  const time = automationDateMillis(raw);
+  return time > 0 && time < Date.now();
+}
+
+async function readAutomationSources(db) {
+  const [partnersSnap, expertsSnap, eventsSnap, newsSnap, usersSnap, prizesSnap] = await Promise.all([
+    db.collection('partners').limit(AUTOMATION_SOURCE_LIMIT).get(),
+    db.collection('experts').limit(AUTOMATION_SOURCE_LIMIT).get(),
+    db.collection('events').limit(AUTOMATION_SOURCE_LIMIT).get(),
+    db.collection('news').limit(AUTOMATION_SOURCE_LIMIT).get(),
+    db.collection('users').limit(AUTOMATION_SOURCE_LIMIT).get(),
+    db.collection('prizes').limit(AUTOMATION_SOURCE_LIMIT).get(),
+  ]);
+  const docs = snap => snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const partners = docs(partnersSnap).filter(item => item.archived !== true);
+  const experts = docs(expertsSnap).filter(item => item.archived !== true);
+  const events = docs(eventsSnap);
+  return [
+    ...partners.flatMap(item => buildAutomationActionsForSource('partner_created', item)),
+    ...experts.flatMap(item => buildAutomationActionsForSource('expert_created', item)),
+    ...events.flatMap(item => buildAutomationActionsForSource('event_created', item)),
+    ...events.filter(item => String(item.status || '').toLowerCase() === 'completed' || isPastAutomationEvent(item)).flatMap(item => buildAutomationActionsForSource('event_completed', item)),
+    ...docs(newsSnap).flatMap(item => buildAutomationActionsForSource('news_created', item)),
+    ...partners.filter(item => safeAutomationText(item.offer || item.promo || item.discount)).flatMap(item => buildAutomationActionsForSource('promotion_created', item)),
+    ...docs(usersSnap).filter(item => !String(item.id || '').startsWith('guest_')).flatMap(item => buildAutomationActionsForSource('user_registered', item)),
+    ...docs(prizesSnap).flatMap(item => buildAutomationActionsForSource('prize_created', item)),
+  ];
 }
 
 function withServerTimestamps(patch, fields = []) {
@@ -336,6 +492,129 @@ async function handleTelegramAuthAdminAction(db, request, actor) {
     return { ok: true, state };
   }
   throw Object.assign(new Error('Неизвестное действие Telegram-авторизации.'), { statusCode: 400 });
+}
+
+async function buildAutomationAudit(db, persist = false) {
+  const generated = await readAutomationSources(db);
+  const existingSnap = await db.collection('automationRecommendations').limit(500).get();
+  const existing = new Map(existingSnap.docs.map(doc => [doc.id, { id: doc.id, ...(doc.data() || {}) }]));
+  if (persist) {
+    const batch = db.batch();
+    generated.forEach(item => {
+      if (existing.has(item.id)) return;
+      batch.set(db.collection('automationRecommendations').doc(item.id), {
+        ...item,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+    if (generated.some(item => !existing.has(item.id))) await batch.commit();
+  }
+  const merged = generated.map(item => ({ ...item, ...(existing.get(item.id) || {}) }));
+  const extraExisting = [...existing.values()].filter(item => !generated.some(row => row.id === item.id));
+  const rows = [...merged, ...extraExisting]
+    .sort((a, b) => {
+      const statusRank = { pending: 0, confirmed: 1, done: 1, dismissed: 2 };
+      const prioRank = { high: 0, normal: 1, low: 2 };
+      return (statusRank[a.status] ?? 3) - (statusRank[b.status] ?? 3)
+        || (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2)
+        || String(a.eventLabel || '').localeCompare(String(b.eventLabel || ''));
+    })
+    .slice(0, 500)
+    .map(serializeAdminValue);
+  return {
+    rows,
+    summary: {
+      total: rows.length,
+      pending: rows.filter(row => row.status === 'pending').length,
+      done: rows.filter(row => ['done', 'confirmed'].includes(row.status)).length,
+      dismissed: rows.filter(row => row.status === 'dismissed').length,
+      eventTypes: Object.keys(AUTOMATION_EVENT_LABELS).length,
+    },
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function createAutomationDraft(db, recommendation, actor) {
+  const payload = recommendation.payload || {};
+  if (['news_draft', 'followup_news'].includes(recommendation.actionId)) {
+    const title = safeAutomationText(payload.title, recommendation.sourceTitle || 'Черновик новости');
+    const text = safeAutomationText(payload.text, 'Текст будет подготовлен редактором.');
+    const ref = await db.collection('news').add({
+      title,
+      text,
+      fullText: text,
+      summary: text.slice(0, 220),
+      sourceName: payload.sourceName || 'APG Automation',
+      status: 'draft',
+      active: false,
+      automationSource: recommendation.sourceKey,
+      eventId: payload.eventId || null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { resource: 'news', id: ref.id };
+  }
+  if (recommendation.actionId === 'push_draft') {
+    const ref = await db.collection('notifications').add({
+      title: safeAutomationText(payload.title, recommendation.sourceTitle || 'Черновик push'),
+      body: safeAutomationText(payload.body, 'Текст push будет подготовлен редактором.'),
+      category: payload.category || 'important',
+      type: 'info',
+      status: 'draft',
+      active: false,
+      automationSource: recommendation.sourceKey,
+      eventId: payload.eventId || null,
+      newsId: payload.newsId || null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { resource: 'notifications', id: ref.id };
+  }
+  if (recommendation.actionId === 'task_draft') {
+    const ref = await db.collection('customTasks').add({
+      title: safeAutomationText(payload.title, recommendation.sourceTitle || 'Черновик задания'),
+      description: safeAutomationText(payload.description, 'Описание будет подготовлено администратором.'),
+      rewardKeys: Number(payload.rewardKeys || 1),
+      status: 'draft',
+      active: false,
+      automationSource: recommendation.sourceKey,
+      eventId: payload.eventId || null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { resource: 'customTasks', id: ref.id };
+  }
+  return { resource: 'automationRecommendations', id: recommendation.id, note: payload.note || payload.reason || '' };
+}
+
+async function handleAutomationAction(db, request, actor) {
+  const action = String(request.body?.action || '').trim();
+  await requireAdminPermission(request, action === 'automation:audit' ? 'ai:read' : 'ai:update');
+  if (action === 'automation:audit' || action === 'automation:refresh') {
+    const audit = await buildAutomationAudit(db, action === 'automation:refresh');
+    await writeAuditLog(db, request, actor, action, 'automationRecommendations', 'automation', { label: 'Проверка автоматизаций', summary: audit.summary });
+    return { ok: true, ...audit };
+  }
+  const id = String(request.body?.id || '').trim();
+  if (!id) throw Object.assign(new Error('Не указана автоматизация.'), { statusCode: 400 });
+  const ref = db.collection('automationRecommendations').doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Автоматизация не найдена. Сначала обновите рекомендации.'), { statusCode: 404 });
+  const recommendation = { id: snap.id, ...(snap.data() || {}) };
+  if (action === 'automation:dismiss') {
+    await ref.set({ status: 'dismissed', dismissedAt: FieldValue.serverTimestamp(), dismissedBy: actor.uid, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    await writeAuditLog(db, request, actor, action, 'automationRecommendations', id, { label: `Отклонена автоматизация: ${recommendation.actionLabel || id}` });
+    return { ok: true, id, status: 'dismissed' };
+  }
+  if (action === 'automation:confirm') {
+    if (['done', 'confirmed'].includes(recommendation.status) && recommendation.result?.id) return { ok: true, id, status: recommendation.status, result: recommendation.result, idempotent: true };
+    const result = await createAutomationDraft(db, recommendation, actor);
+    await ref.set({ status: 'done', result, confirmedAt: FieldValue.serverTimestamp(), confirmedBy: actor.uid, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    await writeAuditLog(db, request, actor, action, 'automationRecommendations', id, { label: `Подтверждена автоматизация: ${recommendation.actionLabel || id}`, result });
+    return { ok: true, id, status: 'done', result };
+  }
+  throw Object.assign(new Error('Неизвестное действие автоматизации.'), { statusCode: 400 });
 }
 
 async function buildReferralAudit(db) {
@@ -1215,6 +1494,8 @@ export default async function adminActionsRoutes(fastify) {
           ? await handleReferralAction(db, request, actor)
         : action.startsWith('telegram-auth:')
           ? await handleTelegramAuthAdminAction(db, request, actor)
+        : action.startsWith('automation:')
+          ? await handleAutomationAction(db, request, actor)
         : action.startsWith('partner:')
           ? await handlePartnerOnboardingAction(db, request, actor)
           : await handleNewsAction(db, request, actor);

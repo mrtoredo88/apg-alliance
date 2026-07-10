@@ -1656,6 +1656,127 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
   );
 }
 
+function AutomationPanel({ data, loading, filter, onFilter, onRefresh, onConfirm, onDismiss }) {
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  const summary = data?.summary || {};
+  const filtered = rows.filter(row => {
+    if (filter === 'all') return true;
+    if (filter === 'pending') return row.status === 'pending';
+    if (filter === 'done') return ['done', 'confirmed'].includes(row.status);
+    if (filter === 'dismissed') return row.status === 'dismissed';
+    return row.sourceType === filter;
+  });
+  const statusColor = {
+    pending: A.gold,
+    done: '#4BB34B',
+    confirmed: '#4BB34B',
+    dismissed: A.textSec,
+  };
+  const statusLabel = {
+    pending: 'Ожидает подтверждения',
+    done: 'Выполнено',
+    confirmed: 'Выполнено',
+    dismissed: 'Отклонено',
+  };
+  const eventFilters = [
+    ['all', 'Все'],
+    ['pending', 'Ожидают'],
+    ['done', 'Выполнено'],
+    ['dismissed', 'Отклонено'],
+    ['partner_created', 'Партнёры'],
+    ['expert_created', 'Эксперты'],
+    ['event_created', 'Мероприятия'],
+    ['news_created', 'Новости'],
+    ['promotion_created', 'Акции'],
+    ['user_registered', 'Пользователи'],
+    ['prize_created', 'Призы'],
+    ['event_completed', 'Завершённые'],
+  ];
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+        <div>
+          <h1 style={s.h1}>Автоматизация</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: A.textSec, lineHeight: '18px' }}>
+            Подтверждаемые рекомендации и черновики для событий платформы.
+          </p>
+        </div>
+        <button style={{ ...s.btn, ...s.btnPri, opacity: loading ? 0.7 : 1 }} disabled={loading} onClick={onRefresh}>
+          {loading ? 'Обновляем...' : 'Обновить рекомендации'}
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
+        {[
+          ['Всего', summary.total ?? rows.length, A.text],
+          ['Ожидают', summary.pending ?? 0, A.gold],
+          ['Выполнено', summary.done ?? 0, '#4BB34B'],
+          ['Типов событий', summary.eventTypes ?? 8, A.blue],
+        ].map(([label, value, color]) => (
+          <div key={label} style={{ ...s.card, marginBottom: 0, border: `1px solid ${color}30` }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...s.card, marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {eventFilters.map(([id, label]) => (
+            <button key={id} onClick={() => onFilter(id)} style={{ ...s.btn, ...(filter === id ? s.btnPri : s.btnGray), padding: '8px 12px', fontSize: 12 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading && !rows.length ? (
+        <div style={s.card}>Загружаем автоматизации...</div>
+      ) : filtered.length === 0 ? (
+        <div style={s.card}>Рекомендаций по выбранному фильтру нет.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {filtered.map(row => {
+            const color = statusColor[row.status] || A.textSec;
+            return (
+              <div key={row.id} style={{ ...s.card, marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: A.gold, fontSize: 11, fontWeight: 900, letterSpacing: 0.6, textTransform: 'uppercase' }}>{row.eventLabel}</div>
+                    <div style={{ color: A.text, fontSize: 16, fontWeight: 900, marginTop: 4 }}>{row.actionLabel}</div>
+                    <div style={{ color: A.textSec, fontSize: 12, marginTop: 5, lineHeight: '17px' }}>{row.sourceTitle || row.sourceId}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 850, color, background: `${color}18`, borderRadius: 999, padding: '5px 9px', flexShrink: 0 }}>
+                    {statusLabel[row.status] || row.status}
+                  </span>
+                </div>
+                {row.payload?.note && (
+                  <div style={{ marginTop: 10, color: A.textSec, fontSize: 12, lineHeight: '18px' }}>{row.payload.note}</div>
+                )}
+                {row.payload?.title && (
+                  <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}` }}>
+                    <div style={{ color: A.text, fontSize: 13, fontWeight: 850 }}>{row.payload.title}</div>
+                    <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px', marginTop: 4 }}>{row.payload.text || row.payload.body || row.payload.description || 'Черновик будет создан после подтверждения.'}</div>
+                  </div>
+                )}
+                {row.result?.resource && (
+                  <div style={{ marginTop: 10, color: '#4BB34B', fontSize: 12, lineHeight: '18px' }}>
+                    Создано: {row.result.resource} · {row.result.id}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button disabled={loading || row.status !== 'pending'} onClick={() => onDismiss(row)} style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12, opacity: row.status === 'pending' ? 1 : 0.45 }}>Отклонить</button>
+                  <button disabled={loading || row.status !== 'pending'} onClick={() => onConfirm(row)} style={{ ...s.btn, ...s.btnPri, padding: '8px 10px', fontSize: 12, opacity: row.status === 'pending' ? 1 : 0.45 }}>Подтвердить</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, canSeeLegal, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink }) {
   const [type, setType] = useState('partner');
   const [sourceText, setSourceText] = useState('');
@@ -3056,6 +3177,9 @@ export const AdminPanel = () => {
   const [adminSession, setAdminSession] = useState(null);
   const [adminSecurity, setAdminSecurity] = useState(null);
   const [adminSecurityLoading, setAdminSecurityLoading] = useState(false);
+  const [automationAudit, setAutomationAudit] = useState(null);
+  const [automationLoading, setAutomationLoading] = useState(false);
+  const [automationFilter, setAutomationFilter] = useState('all');
   const [partners, setPartners]     = useState([]);
   const [experts, setExperts]       = useState([]);
   const [events, setEvents]         = useState([]);
@@ -3528,6 +3652,36 @@ export const AdminPanel = () => {
       setReferralLoading(false);
     }
   }, [loadReferralAudit]);
+
+  const loadAutomationAudit = useCallback(async (action = 'automation:audit') => {
+    setAutomationLoading(true);
+    try {
+      const data = await runAdminAction(action, { idempotencyKey: `${action}_${Date.now()}` });
+      setAutomationAudit(data);
+      return data;
+    } catch (e) {
+      logError(e, 'AdminPanel.loadAutomationAudit');
+      setAutomationAudit({ ok: false, rows: [], summary: {}, error: e.message || 'Не удалось загрузить автоматизации.' });
+      return null;
+    } finally {
+      setAutomationLoading(false);
+    }
+  }, []);
+
+  const runAutomationAction = useCallback(async (action, row) => {
+    if (!row?.id) return;
+    setAutomationLoading(true);
+    try {
+      await runAdminAction(action, { id: row.id, idempotencyKey: `${action}_${row.id}_${Date.now()}` });
+      await loadAutomationAudit('automation:audit');
+      await fetchData();
+    } catch (e) {
+      logError(e, `AdminPanel.${action}`);
+      alert(e.message || 'Не удалось выполнить автоматизацию.');
+    } finally {
+      setAutomationLoading(false);
+    }
+  }, [loadAutomationAudit]);
 
   const loadAdminSecurity = useCallback(async () => {
     setAdminSecurityLoading(true);
@@ -5432,7 +5586,8 @@ export const AdminPanel = () => {
     if (activeTab === 'ai-import' && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
     if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
     if (activeTab === 'referrals' && !referralAudit && !referralLoading) loadReferralAudit();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit]);
+    if (activeTab === 'automation' && !automationAudit && !automationLoading) loadAutomationAudit();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit]);
 
   if (!authed) return <AdminLoginGate onAllow={(actor) => { setAdminSession(actor || null); setAuthed(true); fetchData(); }} />;
 
@@ -5635,6 +5790,7 @@ export const AdminPanel = () => {
             { id: 'comments', emoji: '💬', label: 'Комментарии', count: newsComments.filter(c => !c.hidden).length || undefined },
             { id: 'users', emoji: '👥', label: 'Пользователи', count: adminMetrics.users.length || undefined },
             { id: 'referrals', emoji: '🔗', label: 'Рефералы', count: referralAudit?.summary?.grantErrors || undefined },
+            { id: 'automation', emoji: '⚙️', label: 'Автоматизация', count: automationAudit?.summary?.pending || undefined },
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
@@ -5659,7 +5815,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'automation') loadAutomationAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -5938,6 +6094,18 @@ export const AdminPanel = () => {
           onLoad={() => loadReferralAudit('referrals:recalculate')}
           onCheck={() => loadReferralAudit('referrals:check')}
           onGrant={grantReferralFromAudit}
+        />
+      )}
+
+      {activeTab === 'automation' && (
+        <AutomationPanel
+          data={automationAudit}
+          loading={automationLoading}
+          filter={automationFilter}
+          onFilter={setAutomationFilter}
+          onRefresh={() => loadAutomationAudit('automation:refresh')}
+          onConfirm={(row) => runAutomationAction('automation:confirm', row)}
+          onDismiss={(row) => runAutomationAction('automation:dismiss', row)}
         />
       )}
 
