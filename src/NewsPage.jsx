@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
@@ -353,14 +354,14 @@ function ContentBlocks({ blocks = [] }) {
             ? { border: '1px solid rgba(215,184,106,0.30)', background: 'rgba(215,184,106,0.10)', mark: '✓' }
             : type === 'faq'
               ? { border: '1px solid rgba(96,165,250,0.30)', background: 'rgba(96,165,250,0.08)', mark: '?' }
-              : { border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.24)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.20)', mark: '”' };
+              : { border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', mark: '"' };
         return (
           <GlassCard key={index} style={{ borderRadius: 26, padding: 16, border: tone.border, background: tone.background }}>
             <div style={{ display: 'grid', gridTemplateColumns: '34px 1fr', gap: 12, alignItems: 'start' }}>
               <div style={{ width: 34, height: 34, borderRadius: 14, display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, background: 'rgba(8,8,10,0.22)', fontWeight: 950 }}>{tone.mark}</div>
               <div style={{ minWidth: 0 }}>
                 {block.title && <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 900, marginBottom: block.text ? 6 : 0 }}>{block.title}</div>}
-                {block.text && <RichText color={APG2_PROFILE.textSoft} fontSize={14.5} lineHeight="23px">{block.text}</RichText>}
+                {block.text && <RichText color={APG2_PROFILE.text} fontSize={14.5} lineHeight="23px">{block.text}</RichText>}
               </div>
             </div>
           </GlassCard>
@@ -455,7 +456,7 @@ function ArticleHeader({ item, wordCount }) {
         </div>
       )}
       {(summary || text) && (
-        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15.5, lineHeight: '24px', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '25px', fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {summary || text}
         </div>
       )}
@@ -470,8 +471,8 @@ function ArticleHeader({ item, wordCount }) {
           ['Реакции', String(reactions)],
           ['Комментарии', String(stats.comments)],
         ].map(([label, value]) => (
-          <div key={label} style={{ minHeight: 58, borderRadius: 18, padding: '10px 11px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.20)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.26)', boxSizing: 'border-box' }}>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', fontWeight: 720 }}>{label}</div>
+          <div key={label} style={{ minHeight: 58, borderRadius: 18, padding: '10px 11px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', boxSizing: 'border-box' }}>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 720 }}>{label}</div>
             <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 880, marginTop: 4 }}>{value}</div>
           </div>
         ))}
@@ -1018,11 +1019,11 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
             </div>
           )}
 
-          <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 'clamp(18px, 4vw, 28px)' }}>
-            <RichText color={APG2_PROFILE.textSoft} fontSize={16} lineHeight="27px">
+          <div style={{ marginTop: 18, borderRadius: 30, padding: 'clamp(18px, 4vw, 28px)', background: 'rgba(10,10,12,0.70)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
+            <RichText color={APG2_PROFILE.text} fontSize={16} lineHeight="28px">
               {text || 'Подробный текст новости появится здесь после публикации.'}
             </RichText>
-          </GlassCard>
+          </div>
 
           <ContentBlocks blocks={item.contentBlocks} />
 
@@ -1130,9 +1131,9 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
           )}
 
           {completed && (
-            <GlassCard style={{ marginTop: 16, borderRadius: 28, padding: 16, textAlign: 'center', color: APG2_PROFILE.textSoft }}>
+            <GlassCard style={{ marginTop: 16, borderRadius: 28, padding: 16, textAlign: 'center' }}>
               <div style={{ color: APG2_PROFILE.gold, fontSize: 13, fontWeight: 900, marginBottom: 5 }}>Материал дочитан</div>
-              <div style={{ fontSize: 13, lineHeight: '19px' }}>Можно перейти к следующей новости или сохранить эту публикацию.</div>
+              <div style={{ fontSize: 13, lineHeight: '19px', color: APG2_PROFILE.text }}>Можно перейти к следующей новости или сохранить эту публикацию.</div>
             </GlassCard>
           )}
         </div>
@@ -1341,7 +1342,7 @@ export function NewsPage({
         )}
       </div>
 
-      {selected && (
+      {selected && createPortal(
         <ArticleView
           item={selected}
           related={related}
@@ -1359,7 +1360,8 @@ export function NewsPage({
           reaction={newsReactions?.[selectedId]}
           subscriptions={newsSubscriptions}
           user={user}
-        />
+        />,
+        document.body
       )}
     </div>
   );
