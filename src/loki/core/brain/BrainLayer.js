@@ -150,6 +150,16 @@ function scoreEntity({ item, type, scenario, queryWords, runtime }) {
 }
 
 function collectCandidates({ context, scenario, queryWords, runtime }) {
+  if ([
+    'apg.keys',
+    'apg.qr',
+    'apg.profile',
+    'apg.favorites',
+    'apg.notifications',
+    'apg.how_to_use',
+  ].includes(scenario.id)) {
+    return [];
+  }
   const lists = {
     event: context?.apg?.events ?? [],
     partner: context?.apg?.partners ?? [],
@@ -208,11 +218,16 @@ function cardFor(row, scenario) {
 }
 
 function fallbackActionCard(scenario) {
-  const actionType = scenario.availableActions?.includes('OPEN_EVENTS') ? LOKI_APP_ACTIONS.OPEN_EVENTS
+  const actionType = scenario.id === 'apg.qr' && scenario.availableActions?.includes('START_QR_SCANNER') ? LOKI_APP_ACTIONS.START_QR_SCANNER
+    : scenario.availableActions?.includes('SHOW_PROFILE') ? LOKI_APP_ACTIONS.SHOW_PROFILE
+      : scenario.availableActions?.includes('START_QR_SCANNER') ? LOKI_APP_ACTIONS.START_QR_SCANNER
+        : scenario.availableActions?.includes('SHOW_ACHIEVEMENTS') ? LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS
+          : scenario.availableActions?.includes('SHOW_FAVORITES') ? LOKI_APP_ACTIONS.SHOW_FAVORITES
+            : scenario.availableActions?.includes('SHOW_NOTIFICATIONS') ? LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS
+              : scenario.availableActions?.includes('OPEN_EVENTS') ? LOKI_APP_ACTIONS.OPEN_EVENTS
     : scenario.availableActions?.includes('OPEN_PARTNERS') ? LOKI_APP_ACTIONS.OPEN_PARTNERS
       : scenario.availableActions?.includes('OPEN_EXPERTS') ? LOKI_APP_ACTIONS.OPEN_EXPERTS
-        : scenario.availableActions?.includes('SHOW_PROFILE') ? LOKI_APP_ACTIONS.SHOW_PROFILE
-          : LOKI_APP_ACTIONS.OPEN_REFERENCE;
+        : LOKI_APP_ACTIONS.OPEN_REFERENCE;
   return {
     id: `scenario-${scenario.id}`,
     type: 'scenario',

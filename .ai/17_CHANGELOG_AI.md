@@ -15,6 +15,17 @@
 
 ---
 
+## [2026-07-10] fix: уточнены системные действия Brain Layer
+**Коммит:** `pending`
+**Файлы:** `src/loki/core/brain/BrainLayer.js`
+**Тип:** fix
+**Что изменено:**
+- Системные APG-сценарии больше не выбирают случайное событие или партнёра как основной объект.
+- Запросы про ключи открывают профиль, QR-запросы открывают сканер, уведомления открывают уведомления.
+**Почему:** Локи должен вести пользователя к правильному действию по смыслу запроса, а не к первому подходящему объекту из загруженных данных.
+
+---
+
 ## [2026-07-10] feat: Локи переведён на Brain Layer и сценарную AI Platform
 **Коммит:** `pending`
 **Файлы:** `src/loki/core/brain/BrainLayer.js`, `src/loki/core/brain/lokiScenarios.js`, `src/loki/core/LokiCore.js`, `src/loki/core/modules/MemoryEngine.js`, `src/loki/core/modules/PersonalityEngine.js`, `src/loki/lokiActionTypes.js`, `src/UserApp.jsx`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/21_LOKI_CORE.md`
