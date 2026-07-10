@@ -856,6 +856,11 @@ async function handleEntityAction(db, request, actor) {
 
   if (action === 'entity:delete') {
     await requireAdminPermission(request, `${config.scope}:delete`);
+    if ((resource === 'partners' || resource === 'experts') && String(actor?.role || '').toLowerCase() !== 'owner') {
+      const error = new Error('Окончательное удаление партнёров и экспертов доступно только owner. Используйте архив.');
+      error.statusCode = 403;
+      throw error;
+    }
     return runIdempotent(db, actor, idempotencyKey, async () => {
       await ref.delete();
       await writeAuditLog(db, request, actor, `${config.scope}:delete`, config.collection, id, { label: `Удалён ${config.label}: ${id}` });

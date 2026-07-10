@@ -37,6 +37,7 @@ export default async function handler(req, res) {
   const byCategory = {};
   for (const d of snap.docs) {
     const e = { id: d.id, ...d.data() };
+    if (e.archived === true) continue;
     const cat = e.category ?? 'other';
     if (!byCategory[cat]) byCategory[cat] = [];
     byCategory[cat].push(e);

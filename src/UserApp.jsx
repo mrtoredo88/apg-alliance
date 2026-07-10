@@ -60,6 +60,10 @@ function safeScrollTop() {
   }
 }
 
+function isNotArchived(item) {
+  return item?.archived !== true;
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
@@ -810,7 +814,7 @@ export function UserApp() {
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
     try {
       const cached = localStorage.getItem('apg_partners_cache');
-      if (cached) setPartners(JSON.parse(cached));
+      if (cached) setPartners(JSON.parse(cached).filter(isNotArchived));
     } catch {}
     try {
       const cachedE = localStorage.getItem('apg_events_cache');
@@ -957,7 +961,7 @@ export function UserApp() {
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(item => item.catalogPublished !== false);
+        .filter(item => item.catalogPublished !== false && isNotArchived(item));
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
       if (userData && isMounted.current) {
@@ -971,7 +975,10 @@ export function UserApp() {
         } else if (userData.partnerId) {
           getDoc(doc(db, 'partners', String(userData.partnerId)))
             .then(snap => {
-              if (snap.exists() && isMounted.current) setOwnedPartner({ id: snap.id, ...snap.data() });
+              if (snap.exists() && isMounted.current) {
+                const partner = { id: snap.id, ...snap.data() };
+                setOwnedPartner(isNotArchived(partner) ? partner : null);
+              }
             })
             .catch(() => setOwnedPartner(null));
         } else {
@@ -1010,7 +1017,7 @@ export function UserApp() {
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
       setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
-      const freshExperts = exSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const freshExperts = exSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(isNotArchived);
       if (isMounted.current) {
         setExperts(freshExperts);
         if (userData) {
@@ -1399,7 +1406,7 @@ export function UserApp() {
       if (scanValue) {
         rawQrValue = scanValue;
       } else if (partnerId) {
-        const partner = enrichedPartners.find(p => p.id === partnerId);
+          const partner = enrichedPartners.find(p => p.id === partnerId && isNotArchived(p));
         if (partner) {
           openPartner(partner);
           userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
@@ -1411,7 +1418,7 @@ export function UserApp() {
         isScanningRef.current = false;
         return;
       } else if (expertId) {
-        const expert = experts.find(e => e.id === expertId);
+        const expert = experts.find(e => e.id === expertId && isNotArchived(e));
         if (expert) {
           userAction('publicQr:view', { type: 'expert', id: expert.id }).catch(() => {});
           showToast('Это информационный QR. Для ключа попросите служебный QR у эксперта.', 'info');
@@ -2353,7 +2360,7 @@ export function UserApp() {
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
       const targetId = partnerId ?? id;
-      const partner = targetId ? enrichedPartners.find(p => p.id === targetId) : enrichedPartners[0];
+      const partner = targetId ? enrichedPartners.find(p => p.id === targetId && isNotArchived(p)) : enrichedPartners[0];
       if (partner) openPartner(partner);
       else goPanel('offers');
     },

@@ -64,6 +64,8 @@ const NOTIFICATION_PRIORITIES = [
   ['high', 'Высокий'],
   ['critical', 'Критический'],
 ];
+
+const isArchived = item => item?.archived === true;
 const CONTENT_CATEGORIES = [
   { id: 'economy',   label: 'Экономика',   color: '#6AABEC' },
   { id: 'society',   label: 'Общество',    color: '#A78BFA' },
@@ -2983,6 +2985,8 @@ export const AdminPanel = () => {
   const [bnError, setBnError]                   = useState('');
   const [partnerLinksFilter, setPartnerLinksFilter] = useState('unverified');
   const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
+  const [partnerArchiveView, setPartnerArchiveView] = useState('active');
+  const [expertArchiveView, setExpertArchiveView]   = useState('active');
   const [expertSearch, setExpertSearch]             = useState('');
   const [globalSearch, setGlobalSearch]     = useState('');
   const [showSearchDrop, setShowSearchDrop] = useState(false);
@@ -3725,8 +3729,27 @@ export const AdminPanel = () => {
   };
 
   const deleteExpert = async (id) => {
-    if (!window.confirm('Удалить эксперта?')) return;
+    if (!window.confirm('Удалить эксперта окончательно? Действие нельзя отменить.')) return;
     await runAdminEntityAction('experts', 'delete', { id });
+    fetchData();
+  };
+
+  const archiveExpert = async (ex) => {
+    if (!window.confirm(`Архивировать эксперта «${ex.name || ex.id}»? Он исчезнет из публичного приложения.`)) return;
+    await runAdminEntityAction('experts', 'update', {
+      id: ex.id,
+      patch: { archived: true, active: false, archivedBy: adminSecurity?.actor?.userId || adminSession?.uid || 'admin' },
+      serverTimestampFields: ['archivedAt'],
+    });
+    fetchData();
+  };
+
+  const restoreExpert = async (ex) => {
+    if (!window.confirm(`Восстановить эксперта «${ex.name || ex.id}»?`)) return;
+    await runAdminEntityAction('experts', 'update', {
+      id: ex.id,
+      patch: { archived: false, archivedAt: null, archivedBy: null },
+    });
     fetchData();
   };
 
@@ -3973,8 +3996,27 @@ export const AdminPanel = () => {
   };
 
   const deletePartner = async (id) => {
-    if (!window.confirm('Удалить партнёра?')) return;
+    if (!window.confirm('Удалить партнёра окончательно? Действие нельзя отменить.')) return;
     await runAdminEntityAction('partners', 'delete', { id });
+    fetchData();
+  };
+
+  const archivePartner = async (p) => {
+    if (!window.confirm(`Архивировать партнёра «${p.name || p.id}»? Он исчезнет из публичного приложения.`)) return;
+    await runAdminEntityAction('partners', 'update', {
+      id: p.id,
+      patch: { archived: true, active: false, catalogPublished: false, featured: false, archivedBy: adminSecurity?.actor?.userId || adminSession?.uid || 'admin' },
+      serverTimestampFields: ['archivedAt'],
+    });
+    fetchData();
+  };
+
+  const restorePartner = async (p) => {
+    if (!window.confirm(`Восстановить партнёра «${p.name || p.id}»?`)) return;
+    await runAdminEntityAction('partners', 'update', {
+      id: p.id,
+      patch: { archived: false, archivedAt: null, archivedBy: null },
+    });
     fetchData();
   };
 
@@ -5181,6 +5223,7 @@ export const AdminPanel = () => {
 
   const q = globalSearch.toLowerCase();
   const canSeeLegalInAdmin = ['owner', 'super_admin', 'admin'].includes(String(adminSecurity?.actor?.role || adminSession?.role || '').toLowerCase());
+  const canPermanentDeleteArchive = String(adminSecurity?.actor?.role || adminSession?.role || '').toLowerCase() === 'owner';
   const searchResults = globalSearch.length > 1 ? [
     ...adminMetrics.users.filter(u => userDisplayName(u).toLowerCase().includes(q) || String(u.email ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase().includes(q)).slice(0, 4).map(u => ({ tab: 'users', id: u.id, label: userDisplayName(u), sub: providerLabel(u), emoji: '👤', typeName: 'Пользователь' })),
     ...partners.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 4).map(p => ({ tab: 'partners', id: p.id, label: p.name, sub: CATEGORIES.find(c => c.id === p.category)?.label, emoji: '🤝', typeName: 'Партнёр' })),
@@ -5966,8 +6009,8 @@ export const AdminPanel = () => {
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Список экспертов</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
                   {expertSearch
-                    ? `${experts.filter(ex => ex.name?.toLowerCase().includes(expertSearch.toLowerCase())).length} / ${experts.length}`
-                    : <>{experts.length} · <span style={{ color: experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{experts.filter(ex => !isCheckedRecently(ex.linksCheckedAt)).length} не проверено</span></>}
+                    ? `${experts.filter(ex => (expertArchiveView === 'archive' ? isArchived(ex) : !isArchived(ex)) && ex.name?.toLowerCase().includes(expertSearch.toLowerCase())).length} / ${experts.filter(ex => expertArchiveView === 'archive' ? isArchived(ex) : !isArchived(ex)).length}`
+                    : <>{experts.filter(ex => expertArchiveView === 'archive' ? isArchived(ex) : !isArchived(ex)).length} · <span style={{ color: experts.filter(ex => !isArchived(ex) && !isCheckedRecently(ex.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{experts.filter(ex => !isArchived(ex) && !isCheckedRecently(ex.linksCheckedAt)).length} не проверено</span></>}
                 </span>
               </div>
               <button
@@ -5977,7 +6020,13 @@ export const AdminPanel = () => {
                 ➕ Добавить эксперта
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {[['active', `Активные · ${experts.filter(ex => !isArchived(ex)).length}`], ['archive', `Архив · ${experts.filter(isArchived).length}`]].map(([val, label]) => (
+                <button key={val} onClick={() => setExpertArchiveView(val)}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${expertArchiveView === val ? A.gold : A.border}`, background: expertArchiveView === val ? A.goldDim : 'transparent', color: expertArchiveView === val ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
               {[['unverified', '⚠ Непроверенные'], ['all', 'Все']].map(([val, label]) => (
                 <button key={val} onClick={() => setExpertLinksFilter(val)}
                   style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${expertLinksFilter === val ? A.gold : A.border}`, background: expertLinksFilter === val ? A.goldDim : 'transparent', color: expertLinksFilter === val ? A.gold : A.textSec }}>
@@ -5996,10 +6045,11 @@ export const AdminPanel = () => {
               />
               {expertSearch && <button onClick={() => setExpertSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: A.textSec, fontSize: 16, padding: 0, flexShrink: 0 }}>✕</button>}
             </div>
-            {experts.length === 0 ? (
+            {experts.filter(ex => expertArchiveView === 'archive' ? isArchived(ex) : !isArchived(ex)).length === 0 ? (
               <p style={{ color: A.textSec, fontSize: 14, margin: 0 }}>Экспертов пока нет.</p>
             ) : experts
-              .filter(ex => expertLinksFilter === 'all' || !isCheckedRecently(ex.linksCheckedAt))
+              .filter(ex => expertArchiveView === 'archive' ? isArchived(ex) : !isArchived(ex))
+              .filter(ex => expertArchiveView === 'archive' || expertLinksFilter === 'all' || !isCheckedRecently(ex.linksCheckedAt))
               .filter(ex => !expertSearch || ex.name?.toLowerCase().includes(expertSearch.toLowerCase()))
               .sort((a, b) => {
                 const ta = a.linksCheckedAt?.toDate ? a.linksCheckedAt.toDate().getTime() : 0;
@@ -6094,7 +6144,14 @@ export const AdminPanel = () => {
                       {/* действия */}
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button style={{ ...s.btn, ...s.btnGray, fontSize: 13 }} onClick={() => startEditExpert(ex)}>✏️ Редактировать</button>
-                        <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => deleteExpert(ex.id)}>🗑️ Удалить</button>
+                        {isArchived(ex) ? (
+                          <>
+                            <button style={{ ...s.btn, ...s.btnPri, fontSize: 13 }} onClick={() => restoreExpert(ex)}>↩️ Восстановить</button>
+                            {canPermanentDeleteArchive && <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => deleteExpert(ex.id)}>🗑️ Удалить окончательно</button>}
+                          </>
+                        ) : (
+                          <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => archiveExpert(ex)}>🗄️ Архивировать</button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -6485,8 +6542,8 @@ export const AdminPanel = () => {
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все партнёры</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
-                  {partners.length} · <span style={{ color: partners.filter(p => !isCheckedRecently(p.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>
-                    {partners.filter(p => !isCheckedRecently(p.linksCheckedAt)).length} не проверено
+                  {partners.filter(p => partnerArchiveView === 'archive' ? isArchived(p) : !isArchived(p)).length} · <span style={{ color: partners.filter(p => !isArchived(p) && !isCheckedRecently(p.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>
+                    {partners.filter(p => !isArchived(p) && !isCheckedRecently(p.linksCheckedAt)).length} не проверено
                   </span>
                 </span>
               </div>
@@ -6497,7 +6554,13 @@ export const AdminPanel = () => {
                 ➕ Добавить партнёра
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              {[['active', `Активные · ${partners.filter(p => !isArchived(p)).length}`], ['archive', `Архив · ${partners.filter(isArchived).length}`]].map(([val, label]) => (
+                <button key={val} onClick={() => setPartnerArchiveView(val)}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${partnerArchiveView === val ? A.gold : A.border}`, background: partnerArchiveView === val ? A.goldDim : 'transparent', color: partnerArchiveView === val ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
               {[['unverified', '⚠ Сначала непроверенные'], ['all', 'Все']].map(([val, label]) => (
                 <button key={val} onClick={() => setPartnerLinksFilter(val)}
                   style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${partnerLinksFilter === val ? A.gold : A.border}`, background: partnerLinksFilter === val ? A.goldDim : 'transparent', color: partnerLinksFilter === val ? A.gold : A.textSec }}>
@@ -6519,9 +6582,10 @@ export const AdminPanel = () => {
               )}
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
-              : partners.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет партнёров</p>
+              : partners.filter(p => partnerArchiveView === 'archive' ? isArchived(p) : !isArchived(p)).length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>{partnerArchiveView === 'archive' ? 'Архив пуст' : 'Нет активных партнёров'}</p>
               : partners
-                .filter(p => partnerLinksFilter === 'all' || !isCheckedRecently(p.linksCheckedAt))
+                .filter(p => partnerArchiveView === 'archive' ? isArchived(p) : !isArchived(p))
+                .filter(p => partnerArchiveView === 'archive' || partnerLinksFilter === 'all' || !isCheckedRecently(p.linksCheckedAt))
                 .filter(p => !partnerSearch || p.name?.toLowerCase().includes(partnerSearch.toLowerCase()))
                 .sort((a, b) => {
                   const ta = a.linksCheckedAt?.toDate ? a.linksCheckedAt.toDate().getTime() : 0;
@@ -6646,7 +6710,14 @@ export const AdminPanel = () => {
                         {/* действия */}
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button style={{ ...s.btn, ...s.btnGray, fontSize: 13 }} onClick={() => startEditPartner(p)}>✏️ Редактировать</button>
-                          <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => deletePartner(p.id)}>🗑️ Удалить</button>
+                          {isArchived(p) ? (
+                            <>
+                              <button style={{ ...s.btn, ...s.btnPri, fontSize: 13 }} onClick={() => restorePartner(p)}>↩️ Восстановить</button>
+                              {canPermanentDeleteArchive && <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => deletePartner(p.id)}>🗑️ Удалить окончательно</button>}
+                            </>
+                          ) : (
+                            <button style={{ ...s.btn, ...s.btnDanger, fontSize: 13 }} onClick={() => archivePartner(p)}>🗄️ Архивировать</button>
+                          )}
                         </div>
                       </div>
                     )}

@@ -61,7 +61,9 @@ async function calcActivityIndex(db) {
     loadEventsForMonth(db, monthStart),
   ]);
 
-  const partners = partnersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const partners = partnersSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.archived !== true);
 
   const rawStats = partners.map(p => {
     const scans = scansByPartner[p.id] ?? { newClients: 0, totalVisits: 0 };
@@ -127,7 +129,8 @@ async function handleMonthStart(db) {
 
   const partnersSnap = await db.collection('partners').get();
   const candidates = partnersSnap.docs
-    .map(d => ({ id: d.id, name: d.data().name, ...d.data().activityStats }))
+    .map(d => ({ id: d.id, archived: d.data().archived, name: d.data().name, ...d.data().activityStats }))
+    .filter(s => s.archived !== true)
     .filter(s => s.month === prev && s.activityIndex > 0);
 
   if (!candidates.length) return { skipped: 'No activity data for ' + prev };

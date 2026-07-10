@@ -442,10 +442,19 @@ async function actionProfileDelete(db, req, actor) {
   return { ok: true };
 }
 
+async function assertPublicProfileAvailable(db, collectionName, id, label) {
+  const snap = await db.collection(collectionName).doc(id).get();
+  if (!snap.exists || snap.data()?.archived === true) {
+    throw Object.assign(new Error(`${label} недоступен.`), { statusCode: 404 });
+  }
+  return { id: snap.id, ...(snap.data() || {}) };
+}
+
 async function actionFavoritesToggle(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
   if (!partnerId) throw Object.assign(new Error('Не указан партнёр.'), { statusCode: 400 });
+  const partner = await assertPublicProfileAvailable(db, 'partners', partnerId, 'Партнёр');
   const userRef = db.collection('users').doc(userId);
   const partnerRef = db.collection('partners').doc(partnerId);
   let favorites = [];
@@ -465,7 +474,7 @@ async function actionFavoritesToggle(db, req, actor) {
       ts: FieldValue.serverTimestamp(),
     });
   });
-  await audit(db, req, actor, isAdding ? 'favorites:add' : 'favorites:remove', 'partners', partnerId);
+  await audit(db, req, actor, isAdding ? 'favorites:add' : 'favorites:remove', 'partners', partnerId, 'success', { partnerName: partner.name || '' });
   return { ok: true, favorites, isAdding };
 }
 
@@ -673,6 +682,7 @@ async function actionReviewPartner(db, req, actor) {
   const stars = Math.max(1, Math.min(5, Number(req.body?.stars || 0)));
   const text = safeString(req.body?.text, MAX_TEXT);
   if (!partnerId || !stars) throw Object.assign(new Error('Некорректный отзыв.'), { statusCode: 400 });
+  await assertPublicProfileAvailable(db, 'partners', partnerId, 'Партнёр');
   const reviewData = {
     userId,
     userName: safeString(req.body?.userName || 'Участник АПГ', 200),
@@ -699,6 +709,7 @@ async function actionReviewExpert(db, req, actor) {
   const expertId = safeString(req.body?.expertId, 160);
   const rating = Math.max(1, Math.min(5, Number(req.body?.rating || 0)));
   if (!expertId || !rating) throw Object.assign(new Error('Некорректный отзыв.'), { statusCode: 400 });
+  await assertPublicProfileAvailable(db, 'experts', expertId, 'Эксперт');
   const reviewId = `${expertId}_${userId}`.replace(/[/#?[\\\]]/g, '_');
   const reviewData = {
     expertId,

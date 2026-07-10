@@ -1300,6 +1300,15 @@
 
 ---
 
+## [2026-07-10] Архив партнёров/экспертов и демо-партнёр
+**Коммит:** `pending`
+**Файлы:** `src/AdminPanel.jsx`, `src/UserApp.jsx`, `api/admin-actions.js`, `api/user-actions.js`, `api/activity-index.js`, `api/expert-rotation.js`, `server/src/routes/admin-actions.js`, `server/src/routes/user-actions.js`, `server/src/routes/activity-index.js`, `server/src/routes/expert-rotation.js`, `scripts/seed-demo-partner.mjs`
+**Тип:** feat
+**Что изменено:** Добавлен soft-archive для партнёров и экспертов, owner-only окончательное удаление, публичная фильтрация архивных профилей, backend-защита пользовательских действий и seed-скрипт демонстрационного партнёра АПГ.
+**Почему:** Партнёров и экспертов нужно скрывать безопасно без потери истории, а owner-аккаунту нужен презентационный кабинет с заполненными данными.
+
+---
+
 ## Шаблон для будущих записей
 
 ```markdown
