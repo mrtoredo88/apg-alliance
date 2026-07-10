@@ -1109,8 +1109,10 @@ export function EventDetailSheet({
         onPointerCancel={() => setPointerStartY(null)}
       >
         <div style={{ height: 6, width: 46, borderRadius: 99, background: 'rgba(var(--apg2-glass-a,255,255,255),0.34)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)', margin: '12px auto 0' }} />
-        <div key={detailEvent.id || 'event-detail'} ref={contentRef} style={{ overflowY: 'auto', padding: '16px 10px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 14, flex: 1, boxSizing: 'border-box' }}>
+        <div style={{ padding: '16px 10px 0', flexShrink: 0, boxSizing: 'border-box' }}>
           <HeroSection event={detailEvent} status={status} statusTone={statusTone} />
+        </div>
+        <div key={detailEvent.id || 'event-detail'} ref={contentRef} style={{ overflowY: 'auto', padding: '14px 10px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 14, flex: 1, boxSizing: 'border-box' }}>
           {isAdminRole && <QualitySection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
           {isAdminRole && <PreparationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
           {isAdminRole && <ConflictSection event={detailEvent} allEvents={allEvents} />}
