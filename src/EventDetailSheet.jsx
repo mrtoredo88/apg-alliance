@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GLASS, GLASS_GOLD } from './design.js';
+import { GLASS } from './design.js';
 import { motionTransition } from './motion.js';
 
 const A = {
   text: '#F0F0F0',
-  textSec: 'rgba(240,240,240,0.45)',
+  textSec: 'rgba(240,240,240,0.74)',
   gold: '#C9A84C',
   goldBrd: 'rgba(201,168,76,0.3)',
   border: 'rgba(255,255,255,0.2)',
@@ -21,7 +21,7 @@ const BUTTON = {
 };
 
 const SECTION = {
-  background: GLASS.background,
+  background: 'linear-gradient(145deg,rgba(255,255,255,0.10),rgba(255,255,255,0.045))',
   backdropFilter: GLASS.backdropFilter,
   WebkitBackdropFilter: GLASS.WebkitBackdropFilter,
   border: GLASS.border,
@@ -102,11 +102,11 @@ function parseDurationMinutes(startAt, endAt, fallback) {
 }
 
 function eventImage(event) {
-  return event?.coverPhoto || event?.imageUrl || event?.thumbnail || event?.banner || event?.image || '';
+  return event?.coverPhoto || event?.coverUrl || event?.cover || event?.imageUrl || event?.thumbnail || event?.banner || event?.image || event?.photo || event?.photos?.[0] || event?.images?.[0] || '';
 }
 
 function eventGallery(event) {
-  const items = event?.gallery;
+  const items = event?.gallery || event?.photos || event?.images || event?.media;
   if (!Array.isArray(items)) return [];
   return items
     .map((item) => {
@@ -133,43 +133,6 @@ function safeText(value, fallback = '') {
   if (typeof value === 'string') return value;
   if (value == null) return fallback;
   return String(value);
-}
-
-function logSheetStep(step, detail = {}) {
-  const payload = {
-    step,
-    ts: new Date().toISOString(),
-    t: Math.round(performance.now()),
-    ...detail,
-  };
-  window.__APG_EVENT_SHEET_LOGS = [...(window.__APG_EVENT_SHEET_LOGS || []), payload].slice(-40);
-  console.info('[APG_EVENT_SHEET]', payload);
-  window.dispatchEvent(new CustomEvent('apg:event-sheet-debug', { detail: payload }));
-}
-
-async function getRuntimeDiagnostics() {
-  const version = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
-    .then((res) => res.json())
-    .then((data) => data?.v || '')
-    .catch(() => '');
-  const registrations = await navigator?.serviceWorker?.getRegistrations?.().catch(() => []) || [];
-  const registration = registrations[0] || null;
-  const controller = navigator?.serviceWorker?.controller || null;
-  const cacheKeys = typeof caches !== 'undefined' ? await caches.keys().catch(() => []) : [];
-  const scripts = performance.getEntriesByType?.('resource')
-    ?.map((entry) => entry.name)
-    ?.filter((name) => /EventDetailSheet|EventsPage|index-.*\.js|assets\/.*\.js/.test(name))
-    ?.map((name) => name.split('/').pop())
-    ?.slice(-8) || [];
-  return {
-    version,
-    swController: controller?.scriptURL?.split('/').pop() || 'none',
-    swControlled: Boolean(controller),
-    swActive: registration?.active?.scriptURL?.split('/').pop() || 'none',
-    swState: registration?.active?.state || 'none',
-    cacheKeys,
-    chunks: scripts,
-  };
 }
 
 function normalizeMode(event) {
@@ -222,6 +185,75 @@ function getFieldNameById(list, id) {
   return item?.name || '';
 }
 
+function firstText(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (value != null && typeof value !== 'object' && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+function locationText(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return firstText(value.address, value.title, value.name, value.text, value.label);
+}
+
+function countValue(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value.length;
+    const n = Number(value);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return 0;
+}
+
+function normalizeDetailEvent(event, partners, experts) {
+  if (!event) return null;
+  const partnerName = firstText(
+    event.partner,
+    event.partnerName,
+    event.organizer,
+    event.organizerName,
+    event.hostName,
+    getFieldNameById(partners, event.partnerId),
+  );
+  const expertName = firstText(
+    event.expert,
+    event.expertName,
+    event.speaker,
+    event.speakerName,
+    event.mentorName,
+    getFieldNameById(experts, event.expertId),
+  );
+  const description = firstText(event.description, event.fullDescription, event.details, event.body, event.content, event.text, event.about, event.comment);
+  const address = firstText(event.address, event.locationAddress, event.place, event.placeName, event.venue, event.venueName, locationText(event.location));
+  const startAt = event.startAt || event.eventDate || event.date || event.schedule?.startAt || event.schedule?.date || event.datetime || event.startsAt;
+  const endAt = event.endAt || event.schedule?.endAt || event.endsAt;
+  const maxParticipants = countValue(event.maxParticipants, event.capacity, event.seats, event.seatsTotal, event.limit, event.registrationLimit);
+  const registeredCount = countValue(event.registeredCount, event.registrationsCount, event.participantsCount, event.attendeesCount, event.registrations, event.participants, event.attendees);
+  return {
+    ...event,
+    title: firstText(event.title, event.name, event.eventTitle, 'Событие АПГ'),
+    emoji: firstText(event.emoji, event.icon, '🎉'),
+    description,
+    partner: partnerName,
+    expert: expertName,
+    address,
+    location: typeof event.location === 'string' ? event.location : address,
+    startAt,
+    endAt,
+    date: startAt || event.date,
+    deadline: event.deadline || event.registrationDeadline || event.registrationEndsAt,
+    maxParticipants,
+    registeredCount,
+    price: firstText(event.price, event.priceClub, event.pricePublic, event.cost),
+    category: firstText(event.category, event.categoryName, event.type),
+    linkUrl: firstText(event.linkUrl, event.socialUrl, event.url, event.website, event.registrationUrl),
+    linkLabel: firstText(event.linkLabel, event.buttonLabel, event.ctaLabel, 'Перейти по ссылке'),
+  };
+}
+
 function csvEscape(value) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
@@ -252,7 +284,7 @@ function HeroSection({ event, status, statusTone }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ fontSize: 38, width: 56, height: 56, borderRadius: 16, background: GLASS_GOLD.background, border: GLASS_GOLD.border, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ fontSize: 38, width: 56, height: 56, borderRadius: 16, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.34)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {event?.emoji || '🎉'}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -918,17 +950,13 @@ export function EventDetailSheet({
   const [isClosing, setIsClosing] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
   const [pointerStartY, setPointerStartY] = useState(null);
-  const [debugRect, setDebugRect] = useState(null);
-  const [debugLogs, setDebugLogs] = useState([]);
-  const [runtime, setRuntime] = useState(null);
-  const sheetRef = useRef(null);
+  const detailEvent = useMemo(() => normalizeDetailEvent(event, partners, experts), [event, partners, experts]);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
 
   useEffect(() => {
     if (open) {
       setVisible(true);
       setIsClosing(false);
-      logSheetStep('SHEET_VISIBLE', { eventId: event?.id || null, open: true });
     } else if (visible) {
       setIsClosing(true);
       const timer = setTimeout(() => {
@@ -950,77 +978,34 @@ export function EventDetailSheet({
     };
   }, [open, event?.id]);
 
-  useEffect(() => {
-    const handler = (debugEvent) => {
-      setDebugLogs((prev) => [...prev, debugEvent.detail].slice(-10));
-    };
-    window.addEventListener('apg:event-sheet-debug', handler);
-    return () => window.removeEventListener('apg:event-sheet-debug', handler);
-  }, []);
-
-  useEffect(() => {
-    if (!visible || !event) return;
-    logSheetStep('SHEET_MOUNT', { eventId: event?.id || null, visible, open });
-    let raf = 0;
-    let timer = 0;
-    const updateRect = () => {
-      const rect = sheetRef.current?.getBoundingClientRect?.();
-      const next = rect ? {
-        top: Math.round(rect.top),
-        bottom: Math.round(rect.bottom),
-        left: Math.round(rect.left),
-        right: Math.round(rect.right),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-        visualWidth: Math.round(window.visualViewport?.width || window.innerWidth),
-        visualHeight: Math.round(window.visualViewport?.height || window.innerHeight),
-        pageYOffset: Math.round(window.pageYOffset || 0),
-      } : null;
-      setDebugRect(next);
-      logSheetStep('SHEET_RECT', { eventId: event?.id || null, rect: next });
-    };
-    raf = requestAnimationFrame(updateRect);
-    timer = setTimeout(updateRect, 420);
-    getRuntimeDiagnostics().then(setRuntime).catch(() => {});
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-      logSheetStep('SHEET_UNMOUNT', { eventId: event?.id || null });
-    };
-  }, [visible, event?.id, open]);
-
-  if (!visible || !event) return null;
+  if (!visible || !detailEvent) return null;
 
   const isAdminRole = ['admin', 'owner'].includes(String(role || '').toLowerCase());
-  const status = resolveStatus(event);
-  const statusTone = MODERATION_STATUS_META[moderationKey(event)]?.tone || (status === 'Завершено' ? '#E64646' : status.includes('закрыта') ? '#f59e0b' : A.gold);
-  const modeKey = normalizeMode(event);
+  const status = resolveStatus(detailEvent);
+  const statusTone = MODERATION_STATUS_META[moderationKey(detailEvent)]?.tone || (status === 'Завершено' ? '#E64646' : status.includes('закрыта') ? '#f59e0b' : A.gold);
+  const modeKey = normalizeMode(detailEvent);
   const mode = EVENT_MODE_META[modeKey] || EVENT_MODE_META.offline;
-  const capacity = Number(event?.maxParticipants ?? 0);
-  const registered = Number(event?.registeredCount ?? 0);
-  const partnerName = event?.partner || getFieldNameById(partners, event?.partnerId);
-  const expertName = event?.expert || getFieldNameById(experts, event?.expertId);
-  const isRegistered = registeredEventIds.map(String).includes(String(event?.id || ''));
+  const capacity = Number(detailEvent?.maxParticipants ?? 0);
+  const registered = Number(detailEvent?.registeredCount ?? 0);
+  const partnerName = detailEvent?.partner || getFieldNameById(partners, detailEvent?.partnerId);
+  const expertName = detailEvent?.expert || getFieldNameById(experts, detailEvent?.expertId);
+  const isRegistered = registeredEventIds.map(String).includes(String(detailEvent?.id || ''));
 
   const handleClose = () => {
-    logSheetStep('SHEET_CLOSE', { eventId: event?.id || null });
     setSearch('');
     onClose();
   };
 
   const handleEdit = () => {
-    onEdit(event);
+    onEdit(detailEvent);
   };
 
-  const handleExport = () => exportParticipantsCSV(event, participants);
+  const handleExport = () => exportParticipantsCSV(detailEvent, participants);
 
   const handleTouchEnd = (touchEvent) => {
     if (touchStartY == null) return;
     const endY = touchEvent.changedTouches?.[0]?.clientY ?? touchStartY;
     if (endY - touchStartY > 86) {
-      logSheetStep('DRAG_CLOSE', { eventId: event?.id || null, type: 'touchEnd', delta: Math.round(endY - touchStartY) });
       handleClose();
     }
     setTouchStartY(null);
@@ -1031,7 +1016,6 @@ export function EventDetailSheet({
     const currentY = touchEvent.touches?.[0]?.clientY ?? touchStartY;
     if (currentY - touchStartY > 110) {
       setTouchStartY(null);
-      logSheetStep('DRAG_CLOSE', { eventId: event?.id || null, type: 'touchMove', delta: Math.round(currentY - touchStartY) });
       handleClose();
     }
   };
@@ -1040,7 +1024,6 @@ export function EventDetailSheet({
     if (pointerStartY == null) return;
     if (pointerEvent.clientY - pointerStartY > 110) {
       setPointerStartY(null);
-      logSheetStep('DRAG_CLOSE', { eventId: event?.id || null, type: 'pointerMove', delta: Math.round(pointerEvent.clientY - pointerStartY) });
       handleClose();
     }
   };
@@ -1055,27 +1038,27 @@ export function EventDetailSheet({
         alignItems: 'flex-end',
         justifyContent: 'center',
         background: isClosing ? 'rgba(0,0,0,0.54)' : 'rgba(0,0,0,0.72)',
-        padding: `max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left))`,
+        padding: `max(10px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left))`,
         transition: motionTransition(['background'], 'modal', 'soft'),
         overflow: 'hidden',
         boxSizing: 'border-box',
         isolation: 'isolate',
       }}
-      onClick={() => {
-        logSheetStep('BACKDROP_CLICK', { eventId: event?.id || null });
-        handleClose();
-      }}
+      onClick={handleClose}
     >
       <div
-        ref={sheetRef}
         style={{
-          ...GLASS_GOLD,
+          background: 'radial-gradient(circle at 50% -12%, rgba(201,168,76,0.20), transparent 32%), linear-gradient(180deg, rgba(24,24,28,0.98), rgba(12,12,16,0.98))',
+          backdropFilter: 'blur(34px) saturate(1.6)',
+          WebkitBackdropFilter: 'blur(34px) saturate(1.6)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          boxShadow: '0 -22px 70px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.14)',
           width: '100%',
-          maxWidth: 900,
-          height: 'calc(100dvh - max(14px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)))',
-          maxHeight: '95dvh',
-          minHeight: 'min(90dvh, calc(100dvh - max(14px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom))))',
-          borderRadius: 28,
+          maxWidth: 'min(900px, 100%)',
+          height: 'calc(96dvh - max(10px, env(safe-area-inset-top)))',
+          maxHeight: '96dvh',
+          minHeight: 'min(90dvh, calc(96dvh - max(10px, env(safe-area-inset-top))))',
+          borderRadius: 30,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
           overflow: 'hidden',
@@ -1086,51 +1069,40 @@ export function EventDetailSheet({
           transition: motionTransition(['transform', 'opacity'], 'modal', 'out'),
           willChange: 'transform, opacity',
           pointerEvents: 'auto',
-          outline: '3px solid rgba(255,0,180,0.88)',
           boxSizing: 'border-box',
         }}
         onClick={(event) => event.stopPropagation()}
         onTouchStart={(event) => {
           const y = event.touches?.[0]?.clientY ?? null;
           setTouchStartY(y);
-          logSheetStep('DRAG_START', { eventId: event?.id || null, type: 'touch', y });
         }}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => setTouchStartY(null)}
         onPointerDown={(event) => {
           setPointerStartY(event.clientY);
-          logSheetStep('DRAG_START', { eventId: event?.id || null, type: 'pointer', y: Math.round(event.clientY), pointerType: event.pointerType });
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={() => setPointerStartY(null)}
         onPointerCancel={() => setPointerStartY(null)}
       >
-        <div style={{ position: 'absolute', left: 10, right: 10, top: 10, zIndex: 5, borderRadius: 14, padding: 10, background: 'rgba(255,0,180,0.88)', color: '#fff', fontSize: 11, lineHeight: '15px', fontWeight: 800, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', pointerEvents: 'none' }}>
-          <div>EVENT SHEET OPEN</div>
-          <div>id: {String(event?.id || 'none')} · visible: {String(visible)} · mounted: true</div>
-          <div>rect: {debugRect ? `t${debugRect.top} b${debugRect.bottom} h${debugRect.height} w${debugRect.width} vh${debugRect.viewportHeight} y${debugRect.pageYOffset}` : 'pending'}</div>
-          <div>version: {runtime?.version || 'loading'} · sw: {runtime?.swControlled ? 'controlled' : 'uncontrolled'} · {runtime?.swActive || 'sw...'}</div>
-          <div>chunks: {(runtime?.chunks || []).join(', ') || 'loading'}</div>
-          <div>{debugLogs.slice(-4).map((entry) => `${entry.t}:${entry.step}`).join(' · ')}</div>
-        </div>
         <div style={{ height: 7, width: 44, borderRadius: 99, background: 'rgba(255,255,255,0.35)', margin: '14px auto 0' }} />
-        <div style={{ overflowY: 'auto', padding: '116px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-          <HeroSection event={event} status={status} statusTone={statusTone} />
-          {isAdminRole && <QualitySection event={event} partnerName={partnerName} expertName={expertName} />}
-          {isAdminRole && <PreparationSection event={event} partnerName={partnerName} expertName={expertName} />}
-          {isAdminRole && <ConflictSection event={event} allEvents={allEvents} />}
-          <DateSection event={event} status={status} />
-          <LocationSection event={event} partnerName={partnerName} expertName={expertName} />
-          <DescriptionSection event={event} />
-          <ModerationSection event={event} canManage={isAdminRole} />
-          {isAdminRole && <PreviewSection event={event} partnerName={partnerName} />}
-          {isAdminRole && <PromotionPlanSection event={event} canManage={isAdminRole} onPatch={onPatch} />}
-          {isAdminRole && <SeriesSection event={event} canManage={isAdminRole} onCreateSeries={onCreateSeries} />}
-          <RegistrationSection event={event} />
+        <div style={{ overflowY: 'auto', padding: '16px 12px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 12, flex: 1, boxSizing: 'border-box' }}>
+          <HeroSection event={detailEvent} status={status} statusTone={statusTone} />
+          {isAdminRole && <QualitySection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
+          {isAdminRole && <PreparationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
+          {isAdminRole && <ConflictSection event={detailEvent} allEvents={allEvents} />}
+          <DateSection event={detailEvent} status={status} />
+          <LocationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />
+          <DescriptionSection event={detailEvent} />
+          <ModerationSection event={detailEvent} canManage={isAdminRole} />
+          {isAdminRole && <PreviewSection event={detailEvent} partnerName={partnerName} />}
+          {isAdminRole && <PromotionPlanSection event={detailEvent} canManage={isAdminRole} onPatch={onPatch} />}
+          {isAdminRole && <SeriesSection event={detailEvent} canManage={isAdminRole} onCreateSeries={onCreateSeries} />}
+          <RegistrationSection event={detailEvent} />
           {!isAdminRole && onRegister && (
             <UserActionsSection
-              event={event}
+              event={detailEvent}
               isRegistered={isRegistered}
               onRegister={onRegister}
               onClose={handleClose}
@@ -1174,7 +1146,7 @@ export function EventDetailSheet({
           ) : null}
           <FooterActions
             isAdminRole={isAdminRole}
-            event={event}
+            event={detailEvent}
             onEdit={handleEdit}
             onClose={handleClose}
             onDuplicate={onDuplicate}

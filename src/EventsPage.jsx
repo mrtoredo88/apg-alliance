@@ -38,18 +38,6 @@ const CATEGORY_COLORS = {
   family: '#D7B86A',
 };
 
-function logEventSheetStep(step, detail = {}) {
-  const payload = {
-    step,
-    ts: new Date().toISOString(),
-    t: Math.round(performance.now()),
-    ...detail,
-  };
-  window.__APG_EVENT_SHEET_LOGS = [...(window.__APG_EVENT_SHEET_LOGS || []), payload].slice(-40);
-  console.info('[APG_EVENT_SHEET]', payload);
-  window.dispatchEvent(new CustomEvent('apg:event-sheet-debug', { detail: payload }));
-}
-
 function toDateValue(value) {
   if (!value) return null;
   if (value?.toDate) return value.toDate();
@@ -421,9 +409,7 @@ function EventPosterCard({ event, index, onClick, compact = false }) {
   const left = capacity > 0 ? Math.max(0, capacity - registered) : null;
   return (
     <GlassCard
-      onPointerDown={() => logEventSheetStep('CARD_POINTER_DOWN', { eventId: event?.id || null, title: event?.title || '' })}
       onClick={() => {
-        logEventSheetStep('CARD_CLICK', { eventId: event?.id || null, title: event?.title || '' });
         onClick(event);
       }}
       style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', borderRadius: 30, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: compact ? '92px minmax(0, 1fr)' : '116px minmax(0, 1fr)', minHeight: compact ? 126 : 158, animation: `fadeInUp 0.34s ease ${index * 0.035}s both` }}
@@ -568,7 +554,6 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
 
   const toggleFilter = (id) => setFilters(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   const openEventSheet = (event) => {
-    logEventSheetStep('SET_SELECTED_EVENT', { eventId: event?.id || null, title: event?.title || '' });
     setSelectedEvent(event);
   };
 

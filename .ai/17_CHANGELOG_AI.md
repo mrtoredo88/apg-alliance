@@ -1394,3 +1394,11 @@
 **Файлы:** `src/EventsPage.jsx`, `src/EventDetailSheet.jsx`
 
 **Что изменено:** Ширина карточек горизонтальных подборок изменена на `clamp(270px, 94%, 420px)`, чтобы на мобильных экранах карточка занимала около 94% доступного контейнера и сохраняла намёк на следующую карточку без расширения страницы. `EventDetailSheet` теперь рендерится через `createPortal(..., document.body)`, чтобы `position: fixed` не зависел от transform/stacking context родительских контейнеров. Добавлена временная визуальная диагностика открытия: яркая рамка sheet, надпись `EVENT SHEET OPEN`, rect, версия приложения, состояние service worker, загруженные JS chunks и timestamp-логи `CARD_POINTER_DOWN`, `CARD_CLICK`, `SET_SELECTED_EVENT`, `SHEET_MOUNT`, `SHEET_VISIBLE`, `BACKDROP_CLICK`, `DRAG_START`, `DRAG_CLOSE`, `SHEET_CLOSE`.
+
+## 2026-07-10 — EventDetailSheet content normalization and final mobile layout
+
+**Задача:** После диагностики стало ясно, что `EventDetailSheet` открывается корректно, но на реальном устройстве секции выглядели пустыми/skeleton-like: данные события не распознавались всеми секциями, а золотая поверхность sheet давала слабый контраст для внутренних glass-блоков.
+
+**Файлы:** `src/EventDetailSheet.jsx`, `src/EventsPage.jsx`
+
+**Что изменено:** Временная диагностика полностью удалена. `EventDetailSheet` оставлен в `createPortal(..., document.body)`, но теперь строит нормализованный `detailEvent` с поддержкой старых и новых полей: `partnerName`, `expertName`, `organizerName`, `speakerName`, `location.address`, `schedule`, `photos/images/gallery`, `registrationDeadline`, `registrations/participants` и других алиасов. Внутренние секции читают нормализованные значения, поэтому описание, дата, место, организатор и регистрация отображаются без ожидания дополнительного loading-state. Sheet переведён на тёмную iOS bottom-sheet поверхность, увеличена читаемость текста, внешний мобильный отступ уменьшен до safe-area + 6px, чтобы карточка занимала почти всю ширину экрана.
