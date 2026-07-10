@@ -2672,6 +2672,7 @@ export function UserApp() {
                     onSubscribe={toggleNewsSubscription}
                     onRefresh={handleRefresh}
                     onToast={showToast}
+                    onOpenLoki={() => goPanel('loki')}
                     initialNewsTarget={pendingLokiNewsTarget}
                   />
                 </Suspense>

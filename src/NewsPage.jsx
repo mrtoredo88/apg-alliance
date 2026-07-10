@@ -331,6 +331,34 @@ function SocialLinksBlock({ links = [] }) {
   );
 }
 
+function SourceBadge({ item }) {
+  const source = item?.source;
+  const sourceName = item?.sourceName || (source === 'vk' ? 'ВКонтакте' : null);
+  if (!sourceName || source === 'apg') return null;
+  const icon = source === 'vk' ? 'VK' : source === 'telegram' ? 'TG' : '↗';
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'rgba(247,241,230,0.05)', border: '1px solid rgba(247,241,230,0.09)' }}>
+      <span style={{ fontSize: 10, fontWeight: 860, color: APG2_PROFILE.textMuted }}>{icon}</span>
+      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 680 }}>Источник: <span style={{ color: APG2_PROFILE.textSoft, fontWeight: 760 }}>{sourceName}</span></span>
+    </div>
+  );
+}
+
+function LokiArticleBanner({ wordCount, onOpenLoki }) {
+  if (wordCount < 260 || !onOpenLoki) return null;
+  const minutes = Math.max(1, Math.ceil(wordCount / 200));
+  return (
+    <div style={{ marginTop: 20, borderRadius: 18, padding: '12px 14px', background: 'rgba(215,184,106,0.06)', border: '1px solid rgba(215,184,106,0.15)', display: 'grid', gridTemplateColumns: '36px 1fr auto', gap: 10, alignItems: 'center' }}>
+      <div style={{ width: 36, height: 36, borderRadius: 13, background: 'rgba(215,184,106,0.12)', border: '1px solid rgba(215,184,106,0.20)', display: 'grid', placeItems: 'center', fontSize: 17 }}>◌</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 860, lineHeight: '16px' }}>Локи</div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '17px', fontWeight: 560 }}>Статья на {minutes} мин. Кратко перескажу и найду связанные материалы</div>
+      </div>
+      <button type="button" onClick={onOpenLoki} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 12, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(215,184,106,0.10)', color: APG2_PROFILE.gold, fontSize: 11.5, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer' }}>Спросить</button>
+    </div>
+  );
+}
+
 function ContentBlocks({ blocks = [] }) {
   const safeBlocks = Array.isArray(blocks) ? blocks.filter(Boolean) : [];
   if (!safeBlocks.length) return null;
@@ -430,54 +458,36 @@ function SharePanel({ item, onToast, onShare }) {
   );
 }
 
-function ArticleHeader({ item, wordCount }) {
+function ArticleHeader({ item }) {
   const title = getNewsTitle(item);
-  const text = getNewsText(item);
   const subtitle = String(item?.subtitle || '').trim();
   const summary = String(item?.summary || '').trim();
-  const stats = getNewsStats(item);
-  const reactions = getNewsReactionsTotal(item) || stats.likes;
   const date = getNewsDate(item);
-  const source = item?.sourceName || (item?.source === 'vk' ? 'ВКонтакте' : 'АПГ');
   const badges = getSmartBadges(item);
 
   return (
-    <GlassCard style={{ marginTop: 18, borderRadius: 32, padding: 18, display: 'grid', gap: 14 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ padding: '8px 12px', borderRadius: 999, background: 'rgba(215,184,106,0.14)', border: '1px solid rgba(215,184,106,0.28)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900 }}>{getNewsCategoryLabel(item)}</span>
+    <div style={{ paddingTop: 18 }}>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ padding: '6px 11px', borderRadius: 999, background: 'rgba(215,184,106,0.12)', border: '1px solid rgba(215,184,106,0.22)', color: APG2_PROFILE.gold, fontSize: 11.5, fontWeight: 860 }}>{getNewsCategoryLabel(item)}</span>
         {badges.map(([emoji, label]) => (
-          <span key={`${emoji}-${label}`} style={{ padding: '8px 11px', borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.22)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.28)', color: APG2_PROFILE.text, fontSize: 11.5, fontWeight: 820 }}>{emoji} {label}</span>
+          <span key={`${emoji}-${label}`} style={{ padding: '5px 10px', borderRadius: 999, background: 'rgba(247,241,230,0.07)', border: '1px solid rgba(247,241,230,0.11)', color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 760 }}>{emoji} {label}</span>
         ))}
       </div>
-      <h1 style={{ margin: 0, color: APG2_PROFILE.text, fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: '1.08', fontWeight: 950, letterSpacing: 0 }}>{title}</h1>
+      <h1 style={{ margin: '0 0 12px', color: APG2_PROFILE.text, fontSize: 'clamp(24px, 5.5vw, 38px)', lineHeight: 1.12, fontWeight: 950, letterSpacing: '-0.02em' }}>{title}</h1>
       {subtitle && (
-        <div style={{ color: APG2_PROFILE.gold, fontSize: 18, lineHeight: '25px', fontWeight: 850 }}>
-          {subtitle}
-        </div>
+        <div style={{ color: APG2_PROFILE.gold, fontSize: 17, lineHeight: '25px', fontWeight: 800, marginBottom: 10 }}>{subtitle}</div>
       )}
-      {(summary || text) && (
-        <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '25px', fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {summary || text}
-        </div>
-      )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(116px, 1fr))', gap: 8 }}>
-        {[
-          ['Источник', source],
-          ['Дата', date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'Недавно'],
-          ['Время', date ? date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'сейчас'],
-          ['Чтение', `${getReadingMinutes(item)} мин`],
-          ['Слова', String(wordCount)],
-          ['Просмотры', String(stats.views)],
-          ['Реакции', String(reactions)],
-          ['Комментарии', String(stats.comments)],
-        ].map(([label, value]) => (
-          <div key={label} style={{ minHeight: 58, borderRadius: 18, padding: '10px 11px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', boxSizing: 'border-box' }}>
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 720 }}>{label}</div>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 880, marginTop: 4 }}>{value}</div>
-          </div>
-        ))}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 660, lineHeight: '16px', marginBottom: summary ? 14 : 0 }}>
+        {date && <span>{date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+        {date && <span style={{ opacity: 0.6 }}>·</span>}
+        {date && <span>{date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>}
+        <span style={{ opacity: 0.6 }}>·</span>
+        <span>⏱ {getReadingMinutes(item)} мин</span>
       </div>
-    </GlassCard>
+      {summary && (
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 16, lineHeight: '26px', fontWeight: 480 }}>{summary}</div>
+      )}
+    </div>
   );
 }
 
@@ -877,7 +887,7 @@ function NewsCard({ item, index, onOpen, onShare, saved, later }) {
   );
 }
 
-function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, onSubscribe, saved, later, reaction, subscriptions, user, onToast }) {
+function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, onSubscribe, saved, later, reaction, subscriptions, user, onToast, onOpenLoki }) {
   const [progress, setProgress] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showArticleTop, setShowArticleTop] = useState(false);
@@ -994,122 +1004,151 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
       });
   };
 
+  const ART_BG = 'radial-gradient(circle at 50% -6%, rgba(219,187,111,0.18), transparent 30%), linear-gradient(180deg, #1A1812 0%, #1F1D14 55%, #1A1812 100%)';
+  const DIVIDER = <div style={{ margin: '24px 0', height: 1, background: 'rgba(247,241,230,0.08)' }} />;
+
   return (
-    <div data-apg-pull-disabled="true" style={{ position: 'fixed', inset: 0, zIndex: 13000, background: APG2_PROFILE.bg, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+    <div data-apg-pull-disabled="true" style={{ position: 'fixed', inset: 0, zIndex: 13000, background: ART_BG, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: `${progress * 100}%`, background: 'linear-gradient(90deg, #9F7932, #F4D98C, #FFF0B8)', boxShadow: '0 0 18px rgba(244,217,140,0.44)', zIndex: 2, transition: 'width 80ms linear' }} />
+
       <div ref={scrollRef} data-apg-scroll-root="news-article" data-apg-pull-disabled="true" onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', touchAction: 'pan-y' }}>
-        <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(110px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
-          <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, transform: headerHidden ? 'translateY(calc(-100% - 18px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
-            <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 22, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>←</button>
-            <span style={{ minWidth: 0, flex: 1, textAlign: 'center', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress > 0.08 ? title : getNewsCategoryLabel(item)}</span>
-            <button type="button" onClick={async () => { await shareNewsItem(item, onToast); trackShare('top'); }} aria-label="Поделиться новостью" style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(12,12,14,0.72)', color: APG2_PROFILE.text, fontSize: 17, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>↗</button>
+        <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', boxSizing: 'border-box' }}>
+
+          {/* ── nav bar ── */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 'calc(var(--safe-top, 0px) + 10px) 14px 10px', background: 'rgba(26,24,18,0.86)', backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', transform: headerHidden ? 'translateY(calc(-100% - 2px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
+            <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 16, border: '1px solid rgba(247,241,230,0.14)', background: 'rgba(247,241,230,0.07)', color: APG2_PROFILE.text, fontSize: 22 }}>←</button>
+            <span style={{ minWidth: 0, flex: 1, textAlign: 'center', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress > 0.08 ? title : getNewsCategoryLabel(item)}</span>
+            <button type="button" onClick={async () => { await shareNewsItem(item, onToast); trackShare('top'); }} aria-label="Поделиться новостью" style={{ width: 44, height: 44, borderRadius: 16, border: '1px solid rgba(247,241,230,0.14)', background: 'rgba(247,241,230,0.07)', color: APG2_PROFILE.text, fontSize: 17 }}>↗</button>
           </div>
 
-          <NewsImage item={item} height={310} radius={34} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
+          {/* ── hero image ── */}
+          <NewsImage item={item} height={300} radius={0} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
             {(item.isPinned || item.pinned) && (
-              <div style={{ position: 'absolute', left: 16, top: 16, padding: '8px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.56)', border: '1px solid rgba(215,184,106,0.34)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>📌 Закреплено</div>
+              <div style={{ position: 'absolute', left: 16, top: 16, padding: '7px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.56)', border: '1px solid rgba(215,184,106,0.34)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>📌 Закреплено</div>
             )}
           </NewsImage>
-          <ArticleHeader item={item} wordCount={wordCount} />
-          {tags.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-              {tags.slice(0, 8).map(tag => (
-                <span key={tag} style={{ padding: '7px 11px', borderRadius: 999, background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.20)', fontSize: 11, fontWeight: 820 }}>#{tag}</span>
-              ))}
-            </div>
-          )}
 
-          <div style={{ marginTop: 18, borderRadius: 30, padding: 'clamp(18px, 4vw, 28px)', background: 'rgba(10,10,12,0.70)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
-            <RichText color={APG2_PROFILE.text} fontSize={16} lineHeight="28px">
+          {/* ── article head ── */}
+          <div style={{ padding: '0 18px' }}>
+            {item.source && item.source !== 'apg' && (
+              <div style={{ paddingTop: 16 }}>
+                <SourceBadge item={item} />
+              </div>
+            )}
+            <ArticleHeader item={item} />
+
+            {tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 14 }}>
+                {tags.slice(0, 8).map(tag => (
+                  <span key={tag} style={{ padding: '6px 11px', borderRadius: 999, background: 'rgba(215,184,106,0.10)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.18)', fontSize: 11, fontWeight: 800 }}>#{tag}</span>
+                ))}
+              </div>
+            )}
+
+            <LokiArticleBanner wordCount={wordCount} onOpenLoki={onOpenLoki} />
+
+            {DIVIDER}
+
+            {/* ── body text ── */}
+            <RichText color={APG2_PROFILE.text} fontSize={17} lineHeight="30px">
               {text || 'Подробный текст новости появится здесь после публикации.'}
             </RichText>
           </div>
 
-          <ContentBlocks blocks={item.contentBlocks} />
+          {/* ── content blocks ── */}
+          <div style={{ padding: '0 18px' }}>
+            <ContentBlocks blocks={item.contentBlocks} />
+          </div>
 
-          <PhotoCarousel photos={photos} onOpen={setLightboxIndex} />
+          {/* ── photo carousel ── */}
+          <div style={{ padding: '0 14px' }}>
+            <PhotoCarousel photos={photos} onOpen={setLightboxIndex} />
+          </div>
 
+          {/* ── videos ── */}
           {videos.length > 0 && (
-            <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: '6px 0 12px' }}>
-              <VideoSection videos={videos} />
-            </GlassCard>
+            <div style={{ padding: '16px 14px 0' }}>
+              <GlassCard style={{ borderRadius: 28, padding: '6px 0 12px' }}>
+                <VideoSection videos={videos} />
+              </GlassCard>
+            </div>
           )}
 
-          <SocialLinksBlock links={item.socialLinks} />
+          {/* ── social links ── */}
+          <div style={{ padding: '0 14px' }}>
+            <SocialLinksBlock links={item.socialLinks} />
+          </div>
 
+          {/* ── attachments ── */}
           {(links.length > 0 || docs.length > 0) && (
-            <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 12 }}>Вложения</div>
-              <div style={{ display: 'grid', gap: 10 }}>
-                {links.map((link, index) => (
-                  <button key={`${link.url}-${index}`} type="button" onClick={() => openUrl(link.url)} style={{ display: 'grid', gridTemplateColumns: link.imageUrl ? '58px 1fr' : '1fr', gap: 12, alignItems: 'center', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 20, padding: 10, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
-                    {link.imageUrl && <img src={link.imageUrl} alt="" loading="lazy" style={{ width: 58, height: 50, borderRadius: 14, objectFit: 'cover' }} />}
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 840, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title || link.url}</span>
-                      {link.description && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.description}</span>}
-                    </span>
-                  </button>
-                ))}
-                {docs.map((doc, index) => (
-                  <button key={`${doc.url}-${index}`} type="button" onClick={() => openUrl(doc.url)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 20, padding: 12, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
-                    <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 840 }}>📎 {doc.title}</span>
-                    {doc.ext && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 4 }}>{doc.ext.toUpperCase()}</span>}
-                  </button>
-                ))}
-              </div>
-            </GlassCard>
-          )}
-
-          {item.source === 'vk' && (
-            <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-                {[
-                  ['Просмотры', stats.views],
-                  ['Лайки', stats.likes],
-                  ['Комментарии', stats.comments],
-                  ['Репосты', stats.reposts],
-                ].map(([label, value]) => (
-                  <div key={label} style={{ textAlign: 'center', borderRadius: 18, padding: '10px 6px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
-                    <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900 }}>{value}</div>
-                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, marginTop: 3 }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              {url && <GlassButton onClick={() => openUrl(url)} tone="gold" style={{ width: '100%', minHeight: 48, borderRadius: 20, color: '#17120a' }}>Открыть оригинал в ВКонтакте</GlassButton>}
-            </GlassCard>
-          )}
-
-          <GlassCard style={{ marginTop: 16, borderRadius: 30, padding: 16 }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 900, marginBottom: 6 }}>Была полезна эта новость?</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginBottom: 12 }}>Короткий ответ помогает редакции лучше понимать, что важно жителям.</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
-              <GlassButton onClick={() => submitFeedback(true)} tone={feedback === true ? 'gold' : undefined} style={{ minHeight: 42, borderRadius: 18, color: feedback === true ? '#17120a' : APG2_PROFILE.text }}>👍 Да</GlassButton>
-              <GlassButton onClick={() => submitFeedback(false)} tone={feedback === false ? 'gold' : undefined} style={{ minHeight: 42, borderRadius: 18, color: feedback === false ? '#17120a' : APG2_PROFILE.text }}>👎 Нет</GlassButton>
+            <div style={{ padding: '16px 14px 0' }}>
+              <GlassCard style={{ borderRadius: 28, padding: 16 }}>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900, marginBottom: 12 }}>Вложения</div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {links.map((link, index) => (
+                    <button key={`${link.url}-${index}`} type="button" onClick={() => openUrl(link.url)} style={{ display: 'grid', gridTemplateColumns: link.imageUrl ? '56px 1fr' : '1fr', gap: 12, alignItems: 'center', border: '1px solid rgba(247,241,230,0.10)', background: 'rgba(247,241,230,0.04)', borderRadius: 18, padding: 10, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
+                      {link.imageUrl && <img src={link.imageUrl} alt="" loading="lazy" style={{ width: 56, height: 48, borderRadius: 13, objectFit: 'cover' }} />}
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title || link.url}</span>
+                        {link.description && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.description}</span>}
+                      </span>
+                    </button>
+                  ))}
+                  {docs.map((doc, index) => (
+                    <button key={`${doc.url}-${index}`} type="button" onClick={() => openUrl(doc.url)} style={{ border: '1px solid rgba(247,241,230,0.10)', background: 'rgba(247,241,230,0.04)', borderRadius: 18, padding: 12, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
+                      <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 820 }}>📎 {doc.title}</span>
+                      {doc.ext && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 4 }}>{doc.ext.toUpperCase()}</span>}
+                    </button>
+                  ))}
+                </div>
+              </GlassCard>
             </div>
-          </GlassCard>
-
-          <SharePanel item={item} onToast={onToast} onShare={trackShare} />
-
-          <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
-
-          {item.commentsEnabled === false ? (
-            <GlassCard style={{ marginTop: 18, borderRadius: 30, padding: 16, color: APG2_PROFILE.textMuted, fontSize: 13.5, lineHeight: '20px' }}>
-              Комментарии к этой публикации отключены редакцией.
-            </GlassCard>
-          ) : (
-            <CommentsPanel item={item} user={user} onToast={onToast} />
           )}
 
+          {/* ── actions ── */}
+          <div style={{ padding: '24px 14px 0' }}>
+            <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
+          </div>
+
+          {/* ── feedback ── */}
+          <div style={{ padding: '12px 14px 0' }}>
+            <GlassCard style={{ borderRadius: 28, padding: 16 }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 880, marginBottom: 5 }}>Была полезна эта новость?</div>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 12 }}>Короткий ответ помогает редакции.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
+                <GlassButton onClick={() => submitFeedback(true)} tone={feedback === true ? 'gold' : undefined} style={{ minHeight: 42, borderRadius: 18, color: feedback === true ? '#17120a' : APG2_PROFILE.text }}>👍 Да</GlassButton>
+                <GlassButton onClick={() => submitFeedback(false)} tone={feedback === false ? 'gold' : undefined} style={{ minHeight: 42, borderRadius: 18, color: feedback === false ? '#17120a' : APG2_PROFILE.text }}>👎 Нет</GlassButton>
+              </div>
+            </GlassCard>
+          </div>
+
+          {/* ── share ── */}
+          <div style={{ padding: '0 14px' }}>
+            <SharePanel item={item} onToast={onToast} onShare={trackShare} />
+          </div>
+
+          {/* ── comments ── */}
+          <div style={{ padding: '0 14px' }}>
+            {item.commentsEnabled === false ? (
+              <GlassCard style={{ marginTop: 18, borderRadius: 28, padding: 14, color: APG2_PROFILE.textMuted, fontSize: 13.5, lineHeight: '20px' }}>
+                Комментарии к этой публикации отключены редакцией.
+              </GlassCard>
+            ) : (
+              <CommentsPanel item={item} user={user} onToast={onToast} />
+            )}
+          </div>
+
+          {/* ── read also ── */}
           {!!related.length && (
-            <div style={{ marginTop: 28 }}>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 21, lineHeight: '26px', fontWeight: 920, marginBottom: 12 }}>Локи рекомендует прочитать ещё</div>
-              <div style={{ display: 'grid', gap: 12 }}>
-                {related.slice(0, 3).map(next => (
-                  <button key={next.id || getNewsTitle(next)} type="button" onClick={() => onClose(next)} style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 12, display: 'grid', gridTemplateColumns: '76px 1fr', gap: 12, textAlign: 'left', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', color: APG2_PROFILE.text }}>
-                    <NewsImage item={next} height={76} radius={18} />
-                    <span style={{ minWidth: 0, display: 'grid', gap: 5 }}>
-                      <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 840 }}>{getNewsCategoryLabel(next)}</span>
-                      <span style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '18px', fontWeight: 820, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(next)}</span>
+            <div style={{ padding: '28px 14px 0' }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 920, marginBottom: 14 }}>Читайте также</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {related.slice(0, 4).map(next => (
+                  <button key={next.id || getNewsTitle(next)} type="button" onClick={() => onClose(next)} style={{ borderRadius: 22, padding: 12, display: 'grid', gridTemplateColumns: '72px 1fr', gap: 12, textAlign: 'left', border: '1px solid rgba(247,241,230,0.09)', background: 'rgba(247,241,230,0.04)', color: APG2_PROFILE.text, fontFamily: 'inherit', cursor: 'pointer' }}>
+                    <NewsImage item={next} height={72} radius={16} />
+                    <span style={{ minWidth: 0, display: 'grid', gap: 4, alignContent: 'start' }}>
+                      <span style={{ color: APG2_PROFILE.gold, fontSize: 10.5, fontWeight: 820 }}>{getNewsCategoryLabel(next)}</span>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 800, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(next)}</span>
                     </span>
                   </button>
                 ))}
@@ -1117,29 +1156,47 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
             </div>
           )}
 
+          {/* ── prev / next ── */}
           {(previousItem || nextItem) && (
-            <GlassCard style={{ marginTop: 20, borderRadius: 30, padding: 14, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-              <button type="button" disabled={!previousItem} onClick={() => previousItem && onNavigate(previousItem)} style={{ minHeight: 70, borderRadius: 22, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: previousItem ? 'rgba(var(--apg2-glass-a,255,255,255),0.06)' : 'rgba(var(--apg2-glass-a,255,255,255),0.025)', color: previousItem ? APG2_PROFILE.text : APG2_PROFILE.textMuted, padding: 12, textAlign: 'left', fontFamily: 'inherit', opacity: previousItem ? 1 : 0.48 }}>
-                <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, marginBottom: 5 }}>← Предыдущая</span>
-                <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '17px', fontWeight: 800 }}>{previousItem ? getNewsTitle(previousItem) : 'Нет материала'}</span>
-              </button>
-              <button type="button" disabled={!nextItem} onClick={() => nextItem && onNavigate(nextItem)} style={{ minHeight: 70, borderRadius: 22, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: nextItem ? 'rgba(var(--apg2-glass-a,255,255,255),0.06)' : 'rgba(var(--apg2-glass-a,255,255,255),0.025)', color: nextItem ? APG2_PROFILE.text : APG2_PROFILE.textMuted, padding: 12, textAlign: 'right', fontFamily: 'inherit', opacity: nextItem ? 1 : 0.48 }}>
-                <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, marginBottom: 5 }}>Следующая →</span>
-                <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '17px', fontWeight: 800 }}>{nextItem ? getNewsTitle(nextItem) : 'Нет материала'}</span>
-              </button>
-            </GlassCard>
+            <div style={{ padding: '20px 14px 0' }}>
+              <GlassCard style={{ borderRadius: 28, padding: 14, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                <button type="button" disabled={!previousItem} onClick={() => previousItem && onNavigate(previousItem)} style={{ minHeight: 70, borderRadius: 20, border: '1px solid rgba(247,241,230,0.10)', background: previousItem ? 'rgba(247,241,230,0.05)' : 'rgba(247,241,230,0.02)', color: previousItem ? APG2_PROFILE.text : APG2_PROFILE.textMuted, padding: 12, textAlign: 'left', fontFamily: 'inherit', opacity: previousItem ? 1 : 0.44 }}>
+                  <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 840, marginBottom: 5 }}>← Предыдущая</span>
+                  <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '17px', fontWeight: 780 }}>{previousItem ? getNewsTitle(previousItem) : 'Нет материала'}</span>
+                </button>
+                <button type="button" disabled={!nextItem} onClick={() => nextItem && onNavigate(nextItem)} style={{ minHeight: 70, borderRadius: 20, border: '1px solid rgba(247,241,230,0.10)', background: nextItem ? 'rgba(247,241,230,0.05)' : 'rgba(247,241,230,0.02)', color: nextItem ? APG2_PROFILE.text : APG2_PROFILE.textMuted, padding: 12, textAlign: 'right', fontFamily: 'inherit', opacity: nextItem ? 1 : 0.44 }}>
+                  <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 840, marginBottom: 5 }}>Следующая →</span>
+                  <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '17px', fontWeight: 780 }}>{nextItem ? getNewsTitle(nextItem) : 'Нет материала'}</span>
+                </button>
+              </GlassCard>
+            </div>
           )}
 
-          {completed && (
-            <GlassCard style={{ marginTop: 16, borderRadius: 28, padding: 16, textAlign: 'center' }}>
-              <div style={{ color: APG2_PROFILE.gold, fontSize: 13, fontWeight: 900, marginBottom: 5 }}>Материал дочитан</div>
-              <div style={{ fontSize: 13, lineHeight: '19px', color: APG2_PROFILE.text }}>Можно перейти к следующей новости или сохранить эту публикацию.</div>
-            </GlassCard>
+          {/* ── vk original link (bottom, secondary) ── */}
+          {item.source === 'vk' && url && (
+            <div style={{ padding: '20px 14px 0', textAlign: 'center' }}>
+              <button type="button" onClick={() => openUrl(url)} style={{ border: 'none', background: 'transparent', color: APG2_PROFILE.textMuted, fontSize: 12.5, fontWeight: 680, fontFamily: 'inherit', cursor: 'pointer', padding: '8px 12px', borderRadius: 12 }}>
+                Перейти к публикации во ВКонтакте →
+              </button>
+            </div>
           )}
+
+          {/* ── completed ── */}
+          {completed && (
+            <div style={{ padding: '16px 14px 0' }}>
+              <GlassCard style={{ borderRadius: 26, padding: 14, textAlign: 'center' }}>
+                <div style={{ color: APG2_PROFILE.gold, fontSize: 13, fontWeight: 900, marginBottom: 5 }}>Материал дочитан</div>
+                <div style={{ fontSize: 13, lineHeight: '19px', color: APG2_PROFILE.text }}>Можно перейти к следующей новости или сохранить эту публикацию.</div>
+              </GlassCard>
+            </div>
+          )}
+
+          <div style={{ height: 'calc(110px + env(safe-area-inset-bottom, 0px))' }} />
         </div>
       </div>
+
       {showArticleTop && (
-        <button type="button" onClick={scrollArticleTop} aria-label="Вернуться к началу новости" style={{ position: 'fixed', right: 16, bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', zIndex: 6, width: 48, height: 48, borderRadius: 19, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(18,17,15,0.72)', color: APG2_PROFILE.text, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 18px 44px rgba(0,0,0,0.28)', fontSize: 20, cursor: 'pointer' }}>↑</button>
+        <button type="button" onClick={scrollArticleTop} aria-label="Вернуться к началу новости" style={{ position: 'fixed', right: 16, bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', zIndex: 6, width: 48, height: 48, borderRadius: 18, border: '1px solid rgba(247,241,230,0.14)', background: 'rgba(26,24,18,0.78)', color: APG2_PROFILE.text, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 14px 38px rgba(0,0,0,0.28)', fontSize: 20, cursor: 'pointer' }}>↑</button>
       )}
       {lightboxIndex !== null && <Lightbox photos={photos} initial={lightboxIndex} onClose={() => setLightboxIndex(null)} />}
     </div>
@@ -1161,6 +1218,7 @@ export function NewsPage({
   onSubscribe,
   onRefresh,
   onToast,
+  onOpenLoki,
   initialNewsTarget = null,
 }) {
   const [category, setCategory] = useState('all');
@@ -1355,6 +1413,7 @@ export function NewsPage({
           onReadLater={onReadLater}
           onSubscribe={onSubscribe}
           onToast={onToast}
+          onOpenLoki={onOpenLoki}
           saved={savedSet.has(selectedId)}
           later={laterSet.has(selectedId)}
           reaction={newsReactions?.[selectedId]}
