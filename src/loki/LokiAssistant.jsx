@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { APG2_PROFILE } from '../components/Apg2ProfileGlass.jsx';
 import { useLoki } from './LokiProvider.jsx';
 import { LokiExperience } from './LokiExperience.jsx';
@@ -98,7 +99,7 @@ export function LokiAssistant() {
   }), []);
 
   if (loki.experienceOpen) {
-    return <LokiExperience loki={loki} />;
+    return createPortal(<LokiExperience loki={loki} />, document.body);
   }
 
   if (shouldShowRestore) {

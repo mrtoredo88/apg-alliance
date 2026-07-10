@@ -194,7 +194,7 @@ export function LokiExperience({ loki }) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 13000,
+        zIndex: 14000,
         color: APG2_PROFILE.text,
         background: 'radial-gradient(circle at 50% -8%, rgba(215,184,106,0.22), transparent 34%), radial-gradient(circle at 100% 12%, rgba(255,255,255,0.08), transparent 30%), var(--apg2-bg, #101114)',
         backdropFilter: 'blur(22px) saturate(1.35)',
