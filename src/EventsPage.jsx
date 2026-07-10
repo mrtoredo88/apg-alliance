@@ -38,6 +38,18 @@ const CATEGORY_COLORS = {
   family: '#D7B86A',
 };
 
+function logEventSheetStep(step, detail = {}) {
+  const payload = {
+    step,
+    ts: new Date().toISOString(),
+    t: Math.round(performance.now()),
+    ...detail,
+  };
+  window.__APG_EVENT_SHEET_LOGS = [...(window.__APG_EVENT_SHEET_LOGS || []), payload].slice(-40);
+  console.info('[APG_EVENT_SHEET]', payload);
+  window.dispatchEvent(new CustomEvent('apg:event-sheet-debug', { detail: payload }));
+}
+
 function toDateValue(value) {
   if (!value) return null;
   if (value?.toDate) return value.toDate();
@@ -408,7 +420,14 @@ function EventPosterCard({ event, index, onClick, compact = false }) {
   const registered = Number(event?.registeredCount || 0);
   const left = capacity > 0 ? Math.max(0, capacity - registered) : null;
   return (
-    <GlassCard onClick={() => onClick(event)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', borderRadius: 30, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: compact ? '92px minmax(0, 1fr)' : '116px minmax(0, 1fr)', minHeight: compact ? 126 : 158, animation: `fadeInUp 0.34s ease ${index * 0.035}s both` }}>
+    <GlassCard
+      onPointerDown={() => logEventSheetStep('CARD_POINTER_DOWN', { eventId: event?.id || null, title: event?.title || '' })}
+      onClick={() => {
+        logEventSheetStep('CARD_CLICK', { eventId: event?.id || null, title: event?.title || '' });
+        onClick(event);
+      }}
+      style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', borderRadius: 30, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: compact ? '92px minmax(0, 1fr)' : '116px minmax(0, 1fr)', minHeight: compact ? 126 : 158, animation: `fadeInUp 0.34s ease ${index * 0.035}s both` }}
+    >
       <div style={{ position: 'relative', background: APG2_PROFILE.goldSoft, overflow: 'hidden' }}>
         {image ? <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event?.emoji || '🎉'}</div>}
         <div style={{ position: 'absolute', left: 10, bottom: 10, minWidth: 48, borderRadius: 18, padding: '8px 7px', background: 'rgba(12,12,14,0.72)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', color: APG2_PROFILE.text, textAlign: 'center', border: '1px solid rgba(255,255,255,0.18)' }}>
@@ -548,6 +567,10 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
   const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7);
 
   const toggleFilter = (id) => setFilters(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  const openEventSheet = (event) => {
+    logEventSheetStep('SET_SELECTED_EVENT', { eventId: event?.id || null, title: event?.title || '' });
+    setSelectedEvent(event);
+  };
 
   const filteredUpcoming = useMemo(() => {
     return upcoming.filter(event => {
@@ -652,7 +675,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
             action={<GlassButton tone="gold" onClick={() => { setFilters([]); setView('list'); }} style={{ color: '#17120a' }}>Показать ближайшие события</GlassButton>}
           />
         ) : view === 'calendar' ? (
-          <EventsCalendarView events={filteredUpcoming} selectedDay={selectedDay} onSelectDay={setSelectedDay} onOpenEvent={setSelectedEvent} />
+          <EventsCalendarView events={filteredUpcoming} selectedDay={selectedDay} onSelectDay={setSelectedDay} onOpenEvent={openEventSheet} />
         ) : (
           <>
             {collections.length > 0 && filters.length === 0 && (
@@ -660,8 +683,8 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
                 {collections.map(([title, items]) => (
                   <section key={title} style={{ minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
                     <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 900, margin: '0 2px 10px' }}>{title}</div>
-                    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(240px, min(82vw, 82%))', gap: 10, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 2, WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}>
-                      {items.map((event, index) => <EventPosterCard key={`${title}-${event.id || index}`} event={event} index={index} compact onClick={setSelectedEvent} />)}
+                    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'clamp(270px, 94%, 420px)', gap: 10, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 2, WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}>
+                      {items.map((event, index) => <EventPosterCard key={`${title}-${event.id || index}`} event={event} index={index} compact onClick={openEventSheet} />)}
                     </div>
                   </section>
                 ))}
@@ -672,7 +695,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
                 <section key={title} style={{ minWidth: 0, maxWidth: '100%' }}>
                   <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 66px)', zIndex: 4, margin: '0 -2px 10px', padding: '8px 2px', background: 'linear-gradient(180deg,rgba(17,17,19,0.94),rgba(17,17,19,0.74),rgba(17,17,19,0))', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: 'uppercase' }}>{title}</div>
                   <div style={{ display: 'grid', gap: 10 }}>
-                    {items.map((event, index) => <EventPosterCard key={event.id || index} event={event} index={index} onClick={setSelectedEvent} />)}
+                    {items.map((event, index) => <EventPosterCard key={event.id || index} event={event} index={index} onClick={openEventSheet} />)}
                   </div>
                 </section>
               ))}

@@ -1386,3 +1386,11 @@
 **Файлы:** `src/EventsPage.jsx`
 
 **Что изменено:** В `EventPosterCard` добавлены `width: '100%'`, `maxWidth: '100%'`, `minWidth: 0`, `boxSizing: 'border-box'`, а внутренний grid переведён на `minmax(0, 1fr)`. Для секций подборок добавлены `minWidth: 0`, `maxWidth: '100%'`, `overflow: 'hidden'`. Горизонтальный scroller ограничен `width: '100%'`, `maxWidth: '100%'`, `minWidth: 0`, `boxSizing: 'border-box'`, `overflowY: 'hidden'`; `gridAutoColumns` заменён с `minmax(260px, 82%)` на `minmax(240px, min(82vw, 82%))`, чтобы карточки не могли раздувать родителя шире viewport.
+
+## 2026-07-10 — EventsPage real-device sheet diagnostics
+
+**Задача:** Реальное устройство после `7768c223` показало две проблемы: карточки подборок стали визуально слишком узкими, а `EventDetailSheet` не открывался видимо, несмотря на успешные DOM-проверки.
+
+**Файлы:** `src/EventsPage.jsx`, `src/EventDetailSheet.jsx`
+
+**Что изменено:** Ширина карточек горизонтальных подборок изменена на `clamp(270px, 94%, 420px)`, чтобы на мобильных экранах карточка занимала около 94% доступного контейнера и сохраняла намёк на следующую карточку без расширения страницы. `EventDetailSheet` теперь рендерится через `createPortal(..., document.body)`, чтобы `position: fixed` не зависел от transform/stacking context родительских контейнеров. Добавлена временная визуальная диагностика открытия: яркая рамка sheet, надпись `EVENT SHEET OPEN`, rect, версия приложения, состояние service worker, загруженные JS chunks и timestamp-логи `CARD_POINTER_DOWN`, `CARD_CLICK`, `SET_SELECTED_EVENT`, `SHEET_MOUNT`, `SHEET_VISIBLE`, `BACKDROP_CLICK`, `DRAG_START`, `DRAG_CLOSE`, `SHEET_CLOSE`.

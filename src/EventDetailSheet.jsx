@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { GLASS, GLASS_GOLD } from './design.js';
 import { motionTransition } from './motion.js';
 
@@ -132,6 +133,43 @@ function safeText(value, fallback = '') {
   if (typeof value === 'string') return value;
   if (value == null) return fallback;
   return String(value);
+}
+
+function logSheetStep(step, detail = {}) {
+  const payload = {
+    step,
+    ts: new Date().toISOString(),
+    t: Math.round(performance.now()),
+    ...detail,
+  };
+  window.__APG_EVENT_SHEET_LOGS = [...(window.__APG_EVENT_SHEET_LOGS || []), payload].slice(-40);
+  console.info('[APG_EVENT_SHEET]', payload);
+  window.dispatchEvent(new CustomEvent('apg:event-sheet-debug', { detail: payload }));
+}
+
+async function getRuntimeDiagnostics() {
+  const version = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
+    .then((res) => res.json())
+    .then((data) => data?.v || '')
+    .catch(() => '');
+  const registrations = await navigator?.serviceWorker?.getRegistrations?.().catch(() => []) || [];
+  const registration = registrations[0] || null;
+  const controller = navigator?.serviceWorker?.controller || null;
+  const cacheKeys = typeof caches !== 'undefined' ? await caches.keys().catch(() => []) : [];
+  const scripts = performance.getEntriesByType?.('resource')
+    ?.map((entry) => entry.name)
+    ?.filter((name) => /EventDetailSheet|EventsPage|index-.*\.js|assets\/.*\.js/.test(name))
+    ?.map((name) => name.split('/').pop())
+    ?.slice(-8) || [];
+  return {
+    version,
+    swController: controller?.scriptURL?.split('/').pop() || 'none',
+    swControlled: Boolean(controller),
+    swActive: registration?.active?.scriptURL?.split('/').pop() || 'none',
+    swState: registration?.active?.state || 'none',
+    cacheKeys,
+    chunks: scripts,
+  };
 }
 
 function normalizeMode(event) {
@@ -880,12 +918,17 @@ export function EventDetailSheet({
   const [isClosing, setIsClosing] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
   const [pointerStartY, setPointerStartY] = useState(null);
+  const [debugRect, setDebugRect] = useState(null);
+  const [debugLogs, setDebugLogs] = useState([]);
+  const [runtime, setRuntime] = useState(null);
+  const sheetRef = useRef(null);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
 
   useEffect(() => {
     if (open) {
       setVisible(true);
       setIsClosing(false);
+      logSheetStep('SHEET_VISIBLE', { eventId: event?.id || null, open: true });
     } else if (visible) {
       setIsClosing(true);
       const timer = setTimeout(() => {
@@ -907,6 +950,47 @@ export function EventDetailSheet({
     };
   }, [open, event?.id]);
 
+  useEffect(() => {
+    const handler = (debugEvent) => {
+      setDebugLogs((prev) => [...prev, debugEvent.detail].slice(-10));
+    };
+    window.addEventListener('apg:event-sheet-debug', handler);
+    return () => window.removeEventListener('apg:event-sheet-debug', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!visible || !event) return;
+    logSheetStep('SHEET_MOUNT', { eventId: event?.id || null, visible, open });
+    let raf = 0;
+    let timer = 0;
+    const updateRect = () => {
+      const rect = sheetRef.current?.getBoundingClientRect?.();
+      const next = rect ? {
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        visualWidth: Math.round(window.visualViewport?.width || window.innerWidth),
+        visualHeight: Math.round(window.visualViewport?.height || window.innerHeight),
+        pageYOffset: Math.round(window.pageYOffset || 0),
+      } : null;
+      setDebugRect(next);
+      logSheetStep('SHEET_RECT', { eventId: event?.id || null, rect: next });
+    };
+    raf = requestAnimationFrame(updateRect);
+    timer = setTimeout(updateRect, 420);
+    getRuntimeDiagnostics().then(setRuntime).catch(() => {});
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      logSheetStep('SHEET_UNMOUNT', { eventId: event?.id || null });
+    };
+  }, [visible, event?.id, open]);
+
   if (!visible || !event) return null;
 
   const isAdminRole = ['admin', 'owner'].includes(String(role || '').toLowerCase());
@@ -921,6 +1005,7 @@ export function EventDetailSheet({
   const isRegistered = registeredEventIds.map(String).includes(String(event?.id || ''));
 
   const handleClose = () => {
+    logSheetStep('SHEET_CLOSE', { eventId: event?.id || null });
     setSearch('');
     onClose();
   };
@@ -934,7 +1019,10 @@ export function EventDetailSheet({
   const handleTouchEnd = (touchEvent) => {
     if (touchStartY == null) return;
     const endY = touchEvent.changedTouches?.[0]?.clientY ?? touchStartY;
-    if (endY - touchStartY > 86) handleClose();
+    if (endY - touchStartY > 86) {
+      logSheetStep('DRAG_CLOSE', { eventId: event?.id || null, type: 'touchEnd', delta: Math.round(endY - touchStartY) });
+      handleClose();
+    }
     setTouchStartY(null);
   };
 
@@ -943,6 +1031,7 @@ export function EventDetailSheet({
     const currentY = touchEvent.touches?.[0]?.clientY ?? touchStartY;
     if (currentY - touchStartY > 110) {
       setTouchStartY(null);
+      logSheetStep('DRAG_CLOSE', { eventId: event?.id || null, type: 'touchMove', delta: Math.round(currentY - touchStartY) });
       handleClose();
     }
   };
@@ -951,11 +1040,12 @@ export function EventDetailSheet({
     if (pointerStartY == null) return;
     if (pointerEvent.clientY - pointerStartY > 110) {
       setPointerStartY(null);
+      logSheetStep('DRAG_CLOSE', { eventId: event?.id || null, type: 'pointerMove', delta: Math.round(pointerEvent.clientY - pointerStartY) });
       handleClose();
     }
   };
 
-  return (
+  const sheet = (
     <div
       style={{
         position: 'fixed',
@@ -968,16 +1058,23 @@ export function EventDetailSheet({
         padding: `max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left))`,
         transition: motionTransition(['background'], 'modal', 'soft'),
         overflow: 'hidden',
+        boxSizing: 'border-box',
+        isolation: 'isolate',
       }}
-      onClick={handleClose}
+      onClick={() => {
+        logSheetStep('BACKDROP_CLICK', { eventId: event?.id || null });
+        handleClose();
+      }}
     >
       <div
+        ref={sheetRef}
         style={{
           ...GLASS_GOLD,
           width: '100%',
           maxWidth: 900,
-          height: '95vh',
-          minHeight: '90vh',
+          height: 'calc(100dvh - max(14px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)))',
+          maxHeight: '95dvh',
+          minHeight: 'min(90dvh, calc(100dvh - max(14px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom))))',
           borderRadius: 28,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
@@ -989,21 +1086,36 @@ export function EventDetailSheet({
           transition: motionTransition(['transform', 'opacity'], 'modal', 'out'),
           willChange: 'transform, opacity',
           pointerEvents: 'auto',
+          outline: '3px solid rgba(255,0,180,0.88)',
+          boxSizing: 'border-box',
         }}
         onClick={(event) => event.stopPropagation()}
-        onTouchStart={(event) => setTouchStartY(event.touches?.[0]?.clientY ?? null)}
+        onTouchStart={(event) => {
+          const y = event.touches?.[0]?.clientY ?? null;
+          setTouchStartY(y);
+          logSheetStep('DRAG_START', { eventId: event?.id || null, type: 'touch', y });
+        }}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => setTouchStartY(null)}
         onPointerDown={(event) => {
           setPointerStartY(event.clientY);
+          logSheetStep('DRAG_START', { eventId: event?.id || null, type: 'pointer', y: Math.round(event.clientY), pointerType: event.pointerType });
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={() => setPointerStartY(null)}
         onPointerCancel={() => setPointerStartY(null)}
       >
+        <div style={{ position: 'absolute', left: 10, right: 10, top: 10, zIndex: 5, borderRadius: 14, padding: 10, background: 'rgba(255,0,180,0.88)', color: '#fff', fontSize: 11, lineHeight: '15px', fontWeight: 800, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', pointerEvents: 'none' }}>
+          <div>EVENT SHEET OPEN</div>
+          <div>id: {String(event?.id || 'none')} · visible: {String(visible)} · mounted: true</div>
+          <div>rect: {debugRect ? `t${debugRect.top} b${debugRect.bottom} h${debugRect.height} w${debugRect.width} vh${debugRect.viewportHeight} y${debugRect.pageYOffset}` : 'pending'}</div>
+          <div>version: {runtime?.version || 'loading'} · sw: {runtime?.swControlled ? 'controlled' : 'uncontrolled'} · {runtime?.swActive || 'sw...'}</div>
+          <div>chunks: {(runtime?.chunks || []).join(', ') || 'loading'}</div>
+          <div>{debugLogs.slice(-4).map((entry) => `${entry.t}:${entry.step}`).join(' · ')}</div>
+        </div>
         <div style={{ height: 7, width: 44, borderRadius: 99, background: 'rgba(255,255,255,0.35)', margin: '14px auto 0' }} />
-        <div style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+        <div style={{ overflowY: 'auto', padding: '116px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
           <HeroSection event={event} status={status} statusTone={statusTone} />
           {isAdminRole && <QualitySection event={event} partnerName={partnerName} expertName={expertName} />}
           {isAdminRole && <PreparationSection event={event} partnerName={partnerName} expertName={expertName} />}
@@ -1074,4 +1186,6 @@ export function EventDetailSheet({
       </div>
     </div>
   );
+
+  return createPortal(sheet, document.body);
 }
