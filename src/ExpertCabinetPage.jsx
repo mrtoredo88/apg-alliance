@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
@@ -13,6 +13,60 @@ import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
 import { buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
+import {
+  EXPERT_CATEGORIES,
+  EXPERT_SOCIAL_FIELDS,
+  EXPERT_TARIFFS,
+  EXPERT_WORK_FORMATS,
+  buildExpertAiSuggestions,
+  calculateExpertProfileCompletion,
+  hasPremiumExpertAccess,
+  normalizeExpertVideo,
+} from './expertProfileForm.js';
+
+function splitExpertName(name = '') {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    lastName: parts[0] || '',
+    firstName: parts[1] || parts[0] || '',
+    middleName: parts.length > 2 ? parts.slice(2).join(' ') : '',
+  };
+}
+
+function buildExpertForm(expert = {}) {
+  const name = splitExpertName(expert.name);
+  return {
+    lastName: expert.lastName || name.lastName || '',
+    firstName: expert.firstName || name.firstName || '',
+    middleName: expert.middleName || '',
+    primaryCategory: expert.primaryCategory || expert.category || '',
+    secondaryCategories: Array.isArray(expert.secondaryCategories) ? expert.secondaryCategories : [],
+    shortDescription: String(expert.shortDescription || expert.specialization || '').slice(0, 120),
+    description: expert.description || '',
+    workFormats: Array.isArray(expert.workFormats) ? expert.workFormats : Array.isArray(expert.formats) ? expert.formats : [],
+    offer: expert.offer || '',
+    tariff: expert.tariff || expert.tier || 'basic',
+    contactName: expert.contactName || expert.managerName || '',
+    phone: expert.phone || '',
+    email: expert.email || '',
+    inn: expert.inn || '',
+    city: expert.city || '',
+    websiteUrl: expert.websiteUrl || '',
+    bookingUrl: expert.bookingUrl || '',
+    vkUrl: expert.vkUrl || '',
+    telegramUrl: expert.telegramUrl || '',
+    maxUrl: expert.maxUrl || '',
+    instagramUrl: expert.instagramUrl || '',
+    youtubeUrl: expert.youtubeUrl || '',
+    rutubeUrl: expert.rutubeUrl || '',
+    comment: expert.comment || '',
+    photo: expert.photo || '',
+    logoUrl: expert.logoUrl || '',
+    coverPhoto: expert.coverPhoto || '',
+    gallery: Array.isArray(expert.gallery) ? expert.gallery.filter(Boolean) : [],
+    videos: Array.isArray(expert.videos) ? expert.videos.filter(Boolean) : [],
+  };
+}
 
 function getExpertReadyState(expert = {}) {
   const galleryCount = (Array.isArray(expert.gallery) ? expert.gallery : []).filter(Boolean).length;
@@ -40,6 +94,9 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const [saved, setSaved]         = useState(false);
   const [uploading, setUploading] = useState(false);
   const photoInputRef             = useRef(null);
+  const logoInputRef              = useRef(null);
+  const coverInputRef             = useRef(null);
+  const galleryInputRef           = useRef(null);
 
   const [fDesc,     setFDesc]     = useState('');
   const [fOffer,    setFOffer]    = useState('');
@@ -51,6 +108,14 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const [fMax,      setFMax]      = useState('');
   const [fPhoto,    setFPhoto]    = useState('');
   const [fAiProfile, setFAiProfile] = useState(null);
+  const [form, setForm]           = useState(() => buildExpertForm(initialExpert || {}));
+  const [videoUrl, setVideoUrl]   = useState('');
+  const [videoTitle, setVideoTitle] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const updateForm = (patch) => {
+    setForm(prev => ({ ...prev, ...patch }));
+  };
 
   useEffect(() => {
     if (!initialExpert?.id) return;
@@ -66,6 +131,15 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       )).catch(() => ({ docs: [] })),
     ]).then(([eSnap, rSnap]) => {
       const e = eSnap.exists() ? { id: eSnap.id, ...eSnap.data() } : initialExpert;
+      const draftKey = `apg_expert_form_draft_${initialExpert.id}`;
+      let nextForm = buildExpertForm(e);
+      try {
+        const raw = localStorage.getItem(draftKey);
+        if (raw) {
+          nextForm = { ...nextForm, ...JSON.parse(raw) };
+          setDraftRestored(true);
+        }
+      } catch {}
       setExpert(e);
       setFDesc(e.description ?? '');
       setFOffer(e.offer ?? '');
@@ -76,11 +150,22 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       setFTelegram(e.telegramUrl ?? '');
       setFMax(e.maxUrl ?? '');
       setFPhoto(e.photo ?? '');
+      setForm(nextForm);
       setFAiProfile(sanitizeAiProfile(e.aiProfile || buildAiProfileDraft(e, 'expert')));
       setReviews(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [initialExpert?.id]);
+
+  useEffect(() => {
+    if (!expert?.id) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`apg_expert_form_draft_${expert.id}`, JSON.stringify(form));
+      } catch {}
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [expert?.id, form]);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -90,23 +175,49 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     try {
       const url = await uploadPhoto(file, `experts/${expert.id}`);
       setFPhoto(url);
+      updateForm({ photo: url });
     } catch { onToast?.('Ошибка загрузки фото', 'error'); }
     setUploading(false);
   };
 
+  const handleMediaUpload = async (e, field, { multi = false } = {}) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !expert?.id) return;
+    setUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of files.slice(0, multi ? 12 : 1)) {
+        if (file.size > 3 * 1024 * 1024) {
+          onToast?.('Файл слишком большой. Максимум 3 МБ.', 'error');
+          continue;
+        }
+        uploaded.push(await uploadPhoto(file, `experts/${expert.id}/${field}`));
+      }
+      if (uploaded.length) {
+        setForm(prev => ({
+          ...prev,
+          [field]: multi ? [...(Array.isArray(prev[field]) ? prev[field] : []), ...uploaded].slice(0, 24) : uploaded[0],
+        }));
+      }
+    } catch {
+      onToast?.('Ошибка загрузки медиа', 'error');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSave = async () => {
     if (!expert?.id) return;
-    const phone = fPhone.trim();
+    const phone = form.phone.trim();
     if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) {
       onToast?.('Некорректный номер телефона. Пример: +7 (499) 123-45-67', 'error');
       return;
     }
     const urlFields = [
-      ['Запись', fBooking, ''],
-      ['Сайт', fWebsite, ''],
-      ['VK', fVk, 'vk'],
-      ['Telegram', fTelegram, 'telegram'],
-      ['Max', fMax, 'max'],
+      ['Запись', form.bookingUrl, ''],
+      ['Сайт', form.websiteUrl, ''],
+      ...EXPERT_SOCIAL_FIELDS.map(item => [item.label, form[item.key], item.platform]),
     ];
     for (const [label, value, platform] of urlFields) {
       const result = validateExternalUrl(value, platform ? { platform } : {});
@@ -117,21 +228,60 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     }
     setSaving(true);
     try {
+      const fullName = [form.lastName, form.firstName, form.middleName].map(v => String(v || '').trim()).filter(Boolean).join(' ');
+      const primaryCategory = EXPERT_CATEGORIES.find(c => c.id === form.primaryCategory);
       const data = {
-        description:      fDesc.trim(),
-        offer:            fOffer.trim(),
+        name:             fullName || expert.name,
+        lastName:         form.lastName.trim(),
+        firstName:        form.firstName.trim(),
+        middleName:       form.middleName.trim(),
+        category:         form.primaryCategory,
+        categoryLabel:    primaryCategory?.label || '',
+        primaryCategory:  form.primaryCategory,
+        secondaryCategories: form.secondaryCategories,
+        specialization:   form.shortDescription.trim().slice(0, 120),
+        shortDescription: form.shortDescription.trim().slice(0, 120),
+        description:      form.description.trim(),
+        workFormats:      form.workFormats,
+        formats:          form.workFormats,
+        offer:            form.offer.trim(),
+        tariff:           form.tariff,
+        contactName:      form.contactName.trim(),
         phone:            phone,
-        bookingUrl:       normalizeExternalUrl(fBooking),
-        websiteUrl:       normalizeExternalUrl(fWebsite),
-        vkUrl:            normalizeExternalUrl(fVk, { platform: 'vk' }),
-        telegramUrl:      normalizeExternalUrl(fTelegram, { platform: 'telegram' }),
-        maxUrl:           normalizeExternalUrl(fMax, { platform: 'max' }),
-        photo:            fPhoto.trim(),
+        email:            form.email.trim(),
+        inn:              hasPremiumExpertAccess(form.tariff) ? form.inn.trim() : '',
+        city:             form.city.trim(),
+        websiteUrl:       normalizeExternalUrl(form.websiteUrl),
+        bookingUrl:       normalizeExternalUrl(form.bookingUrl),
+        vkUrl:            normalizeExternalUrl(form.vkUrl, { platform: 'vk' }),
+        telegramUrl:      normalizeExternalUrl(form.telegramUrl, { platform: 'telegram' }),
+        maxUrl:           normalizeExternalUrl(form.maxUrl, { platform: 'max' }),
+        instagramUrl:     normalizeExternalUrl(form.instagramUrl),
+        youtubeUrl:       normalizeExternalUrl(form.youtubeUrl),
+        rutubeUrl:        normalizeExternalUrl(form.rutubeUrl),
+        comment:          form.comment.trim(),
+        photo:            form.photo.trim(),
+        logoUrl:          form.logoUrl.trim(),
+        coverPhoto:       form.coverPhoto.trim(),
+        gallery:          form.gallery.filter(Boolean),
+        videos:           form.videos.filter(Boolean),
+        servicesDraftReady: true,
       };
       await userAction('expert:profileUpdate', { id: expert.id, patch: data });
       const updated = { ...expert, ...data };
       setExpert(updated);
+      setFDesc(data.description);
+      setFOffer(data.offer);
+      setFPhone(data.phone);
+      setFBooking(data.bookingUrl);
+      setFWebsite(data.websiteUrl);
+      setFVk(data.vkUrl);
+      setFTelegram(data.telegramUrl);
+      setFMax(data.maxUrl);
+      setFPhoto(data.photo);
       onExpertUpdate?.(updated);
+      try { localStorage.removeItem(`apg_expert_form_draft_${expert.id}`); } catch {}
+      setDraftRestored(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
@@ -176,6 +326,9 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     const videosCount   = (Array.isArray(expert.videos)  ? expert.videos  : []).filter(Boolean).length;
     const favCount      = expert.favoritesCount ?? 0;
     const readyState    = getExpertReadyState(expert);
+    const formCompletion = calculateExpertProfileCompletion(form);
+    const aiSuggestions  = buildExpertAiSuggestions(form);
+    const premiumAccess  = hasPremiumExpertAccess(form.tariff);
     const firstTodoIdx  = readyState.checks.findIndex(c => !c.done);
     const nextTodo      = firstTodoIdx >= 0 ? readyState.checks[firstTodoIdx] : null;
     const statusLabel   = expert.tier === 'ambassador' ? 'Амбассадор' : expert.verified ? 'Проверенный' : 'Эксперт';
@@ -534,47 +687,209 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
           {/* ── КАРТОЧКА ── */}
           {activeTab === 'edit' && (
-            <GlassSection title="Карточка эксперта">
-              <GlassCard style={{ borderRadius: 32 }}>
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Фото профиля</label>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '8px 0 14px' }}>
-                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {fPhoto ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🧑‍💼'}
+            <GlassSection title="Анкета эксперта">
+              <GlassCard tone="gold" style={{ borderRadius: 32, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ color: '#17120a', fontSize: 20, fontWeight: 930 }}>Заполнено: {formCompletion}%</div>
+                    <div style={{ color: 'rgba(23,18,10,0.62)', fontSize: 12, marginTop: 4 }}>{draftRestored ? 'Черновик восстановлен автоматически.' : 'Черновик сохраняется автоматически на устройстве.'}</div>
                   </div>
-                  <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
-                  <GlassButton onClick={() => photoInputRef.current?.click()}>{uploading ? 'Загрузка...' : 'Загрузить'}</GlassButton>
+                  <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{EXPERT_TARIFFS.find(t => t.id === form.tariff)?.label || 'Базовый'}</GlassBadge>
                 </div>
-
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>О себе</label>
-                <textarea value={fDesc} onChange={e => setFDesc(e.target.value)} rows={4} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} placeholder="Расскажите о своей деятельности, опыте, подходе к работе..." />
-
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Предложение для участников АПГ</label>
-                <textarea value={fOffer} onChange={e => setFOffer(e.target.value)} rows={3} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} placeholder="Скидка 10% на первую консультацию" />
-
-                {[
-                  ['Телефон',       fPhone,    setFPhone,    '+7 (499) 123-45-67'],
-                  ['Ссылка для записи', fBooking, setFBooking, 'https://...'],
-                  ['Сайт',          fWebsite,  setFWebsite,  'https://...'],
-                  ['ВКонтакте',     fVk,       setFVk,       'https://vk.com/...'],
-                  ['Telegram',      fTelegram, setFTelegram, 'https://t.me/...'],
-                  ['Max',           fMax,      setFMax,      'https://...'],
-                ].map(([label, value, setter, ph]) => (
-                  <React.Fragment key={label}>
-                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
-                    <input value={value} onChange={e => setter(e.target.value)} placeholder={ph} style={{ ...v2InputStyle, marginTop: 6 }} />
-                  </React.Fragment>
-                ))}
-
-                <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
-                  {saving ? 'Сохраняем...' : saved ? '✓ Сохранено' : 'Сохранить изменения'}
-                </GlassButton>
-
-                <div style={{ marginTop: 10, padding: '10px 12px', background: 'rgba(215,184,106,0.07)', border: '1px solid rgba(215,184,106,0.18)', borderRadius: 16 }}>
-                  <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, lineHeight: '17px' }}>
-                    💡 Имя, специализация, ключи и категории управляются администратором АПГ.
-                  </div>
+                <div style={{ height: 8, borderRadius: 999, background: 'rgba(23,18,10,0.15)', overflow: 'hidden' }}>
+                  <div style={{ width: `${formCompletion}%`, height: '100%', borderRadius: 999, background: '#17120a', transition: 'width 0.35s ease' }} />
                 </div>
               </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>1. Основная информация</GlassBadge>
+                {[
+                  ['Фамилия', 'lastName', 'Иванов'],
+                  ['Имя', 'firstName', 'Иван'],
+                  ['Отчество (необязательно)', 'middleName', 'Иванович'],
+                ].map(([label, key, ph]) => (
+                  <React.Fragment key={key}>
+                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
+                    <input value={form[key]} onChange={e => updateForm({ [key]: e.target.value })} placeholder={ph} style={{ ...v2InputStyle, marginTop: 6 }} />
+                  </React.Fragment>
+                ))}
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>2. Направление деятельности</GlassBadge>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Основная категория</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '8px 0 14px' }}>
+                  {EXPERT_CATEGORIES.map(category => (
+                    <GlassButton key={category.id} onClick={() => updateForm({ primaryCategory: category.id })} tone={form.primaryCategory === category.id ? 'gold' : 'glass'} style={{ minHeight: 42, borderRadius: 18, color: form.primaryCategory === category.id ? '#17120a' : APG2_PROFILE.text }}>{category.label}</GlassButton>
+                  ))}
+                </div>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Дополнительные категории</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  {EXPERT_CATEGORIES.filter(c => c.id !== form.primaryCategory).map(category => {
+                    const active = form.secondaryCategories.includes(category.id);
+                    return <GlassButton key={category.id} onClick={() => updateForm({ secondaryCategories: active ? form.secondaryCategories.filter(id => id !== category.id) : [...form.secondaryCategories, category.id] })} tone={active ? 'gold' : 'glass'} style={{ minHeight: 36, borderRadius: 999, padding: '7px 11px', color: active ? '#17120a' : APG2_PROFILE.text }}>{category.label}</GlassButton>;
+                  })}
+                </div>
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>3. Описание</GlassBadge>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Короткое описание · до 120 символов</label>
+                <input value={form.shortDescription} maxLength={120} onChange={e => updateForm({ shortDescription: e.target.value.slice(0, 120) })} placeholder="Юрист, психолог, финансовый консультант..." style={{ ...v2InputStyle, marginTop: 6 }} />
+                <div style={{ textAlign: 'right', color: APG2_PROFILE.textMuted, fontSize: 11, marginTop: -8, marginBottom: 8 }}>{form.shortDescription.length}/120</div>
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Подробное описание</label>
+                <textarea value={form.description} onChange={e => updateForm({ description: e.target.value })} rows={7} style={{ ...v2InputStyle, resize: 'vertical', marginTop: 6 }} placeholder="С кем работаете. Какие задачи решаете. Чем будете полезны пользователям АПГ." />
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>4. Форматы работы</GlassBadge>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {EXPERT_WORK_FORMATS.map(item => {
+                    const active = form.workFormats.includes(item.id);
+                    return <GlassButton key={item.id} onClick={() => updateForm({ workFormats: active ? form.workFormats.filter(id => id !== item.id) : [...form.workFormats, item.id] })} tone={active ? 'gold' : 'glass'} style={{ minHeight: 42, borderRadius: 18, color: active ? '#17120a' : APG2_PROFILE.text }}>{active ? '☑ ' : '☐ '}{item.label}</GlassButton>;
+                  })}
+                </div>
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>5. Специальное предложение</GlassBadge>
+                <textarea value={form.offer} onChange={e => updateForm({ offer: e.target.value })} rows={3} style={{ ...v2InputStyle, resize: 'vertical' }} placeholder="Скидка, бесплатная консультация, подарок, бонус или сертификат для пользователей АПГ." />
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>6. Тариф и доступы</GlassBadge>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+                  {EXPERT_TARIFFS.map(tariff => (
+                    <GlassButton key={tariff.id} onClick={() => updateForm({ tariff: tariff.id })} tone={form.tariff === tariff.id ? 'gold' : 'glass'} style={{ minHeight: 42, borderRadius: 18, color: form.tariff === tariff.id ? '#17120a' : APG2_PROFILE.text }}>{tariff.label}</GlassButton>
+                  ))}
+                </div>
+                {premiumAccess ? (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <GlassBadge>Новости доступны</GlassBadge>
+                    <GlassBadge>Мероприятия доступны</GlassBadge>
+                    <GlassBadge>Реквизиты доступны</GlassBadge>
+                  </div>
+                ) : (
+                  <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>Блоки новостей, мероприятий и ИНН доступны только тарифам Премиум и Амбассадор.</div>
+                )}
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>7. Контакты и город</GlassBadge>
+                {[
+                  ['Контактное лицо', 'contactName', 'Имя ответственного'],
+                  ['Телефон', 'phone', '+7 (499) 123-45-67'],
+                  ['Email', 'email', 'expert@example.ru'],
+                  ['Город (необязательно)', 'city', 'Зеленоград'],
+                ].map(([label, key, ph]) => (
+                  <React.Fragment key={key}>
+                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
+                    <input value={form[key]} onChange={e => updateForm({ [key]: e.target.value })} placeholder={ph} style={{ ...v2InputStyle, marginTop: 6 }} />
+                  </React.Fragment>
+                ))}
+                {premiumAccess && (
+                  <>
+                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>ИНН</label>
+                    <input value={form.inn} onChange={e => updateForm({ inn: e.target.value })} placeholder="ИНН для документов" style={{ ...v2InputStyle, marginTop: 6 }} />
+                  </>
+                )}
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>8. Ссылки и соцсети</GlassBadge>
+                {[
+                  ['Сайт', 'websiteUrl', 'https://...'],
+                  ['Онлайн-запись', 'bookingUrl', 'https://...'],
+                ].map(([label, key, ph]) => (
+                  <React.Fragment key={key}>
+                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
+                    <input value={form[key]} onChange={e => updateForm({ [key]: e.target.value })} placeholder={ph} style={{ ...v2InputStyle, marginTop: 6 }} />
+                  </React.Fragment>
+                ))}
+                {EXPERT_SOCIAL_FIELDS.map(item => (
+                  <React.Fragment key={item.key}>
+                    <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{item.label}</label>
+                    <input value={form[item.key]} onChange={e => updateForm({ [item.key]: e.target.value })} placeholder={item.placeholder} style={{ ...v2InputStyle, marginTop: 6 }} />
+                  </React.Fragment>
+                ))}
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>9. Видео</GlassBadge>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Поддерживаются YouTube, VK Видео, RuTube и MAX. Можно добавить несколько ссылок.</div>
+                <input value={videoTitle} onChange={e => setVideoTitle(e.target.value)} placeholder="Название видео" style={v2InputStyle} />
+                <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://youtube.com/... или https://rutube.ru/..." style={v2InputStyle} />
+                <GlassButton onClick={() => {
+                  const video = normalizeExpertVideo(videoUrl, videoTitle);
+                  if (!video) return;
+                  updateForm({ videos: [...form.videos, video].slice(0, 12) });
+                  setVideoUrl('');
+                  setVideoTitle('');
+                }} style={{ width: '100%', marginBottom: 10 }}>Добавить видео</GlassButton>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {form.videos.map((video, index) => (
+                    <GlassCard key={`${video.url}-${index}`} style={{ borderRadius: 18, padding: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.title || video.url}</div>
+                        <div style={{ color: APG2_PROFILE.gold, fontSize: 11, marginTop: 2 }}>{video.platformLabel || video.platform}</div>
+                      </div>
+                      <GlassButton onClick={() => updateForm({ videos: form.videos.filter((_, i) => i !== index) })} style={{ minHeight: 34, borderRadius: 14, padding: '6px 10px' }}>Удалить</GlassButton>
+                    </GlassCard>
+                  ))}
+                </div>
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>10. Медиа</GlassBadge>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 12 }}>Фото профиля: 800×800. Логотип: 512×512. Обложка: 1600×900. Галерея: от 1200 px по ширине.</div>
+                {[
+                  ['Фото профиля', 'photo', photoInputRef, false],
+                  ['Логотип', 'logoUrl', logoInputRef, false],
+                  ['Горизонтальная обложка карточки', 'coverPhoto', coverInputRef, false],
+                ].map(([label, key, ref]) => (
+                  <div key={key} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ width: 58, height: 46, borderRadius: 16, overflow: 'hidden', background: APG2_PROFILE.goldSoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      {form[key] ? <img src={form[key]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '＋'}
+                    </div>
+                    <div style={{ flex: 1, color: APG2_PROFILE.text, fontSize: 13, fontWeight: 820 }}>{label}</div>
+                    <input ref={ref} type="file" accept="image/*" onChange={e => key === 'photo' ? handlePhotoUpload(e) : handleMediaUpload(e, key)} style={{ display: 'none' }} />
+                    <GlassButton onClick={() => ref.current?.click()} style={{ minHeight: 38, borderRadius: 16, padding: '7px 12px' }}>{uploading ? '...' : 'Загрузить'}</GlassButton>
+                  </div>
+                ))}
+                <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={e => handleMediaUpload(e, 'gallery', { multi: true })} style={{ display: 'none' }} />
+                <GlassButton onClick={() => galleryInputRef.current?.click()} style={{ width: '100%', marginBottom: 10 }}>Добавить фото в галерею</GlassButton>
+                {!!form.gallery.length && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+                    {form.gallery.map((url, index) => (
+                      <div key={`${url}-${index}`} style={{ position: 'relative', aspectRatio: '1', borderRadius: 14, overflow: 'hidden', background: APG2_PROFILE.goldSoft }}>
+                        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button onClick={() => updateForm({ gallery: form.gallery.filter((_, i) => i !== index) })} style={{ position: 'absolute', top: 5, right: 5, border: 0, borderRadius: 999, width: 24, height: 24, background: 'rgba(0,0,0,0.55)', color: '#fff' }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>11. Комментарий</GlassBadge>
+                <textarea value={form.comment} onChange={e => updateForm({ comment: e.target.value })} rows={3} style={{ ...v2InputStyle, resize: 'vertical' }} placeholder="Внутренний комментарий для команды АПГ или модерации." />
+              </GlassCard>
+
+              <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
+                <GlassBadge tone="gold" style={{ marginBottom: 12 }}>AI-помощник анкеты</GlassBadge>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '21px', fontWeight: 760, marginBottom: 10 }}>SEO-заголовок: {aiSuggestions.seoTitle}</div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', marginBottom: 10 }}>Краткое описание: {aiSuggestions.shortDescription}</div>
+                {aiSuggestions.missing.length ? (
+                  <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px' }}>Не хватает: {aiSuggestions.missing.join(', ')}.</div>
+                ) : (
+                  <div style={{ color: 'rgba(75,179,75,0.9)', fontSize: 13, fontWeight: 820 }}>Основные поля заполнены.</div>
+                )}
+                <GlassButton onClick={() => updateForm({ description: aiSuggestions.improvedDescription, shortDescription: aiSuggestions.shortDescription })} style={{ width: '100%', marginTop: 12 }}>Улучшить описание AI</GlassButton>
+              </GlassCard>
+
+              <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
+                {saving ? 'Сохраняем...' : saved ? '✓ Сохранено' : 'Сохранить анкету'}
+              </GlassButton>
             </GlassSection>
           )}
 
