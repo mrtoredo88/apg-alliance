@@ -1520,3 +1520,11 @@
 **Файлы:** `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`
 
 **Что изменено:** Добавлена первая dependency map по крупным узлам: App, UserApp, AdminPanel, ProfilePanel, News, Events, Partners, Experts, Loki, Firebase, Backend, Push, Telegram, VK и PWA. Для каждого узла зафиксированы пользователи, зависимости, providers, API/backend endpoints, Firestore коллекции, глобальные состояния, маршруты, bottom sheets, portals и критические зависимости.
+
+## 2026-07-10 — APG system philosophy
+
+**Задача:** Создать человеческую инструкцию для будущих AI-разработчиков АПГ без изменения функциональности, UI, backend, merge и deploy.
+
+**Файлы:** `.ai/20_SYSTEM_PHILOSOPHY.md`, `.ai/17_CHANGELOG_AI.md`
+
+**Что изменено:** Добавлен документ с философией проекта: зачем существует АПГ, какие цели и принципы нельзя нарушать, что считается хорошим и плохим решением, какие архитектурные и UX-принципы обязательны, что запрещено делать и как должен думать AI-разработчик перед изменением системы.
