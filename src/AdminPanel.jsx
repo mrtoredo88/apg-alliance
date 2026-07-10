@@ -67,6 +67,11 @@ const NOTIFICATION_PRIORITIES = [
 ];
 
 const isArchived = item => item?.archived === true;
+const isErrorArchived = item => item?.archived === true;
+const isErrorResolved = item => item?.resolved === true;
+const isErrorActive = item => !isErrorResolved(item) && !isErrorArchived(item);
+const errorTimestamp = item => item?.timestamp || item?.createdAt || item?.updatedAt || item?.resolvedAt || item?.archivedAt;
+const isTodayValue = value => dateKey(value) === new Date().toISOString().slice(0, 10);
 const CONTENT_CATEGORIES = [
   { id: 'economy',   label: 'Экономика',   color: '#6AABEC' },
   { id: 'society',   label: 'Общество',    color: '#A78BFA' },
@@ -662,7 +667,8 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   const reviewTotal = reviews.length + expertReviews.length;
   const newComments = comments.filter(c => !c.hidden && withinDays(c.createdAt || c.updatedAt, 1)).length;
   const moderationComments = comments.filter(c => !c.hidden && (c.status === 'pending' || !c.moderationReviewedAt)).length;
-  const openErrors = errors.filter(e => !e.resolved).length;
+  const activeErrors = errors.filter(isErrorActive);
+  const openErrors = activeErrors.length;
   const pendingNews = news.filter(n => ['draft', 'pending', 'scheduled'].includes(String(n.status || '').toLowerCase()) || n.active === false).length;
   const sourceRows = Object.entries(users.reduce((acc, u) => {
     const label = providerLabel(u);
@@ -721,7 +727,7 @@ function AdminDashboard({ partners, experts, events, news, banners, customTasks,
   const mostReadNews = [...news]
     .sort((a, b) => Number(b.stats?.views ?? b.views ?? 0) - Number(a.stats?.views ?? a.views ?? 0))[0];
   const latestComment = [...comments].sort((a, b) => Number(toJsDate(b.createdAt) || 0) - Number(toJsDate(a.createdAt) || 0))[0];
-  const latestError = [...errors].sort((a, b) => Number(toJsDate(b.timestamp || b.createdAt) || 0) - Number(toJsDate(a.timestamp || a.createdAt) || 0))[0];
+  const latestError = [...activeErrors].sort((a, b) => Number(toJsDate(errorTimestamp(b)) || 0) - Number(toJsDate(errorTimestamp(a)) || 0))[0];
   const newestPartner = [...partners].sort((a, b) => Number(toJsDate(b.createdAt) || 0) - Number(toJsDate(a.createdAt) || 0))[0];
 
   return (
@@ -3455,15 +3461,16 @@ export const AdminPanel = () => {
   // Ошибки
   const [errorLogs, setErrorLogs]           = useState([]);
   const [errorsLoading, setErrorsLoading]   = useState(false);
-  const [errShowResolved, setErrShowResolved] = useState(false);
+  const [errFilter, setErrFilter] = useState('active');
   const [errExpanded, setErrExpanded]       = useState({});
+  const [errDeletedCount, setErrDeletedCount] = useState(0);
   const [systemStatus, setSystemStatus] = useState(null);
   const [systemStatusLoading, setSystemStatusLoading] = useState(false);
 
   const loadErrors = useCallback(async () => {
     setErrorsLoading(true);
     try {
-      const rows = await fetchAdminEntityList('errorLogs', 100);
+      const rows = await fetchAdminEntityList('errorLogs', 500);
       setErrorLogs(rows);
       setAdminMetrics(prev => ({ ...prev, errorLogs: rows }));
     } catch (e) {
@@ -3474,10 +3481,30 @@ export const AdminPanel = () => {
   }, []);
 
   const resolveError = useCallback(async (id) => {
-    await runAdminEntityAction('errorLogs', 'update', { id, patch: { resolved: true } }).catch(() => {});
-    setErrorLogs(prev => prev.map(e => e.id === id ? { ...e, resolved: true } : e));
-    setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.map(e => e.id === id ? { ...e, resolved: true } : e) }));
-  }, []);
+    const patch = {
+      resolved: true,
+      archived: true,
+      archivedBy: adminSecurity?.actor?.userId || adminSession?.uid || 'admin',
+    };
+    await runAdminEntityAction('errorLogs', 'update', { id, patch, serverTimestampFields: ['resolvedAt', 'archivedAt'] });
+    const localPatch = { ...patch, resolvedAt: new Date().toISOString(), archivedAt: new Date().toISOString() };
+    setErrorLogs(prev => prev.map(e => e.id === id ? { ...e, ...localPatch } : e));
+    setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.map(e => e.id === id ? { ...e, ...localPatch } : e) }));
+  }, [adminSecurity?.actor?.userId, adminSession?.uid]);
+
+  const deleteArchivedErrors = useCallback(async () => {
+    const archived = errorLogs.filter(isErrorArchived);
+    if (!archived.length) return;
+    if (!window.confirm(`Удалить ${archived.length} архивных ошибок? Активные ошибки останутся без изменений.`)) return;
+    let deleted = 0;
+    for (const item of archived) {
+      await runAdminEntityAction('errorLogs', 'delete', { id: item.id, idempotencyKey: `delete_archived_error_${item.id}_${Date.now()}` });
+      deleted += 1;
+    }
+    setErrDeletedCount(prev => prev + deleted);
+    setErrorLogs(prev => prev.filter(item => !archived.some(error => error.id === item.id)));
+    setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.filter(item => !archived.some(error => error.id === item.id)) }));
+  }, [errorLogs]);
 
   const loadSystemStatus = useCallback(async () => {
     setSystemStatusLoading(true);
@@ -3941,7 +3968,7 @@ export const AdminPanel = () => {
         { name: 'customTasks', label: 'Задания', ref: () => query(collection(db, 'customTasks'), orderBy('createdAt', 'asc')) },
         { name: 'prizeClaims', label: 'Выдачи призов', load: () => fetchAdminEntityList('prizeClaims', 100), optional: true },
         { name: 'banners', label: 'Баннеры', load: () => fetchAdminEntityList('banners', 200) },
-        { name: 'errorLogs', label: 'Ошибки приложения', load: () => fetchAdminEntityList('errorLogs', 100), optional: true },
+        { name: 'errorLogs', label: 'Ошибки приложения', load: () => fetchAdminEntityList('errorLogs', 500), optional: true },
         { name: 'adminActivity', label: 'Действия админки', load: () => fetchAdminEntityList('adminActivity', 120), optional: true },
         { name: 'users', label: 'Пользователи', load: () => fetchAdminEntityList('users', 1000), optional: true },
         { name: 'scans', label: 'Сканы партнёров', load: () => fetchAdminEntityList('scans', 500), optional: true },
@@ -5643,7 +5670,7 @@ export const AdminPanel = () => {
     ...news.filter(n => n.title?.toLowerCase().includes(q)).slice(0, 3).map(n => ({ tab: 'news', id: n.id, label: n.title, emoji: '📢', typeName: 'Новость' })),
     ...prizes.filter(p => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)).slice(0, 3).map(p => ({ tab: 'prizes', id: p.id, label: p.name || p.title, emoji: '🎁', typeName: 'Приз' })),
     ...newsComments.filter(c => String(c.text || '').toLowerCase().includes(q) || String(c.userName || '').toLowerCase().includes(q)).slice(0, 4).map(c => ({ tab: 'comments', id: c.id, label: c.text || 'Комментарий', sub: c.userName, emoji: '💬', typeName: 'Комментарий' })),
-    ...errorLogs.filter(e => String(e.message || e.error || e.source || e.screen || e.userId || '').toLowerCase().includes(q)).slice(0, 4).map(e => ({ tab: 'errors', id: e.id, label: e.message || e.error || 'Ошибка приложения', sub: e.source || e.screen, emoji: '🐞', typeName: 'Ошибка' })),
+    ...errorLogs.filter(e => !isErrorArchived(e) && String(e.message || e.error || e.source || e.screen || e.userId || '').toLowerCase().includes(q)).slice(0, 4).map(e => ({ tab: 'errors', id: e.id, label: e.message || e.error || 'Ошибка приложения', sub: e.source || e.screen, emoji: '🐞', typeName: 'Ошибка' })),
     ...aiImportRequests.filter(item => {
       const legalText = canSeeLegalInAdmin ? [
         item.legalProfile?.fields?.inn,
@@ -5721,7 +5748,7 @@ export const AdminPanel = () => {
       prizes: [['ID', 'Название', 'Остаток', 'Активно'], prizes.map(p => [p.id, p.name || p.title || '', p.stock ?? '', p.active !== false ? 'yes' : 'no'])],
       comments: [['ID', 'Пользователь', 'Текст', 'Скрыт'], newsComments.map(c => [c.id, c.userName || c.userId || '', c.text || '', c.hidden ? 'yes' : 'no'])],
       moderation: [['ID', 'Пользователь', 'Текст', 'Статус'], newsComments.map(c => [c.id, c.userName || c.userId || '', c.text || '', c.status || ''])],
-      errors: [['ID', 'Сообщение', 'Экран', 'Решено'], errorLogs.map(e => [e.id, e.message || e.error || '', e.screen || e.source || '', e.resolved ? 'yes' : 'no'])],
+      errors: [['ID', 'Сообщение', 'Экран', 'Статус'], errorLogs.map(e => [e.id, e.message || e.error || '', e.screen || e.source || '', isErrorArchived(e) ? 'archived' : isErrorResolved(e) ? 'resolved' : 'active'])],
       'ai-import': [['ID', 'Тип', 'Заголовок', 'Статус', 'Confidence'], aiImportRequests.map(item => [item.id, item.type || '', item.title || item.draft?.fields?.title || '', item.status || '', item.confidence || item.draft?.confidence || 0])],
     };
     const [header, rows] = datasets[activeTab] || datasets.news;
@@ -5806,7 +5833,7 @@ export const AdminPanel = () => {
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
             { id: 'access',    emoji: '🔐', label: 'Доступ' },
             { id: 'system',    emoji: '🛡', label: 'Система' },
-            { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(e => !e.resolved).length || undefined },
+            { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(isErrorActive).length || undefined },
             { id: 'ai-import', emoji: '📥', label: 'ИИ-импорт', count: aiImportRequests.filter(item => item.status !== 'published' && item.status !== 'rejected').length || undefined },
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
             { id: 'loki-knowledge', emoji: '🧠', label: 'База знаний Локи', count: lokiKnowledge.length || undefined },
@@ -8773,7 +8800,22 @@ export const AdminPanel = () => {
 
       {/* ── ОШИБКИ ── */}
       {activeTab === 'errors' && (() => {
-        const visible = errorLogs.filter(e => errShowResolved ? true : !e.resolved);
+        const activeErrors = errorLogs.filter(isErrorActive);
+        const resolvedErrors = errorLogs.filter(e => isErrorResolved(e) && !isErrorArchived(e));
+        const archivedErrors = errorLogs.filter(isErrorArchived);
+        const resolvedToday = errorLogs.filter(e => isErrorResolved(e) && isTodayValue(e.resolvedAt || e.updatedAt || e.archivedAt)).length;
+        const visible = errorLogs.filter(e => {
+          if (errFilter === 'all') return true;
+          if (errFilter === 'resolved') return isErrorResolved(e) && !isErrorArchived(e);
+          if (errFilter === 'archive') return isErrorArchived(e);
+          return isErrorActive(e);
+        });
+        const filters = [
+          ['all', 'Все', errorLogs.length],
+          ['active', 'Активные', activeErrors.length],
+          ['resolved', 'Решённые', resolvedErrors.length],
+          ['archive', 'Архив', archivedErrors.length],
+        ];
         return (
           <div>
             <div style={{ ...s.card, marginBottom: 12 }}>
@@ -8787,14 +8829,44 @@ export const AdminPanel = () => {
                   {errorsLoading ? '⏳' : '↻ Обновить'}
                 </button>
                 <button
-                  style={{ ...s.btn, padding: '6px 12px', fontSize: 12, background: errShowResolved ? 'rgba(75,179,75,0.15)' : A.chip, border: `1px solid ${errShowResolved ? '#4BB34B' : A.border}`, color: errShowResolved ? '#4BB34B' : A.textSec, borderRadius: 10, cursor: 'pointer' }}
-                  onClick={() => setErrShowResolved(v => !v)}
+                  style={{ ...s.btn, padding: '6px 12px', fontSize: 12, background: archivedErrors.length ? 'rgba(230,70,70,0.10)' : A.chip, border: `1px solid ${archivedErrors.length ? 'rgba(230,70,70,0.35)' : A.border}`, color: archivedErrors.length ? A.red : A.textSec, borderRadius: 10, cursor: archivedErrors.length ? 'pointer' : 'default', opacity: archivedErrors.length ? 1 : 0.55 }}
+                  onClick={deleteArchivedErrors}
+                  disabled={!archivedErrors.length}
                 >
-                  {errShowResolved ? '✓ Показываю решённые' : 'Скрыты решённые'}
+                  Удалить все решённые ошибки
                 </button>
               </div>
-              <p style={{ margin: '8px 0 0', fontSize: 12, color: A.textSec }}>
-                {visible.length} из {errorLogs.length} • нерешённых: {errorLogs.filter(e => !e.resolved).length}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginTop: 12 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 14, background: activeErrors.length ? 'rgba(230,70,70,0.12)' : 'rgba(75,179,75,0.12)', border: `1px solid ${activeErrors.length ? 'rgba(230,70,70,0.28)' : 'rgba(75,179,75,0.28)'}` }}>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🟢 Активных ошибок</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: activeErrors.length ? A.red : '#4BB34B' }}>{activeErrors.length}</div>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🟡 Решено за сегодня</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: '#f59e0b' }}>{resolvedToday}</div>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(201,168,76,0.10)', border: '1px solid rgba(201,168,76,0.25)' }}>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>📦 В архиве</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: A.gold }}>{archivedErrors.length}</div>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 14, background: A.chip, border: `1px solid ${A.border}` }}>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🗑 Удалённых</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: A.text }}>{errDeletedCount}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                {filters.map(([id, label, count]) => (
+                  <button
+                    key={id}
+                    style={{ ...s.btn, padding: '7px 12px', fontSize: 12, background: errFilter === id ? 'rgba(201,168,76,0.16)' : A.chip, border: `1px solid ${errFilter === id ? A.gold : A.border}`, color: errFilter === id ? A.gold : A.textSec, borderRadius: 999 }}
+                    onClick={() => setErrFilter(id)}
+                  >
+                    {label} · {count}
+                  </button>
+                ))}
+              </div>
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: activeErrors.length ? A.textSec : '#4BB34B' }}>
+                {activeErrors.length ? `${activeErrors.length} требуют внимания` : 'Система здорова: активных ошибок нет'}
               </p>
             </div>
 
@@ -8802,29 +8874,31 @@ export const AdminPanel = () => {
               <div style={{ textAlign: 'center', padding: 48, color: A.textSec }}>⏳ Загружаем...</div>
             ) : visible.length === 0 ? (
               <div style={{ ...s.card, textAlign: 'center', color: A.textSec }}>
-                {errorLogs.length === 0 ? 'Ошибок нет' : 'Все ошибки решены'}
+                {errFilter === 'active' ? 'Активных ошибок нет. Система выглядит здоровой.' : errorLogs.length === 0 ? 'Ошибок нет' : 'В этом фильтре записей нет'}
               </div>
             ) : visible.map(e => {
               const ts = e.timestamp?.toDate ? e.timestamp.toDate() : e.timestamp ? new Date(e.timestamp) : null;
               const tsStr = ts ? ts.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
               const isExp = errExpanded[e.id];
               return (
-                <div key={e.id} style={{ ...s.card, marginBottom: 10, opacity: e.resolved ? 0.55 : 1, borderLeft: `3px solid ${e.resolved ? '#4BB34B' : A.red}` }}>
+                <div key={e.id} style={{ ...s.card, marginBottom: 10, opacity: isErrorArchived(e) ? 0.62 : isErrorResolved(e) ? 0.72 : 1, borderLeft: `3px solid ${isErrorArchived(e) ? A.gold : isErrorResolved(e) ? '#4BB34B' : A.red}` }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: e.resolved ? '#4BB34B' : A.red, wordBreak: 'break-word', lineHeight: '17px', marginBottom: 4 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isErrorArchived(e) ? A.gold : isErrorResolved(e) ? '#4BB34B' : A.red, wordBreak: 'break-word', lineHeight: '17px', marginBottom: 4 }}>
                         {e.message}
                       </div>
                       <div style={{ fontSize: 11, color: A.textSec, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
                         <span>🕒 {tsStr}</span>
                         <span>📱 {e.device} / {e.browser}</span>
+                        {isErrorArchived(e) && <span>📦 архив</span>}
+                        {!isErrorArchived(e) && isErrorResolved(e) && <span>✓ решена</span>}
                         {e.userId && <span>👤 {String(e.userId).slice(0, 30)}</span>}
                         {e.version && e.version !== '?' && <span>v{e.version}</span>}
                         {e.source && <span style={{ color: A.textSec, opacity: 0.7 }}>📄 {String(e.source).slice(0, 60)}</span>}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                      {!e.resolved && (
+                      {isErrorActive(e) && (
                         <button
                           style={{ ...s.btn, padding: '4px 10px', fontSize: 11, background: 'rgba(75,179,75,0.12)', border: `1px solid #4BB34B40`, color: '#4BB34B', borderRadius: 8, cursor: 'pointer' }}
                           onClick={() => resolveError(e.id)}

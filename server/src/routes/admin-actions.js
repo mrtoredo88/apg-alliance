@@ -36,7 +36,7 @@ const LIST_CONFIG = {
   users: { orderBy: null, limit: 1000 },
   prizeClaims: { orderBy: ['claimedAt', 'desc'], limit: 200 },
   banners: { orderBy: ['priority', 'asc'], limit: 200 },
-  errorLogs: { orderBy: ['timestamp', 'desc'], limit: 200 },
+  errorLogs: { orderBy: ['timestamp', 'desc'], limit: 500 },
   adminActivity: { orderBy: ['createdAt', 'desc'], limit: 200 },
   scans: { orderBy: ['scannedAt', 'desc'], limit: 500 },
   expertScans: { orderBy: ['scannedAt', 'desc'], limit: 500 },
