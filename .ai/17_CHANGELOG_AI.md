@@ -1378,3 +1378,11 @@
 **Файлы:** `src/EventDetailSheet.jsx`
 
 **Что изменено:** Pointer drag вниз больше чем на 110px теперь работает для всех pointer types, включая mouse. Обычный клик не закрывает карточку, нужен именно заметный drag вниз.
+
+## 2026-07-10 — EventsPage mobile layout width fix
+
+**Задача:** Исправить доказанный разъезд layout афиши на production: горизонтальные подборки событий расширяли страницу до 656-800px при мобильном viewport 390px.
+
+**Файлы:** `src/EventsPage.jsx`
+
+**Что изменено:** В `EventPosterCard` добавлены `width: '100%'`, `maxWidth: '100%'`, `minWidth: 0`, `boxSizing: 'border-box'`, а внутренний grid переведён на `minmax(0, 1fr)`. Для секций подборок добавлены `minWidth: 0`, `maxWidth: '100%'`, `overflow: 'hidden'`. Горизонтальный scroller ограничен `width: '100%'`, `maxWidth: '100%'`, `minWidth: 0`, `boxSizing: 'border-box'`, `overflowY: 'hidden'`; `gridAutoColumns` заменён с `minmax(260px, 82%)` на `minmax(240px, min(82vw, 82%))`, чтобы карточки не могли раздувать родителя шире viewport.

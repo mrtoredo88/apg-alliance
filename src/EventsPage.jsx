@@ -408,7 +408,7 @@ function EventPosterCard({ event, index, onClick, compact = false }) {
   const registered = Number(event?.registeredCount || 0);
   const left = capacity > 0 ? Math.max(0, capacity - registered) : null;
   return (
-    <GlassCard onClick={() => onClick(event)} style={{ borderRadius: 30, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: compact ? '92px 1fr' : '116px 1fr', minHeight: compact ? 126 : 158, animation: `fadeInUp 0.34s ease ${index * 0.035}s both` }}>
+    <GlassCard onClick={() => onClick(event)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', borderRadius: 30, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: compact ? '92px minmax(0, 1fr)' : '116px minmax(0, 1fr)', minHeight: compact ? 126 : 158, animation: `fadeInUp 0.34s ease ${index * 0.035}s both` }}>
       <div style={{ position: 'relative', background: APG2_PROFILE.goldSoft, overflow: 'hidden' }}>
         {image ? <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event?.emoji || '🎉'}</div>}
         <div style={{ position: 'absolute', left: 10, bottom: 10, minWidth: 48, borderRadius: 18, padding: '8px 7px', background: 'rgba(12,12,14,0.72)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', color: APG2_PROFILE.text, textAlign: 'center', border: '1px solid rgba(255,255,255,0.18)' }}>
@@ -656,20 +656,20 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
         ) : (
           <>
             {collections.length > 0 && filters.length === 0 && (
-              <div style={{ display: 'grid', gap: 16, marginBottom: 18 }}>
+              <div style={{ display: 'grid', gap: 16, marginBottom: 18, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
                 {collections.map(([title, items]) => (
-                  <section key={title}>
+                  <section key={title} style={{ minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
                     <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 900, margin: '0 2px 10px' }}>{title}</div>
-                    <div style={{ display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(260px, 82%)', gap: 10, overflowX: 'auto', paddingBottom: 2 }}>
+                    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(240px, min(82vw, 82%))', gap: 10, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 2, WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}>
                       {items.map((event, index) => <EventPosterCard key={`${title}-${event.id || index}`} event={event} index={index} compact onClick={setSelectedEvent} />)}
                     </div>
                   </section>
                 ))}
               </div>
             )}
-            <div style={{ display: 'grid', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 16, minWidth: 0, maxWidth: '100%' }}>
               {grouped.map(([title, items]) => (
-                <section key={title}>
+                <section key={title} style={{ minWidth: 0, maxWidth: '100%' }}>
                   <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 66px)', zIndex: 4, margin: '0 -2px 10px', padding: '8px 2px', background: 'linear-gradient(180deg,rgba(17,17,19,0.94),rgba(17,17,19,0.74),rgba(17,17,19,0))', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: 'uppercase' }}>{title}</div>
                   <div style={{ display: 'grid', gap: 10 }}>
                     {items.map((event, index) => <EventPosterCard key={event.id || index} event={event} index={index} onClick={setSelectedEvent} />)}
