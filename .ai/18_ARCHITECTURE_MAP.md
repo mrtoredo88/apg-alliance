@@ -156,6 +156,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 
 - глобальный provider;
 - floating assistant;
+- Loki Home AI Dashboard;
 - полноэкранный опыт `LokiExperience`;
 - action routing через `LOKI_APP_ACTIONS`;
 - память в localStorage;

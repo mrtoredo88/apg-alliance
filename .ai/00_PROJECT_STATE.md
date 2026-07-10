@@ -71,7 +71,7 @@ VK Mini App: основная платформа; используется VK Br
 ### Локи
 
 - Статус: работает.
-- Краткое описание: AI Platform внутри приложения, `LokiProvider`, `LokiAssistant`, `LokiExperience`, Brain Layer, сценарии, рекомендации лучшего решения, действия по приложению, контекст новости через `activeContext`.
+- Краткое описание: AI Platform внутри приложения, Loki Home AI Dashboard, `LokiProvider`, `LokiAssistant`, `LokiExperience`, Brain Layer, сценарии, рекомендации лучшего решения, действия по приложению, контекст новости через `activeContext`.
 - Уровень готовности: production, активно развивается.
 
 ### Push

@@ -200,6 +200,85 @@ function buildNewsContextAnswer(context, text, appState = {}) {
   };
 }
 
+function toMillis(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return value;
+  if (value.toDate) return value.toDate().getTime();
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function hasOffer(item = {}) {
+  return Boolean(item.offer || item.promo || item.discount || item.specialOffer || item.actionText);
+}
+
+function isToday(value) {
+  const ms = toMillis(value);
+  if (!ms) return false;
+  const date = new Date(ms);
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+}
+
+function freshRows(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .map(item => ({ item, ms: toMillis(item?.publishedAt ?? item?.createdAt ?? item?.date ?? item?.updatedAt) }))
+    .sort((a, b) => b.ms - a.ms);
+}
+
+function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] } = {}) {
+  const hour = new Date().getHours();
+  const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
+  const events = Array.isArray(appState.events) ? appState.events : [];
+  const news = Array.isArray(appState.news) ? appState.news : [];
+  const tasks = Array.isArray(appState.customTasks) ? appState.customTasks : [];
+  const partners = Array.isArray(appState.partners) ? appState.partners : [];
+  const todayEvents = events.filter(item => isToday(item?.date ?? item?.startAt ?? item?.startsAt ?? item?.eventDate));
+  const freshNews = freshRows(news).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 3).map(row => row.item);
+  const offerPartners = partners.filter(hasOffer);
+  const activeTasks = tasks.filter(item => !appState.completedTasks?.includes?.(item.id));
+  const keyOpportunity = Math.min(5, Math.max(1, activeTasks.length || offerPartners.length || todayEvents.length));
+  const priority = { event: 5, partner: 4, news: 3, task: 2, prize: 1, expert: 1 };
+  const todayRecommendations = [...recommendationFeed]
+    .sort((a, b) => (priority[b.type] ?? 0) - (priority[a.type] ?? 0) || Number(b.score ?? 0) - Number(a.score ?? 0))
+    .slice(0, 3);
+  const mainNews = freshNews[0] ? {
+    id: freshNews[0].id,
+    title: titleOf(freshNews[0], 'Новость АПГ'),
+    text: truncateText(freshNews[0].summary || freshNews[0].text || freshNews[0].description, 220),
+    action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: freshNews[0].id }),
+  } : null;
+  const dayPlan = [
+    todayEvents[0] ? { title: titleOf(todayEvents[0], 'Мероприятие дня'), text: 'Начать с события, которое подходит по времени и контексту.' } : null,
+    offerPartners[0] ? { title: titleOf(offerPartners[0], 'Партнёр с предложением'), text: 'Проверить актуальную акцию или пользу у партнёра.' } : null,
+    mainNews ? { title: mainNews.title, text: 'Прочитать главную новость дня и понять, что это значит.' } : null,
+    activeTasks[0] ? { title: titleOf(activeTasks[0], 'Задание АПГ'), text: 'Закрыть простое действие и продвинуться по ключам.' } : null,
+  ].filter(Boolean);
+  while (dayPlan.length < 3) {
+    const fallback = [
+      { title: 'Открыть рекомендации Локи', text: 'Выбрать один полезный сценарий вместо долгого поиска.' },
+      { title: 'Проверить партнёров рядом', text: 'Найти место, куда можно зайти сегодня.' },
+      { title: 'Задать Локи задачу', text: 'Написать, что нужно сейчас, и получить лучшее решение.' },
+    ][dayPlan.length];
+    if (fallback) dayPlan.push(fallback);
+    else break;
+  }
+  return {
+    greeting,
+    userName: safeString(user?.first_name || user?.name || appState.user?.first_name || appState.user?.name),
+    summary: `Сегодня для тебя есть ${todayEvents.length} ${todayEvents.length === 1 ? 'мероприятие' : 'мероприятия'}, ${freshNews.length} ${freshNews.length === 1 ? 'новость' : 'новости'} и возможность заработать ещё ${keyOpportunity} ключей.`,
+    todayRecommendations,
+    dayPlan,
+    mainNews,
+    progress: {
+      keys: Number(appState.userKeys ?? 0),
+      activeTasks: activeTasks.length,
+      completedTasks: Array.isArray(appState.completedTasks) ? appState.completedTasks.length : 0,
+      achievements: Array.isArray(appState.completedTasks) ? appState.completedTasks.length : 0,
+    },
+  };
+}
+
 export function LokiProvider({ children, user, activePanel, appActions, appState }) {
   const [settings, setSettings] = useState(() => loadLokiSettings());
   const [memory, setMemory] = useState(() => loadLokiMemory());
@@ -714,7 +793,13 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, [activePanel, updateMemory]);
 
-  const value = useMemo(() => ({
+  const value = useMemo(() => {
+    const state = { ...appState, user, activePanel };
+    const interestProfile = buildInterestProfile({ appState: state, memory, userMemory });
+    const recommendationFeed = buildRecommendationFeed({ appState: state, memory, userMemory, limit: 8 });
+    const scenarioCollections = buildScenarioCollections({ appState: state, memory, userMemory }).filter(item => item.cards.length);
+    const dashboard = buildLokiHomeDashboard({ appState: state, user, recommendationFeed });
+    return {
     action,
     activeContext,
     activePanel,
@@ -724,6 +809,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     brainThinking,
     canTalk,
     card,
+    dashboard,
     dismissed,
     emotion,
     emotionalState,
@@ -732,9 +818,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     isHiddenOnPanel,
     lastEvent,
     history,
-    interestProfile: buildInterestProfile({ appState: { ...appState, user, activePanel }, memory, userMemory }),
-    recommendationFeed: buildRecommendationFeed({ appState: { ...appState, user, activePanel }, memory, userMemory, limit: 8 }),
-    scenarioCollections: buildScenarioCollections({ appState: { ...appState, user, activePanel }, memory, userMemory }).filter(item => item.cards.length),
+    interestProfile,
+    recommendationFeed,
+    scenarioCollections,
     memory: memory ?? DEFAULT_LOKI_MEMORY,
     userMemory,
     message,
@@ -778,7 +864,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
     setMode: (mode) => persistSettings({ ...settings, mode }),
-  }), [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
+  };
+  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

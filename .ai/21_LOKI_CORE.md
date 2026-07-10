@@ -70,6 +70,22 @@ Every Brain Layer response follows this structure:
 
 The legacy modules remain as fallback for narrow commands and old scenarios.
 
+## Loki Home
+
+`src/LokiPage.jsx` is no longer a chat-first screen. It is the Loki Home AI Dashboard.
+
+The dashboard is fed by `LokiProvider.dashboard` and uses already loaded APG data:
+
+- personal greeting and day summary;
+- three priority recommendations for today;
+- large scenario cards that call `loki.askExperience()`;
+- day plan;
+- user progress;
+- main news of the day;
+- one large task input field.
+
+The screen must not duplicate data loading or recommendation logic. It should render provider data and trigger existing Loki actions.
+
 ## Extension Contract
 
 A new capability module is registered in `src/loki/core/LokiCore.js`.
