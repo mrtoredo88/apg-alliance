@@ -1354,3 +1354,11 @@
 **Файлы:** `src/EventDetailSheet.jsx`, `src/UserApp.jsx`
 
 **Что изменено:** `EventDetailSheet` отправляет событие `apg:event-sheet-open` при открытии/закрытии и помечает `document.body.dataset.apgEventSheetOpen`. `UserApp` слушает это событие и временно не рендерит `LokiAssistant`, пока карточка события открыта. В `EventDetailSheet` добавлена touch-обработка свайпа вниз: если пользователь тянет sheet вниз больше чем на 86px, вызывается штатное закрытие.
+
+## 2026-07-10 — EventDetailSheet swipe close fix
+
+**Задача:** После production QA закрытие карточки события свайпом вниз не срабатывало в touch-сценарии.
+
+**Файлы:** `src/EventDetailSheet.jsx`
+
+**Что изменено:** Добавлен `onTouchMove` для bottom sheet: если пользователь протягивает карточку вниз больше чем на 110px, вызывается штатное закрытие. `onTouchEnd` оставлен как дополнительный fallback.

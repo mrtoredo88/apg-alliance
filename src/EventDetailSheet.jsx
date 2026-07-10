@@ -937,6 +937,15 @@ export function EventDetailSheet({
     setTouchStartY(null);
   };
 
+  const handleTouchMove = (touchEvent) => {
+    if (touchStartY == null) return;
+    const currentY = touchEvent.touches?.[0]?.clientY ?? touchStartY;
+    if (currentY - touchStartY > 110) {
+      setTouchStartY(null);
+      handleClose();
+    }
+  };
+
   return (
     <div
       style={{
@@ -974,6 +983,7 @@ export function EventDetailSheet({
         }}
         onClick={(event) => event.stopPropagation()}
         onTouchStart={(event) => setTouchStartY(event.touches?.[0]?.clientY ?? null)}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => setTouchStartY(null)}
       >
