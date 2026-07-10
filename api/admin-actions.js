@@ -861,6 +861,105 @@ async function handleEntityAction(db, req, actor) {
   throw error;
 }
 
+async function notifyEventAuthor(db, event, type, title, text) {
+  const userId = String(event.submittedByUserId || event.proposalAuthorId || '').trim();
+  if (!userId) return;
+  await db.collection('notifications').add({
+    title,
+    text,
+    category: 'events',
+    type,
+    priority: type === 'error' ? 'high' : 'normal',
+    targetType: 'user',
+    targetValue: userId,
+    userId,
+    eventId: event.id,
+    source: 'event_moderation',
+    status: 'published',
+    active: true,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+async function handleEventModerationAction(db, req, actor) {
+  const action = String(req.body?.action || '').trim();
+  const id = String(req.body?.id || req.body?.eventId || '').trim();
+  const comment = String(req.body?.comment || req.body?.reason || '').trim().slice(0, 1000);
+  const idempotencyKey = String(req.headers['x-idempotency-key'] || req.body?.idempotencyKey || '').trim();
+  if (!id) {
+    const error = new Error('Не указано событие.');
+    error.statusCode = 400;
+    throw error;
+  }
+  await requireAdminPermission(req, 'events:update');
+  const ref = db.collection('events').doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const error = new Error('Событие не найдено.');
+    error.statusCode = 404;
+    throw error;
+  }
+  const before = { id, ...(snap.data() || {}) };
+
+  return runIdempotent(db, actor, idempotencyKey, async () => {
+    let patch;
+    let notify;
+    if (action === 'event:approve') {
+      patch = {
+        active: true,
+        status: 'published',
+        submissionStatus: 'approved',
+        moderationStatus: 'approved',
+        approvedAt: FieldValue.serverTimestamp(),
+        approvedBy: actor.uid,
+        moderationComment: comment || '',
+        publishedAt: before.publishedAt || FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      notify = ['success', 'Мероприятие одобрено', `Ваше предложение «${before.title || 'мероприятие'}» опубликовано в АПГ.`];
+    } else if (action === 'event:request_changes') {
+      patch = {
+        active: false,
+        status: 'revision_requested',
+        submissionStatus: 'revision_requested',
+        moderationStatus: 'revision_requested',
+        revisionComment: comment || 'Администратор попросил уточнить детали мероприятия.',
+        reviewedAt: FieldValue.serverTimestamp(),
+        reviewedBy: actor.uid,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      notify = ['important', 'Мероприятие отправлено на доработку', comment || 'Администратор попросил уточнить детали мероприятия.'];
+    } else if (action === 'event:reject') {
+      if (!comment) {
+        const error = new Error('Укажите причину отклонения.');
+        error.statusCode = 400;
+        throw error;
+      }
+      patch = {
+        active: false,
+        status: 'rejected',
+        submissionStatus: 'rejected',
+        moderationStatus: 'rejected',
+        rejectionReason: comment,
+        rejectedAt: FieldValue.serverTimestamp(),
+        rejectedBy: actor.uid,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      notify = ['error', 'Мероприятие отклонено', comment];
+    } else {
+      const error = new Error('Неизвестное действие модерации события.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    await ref.set(patch, { merge: true });
+    await notifyEventAuthor(db, before, notify[0], notify[1], notify[2]);
+    await writeAuditLog(db, req, actor, action, 'events', id, { label: `${notify[1]}: ${before.title || id}`, comment });
+    return { ok: true, id, patch: serializeAdminValue(patch) };
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -874,6 +973,8 @@ export default async function handler(req, res) {
     const action = String(req.body?.action || '');
     const result = action.startsWith('entity:')
       ? await handleEntityAction(db, req, actor)
+      : action.startsWith('event:')
+        ? await handleEventModerationAction(db, req, actor)
       : action.startsWith('partner:')
         ? await handlePartnerOnboardingAction(db, req, actor)
         : await handleNewsAction(db, req, actor);

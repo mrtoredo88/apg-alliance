@@ -667,6 +667,83 @@ async function actionEventToggle(db, req, actor) {
   return { ok: true, registeredEvents };
 }
 
+function cleanEventProposal(input = {}) {
+  const title = safeString(input.title, 180);
+  const date = safeString(input.date, 40);
+  const time = safeString(input.time, 40);
+  const place = safeString(input.place || input.location || input.address, 300);
+  const description = safeString(input.description, MAX_TEXT);
+  if (!title) throw Object.assign(new Error('Укажите название мероприятия.'), { statusCode: 400 });
+  if (!date) throw Object.assign(new Error('Укажите дату мероприятия.'), { statusCode: 400 });
+  return {
+    title,
+    date,
+    time,
+    partner: safeString(input.partner, 220),
+    description,
+    address: place,
+    location: place,
+    coverPhoto: safeString(input.coverPhoto || input.imageUrl || input.photo, 1000),
+    maxParticipants: Math.max(0, Math.min(5000, Number(input.maxParticipants || 0))),
+    pricePublic: safeString(input.price || input.cost, 120),
+    priceClub: safeString(input.priceClub, 120),
+    linkUrl: safeString(input.linkUrl || input.link, 1000),
+    socialUrl: safeString(input.linkUrl || input.link, 1000),
+    comment: safeString(input.comment, 1000),
+  };
+}
+
+async function assertOwnedProfile(db, actor, type, id) {
+  const profileId = safeString(id, 180);
+  const collection = type === 'expert' ? 'experts' : 'partners';
+  if (!profileId) throw Object.assign(new Error('Не указан профиль автора.'), { statusCode: 400 });
+  const snap = await db.collection(collection).doc(profileId).get();
+  if (!snap.exists) throw Object.assign(new Error('Профиль автора не найден.'), { statusCode: 404 });
+  const data = snap.data() || {};
+  const actorEmail = safeString(actor.user?.email || actor.user?.linkedEmail, 200).toLowerCase();
+  const allowed = data.ownerId === actor.userId
+    || String(data.vkOwnerId || '') === actor.userId
+    || (actorEmail && safeString(data.ownerEmail || data.connectionEmail, 200).toLowerCase() === actorEmail);
+  if (!allowed) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
+  return { id: profileId, ...data };
+}
+
+async function actionEventPropose(db, req, actor) {
+  const authorType = safeString(req.body?.authorType || req.body?.type, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId || req.body?.partnerId || req.body?.expertId, 180);
+  const profile = await assertOwnedProfile(db, actor, authorType, profileId);
+  const proposal = cleanEventProposal(req.body?.event || req.body?.proposal || {});
+  const ref = await db.collection('events').add({
+    ...proposal,
+    emoji: authorType === 'expert' ? '🎓' : '🎉',
+    active: false,
+    status: 'pending_review',
+    submissionStatus: 'pending_review',
+    moderationStatus: 'pending_review',
+    proposalSource: authorType,
+    proposalAuthorType: authorType,
+    proposalAuthorId: actor.userId,
+    proposalAuthorUid: actor.uid,
+    proposalAuthorName: safeString(actor.user?.displayName || actor.user?.name || actor.user?.email || profile.name || 'Автор предложения', 220),
+    submittedByUserId: actor.userId,
+    submittedByName: safeString(actor.user?.displayName || actor.user?.name || actor.user?.email || profile.name || 'Автор предложения', 220),
+    submittedAt: FieldValue.serverTimestamp(),
+    submittedProfileId: profile.id,
+    submittedProfileName: safeString(profile.name, 220),
+    submissionComment: proposal.comment,
+    partnerId: authorType === 'partner' ? profile.id : null,
+    partner: authorType === 'partner' ? safeString(profile.name, 220) : proposal.partner,
+    expertId: authorType === 'expert' ? profile.id : null,
+    expert: authorType === 'expert' ? safeString(profile.name, 220) : '',
+    isExpertEvent: authorType === 'expert',
+    registeredCount: 0,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  await audit(db, req, actor, 'event:propose', 'events', ref.id, 'success', { authorType, profileId: profile.id });
+  return { ok: true, id: ref.id, event: { id: ref.id, ...proposal, status: 'pending_review', submissionStatus: 'pending_review', active: false, proposalAuthorType: authorType, submittedProfileId: profile.id, submittedProfileName: profile.name || '' } };
+}
+
 async function actionReviewPartner(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
@@ -824,6 +901,7 @@ async function routeAction(db, req, actor) {
   if (action === 'prize:claim') return actionPrizeClaim(db, req, actor);
   if (action === 'raffle:enter') return actionRaffleEnter(db, req, actor);
   if (action === 'event:toggle') return actionEventToggle(db, req, actor);
+  if (action === 'event:propose') return actionEventPropose(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');

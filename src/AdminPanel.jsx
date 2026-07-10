@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EventsCalendar } from './EventsCalendar.jsx';
+import { EventDetailSheet } from './EventDetailSheet.jsx';
 import { QRCodeCanvas } from 'qrcode.react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
@@ -2957,6 +2958,8 @@ export const AdminPanel = () => {
   const [showExpertModal, setShowExpertModal]   = useState(false);
   const [expandedExpertId, setExpandedExpertId] = useState(null);
   const [showEventModal, setShowEventModal]     = useState(false);
+  const [showEventDetailSheet, setShowEventDetailSheet] = useState(false);
+  const [selectedEventForSheet, setSelectedEventForSheet] = useState(null);
   const [showNewsModal, setShowNewsModal]       = useState(false);
   const [eventLinksFilter, setEventLinksFilter] = useState('all');
   const [newsLinksFilter, setNewsLinksFilter]   = useState('all');
@@ -4619,6 +4622,20 @@ export const AdminPanel = () => {
     setShowEventModal(true);
   };
 
+  const openEventDetail = (e) => {
+    setSelectedEventForSheet(e);
+    setShowEventDetailSheet(true);
+  };
+
+  const closeEventDetail = () => {
+    setShowEventDetailSheet(false);
+  };
+
+  const editEventFromDetail = (e) => {
+    closeEventDetail();
+    startEditEvent(e);
+  };
+
   const saveEvent = async () => {
     if (!eTitle.trim()) return;
     const data = {
@@ -4656,6 +4673,102 @@ export const AdminPanel = () => {
     if (!window.confirm('Удалить событие?')) return;
     await runAdminEntityAction('events', 'delete', { id });
     fetchData();
+  };
+
+  const moderateEvent = async (event, action) => {
+    if (!event?.id) return;
+    let comment = '';
+    if (action === 'event:reject') {
+      comment = window.prompt('Укажите причину отклонения предложения:') || '';
+      if (!comment.trim()) return;
+    }
+    if (action === 'event:request_changes') {
+      comment = window.prompt('Комментарий для автора предложения:') || '';
+      if (!comment.trim()) return;
+    }
+    const result = await runAdminAction(action, { eventId: event.id, comment: comment.trim() });
+    const patch = reviveAdminValue(result.patch || {});
+    setEvents(prev => prev.map(item => item.id === event.id ? { ...item, ...patch } : item));
+    setSelectedEventForSheet(prev => prev?.id === event.id ? { ...prev, ...patch } : prev);
+    fetchData();
+  };
+
+  const cleanEventCopyPatch = (event, extra = {}) => {
+    const skip = new Set([
+      'id', 'createdAt', 'updatedAt', 'deletedAt', 'registeredCount', 'registrationsCount',
+      'views', 'viewCount', 'pushStatus', 'pushSentAt', 'comments', 'history',
+      'submissionStatus', 'moderationStatus', 'approvedAt', 'approvedBy', 'publishedAt',
+      'rejectedAt', 'rejectedBy', 'rejectionReason', 'reviewedAt', 'reviewedBy',
+      'submittedAt', 'submittedByUserId', 'submittedByName', 'proposalAuthorId',
+      'proposalAuthorUid', 'proposalAuthorName',
+    ]);
+    const copy = {};
+    Object.entries(event || {}).forEach(([key, value]) => {
+      if (!skip.has(key) && value !== undefined) copy[key] = value;
+    });
+    return {
+      ...copy,
+      ...extra,
+      active: false,
+      status: 'draft',
+      submissionStatus: 'draft',
+      moderationStatus: 'draft',
+      registeredCount: 0,
+      registrationsCount: 0,
+    };
+  };
+
+  const patchEventFromSheet = async (event, patch) => {
+    if (!event?.id || !patch) return;
+    await runAdminEntityAction('events', 'update', { id: event.id, patch });
+    const next = { ...event, ...patch };
+    setEvents(prev => prev.map(item => item.id === event.id ? { ...item, ...patch } : item));
+    setSelectedEventForSheet(prev => prev?.id === event.id ? { ...prev, ...patch } : prev);
+  };
+
+  const duplicateEventFromSheet = async (event) => {
+    if (!event?.id) return;
+    const patch = cleanEventCopyPatch(event, { title: `${event.title || 'Событие'} · копия` });
+    const created = await runAdminEntityAction('events', 'create', { patch });
+    const duplicate = { id: created.id, ...patch, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    setEvents(prev => [duplicate, ...prev]);
+    setSelectedEventForSheet(duplicate);
+  };
+
+  const shiftDate = (value, frequency, index) => {
+    const date = value?.toDate ? value.toDate() : (value ? new Date(value) : null);
+    if (!date || Number.isNaN(date.getTime())) return value || null;
+    const next = new Date(date);
+    if (frequency === 'daily') next.setDate(next.getDate() + index);
+    if (frequency === 'weekly') next.setDate(next.getDate() + index * 7);
+    if (frequency === 'biweekly') next.setDate(next.getDate() + index * 14);
+    if (frequency === 'monthly') next.setMonth(next.getMonth() + index);
+    return next;
+  };
+
+  const createEventSeriesFromSheet = async (event, options = {}) => {
+    if (!event?.id) return;
+    const total = Math.max(1, Math.min(52, Number(options.count || 1)));
+    const end = options.endDate ? new Date(`${options.endDate}T23:59:59`) : null;
+    const createdItems = [];
+    for (let i = 1; i <= total; i += 1) {
+      const startAt = shiftDate(event.startAt || event.eventDate || event.date, options.frequency, i);
+      if (end && startAt && startAt > end) break;
+      const endAt = shiftDate(event.endAt, options.frequency, i);
+      const patch = cleanEventCopyPatch(event, {
+        title: event.title || 'Событие',
+        startAt,
+        endAt,
+        eventDate: startAt instanceof Date ? startAt.toISOString().slice(0, 16) : (event.eventDate || ''),
+        date: startAt instanceof Date ? startAt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : (event.date || ''),
+        seriesParentId: event.id,
+        seriesFrequency: options.frequency || 'weekly',
+        seriesIndex: i,
+      });
+      const created = await runAdminEntityAction('events', 'create', { patch });
+      createdItems.push({ id: created.id, ...patch, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    }
+    if (createdItems.length) setEvents(prev => [...createdItems, ...prev]);
   };
 
   // ─── Партнёр дня ────────────────────────────────────────────────────────────
@@ -5094,6 +5207,22 @@ export const AdminPanel = () => {
     ...((q.includes('ии') || q.includes('ai') || q.includes('чернов')) ? [{ tab: 'ai-drafts', id: 'ai-drafts', label: 'Черновики ИИ', sub: 'Раздел подготовлен к V4.5', emoji: '🤖', typeName: 'Раздел' }] : []),
   ] : [];
   const isCompact = viewportWidth < 860;
+  const eventProposalStatus = (event) => String(event.submissionStatus || event.moderationStatus || event.status || '').toLowerCase();
+  const eventProposalStatusLabel = (event) => ({
+    draft: 'Черновик',
+    pending_review: 'На модерации',
+    revision_requested: 'На доработке',
+    rejected: 'Отклонено',
+    approved: 'Опубликовано',
+    published: 'Опубликовано',
+  }[eventProposalStatus(event)] || event.status || 'Черновик');
+  const eventProposals = events
+    .filter(event => event.submittedByUserId || event.proposalAuthorType || ['pending_review', 'revision_requested', 'rejected'].includes(eventProposalStatus(event)))
+    .sort((a, b) => {
+      const ta = a.submittedAt?.toDate?.()?.getTime?.() ?? new Date(a.submittedAt || a.createdAt || 0).getTime();
+      const tb = b.submittedAt?.toDate?.()?.getTime?.() ?? new Date(b.submittedAt || b.createdAt || 0).getTime();
+      return tb - ta;
+    });
   const createActionGroups = {
     dashboard: [
       ['📢', 'Новость', () => { resetNewsForm(); setActiveTab('news'); setShowNewsModal(true); }],
@@ -6693,9 +6822,26 @@ export const AdminPanel = () => {
                   </button>
                   {editingEvent && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetEventForm}>Отмена</button>}
                 </div>
+                </div>
               </div>
-            </div>
       )}
+      <EventDetailSheet
+        open={showEventDetailSheet && activeTab === 'events-center'}
+        event={selectedEventForSheet}
+        role={adminSecurity?.actor?.role || adminSession?.role}
+        users={adminMetrics.users}
+        partners={partners}
+        experts={experts}
+        allEvents={events}
+        onClose={closeEventDetail}
+        onEdit={editEventFromDetail}
+        onPatch={patchEventFromSheet}
+        onDuplicate={duplicateEventFromSheet}
+        onCreateSeries={createEventSeriesFromSheet}
+        onApprove={(event) => moderateEvent(event, 'event:approve')}
+        onRequestChanges={(event) => moderateEvent(event, 'event:request_changes')}
+        onReject={(event) => moderateEvent(event, 'event:reject')}
+      />
 
       {/* ── СОБЫТИЯ ── */}
       {activeTab === 'events' && (
@@ -6769,12 +6915,62 @@ export const AdminPanel = () => {
 
       {/* ── ЦЕНТР СОБЫТИЙ ── */}
       {activeTab === 'events-center' && (
-        <EventsCalendar
-          events={events}
-          A={A}
-          onEventClick={ev => startEditEvent(ev)}
-          onCreateEvent={() => { resetEventForm(); setShowEventModal(true); }}
-        />
+        <>
+          <div style={{ ...s.card, marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 4px' }}>Предложения</h2>
+                <div style={{ color: A.textSec, fontSize: 12 }}>
+                  Мероприятия от партнёров и экспертов, ожидающие решения администрации
+                </div>
+              </div>
+              <span style={{ padding: '5px 10px', borderRadius: 999, background: A.goldDim, border: `1px solid ${A.goldBrd}`, color: A.gold, fontSize: 12, fontWeight: 800 }}>
+                {eventProposals.length}
+              </span>
+            </div>
+            {eventProposals.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '22px 12px', borderRadius: 16, border: `1px dashed ${A.border}`, background: A.chip, color: A.textSec }}>
+                <div style={{ fontSize: 30, marginBottom: 6 }}>📅</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: A.text }}>Новых предложений нет</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Когда партнёр или эксперт предложит мероприятие, оно появится здесь.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 9 }}>
+                {eventProposals.map(event => {
+                  const status = eventProposalStatus(event);
+                  const isPending = status === 'pending_review';
+                  const submittedDate = event.submittedAt?.toDate ? event.submittedAt.toDate() : (event.submittedAt || event.createdAt ? new Date(event.submittedAt || event.createdAt) : null);
+                  return (
+                    <div key={event.id} onClick={() => openEventDetail(event)} style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1fr auto', gap: 10, alignItems: 'center', padding: 12, borderRadius: 16, border: `1px solid ${isPending ? A.goldBrd : A.border}`, background: isPending ? 'rgba(201,168,76,0.10)' : A.chip, cursor: 'pointer' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 5 }}>
+                          <span style={{ color: A.text, fontSize: 14, fontWeight: 800, overflowWrap: 'anywhere' }}>{event.title || 'Без названия'}</span>
+                          <span style={{ padding: '2px 7px', borderRadius: 999, background: isPending ? A.goldDim : 'rgba(255,255,255,0.07)', border: `1px solid ${isPending ? A.goldBrd : A.border}`, color: isPending ? A.gold : A.textSec, fontSize: 10, fontWeight: 800 }}>{eventProposalStatusLabel(event)}</span>
+                        </div>
+                        <div style={{ color: A.textSec, fontSize: 12, lineHeight: '17px' }}>
+                          {(event.proposalAuthorType === 'expert' ? 'Эксперт' : 'Партнёр')} · {event.submittedProfileName || event.proposalAuthorName || event.submittedByName || 'автор не указан'}
+                          {event.date ? ` · ${event.date}` : ''}
+                          {submittedDate && ` · создано ${submittedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`}
+                        </div>
+                      </div>
+                      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: isCompact ? 'stretch' : 'flex-end' }}>
+                        <button disabled={!isPending} style={{ ...s.btn, ...s.btnPri, padding: '7px 10px', fontSize: 12, opacity: isPending ? 1 : 0.45 }} onClick={() => moderateEvent(event, 'event:approve')}>Одобрить</button>
+                        <button disabled={!isPending} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12, opacity: isPending ? 1 : 0.45 }} onClick={() => moderateEvent(event, 'event:request_changes')}>Доработка</button>
+                        <button disabled={!isPending} style={{ ...s.btn, ...s.btnDanger, padding: '7px 10px', fontSize: 12, opacity: isPending ? 1 : 0.45 }} onClick={() => moderateEvent(event, 'event:reject')}>Отклонить</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <EventsCalendar
+            events={events}
+            A={A}
+            onEventClick={openEventDetail}
+            onCreateEvent={() => { resetEventForm(); setShowEventModal(true); }}
+          />
+        </>
       )}
 
       {/* ── НОВОСТИ ── */}

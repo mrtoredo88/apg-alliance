@@ -2694,7 +2694,16 @@ export function UserApp() {
               {/* Lazy pages — Suspense обёрнут в Panel чтобы View видел nav/id */}
               <Panel id="events">
                 <Suspense fallback={<LazyFallback />}>
-                  <EventsPage nav="events" variant="v2" events={events} onBack={goBackPanel} appearance={appearance} initialEventTarget={pendingLokiEventTarget} />
+                  <EventsPage
+                    nav="events"
+                    variant="v2"
+                    events={events}
+                    onBack={goBackPanel}
+                    appearance={appearance}
+                    initialEventTarget={pendingLokiEventTarget}
+                    registeredEventIds={registeredEventIds}
+                    onEventRegister={handleEventRegister}
+                  />
                 </Suspense>
               </Panel>
 
@@ -2755,8 +2764,10 @@ export function UserApp() {
                     variant="v2"
                     partner={ownedPartner}
                     expert={ownedExpert}
+                    events={events}
                     onBack={goBackPanel}
                     onToast={showToast}
+                    onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
                     onPartnerUpdate={(updated) => {
                       setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
                       setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
@@ -2770,8 +2781,10 @@ export function UserApp() {
                   <ExpertCabinetPage
                     variant="v2"
                     expert={ownedExpert}
+                    events={events}
                     onBack={goBackPanel}
                     onToast={showToast}
+                    onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
                     onExpertUpdate={(updated) => {
                       setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
                       setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);

@@ -48,6 +48,20 @@ function formatDayLabel(date) {
   return `${dow.charAt(0).toUpperCase() + dow.slice(1)}, ${date.getDate()} ${MONTHS_GEN[date.getMonth()]}`;
 }
 
+function buildDayWindows(events) {
+  const busy = new Set(events.map(ev => {
+    const d = getEventDate(ev);
+    return d ? d.getHours() : null;
+  }).filter(v => v !== null));
+  return [9, 12, 15, 18, 20].map(hour => {
+    const event = events.find(ev => {
+      const d = getEventDate(ev);
+      return d && d.getHours() === hour;
+    });
+    return { hour, free: !busy.has(hour), event };
+  });
+}
+
 const card = {
   background: 'rgba(255,255,255,0.04)',
   backdropFilter: 'blur(28px) saturate(1.6)',
@@ -119,6 +133,31 @@ function EventRow({ ev, onEventClick, A, showDate = false }) {
       </div>
 
       <div style={{ width: 7, height: 7, borderRadius: '50%', background: catColor, flexShrink: 0 }} />
+    </div>
+  );
+}
+
+function FreeWindows({ date, events, onCreateEvent, A }) {
+  const windows = buildDayWindows(events);
+  return (
+    <div style={{ ...card, padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div>
+          <div style={{ color: A.text, fontSize: 14, fontWeight: 800 }}>Свободные окна</div>
+          <div style={{ color: A.textSec, fontSize: 11, marginTop: 2 }}>{formatDayLabel(date)}</div>
+        </div>
+        <button onClick={onCreateEvent} style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid ${A.goldBrd}`, background: 'rgba(201,168,76,0.12)', color: A.gold, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>+ Событие</button>
+      </div>
+      <div style={{ display: 'grid', gap: 7 }}>
+        {windows.map(item => (
+          <div key={item.hour} style={{ display: 'grid', gridTemplateColumns: '48px 1fr', gap: 10, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: item.free ? 'rgba(75,179,75,0.08)' : 'rgba(201,168,76,0.10)', border: `1px solid ${item.free ? 'rgba(75,179,75,0.22)' : A.goldBrd}` }}>
+            <div style={{ color: item.free ? '#4ade80' : A.gold, fontSize: 12, fontWeight: 900 }}>{String(item.hour).padStart(2, '0')}:00</div>
+            <div style={{ color: item.free ? A.textSec : A.text, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.free ? 'свободно' : (item.event?.title || 'мероприятие')}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -382,35 +421,41 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
 
           {/* Список событий выбранного дня */}
           {selectedDay && selEvents.length > 0 && (
-            <div style={{ ...card, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px', borderBottom: `1px solid ${A.border}` }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: A.text }}>
-                  {formatDayLabel(selectedDay)}
-                  {toKey(selectedDay) === todayKey && (
-                    <span style={{ marginLeft: 8, background: A.gold, color: '#1A1208', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>Сегодня</span>
-                  )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 14, alignItems: 'start' }}>
+              <div style={{ ...card, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px', borderBottom: `1px solid ${A.border}` }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: A.text }}>
+                    {formatDayLabel(selectedDay)}
+                    {toKey(selectedDay) === todayKey && (
+                      <span style={{ marginLeft: 8, background: A.gold, color: '#1A1208', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>Сегодня</span>
+                    )}
+                  </div>
+                  <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', color: A.textSec, cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>✕</button>
                 </div>
-                <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', color: A.textSec, cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>✕</button>
+                {selEvents.map((ev, i) => (
+                  <div key={ev.id || i} style={{ borderBottom: i < selEvents.length - 1 ? `1px solid ${A.border}` : 'none' }}>
+                    <EventRow ev={ev} onEventClick={onEventClick} A={A} />
+                  </div>
+                ))}
               </div>
-              {selEvents.map((ev, i) => (
-                <div key={ev.id || i} style={{ borderBottom: i < selEvents.length - 1 ? `1px solid ${A.border}` : 'none' }}>
-                  <EventRow ev={ev} onEventClick={onEventClick} A={A} />
-                </div>
-              ))}
+              <FreeWindows date={selectedDay} events={selEvents} onCreateEvent={onCreateEvent} A={A} />
             </div>
           )}
 
           {selectedDay && selEvents.length === 0 && (
-            <div style={{ ...card, padding: '28px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: A.text, marginBottom: 6 }}>
-                {formatDayLabel(selectedDay)}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 14, alignItems: 'start' }}>
+              <div style={{ ...card, padding: '28px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: A.text, marginBottom: 6 }}>
+                  {formatDayLabel(selectedDay)}
+                </div>
+                <div style={{ fontSize: 13, color: A.textSec, marginBottom: 16 }}>В этот день нет событий</div>
+                <button onClick={onCreateEvent} style={{
+                  padding: '9px 20px', borderRadius: 10, border: 'none',
+                  background: A.gold, color: '#1A1208', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>+ Создать событие на этот день</button>
               </div>
-              <div style={{ fontSize: 13, color: A.textSec, marginBottom: 16 }}>В этот день нет событий</div>
-              <button onClick={onCreateEvent} style={{
-                padding: '9px 20px', borderRadius: 10, border: 'none',
-                background: A.gold, color: '#1A1208', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}>+ Создать событие на этот день</button>
+              <FreeWindows date={selectedDay} events={[]} onCreateEvent={onCreateEvent} A={A} />
             </div>
           )}
         </>

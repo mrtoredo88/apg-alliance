@@ -6,6 +6,7 @@ import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { PartnerQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, ContactCard, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { CabinetEventsBlock } from './EventProposalTools.jsx';
 import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
@@ -52,7 +53,7 @@ function getPartnerLaunchState(partner = {}) {
   };
 }
 
-export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, onBack, onPartnerUpdate, onToast }) {
+export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, events = [], onBack, onPartnerUpdate, onEventCreated, onToast }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -221,6 +222,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
             {[
               { icon: '📷', label: 'Фото',     action: () => setActiveTab('edit') },
               { icon: '🎁', label: 'Акция',     action: () => setActiveTab('edit') },
+              { icon: '📅', label: 'Календарь', action: () => setActiveTab('calendar') },
               { icon: '📲', label: 'QR-код',    action: () => setActiveTab('qr') },
               { icon: '🌐', label: 'Карточка',  action: () => window.open(`${APP_URL}/?partner=${partner.id}`, '_blank') },
             ].map(({ icon, label, action }) => (
@@ -239,7 +241,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* Навигация по вкладкам */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['launch', 'Старт'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -361,6 +363,16 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                 </GlassCard>
               )}
             </GlassSection>
+          )}
+
+          {activeTab === 'calendar' && (
+            <CabinetEventsBlock
+              type="partner"
+              profile={partner}
+              events={events}
+              onToast={onToast}
+              onEventCreated={onEventCreated}
+            />
           )}
 
           {/* ── Аналитика ── */}

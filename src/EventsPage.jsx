@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 import { T, GLASS } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, ApgModal, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { EventDetailSheet } from './EventDetailSheet.jsx';
 import { openUrl } from './vk.js';
 
 const GRADIENTS_DARK = [
@@ -22,6 +23,107 @@ const GRADIENTS_LIGHT = [
 
 const eventImageOf = (event) =>
   event?.coverPhoto || event?.imageUrl || event?.thumbnail || event?.banner || event?.image || '';
+
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const DAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const CATEGORY_COLORS = {
+  economy: '#6AABEC',
+  society: '#A78BFA',
+  sport: '#4ade80',
+  culture: '#f59e0b',
+  education: '#38bdf8',
+  transport: '#fb923c',
+  kids: '#fb7185',
+  family: '#D7B86A',
+};
+
+function toDateValue(value) {
+  if (!value) return null;
+  if (value?.toDate) return value.toDate();
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T12:00:00`);
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function eventDate(event) {
+  return toDateValue(event?.startAt || event?.eventDate || event?.date || event?.deadline);
+}
+
+function dayKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function isSameDay(a, b) {
+  return a && b && dayKey(a) === dayKey(b);
+}
+
+function isWeekendDate(date) {
+  return date && (date.getDay() === 0 || date.getDay() === 6);
+}
+
+function isEventPast(event) {
+  const d = eventDate(event);
+  if (!d) return false;
+  const end = toDateValue(event?.endAt);
+  return (end || d).getTime() < Date.now() - 2 * 60 * 60 * 1000;
+}
+
+function isFreeEvent(event) {
+  const text = `${event?.priceClub || ''} ${event?.pricePublic || ''} ${event?.price || ''}`.toLowerCase();
+  return !text.trim() || text.includes('бесплат') || text.includes('free') || text === '0';
+}
+
+function isKidsEvent(event) {
+  const text = `${event?.title || ''} ${event?.description || ''} ${event?.category || ''}`.toLowerCase();
+  return text.includes('дет') || text.includes('сем') || text.includes('kids') || event?.forKids || event?.family;
+}
+
+function isAdultEvent(event) {
+  const text = `${event?.title || ''} ${event?.description || ''}`.toLowerCase();
+  return text.includes('18+') || event?.adultOnly;
+}
+
+function deadlineSoon(event) {
+  const d = toDateValue(event?.deadline);
+  return d && d.getTime() >= Date.now() && d.getTime() <= Date.now() + 3 * 24 * 60 * 60 * 1000;
+}
+
+function distanceKm(a, b) {
+  if (!a || !b) return null;
+  const toRad = v => v * Math.PI / 180;
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function eventCoords(event) {
+  const lat = Number(event?.latitude ?? event?.lat ?? event?.coords?.lat);
+  const lng = Number(event?.longitude ?? event?.lng ?? event?.coords?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function formatEventDate(event) {
+  const d = eventDate(event);
+  if (!d) return event?.date || 'Скоро';
+  return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+}
+
+function formatEventTime(event) {
+  const d = eventDate(event);
+  if (!d) return '';
+  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
 
 function useCountdown(deadline) {
   const getRemaining = (dl) => {
@@ -270,7 +372,7 @@ function EventListCard({ event, index, onClick, isDark = true }) {
   );
 }
 
-function isEventPast(event) {
+function isEventPastLegacy(event) {
   const dateStr = event.deadline ?? event.eventDate;
   if (!dateStr) return false;
   const d = new Date(dateStr.length <= 10 ? dateStr + 'T23:59:59' : dateStr);
@@ -293,10 +395,131 @@ function EmptyState({ tab }) {
   );
 }
 
-export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null }) {
+function FilterChip({ active, children, onClick }) {
+  return (
+    <button onClick={onClick} style={{ flexShrink: 0, minHeight: 38, padding: '8px 13px', borderRadius: 999, border: active ? '1px solid rgba(215,184,106,0.50)' : APG2_PROFILE.glass.border, background: active ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.12)', color: active ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>{children}</button>
+  );
+}
+
+function EventPosterCard({ event, index, onClick, compact = false }) {
+  const image = eventImageOf(event);
+  const d = eventDate(event);
+  const capacity = Number(event?.maxParticipants || 0);
+  const registered = Number(event?.registeredCount || 0);
+  const left = capacity > 0 ? Math.max(0, capacity - registered) : null;
+  return (
+    <GlassCard onClick={() => onClick(event)} style={{ borderRadius: 30, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: compact ? '92px 1fr' : '116px 1fr', minHeight: compact ? 126 : 158, animation: `fadeInUp 0.34s ease ${index * 0.035}s both` }}>
+      <div style={{ position: 'relative', background: APG2_PROFILE.goldSoft, overflow: 'hidden' }}>
+        {image ? <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event?.emoji || '🎉'}</div>}
+        <div style={{ position: 'absolute', left: 10, bottom: 10, minWidth: 48, borderRadius: 18, padding: '8px 7px', background: 'rgba(12,12,14,0.72)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', color: APG2_PROFILE.text, textAlign: 'center', border: '1px solid rgba(255,255,255,0.18)' }}>
+          <div style={{ fontSize: 20, fontWeight: 930, lineHeight: '20px' }}>{d ? d.getDate() : '—'}</div>
+          <div style={{ fontSize: 9, fontWeight: 820, color: APG2_PROFILE.gold, textTransform: 'uppercase' }}>{d ? MONTHS_GEN[d.getMonth()].slice(0, 3) : 'скоро'}</div>
+        </div>
+      </div>
+      <div style={{ padding: compact ? 13 : 16, minWidth: 0 }}>
+        <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+          {isFreeEvent(event) && <GlassBadge tone="gold" style={{ fontSize: 10, padding: '4px 7px' }}>Бесплатно</GlassBadge>}
+          {deadlineSoon(event) && <GlassBadge style={{ fontSize: 10, padding: '4px 7px' }}>Регистрация скоро</GlassBadge>}
+          {event.isExpertEvent && <GlassBadge style={{ fontSize: 10, padding: '4px 7px' }}>Эксперт</GlassBadge>}
+        </div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: compact ? 15 : 18, lineHeight: compact ? '19px' : '22px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Событие АПГ'}</div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '18px', marginTop: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {formatEventDate(event)}{formatEventTime(event) ? ` · ${formatEventTime(event)}` : ''}{event.partner ? ` · ${event.partner}` : ''}{event.address ? ` · ${event.address}` : ''}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 760 }}>
+          {left !== null ? <span>{left} мест осталось</span> : <span>Запись открыта</span>}
+          <span style={{ marginLeft: 'auto', color: APG2_PROFILE.gold, fontSize: 22, lineHeight: 1 }}>›</span>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+function EventsCalendarView({ events, selectedDay, onSelectDay, onOpenEvent }) {
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const today = new Date();
+  const byDay = useMemo(() => {
+    const map = {};
+    events.forEach(event => {
+      const d = eventDate(event);
+      if (!d) return;
+      const key = dayKey(d);
+      if (!map[key]) map[key] = [];
+      map[key].push(event);
+    });
+    return map;
+  }, [events]);
+  const grid = useMemo(() => {
+    const y = month.getFullYear();
+    const m = month.getMonth();
+    const first = new Date(y, m, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const days = [];
+    for (let i = offset - 1; i >= 0; i -= 1) days.push({ date: new Date(y, m, -i), outside: true });
+    const last = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= last; d += 1) days.push({ date: new Date(y, m, d), outside: false });
+    while (days.length < 42) days.push({ date: new Date(y, m + 1, days.length - offset - last + 1), outside: true });
+    return days;
+  }, [month]);
+  const selectedEvents = selectedDay ? (byDay[dayKey(selectedDay)] || []) : [];
+  return (
+    <>
+      <GlassCard style={{ borderRadius: 32, padding: 14, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <button onClick={() => setMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} style={{ ...APG2_PROFILE.glass, width: 38, height: 38, borderRadius: 17, color: APG2_PROFILE.text, border: APG2_PROFILE.glass.border, fontSize: 22 }}>‹</button>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 900 }}>{MONTHS_RU[month.getMonth()]} {month.getFullYear()}</div>
+          <button onClick={() => setMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))} style={{ ...APG2_PROFILE.glass, width: 38, height: 38, borderRadius: 17, color: APG2_PROFILE.text, border: APG2_PROFILE.glass.border, fontSize: 22 }}>›</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
+          {DAYS_SHORT.map(day => <div key={day} style={{ color: APG2_PROFILE.textMuted, fontSize: 10, textAlign: 'center', fontWeight: 850 }}>{day}</div>)}
+          {grid.map(({ date, outside }, idx) => {
+            const key = dayKey(date);
+            const dayEvents = byDay[key] || [];
+            const active = selectedDay && isSameDay(date, selectedDay);
+            const isToday = isSameDay(date, today);
+            return (
+              <button key={idx} onClick={() => onSelectDay(active ? null : date)} style={{ minHeight: 58, borderRadius: 18, border: active ? '1px solid rgba(215,184,106,0.58)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: active ? APG2_PROFILE.goldSoft : isToday ? 'rgba(215,184,106,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: outside ? APG2_PROFILE.textMuted : APG2_PROFILE.text, padding: 6, fontFamily: 'inherit', cursor: 'pointer' }}>
+                <div style={{ fontSize: 13, fontWeight: isToday ? 950 : 760, color: isToday ? APG2_PROFILE.gold : outside ? APG2_PROFILE.textMuted : APG2_PROFILE.text }}>{date.getDate()}</div>
+                {dayEvents.length > 0 && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 10, fontWeight: 850, marginTop: 3 }}>{dayEvents.length}</div>}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 4 }}>
+                  {dayEvents.slice(0, 3).map((event, i) => <span key={`${event.id}-${i}`} style={{ width: 5, height: 5, borderRadius: '50%', background: CATEGORY_COLORS[event.category] || APG2_PROFILE.gold }} />)}
+                  {dayEvents.length > 3 && <span style={{ color: APG2_PROFILE.textMuted, fontSize: 9, lineHeight: '5px' }}>+{dayEvents.length - 3}</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
+      {selectedDay && (
+        <div style={{ animation: 'fadeInUp 0.24s ease both' }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 900, margin: '14px 2px 10px' }}>
+            {selectedDay.getDate()} {MONTHS_GEN[selectedDay.getMonth()]}
+          </div>
+          {selectedEvents.length ? (
+            <div style={{ display: 'grid', gap: 10 }}>{selectedEvents.map((event, index) => <EventPosterCard key={event.id || index} event={event} index={index} compact onClick={onOpenEvent} />)}</div>
+          ) : (
+            <EmptyStateV2 icon="☕" title="На эту дату мероприятий пока нет." text="Можно посмотреть ближайшие события в списке." />
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem('apg_events_v2_view') || 'list'; } catch { return 'list'; }
+  });
+  const [filters, setFilters] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [nearRadius, setNearRadius] = useState(1);
 
   useEffect(() => {
     if (!selectedEvent) return;
@@ -304,9 +527,79 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
     return () => { document.body.style.overflow = ''; };
   }, [selectedEvent]);
 
-  const upcoming = events.filter(e => !isEventPast(e));
+  useEffect(() => {
+    try { localStorage.setItem('apg_events_v2_view', view); } catch {}
+  }, [view]);
+
+  useEffect(() => {
+    if (!navigator?.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: false, timeout: 3500, maximumAge: 10 * 60 * 1000 },
+    );
+  }, []);
+
+  const upcoming = events.filter(e => !isEventPast(e) && e.active !== false && !['draft', 'pending_review', 'rejected', 'revision_requested'].includes(String(e.status || e.submissionStatus || '').toLowerCase()));
   const past     = events.filter(e => isEventPast(e)).reverse();
   const list     = tab === 'upcoming' ? upcoming : past;
+  const today = startOfDay(new Date());
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7);
+
+  const toggleFilter = (id) => setFilters(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+
+  const filteredUpcoming = useMemo(() => {
+    return upcoming.filter(event => {
+      const d = eventDate(event);
+      if (filters.includes('today') && !isSameDay(d, today)) return false;
+      if (filters.includes('tomorrow') && !isSameDay(d, tomorrow)) return false;
+      if (filters.includes('weekend') && !isWeekendDate(d)) return false;
+      if (filters.includes('week') && (!d || d < today || d > weekEnd)) return false;
+      if (filters.includes('free') && !isFreeEvent(event)) return false;
+      if (filters.includes('kids') && !isKidsEvent(event)) return false;
+      if (filters.includes('adult') && !isAdultEvent(event)) return false;
+      if (filters.includes('popular') && Number(event.registeredCount || 0) < 5 && Number(event.priority || 0) < 8) return false;
+      if (filters.includes('deadline') && !deadlineSoon(event)) return false;
+      if (filters.includes('near')) {
+        const km = distanceKm(userLocation, eventCoords(event));
+        if (km === null || km > nearRadius) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      const da = eventDate(a);
+      const db = eventDate(b);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    });
+  }, [upcoming, filters, today, tomorrow, weekEnd, userLocation, nearRadius]);
+
+  const grouped = useMemo(() => {
+    const groups = { today: [], tomorrow: [], weekend: [], later: [] };
+    filteredUpcoming.forEach(event => {
+      const d = eventDate(event);
+      if (isSameDay(d, today)) groups.today.push(event);
+      else if (isSameDay(d, tomorrow)) groups.tomorrow.push(event);
+      else if (isWeekendDate(d) && d <= weekEnd) groups.weekend.push(event);
+      else groups.later.push(event);
+    });
+    return [
+      ['Сегодня', groups.today],
+      ['Завтра', groups.tomorrow],
+      ['Выходные', groups.weekend],
+      ['Позже', groups.later],
+    ].filter(([, items]) => items.length);
+  }, [filteredUpcoming, today, tomorrow, weekEnd]);
+
+  const collections = [
+    ['🔥 Самые популярные', upcoming.filter(e => Number(e.registeredCount || 0) >= 5 || Number(e.priority || 0) >= 8).slice(0, 6)],
+    ['⭐ Скоро закончится регистрация', upcoming.filter(deadlineSoon).slice(0, 6)],
+    ['🆕 Новые события', [...upcoming].sort((a, b) => (toDateValue(b.createdAt)?.getTime() || 0) - (toDateValue(a.createdAt)?.getTime() || 0)).slice(0, 6)],
+    ['🎁 Бесплатные', upcoming.filter(isFreeEvent).slice(0, 6)],
+    ['👨‍👩‍👧 Для всей семьи', upcoming.filter(isKidsEvent).slice(0, 6)],
+  ].filter(([, items]) => items.length);
 
   useEffect(() => {
     const targetId = initialEventTarget?.id ? String(initialEventTarget.id) : '';
@@ -320,24 +613,81 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
   if (variant === 'v2') {
     return (
       <GlassPanel>
-        <ScreenHeader title="Афиша мероприятий" subtitle={`${upcoming.length} предстоящих · ${past.length} прошедших`} kicker="События города" onBack={onBack} />
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-          <StatPill label="предстоящих" value={upcoming.length} tone="gold" />
-          <StatPill label="в архиве" value={past.length} />
-        </div>
-        <GlassCard style={{ borderRadius: 26, padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 18 }}>
-          {[['upcoming', 'Скоро'], ['past', 'Архив']].map(([id, label]) => (
-            <GlassButton key={id} onClick={() => setTab(id)} tone={tab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: tab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
+        <ScreenHeader title="Афиша города" subtitle="Что сегодня, вечером, на выходных и рядом" kicker="События АПГ" onBack={onBack} />
+
+        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 }}>
+          {[['list', 'Список'], ['calendar', 'Календарь']].map(([id, label]) => (
+            <GlassButton key={id} onClick={() => setView(id)} tone={view === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: view === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
-        {list.length === 0 ? (
-          <EmptyStateV2 icon={tab === 'upcoming' ? '🗓️' : '✦'} title={tab === 'upcoming' ? 'Скоро будут мероприятия' : 'Архив пока пуст'} text={tab === 'upcoming' ? 'Партнеры АПГ готовят новые события и поводы выйти в город.' : 'После мероприятий здесь появится история.'} />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {list.map((event, i) => <EventCardV2 key={event.id ?? i} event={event} index={i} onClick={setSelectedEvent} />)}
+
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 2px 12px', margin: '0 -2px 4px' }}>
+          {[
+            ['today', 'Сегодня'], ['tomorrow', 'Завтра'], ['weekend', 'Выходные'], ['week', 'Эта неделя'],
+            ['free', 'Бесплатно'], ['kids', 'Детям'], ['adult', '18+'],
+            ...(userLocation ? [['near', 'Рядом']] : []),
+            ['popular', 'Популярное'], ['deadline', 'Скоро регистрация закроется'],
+          ].map(([id, label]) => <FilterChip key={id} active={filters.includes(id)} onClick={() => toggleFilter(id)}>{label}</FilterChip>)}
+        </div>
+
+        {filters.includes('near') && userLocation && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {[0.5, 1, 3, 5].map(radius => (
+              <FilterChip key={radius} active={nearRadius === radius} onClick={() => setNearRadius(radius)}>{radius < 1 ? '500 м' : `${radius} км`}</FilterChip>
+            ))}
           </div>
         )}
-        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          <StatPill label="событий" value={filteredUpcoming.length} tone="gold" />
+          <StatPill label="сегодня" value={upcoming.filter(e => isSameDay(eventDate(e), today)).length} />
+          <StatPill label="бесплатно" value={upcoming.filter(isFreeEvent).length} />
+        </div>
+
+        {filteredUpcoming.length === 0 ? (
+          <EmptyStateV2
+            icon="😊"
+            title={filters.length ? 'На эту дату мероприятий пока нет.' : 'Сегодня город отдыхает'}
+            text="Можно сбросить фильтры или посмотреть ближайшие события."
+            action={<GlassButton tone="gold" onClick={() => { setFilters([]); setView('list'); }} style={{ color: '#17120a' }}>Показать ближайшие события</GlassButton>}
+          />
+        ) : view === 'calendar' ? (
+          <EventsCalendarView events={filteredUpcoming} selectedDay={selectedDay} onSelectDay={setSelectedDay} onOpenEvent={setSelectedEvent} />
+        ) : (
+          <>
+            {collections.length > 0 && filters.length === 0 && (
+              <div style={{ display: 'grid', gap: 16, marginBottom: 18 }}>
+                {collections.map(([title, items]) => (
+                  <section key={title}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 900, margin: '0 2px 10px' }}>{title}</div>
+                    <div style={{ display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(260px, 82%)', gap: 10, overflowX: 'auto', paddingBottom: 2 }}>
+                      {items.map((event, index) => <EventPosterCard key={`${title}-${event.id || index}`} event={event} index={index} compact onClick={setSelectedEvent} />)}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'grid', gap: 16 }}>
+              {grouped.map(([title, items]) => (
+                <section key={title}>
+                  <div style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 66px)', zIndex: 4, margin: '0 -2px 10px', padding: '8px 2px', background: 'linear-gradient(180deg,rgba(17,17,19,0.94),rgba(17,17,19,0.74),rgba(17,17,19,0))', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: 'uppercase' }}>{title}</div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {items.map((event, index) => <EventPosterCard key={event.id || index} event={event} index={index} onClick={setSelectedEvent} />)}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+
+        <EventDetailSheet
+          open={Boolean(selectedEvent)}
+          event={selectedEvent}
+          role="user"
+          registeredEventIds={registeredEventIds}
+          onRegister={onEventRegister}
+          onClose={() => setSelectedEvent(null)}
+        />
       </GlassPanel>
     );
   }

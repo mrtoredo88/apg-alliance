@@ -7,6 +7,7 @@ import { APP_URL } from './constants.js';
 import { Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { CabinetEventsBlock } from './EventProposalTools.jsx';
 import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
@@ -29,7 +30,7 @@ function getExpertReadyState(expert = {}) {
   return { checks, percent: Math.round((doneCount / checks.length) * 100), doneCount };
 }
 
-export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, onBack, onExpertUpdate, onToast }) {
+export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expert: initialExpert, events = [], onBack, onExpertUpdate, onEventCreated, onToast }) {
   const [expert, setExpert]       = useState(initialExpert);
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -215,6 +216,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 7, marginTop: 12 }}>
             {[
               { icon: '✏️', label: 'Профиль',  action: () => setActiveTab('edit') },
+              { icon: '📅', label: 'Расписание', action: () => setActiveTab('schedule') },
               { icon: '📸', label: 'Контент',  action: () => setActiveTab('content') },
               { icon: '📲', label: 'QR-код',   action: () => setActiveTab('qr') },
               { icon: '🌐', label: 'Карточка', action: () => window.open(`${APP_URL}/?expert=${expert.id}`, '_blank') },
@@ -233,7 +235,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
           {/* Навигация */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['start', 'Старт'], ['stats', 'Аналитика'], ['content', 'Контент'], ['qr', 'QR'], ['reviews', 'Отзывы'], ['edit', 'Карточка']].map(([id, label]) => (
+            {[['start', 'Старт'], ['schedule', 'Расписание'], ['stats', 'Аналитика'], ['content', 'Контент'], ['qr', 'QR'], ['reviews', 'Отзывы'], ['edit', 'Карточка']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -350,6 +352,16 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
                 </GlassCard>
               )}
             </GlassSection>
+          )}
+
+          {activeTab === 'schedule' && (
+            <CabinetEventsBlock
+              type="expert"
+              profile={expert}
+              events={events}
+              onToast={onToast}
+              onEventCreated={onEventCreated}
+            />
           )}
 
           {/* ── АНАЛИТИКА ── */}
