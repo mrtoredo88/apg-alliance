@@ -450,6 +450,22 @@ async function assertPublicProfileAvailable(db, collectionName, id, label) {
   return { id: snap.id, ...(snap.data() || {}) };
 }
 
+function safeStringList(value) {
+  return Array.isArray(value) ? value.map(item => safeString(item, 220)).filter(Boolean) : [];
+}
+
+function actorOwnsProfile(data, actor) {
+  const actorIds = [actor.userId, actor.uid].map(item => safeString(item, 220)).filter(Boolean);
+  const actorEmail = safeString(actor.user?.email || actor.user?.linkedEmail, 200).toLowerCase();
+  const ownerUserIds = safeStringList(data.ownerUserIds);
+  const ownerEmails = safeStringList(data.ownerEmails).map(item => item.toLowerCase());
+  return actorIds.some(id => data.ownerId === id || String(data.vkOwnerId || '') === id || ownerUserIds.includes(id))
+    || (actorEmail && (
+      safeString(data.ownerEmail || data.connectionEmail, 200).toLowerCase() === actorEmail
+      || ownerEmails.includes(actorEmail)
+    ));
+}
+
 async function actionFavoritesToggle(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
@@ -737,11 +753,7 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   const snap = await ref.get();
   if (!snap.exists) throw Object.assign(new Error('Профиль не найден.'), { statusCode: 404 });
   const data = snap.data() || {};
-  const actorEmail = safeString(actor.user?.email || actor.user?.linkedEmail, 200).toLowerCase();
-  const allowed = data.ownerId === actor.userId
-    || String(data.vkOwnerId || '') === actor.userId
-    || (actorEmail && safeString(data.ownerEmail, 200).toLowerCase() === actorEmail);
-  if (!allowed) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
+  if (!actorOwnsProfile(data, actor)) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
   const allowedFields = type === 'expert'
     ? new Set(['description', 'offer', 'phone', 'bookingUrl', 'websiteUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'photo'])
     : new Set(['description', 'offer', 'phone', 'hours', 'socialUrl', 'logoUrl']);

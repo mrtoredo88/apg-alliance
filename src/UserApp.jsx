@@ -64,6 +64,39 @@ function isNotArchived(item) {
   return item?.archived !== true;
 }
 
+function safeStringList(value) {
+  return Array.isArray(value) ? value.map(item => String(item || '').trim()).filter(Boolean) : [];
+}
+
+function profileOwnedByUser(profile, userData, fallbackEmail = '') {
+  if (!profile || !userData) return false;
+  const userIds = [
+    userData.id,
+    userData.uid,
+    userData.firebaseUid,
+    userData.authUid,
+  ].map(item => String(item || '').trim()).filter(Boolean);
+  const emails = [
+    userData.email,
+    userData.linkedEmail,
+    fallbackEmail,
+  ].map(item => String(item || '').trim().toLowerCase()).filter(Boolean);
+  const ownerUserIds = safeStringList(profile.ownerUserIds);
+  const ownerEmails = safeStringList(profile.ownerEmails).map(item => item.toLowerCase());
+  const userPartnerIds = safeStringList(userData.partnerCabinetIds);
+  return userIds.some(id => (
+    String(profile.ownerId || '') === id
+    || String(profile.vkOwnerId || '') === id
+    || ownerUserIds.includes(id)
+  ))
+    || emails.some(email => (
+      String(profile.ownerEmail || '').toLowerCase() === email
+      || String(profile.connectionEmail || '').toLowerCase() === email
+      || ownerEmails.includes(email)
+    ))
+    || userPartnerIds.includes(String(profile.id || ''));
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
@@ -965,11 +998,7 @@ export function UserApp() {
       setPartners(freshPartners);
       try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
       if (userData && isMounted.current) {
-        const owned = freshPartners.find(p =>
-          (p.ownerId && String(p.ownerId) === String(userData.id)) ||
-          (p.ownerEmail && userData.email && p.ownerEmail.toLowerCase() === userData.email.toLowerCase()) ||
-          (p.vkOwnerId && String(p.vkOwnerId) === String(userData.id))
-        );
+        const owned = freshPartners.find(p => profileOwnedByUser(p, userData));
         if (owned) {
           setOwnedPartner(owned);
         } else if (userData.partnerId) {
@@ -1021,10 +1050,7 @@ export function UserApp() {
       if (isMounted.current) {
         setExperts(freshExperts);
         if (userData) {
-          const ownedEx = freshExperts.find(e =>
-            (e.ownerEmail && userData.email && e.ownerEmail.toLowerCase() === userData.email.toLowerCase()) ||
-            (e.vkOwnerId && String(e.vkOwnerId) === String(userData.id))
-          );
+          const ownedEx = freshExperts.find(e => profileOwnedByUser(e, userData));
           setOwnedExpert(ownedEx ?? null);
         }
       }
@@ -1123,9 +1149,9 @@ export function UserApp() {
         // Это нужно чтобы ownerEmail у партнёра/эксперта матчился даже для VK-пользователей.
         const fsEmail = (data.email || data.linkedEmail)?.trim().toLowerCase();
         if (fsEmail && isMounted.current) {
-          const exByEmail = freshExperts.find(e => e.ownerEmail?.toLowerCase() === fsEmail);
+          const exByEmail = freshExperts.find(e => profileOwnedByUser(e, userData, fsEmail));
           if (exByEmail) setOwnedExpert(exByEmail);
-          const ptByEmail = freshPartners.find(p => p.ownerEmail?.toLowerCase() === fsEmail);
+          const ptByEmail = freshPartners.find(p => profileOwnedByUser(p, userData, fsEmail));
           if (ptByEmail) setOwnedPartner(ptByEmail);
         }
 

@@ -287,6 +287,10 @@ async function findPartnerConflicts(db, partnerId, email, userId = '') {
     ownerSnap?.docs?.forEach(doc => {
       if (doc.id !== partnerId) conflicts.push({ partnerId: doc.id, field: 'ownerId', name: doc.data()?.name || '' });
     });
+    const ownersSnap = await db.collection('partners').where('ownerUserIds', 'array-contains', userId).limit(5).get().catch(() => null);
+    ownersSnap?.docs?.forEach(doc => {
+      if (doc.id !== partnerId) conflicts.push({ partnerId: doc.id, field: 'ownerUserIds', name: doc.data()?.name || '' });
+    });
   }
   if (email) {
     for (const field of ['ownerEmail', 'connectionEmail']) {
@@ -295,6 +299,10 @@ async function findPartnerConflicts(db, partnerId, email, userId = '') {
         if (doc.id !== partnerId) conflicts.push({ partnerId: doc.id, field, name: doc.data()?.name || '' });
       });
     }
+    const emailsSnap = await db.collection('partners').where('ownerEmails', 'array-contains', email).limit(5).get().catch(() => null);
+    emailsSnap?.docs?.forEach(doc => {
+      if (doc.id !== partnerId) conflicts.push({ partnerId: doc.id, field: 'ownerEmails', name: doc.data()?.name || '' });
+    });
   }
   return conflicts.filter((item, index, arr) => arr.findIndex(x => x.partnerId === item.partnerId && x.field === item.field) === index);
 }
@@ -462,6 +470,8 @@ async function handlePartnerOnboardingAction(db, request, actor) {
       await updatePartnerOnboarding(db, request, actor, id, {
         ownerId: user.id,
         ownerEmail: email,
+        ownerUserIds: FieldValue.arrayUnion(user.id),
+        ownerEmails: FieldValue.arrayUnion(email),
         connectionEmail: email,
         partnerCabinetEnabled: true,
         connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked',
@@ -509,6 +519,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
       }
       await updatePartnerOnboarding(db, request, actor, id, {
         ownerEmail: email,
+        ownerEmails: FieldValue.arrayUnion(email),
         connectionEmail: email,
         connectionStatus: 'invitation_sent',
         connectionStatusLabel: PARTNER_STATUS_LABELS.invitation_sent,

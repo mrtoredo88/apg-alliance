@@ -33,7 +33,75 @@ async function resolveOwner() {
   throw new Error('Owner user not found. Run with OWNER_EMAIL=owner@example.com');
 }
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function publicUser(doc) {
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    email: normalizeEmail(data.email || data.login || data.linkedEmail),
+    data,
+  };
+}
+
+async function findUserByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  const direct = await db.collection('users').doc(`email:${normalized}`).get().catch(() => null);
+  if (direct?.exists) return publicUser(direct);
+  const byEmail = await db.collection('users').where('email', '==', normalized).limit(1).get();
+  if (!byEmail.empty) return publicUser(byEmail.docs[0]);
+  const byLinkedEmail = await db.collection('users').where('linkedEmail', '==', normalized).limit(1).get().catch(() => null);
+  if (byLinkedEmail && !byLinkedEmail.empty) return publicUser(byLinkedEmail.docs[0]);
+  return null;
+}
+
+async function findTatianaGordeeva() {
+  const snap = await db.collection('users').limit(1200).get();
+  const matches = snap.docs.map(publicUser).filter(user => {
+    const data = user.data || {};
+    const haystack = [
+      data.name,
+      data.displayName,
+      data.firstName,
+      data.first_name,
+      data.lastName,
+      data.last_name,
+      data.email,
+      data.linkedEmail,
+    ].join(' ').toLowerCase();
+    return haystack.includes('татья') && haystack.includes('горде');
+  });
+  return matches[0] || null;
+}
+
+async function resolveDemoOwners(primaryOwner) {
+  const explicitEmails = String(process.env.DEMO_PARTNER_OWNER_EMAILS || '')
+    .split(',')
+    .map(normalizeEmail)
+    .filter(Boolean);
+  const owners = [primaryOwner];
+  for (const email of explicitEmails) {
+    const found = await findUserByEmail(email);
+    if (found) owners.push(found);
+  }
+  if (!explicitEmails.length) {
+    const tatiana = await findTatianaGordeeva();
+    if (tatiana) owners.push(tatiana);
+  }
+  const byId = new Map();
+  owners.forEach(owner => {
+    if (owner?.id) byId.set(owner.id, owner);
+  });
+  return [...byId.values()];
+}
+
 const owner = await resolveOwner();
+const demoOwners = await resolveDemoOwners(owner);
+const ownerUserIds = [...new Set(demoOwners.map(item => String(item.id || '').trim()).filter(Boolean))];
+const ownerEmails = [...new Set(demoOwners.map(item => normalizeEmail(item.email)).filter(Boolean))];
 const logo = `${APP_URL}/logo.png`;
 const cover = `${APP_URL}/splash-v43.png`;
 const icon = `${APP_URL}/icon.png`;
@@ -81,6 +149,8 @@ const partner = {
   publicationConsentAccepted: true,
   ownerId: owner.id,
   ownerEmail: owner.email,
+  ownerUserIds,
+  ownerEmails,
   connectionEmail: owner.email,
   phone: '+7 (499) 000-00-00',
   address: 'Зеленоград, Центральная площадь, демо-пространство АПГ',
@@ -204,17 +274,22 @@ await db.collection('events').doc('demo-partner-apg-event').set({
   updatedAt: FieldValue.serverTimestamp(),
 }, { merge: true });
 
-await db.collection('users').doc(owner.id).set({
-  partnerId: DEMO_ID,
-  ownerPartnerId: DEMO_ID,
-  partnerCabinetIds: FieldValue.arrayUnion(DEMO_ID),
-  updatedAt: FieldValue.serverTimestamp(),
-  ...(owner.email ? { email: owner.email } : {}),
-}, { merge: true });
+for (const demoOwner of demoOwners) {
+  await db.collection('users').doc(demoOwner.id).set({
+    partnerId: DEMO_ID,
+    ownerPartnerId: DEMO_ID,
+    partnerCabinetIds: FieldValue.arrayUnion(DEMO_ID),
+    updatedAt: FieldValue.serverTimestamp(),
+    ...(demoOwner.email ? { email: demoOwner.email } : {}),
+  }, { merge: true });
+}
 
 console.log(JSON.stringify({
   ok: true,
   partnerId: DEMO_ID,
   ownerUserId: owner.id,
   ownerEmail: owner.email,
+  ownerUserIds,
+  ownerEmails,
+  ownersCount: demoOwners.length,
 }, null, 2));
