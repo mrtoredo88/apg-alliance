@@ -186,6 +186,20 @@
 - Portal используются: специальных portal для Economy Engine нет; UI наследует существующие overlay-механики `RewardsPage`.
 - Критические зависимости: сохранность существующих `users.keys`, idempotent rewards, transaction safety for ticket exchange/raffles, parity between Vercel `api/` and Fastify/Yandex `server/src/routes/`.
 
+## APG Learning System
+
+- Кто использует: `UserApp`, `Onboarding`, `TasksPage`, `ReferencePage`, `LokiPage`, `ProfilePanel`, `LokiCore`, `news-comments`.
+- Что использует он: `src/learningSystem.js`, существующую систему задач, `LokiProvider`/`LokiCore`, `profile:update`, `task:claim`.
+- Provider ему необходимы: `LokiProvider` нужен для объяснения экранов через Локи; остальные части работают через props из `UserApp`.
+- API вызывает: `/api/user-actions` для `profile:update` и `task:claim`; `/api/news-comments` фиксирует учебное действие комментария.
+- Firestore коллекции использует: `users` (`learningProgress`, `learningHintsEnabled`, `learningAnalytics`, `completedTasks`), `users/{id}/activity`, `newsComments`.
+- Backend endpoint использует: `/api/user-actions`, `/api/news-comments`.
+- Глобальные состояния изменяет: `showOnboarding`, `learningProgress`, `learningHintsEnabled`, `completedTasks`, `userKeys`, `userReputation`.
+- Маршруты его открывают: первый запуск приложения, `profile`, `tasks`, `reference`, `loki`.
+- BottomSheet связаны: напрямую нет.
+- Portal используются: `Onboarding` и контекстные подсказки отображаются поверх приложения; `LokiExperience` остаётся существующим portal-механизмом.
+- Критические зависимости: `UserApp` как owner learning state, backend allowlist `profile:update`, idempotent `task:claim`, текущий `activePanel` для объяснения экранов.
+
 ## Firebase
 
 - Кто использует: `UserApp`, `AdminPanel`, `NewsPage` auth token usage, `PartnerPage`, `ExpertsPage`, `ProfilePanel`, backend routes through Firebase Admin SDK.
@@ -276,6 +290,7 @@
 - `Firebase`: общий источник Auth, Firestore data и Messaging; используется frontend and backend sides.
 - `Backend API`: защищённые изменения, admin actions, comments, auth, push, upload, Telegram, VK sync and analytics depend on it.
 - `APG Economy`: центральный слой ключей, билетов, репутации, розыгрышей и наград; ошибки здесь напрямую влияют на доверие пользователей.
+- `APG Learning System`: влияет на первый запуск, понимание приложения и первые ключевые действия пользователя.
 - `LokiProvider`: required for contextual assistant and any `useLoki` consumer; also changes navigation through `appActions`.
 - `App` routing layer: owns BrowserRouter, top-level routes, lazy chunk boundaries and update/version check.
 - `EventDetailSheet`: shared by user events and admin events center; portal and data compatibility are critical.

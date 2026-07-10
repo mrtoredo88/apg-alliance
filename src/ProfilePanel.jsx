@@ -386,7 +386,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, onOpenHealth }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, onRestartLearning, onOpenHealth }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -1618,6 +1618,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           {[
             { icon: '◌', label: 'Локи АПГ',          action: onOpenLoki,             right: 'помощник' },
             { icon: '⌕', label: 'Справочник',        action: onOpenReference,        right: null },
+            { icon: '🎓', label: 'Повторить обучение', action: onRestartLearning,      right: '1 мин' },
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },

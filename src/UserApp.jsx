@@ -28,6 +28,7 @@ import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
+import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -619,6 +620,8 @@ export function UserApp() {
   const [favorites, setFavorites]               = useState([]);
   const [scannedPartnerIds, setScannedPartnerIds] = useState({});
   const [completedTasks, setCompletedTasks]     = useState([]);
+  const [learningProgress, setLearningProgress] = useState({});
+  const [learningHintsEnabled, setLearningHintsEnabled] = useState(true);
   const [streak, setStreak]                     = useState(0);
   const [lastScanDate, setLastScanDate]         = useState(null);
   const [referralCount, setReferralCount]       = useState(0);
@@ -1171,6 +1174,8 @@ export function UserApp() {
         setInterestProfile(data.interestProfile && typeof data.interestProfile === 'object' ? data.interestProfile : null);
         setScannedPartnerIds(data.scannedPartners ?? {});
         setCompletedTasks(data.completedTasks ?? []);
+        setLearningProgress(normalizeLearningProgress(data.learningProgress));
+        setLearningHintsEnabled(data.learningHintsEnabled !== false);
         setStreak(data.streak ?? 0);
         setLastScanDate(data.lastScanDate ?? null);
         setReferralCount(data.referralCount ?? 0);
@@ -1359,10 +1364,109 @@ export function UserApp() {
     setShowOnboarding(false);
     setShowScannerHint(true);
     if (user) {
-      try { await userAction('profile:update', { userId: String(user.id), patch: { onboardingDone: true } }); }
+      try {
+        await userAction('profile:update', {
+          userId: String(user.id),
+          patch: {
+            onboardingDone: true,
+            learningHintsEnabled: true,
+            learningAnalytics: {
+              onboardingCompleted: true,
+              onboardingCompletedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
       catch (e) { logError(e, 'UserApp.handleOnboardingComplete'); }
     }
   };
+
+  const handleOnboardingProgress = useCallback((step, total) => {
+    if (!user) return;
+    userAction('profile:update', {
+      userId: String(user.id),
+      patch: {
+        learningAnalytics: {
+          onboardingLastStep: step,
+          onboardingTotalSteps: total,
+          onboardingUpdatedAt: new Date().toISOString(),
+        },
+      },
+    }).catch(e => logError(e, 'UserApp.handleOnboardingProgress'));
+  }, [user]);
+
+  const markLearningAction = useCallback((key) => {
+    if (!key) return;
+    setLearningProgress(prev => {
+      const next = nextLearningProgress(prev, key);
+      if (next === prev || prev?.[key]) return prev;
+      if (user) {
+        userAction('profile:update', {
+          userId: String(user.id),
+          patch: {
+            learningProgress: next,
+            learningAnalytics: {
+              lastAction: key,
+              lastActionAt: new Date().toISOString(),
+            },
+          },
+        }).catch(e => logError(e, 'UserApp.markLearningAction'));
+      }
+      return next;
+    });
+  }, [user]);
+
+  const markLearningHintSeen = useCallback((hint) => {
+    if (!hint?.id) return;
+    setLearningProgress(prev => {
+      const seenHints = { ...(prev?.seenHints ?? {}), [hint.id]: true };
+      const next = { ...normalizeLearningProgress(prev), seenHints, updatedAt: new Date().toISOString() };
+      if (user) {
+        userAction('profile:update', {
+          userId: String(user.id),
+          patch: {
+            learningProgress: next,
+            learningAnalytics: {
+              lastHint: hint.id,
+              hints: { [hint.id]: true },
+            },
+          },
+        }).catch(e => logError(e, 'UserApp.markLearningHintSeen'));
+      }
+      return next;
+    });
+  }, [user]);
+
+  const restartLearning = useCallback(() => {
+    const next = { ...normalizeLearningProgress(learningProgress), seenHints: {}, restartedAt: new Date().toISOString() };
+    setLearningProgress(next);
+    setLearningHintsEnabled(true);
+    setShowOnboarding(true);
+    if (user) {
+      userAction('profile:update', {
+        userId: String(user.id),
+        patch: {
+          onboardingDone: false,
+          learningHintsEnabled: true,
+          learningProgress: next,
+          learningAnalytics: { restartedAt: next.restartedAt },
+        },
+      }).catch(e => logError(e, 'UserApp.restartLearning'));
+    }
+  }, [learningProgress, user]);
+
+  useEffect(() => {
+    if (activePanel === 'loki') markLearningAction('lokiOpened');
+    if (activePanel === 'profile') markLearningAction('profileOpened');
+  }, [activePanel, markLearningAction]);
+
+  const activeLearningHint = useMemo(() => {
+    if (!learningHintsEnabled) return null;
+    const hint = LEARNING_HINTS[activePanel];
+    if (!hint) return null;
+    if (learningProgress?.seenHints?.[hint.id]) return null;
+    return hint;
+  }, [activePanel, learningHintsEnabled, learningProgress]);
 
   // ─── Избранное ──────────────────────────────────────────────────────────────
 
@@ -1589,10 +1693,11 @@ export function UserApp() {
 
   const openPartner = useCallback((partner) => {
     setActivePartner(partner);
+    markLearningAction('partnerOpened');
     recordInterest({ type: 'partner_open', itemType: 'partner', item: partner });
     showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { id: partner?.id, partnerName: partner?.name });
     navigatePanel('partner');
-  }, [navigatePanel, recordInterest]);
+  }, [markLearningAction, navigatePanel, recordInterest]);
 
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
@@ -2850,6 +2955,7 @@ export function UserApp() {
                     onEmailAuthSuccess={handleEmailAuthSuccess}
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
+                    onRestartLearning={restartLearning}
                     onOpenNews={() => goPanel('news')}
                     onOpenHealth={() => goPanel('health')}
                   />
@@ -2868,7 +2974,10 @@ export function UserApp() {
                     initialEventTarget={pendingLokiEventTarget}
                     registeredEventIds={registeredEventIds}
                     onEventRegister={handleEventRegister}
-                    onEventOpen={(event) => recordInterest({ type: 'event_open', itemType: 'event', item: event })}
+                    onEventOpen={(event) => {
+                      markLearningAction('eventOpened');
+                      recordInterest({ type: 'event_open', itemType: 'event', item: event });
+                    }}
                   />
                 </Suspense>
               </Panel>
@@ -2880,6 +2989,7 @@ export function UserApp() {
                     userKeys={userKeys} favCount={favorites.length}
                     streak={streak} referralCount={referralCount}
                     scannedCount={Object.keys(scannedPartnerIds).length}
+                    learningProgress={learningProgress}
                     completedTasks={completedTasks}
                     customTasks={customTasks}
                     onBack={goBackPanel}
@@ -3080,8 +3190,23 @@ export function UserApp() {
 
           {showOnboarding && (
             <Suspense fallback={null}>
-              <Onboarding onComplete={handleOnboardingComplete} />
+              <Onboarding onComplete={handleOnboardingComplete} onProgress={handleOnboardingProgress} />
             </Suspense>
+          )}
+
+          {activeLearningHint && !showOnboarding && !isScannerOpen && (
+            <div style={{ position: 'fixed', left: 14, right: 14, bottom: 'calc(92px + env(safe-area-inset-bottom, 0px))', zIndex: 4200, pointerEvents: 'none' }}>
+              <GlassCard style={{ maxWidth: 520, margin: '0 auto', borderRadius: 26, padding: 14, pointerEvents: 'auto', border: '1px solid rgba(215,184,106,0.24)' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 16, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', flexShrink: 0 }}>?</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 14.5, lineHeight: '18px', fontWeight: 860 }}>{activeLearningHint.title}</div>
+                    <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px', marginTop: 4 }}>{activeLearningHint.text}</div>
+                  </div>
+                  <GlassButton onClick={() => markLearningHintSeen(activeLearningHint)} style={{ minHeight: 34, borderRadius: 14, padding: '6px 10px', flexShrink: 0 }}>Понятно</GlassButton>
+                </div>
+              </GlassCard>
+            </div>
           )}
 
           {showScannerHint && (

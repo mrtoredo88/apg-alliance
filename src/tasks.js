@@ -1,7 +1,10 @@
-// check(keys, favCount, referralCount, streak, scannedCount)
+import { LEARNING_TASKS } from './learningSystem.js';
+
+// check(keys, favCount, referralCount, streak, scannedCount, learningProgress)
 // sc = scannedCount — количество уникальных посещённых партнёров
 
 export const TASKS = [
+  ...LEARNING_TASKS,
   {
     id: 'first_open',
     emoji: '🎯', title: 'Добро пожаловать',

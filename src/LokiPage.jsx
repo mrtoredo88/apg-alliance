@@ -192,6 +192,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       <GlassCard style={{ borderRadius: 32, padding: 14, marginBottom: 14 }}>
         <form onSubmit={(e) => { e.preventDefault(); ask(input); }} style={{ display: 'grid', gap: 10 }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 930 }}>Чем я могу помочь сегодня?</div>
+          <GlassButton onClick={() => ask('Объясни этот экран')} tone="gold" style={{ width: '100%', minHeight: 46, borderRadius: 20, color: '#17120a' }}>Объяснить этот экран</GlassButton>
           <GlassInput value={input} onChange={e => setInput(e.target.value)} placeholder="Напиши задачу, а не команду" aria-label="Вопрос Локи" style={{ minHeight: 56, borderRadius: 24 }} />
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
             {EXAMPLE_PROMPTS.map(prompt => <GlassButton key={prompt} onClick={() => ask(prompt)} style={{ minHeight: 38, borderRadius: 999, padding: '8px 11px', flex: '0 0 auto', fontSize: 12 }}>{prompt}</GlassButton>)}

@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: APG Learning System
+**Коммит:** `pending`
+**Файлы:** `src/learningSystem.js`, `src/Onboarding.jsx`, `src/tasks.js`, `src/TasksPage.jsx`, `src/ReferencePage.jsx`, `src/LokiPage.jsx`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/loki/core/LokiCore.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `api/news-comments.js`, `server/src/routes/news-comments.js`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Создан APG Learning System: 7 экранов первого запуска, учебные задания, одноразовые контекстные подсказки и центр знаний для пользователей, партнёров и экспертов.
+- Учебные задания подключены к существующей системе `TasksPage`/`task:claim`, а прогресс действий сохраняется в профиле пользователя.
+- Локи получил сценарий «Объяснить этот экран» на основе текущего `activePanel`.
+**Почему:** Пользователь должен быстро понимать возможности АПГ через действия, контекст и Локи, а не через отдельный FAQ.
+
+---
+
 ## [2026-07-10] feat: APG Economy 1.0
 **Коммит:** `pending`
 **Файлы:** `server-shared/economy-engine.js`, `src/economyEngine.js`, `src/UserApp.jsx`, `src/RewardsPage.jsx`, `src/AdminPanel.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `api/news-engagement.js`, `server/src/routes/news-engagement.js`, `api/news-comments.js`, `server/src/routes/news-comments.js`, `server-shared/reward-service.js`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`

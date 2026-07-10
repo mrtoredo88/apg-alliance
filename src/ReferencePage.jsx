@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import guides from './assistant/guides.json';
-import faq from './assistant/faq.json';
+import baseGuides from './assistant/guides.json';
+import baseFaq from './assistant/faq.json';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel } from './components/Apg2ProfileGlass.jsx';
+import { LEARNING_KNOWLEDGE_SECTIONS, flattenLearningKnowledgeArticles } from './learningSystem.js';
 import { isVK } from './vk.js';
+
+const learningGuides = flattenLearningKnowledgeArticles();
+const guides = [...learningGuides, ...baseGuides];
+const faq = baseFaq;
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/ё/g, 'е').trim();
@@ -38,21 +43,24 @@ function GuideCard({ guide, active, onClick }) {
 
 export function ReferencePage({ onBack, onOpenLoki, onOpenPanel }) {
   const [query, setQuery] = useState('');
+  const [audience, setAudience] = useState('users');
   const [selectedId, setSelectedId] = useState(guides[0]?.id ?? '');
   const selectedGuide = guides.find(item => item.id === selectedId) ?? guides[0];
   const isVkShell = isVK();
+  const activeSection = LEARNING_KNOWLEDGE_SECTIONS.find(item => item.audience === audience) ?? LEARNING_KNOWLEDGE_SECTIONS[0];
 
   const filteredGuides = useMemo(() => {
     const q = normalize(query);
     return guides
+      .filter(guide => !guide.audience || guide.audience === audience)
       .map(guide => ({
         guide,
-        score: scoreItem(q, [guide.title, guide.description, ...(guide.keywords || []), ...guide.steps.map(step => `${step.title} ${step.text}`)]),
+        score: scoreItem(q, [guide.title, guide.description, ...(guide.keywords || []), ...(guide.steps || []).map(step => `${step.title} ${step.text}`)]),
       }))
       .filter(item => !q || item.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(item => item.guide);
-  }, [query]);
+  }, [audience, query]);
 
   const filteredFaq = useMemo(() => {
     const q = normalize(query);
@@ -77,16 +85,21 @@ export function ReferencePage({ onBack, onOpenLoki, onOpenPanel }) {
         <GlassButton onClick={onBack} style={{ width: 44, minHeight: 44, borderRadius: 18, padding: 0 }}>‹</GlassButton>
         <div style={{ flex: 1, minWidth: 0 }}>
           <GlassBadge tone="gold" style={{ marginBottom: 7 }}>{isVkShell ? 'VK Mini App' : 'АПГ'}</GlassBadge>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 27, lineHeight: '31px', fontWeight: 940 }}>Справочник АПГ</div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px', marginTop: 4 }}>Короткие ответы, инструкции и безопасные шаги внутри одной экосистемы.</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 27, lineHeight: '31px', fontWeight: 940 }}>Центр знаний АПГ</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px', marginTop: 4 }}>Обучение, пошаговые инструкции, видео-подсказки и помощь Локи.</div>
         </div>
       </div>
 
       <GlassCard style={{ borderRadius: 30, padding: 14, marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 10 }}>
+          {LEARNING_KNOWLEDGE_SECTIONS.map(section => (
+            <GlassButton key={section.audience} onClick={() => { setAudience(section.audience); setSelectedId(section.articles[0]?.id ?? selectedId); }} tone={audience === section.audience ? 'gold' : 'glass'} style={{ minHeight: 38, flex: '0 0 auto', borderRadius: 999, padding: '8px 12px', color: audience === section.audience ? '#17120a' : APG2_PROFILE.text }}>{section.label}</GlassButton>
+          ))}
+        </div>
         <GlassInput
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Поиск: ключи, QR, партнёры, розыгрыш..."
+          placeholder={`Поиск для раздела «${activeSection?.label ?? 'АПГ'}»`}
           aria-label="Поиск по справочнику"
           style={{ marginBottom: 10 }}
         />
@@ -96,6 +109,11 @@ export function ReferencePage({ onBack, onOpenLoki, onOpenPanel }) {
           ))}
           <GlassButton onClick={onOpenLoki} tone="gold" style={{ minHeight: 38, flex: '0 0 auto', borderRadius: 999, padding: '8px 12px', color: '#17120a' }}>Спросить Локи</GlassButton>
         </div>
+        {!!activeSection?.categories?.length && (
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 10 }}>
+            {activeSection.categories.map(category => <GlassBadge key={category}>{category}</GlassBadge>)}
+          </div>
+        )}
       </GlassCard>
 
       <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
@@ -118,8 +136,14 @@ export function ReferencePage({ onBack, onOpenLoki, onOpenPanel }) {
               <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px', marginTop: 3 }}>{selectedGuide.description}</div>
             </div>
           </div>
+          {selectedGuide.video && (
+            <GlassCard style={{ borderRadius: 24, padding: 13, marginBottom: 12, background: 'rgba(215,184,106,0.08)' }}>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 860, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Видео</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px' }}>{selectedGuide.video}</div>
+            </GlassCard>
+          )}
           <div style={{ display: 'grid', gap: 10 }}>
-            {selectedGuide.steps.map((step, index) => (
+            {(selectedGuide.steps || []).map((step, index) => (
               <div key={`${selectedGuide.id}-${step.title}`} style={{ display: 'grid', gridTemplateColumns: '42px 1fr', gap: 12, alignItems: 'start' }}>
                 <VisualToken visual={step.visual} />
                 <div style={{ minWidth: 0, paddingBottom: index === selectedGuide.steps.length - 1 ? 0 : 10, borderBottom: index === selectedGuide.steps.length - 1 ? 'none' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>

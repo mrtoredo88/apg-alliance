@@ -17,6 +17,7 @@ import { APG_KNOWLEDGE_BASE, validateApgKnowledgeBase } from '../knowledge/index
 import { explainLastRecommendation } from '../LokiIntelligence.js';
 import { buildPersonalRoute, buildSurprisePick } from '../LokiPlanner.js';
 import { runBrainLayer } from './brain/BrainLayer.js';
+import { getLearningScreenExplanation } from '../../learningSystem.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -102,6 +103,13 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   let intelligenceResult = null;
   if (includesAny(query, ['почему ты', 'почему предлож', 'зачем предлож', 'объясни рекомендац'])) {
     intelligenceResult = explainLastRecommendation(memory);
+  } else if (includesAny(query, ['объясни экран', 'объясни этот экран', 'что на этом экране', 'как пользоваться этим экраном', 'что здесь делать'])) {
+    const panel = context.user?.currentPanel ?? appState?.currentScreen?.id ?? appState?.activePanel;
+    intelligenceResult = {
+      intent: 'learning.explain_screen',
+      text: getLearningScreenExplanation(panel),
+      cards: [],
+    };
   } else if (includesAny(query, ['что мне сегодня посмотреть', 'маршрут', 'план на сегодня', 'куда сходить сегодня'])) {
     intelligenceResult = buildPersonalRoute({ appState, learning: memory?.learning ?? {}, now: new Date() });
   } else if (includesAny(query, ['удиви меня', 'что-нибудь необыч', 'что нибудь необыч', 'случайно', 'сюрприз'])) {

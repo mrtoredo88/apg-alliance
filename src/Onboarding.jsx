@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
+import { LEARNING_ONBOARDING_SLIDES } from './learningSystem.js';
 
 const T = {
   bg:      '#0F0F1A',
@@ -11,7 +12,7 @@ const T = {
   textSec: 'rgba(240,240,240,0.55)',
 };
 
-const SLIDES = [
+const LEGACY_SLIDES = [
   {
     accent:  '#C9A84C',
     orb:     'rgba(201,168,76,0.12)',
@@ -46,6 +47,8 @@ const SLIDES = [
     visual:  'partners',
   },
 ];
+
+const SLIDES = LEARNING_ONBOARDING_SLIDES.length ? LEARNING_ONBOARDING_SLIDES : LEGACY_SLIDES;
 
 const LEVELS = [
   { emoji: '🌱', name: 'Новичок',    min: 0,   color: '#7EB87E' },
@@ -144,7 +147,7 @@ function PartnersVisual() {
   );
 }
 
-export function Onboarding({ onComplete }) {
+export function Onboarding({ onComplete, onProgress }) {
   const [step, setStep]   = useState(0);
   const [dir, setDir]     = useState(1); // 1=вперёд, -1=назад
   const [animKey, setAnimKey] = useState(0);
@@ -153,6 +156,10 @@ export function Onboarding({ onComplete }) {
 
   const slide   = SLIDES[step];
   const isLast  = step === SLIDES.length - 1;
+
+  useEffect(() => {
+    onProgress?.(step + 1, SLIDES.length);
+  }, [onProgress, step]);
 
   const goTo = useCallback((next) => {
     if (next < 0 || next >= SLIDES.length) return;

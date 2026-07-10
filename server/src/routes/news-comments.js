@@ -174,6 +174,14 @@ export default async function newsCommentsRoutes(fastify) {
         await db.collection('users').doc(user.id).set({
           keys: FieldValue.increment(reward.keys),
           reputation: FieldValue.increment(reward.reputation),
+          learningProgress: {
+            newsCommented: true,
+            updatedAt: new Date().toISOString(),
+          },
+          learningAnalytics: {
+            lastAction: 'newsCommented',
+            lastActionAt: new Date().toISOString(),
+          },
           economyVersion: ECONOMY_VERSION,
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
