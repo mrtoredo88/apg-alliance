@@ -1512,3 +1512,11 @@
 **Файлы:** `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/17_CHANGELOG_AI.md`
 
 **Что изменено:** Добавлен паспорт актуального состояния проекта и первая архитектурная карта. Документы заполнены только подтверждёнными фактами из кода, проектной документации и production `version.json`.
+
+## 2026-07-10 — APG dependency map
+
+**Задача:** Построить карту зависимостей проекта без изменения функциональности, UI, backend, merge и deploy.
+
+**Файлы:** `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`
+
+**Что изменено:** Добавлена первая dependency map по крупным узлам: App, UserApp, AdminPanel, ProfilePanel, News, Events, Partners, Experts, Loki, Firebase, Backend, Push, Telegram, VK и PWA. Для каждого узла зафиксированы пользователи, зависимости, providers, API/backend endpoints, Firestore коллекции, глобальные состояния, маршруты, bottom sheets, portals и критические зависимости.
