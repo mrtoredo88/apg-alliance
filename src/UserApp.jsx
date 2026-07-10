@@ -1194,17 +1194,36 @@ export function UserApp() {
           .then(snap => { if (isMounted.current) setUserRank(snap.data().count + 1); })
           .catch(() => {});
 
+        const existingRefId = !String(userData.id).startsWith('guest_') && pendingRefId && pendingRefId !== String(userData.id) && !data.referredBy && data.referralBonusGranted !== true
+          ? pendingRefId
+          : null;
+        const syncExistingPayload = {
+          userId: String(userData.id),
+          profile: { ...userData, ...profilePatch },
+          ...(existingRefId ? { referrerId: existingRefId } : {}),
+        };
+        const handleReferralSyncResult = result => {
+          if (!result?.referralBonusAwarded || !isMounted.current) return;
+          localStorage.removeItem('apg_pending_ref');
+          setUserKeys(prev => prev + 2);
+          setTimeout(() => {
+            if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
+          }, 1200);
+        };
+
         // Ежедневный бонус: +1 ключ за первый вход каждый день
         if (data.lastBonusDate !== todayKey) {
-          userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } })
-            .then(() => {
+          userAction('profile:sync', syncExistingPayload)
+            .then(result => {
               if (!isMounted.current) return;
               setUserKeys(prev => prev + 1);
               if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+              return result;
             })
+            .then(handleReferralSyncResult)
             .catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
         } else {
-          userAction('profile:sync', { userId: String(userData.id), profile: { ...userData, ...profilePatch } }).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
+          userAction('profile:sync', syncExistingPayload).then(handleReferralSyncResult).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
         }
       } else {
         // Новый пользователь
@@ -1235,12 +1254,6 @@ export function UserApp() {
 
         if (isValidRef) {
           localStorage.removeItem('apg_pending_ref');
-          // Начисляем рефереру через Admin SDK (клиент не может писать в чужой users-doc)
-          fetch(`${API_BASE_URL}/api/email-auth`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'grant-referral', referrerId: refId, newUserId: String(userData.id) }),
-          }).catch(() => {});
           if (isMounted.current) {
             setTimeout(() => {
               if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');

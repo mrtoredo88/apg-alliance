@@ -11,6 +11,10 @@ function safeUserId(value) {
   return safeString(value, 180);
 }
 
+function canUseReferral(referrerId, userId) {
+  return !!referrerId && referrerId !== userId && !referrerId.startsWith('guest_') && !userId.startsWith('guest_');
+}
+
 function jsonError(res, status, message, code = 'USER_ACTION_ERROR') {
   return res.status(status).json({ ok: false, code, error: message });
 }
@@ -219,26 +223,55 @@ async function actionProfileSync(db, req, actor) {
   const ref = db.collection('users').doc(userId);
   let created = false;
   let dailyBonusAwarded = false;
+  let referralBonusAwarded = false;
   let userDoc = {};
   let consentStatus = null;
 
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
+    const isValidRef = canUseReferral(refId, userId);
     if (snap.exists) {
       const before = snap.data() || {};
+      const currentReferrer = safeUserId(before.referredBy);
+      const canAttachReferral = isValidRef && !currentReferrer && before.referralBonusGranted !== true;
+      const canGrantExistingReferral = isValidRef && (canAttachReferral || currentReferrer === refId) && before.referralBonusGranted !== true;
+      const referrerRef = canGrantExistingReferral ? db.collection('users').doc(refId) : null;
+      const referrerSnap = referrerRef ? await tx.get(referrerRef) : null;
       const patch = { ...profile, lastSeen: FieldValue.serverTimestamp() };
+      let keyIncrement = 0;
       consentStatus = getConsentStatus(before);
       const consentMigration = buildConsentMigrationPatch(consentStatus);
       if (consentMigration) Object.assign(patch, consentMigration);
       if (before.lastBonusDate !== todayKey) {
-        patch.keys = FieldValue.increment(1);
+        keyIncrement += 1;
         patch.lastBonusDate = todayKey;
         dailyBonusAwarded = true;
       }
+      if (referrerSnap?.exists) {
+        referralBonusAwarded = true;
+        keyIncrement += canAttachReferral ? 2 : 0;
+        patch.referredBy = refId;
+        patch.referralBonusGranted = true;
+        patch.referralBonusGrantedTo = refId;
+        patch.referralBonusGrantedAt = FieldValue.serverTimestamp();
+        tx.set(referrerRef, {
+          keys: FieldValue.increment(2),
+          referralCount: FieldValue.increment(1),
+          referralRewardedUsers: FieldValue.arrayUnion(userId),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      if (keyIncrement > 0) patch.keys = FieldValue.increment(keyIncrement);
       tx.set(ref, patch, { merge: true });
       userDoc = {
         ...before,
         ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null)),
+        ...(referralBonusAwarded ? {
+          referredBy: refId,
+          referralBonusGranted: true,
+          referralBonusGrantedTo: refId,
+          referralBonusGrantedAt: null,
+        } : {}),
         ...(consentMigration ? {
           consents: { ...consentStatus.normalizedConsent, acceptedAt: consentStatus.acceptedAt || null },
           consentAcceptedAt: consentStatus.acceptedAt || before.consentAcceptedAt || null,
@@ -248,15 +281,18 @@ async function actionProfileSync(db, req, actor) {
           notificationConsent: consentStatus.normalizedConsent.notificationsAccepted,
         } : {}),
         lastBonusDate: patch.lastBonusDate || before.lastBonusDate,
-        keys: Number(before.keys || 0) + (dailyBonusAwarded ? 1 : 0),
+        keys: Number(before.keys || 0) + keyIncrement,
       };
       return;
     }
 
     created = true;
-    const isValidRef = refId && refId !== userId;
+    const referrerRef = isValidRef ? db.collection('users').doc(refId) : null;
+    const referrerSnap = referrerRef ? await tx.get(referrerRef) : null;
+    const shouldGrantReferral = !!referrerSnap?.exists;
+    referralBonusAwarded = shouldGrantReferral;
     const base = {
-      keys: isValidRef ? 2 : 0,
+      keys: shouldGrantReferral ? 2 : 0,
       favorites: [],
       scannedPartners: {},
       savedNews: [],
@@ -268,7 +304,10 @@ async function actionProfileSync(db, req, actor) {
       onboardingDone: false,
       scanDates: [],
       lastBonusDate: todayKey,
-      referredBy: isValidRef ? refId : null,
+      referredBy: shouldGrantReferral ? refId : null,
+      referralBonusGranted: shouldGrantReferral,
+      referralBonusGrantedTo: shouldGrantReferral ? refId : null,
+      referralBonusGrantedAt: shouldGrantReferral ? FieldValue.serverTimestamp() : null,
       registeredEvents: [],
       registeredAt: FieldValue.serverTimestamp(),
       lastSeen: FieldValue.serverTimestamp(),
@@ -285,13 +324,21 @@ async function actionProfileSync(db, req, actor) {
     }
     consentStatus = getConsentStatus(base);
     tx.set(ref, base, { merge: true });
+    if (shouldGrantReferral) {
+      tx.set(referrerRef, {
+        keys: FieldValue.increment(2),
+        referralCount: FieldValue.increment(1),
+        referralRewardedUsers: FieldValue.arrayUnion(userId),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
     tx.set(db.collection('stats').doc('global'), { userCount: FieldValue.increment(1) }, { merge: true });
     userDoc = { ...base, keys: base.keys };
   });
 
   consentStatus = getConsentStatus(userDoc);
-  await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
-  return { ok: true, userId, created, dailyBonusAwarded, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
+  await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
+  return { ok: true, userId, created, dailyBonusAwarded, referralBonusAwarded, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
 }
 
 async function actionProfilePatch(db, req, actor) {

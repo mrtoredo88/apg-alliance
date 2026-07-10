@@ -1627,3 +1627,11 @@
 **Файлы:** `.ai/audits/USERAPP_AUDIT_V1.md`, `.ai/17_CHANGELOG_AI.md`
 
 **Что изменено:** Добавлен аудит UserApp V1: размеры файла и hook-метрики, обязанности, карта зависимостей, API/backend/Firestore связи, архитектурные риски, подтверждённые кандидаты на выделение и оценка читаемости, масштабируемости, связанности, сложности и риска изменений.
+
+## 2026-07-10 — Referral bonus Telegram audit and fix
+
+**Задача:** Провести production-аудит реферальной цепочки для Telegram-приглашения и устранить потерю начисления без ручного начисления ключей.
+
+**Файлы:** `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `api/user-actions.js`, `scripts/backfill-referral.mjs`, `.ai/17_CHANGELOG_AI.md`
+
+**Что изменено:** Начисление реферального бонуса перенесено в серверный `profile:sync` и выполняется транзакционно для новых и уже созданных Telegram-профилей. Existing-user sync теперь передаёт pending referral на backend. Добавлен безопасный idempotent backfill-скрипт для реально неначисленных приглашений.
