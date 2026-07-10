@@ -6,11 +6,13 @@
 
 ## Перед любой задачей
 
-1. Прочитать `.ai/00_PROJECT_STATE.md`.
-2. Прочитать `.ai/20_SYSTEM_PHILOSOPHY.md`.
-3. Прочитать `.ai/18_ARCHITECTURE_MAP.md`.
-4. Прочитать `.ai/19_DEPENDENCY_MAP.md`.
-5. Только после этого перейти к конкретному разделу ниже.
+1. Прочитать `.ai/00_APG_MANIFEST.md`.
+2. Прочитать `.ai/01_APG_OPERATING_SYSTEM.md`.
+3. Прочитать `.ai/00_PROJECT_STATE.md`.
+4. Прочитать `.ai/20_SYSTEM_PHILOSOPHY.md`.
+5. Прочитать `.ai/18_ARCHITECTURE_MAP.md`.
+6. Прочитать `.ai/19_DEPENDENCY_MAP.md`.
+7. Только после этого перейти к конкретному разделу ниже.
 
 ## Авторизация
 

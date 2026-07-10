@@ -15,6 +15,17 @@
 
 ---
 
+## [2026-07-10] docs: APG Manifest и Operating System
+**Коммит:** `pending`
+**Файлы:** `.ai/00_APG_MANIFEST.md`, `.ai/01_APG_OPERATING_SYSTEM.md`, `.ai/03_KNOWLEDGE_NAVIGATOR.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** docs
+**Что изменено:**
+- Добавлены утверждённые документы `APG Manifest` и `APG Operating System`.
+- Knowledge Navigator обновлён: перед любой задачей сначала читаются Manifest и Operating System.
+**Почему:** Будущие AI-инженеры должны начинать работу с смысла, принципов и операционной логики АПГ, а уже затем переходить к технической архитектуре.
+
+---
+
 ## [2026-07-10] feat: APG Learning System
 **Коммит:** `pending`
 **Файлы:** `src/learningSystem.js`, `src/Onboarding.jsx`, `src/tasks.js`, `src/TasksPage.jsx`, `src/ReferencePage.jsx`, `src/LokiPage.jsx`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/loki/core/LokiCore.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `api/news-comments.js`, `server/src/routes/news-comments.js`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`
