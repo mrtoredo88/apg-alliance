@@ -878,6 +878,7 @@ export function EventDetailSheet({
   const [search, setSearch] = useState('');
   const [visible, setVisible] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(null);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
 
   useEffect(() => {
@@ -893,6 +894,17 @@ export function EventDetailSheet({
       return () => clearTimeout(timer);
     }
   }, [open, visible]);
+
+  useEffect(() => {
+    const isOpen = Boolean(open && event);
+    window.dispatchEvent(new CustomEvent('apg:event-sheet-open', { detail: { open: isOpen } }));
+    if (isOpen) document.body.dataset.apgEventSheetOpen = '1';
+    else delete document.body.dataset.apgEventSheetOpen;
+    return () => {
+      window.dispatchEvent(new CustomEvent('apg:event-sheet-open', { detail: { open: false } }));
+      delete document.body.dataset.apgEventSheetOpen;
+    };
+  }, [open, event?.id]);
 
   if (!visible || !event) return null;
 
@@ -917,6 +929,13 @@ export function EventDetailSheet({
   };
 
   const handleExport = () => exportParticipantsCSV(event, participants);
+
+  const handleTouchEnd = (touchEvent) => {
+    if (touchStartY == null) return;
+    const endY = touchEvent.changedTouches?.[0]?.clientY ?? touchStartY;
+    if (endY - touchStartY > 86) handleClose();
+    setTouchStartY(null);
+  };
 
   return (
     <div
@@ -954,6 +973,9 @@ export function EventDetailSheet({
           pointerEvents: 'auto',
         }}
         onClick={(event) => event.stopPropagation()}
+        onTouchStart={(event) => setTouchStartY(event.touches?.[0]?.clientY ?? null)}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => setTouchStartY(null)}
       >
         <div style={{ height: 7, width: 44, borderRadius: 99, background: 'rgba(255,255,255,0.35)', margin: '14px auto 0' }} />
         <div style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>

@@ -581,6 +581,7 @@ export function UserApp() {
   const [activePartner, setActivePartner]       = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(null);
+  const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
   const [user, setUser]                         = useState(null);
   const [userKeys, setUserKeys]                 = useState(0);
@@ -760,6 +761,12 @@ export function UserApp() {
     window.addEventListener('online',  on);
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  useEffect(() => {
+    const handler = (event) => setEventSheetOpen(Boolean(event.detail?.open));
+    window.addEventListener('apg:event-sheet-open', handler);
+    return () => window.removeEventListener('apg:event-sheet-open', handler);
   }, []);
 
   // Sync data-theme attribute and meta theme-color with appearance state
@@ -3054,7 +3061,7 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !isScannerOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant />}
+          {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant />}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>

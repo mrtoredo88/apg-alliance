@@ -1346,3 +1346,11 @@
 **Файлы:** `src/EventDetailSheet.jsx`
 
 **Что изменено:** Убран внутренний `EventDetailSheetErrorBoundary`, добавленный в предыдущем hotfix, вместе с диагностическим `useEffect` и импортом `logError`, чтобы вернуть дерево рендера карточки к состоянию до регрессии. Сохранён настоящий фикс React #310: `useMemo(buildParticipants)` остаётся выше раннего `return null`. Слой bottom sheet поднят до `zIndex: 12000`, чтобы открытая карточка события перекрывала Локи и нижние плавающие элементы.
+
+## 2026-07-10 — EventDetailSheet production QA follow-up
+
+**Задача:** По результатам функциональной QA production-сценариев события скрыть Локи при открытой карточке события и добавить настоящее закрытие карточки свайпом вниз.
+
+**Файлы:** `src/EventDetailSheet.jsx`, `src/UserApp.jsx`
+
+**Что изменено:** `EventDetailSheet` отправляет событие `apg:event-sheet-open` при открытии/закрытии и помечает `document.body.dataset.apgEventSheetOpen`. `UserApp` слушает это событие и временно не рендерит `LokiAssistant`, пока карточка события открыта. В `EventDetailSheet` добавлена touch-обработка свайпа вниз: если пользователь тянет sheet вниз больше чем на 86px, вызывается штатное закрытие.
