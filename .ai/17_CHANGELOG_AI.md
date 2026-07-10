@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] fix: Локи открывается поверх статьи (stacking context + portal)
+**Коммит:** `757ab610`
+**Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiExperience.jsx`
+**Тип:** fix
+**Что изменено:**
+- `LokiAssistant`: `LokiExperience` теперь рендерится через `createPortal(…, document.body)` — выходит из stacking context UserApp wrapper.
+- `LokiExperience`: z-index поднят 13000 → 14000 (выше ArticleView z=13000).
+**Почему:** UserApp wrapper div создаёт stacking context (position:relative, zIndex:1). LokiExperience внутри него имел эффективный вес z=1 в body, а ArticleView — portal z=13000 в body. Loki всегда был под статьёй.
+**Статус деплоя:** Frontend ✓ задеплоен (version: 757ab610).
+
+---
+
 ## [2026-07-10] feat: полный редизайн экрана статьи новости
 **Коммит:** `2dcd1576`
 **Файлы:** `src/NewsPage.jsx`, `src/UserApp.jsx`
