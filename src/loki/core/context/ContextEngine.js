@@ -1,5 +1,6 @@
 import { buildRecommendationFeed } from '../../LokiRecommendationCenter.js';
 import { buildInterestProfile } from '../../../interestEngine.js';
+import { buildLifeGraph } from '../../../lifeGraph.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -64,6 +65,16 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
   const partnerRecommendations = recommendationFeed.filter(item => item.type === 'partner');
   const expertRecommendations = recommendationFeed.filter(item => item.type === 'expert');
   const activePromotions = partners.filter(hasPromotion);
+  const lifeGraph = buildLifeGraph({
+    news,
+    events,
+    partners,
+    experts,
+    tasks,
+    rewards: cleanList(appState.prizes ?? appState.rewards),
+    promotions: cleanList(appState.promotions),
+    interestProfile,
+  });
   const topNews = sortFresh(news).slice(0, 5);
   const eventsToday = sortUpcoming(events).filter(item => isToday(item?.startAt ?? item?.startsAt ?? item?.date ?? item?.eventDate, now));
   const activeTasks = tasks.filter(item => !completedTasks.includes(String(item?.id ?? '')));
@@ -111,7 +122,9 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
     expertRecommendations,
     recommendations: {
       feed: recommendationFeed,
+      graph: lifeGraph.recommendations,
     },
+    lifeGraph,
     interestProfile,
     activePromotions,
     topNews,
@@ -143,6 +156,12 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
       favorites,
       completedTasks,
       interestProfile,
+      lifeGraph: {
+        version: lifeGraph.version,
+        nodeCount: lifeGraph.nodes.length,
+        edgeCount: lifeGraph.edges.length,
+        recommendations: lifeGraph.recommendations,
+      },
     },
   };
 }

@@ -196,6 +196,22 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - адаптивная сортировка данных главной страницы без изменения дизайна;
 - передача Interest Profile в Context Engine Локи.
 
+## APG Life Graph
+
+Ключевые файлы:
+
+- `src/lifeGraph.js`
+- `src/loki/core/context/ContextEngine.js`
+
+Подтверждённые возможности:
+
+- универсальная нормализация metadata для `news`, `event`, `partner`, `expert`, `task`, `reward`, `promotion`;
+- taxonomy categories/tags/topics/audience/season/age and boolean flags для городских тематик;
+- поиск связанных объектов;
+- поиск похожих объектов;
+- graph-рекомендации на основе metadata и Interest Profile;
+- подключение к Context Engine Локи без изменения UI.
+
 ## Backend
 
 Основные реализации:

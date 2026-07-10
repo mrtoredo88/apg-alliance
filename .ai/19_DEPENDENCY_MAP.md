@@ -144,6 +144,20 @@
 - Portal используются: напрямую нет.
 - Критические зависимости: backward-compatible profile shape, safe category fallbacks, throttled persistence, no new source of truth outside user profile.
 
+## APG Life Graph
+
+- Кто использует: `ContextEngine`; future Loki/AI modules should use this instead of building separate relation logic.
+- Что использует он: `src/lifeGraph.js`, existing appState arrays for news, events, partners, experts, custom tasks, rewards/prizes and promotions.
+- Provider ему необходимы: отдельный provider не требуется.
+- API вызывает: не вызывает API.
+- Firestore коллекции использует: напрямую не читает Firestore; работает с уже загруженными данными из `news`, `events`, `partners`, `experts`, `customTasks`, `prizes`/`rewards`.
+- Backend endpoint использует: не использует backend endpoints.
+- Глобальные состояния изменяет: не изменяет состояние; сервис чистый и строит graph snapshot.
+- Маршруты его открывают: напрямую не открывается.
+- BottomSheet связаны: напрямую не связан; может давать future related recommendations для `EventDetailSheet` и article reader.
+- Portal используются: нет.
+- Критические зависимости: стабильный metadata contract, backward compatibility со старыми документами, отсутствие сайд-эффектов, не дублировать recommendation logic вне graph service.
+
 ## Firebase
 
 - Кто использует: `UserApp`, `AdminPanel`, `NewsPage` auth token usage, `PartnerPage`, `ExpertsPage`, `ProfilePanel`, backend routes through Firebase Admin SDK.
