@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GLASS } from './design.js';
 import { motionTransition } from './motion.js';
+import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 
 const A = {
-  text: '#F0F0F0',
-  textSec: 'rgba(240,240,240,0.74)',
-  gold: '#C9A84C',
-  goldBrd: 'rgba(201,168,76,0.3)',
-  border: 'rgba(255,255,255,0.2)',
+  text: APG2_PROFILE.text,
+  textSec: APG2_PROFILE.textSoft,
+  textMuted: APG2_PROFILE.textMuted,
+  gold: APG2_PROFILE.gold,
+  goldBrd: 'rgba(215,184,106,0.36)',
+  border: 'var(--apg2-glass-border, rgba(255,255,255,0.24))',
 };
 
 const BUTTON = {
@@ -21,20 +22,17 @@ const BUTTON = {
 };
 
 const SECTION = {
-  background: 'linear-gradient(145deg,rgba(255,255,255,0.10),rgba(255,255,255,0.045))',
-  backdropFilter: GLASS.backdropFilter,
-  WebkitBackdropFilter: GLASS.WebkitBackdropFilter,
-  border: GLASS.border,
-  boxShadow: GLASS.boxShadow,
-  borderRadius: 18,
-  padding: 14,
+  ...APG2_PROFILE.glass,
+  borderRadius: 26,
+  padding: 16,
+  color: APG2_PROFILE.text,
 };
 
 const SECTION_TITLE = {
-  margin: '0 0 10px',
+  margin: '0 0 12px',
   color: A.text,
   fontWeight: 800,
-  fontSize: 13,
+  fontSize: 14,
   letterSpacing: 0.2,
 };
 
@@ -271,29 +269,36 @@ function toDateOrLabel(value) {
 function HeroSection({ event, status, statusTone }) {
   const image = eventImage(event);
   return (
-    <section style={SECTION}>
-      <h3 style={SECTION_TITLE}>Обложка и сводка</h3>
-      <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${A.border}`, marginBottom: 12, background: '#14142B', minHeight: image ? 160 : 120 }}>
+    <section style={{ ...APG2_PROFILE.glass, borderRadius: 32, padding: 0, overflow: 'hidden', color: APG2_PROFILE.text }}>
+      <div style={{ position: 'relative', minHeight: 250, background: APG2_PROFILE.goldSoft, overflow: 'hidden' }}>
         {image ? (
-          <img src={image} alt="" loading="lazy" style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }} />
+          <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.04) contrast(1.02)' }} />
         ) : (
-          <div style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, color: A.text, background: 'linear-gradient(135deg, rgba(201,168,76,0.20), rgba(255,255,255,0.05))' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 64, color: A.text, background: 'radial-gradient(circle at 34% 18%,rgba(215,184,106,0.32),transparent 36%), linear-gradient(145deg,rgba(var(--apg2-glass-a,255,255,255),0.22),rgba(var(--apg2-glass-a,255,255,255),0.06))' }}>
             {event?.emoji || '🎉'}
           </div>
         )}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ fontSize: 38, width: 56, height: 56, borderRadius: 16, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.34)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {event?.emoji || '🎉'}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: A.text, lineHeight: 1.2, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(8,8,10,0.04),rgba(8,8,10,0.12) 38%,rgba(8,8,10,0.78))' }} />
+        <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12, flexWrap: 'wrap' }}>
+            <span style={{ width: 48, height: 48, borderRadius: 18, background: APG2_PROFILE.goldGlass.background, border: APG2_PROFILE.goldGlass.border, color: '#17120a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, boxShadow: '0 16px 34px rgba(0,0,0,0.24)' }}>{event?.emoji || '🎉'}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 999, background: statusTone + '22', border: `1px solid ${statusTone}55`, color: statusTone, fontSize: 12, fontWeight: 880, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxShadow: '0 10px 28px rgba(0,0,0,0.24)' }}>
+              {status}
+            </span>
+          </div>
+          <div style={{ color: '#fff', fontSize: 24, lineHeight: '29px', fontWeight: 930, letterSpacing: -0.45, textShadow: '0 2px 18px rgba(0,0,0,0.46)' }}>
             {event?.title || 'Мероприятие без названия'}
           </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: statusTone + '22', border: `1px solid ${statusTone}44`, color: statusTone, fontSize: 11, fontWeight: 800 }}>
-            {status}
-          </div>
+        </div>
+      </div>
+      <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 12 }}>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>Формат</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 14, fontWeight: 850 }}>{normalizeMode(event) === 'online' ? 'Онлайн' : normalizeMode(event) === 'hybrid' ? 'Гибрид' : 'Офлайн'}</div>
+        </div>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 12 }}>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>Запись</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 14, fontWeight: 850 }}>{Number(event?.maxParticipants || 0) > 0 ? `${Math.max(Number(event.maxParticipants || 0) - Number(event.registeredCount || 0), 0)} мест` : 'Открыта'}</div>
         </div>
       </div>
     </section>
@@ -313,7 +318,7 @@ function DateSection({ event, status }) {
   return (
     <section style={SECTION}>
       <h3 style={SECTION_TITLE}>Дата и время</h3>
-      <div style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 11 }}>
         <Row label="Дата" value={startDateText} />
         <Row label="Время" value={startTimeText ? `${startTimeText}${endTimeText ? ` — ${endTimeText}` : ''}` : 'не указано'} />
         <Row label="Длительность" value={durationText} />
@@ -329,7 +334,7 @@ function LocationSection({ event, partnerName, expertName }) {
   return (
     <section style={SECTION}>
       <h3 style={SECTION_TITLE}>Партнёр и локация</h3>
-      <div style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 11 }}>
         <Row label="Партнёр" value={partnerName || 'не указан'} />
         <Row label="Эксперт" value={expertName || 'не указан'} />
         <Row label="Адрес" value={event?.address || event?.location || 'не указан'} />
@@ -349,7 +354,7 @@ function DescriptionSection({ event }) {
   return (
     <section style={SECTION}>
       <h3 style={SECTION_TITLE}>Описание</h3>
-      <div style={{ color: A.textSec, fontSize: 14, lineHeight: '20px', whiteSpace: 'pre-wrap', marginBottom: event.description ? 14 : 0 }}>
+      <div style={{ color: A.textSec, fontSize: 14.5, lineHeight: '22px', whiteSpace: 'pre-wrap', marginBottom: event.description ? 14 : 0 }}>
         {event.description || 'Описание пока не заполнено.'}
       </div>
 
@@ -1037,9 +1042,11 @@ export function EventDetailSheet({
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        background: isClosing ? 'rgba(0,0,0,0.54)' : 'rgba(0,0,0,0.72)',
+        background: isClosing ? 'rgba(12,12,14,0.36)' : 'rgba(12,12,14,0.58)',
+        backdropFilter: 'blur(12px) saturate(1.35)',
+        WebkitBackdropFilter: 'blur(12px) saturate(1.35)',
         padding: `max(10px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left))`,
-        transition: motionTransition(['background'], 'modal', 'soft'),
+        transition: motionTransition(['background', 'backdrop-filter'], 'modal', 'soft'),
         overflow: 'hidden',
         boxSizing: 'border-box',
         isolation: 'isolate',
@@ -1048,23 +1055,23 @@ export function EventDetailSheet({
     >
       <div
         style={{
-          background: 'radial-gradient(circle at 50% -12%, rgba(201,168,76,0.20), transparent 32%), linear-gradient(180deg, rgba(24,24,28,0.98), rgba(12,12,16,0.98))',
-          backdropFilter: 'blur(34px) saturate(1.6)',
-          WebkitBackdropFilter: 'blur(34px) saturate(1.6)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          boxShadow: '0 -22px 70px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.14)',
+          background: APG2_PROFILE.bg,
+          backdropFilter: APG2_PROFILE.glass.backdropFilter,
+          WebkitBackdropFilter: APG2_PROFILE.glass.WebkitBackdropFilter,
+          border: APG2_PROFILE.glass.border,
+          boxShadow: '0 -26px 90px rgba(0,0,0,0.38), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.38)',
           width: '100%',
           maxWidth: 'min(900px, 100%)',
           height: 'calc(96dvh - max(10px, env(safe-area-inset-top)))',
           maxHeight: '96dvh',
           minHeight: 'min(90dvh, calc(96dvh - max(10px, env(safe-area-inset-top))))',
-          borderRadius: 30,
+          borderRadius: 34,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          transform: isClosing ? 'translateY(110%)' : 'translateY(0)',
+          transform: isClosing ? 'translateY(110%) scale(0.985)' : 'translateY(0) scale(1)',
           opacity: isClosing ? 0 : 1,
           transition: motionTransition(['transform', 'opacity'], 'modal', 'out'),
           willChange: 'transform, opacity',
@@ -1086,8 +1093,8 @@ export function EventDetailSheet({
         onPointerUp={() => setPointerStartY(null)}
         onPointerCancel={() => setPointerStartY(null)}
       >
-        <div style={{ height: 7, width: 44, borderRadius: 99, background: 'rgba(255,255,255,0.35)', margin: '14px auto 0' }} />
-        <div style={{ overflowY: 'auto', padding: '16px 12px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 12, flex: 1, boxSizing: 'border-box' }}>
+        <div style={{ height: 6, width: 46, borderRadius: 99, background: 'rgba(var(--apg2-glass-a,255,255,255),0.34)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)', margin: '12px auto 0' }} />
+        <div style={{ overflowY: 'auto', padding: '16px 10px max(18px, env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 14, flex: 1, boxSizing: 'border-box' }}>
           <HeroSection event={detailEvent} status={status} statusTone={statusTone} />
           {isAdminRole && <QualitySection event={detailEvent} partnerName={partnerName} expertName={expertName} />}
           {isAdminRole && <PreparationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />}

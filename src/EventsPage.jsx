@@ -416,9 +416,9 @@ function EventPosterCard({ event, index, onClick, compact = false }) {
     >
       <div style={{ position: 'relative', background: APG2_PROFILE.goldSoft, overflow: 'hidden' }}>
         {image ? <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>{event?.emoji || '🎉'}</div>}
-        <div style={{ position: 'absolute', left: 10, bottom: 10, minWidth: 48, borderRadius: 18, padding: '8px 7px', background: 'rgba(12,12,14,0.72)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', color: APG2_PROFILE.text, textAlign: 'center', border: '1px solid rgba(255,255,255,0.18)' }}>
-          <div style={{ fontSize: 20, fontWeight: 930, lineHeight: '20px' }}>{d ? d.getDate() : '—'}</div>
-          <div style={{ fontSize: 9, fontWeight: 820, color: APG2_PROFILE.gold, textTransform: 'uppercase' }}>{d ? MONTHS_GEN[d.getMonth()].slice(0, 3) : 'скоро'}</div>
+        <div style={{ position: 'absolute', left: 9, bottom: 9, minWidth: 54, borderRadius: 20, padding: '8px 8px 7px', background: 'linear-gradient(145deg,rgba(255,247,218,0.96),rgba(215,184,106,0.92))', backdropFilter: 'blur(18px) saturate(1.65)', WebkitBackdropFilter: 'blur(18px) saturate(1.65)', color: '#17120a', textAlign: 'center', border: '1px solid rgba(255,255,255,0.64)', boxShadow: '0 10px 26px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.72)' }}>
+          <div style={{ fontSize: compact ? 23 : 25, fontWeight: 980, lineHeight: compact ? '22px' : '24px', letterSpacing: -0.6, fontVariantNumeric: 'tabular-nums' }}>{d ? d.getDate() : '—'}</div>
+          <div style={{ marginTop: 1, fontSize: 9, lineHeight: '10px', fontWeight: 940, color: 'rgba(23,18,10,0.78)', textTransform: 'uppercase', letterSpacing: 0.9 }}>{d ? MONTHS_GEN[d.getMonth()].slice(0, 3) : 'скоро'}</div>
         </div>
       </div>
       <div style={{ padding: compact ? 13 : 16, minWidth: 0 }}>
