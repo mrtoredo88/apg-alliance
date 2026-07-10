@@ -131,6 +131,66 @@ function cleanEntityPatch(input = {}) {
   return patch;
 }
 
+function safeAiProfileList(value) {
+  const source = Array.isArray(value) ? value : String(value ?? '').split(/[\n,;]+/);
+  return Array.from(new Set(source.map(item => String(item ?? '').trim().slice(0, 220)).filter(Boolean))).slice(0, 12);
+}
+
+function buildAdminAiProfileDraft(entity = {}, type = 'partner') {
+  const categories = safeAiProfileList([entity.categoryLabel, entity.category, ...(Array.isArray(entity.categories) ? entity.categories : []), ...(Array.isArray(entity.tags) ? entity.tags : [])]);
+  const summary = String(entity.description || entity.summary || entity.about || entity.offer || '').trim().slice(0, 1200);
+  const specialization = String(entity.specialization || entity.categoryLabel || entity.category || '').trim().slice(0, 500);
+  const missingFields = [!summary ? 'summary' : '', !specialization ? 'specialization' : '', !categories.length ? 'categories' : ''].filter(Boolean);
+  return {
+    summary,
+    specialization,
+    strengths: safeAiProfileList([
+      entity.verified || entity.verifiedPartner ? 'Проверенный участник АПГ' : '',
+      entity.featured ? 'Рекомендован АПГ' : '',
+      entity.offer ? 'Есть специальное предложение для участников АПГ' : '',
+      entity.avgRating ? `Рейтинг ${entity.avgRating}` : '',
+      entity.address ? 'Есть офлайн-точка' : '',
+      entity.bookingUrl ? 'Можно записаться онлайн' : '',
+    ]),
+    categories,
+    typicalClients: safeAiProfileList([type === 'expert' ? 'Жители, которым нужен экспертный совет' : 'Жители Зеленограда', categories[0] ? `Интересуются: ${categories[0]}` : '']),
+    recommendedFor: safeAiProfileList([type === 'expert' ? 'Пользователям, которым нужна консультация специалиста' : 'Пользователям, которые ищут проверенное место АПГ', entity.offer ? 'Тем, кто хочет воспользоваться специальным предложением' : '']),
+    typicalRequests: safeAiProfileList([entity.offer, specialization, type === 'expert' ? 'Консультация' : 'Акция или услуга']),
+    relatedCategories: categories,
+    relatedPartnerIds: safeAiProfileList(entity.aiProfile?.relatedPartnerIds),
+    relatedExpertIds: safeAiProfileList(entity.aiProfile?.relatedExpertIds),
+    status: missingFields.length ? 'draft' : 'generated',
+    source: 'admin-generated',
+    needsReview: missingFields.length > 0,
+    missingFields,
+  };
+}
+
+async function handleAiProfileAction(db, request, actor) {
+  const action = String(request.body?.action || '').trim();
+  await requireAdminPermission(request, action === 'ai-profile:generate' ? 'ai:update' : 'ai:read');
+  const resource = String(request.body?.resource || request.body?.type || '').trim();
+  const id = String(request.body?.id || request.body?.targetId || '').trim();
+  const config = resource === 'expert' || resource === 'experts' ? RESOURCE_CONFIG.experts : RESOURCE_CONFIG.partners;
+  if (!id) {
+    const error = new Error('Не указан id AI Profile.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const ref = db.collection(config.collection).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const error = new Error('Профиль не найден.');
+    error.statusCode = 404;
+    throw error;
+  }
+  const entity = { id: snap.id, ...(snap.data() || {}) };
+  const aiProfile = buildAdminAiProfileDraft(entity, config.collection === 'experts' ? 'expert' : 'partner');
+  await ref.set({ aiProfile, aiProfileGeneratedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await writeAuditLog(db, request, actor, action, config.collection, id, { label: `Сгенерирован AI Profile: ${entity.name || id}`, status: aiProfile.status, missingFields: aiProfile.missingFields });
+  return { ok: true, resource: config.collection, id, aiProfile };
+}
+
 function safeAutomationText(value, fallback = '') {
   return String(value ?? fallback).trim();
 }
@@ -1496,6 +1556,8 @@ export default async function adminActionsRoutes(fastify) {
           ? await handleTelegramAuthAdminAction(db, request, actor)
         : action.startsWith('automation:')
           ? await handleAutomationAction(db, request, actor)
+        : action.startsWith('ai-profile:')
+          ? await handleAiProfileAction(db, request, actor)
         : action.startsWith('partner:')
           ? await handlePartnerOnboardingAction(db, request, actor)
           : await handleNewsAction(db, request, actor);

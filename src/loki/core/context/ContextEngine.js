@@ -1,6 +1,7 @@
 import { buildRecommendationFeed } from '../../LokiRecommendationCenter.js';
 import { buildInterestProfile } from '../../../interestEngine.js';
 import { buildLifeGraph } from '../../../lifeGraph.js';
+import { getAiProfile } from '../../../aiProfile.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -51,8 +52,10 @@ function getUserName(user, appUser) {
 
 export function buildLokiContext({ appState = {}, user = null, activePanel = 'home', memory = {}, userMemory = {} } = {}) {
   const now = new Date();
-  const partners = cleanList(appState.partners).filter(isActive);
-  const experts = cleanList(appState.experts).filter(isActive);
+  const rawPartners = cleanList(appState.partners).filter(isActive);
+  const rawExperts = cleanList(appState.experts).filter(isActive);
+  const partners = rawPartners.map(item => ({ ...item, aiProfile: getAiProfile(item, 'partner', { partners: rawPartners, experts: rawExperts }) }));
+  const experts = rawExperts.map(item => ({ ...item, aiProfile: getAiProfile(item, 'expert', { partners, experts: rawExperts }) }));
   const events = cleanList(appState.events).filter(isActive);
   const news = cleanList(appState.news).filter(isActive);
   const tasks = cleanList(appState.customTasks);

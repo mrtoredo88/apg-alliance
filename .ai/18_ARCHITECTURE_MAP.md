@@ -111,6 +111,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - карточка партнёра;
 - кабинет партнёра;
 - Partner AI внутри кабинета партнёра: анализ свободного текста и создание moderation drafts;
+- AI Profile внутри кабинета партнёра;
 - QR-раздел;
 - deep link `/partner/:id`.
 
@@ -126,6 +127,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - каталог экспертов;
 - карточки экспертов;
 - кабинет эксперта;
+- AI Profile внутри кабинета эксперта;
 - deep link `/expert/:id`.
 
 ## Профиль
@@ -153,6 +155,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - `src/loki/core/context/ContextEngine.js`
 - `src/loki/core/brain/BrainLayer.js`
 - `src/loki/core/brain/lokiScenarios.js`
+- `src/aiProfile.js`
 
 Подтверждённые возможности:
 
@@ -160,6 +163,7 @@ Legacy hash-ссылки вида `/#/...` переписываются в path-
 - floating assistant;
 - Loki Home AI Dashboard;
 - Context Engine как единый слой состояния приложения для Локи;
+- AI Profile Layer для партнёров и экспертов в контексте Локи;
 - Interest Profile из Adaptive APG в контексте Локи;
 - полноэкранный опыт `LokiExperience`;
 - action routing через `LOKI_APP_ACTIONS`;

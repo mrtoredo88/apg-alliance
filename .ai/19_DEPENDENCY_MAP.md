@@ -91,11 +91,11 @@
 ## Partners
 
 - Кто использует: `UserApp` panels `offers`, `partner`, `nearby`, `map`, `profile`; Loki `OPEN_PARTNER` and `OPEN_PARTNERS`; route `/partner/:id`; AdminPanel partners tab.
-- Что использует он: `PartnerPage`, `PartnerCabinetPage`, `PartnerQRSection`, Partner AI helper inside cabinet, partner cards in lists, VK Bridge, Firestore reviews subcollection, share helpers.
+- Что использует он: `PartnerPage`, `PartnerCabinetPage`, `PartnerQRSection`, Partner AI helper inside cabinet, AI Profile Layer, partner cards in lists, VK Bridge, Firestore reviews subcollection, share helpers.
 - Provider ему необходимы: VKUI/root providers from `UserApp`; no direct Loki provider requirement.
 - API вызывает: user actions for favorites/reviews/scans through `UserApp` helpers; photo/upload/admin actions through admin/cabinet flows.
-- Firestore коллекции использует: `partners`, `partners/{id}/reviews`, `reviews`, `users`, `scans`, `partnerConnectionEvents`, `partnerInvites`, plus `events`, `news`, `notifications`, `aiDrafts`, `customTasks` for Partner AI moderation drafts depending on caller/backend flow.
-- Backend endpoint использует: `/api/user-actions` including `partner:profileUpdate`, `event:propose`, `partner:aiDraft`; `/api/admin-actions`, `/api/email-auth`, `/api/upload-photo`, `/api/public-submit` depending on partner flow.
+- Firestore коллекции использует: `partners` including embedded `aiProfile`, `partners/{id}/reviews`, `reviews`, `users`, `scans`, `partnerConnectionEvents`, `partnerInvites`, plus `events`, `news`, `notifications`, `aiDrafts`, `customTasks` for Partner AI moderation drafts depending on caller/backend flow.
+- Backend endpoint использует: `/api/user-actions` including `partner:profileUpdate`, `event:propose`, `partner:aiDraft`; `/api/admin-actions` including `ai-profile:generate`; `/api/email-auth`, `/api/upload-photo`, `/api/public-submit` depending on partner flow.
 - Глобальные состояния изменяет: `activePartner`, favorites, scanned partner ids, visit counts, owned partner/cabinet state, Interest Profile signals on partner open/favorite.
 - Маршруты его открывают: `/partner/:id`, internal panel `partner`, offers/nearby/map/profile navigation, Loki partner actions.
 - BottomSheet связаны: none confirmed as shared bottom sheet; partner page uses modal/portal overlays.
@@ -105,11 +105,11 @@
 ## Experts
 
 - Кто использует: `UserApp` panel `experts`, profile expert cabinet entry, Loki `OPEN_EXPERTS`, route `/expert/:id` and `/experts`, AdminPanel experts tab.
-- Что использует он: `ExpertsPage`, `ExpertCabinetPage`, VK Bridge, Firestore expert reviews and rotation collections.
+- Что использует он: `ExpertsPage`, `ExpertCabinetPage`, AI Profile Layer, VK Bridge, Firestore expert reviews and rotation collections.
 - Provider ему необходимы: VKUI/root providers from `UserApp`; no direct Loki provider requirement.
 - API вызывает: user actions for reviews and expert-related mutations through backend helpers; admin actions through AdminPanel.
-- Firestore коллекции использует: `experts`, `expertReviews`, `expertRotation`, `users` through owner/cabinet flows.
-- Backend endpoint использует: `/api/user-actions`, `/api/admin-actions`, `/api/expert-rotation`, `/api/upload-photo` depending on flow.
+- Firestore коллекции использует: `experts` including embedded `aiProfile`, `expertReviews`, `expertRotation`, `users` through owner/cabinet flows.
+- Backend endpoint использует: `/api/user-actions` including `expert:profileUpdate`, `/api/admin-actions` including `ai-profile:generate`, `/api/expert-rotation`, `/api/upload-photo` depending on flow.
 - Глобальные состояния изменяет: selected/open expert target, owned expert/cabinet state, expert review/rating state, Interest Profile signals on expert open.
 - Маршруты его открывают: `/experts`, `/expert/:id`, internal panel `experts`, profile cabinet actions, Loki experts action.
 - BottomSheet связаны: none confirmed as shared bottom sheet.
@@ -119,12 +119,12 @@
 ## Loki
 
 - Кто использует: `UserApp` wraps user shell in `LokiProvider`; `LokiAssistant`, `LokiPage`, `NewsPage`, and profile/home callbacks use Loki entry points; `AdminPanel` manages Loki knowledge/editor separately.
-- Что использует он: `LokiProvider`, `LokiAssistant`, `LokiExperience`, `LokiCore`, `ContextEngine`, `BrainLayer`, scenario registry, Loki modules, `LOKI_APP_ACTIONS`, Interest Profile from Adaptive APG, app `appState`, app `appActions`, localStorage memory.
+- Что использует он: `LokiProvider`, `LokiAssistant`, `LokiExperience`, `LokiCore`, `ContextEngine`, `BrainLayer`, AI Profile Layer, scenario registry, Loki modules, `LOKI_APP_ACTIONS`, Interest Profile from Adaptive APG, app `appState`, app `appActions`, localStorage memory.
 - Provider ему необходимы: `LokiProvider` is the required provider for `useLoki` consumers.
 - API вызывает: `/api/user-actions` through `userAction('loki:analytics')`; AdminPanel calls `/api/loki-editor` for editorial/AI tooling.
 - Firestore коллекции использует: `lokiKnowledge` from `UserApp`, `lokiAnalytics` through backend, `aiSources`, `aiDrafts`, `aiEditorRuns`, `aiEditorActivity`, `config/lokiEditor` through editor backend.
 - Backend endpoint использует: `/api/user-actions`, `/api/loki-editor`.
-- Глобальные состояния изменяет: Loki memory in localStorage, `activeContext`, `lastContext`, `experienceOpen`, assistant visibility, history, user memory, app navigation via `appActions`; Context Engine collects state only; Brain Layer reads context and returns action plans but does not mutate React state directly.
+- Глобальные состояния изменяет: Loki memory in localStorage, `activeContext`, `lastContext`, `experienceOpen`, assistant visibility, history, user memory, app navigation via `appActions`; Context Engine collects state and attaches partner/expert `aiProfile`; Brain Layer reads context and returns action plans but does not mutate React state directly.
 - Маршруты его открывают: internal panel `loki`; floating assistant is mounted globally inside `UserApp`; contextual opening from news does not change route.
 - BottomSheet связаны: none confirmed; `LokiExperience` is fullscreen portal overlay.
 - Portal используются: `LokiAssistant` renders `LokiExperience` via `createPortal(..., document.body)`.

@@ -1,5 +1,6 @@
 import { LOKI_APP_ACTIONS, createLokiAction } from '../../lokiActionTypes.js';
 import { includesAny, makeResultCard, normalizeText, openNearbyResult, titleOf } from '../lokiCoreUtils.js';
+import { aiProfileSearchText } from '../../../aiProfile.js';
 
 const GENERIC_PARTNER_WORDS = ['партнер', 'партнёр', 'места', 'рядом', 'куда сходить', 'посоветуй', 'где можно', 'что есть', 'найди', 'подбери'];
 const AMBIGUOUS_WORDS = ['салон', 'студия', 'мастер', 'записаться', 'услуга'];
@@ -80,6 +81,7 @@ function detectPartnerIntent(query, context) {
 
 function partnerHaystack(partner) {
   return normalizeText([
+    aiProfileSearchText(partner, 'partner'),
     partner.name,
     partner.category,
     partner.description,

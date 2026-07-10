@@ -3,7 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
-import { Stars, StatCard } from './PartnerCabinetPage.jsx';
+import { AiProfileSection, Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import { CabinetEventsBlock } from './EventProposalTools.jsx';
@@ -12,6 +12,7 @@ import { userAction } from './userApi.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
+import { buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
 
 function getExpertReadyState(expert = {}) {
   const galleryCount = (Array.isArray(expert.gallery) ? expert.gallery : []).filter(Boolean).length;
@@ -49,6 +50,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const [fTelegram, setFTelegram] = useState('');
   const [fMax,      setFMax]      = useState('');
   const [fPhoto,    setFPhoto]    = useState('');
+  const [fAiProfile, setFAiProfile] = useState(null);
 
   useEffect(() => {
     if (!initialExpert?.id) return;
@@ -74,6 +76,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       setFTelegram(e.telegramUrl ?? '');
       setFMax(e.maxUrl ?? '');
       setFPhoto(e.photo ?? '');
+      setFAiProfile(sanitizeAiProfile(e.aiProfile || buildAiProfileDraft(e, 'expert')));
       setReviews(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -133,6 +136,15 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       setTimeout(() => setSaved(false), 2500);
     } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
     setSaving(false);
+  };
+
+  const handleAiProfileSave = async (aiProfile) => {
+    if (!expert?.id) return;
+    await userAction('expert:profileUpdate', { id: expert.id, patch: { aiProfile } });
+    const updated = { ...expert, aiProfile };
+    setExpert(updated);
+    setFAiProfile(aiProfile);
+    onExpertUpdate?.(updated);
   };
 
   if (!expert) return null;
@@ -235,7 +247,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
           {/* Навигация */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['start', 'Старт'], ['schedule', 'Расписание'], ['stats', 'Аналитика'], ['content', 'Контент'], ['qr', 'QR'], ['reviews', 'Отзывы'], ['edit', 'Карточка']].map(([id, label]) => (
+            {[['start', 'Старт'], ['schedule', 'Расписание'], ['ai-profile', 'AI Profile'], ['stats', 'Аналитика'], ['content', 'Контент'], ['qr', 'QR'], ['reviews', 'Отзывы'], ['edit', 'Карточка']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -361,6 +373,16 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
               events={events}
               onToast={onToast}
               onEventCreated={onEventCreated}
+            />
+          )}
+
+          {activeTab === 'ai-profile' && (
+            <AiProfileSection
+              type="expert"
+              entity={{ ...expert, aiProfile: fAiProfile || expert.aiProfile }}
+              inputStyle={v2InputStyle}
+              onSave={handleAiProfileSave}
+              onToast={onToast}
             />
           )}
 

@@ -12,6 +12,7 @@ import { userAction } from './userApi.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
+import { aiProfileListToText, buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -210,6 +211,69 @@ function PartnerAiAssistant({ partner, onToast, onDraftCreated }) {
   );
 }
 
+export function AiProfileSection({ type = 'partner', entity, inputStyle, onSave, onToast }) {
+  const [draft, setDraft] = useState(() => sanitizeAiProfile(entity?.aiProfile || buildAiProfileDraft(entity, type)));
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setDraft(sanitizeAiProfile(entity?.aiProfile || buildAiProfileDraft(entity, type)));
+  }, [entity?.id, entity?.aiProfile, type]);
+  const statusLabel = draft.status === 'submitted' ? 'На обновлении' : draft.status === 'approved' ? 'Подтверждён' : draft.status === 'generated' ? 'Сгенерирован' : 'Черновик';
+  const update = (key, value) => setDraft(prev => ({ ...prev, [key]: value }));
+  const save = async (status = draft.status || 'draft') => {
+    setSaving(true);
+    try {
+      const aiProfile = sanitizeAiProfile({ ...draft, status, source: 'cabinet', needsReview: status !== 'approved' });
+      await onSave(aiProfile);
+      setDraft(aiProfile);
+      onToast?.(status === 'submitted' ? 'AI Profile отправлен на обновление.' : 'AI Profile сохранён.', 'success');
+    } catch (error) {
+      onToast?.(error.message || 'Не удалось сохранить AI Profile.', 'error');
+    }
+    setSaving(false);
+  };
+  const field = (label, key, rows = 2, placeholder = '') => (
+    <>
+      <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{label}</label>
+      <textarea
+        value={Array.isArray(draft[key]) ? aiProfileListToText(draft[key]) : draft[key] || ''}
+        onChange={e => update(key, e.target.value)}
+        rows={rows}
+        style={{ ...inputStyle, resize: 'vertical', marginTop: 6 }}
+        placeholder={placeholder}
+      />
+    </>
+  );
+  return (
+    <GlassSection title="AI Profile">
+      <GlassCard style={{ borderRadius: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+          <GlassBadge tone="gold">Локи читает это</GlassBadge>
+          <GlassBadge>{statusLabel}</GlassBadge>
+        </div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', marginBottom: 14 }}>
+          AI Profile помогает Локи понимать, кому рекомендовать карточку и на какие запросы она отвечает. Это не публикуется автоматически.
+        </div>
+        {field('Краткое описание', 'summary', 4, 'Коротко: чем полезна карточка для участников АПГ')}
+        {field('Специализация', 'specialization', 2, type === 'expert' ? 'Например: семейный психолог, юрист, нутрициолог' : 'Например: семейное кафе, студия красоты, сервис для дома')}
+        {field('Сильные стороны', 'strengths', 3, 'Каждый пункт с новой строки')}
+        {field('Категории', 'categories', 2, 'food, children, beauty...')}
+        {field('Типичные клиенты', 'typicalClients', 3)}
+        {field('Кому рекомендуется', 'recommendedFor', 3)}
+        {field('Типичные запросы пользователей', 'typicalRequests', 3, 'Где поесть с детьми\\nНайти специалиста\\nКуда сходить вечером')}
+        {field('Связанные категории', 'relatedCategories', 2)}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <GlassButton disabled={saving} onClick={() => save('draft')}>
+            {saving ? 'Сохраняем...' : 'Сохранить'}
+          </GlassButton>
+          <GlassButton disabled={saving} tone="gold" onClick={() => save('submitted')} style={{ color: '#17120a' }}>
+            Отправить на обновление
+          </GlassButton>
+        </div>
+      </GlassCard>
+    </GlassSection>
+  );
+}
+
 export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', partner: initialPartner, expert, events = [], onBack, onPartnerUpdate, onEventCreated, onToast }) {
   const [partner, setPartner]     = useState(initialPartner);
   const [reviews, setReviews]     = useState([]);
@@ -227,6 +291,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const [fHours,  setFHours]  = useState('');
   const [fSocial, setFSocial] = useState('');
   const [fLogo,   setFLogo]   = useState('');
+  const [fAiProfile, setFAiProfile] = useState(null);
 
   useEffect(() => {
     if (!initialPartner?.id) return;
@@ -248,6 +313,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
       setFHours(p.hours ?? '');
       setFSocial(p.socialUrl ?? '');
       setFLogo(p.logoUrl ?? '');
+      setFAiProfile(sanitizeAiProfile(p.aiProfile || buildAiProfileDraft(p, 'partner')));
       setReviews(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -299,6 +365,15 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
       setTimeout(() => setSaved(false), 2500);
     } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
     setSaving(false);
+  };
+
+  const handleAiProfileSave = async (aiProfile) => {
+    if (!partner?.id) return;
+    await userAction('partner:profileUpdate', { id: partner.id, patch: { aiProfile } });
+    const updated = { ...partner, aiProfile };
+    setPartner(updated);
+    setFAiProfile(aiProfile);
+    onPartnerUpdate?.(updated);
   };
 
   if (!partner) return null;
@@ -399,7 +474,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* Навигация по вкладкам */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['ai-profile', 'AI Profile'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -540,6 +615,16 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
               onDraftCreated={() => {
                 setPartner(prev => prev ? { ...prev, lastPartnerAiDraftAt: new Date().toISOString() } : prev);
               }}
+            />
+          )}
+
+          {activeTab === 'ai-profile' && (
+            <AiProfileSection
+              type="partner"
+              entity={{ ...partner, aiProfile: fAiProfile || partner.aiProfile }}
+              inputStyle={v2InputStyle}
+              onSave={handleAiProfileSave}
+              onToast={onToast}
             />
           )}
 

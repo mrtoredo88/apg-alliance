@@ -501,6 +501,31 @@ function safeStringList(value) {
   return Array.isArray(value) ? value.map(item => safeString(item, 220)).filter(Boolean) : [];
 }
 
+function safeAiProfileList(value) {
+  const source = Array.isArray(value) ? value : String(value ?? '').split(/[\n,;]+/);
+  return Array.from(new Set(source.map(item => safeString(item, 220)).filter(Boolean))).slice(0, 12);
+}
+
+function sanitizeAiProfile(input = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  return {
+    summary: safeString(source.summary, 1200),
+    specialization: safeString(source.specialization, 500),
+    strengths: safeAiProfileList(source.strengths),
+    categories: safeAiProfileList(source.categories),
+    typicalClients: safeAiProfileList(source.typicalClients),
+    recommendedFor: safeAiProfileList(source.recommendedFor),
+    typicalRequests: safeAiProfileList(source.typicalRequests),
+    relatedCategories: safeAiProfileList(source.relatedCategories),
+    relatedPartnerIds: safeAiProfileList(source.relatedPartnerIds),
+    relatedExpertIds: safeAiProfileList(source.relatedExpertIds),
+    status: ['draft', 'submitted', 'approved', 'generated'].includes(safeString(source.status, 40)) ? safeString(source.status, 40) : 'draft',
+    source: safeString(source.source || 'cabinet', 80),
+    needsReview: source.needsReview !== false,
+    missingFields: safeAiProfileList(source.missingFields),
+  };
+}
+
 function actorOwnsProfile(data, actor) {
   const actorIds = [actor.userId, actor.uid].map(item => safeString(item, 220)).filter(Boolean);
   const actorEmail = safeString(actor.user?.email || actor.user?.linkedEmail, 200).toLowerCase();
@@ -916,11 +941,12 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   const data = snap.data() || {};
   if (!actorOwnsProfile(data, actor)) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
   const allowedFields = type === 'expert'
-    ? new Set(['description', 'offer', 'phone', 'bookingUrl', 'websiteUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'photo'])
-    : new Set(['description', 'offer', 'phone', 'hours', 'socialUrl', 'logoUrl']);
+    ? new Set(['description', 'offer', 'phone', 'bookingUrl', 'websiteUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'photo', 'aiProfile'])
+    : new Set(['description', 'offer', 'phone', 'hours', 'socialUrl', 'logoUrl', 'aiProfile']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
-    if (allowedFields.has(key)) patch[key] = typeof value === 'string' ? safeString(value, 4000) : value;
+    if (!allowedFields.has(key)) return;
+    patch[key] = key === 'aiProfile' ? sanitizeAiProfile(value) : typeof value === 'string' ? safeString(value, 4000) : value;
   });
   patch.profileUpdatedAt = FieldValue.serverTimestamp();
   await ref.set(patch, { merge: true });

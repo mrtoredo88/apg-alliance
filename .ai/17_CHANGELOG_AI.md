@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] feat: AI Profile Layer для партнёров и экспертов
+**Коммит:** `pending`
+**Файлы:** `src/aiProfile.js`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/loki/core/context/ContextEngine.js`, `src/loki/core/brain/BrainLayer.js`, `src/loki/core/modules/PartnerExpert.js`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `api/admin-actions.js`, `server/src/routes/admin-actions.js`, `.ai/00_PROJECT_STATE.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Создан `src/aiProfile.js` для нормализации, черновой генерации и search text AI-профилей партнёров/экспертов.
+- Кабинеты партнёра и эксперта получили вкладку `AI Profile` с просмотром, редактированием и отправкой на обновление через существующий `/api/user-actions`.
+- Context Engine и Brain Layer Локи используют `aiProfile`, а admin-actions получил `ai-profile:generate` для создания черновика без новых коллекций.
+**Почему:** Локи должен понимать карточки через единый AI Profile Layer, а не читать разрозненные поля партнёров и экспертов напрямую.
+
+---
+
 ## [2026-07-10] feat: APG Life Graph
 **Коммит:** `pending`
 **Файлы:** `src/lifeGraph.js`, `src/loki/core/context/ContextEngine.js`, `.ai/00_PROJECT_STATE.md`, `.ai/17_CHANGELOG_AI.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`

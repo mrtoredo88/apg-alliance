@@ -1,6 +1,7 @@
 import { LOKI_APP_ACTIONS, createLokiAction } from '../../lokiActionTypes.js';
 import { imageOf, normalizeText, titleOf, toMillis } from '../lokiCoreUtils.js';
 import { LOKI_SCENARIOS } from './lokiScenarios.js';
+import { aiProfileSearchText } from '../../../aiProfile.js';
 
 const CATEGORY_HINTS = {
   city_life: ['город', 'сегодня', 'вечер', 'выходн', 'рядом', 'интерес', 'план', 'ново'],
@@ -103,7 +104,10 @@ function isActiveItem(item) {
 }
 
 function itemText(item) {
+  const type = item?.specialization ? 'expert' : 'partner';
+  const aiText = item?.aiProfile ? aiProfileSearchText(item, type) : '';
   return [
+    aiText,
     item?.name,
     item?.title,
     item?.headline,
@@ -201,13 +205,14 @@ function cardFor(row, scenario) {
   const { item, type } = row;
   const action = actionFor(type, item, scenario);
   const label = action.type === LOKI_APP_ACTIONS.START_EVENT_REGISTRATION ? 'К регистрации' : action.type === LOKI_APP_ACTIONS.ADD_FAVORITE_PARTNER ? 'В избранное' : type === 'news' ? 'Читать' : 'Открыть';
+  const profile = item?.aiProfile && (type === 'partner' || type === 'expert') ? item.aiProfile : null;
   return {
     id: item?.id ?? `${type}-${titleOf(item, type)}`,
     type,
     title: titleOf(item, type === 'event' ? 'Мероприятие' : type === 'expert' ? 'Эксперт' : type === 'news' ? 'Новость' : 'Партнёр'),
-    text: item?.description || item?.summary || item?.address || item?.specialization || item?.category || 'Открою карточку, чтобы посмотреть детали.',
+    text: profile?.summary || item?.description || item?.summary || item?.address || item?.specialization || item?.category || 'Открою карточку, чтобы посмотреть детали.',
     image: imageOf(item),
-    meta: [item?.categoryLabel || item?.category || item?.specialization || '', item?.address || item?.place || '', item?.offer || item?.promo || ''].filter(Boolean).slice(0, 3),
+    meta: [profile?.specialization || item?.categoryLabel || item?.category || item?.specialization || '', item?.address || item?.place || '', item?.offer || item?.promo || ''].filter(Boolean).slice(0, 3),
     action,
     label,
     actions: [
