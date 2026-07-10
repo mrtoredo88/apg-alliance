@@ -20,9 +20,9 @@ import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
-import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
+import { shareLink } from './utils/shareLink.js';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { motionTransition } from './motion.js';
 
@@ -186,9 +186,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
   };
 
   const handleShare = () => {
-    const deepLink = isVK()
-      ? `https://vk.com/app54601851#expert_${expert.id}`
-      : `${APP_URL}/?expert=${expert.id}`;
+    const deepLink = shareLink('expert', expert.id);
 
     const textLines = [
       `${expert.name} — эксперт АПГ Зеленоград! ⭐`,

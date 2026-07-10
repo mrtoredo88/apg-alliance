@@ -30,13 +30,13 @@ const QUICK_COMMANDS = [
 ];
 
 const SECTION_LINKS = {
-  news: `${APP_URL}/#/`,
-  events: `${APP_URL}/#/`,
-  directory: `${APP_URL}/#/telegram-helper?section=directory`,
-  partners: `${APP_URL}/#/`,
-  experts: `${APP_URL}/#/`,
-  rewards: `${APP_URL}/#/`,
-  profile: `${APP_URL}/#/`,
+  news: `${APP_URL}/news`,
+  events: `${APP_URL}/events`,
+  directory: `${APP_URL}/telegram-helper?section=directory`,
+  partners: `${APP_URL}/`,
+  experts: `${APP_URL}/experts`,
+  rewards: `${APP_URL}/`,
+  profile: `${APP_URL}/`,
 };
 
 function normalize(value) {
@@ -104,11 +104,11 @@ function openExternal(url, tg) {
 
 function actionToUrl(action) {
   const type = action?.type;
-  if (type === LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS || type === LOKI_APP_ACTIONS.OPEN_MAP) return `${APP_URL}/#/`;
-  if (type === LOKI_APP_ACTIONS.OPEN_EVENT) return `${APP_URL}/#/`;
-  if (type === LOKI_APP_ACTIONS.OPEN_PRIZE) return `${APP_URL}/#/`;
-  if (type === LOKI_APP_ACTIONS.SHOW_PROFILE || type === LOKI_APP_ACTIONS.OPEN_SETTINGS) return `${APP_URL}/#/`;
-  if (type === LOKI_APP_ACTIONS.START_QR_SCANNER) return `${APP_URL}/#/`;
+  if (type === LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS || type === LOKI_APP_ACTIONS.OPEN_MAP) return `${APP_URL}/`;
+  if (type === LOKI_APP_ACTIONS.OPEN_EVENT) return `${APP_URL}/events`;
+  if (type === LOKI_APP_ACTIONS.OPEN_PRIZE) return `${APP_URL}/`;
+  if (type === LOKI_APP_ACTIONS.SHOW_PROFILE || type === LOKI_APP_ACTIONS.OPEN_SETTINGS) return `${APP_URL}/`;
+  if (type === LOKI_APP_ACTIONS.START_QR_SCANNER) return `${APP_URL}/`;
   return APP_URL;
 }
 

@@ -37,7 +37,8 @@ try {
   const hashQuery = typeof window !== 'undefined' ? (window.location.hash.split('?')[1] || '') : '';
   const params = new URLSearchParams(hashQuery);
   const localHost = host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.');
-  const adminRoute = hashPath === '#/admin' || hashPath === '#/admin-app';
+  const pathName = typeof window !== 'undefined' ? window.location.pathname : '';
+  const adminRoute = hashPath === '#/admin' || hashPath === '#/admin-app' || pathName === '/admin' || pathName === '/admin-app';
   const storedDemoEmulator = window.localStorage?.getItem('apg_demo_content') === 'emulator';
   const storedEmulatorAllowed = window.localStorage?.getItem('apg_firestore_emulator_enabled') === '1';
   if (adminRoute && storedDemoEmulator) {

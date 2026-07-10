@@ -1,4 +1,4 @@
-const SW_VERSION = 'apg-push-sw-20260708';
+const SW_VERSION = 'apg-universal-links-20260710';
 
 async function clearAllCaches() {
   if (!self.caches) return;
@@ -26,8 +26,17 @@ self.addEventListener('message', (event) => {
   );
 });
 
-self.addEventListener('fetch', () => {
-  return;
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.mode !== 'navigate') return;
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response && response.ok) return response;
+        return fetch('/index.html', { cache: 'no-store' });
+      })
+      .catch(() => fetch('/index.html', { cache: 'no-store' }))
+  );
 });
 
 self.addEventListener('push', (event) => {
@@ -62,7 +71,7 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clients) => {
         const absoluteUrl = new URL(targetUrl, self.location.origin).href;
-        const existing = clients.find((client) => client.url === absoluteUrl || client.url.startsWith(self.location.origin));
+        const existing = clients.find((client) => client.url.startsWith(self.location.origin));
         if (existing) {
           existing.focus();
           if ('navigate' in existing) return existing.navigate(absoluteUrl);

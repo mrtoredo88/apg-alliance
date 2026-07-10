@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 async function checkForUpdate() {
@@ -44,7 +44,7 @@ export function App() {
   }, []);
   return (
     <ErrorBoundary>
-      <HashRouter>
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={
             <Suspense fallback={<AppFallback label="Загрузка АПГ..." />}>
@@ -59,6 +59,46 @@ export function App() {
           <Route path="/admin-app" element={
             <Suspense fallback={<AppFallback label="Загрузка админки АПГ..." />}>
               <AdminPanel />
+            </Suspense>
+          } />
+          <Route path="/news/:id" element={
+            <Suspense fallback={<AppFallback label="Открываем новость..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/news" element={
+            <Suspense fallback={<AppFallback label="Открываем новости..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/events" element={
+            <Suspense fallback={<AppFallback label="Открываем афишу..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/event/:id" element={
+            <Suspense fallback={<AppFallback label="Открываем событие..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/partner/:id" element={
+            <Suspense fallback={<AppFallback label="Открываем партнёра..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/expert/:id" element={
+            <Suspense fallback={<AppFallback label="Открываем эксперта..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/experts" element={
+            <Suspense fallback={<AppFallback label="Открываем экспертов..." />}>
+              <UserApp />
+            </Suspense>
+          } />
+          <Route path="/submit/:type/:token" element={
+            <Suspense fallback={<AppFallback label="Открываем форму..." />}>
+              <UserApp />
             </Suspense>
           } />
           <Route path="/assistant" element={
@@ -88,7 +128,7 @@ export function App() {
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </HashRouter>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

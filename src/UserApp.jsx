@@ -97,6 +97,29 @@ function profileOwnedByUser(profile, userData, fallbackEmail = '') {
     || userPartnerIds.includes(String(profile.id || ''));
 }
 
+function readAppDeepLink() {
+  if (typeof window === 'undefined') return { type: '', id: '' };
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
+  const [section, id] = parts;
+  if (section === 'news' && id) return { type: 'news', id };
+  if (section === 'news') return { type: 'news-list', id: '' };
+  if (section === 'event' && id) return { type: 'event', id };
+  if (section === 'events') return { type: 'events', id: '' };
+  if (section === 'partner' && id) return { type: 'partner', id };
+  if (section === 'expert' && id) return { type: 'expert', id };
+  if (section === 'experts') return { type: 'experts', id: '' };
+  return { type: '', id: '' };
+}
+
+function getInitialPanelFromDeepLink(deepLink) {
+  if (deepLink.type === 'news') return 'news';
+  if (deepLink.type === 'news-list') return 'news';
+  if (deepLink.type === 'event' || deepLink.type === 'events') return 'events';
+  if (deepLink.type === 'expert' || deepLink.type === 'experts') return 'experts';
+  return 'home';
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
@@ -560,6 +583,8 @@ function LazyFallback() {
 }
 
 export function UserApp() {
+  const initialDeepLink                         = useMemo(readAppDeepLink, []);
+  const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
@@ -572,15 +597,15 @@ export function UserApp() {
   const [reviewPromptPartnerId, setReviewPromptPartnerId] = useState(null);
   const [scanDates, setScanDates]               = useState([]);
 
-  const [activePanel, setActivePanel]           = useState('home');
-  const panelHistoryRef                         = useRef(['home']);
+  const [activePanel, setActivePanel]           = useState(initialPanel);
+  const panelHistoryRef                         = useRef([initialPanel]);
   const [panelTransition, setPanelTransition]   = useState('forward');
   const [tabIndicator, setTabIndicator]         = useState({ center: 0, width: 0, ready: false });
   const [pullDistance, setPullDistance]         = useState(0);
   const [pullRefreshing, setPullRefreshing]     = useState(false);
   const [activePartner, setActivePartner]       = useState(null);
-  const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(null);
-  const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(null);
+  const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
+  const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
   const [user, setUser]                         = useState(null);
@@ -656,10 +681,11 @@ export function UserApp() {
 
   // Deep link на конкретного партнёра: #partner_ID или ?partner=ID
   const pendingPartnerId = useMemo(() => {
+    if (initialDeepLink.type === 'partner') return initialDeepLink.id;
     const fromHash   = window.location.hash.match(/[#&]partner[=_](\w+)/)?.[1];
     const fromSearch = new URLSearchParams(window.location.search).get('partner');
     return fromHash ?? fromSearch ?? null;
-  }, []);
+  }, [initialDeepLink]);
   const deepLinkOpened = useRef(false);
 
   // Deep link для скана эксперта: ?scan=expert_ID
@@ -669,8 +695,9 @@ export function UserApp() {
 
   // Deep link на конкретного эксперта: ?expert=ID
   const pendingExpertId = useMemo(() => {
+    if (initialDeepLink.type === 'expert') return initialDeepLink.id;
     return new URLSearchParams(window.location.search).get('expert') ?? null;
-  }, []);
+  }, [initialDeepLink]);
   const expertDeepLinkOpened = useRef(false);
   const scanDeepLinkTriggered = useRef(false);
 
@@ -1434,8 +1461,9 @@ export function UserApp() {
     try {
       const parsed = new URL(rawQrValue, APP_URL);
       const scanValue = parsed.searchParams.get('scan');
-      const partnerId = parsed.searchParams.get('partner');
-      const expertId = parsed.searchParams.get('expert');
+      const pathParts = parsed.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+      const partnerId = parsed.searchParams.get('partner') || (pathParts[0] === 'partner' ? pathParts[1] : '');
+      const expertId = parsed.searchParams.get('expert') || (pathParts[0] === 'expert' ? pathParts[1] : '');
       if (scanValue) {
         rawQrValue = scanValue;
       } else if (partnerId) {
@@ -1463,7 +1491,7 @@ export function UserApp() {
         return;
       }
     } catch (e) {
-      if (rawQrValue.includes('?partner=') || rawQrValue.includes('?expert=')) {
+      if (rawQrValue.includes('?partner=') || rawQrValue.includes('?expert=') || rawQrValue.includes('/partner/') || rawQrValue.includes('/expert/')) {
         logError(e, 'UserApp.handleConfirmScan.parsePublicQr');
       }
     }
@@ -2916,7 +2944,7 @@ export function UserApp() {
                     userCount={platformStats.userCount}
                     totalScans={platformStats.totalScans}
                     onBack={goBackPanel}
-                    onGoAdmin={() => { window.location.hash = '/admin-app'; }}
+                    onGoAdmin={() => { window.location.assign('/admin-app'); }}
                   />
                 </Suspense>
               </Panel>

@@ -14,10 +14,10 @@ import { db } from './firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
-import { APP_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
+import { shareLink } from './utils/shareLink.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
@@ -292,9 +292,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   };
 
   const handleShare = () => {
-    const deepLink = isVK()
-      ? `https://vk.com/app54601851#partner_${partner.id}`
-      : `${APP_URL}/?partner=${partner.id}`;
+    const deepLink = shareLink('partner', partner.id);
 
     const textLines = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,

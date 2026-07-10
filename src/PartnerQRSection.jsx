@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { APP_URL } from './constants.js';
 import { T } from './design.js';
+import { shareLink } from './utils/shareLink.js';
 
 const POSTER_TEMPLATE_URL = '/qr-poster-template-v3.jpg';
 
@@ -459,7 +460,7 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
 
 // ─── Partner wrapper (backward compat) ────────────────────────────────────────
 export function PartnerQRSection({ partner }) {
-  const publicVal = `${APP_URL}/?partner=${partner.id}`;
+  const publicVal = shareLink('partner', partner.id);
   return (
     <CabinetQRSection
       entityId={partner.id}
@@ -488,7 +489,7 @@ export function PartnerQRSection({ partner }) {
 
 // ─── Expert wrapper ────────────────────────────────────────────────────────────
 export function ExpertQRSection({ expert }) {
-  const publicVal  = `${APP_URL}/?expert=${expert.id}`;
+  const publicVal  = shareLink('expert', expert.id);
   const serviceVal = `expert_${expert.id}`;
   const serviceLink = `${APP_URL}/?scan=${serviceVal}`;
   return (

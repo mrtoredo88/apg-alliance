@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom';
 import { motionTransition } from './motion.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
+import { shareLink } from './utils/shareLink.js';
 
 const A = {
   text: APG2_PROFILE.text,
@@ -473,7 +474,7 @@ function UserActionsSection({ event, isRegistered, onRegister, onClose }) {
   const canRoute = Boolean(event?.address || event?.location);
   const share = async () => {
     const text = `${event?.title || 'Событие АПГ'}${event?.date ? ` · ${event.date}` : ''}`;
-    const url = typeof window !== 'undefined' ? window.location.href : 'https://myapg.ru';
+    const url = shareLink('event', event?.id || '');
     if (navigator?.share) {
       await navigator.share({ title: event?.title || 'Событие АПГ', text, url }).catch(() => {});
       return;

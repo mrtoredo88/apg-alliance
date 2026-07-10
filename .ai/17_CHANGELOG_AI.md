@@ -1412,3 +1412,13 @@
 **Что изменено:** Бейдж даты на карточках афиши переработан в контрастную золотую glass-пластину с blur, светлым кантом, тенью и более крупной типографикой. `EventDetailSheet` переведён на `APG2_PROFILE`: фон sheet использует `APG2_PROFILE.bg`, секции используют `APG2_PROFILE.glass`, hero стал крупной пользовательской обложкой с градиентом, статусом и быстрыми инфо-плитками. Увеличен воздух между блоками, внешний мобильный отступ сохранён минимальным для почти полноширинного iOS bottom sheet.
 
 **Дополнительно:** При открытии события внутренний scroll карточки принудительно возвращается в начало, чтобы пользователь сразу видел большую hero-обложку, а не середину карточки после предыдущих взаимодействий. Для мобильных браузеров сброс усилен через layout-time reset, remount scroll-контейнера и отложенные fallback-сбросы. Hero-блок вынесен над scroll-областью секций, чтобы обложка всегда была первым видимым экраном bottom sheet.
+
+## 2026-07-10 — Universal Links и path-based deep links
+
+**Задача:** Поддержать открытие новостей, событий, партнёров и экспертов по красивым web/PWA-ссылкам без hash-routing.
+
+**Файлы:** `src/App.jsx`, `src/main.jsx`, `src/UserApp.jsx`, `src/NewsPage.jsx`, `src/EventDetailSheet.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/PartnerQRSection.jsx`, `src/AdminPanel.jsx`, `src/firebase.js`, `src/assistant/AssistantMiniApp.jsx`, `src/utils/shareLink.js`, `public/manifest.json`, `public/sw.js`
+
+**Что изменено:** `App` переведён на `BrowserRouter`, старые `/#/...` ссылки автоматически переписываются в path до рендера, `UserApp` открывает `/news/:id`, `/event/:id`, `/events`, `/partner/:id`, `/expert/:id` и `/experts` сразу в нужной панели/карточке. Добавлен единый helper `shareLink(entityType,id)`, публичные share/QR-ссылки переведены на `/news/...`, `/event/...`, `/partner/...`, `/expert/...`. Manifest теперь использует `id/start_url/scope` от `/`, service worker получил navigation fallback на `/index.html` и фокусирует существующее PWA-окно при push/open.
+
+**Совместимость:** Старые hash-ссылки и старые QR вида `?partner=` / `?expert=` продолжают распознаваться.

@@ -3,9 +3,10 @@ import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
-import { API_BASE_URL, APP_URL } from './constants.js';
+import { API_BASE_URL } from './constants.js';
 import { logError } from './errorLogger.js';
 import { auth } from './firebase.js';
+import { shareLink } from './utils/shareLink.js';
 import {
   NEWS_CATEGORIES,
   filterNewsItems,
@@ -80,8 +81,8 @@ const horizontalSnapItem = {
 };
 
 function getNewsDeepLink(item) {
-  const id = encodeURIComponent(String(item?.id || item?.externalId || ''));
-  return `${APP_URL}/#/news/${id}`;
+  const id = String(item?.id || item?.externalId || '');
+  return shareLink('news', id);
 }
 
 function getSmartBadges(item) {

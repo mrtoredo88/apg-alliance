@@ -3,7 +3,6 @@ import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
-import { APP_URL } from './constants.js';
 import { Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
@@ -12,6 +11,7 @@ import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
+import { shareLink } from './utils/shareLink.js';
 
 function getExpertReadyState(expert = {}) {
   const galleryCount = (Array.isArray(expert.gallery) ? expert.gallery : []).filter(Boolean).length;
@@ -219,7 +219,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
               { icon: '📅', label: 'Расписание', action: () => setActiveTab('schedule') },
               { icon: '📸', label: 'Контент',  action: () => setActiveTab('content') },
               { icon: '📲', label: 'QR-код',   action: () => setActiveTab('qr') },
-              { icon: '🌐', label: 'Карточка', action: () => window.open(`${APP_URL}/?expert=${expert.id}`, '_blank') },
+              { icon: '🌐', label: 'Карточка', action: () => window.open(shareLink('expert', expert.id), '_blank') },
             ].map(({ icon, label, action }) => (
               <button key={label} onClick={action} style={{
                 ...APG2_PROFILE.glass, borderRadius: 22, padding: '11px 4px',

@@ -11,6 +11,7 @@ import { userAction } from './userApi.js';
 
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
+import { shareLink } from './utils/shareLink.js';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -224,7 +225,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
               { icon: '🎁', label: 'Акция',     action: () => setActiveTab('edit') },
               { icon: '📅', label: 'Календарь', action: () => setActiveTab('calendar') },
               { icon: '📲', label: 'QR-код',    action: () => setActiveTab('qr') },
-              { icon: '🌐', label: 'Карточка',  action: () => window.open(`${APP_URL}/?partner=${partner.id}`, '_blank') },
+              { icon: '🌐', label: 'Карточка',  action: () => window.open(shareLink('partner', partner.id), '_blank') },
             ].map(({ icon, label, action }) => (
               <button key={label} onClick={action} style={{
                 ...APG2_PROFILE.glass,

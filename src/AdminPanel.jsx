@@ -15,6 +15,7 @@ import { collection, getDocs, query, orderBy, where, limit } from 'firebase/fire
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
+import { shareLink } from './utils/shareLink.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -3208,7 +3209,7 @@ export const AdminPanel = () => {
     if (!trimmed) return '';
     if (trimmed.startsWith('#') || trimmed.startsWith('/')) return trimmed;
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    return `/#/${trimmed.replace(/^#?\/*/, '')}`;
+    return `/${trimmed.replace(/^#?\/*/, '')}`;
   };
 
   const adminRequestHeaders = async (idempotencyKey = '') => {
@@ -3985,7 +3986,7 @@ export const AdminPanel = () => {
       runAdminEntityAction('partners', 'update', {
         id: created.id,
         patch: {
-          publicQRUrl:     `${APP_URL}/?partner=${created.id}`,
+          publicQRUrl:     shareLink('partner', created.id),
           serviceQRValue:  created.id,
         },
       }).catch(() => {});
@@ -7553,7 +7554,7 @@ export const AdminPanel = () => {
               </div>
               <div>
                 <label style={s.label}>Deep Link</label>
-                <input style={s.input} placeholder="/#/news или /#/partners" value={ntDeepLink} onChange={e => setNtDeepLink(e.target.value)} />
+                <input style={s.input} placeholder="/news или /partner/demo" value={ntDeepLink} onChange={e => setNtDeepLink(e.target.value)} />
               </div>
             </div>
 

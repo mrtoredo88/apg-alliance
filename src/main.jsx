@@ -19,6 +19,14 @@ if (_vkHash.includes('access_token=') && window.opener) {
   } catch {}
   setTimeout(() => window.close(), 300);
 } else {
+  if (/^#\//.test(window.location.hash || '')) {
+    const legacy = window.location.hash.slice(1);
+    const [path, hashQuery = ''] = legacy.split('?');
+    const currentQuery = window.location.search || '';
+    const query = currentQuery || (hashQuery ? `?${hashQuery}` : '');
+    window.history.replaceState({}, '', `${path || '/'}${query}`);
+  }
+
   window.__APG_BOOT_MARK?.('main_module_loaded');
   installNetworkDiagnostics();
   window.__APG_BOOT_MARK?.('network_diagnostics_installed');
