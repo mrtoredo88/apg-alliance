@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-10] fix: убран двойной paddingBottom под навигацией (все GlassPanel-страницы)
+**Коммит:** `47b94b09`
+**Файлы:** `src/UserApp.jsx`
+**Тип:** fix
+**Что изменено:**
+- Удалён `paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))'` из wrapper-div в UserApp (линия 2597).
+**Почему:** UserApp-обёртка и компонент `GlassPanel` (`Apg2ProfileGlass.jsx`) оба добавляли 96px + safe-area-inset-bottom. На iPhone (safe-area ≈ 34px) это давало 260px пустого места под контентом. Все страницы управляют своим нижним отступом сами (через GlassPanel, собственный paddingBottom или self-scroll контейнер). Обёртка была лишней.
+**Страницы, которые затронуло:** ProfilePanel, LokiPage, EventsPage, TasksPage, LeaderboardPage, OffersPage, ActivityPage, ReferralPage, RewardsPage, ExpertCabinetPage, PartnerCabinetPage, ApgHealthPage, MapPage, NearbyPage, NotificationsPage, ReferencePage.
+**Статус деплоя:** Frontend ✓ задеплоен (version: 47b94b09).
+
+---
+
 ## [2026-07-10] fix: Локи открывается поверх статьи (stacking context + portal)
 **Коммит:** `757ab610`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiExperience.jsx`
