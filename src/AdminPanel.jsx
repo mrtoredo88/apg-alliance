@@ -4,6 +4,7 @@ import { EventDetailSheet } from './EventDetailSheet.jsx';
 import { QRCodeCanvas } from 'qrcode.react';
 import PhotoUpload, { GalleryUpload } from './PhotoUpload.jsx';
 import { MdEditor } from './components/MdEditor.jsx';
+import { EntityPreviewCard } from './components/EntityPreviewCard.jsx';
 import { PartnerQRSection, ExpertQRSection } from './PartnerQRSection.jsx';
 import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
@@ -1943,6 +1944,7 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
   const previewDraft = activeRequest?.draft || draft;
   const previewType = activeRequest?.type || type;
   const previewFields = previewDraft?.fields || {};
+  const previewEntity = previewDraft ? aiImportDraftPatch(previewType, previewDraft, activeRequest?.sourceFiles || sourceFiles) : null;
 
   return (
     <div>
@@ -2083,6 +2085,14 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                 <span style={{ color: A.text, fontSize: 14, fontWeight: 900 }}>{aiImportTypeMeta(previewType).emoji} {aiImportTypeMeta(previewType).label}</span>
                 <span style={{ color: confidenceTone(previewDraft.confidence).color, fontSize: 12, fontWeight: 900 }}>{confidenceTone(previewDraft.confidence).label}</span>
               </div>
+              {previewEntity && (
+                <div style={{ marginBottom: 14 }}>
+                  <EntityPreviewCard type={previewType} item={previewEntity} compact />
+                  <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px', marginTop: 8 }}>
+                    Предпросмотр использует общий renderer карточек АПГ, а не отдельный шаблон AI Editor.
+                  </div>
+                </div>
+              )}
               {Object.entries(previewFields).map(([key, value]) => value ? (
                 <div key={key} style={{ padding: '9px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -2131,6 +2141,9 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                   </button>
                   {isActive && (
                     <div style={{ marginTop: 12 }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <EntityPreviewCard type={item.type} item={aiImportDraftPatch(item.type, item.draft, item.sourceFiles)} compact />
+                      </div>
                       {canSeeLegal && item.legalProfile && (
                         <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
                           <div style={{ padding: 12, borderRadius: 16, background: 'rgba(201,168,76,0.08)', border: `1px solid ${A.goldBrd}` }}>
@@ -2377,18 +2390,14 @@ function AIDraftsPanel() {
               const tone = confidenceTone(draft.confidence);
               return (
                 <div key={draft.id} style={{ marginTop: 12, padding: 14, borderRadius: 18, background: A.chip, border: `1px solid ${A.border}` }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: draft.imageUrl ? '96px 1fr' : '1fr', gap: 12 }}>
-                    {draft.imageUrl && <img src={draft.imageUrl} alt="" loading="lazy" style={{ width: 96, height: 76, objectFit: 'cover', borderRadius: 14, border: `1px solid ${A.border}` }} onError={e => e.currentTarget.style.display = 'none'} />}
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 7 }}>
-                        <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: tone.color, fontSize: 11, fontWeight: 900 }}>{tone.label}</span>
-                        <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: A.textSec, fontSize: 11, fontWeight: 800 }}>{draft.category || 'society'}</span>
-                        <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: A.textSec, fontSize: 11, fontWeight: 800 }}>{draft.status || 'ready'}</span>
-                      </div>
-                      <div style={{ color: A.text, fontSize: 16, fontWeight: 920, lineHeight: '21px' }}>{draft.title}</div>
-                      <div style={{ color: A.textSec, fontSize: 12.5, lineHeight: '19px', marginTop: 6 }}>{draft.summary}</div>
-                      <div style={{ color: A.muted, fontSize: 11.5, marginTop: 8 }}>{draft.sourceName || 'Источник'} · {draft.readingTime || 1} мин чтения</div>
-                    </div>
+                  <EntityPreviewCard
+                    type="news"
+                    item={{ ...draft, text: draft.text || draft.summary, coverPhoto: draft.coverPhoto || draft.imageUrl, status: draft.status || 'ready' }}
+                    compact
+                  />
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 10 }}>
+                    <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: tone.color, fontSize: 11, fontWeight: 900 }}>{tone.label}</span>
+                    <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', color: A.textSec, fontSize: 11, fontWeight: 800 }}>{draft.status || 'ready'}</span>
                   </div>
                   <details style={{ marginTop: 10 }}>
                     <summary style={{ color: A.gold, cursor: 'pointer', fontSize: 12.5, fontWeight: 850 }}>🤖 Почему Локи считает это важным?</summary>
