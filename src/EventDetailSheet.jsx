@@ -128,6 +128,12 @@ function userDisplayName(user) {
     || `#${String(user?.id ?? '').slice(0, 6)}`;
 }
 
+function safeText(value, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (value == null) return fallback;
+  return String(value);
+}
+
 function normalizeMode(event) {
   if (!event) return 'offline';
   const mode = String(event.locationMode || event.mode || event.platform || event.format || '').toLowerCase();
@@ -689,7 +695,12 @@ function ParticipantsSection({ participants, search, setSearch, canManage }) {
   const q = search.trim().toLowerCase();
   const visibleParticipants = q
     ? participants.filter((entry) => {
-        const text = `${entry.name} ${entry.email} ${entry.phone} ${entry.id}`.toLowerCase();
+        const text = [
+          safeText(entry?.name),
+          safeText(entry?.email),
+          safeText(entry?.phone),
+          safeText(entry?.id),
+        ].join(' ').toLowerCase();
         return text.includes(q);
       })
     : participants;
@@ -725,21 +736,24 @@ function ParticipantsSection({ participants, search, setSearch, canManage }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 250, overflowY: 'auto' }}>
-          {visibleParticipants.map((entry) => (
-            <div key={entry.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${A.border}` }}>
+          {visibleParticipants.map((entry, idx) => {
+            const participantName = safeText(entry?.name, 'Участник');
+            const participantContact = safeText(entry?.email || entry?.phone || entry?.id, 'контакт не указан');
+            return (
+            <div key={entry?.id || idx} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${A.border}` }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(201,168,76,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: A.gold, flexShrink: 0 }}>
-                {entry.name?.slice(0, 1) || '👤'}
+                {participantName.slice(0, 1) || '👤'}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: A.text, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {entry.name}
+                  {participantName}
                 </div>
                 <div style={{ color: A.textSec, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {entry.email || entry.id}
+                  {participantContact}
                 </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </section>

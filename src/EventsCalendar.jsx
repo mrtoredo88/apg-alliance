@@ -20,22 +20,42 @@ const CATEGORY_COLORS = {
   transport: '#fb923c',
 };
 
+function safeString(value, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (value == null) return fallback;
+  return String(value);
+}
+
+function safeDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value?.toDate) {
+    const d = value.toDate();
+    return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+  }
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function getEventDate(ev) {
-  if (ev.startAt?.toDate) return ev.startAt.toDate();
-  if (ev.eventDate && /^\d{4}-\d{2}-\d{2}/.test(ev.eventDate)) return new Date(ev.eventDate + 'T12:00:00');
-  if (ev.deadline && /^\d{4}-\d{2}-\d{2}/.test(ev.deadline)) return new Date(ev.deadline + 'T12:00:00');
+  if (!ev) return null;
+  const startAt = safeDate(ev.startAt);
+  if (startAt) return startAt;
+  const eventDate = safeString(ev.eventDate);
+  if (/^\d{4}-\d{2}-\d{2}/.test(eventDate)) return safeDate(eventDate.length === 10 ? `${eventDate}T12:00:00` : eventDate);
+  const deadline = safeString(ev.deadline);
+  if (/^\d{4}-\d{2}-\d{2}/.test(deadline)) return safeDate(deadline.length === 10 ? `${deadline}T12:00:00` : deadline);
   return null;
 }
 
 function toKey(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function getEventTime(ev) {
-  if (ev.startAt?.toDate) {
-    return ev.startAt.toDate().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  }
-  return null;
+  const d = safeDate(ev?.startAt);
+  return d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : null;
 }
 
 function isPast(ev) {
@@ -44,17 +64,22 @@ function isPast(ev) {
 }
 
 function formatDayLabel(date) {
-  const dow = WEEKDAYS_RU[date.getDay()];
-  return `${dow.charAt(0).toUpperCase() + dow.slice(1)}, ${date.getDate()} ${MONTHS_GEN[date.getMonth()]}`;
+  const d = safeDate(date);
+  if (!d) return 'Без даты';
+  const dow = safeString(WEEKDAYS_RU[d.getDay()]);
+  const day = dow ? `${dow.slice(0, 1).toUpperCase()}${dow.slice(1)}` : 'День';
+  const month = safeString(MONTHS_GEN[d.getMonth()]);
+  return `${day}, ${d.getDate()}${month ? ` ${month}` : ''}`;
 }
 
 function buildDayWindows(events) {
-  const busy = new Set(events.map(ev => {
+  const list = Array.isArray(events) ? events.filter(Boolean) : [];
+  const busy = new Set(list.map(ev => {
     const d = getEventDate(ev);
     return d ? d.getHours() : null;
   }).filter(v => v !== null));
   return [9, 12, 15, 18, 20].map(hour => {
-    const event = events.find(ev => {
+    const event = list.find(ev => {
       const d = getEventDate(ev);
       return d && d.getHours() === hour;
     });
@@ -96,7 +121,12 @@ function EventRow({ ev, onEventClick, A, showDate = false }) {
   const d = getEventDate(ev);
   const time = getEventTime(ev);
   const past = isPast(ev);
-  const catColor = CATEGORY_COLORS[ev.category] || A.gold;
+  const catColor = CATEGORY_COLORS[safeString(ev?.category)] || A.gold;
+  const title = safeString(ev?.title, 'Событие без названия') || 'Событие без названия';
+  const partner = safeString(ev?.partner || ev?.partnerName);
+  const address = safeString(ev?.address);
+  const registeredCount = Number(ev?.registeredCount ?? ev?.registrationsCount ?? 0) || 0;
+  const maxParticipants = Number(ev?.maxParticipants ?? ev?.capacity ?? 0) || 0;
   return (
     <div
       onClick={() => onEventClick(ev)}
@@ -108,26 +138,26 @@ function EventRow({ ev, onEventClick, A, showDate = false }) {
         width: 38, height: 38, borderRadius: 12, flexShrink: 0,
         background: past ? 'rgba(255,255,255,0.04)' : 'rgba(201,168,76,0.10)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
-      }}>{ev.emoji || '🎉'}</div>
+      }}>{ev?.emoji || '🎉'}</div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: past ? A.textSec : A.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {ev.isPrivate ? '🔒 ' : ''}{ev.title}
+          {ev?.isPrivate ? '🔒 ' : ''}{title}
         </div>
         <div style={{ fontSize: 11, color: A.textSec, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {ev.partner && <span>{ev.partner}</span>}
-          {ev.address && <span>{ev.partner ? ' · ' : ''}{ev.address}</span>}
-          {showDate && d && <span style={{ marginLeft: ev.partner || ev.address ? 6 : 0, color: past ? A.textSec : A.gold }}>
-            · {d.getDate()} {MONTHS_GEN[d.getMonth()]}
+          {partner && <span>{partner}</span>}
+          {address && <span>{partner ? ' · ' : ''}{address}</span>}
+          {showDate && d && <span style={{ marginLeft: partner || address ? 6 : 0, color: past ? A.textSec : A.gold }}>
+            · {d.getDate()} {safeString(MONTHS_GEN[d.getMonth()])}
           </span>}
         </div>
       </div>
 
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         {time && <div style={{ fontSize: 12, fontWeight: 700, color: past ? A.textSec : A.gold }}>{time}</div>}
-        {ev.registeredCount > 0 && (
+        {registeredCount > 0 && (
           <div style={{ fontSize: 11, color: A.textSec, marginTop: 2 }}>
-            {ev.registeredCount}{ev.maxParticipants > 0 ? ` / ${ev.maxParticipants}` : ''} чел.
+            {registeredCount}{maxParticipants > 0 ? ` / ${maxParticipants}` : ''} чел.
           </div>
         )}
       </div>
@@ -163,6 +193,7 @@ function FreeWindows({ date, events, onCreateEvent, A }) {
 }
 
 export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) {
+  const safeEvents = Array.isArray(events) ? events.filter(Boolean) : [];
   const [view, setView] = useState('month');
   const [curMonth, setCurMonth] = useState(() => {
     const n = new Date();
@@ -177,15 +208,16 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
 
   const byDay = useMemo(() => {
     const m = {};
-    events.forEach(ev => {
+    safeEvents.forEach(ev => {
       const d = getEventDate(ev);
       if (!d) return;
       const k = toKey(d);
+      if (!k) return;
       if (!m[k]) m[k] = [];
       m[k].push(ev);
     });
     return m;
-  }, [events]);
+  }, [safeEvents]);
 
   const statsToday = (byDay[todayKey] || []).length;
 
@@ -233,13 +265,16 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
   }, [curMonth]);
 
   const filteredEvents = useMemo(() => {
-    let r = events;
+    let r = safeEvents;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       r = r.filter(e =>
-        (e.title || '').toLowerCase().includes(q) ||
-        (e.address || '').toLowerCase().includes(q) ||
-        (e.partner || '').toLowerCase().includes(q)
+        safeString(e?.title).toLowerCase().includes(q) ||
+        safeString(e?.address).toLowerCase().includes(q) ||
+        safeString(e?.partner || e?.partnerName).toLowerCase().includes(q) ||
+        safeString(e?.expert || e?.expertName).toLowerCase().includes(q) ||
+        safeString(e?.category).toLowerCase().includes(q) ||
+        safeString(e?.status).toLowerCase().includes(q)
       );
     }
     if (statusFilter === 'upcoming') r = r.filter(e => !isPast(e));
@@ -252,7 +287,7 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
       if (!db) return -1;
       return da - db;
     });
-  }, [events, search, statusFilter]);
+  }, [safeEvents, search, statusFilter]);
 
   const groups = useMemo(() => {
     const result = [];
@@ -287,7 +322,7 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
 
       {/* Статистика */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-        <StatCard icon="🎉" value={events.length} label="Всего событий" color={A.gold} A={A} />
+        <StatCard icon="🎉" value={safeEvents.length} label="Всего событий" color={A.gold} A={A} />
         <StatCard icon="📅" value={statsToday} label="Сегодня" color="#4ade80" A={A} />
         <StatCard icon="📆" value={statsWeek} label="На этой неделе" color="#38bdf8" A={A} />
         <StatCard icon="🗓️" value={Object.keys(byDay).length} label="Дней с событиями" color="#A78BFA" A={A} />
@@ -385,7 +420,7 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
                       {showDots.map((ev, di) => (
                         <div key={di} style={{
                           width: 7, height: 7, borderRadius: '50%',
-                          background: CATEGORY_COLORS[ev.category] || A.gold,
+                          background: CATEGORY_COLORS[safeString(ev?.category)] || A.gold,
                           opacity: item.outside ? 0.4 : 1,
                           flexShrink: 0,
                         }} />
@@ -433,7 +468,7 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
                   <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', color: A.textSec, cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>✕</button>
                 </div>
                 {selEvents.map((ev, i) => (
-                  <div key={ev.id || i} style={{ borderBottom: i < selEvents.length - 1 ? `1px solid ${A.border}` : 'none' }}>
+                  <div key={ev?.id || i} style={{ borderBottom: i < selEvents.length - 1 ? `1px solid ${A.border}` : 'none' }}>
                     <EventRow ev={ev} onEventClick={onEventClick} A={A} />
                   </div>
                 ))}
@@ -519,7 +554,7 @@ export function EventsCalendar({ events = [], onEventClick, onCreateEvent, A }) 
 
               <div style={{ ...card, padding: 0, marginBottom: 8, overflow: 'hidden' }}>
                 {g.list.map((ev, i) => (
-                  <div key={ev.id || i} style={{ borderBottom: i < g.list.length - 1 ? `1px solid ${A.border}` : 'none' }}>
+                  <div key={ev?.id || i} style={{ borderBottom: i < g.list.length - 1 ? `1px solid ${A.border}` : 'none' }}>
                     <EventRow ev={ev} onEventClick={onEventClick} A={A} />
                   </div>
                 ))}
