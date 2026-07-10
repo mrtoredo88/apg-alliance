@@ -52,6 +52,45 @@ const CATEGORY_ALIASES = {
   vkontakte: 'apg',
 };
 
+function cleanNewsId(value) {
+  const id = String(value ?? '').trim();
+  if (!id || id === 'undefined' || id === 'null') return '';
+  return id;
+}
+
+export function getCanonicalNewsId(item) {
+  const direct = cleanNewsId(item?.id || item?.canonicalId || item?.docId || item?.firestoreId);
+  if (direct) return direct;
+  const source = cleanNewsId(item?.source || item?.sourceType || 'news').toLowerCase();
+  const externalId = cleanNewsId(item?.externalId || item?.external_id || item?.postId || item?.vkPostId);
+  if (source && externalId) return `${source}_${externalId}`;
+  return externalId;
+}
+
+export function getNewsLegacyIds(item) {
+  const source = cleanNewsId(item?.source || item?.sourceType || 'news').toLowerCase();
+  const externalId = cleanNewsId(item?.externalId || item?.external_id || item?.postId || item?.vkPostId);
+  return [
+    getCanonicalNewsId(item),
+    cleanNewsId(item?.canonicalId),
+    cleanNewsId(item?.docId),
+    cleanNewsId(item?.firestoreId),
+    cleanNewsId(item?.id),
+    source && externalId ? `${source}_${externalId}` : '',
+    externalId,
+  ].filter((id, index, arr) => id && arr.indexOf(id) === index);
+}
+
+export function isSameNews(a, b) {
+  if (!a || !b) return false;
+  const aIds = new Set(getNewsLegacyIds(a));
+  return getNewsLegacyIds(b).some(id => aIds.has(id));
+}
+
+export function areNewsCommentsEnabled(item) {
+  return item?.commentsEnabled !== false;
+}
+
 export function getNewsImage(item) {
   const firstPhoto = getNewsPhotoItems(item)[0]?.url;
   return item?.coverPhoto || item?.imageUrl || item?.thumbnail || item?.banner || item?.image || item?.photo || firstPhoto || '';

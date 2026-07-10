@@ -1458,3 +1458,15 @@
 **Что изменено:** `App` переведён на `BrowserRouter`, старые `/#/...` ссылки автоматически переписываются в path до рендера, `UserApp` открывает `/news/:id`, `/event/:id`, `/events`, `/partner/:id`, `/expert/:id` и `/experts` сразу в нужной панели/карточке. Добавлен единый helper `shareLink(entityType,id)`, публичные share/QR-ссылки переведены на `/news/...`, `/event/...`, `/partner/...`, `/expert/...`. Manifest теперь использует `id/start_url/scope` от `/`, service worker получил navigation fallback на `/index.html` и фокусирует существующее PWA-окно при push/open.
 
 **Совместимость:** Старые hash-ссылки и старые QR вида `?partner=` / `?expert=` продолжают распознаваться.
+
+## 2026-07-10 — VK news article reader and comments hotfix
+
+**Задача:** Устранить production-проблему VK-новостей: тёмная плохо читаемая статья и отсутствие полноценного блока комментариев/функций АПГ при открытии с главной.
+
+**Файлы:** `src/NewsPage.jsx`, `src/newsUtils.js`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/ProfilePanel.jsx`, `src/NotificationsPage.jsx`, `src/LokiPage.jsx`, `src/index.css`, `api/news-comments.js`, `server/src/routes/news-comments.js`, `scripts/news-article-regression.mjs`, `package.json`
+
+**Что изменено:** Добавлен единый canonical id новости и legacy aliases для VK/исторических записей. Комментарии, реакции, сохранения, deep links и открытие новости теперь используют один canonical id; backend `/api/news-comments` читает canonical + legacy ids с дедупликацией, а новые комментарии пишет под canonical id. `commentsEnabled` нормализован так, что только boolean `false` отключает комментарии.
+
+**UX:** `ArticleView` получил изолированный светлый режим чтения `.apg-news-article-*`: светлый непрозрачный фон области статьи, тёмный основной текст, стабильные CSS-переменные, без родительского opacity/filter/тёмного overlay поверх текста. Временные диагностические `console.log` из новостных сценариев удалены.
+
+**Проверка:** Добавлен `npm run test:news-article`, который на local production preview с реальными VK API-данными проверяет открытие VK-новости с главной, из `/news` и через `/news/:id`, светлый reader, наличие CommentsPanel, default-on comments, canonical id и кнопку оригинала VK после контента.

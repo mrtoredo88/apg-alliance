@@ -18,6 +18,14 @@ function safeUser(user = {}) {
   };
 }
 
+function cleanNewsIds(...values) {
+  return values
+    .flatMap(value => Array.isArray(value) ? value : String(value ?? '').split(','))
+    .map(value => String(value ?? '').trim())
+    .filter((value, index, arr) => value && value !== 'undefined' && value !== 'null' && arr.indexOf(value) === index)
+    .slice(0, 10);
+}
+
 function serializeComment(doc) {
   const data = doc.data() || {};
   const toIso = value => value?.toDate ? value.toDate().toISOString() : value || null;
@@ -60,9 +68,14 @@ async function logCommentError(db, request, error, extra = {}) {
   }
 }
 
-async function listComments(db, newsId) {
-  const snap = await db.collection('newsComments').where('newsId', '==', newsId).get();
-  return snap.docs
+async function listComments(db, newsId, legacyIds = []) {
+  const ids = cleanNewsIds(newsId, legacyIds);
+  const docsById = new Map();
+  for (const id of ids) {
+    const snap = await db.collection('newsComments').where('newsId', '==', id).get();
+    snap.docs.forEach(doc => docsById.set(doc.id, doc));
+  }
+  return [...docsById.values()]
     .map(serializeComment)
     .filter(comment => !comment.hidden)
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -110,8 +123,9 @@ export default async function newsCommentsRoutes(fastify) {
         return { ok: true, comments };
       }
       if (!newsId) return reply.code(400).send({ ok: false, error: 'newsId is required' });
-      const comments = await listComments(db, newsId);
-      return { ok: true, comments };
+      const legacyIds = cleanNewsIds(request.query?.legacyIds || request.query?.aliases || request.query?.legacyNewsIds);
+      const comments = await listComments(db, newsId, legacyIds);
+      return { ok: true, newsId, legacyIds, comments };
     } catch (error) {
       await logCommentError(db, request, error, { method: 'GET', newsId: request.query?.newsId || null });
       return reply.code(500).send({ ok: false, error: 'Не удалось загрузить комментарии.' });

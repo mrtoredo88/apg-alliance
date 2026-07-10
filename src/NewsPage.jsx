@@ -10,8 +10,10 @@ import { auth } from './firebase.js';
 import { shareLink } from './utils/shareLink.js';
 import {
   NEWS_CATEGORIES,
+  areNewsCommentsEnabled,
   filterNewsItems,
   formatNewsDate,
+  getCanonicalNewsId,
   getNewsDocs,
   getNewsCategory,
   getNewsCategoryLabel,
@@ -26,9 +28,11 @@ import {
   getNewsTitle,
   getNewsUrl,
   getNewsVideos,
+  getNewsLegacyIds,
   getReadingMinutes,
   getNewsViews,
   hasNewsVideo,
+  isSameNews,
   isFreshNews,
   sortNewsItems,
 } from './newsUtils.js';
@@ -82,7 +86,7 @@ const horizontalSnapItem = {
 };
 
 function getNewsDeepLink(item) {
-  const id = String(item?.id || item?.externalId || '');
+  const id = getCanonicalNewsId(item);
   return shareLink('news', id);
 }
 
@@ -581,7 +585,10 @@ function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, onPin, o
 }
 
 function CommentsPanel({ item, user, onToast }) {
-  const newsId = String(item?.id || '');
+  const newsId = getCanonicalNewsId(item);
+  const legacyIds = useMemo(() => getNewsLegacyIds(item).filter(id => id !== newsId), [item, newsId]);
+  const legacyKey = legacyIds.join('|');
+  const panelRef = useRef(null);
   const composerRef = useRef(null);
   const [comments, setComments] = useState([]);
   const [sort, setSort] = useState('new');
@@ -605,7 +612,8 @@ function CommentsPanel({ item, user, onToast }) {
     setLoading(true);
     setError('');
     try {
-      const data = await requestNewsComments(`/api/news-comments?newsId=${encodeURIComponent(newsId)}`);
+      const aliasQuery = legacyIds.length ? `&legacyIds=${encodeURIComponent(legacyIds.join(','))}` : '';
+      const data = await requestNewsComments(`/api/news-comments?newsId=${encodeURIComponent(newsId)}${aliasQuery}`);
       setComments(Array.isArray(data.comments) ? data.comments : []);
     } catch (e) {
       logError(e, 'NewsPage.comments.load');
@@ -615,7 +623,7 @@ function CommentsPanel({ item, user, onToast }) {
     }
   };
 
-  useEffect(() => { load(); }, [newsId]);
+  useEffect(() => { load(); }, [newsId, legacyKey]);
   useEffect(() => {
     if (!draftKey) return;
     setText(localStorage.getItem(draftKey) || '');
@@ -751,7 +759,11 @@ function CommentsPanel({ item, user, onToast }) {
   };
 
   return (
-    <GlassCard data-apg-pull-disabled="true" style={{ marginTop: 18, borderRadius: 30, padding: 16 }}>
+    <GlassCard
+      ref={panelRef}
+      data-apg-pull-disabled="true"
+      style={{ marginTop: 18, borderRadius: 30, padding: 16 }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 920 }}>Комментарии</div>
@@ -776,7 +788,10 @@ function CommentsPanel({ item, user, onToast }) {
           <GlassButton onClick={submit} disabled={sending || !text.trim()} tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a', opacity: sending || !text.trim() ? 0.58 : 1 }}>{sending ? 'Отправляем...' : editing ? 'Сохранить' : 'Отправить'}</GlassButton>
         </div>
       ) : (
-        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginBottom: 14 }}>Авторизуйтесь, чтобы оставить комментарий.</div>
+        <div style={{ display: 'grid', gap: 9, marginBottom: 14 }}>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>Авторизуйтесь, чтобы оставить комментарий.</div>
+          <GlassButton disabled tone="gold" style={{ minHeight: 42, borderRadius: 18, color: '#17120a', opacity: 0.48 }}>Отправить</GlassButton>
+        </div>
       )}
       {error && (
         <div style={{ display: 'grid', gap: 8, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', border: '1px solid rgba(255,119,92,0.24)', background: 'rgba(255,119,92,0.08)', borderRadius: 20, padding: 12, marginBottom: 14 }}>
@@ -802,7 +817,7 @@ function CommentsPanel({ item, user, onToast }) {
           ))}
         </div>
       ) : (
-        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Пока нет комментариев. Можно быть первым.</div>
+        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Комментариев пока нет. Можно быть первым.</div>
       )}
     </GlassCard>
   );
@@ -900,6 +915,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
   const completedSentRef = useRef(false);
   const title = getNewsTitle(item);
   const text = getNewsText(item);
+  const commentsDisabledByFlag = !areNewsCommentsEnabled(item);
   const url = getNewsUrl(item);
   const photos = getNewsPhotos(item);
   const videos = getNewsVideos(item);
@@ -907,7 +923,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
   const docs = getNewsDocs(item);
   const stats = getNewsStats(item);
   const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean) : [];
-  const articleId = item?.id ? String(item.id) : '';
+  const articleId = getCanonicalNewsId(item);
   const scrollKey = articleId ? `apg_news_scroll_${articleId}` : '';
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   const completed = progress > 0.92;
@@ -916,6 +932,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
     name: user?.name || user?.first_name || user?.email || '',
     role: user?.role || '',
   }), [user]);
+  const commentsContainerRef = useRef(null);
 
   const sendEngagement = (action, extra = {}) => {
     if (!articleId) return;
@@ -1004,21 +1021,24 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
       });
   };
 
-  const ART_BG = 'radial-gradient(circle at 50% -6%, rgba(219,187,111,0.18), transparent 30%), linear-gradient(180deg, #1A1812 0%, #1F1D14 55%, #1A1812 100%)';
-  const DIVIDER = <div style={{ margin: '24px 0', height: 1, background: 'rgba(247,241,230,0.08)' }} />;
+  const DIVIDER = <div style={{ margin: '24px 0', height: 1, background: 'rgba(35,32,24,0.12)' }} />;
 
   return (
-    <div data-apg-pull-disabled="true" style={{ position: 'fixed', inset: 0, zIndex: 13000, background: ART_BG, color: APG2_PROFILE.text, animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+    <div
+      className="apg-news-article-shell"
+      data-apg-pull-disabled="true"
+      style={{ position: 'fixed', inset: 0, zIndex: 13000, background: 'rgba(18,17,15,0.72)', color: 'var(--apg-news-article-text)', animation: 'fadeIn 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}
+    >
       <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: `${progress * 100}%`, background: 'linear-gradient(90deg, #9F7932, #F4D98C, #FFF0B8)', boxShadow: '0 0 18px rgba(244,217,140,0.44)', zIndex: 2, transition: 'width 80ms linear' }} />
 
-      <div ref={scrollRef} data-apg-scroll-root="news-article" data-apg-pull-disabled="true" onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', touchAction: 'pan-y' }}>
-        <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', boxSizing: 'border-box' }}>
+      <div ref={scrollRef} className="apg-news-article-scroll" data-apg-scroll-root="news-article" data-apg-pull-disabled="true" onScroll={handleScroll}>
+        <div className="apg-news-article-reader">
 
           {/* ── nav bar ── */}
-          <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 'calc(var(--safe-top, 0px) + 10px) 14px 10px', background: 'rgba(26,24,18,0.86)', backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', transform: headerHidden ? 'translateY(calc(-100% - 2px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1, transition: 'transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease' }}>
-            <button type="button" onClick={onClose} aria-label="Вернуться к ленте" style={{ width: 44, height: 44, borderRadius: 16, border: '1px solid rgba(247,241,230,0.14)', background: 'rgba(247,241,230,0.07)', color: APG2_PROFILE.text, fontSize: 22 }}>←</button>
-            <span style={{ minWidth: 0, flex: 1, textAlign: 'center', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress > 0.08 ? title : getNewsCategoryLabel(item)}</span>
-            <button type="button" onClick={async () => { await shareNewsItem(item, onToast); trackShare('top'); }} aria-label="Поделиться новостью" style={{ width: 44, height: 44, borderRadius: 16, border: '1px solid rgba(247,241,230,0.14)', background: 'rgba(247,241,230,0.07)', color: APG2_PROFILE.text, fontSize: 17 }}>↗</button>
+          <div className="apg-news-article-nav" style={{ transform: headerHidden ? 'translateY(calc(-100% - 2px))' : 'translateY(0)', opacity: headerHidden ? 0 : 1 }}>
+            <button type="button" onClick={onClose} aria-label="Вернуться к ленте" className="apg-news-article-icon-button">←</button>
+            <span className="apg-news-article-nav-title">{progress > 0.08 ? title : getNewsCategoryLabel(item)}</span>
+            <button type="button" onClick={async () => { await shareNewsItem(item, onToast); trackShare('top'); }} aria-label="Поделиться новостью" className="apg-news-article-icon-button">↗</button>
           </div>
 
           {/* ── hero image ── */}
@@ -1050,7 +1070,7 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
             {DIVIDER}
 
             {/* ── body text ── */}
-            <RichText color={APG2_PROFILE.text} fontSize={17} lineHeight="30px">
+            <RichText color="var(--apg-news-article-text)" fontSize={17} lineHeight="29px">
               {text || 'Подробный текст новости появится здесь после публикации.'}
             </RichText>
           </div>
@@ -1128,8 +1148,8 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
           </div>
 
           {/* ── comments ── */}
-          <div style={{ padding: '0 14px' }}>
-            {item.commentsEnabled === false ? (
+          <div ref={commentsContainerRef} style={{ padding: '0 14px' }}>
+            {commentsDisabledByFlag ? (
               <GlassCard style={{ marginTop: 18, borderRadius: 28, padding: 14, color: APG2_PROFILE.textMuted, fontSize: 13.5, lineHeight: '20px' }}>
                 Комментарии к этой публикации отключены редакцией.
               </GlassCard>
@@ -1241,23 +1261,23 @@ export function NewsPage({
   const related = useMemo(() => selected
     ? sortNewsItems(news.filter(item => item !== selected && getNewsCategory(item) === getNewsCategory(selected)), 'popular')
     : [], [news, selected]);
-  const selectedIndex = selected ? prepared.findIndex(item => String(item?.id || item?.externalId || '') === String(selected?.id || selected?.externalId || '')) : -1;
+  const selectedIndex = selected ? prepared.findIndex(item => isSameNews(item, selected)) : -1;
   const previousItem = selectedIndex > 0 ? prepared[selectedIndex - 1] : null;
   const nextItem = selectedIndex >= 0 && selectedIndex < prepared.length - 1 ? prepared[selectedIndex + 1] : null;
 
   const refresh = async () => {
-    const before = new Set(news.map(item => String(item?.id || item?.externalId || '')));
+    const before = new Set(news.map(getCanonicalNewsId).filter(Boolean));
     setRefreshing(true);
     try {
       await onRefresh?.();
-      const fresh = news.filter(item => !before.has(String(item?.id || item?.externalId || ''))).length;
+      const fresh = news.filter(item => !before.has(getCanonicalNewsId(item))).length;
       if (fresh > 0) setNewItemsCount(fresh);
     } finally { setRefreshing(false); }
   };
 
-  const savedSet = new Set(savedNews || []);
-  const laterSet = new Set(readLaterNews || []);
-  const selectedId = selected?.id ? String(selected.id) : '';
+  const savedSet = new Set((savedNews || []).map(String));
+  const laterSet = new Set((readLaterNews || []).map(String));
+  const selectedId = getCanonicalNewsId(selected);
   const hasNews = Array.isArray(news) && news.length > 0;
   const showSkeleton = loading && !hasNews;
   const resultLabel = query.trim()
@@ -1265,9 +1285,8 @@ export function NewsPage({
     : category === 'all' && sort === 'new'
       ? `${news.length} материалов`
       : `${prepared.length} материалов`;
-
   useEffect(() => {
-    const current = new Set(news.map(item => String(item?.id || item?.externalId || '')).filter(Boolean));
+    const current = new Set(news.map(getCanonicalNewsId).filter(Boolean));
     if (!knownIdsRef.current.size) {
       knownIdsRef.current = current;
       return;
@@ -1280,7 +1299,7 @@ export function NewsPage({
   useEffect(() => {
     const targetId = initialNewsTarget?.id ? String(initialNewsTarget.id) : '';
     if (!targetId) return;
-    const target = news.find(item => String(item?.id || item?.externalId || '') === targetId);
+    const target = news.find(item => getNewsLegacyIds(item).includes(targetId));
     if (target) setSelected(target);
   }, [initialNewsTarget, news]);
 
@@ -1379,8 +1398,8 @@ export function NewsPage({
                 index={index}
                 onOpen={setSelected}
                 onShare={handleShare}
-                saved={savedSet.has(String(item.id))}
-                later={laterSet.has(String(item.id))}
+                saved={savedSet.has(getCanonicalNewsId(item))}
+                later={laterSet.has(getCanonicalNewsId(item))}
               />
             ))}
           </div>

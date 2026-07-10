@@ -25,6 +25,7 @@ import { LokiAssistant } from './loki/LokiAssistant.jsx';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
+import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -102,8 +103,12 @@ function readAppDeepLink() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
   const [section, id] = parts;
-  if (section === 'news' && id) return { type: 'news', id };
-  if (section === 'news') return { type: 'news-list', id: '' };
+  if (section === 'news' && id) {
+    return { type: 'news', id };
+  }
+  if (section === 'news') {
+    return { type: 'news-list', id: '' };
+  }
   if (section === 'event' && id) return { type: 'event', id };
   if (section === 'events') return { type: 'events', id: '' };
   if (section === 'partner' && id) return { type: 'partner', id };
@@ -314,7 +319,6 @@ async function fetchPublicBootstrap() {
       .then(({ response, payload }) => {
         const data = payload?.data || {};
         if (!response.ok || (!Object.keys(data).length && payload?.ok === false)) throw new Error(payload?.error || 'public_data_failed');
-        if (payload?.partial) console.warn('[APG-DIAG] public-data partial', payload?.errors || []);
         return data;
       })
       .catch(error => {
@@ -348,7 +352,6 @@ async function loadPublicSnap(label, promiseFactory) {
     return snapFromPublicRows(rows);
   } catch (error) {
     logError(error, `UserApp.loadData.${label}.publicData`);
-    console.warn(`[APG-DIAG] public-data failed for ${label}, using firestore fallback`);
     return await promiseFactory();
   }
 }
@@ -360,7 +363,6 @@ async function loadPublicStats(promiseFactory) {
     return docFromPublicRow(data?.stats || null);
   } catch (error) {
     logError(error, 'UserApp.loadData.stats.publicData');
-    console.warn('[APG-DIAG] public-data failed for stats, using firestore fallback');
     return await promiseFactory();
   }
 }
@@ -876,8 +878,6 @@ export function UserApp() {
     }
     setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
 
-    const _diagT0 = performance.now();
-
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
     try {
       const cached = localStorage.getItem('apg_partners_cache');
@@ -896,11 +896,7 @@ export function UserApp() {
       if (cachedNt) setNotifications(JSON.parse(cachedNt));
     } catch {}
 
-    fetch('/manifest.json').then(() => {
-      console.log(`[APG-DIAG] static=ok ${Math.round(performance.now() - _diagT0)}ms`);
-    }).catch(() => {
-      console.warn(`[APG-DIAG] static=fail ${Math.round(performance.now() - _diagT0)}ms`);
-    });
+    fetch('/manifest.json').catch(error => logError(error, 'UserApp.staticManifest'));
 
     try {
     // Firebase Auth и vkBridge — параллельно
@@ -910,17 +906,12 @@ export function UserApp() {
       unsub = onAuthStateChanged(auth, (user) => {
         unsub();
         if (user) {
-          console.log('[APG-DIAG] auth=restored');
           resolve();
         } else {
           Promise.race([
             signInAnonymously(auth),
             new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), 1800)),
-          ]).then(() => {
-            console.log(`[APG-DIAG] auth=ok ${Math.round(performance.now() - _diagT0)}ms`);
-          }).catch((e) => {
-            console.warn(`[APG-DIAG] auth=fail ${e.code ?? e.message} ${Math.round(performance.now() - _diagT0)}ms`);
-          }).finally(resolve);
+          ]).catch(e => logError(e, 'UserApp.auth.anonymous')).finally(resolve);
         }
       });
     });
@@ -991,7 +982,6 @@ export function UserApp() {
           new Promise((_, reject) => setTimeout(() => reject(new Error('owner_auth_timeout')), 5000)),
         ]).catch(error => {
           traceAuthStage('owner_session_deferred', { source: ownerSource, userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
-          console.warn(`[APG-DIAG] owner-auth=deferred ${error?.code ?? error?.message ?? String(error)}`);
           if (error?.code === 'STRONG_IDENTITY_REQUIRED') needsHardRelogin = true;
         });
 
@@ -1019,10 +1009,7 @@ export function UserApp() {
         safeLoad('lokiKnowledge', () => loadPublicSnap('lokiKnowledge', () => getDocs(query(collection(db, 'lokiKnowledge'), orderBy('priority', 'desc'), limit(120)))), emptySnap),
       ]);
 
-      console.time('apg:load-all');
       const _loadResult = await _buildAll();
-      console.timeEnd('apg:load-all');
-      console.log(`[APG-DIAG] public-data=settled ${Math.round(performance.now() - _diagT0)}ms`);
       const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap, lkSnap] = _loadResult;
 
       if (!isMounted.current) return;
@@ -1066,8 +1053,12 @@ export function UserApp() {
       const newsById = new Map();
       [...firestoreNews, ...vkPostsRaw].forEach(item => {
         if (!item) return;
-        const id = String(item.id || item.externalId || `${item.source || 'news'}_${item.title || Math.random()}`);
-        newsById.set(id, { ...newsById.get(id), ...item, id });
+        const id = getCanonicalNewsId(item) || `${item.source || 'news'}_${item.title || Math.random()}`;
+        const merged = { ...newsById.get(id), ...item, id, canonicalId: id };
+        merged.legacyIds = getNewsLegacyIds(merged);
+        merged.commentsEnabled = areNewsCommentsEnabled(merged);
+        merged.allowComments = merged.allowComments !== false;
+        newsById.set(id, merged);
       });
       const freshNews = [...newsById.values()]
         .sort((a, b) => {
@@ -1358,7 +1349,7 @@ export function UserApp() {
   }, [showToast, user]);
 
   const toggleSavedNews = useCallback(async (item) => {
-    const id = item?.id ? String(item.id) : '';
+    const id = getCanonicalNewsId(item);
     if (!id || !canWriteUserNewsState()) return;
     const prev = savedNews;
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
@@ -1374,7 +1365,7 @@ export function UserApp() {
   }, [canWriteUserNewsState, savedNews, showToast, user]);
 
   const toggleReadLaterNews = useCallback(async (item) => {
-    const id = item?.id ? String(item.id) : '';
+    const id = getCanonicalNewsId(item);
     if (!id || !canWriteUserNewsState()) return;
     const prev = readLaterNews;
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
@@ -1390,7 +1381,7 @@ export function UserApp() {
   }, [canWriteUserNewsState, readLaterNews, showToast, user]);
 
   const reactToNews = useCallback(async (item, reaction) => {
-    const id = item?.id ? String(item.id) : '';
+    const id = getCanonicalNewsId(item);
     if (!id || !reaction || !canWriteUserNewsState()) return;
     const prev = newsReactions;
     const previousReaction = prev[id];
@@ -2572,7 +2563,20 @@ export function UserApp() {
     onOpenLeaderboard: () => goPanel('leaderboard'),
     onOpenRewards: () => goPanel('rewards'),
     onOpenNotifications: openNotifications,
-    onOpenNews: () => goPanel('news'),
+    onOpenNews: (itemOrId) => {
+      const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
+      if (targetId && targetId !== 'undefined' && targetId !== 'null') {
+        setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
+      }
+      goPanel('news');
+    },
+    onOpenNewsItem: (itemOrId) => {
+      const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
+      if (targetId && targetId !== 'undefined' && targetId !== 'null') {
+        setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
+      }
+      goPanel('news');
+    },
     joinedGroup,
     onJoinGroup: handleJoinGroup,
     userCount: platformStats.userCount,

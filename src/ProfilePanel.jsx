@@ -11,7 +11,7 @@ import { APP_URL, API_BASE_URL } from './constants.js';
 import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
-import { formatNewsDate, getNewsTitle } from './newsUtils.js';
+import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -684,7 +684,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const saved = new Set((savedNews || []).map(String));
     const later = new Set((readLaterNews || []).map(String));
     return (news || [])
-      .filter(item => item?.id && (saved.has(String(item.id)) || later.has(String(item.id))))
+      .filter(item => item && getNewsLegacyIds(item).some(id => saved.has(id) || later.has(id)))
       .slice(0, 5);
   }, [news, readLaterNews, savedNews]);
 
@@ -938,16 +938,26 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <GlassSection title="Новости">
           <GlassCard style={{ display: 'grid', gap: 11 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <div>
+            <div>
                 <div style={{ color: APG2.text, fontSize: 17, fontWeight: 860 }}>Сохранённые материалы</div>
                 <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3 }}>{savedNews.length} сохранено · {readLaterNews.length} на потом</div>
               </div>
-              <GlassButton onClick={onOpenNews} style={{ minHeight: 38, borderRadius: 17, padding: '8px 12px' }}>Открыть</GlassButton>
+              <GlassButton
+                onClick={() => onOpenNews?.()}
+                style={{ minHeight: 38, borderRadius: 17, padding: '8px 12px' }}
+              >
+                Открыть
+              </GlassButton>
             </div>
             {savedNewsItems.length > 0 && (
               <div style={{ display: 'grid', gap: 8 }}>
                 {savedNewsItems.map(item => (
-                  <button key={item.id} type="button" onClick={onOpenNews} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2.text, padding: '10px 12px', textAlign: 'left', fontFamily: 'inherit' }}>
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onOpenNews?.(item)}
+                    style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2.text, padding: '10px 12px', textAlign: 'left', fontFamily: 'inherit' }}
+                  >
                     <span style={{ display: 'block', color: APG2.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 820, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getNewsTitle(item)}</span>
                     <span style={{ display: 'block', color: APG2.textMuted, fontSize: 11, lineHeight: '15px', marginTop: 3 }}>{formatNewsDate(item)}</span>
                   </button>
@@ -1692,7 +1702,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {(user?.id === 988504 || ['admin', 'owner'].includes(String(user?.role || user?.userRole || '').toLowerCase())) && (
         <div style={{ padding: '16px 16px 0' }}>
           <button
-            onClick={() => { window.location.hash = '/admin-app'; }}
+            onClick={() => { window.location.assign('/admin-app'); }}
             style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: '1px solid rgba(201,168,76,0.27)', background: 'rgba(201,168,76,0.08)', color: APG2.gold, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
             ⚙️ Администрирование

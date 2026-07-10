@@ -403,6 +403,7 @@ function V2SecondScreen({
   onOpenExperts,
   onOpenRewards,
   onOpenNews,
+  onOpenNewsItem,
 }) {
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
@@ -541,7 +542,7 @@ function V2SecondScreen({
       </div>
 
       <div style={{ padding: '0 0 0' }}>
-        <NewsFeed news={newsItems} onOpenNews={onOpenNews} />
+        <NewsFeed news={newsItems} onOpenNews={onOpenNews} onOpenNewsItem={onOpenNewsItem} />
 
         <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780, marginBottom: 16 }}>
           Ближайшие мероприятия
@@ -976,133 +977,7 @@ function PartnerOfMonthCard({ partner, onOpen }) {
 
 // ─── Новостной виджет ────────────────────────────────────────────────────────
 
-function NewsModal({ item, onClose }) {
-  const [dragY, setDragY]           = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const touchY      = useRef(null);
-  const sheetRef    = useRef(null);
-  const scrollRef   = useRef(null);
-  const closeTimer  = useRef(null);
-  useEffect(() => () => clearTimeout(closeTimer.current), []);
-
-  const THRESHOLD = 110;
-
-  // Non-passive touchmove: intercept downward drag only when inner scroll is at top
-  useEffect(() => {
-    const el = sheetRef.current;
-    if (!el) return;
-    const onMove = (e) => {
-      if (touchY.current === null) return;
-      const dy = e.touches[0].clientY - touchY.current;
-      if (dy <= 0) return;
-      if (scrollRef.current && scrollRef.current.scrollTop > 0) return;
-      e.preventDefault();
-      setDragY(Math.min(dy, 420));
-    };
-    el.addEventListener('touchmove', onMove, { passive: false });
-    return () => el.removeEventListener('touchmove', onMove);
-  }, []);
-
-  const onTouchStart = (e) => {
-    e.stopPropagation();
-    touchY.current = e.touches[0].clientY;
-    setIsDragging(true);
-  };
-
-  const onTouchEnd = (e) => {
-    if (touchY.current === null) return;
-    const dy = e.changedTouches[0].clientY - touchY.current;
-    touchY.current = null;
-    setIsDragging(false);
-    if (dy >= THRESHOLD) {
-      setDragY(700);
-      clearTimeout(closeTimer.current);
-      closeTimer.current = setTimeout(onClose, 300);
-    } else {
-      setDragY(0);
-    }
-  };
-
-  const dateStr = item.createdAt?.toDate
-    ? item.createdAt.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
-    : item.createdAt
-    ? new Date(item.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '';
-  const newsImage = contentImageOf(item);
-
-  const pct = Math.max(0, 1 - dragY / 280);
-
-  const modal = (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: `rgba(0,0,0,${(0.72 * pct).toFixed(2)})`,
-        display: 'flex', alignItems: 'flex-end',
-        backdropFilter: `blur(${(6 * pct).toFixed(1)}px)`,
-        WebkitBackdropFilter: `blur(${(6 * pct).toFixed(1)}px)`,
-      }}
-      onClick={onClose}
-    >
-      <div
-        ref={sheetRef}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        onClick={e => e.stopPropagation()}
-        style={{
-          ...V2.glass,
-          borderRadius: '34px 34px 0 0',
-          width: '100%', maxHeight: '88vh',
-          borderBottom: 'none',
-          transform: `translateY(${dragY}px)`,
-          transition: isDragging ? 'none' : motionTransition(['transform'], 'modal', 'soft'),
-          willChange: 'transform',
-          display: 'flex', flexDirection: 'column',
-        }}
-      >
-        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.22)', borderRadius: 2, margin: '14px auto 6px', flexShrink: 0 }} />
-
-        {/* Скроллируемый контент */}
-        <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
-          {newsImage && (
-            <img src={newsImage} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }}
-              style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', marginTop: 8 }} />
-          )}
-          <div style={{ padding: '20px 20px 48px' }}>
-            {!newsImage && item.emoji && <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{item.emoji}</div>}
-            <div style={{ fontSize: 22, fontWeight: 900, color: V2.text, lineHeight: 1.3, marginBottom: 12, letterSpacing: -0.4 }}>{item.title}</div>
-            {dateStr && <div style={{ fontSize: 11, color: V2.textSoft, marginBottom: 14 }}>{dateStr}</div>}
-            <div style={{ fontSize: 15, color: V2.textSoft, lineHeight: '24px', whiteSpace: 'pre-wrap' }}>{item.text}</div>
-            {item.linkUrl && item.linkLabel && (
-              <button
-                type="button"
-                onClick={() => openUrl(item.linkUrl)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  marginTop: 24,
-                  padding: '16px 18px',
-                  ...V2.glass,
-                  borderRadius: 14,
-                  color: V2.text,
-                  fontSize: 15,
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                {item.linkLabel} →
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-  return createPortal(modal, document.body);
-}
-
-function NewsWidget({ news = [], onOpenNews }) {
-  const [modal, setModal] = useState(null);
+function NewsWidget({ news = [], onOpenNews, onOpenNewsItem }) {
   const items = useMemo(() => (Array.isArray(news) ? news.filter(Boolean).slice(0, 8) : []), [news]);
   const freshCount = useMemo(() => items.filter(isFreshNews).length, [items]);
 
@@ -1119,12 +994,12 @@ function NewsWidget({ news = [], onOpenNews }) {
               <div style={{ color: V2.text, fontSize: 22, lineHeight: '27px', fontWeight: 900 }}>Что нового в городе</div>
               {freshCount > 0 && <div style={{ color: V2.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 5 }}>{freshCount} новых материалов</div>}
             </div>
-            <button
-              type="button"
-              onClick={onOpenNews}
-              style={{ border: '1px solid rgba(201,168,76,0.28)', background: 'rgba(201,168,76,0.12)', color: V2.gold, borderRadius: 999, minHeight: 36, padding: '0 13px', fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Все новости →
+              <button
+                type="button"
+                onClick={() => onOpenNews?.()}
+                style={{ border: '1px solid rgba(201,168,76,0.28)', background: 'rgba(201,168,76,0.12)', color: V2.gold, borderRadius: 999, minHeight: 36, padding: '0 13px', fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Все новости →
             </button>
           </div>
 
@@ -1140,7 +1015,13 @@ function NewsWidget({ news = [], onOpenNews }) {
                 <button
                   key={item.id || `${getNewsTitle(item)}-${index}`}
                   type="button"
-                  onClick={() => setModal(item)}
+                  onClick={() => {
+                    if (typeof onOpenNewsItem === 'function') {
+                      onOpenNewsItem(item);
+                    } else {
+                      onOpenNews?.();
+                    }
+                  }}
                   {...pressMotion}
                   aria-label={`Открыть новость: ${getNewsTitle(item)}`}
                   style={{ flex: '0 0 260px', minHeight: 304, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', borderRadius: 28, padding: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: V2.text, textAlign: 'left', overflow: 'hidden', cursor: 'pointer', fontFamily: 'inherit', ...horizontalSnapItem }}
@@ -1168,14 +1049,12 @@ function NewsWidget({ news = [], onOpenNews }) {
           </div>
         </div>
       </div>
-
-      {modal && <NewsModal item={modal} onClose={() => setModal(null)} />}
     </>
   );
 }
 
-function NewsFeed({ news, onOpenNews }) {
-  return <NewsWidget news={news} onOpenNews={onOpenNews} />;
+function NewsFeed({ news, onOpenNews, onOpenNewsItem }) {
+  return <NewsWidget news={news} onOpenNews={onOpenNews} onOpenNewsItem={onOpenNewsItem} />;
 }
 
 // ─── Баннер ───────────────────────────────────────────────────────────────────
@@ -1472,7 +1351,7 @@ export function HomePanelV2({
   joinedGroup = false, onJoinGroup,
   userCount = 0, onOpenForPartners,
   counterPulse = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -1675,6 +1554,7 @@ export function HomePanelV2({
               onOpenExperts={onOpenExperts}
               onOpenRewards={onOpenRewards}
               onOpenNews={onOpenNews}
+              onOpenNewsItem={onOpenNewsItem}
             />
 
           </>

@@ -171,6 +171,82 @@ body {
   overflow-x: hidden;
 }
 
+.apg-news-article-shell {
+  --apg-news-article-bg: #F8F2E7;
+  --apg-news-article-surface: rgba(255,255,255,0.92);
+  --apg-news-article-text: #17130D;
+  --apg-news-article-soft: rgba(23,19,13,0.72);
+  --apg-news-article-muted: rgba(23,19,13,0.52);
+  --apg-news-article-border: rgba(47,38,24,0.14);
+  --apg2-bg: #F8F2E7;
+  --apg2-text: #17130D;
+  --apg2-text-soft: rgba(23,19,13,0.72);
+  --apg2-text-muted: rgba(23,19,13,0.52);
+  --apg2-glass-a: 255,255,255;
+  --apg2-glass-border: rgba(47,38,24,0.14);
+  --apg2-elev-shadow: rgba(70,55,30,0.14);
+  color: var(--apg-news-article-text);
+}
+
+.apg-news-article-scroll {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+  touch-action: pan-y;
+}
+
+.apg-news-article-reader {
+  width: 100%;
+  max-width: 760px;
+  min-height: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: var(--apg-news-article-bg);
+  color: var(--apg-news-article-text);
+  opacity: 1;
+  filter: none;
+}
+
+.apg-news-article-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(var(--safe-top, 0px) + 10px) 14px 10px;
+  background: rgba(248,242,231,0.94);
+  border-bottom: 1px solid var(--apg-news-article-border);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  transition: transform 240ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 180ms ease;
+}
+
+.apg-news-article-icon-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  border: 1px solid var(--apg-news-article-border);
+  background: rgba(255,255,255,0.72);
+  color: var(--apg-news-article-text);
+  font: inherit;
+  font-size: 20px;
+}
+
+.apg-news-article-nav-title {
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+  color: var(--apg2-gold);
+  font-size: 12px;
+  font-weight: 860;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 html {
   background: var(--apg2-bg, var(--c-bg, #ECEEF2));
   background-color: var(--apg2-bg-color, var(--c-bg, #ECEEF2));
