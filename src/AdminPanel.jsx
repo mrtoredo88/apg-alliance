@@ -1357,9 +1357,11 @@ function ModerationPanel({ news, comments, onOpenNews, onOpenComments }) {
   );
 }
 
-function AdminUsersPanel({ users }) {
+function AdminUsersPanel({ users, onAuthAction }) {
   const [queryText, setQueryText] = useState('');
   const [consentFilter, setConsentFilter] = useState('all');
+  const [authDiagnostics, setAuthDiagnostics] = useState({});
+  const [authBusyId, setAuthBusyId] = useState('');
 
   const withConsents = users.filter(u => u.consents?.termsAccepted && u.consents?.privacyAccepted);
   const withoutConsents = users.filter(u => !u.consents?.termsAccepted || !u.consents?.privacyAccepted);
@@ -1395,6 +1397,25 @@ function AdminUsersPanel({ users }) {
     { id: 'push-off', label: '🔕 Push выкл' },
   ];
 
+  const loadAuthDiagnostics = async (user, action = 'telegram-auth:diagnostics', extra = {}) => {
+    if (!onAuthAction) return;
+    setAuthBusyId(user.id);
+    try {
+      const data = await onAuthAction(action, { userId: user.id, email: user.email || user.linkedEmail || '', ...extra });
+      setAuthDiagnostics(prev => ({ ...prev, [user.id]: data }));
+      if (data?.url) {
+        await navigator.clipboard?.writeText(data.url).catch(() => {});
+        alert('Новая Telegram-ссылка создана и скопирована.');
+        const refreshed = await onAuthAction('telegram-auth:diagnostics', { userId: user.id, email: user.email || user.linkedEmail || '' });
+        setAuthDiagnostics(prev => ({ ...prev, [user.id]: refreshed }));
+      }
+    } catch (e) {
+      alert(e.message || 'Не удалось выполнить действие авторизации.');
+    } finally {
+      setAuthBusyId('');
+    }
+  };
+
   return (
     <div>
       <div style={s.card}>
@@ -1419,6 +1440,7 @@ function AdminUsersPanel({ users }) {
         {filtered.slice(0, 120).map(user => {
           const hasConsent = user.consents?.termsAccepted && user.consents?.privacyAccepted;
           const hasPush = user.notificationsEnabled || user.notificationConsent;
+          const authInfo = authDiagnostics[user.id];
           return (
             <div key={user.id} style={{ ...s.card, marginBottom: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
@@ -1431,9 +1453,62 @@ function AdminUsersPanel({ users }) {
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                 <span style={{ padding: '4px 8px', borderRadius: 999, background: hasConsent ? 'rgba(75,179,75,0.12)' : 'rgba(230,70,70,0.12)', color: hasConsent ? A.green : A.red, fontSize: 10.5, fontWeight: 750 }}>{hasConsent ? '✓ согласие' : '⚠ без согласия'}</span>
                 <span style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: hasPush ? A.green : A.textSec, fontSize: 10.5, fontWeight: 750 }}>{hasPush ? '🔔 push вкл' : '🔕 push выкл'}</span>
-                {['role', 'email', 'telegramId'].map(key => user[key] ? (
-                  <span key={key} style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
-                ) : null)}
+	                {['role', 'email', 'telegramId'].map(key => user[key] ? (
+	                  <span key={key} style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
+	                ) : null)}
+	              </div>
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${A.border}` }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button type="button" disabled={authBusyId === user.id} onClick={() => loadAuthDiagnostics(user)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>
+                    {authBusyId === user.id ? 'Проверяем...' : 'Авторизация и привязки'}
+                  </button>
+                  {authInfo?.found && (
+                    <>
+                      <button type="button" disabled={authBusyId === user.id} onClick={() => loadAuthDiagnostics(user, 'telegram-auth:create-link-session')} style={{ ...s.btn, ...s.btnPri, padding: '7px 10px', fontSize: 12 }}>Создать Telegram-сессию</button>
+                      <button type="button" disabled={authBusyId === user.id} onClick={() => loadAuthDiagnostics(user, 'telegram-auth:recheck')} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>Повторно проверить</button>
+                      {authInfo.activeSession?.state && (
+                        <button type="button" disabled={authBusyId === user.id} onClick={() => loadAuthDiagnostics(user, 'telegram-auth:cancel-link-session', { state: authInfo.activeSession.state })} style={{ ...s.btn, ...s.btnDanger, padding: '7px 10px', fontSize: 12 }}>Отменить зависшую</button>
+                      )}
+                    </>
+                  )}
+                </div>
+                {authInfo && (
+                  <div style={{ marginTop: 10, padding: 11, borderRadius: 14, background: 'rgba(255,255,255,0.035)', border: `1px solid ${authInfo.conflicts?.length ? A.redBrd : A.border}` }}>
+                    {!authInfo.found ? (
+                      <div style={{ color: A.red, fontSize: 12, fontWeight: 800 }}>Профиль не найден: {authInfo.reason || 'user_not_found'}</div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                          {[
+                            ['Email', authInfo.user?.email || 'не указан'],
+                            ['Firebase UID', authInfo.user?.firebaseUid || user.id],
+                            ['Telegram ID', authInfo.user?.telegramId || 'не привязан'],
+                            ['Telegram username', authInfo.user?.telegramUsername || 'не указан'],
+                            ['Email-статус', authInfo.emailAuthStatus],
+                            ['Telegram-статус', authInfo.telegramLinkStatus],
+                            ['Последняя попытка', authInfo.lastSession?.status || 'нет'],
+                            ['Ошибка', authInfo.lastSession?.linkError || 'нет'],
+                          ].map(([label, value]) => (
+                            <div key={label} style={{ background: A.chip, borderRadius: 10, padding: 9 }}>
+                              <div style={{ color: A.textSec, fontSize: 10 }}>{label}</div>
+                              <div style={{ color: A.text, fontSize: 12, fontWeight: 800, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(value || '—')}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {authInfo.conflicts?.length > 0 && (
+                          <div style={{ marginTop: 9, color: A.red, fontSize: 12, lineHeight: '17px' }}>
+                            Конфликт: {authInfo.conflicts.map(item => `${item.type}:${item.userId || item.telegramId || ''}`).join(', ')}
+                          </div>
+                        )}
+                        {authInfo.sessions?.length > 0 && (
+                          <div style={{ marginTop: 9, color: A.textSec, fontSize: 11, lineHeight: '16px' }}>
+                            Журнал: {authInfo.sessions.slice(0, 3).map(item => `${item.status}${item.linkError ? `/${item.linkError}` : ''}${item.expiresAt ? ` до ${new Date(item.expiresAt).toLocaleTimeString('ru-RU')}` : ''}`).join(' · ')}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -5851,7 +5926,7 @@ export const AdminPanel = () => {
       )}
 
       {activeTab === 'users' && (
-        <AdminUsersPanel users={adminMetrics.users} />
+        <AdminUsersPanel users={adminMetrics.users} onAuthAction={runAdminAction} />
       )}
 
       {activeTab === 'referrals' && (

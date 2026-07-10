@@ -95,16 +95,57 @@ export default async function handler(req, res) {
     const ref   = db.collection('telegramAuthSessions').doc(state);
     const snap  = await ref.get();
 
-    if (!snap.exists || snap.data().status !== 'pending') {
+    const session = snap.data() || {};
+    if (!snap.exists || session.status !== 'pending') {
       tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
       return res.status(200).json({ ok: true });
     }
 
-    const expiresAt = snap.data().expiresAt;
+    const expiresAt = session.expiresAt;
     const expired   = (expiresAt?.toDate ? expiresAt.toDate() : new Date(expiresAt)) < new Date();
     if (expired) {
       await ref.update({ status: 'expired' });
       tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
+      return res.status(200).json({ ok: true });
+    }
+
+    const tgId = `tg_${from.id}`;
+    if (session.linking === true) {
+      const ownerUserId = String(session.ownerUserId || '').trim();
+      let linkError = '';
+      let linkedOwnerId = ownerUserId || null;
+      if (!ownerUserId) {
+        linkError = 'owner_not_found';
+      } else {
+        const [ownerSnap, linkSnap] = await Promise.all([
+          db.collection('users').doc(ownerUserId).get(),
+          db.collection('tgLinks').doc(tgId).get(),
+        ]);
+        if (!ownerSnap.exists) {
+          linkError = 'owner_not_found';
+        } else if (linkSnap.exists && String(linkSnap.data()?.userId || '') !== ownerUserId) {
+          linkError = 'already_linked';
+          linkedOwnerId = String(linkSnap.data()?.userId || '');
+        }
+      }
+      await ref.update({
+        status: 'done',
+        linking: true,
+        linkError: linkError || null,
+        linkedOwnerId,
+        tgUserId: String(from.id),
+        firstName: from.first_name ?? '',
+        lastName: from.last_name ?? '',
+        username: from.username ?? '',
+        photoUrl: null,
+        completedAt: FieldValue.serverTimestamp(),
+      });
+      tgSend(from.id,
+        linkError
+          ? '⚠️ Не удалось подключить Telegram. Вернитесь в приложение — там показана причина.'
+          : '✅ Telegram подтверждён. Вернитесь в приложение АПГ — привязка завершится автоматически.',
+        { reply_markup: SOCIAL_KEYBOARD },
+      );
       return res.status(200).json({ ok: true });
     }
 
@@ -117,7 +158,7 @@ export default async function handler(req, res) {
       photoUrl:  null,
     });
 
-    const uid      = `tg_${from.id}`;
+    const uid      = tgId;
     const userRef  = db.collection('users').doc(uid);
     tgGetPhotoUrl(from.id)
       .then(async (photoUrl) => {

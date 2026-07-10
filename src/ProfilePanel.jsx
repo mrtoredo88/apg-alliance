@@ -426,13 +426,27 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         const data = await r.json();
         if (tgStateRef.current !== state) return;
         if (data.status === 'done') {
-          traceAuthStage('telegram_auth_done', { state, userId: data.user?.id ?? null, linking: !!tgLinkingRef.current });
+          const responseIsLinking = data.linking === true || tgLinkingRef.current;
+          traceAuthStage('telegram_auth_done', { state, userId: data.user?.id ?? null, linking: responseIsLinking, linkError: data.linkError || null });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
-          if (tgLinkingRef.current && user?.id) {
-            // Режим привязки — записываем tgLinks, не перезагружаем
+          if (responseIsLinking && user?.id) {
             tgLinkingRef.current = false;
-            const tgPayload = { tgId: data.tgId, firstName: data.user.first_name, lastName: data.user.last_name ?? null, photo: data.user.photo_200 ?? null };
+            if (data.linkError) {
+              const errorText = {
+                owner_not_found: 'Не удалось подтвердить владельца аккаунта.',
+                already_linked: 'Этот Telegram уже связан с другим аккаунтом.',
+                session_stale: 'Ссылка устарела, создайте новую.',
+              }[data.linkError] || 'Не удалось привязать Telegram. Попробуйте ещё раз.';
+              throw new Error(errorText);
+            }
+            const tgPayload = {
+              tgId: data.tgId,
+              firstName: data.user?.first_name ?? '',
+              lastName: data.user?.last_name ?? null,
+              username: data.user?.username ?? null,
+              photo: data.user?.photo_200 ?? null,
+            };
             const linkRes = await fetch(`${API_BASE_URL}/api/email-auth`, {
               method: 'POST',
               headers: await getAuthHeaders(),
@@ -463,11 +477,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             traceAuthStage('telegram_user_saved', { userId: data.user?.id ?? null });
             window.location.reload();
           }
-        } else if (data.status === 'expired' || data.status === 'not_found') {
+        } else if (data.status === 'expired' || data.status === 'not_found' || data.status === 'cancelled') {
           traceAuthStage('telegram_auth_unavailable', { state, status: data.status });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
-          setTgError('Сессия истекла. Попробуйте снова.');
+          setTgError(data.status === 'cancelled' ? 'Сессия отменена. Создайте новую ссылку.' : 'Ссылка устарела, создайте новую.');
           setTgStep('idle');
         } else {
           tgPollRef.current = setTimeout(poll, 900);
@@ -505,12 +519,17 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-APG-Version': 'hotfix-telegram-auth' },
-        body: JSON.stringify({ source: 'profile_panel', linking }),
+        body: JSON.stringify({
+          source: 'profile_panel',
+          linking,
+          ownerUserId: linking ? String(user?.id || '') : '',
+          ownerEmail: linking ? String(user?.email || user?.linkedEmail || '') : '',
+        }),
         signal: controller.signal,
       });
       const { state, url, message } = await res.json().catch(() => ({}));
       if (!res.ok || !state || !url) throw new Error(message || 'telegram_start_failed');
-      localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, at: Date.now() }));
+      localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, linking, at: Date.now() }));
       traceAuthStage('telegram_session_created', { state, linking });
       setTgBotUrl(url);
       setTgLoading(false);
@@ -530,7 +549,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [stopPolling, startWaiting]);
+  }, [stopPolling, startWaiting, user]);
 
   const runTelegramAuth = useCallback((isLinking = false) => {
     const now = Date.now();
@@ -556,8 +575,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const saved = localStorage.getItem('apg_tg_pending');
     if (!saved) return;
     try {
-      const { state, url, at } = JSON.parse(saved);
+      const { state, url, linking, at } = JSON.parse(saved);
       if (Date.now() - at > 5 * 60 * 1000) { localStorage.removeItem('apg_tg_pending'); return; }
+      tgLinkingRef.current = linking === true;
       setTgBotUrl(url);
       setTgStep('waiting');
       startWaiting(state);

@@ -244,7 +244,7 @@ export default async function handler(req, res) {
 
   // ── LINK TELEGRAM ───────────────────────────────────────────────────────────
   if (action === 'link-telegram') {
-    const { userId, tgId, firstName, lastName, photo } = req.body ?? {};
+    const { userId, tgId, firstName, lastName, username, photo } = req.body ?? {};
     const normalizedTgId = normalizeTgId(tgId);
     if (!userId || !normalizedTgId) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
@@ -277,7 +277,7 @@ export default async function handler(req, res) {
           createdAt: existingLink.exists ? existingLink.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
         }, { merge: true });
         tx.set(userRef, {
-          linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
+          linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, username: username ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       });

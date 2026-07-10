@@ -325,7 +325,7 @@ export default async function emailAuthRoutes(fastify) {
 
     // ── LINK TELEGRAM ────────────────────────────────────────────────────────────
     if (action === 'link-telegram') {
-      const { userId, tgId, firstName, lastName, photo } = request.body ?? {};
+      const { userId, tgId, firstName, lastName, username, photo } = request.body ?? {};
       const normalizedTgId = normalizeTgId(tgId);
       if (!userId || !normalizedTgId) return reply.code(400).send({ ok: false, error: 'missing_fields' });
 
@@ -358,7 +358,7 @@ export default async function emailAuthRoutes(fastify) {
             createdAt: existingLink.exists ? existingLink.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
           }, { merge: true });
           tx.set(userRef, {
-            linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
+            linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, username: username ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
             updatedAt: FieldValue.serverTimestamp(),
           }, { merge: true });
         });

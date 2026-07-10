@@ -20,8 +20,25 @@ export default async function telegramAuthCheckRoutes(fastify) {
       const data = snap.data();
 
       if (data.status === 'done') {
-        ref.delete().catch(() => {});
         const tgId = `tg_${data.tgUserId}`;
+        if (data.linking === true) {
+          await ref.set({ checkedAt: new Date() }, { merge: true }).catch(() => {});
+          return {
+            status: 'done',
+            linking: true,
+            tgId,
+            linkError: data.linkError || null,
+            linkedOwnerId: data.linkedOwnerId || data.ownerUserId || null,
+            user: {
+              id: data.ownerUserId || null,
+              first_name: data.firstName ?? '',
+              last_name: data.lastName ?? '',
+              username: data.username ?? '',
+              photo_200: data.photoUrl ?? null,
+            },
+          };
+        }
+        ref.delete().catch(() => {});
         const linkSnap = await db.collection('tgLinks').doc(tgId).get();
         const linkedUserId = linkSnap.exists ? linkSnap.data().userId : null;
         const targetUserId = linkedUserId ?? tgId;
@@ -40,7 +57,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
       }
 
       if (data.status !== 'pending') {
-        return { status: data.status };
+        return { status: data.status, linking: data.linking === true, linkError: data.linkError || null };
       }
 
       const expDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);

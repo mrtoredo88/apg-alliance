@@ -1643,3 +1643,15 @@
 **Файлы:** `src/AdminPanel.jsx`, `server/src/routes/admin-actions.js`, `api/admin-actions.js`, `.ai/17_CHANGELOG_AI.md`
 
 **Что изменено:** В `admin-actions` добавлены действия `referrals:audit`, `referrals:check`, `referrals:recalculate`, `referrals:grant`. В админке добавлена вкладка «Рефералы» с фильтрами, статусами регистрации/привязки/начисления, причинами ошибок, пересчётом цепочки и защищённой кнопкой повторного начисления. Для реального Telegram-кейса сохранён production-документ компенсации в `referralCompensations`.
+
+## 2026-07-10 — Telegram linking incident fix
+
+**Задача:** Устранить production-инцидент, когда email-пользователь не мог безопасно подключить Telegram без риска второго `tg_*` профиля.
+
+**Файлы:** `src/ProfilePanel.jsx`, `src/AdminPanel.jsx`, `api/telegram-auth-start.js`, `api/telegram-auth-check.js`, `api/telegram-webhook.js`, `api/email-auth.js`, `api/admin-actions.js`, `server/src/routes/telegram-auth-start.js`, `server/src/routes/telegram-auth-check.js`, `server/src/routes/telegram-webhook.js`, `server/src/routes/email-auth.js`, `server/src/routes/admin-actions.js`, `.ai/17_CHANGELOG_AI.md`
+
+**Что изменено:** Telegram auth flow разделён на login и linking. `ProfilePanel` передаёт `ownerUserId`/`ownerEmail` и сохраняет режим `linking` при возврате из Telegram. Webhook больше не создаёт `tg_*` профиль для linking-сессии, а только подтверждает Telegram ID в сессии. `telegram-auth-check` не выдаёт Firebase custom token для linking. Атомарный `link-telegram` сохраняет username и продолжает защищать `tgLinks` от чужой привязки.
+
+**Админка:** В карточку пользователя добавлен блок «Авторизация и привязки» с диагностикой email/Firebase/Telegram, последней auth-сессии, конфликтов `tgLinks`, созданием новой короткоживущей Telegram-сессии, отменой зависшей сессии и повторной проверкой.
+
+**Проверка:** `npm run build` проходит; после commit требуется повторная сборка, чтобы `dist/version.json` получил новый git hash.

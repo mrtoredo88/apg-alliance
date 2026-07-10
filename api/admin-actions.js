@@ -172,6 +172,141 @@ function buildReferralRow(invitedId, invited = {}, referrerId = '', referrer = n
   };
 }
 
+function authDate(value) {
+  return serializeAdminValue(value) || null;
+}
+
+function authUserSummary(id, user = {}) {
+  return {
+    id,
+    firebaseUid: user.firebaseUid || user.uid || id,
+    email: referralEmail({ ...user, id }),
+    emailVerified: user.emailVerified === true,
+    authProvider: user.authProvider || user.provider || '',
+    telegramId: user.linkedTelegram?.tgId || user.telegramId || user.tgId || (String(id || '').startsWith('tg_') ? id : ''),
+    telegramUsername: user.linkedTelegram?.username || user.telegramUsername || user.username || '',
+    registeredAt: authDate(user.registeredAt || user.createdAt),
+    lastSeen: authDate(user.lastSeen),
+  };
+}
+
+async function findAuthUser(db, { userId = '', email = '' } = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  if (userId) {
+    const snap = await db.collection('users').doc(String(userId)).get();
+    if (snap.exists) return { id: snap.id, ...(snap.data() || {}) };
+  }
+  if (!normalizedEmail) return null;
+  const fields = ['email', 'linkedEmail', 'normalizedEmail'];
+  for (const field of fields) {
+    const snap = await db.collection('users').where(field, '==', normalizedEmail).limit(1).get();
+    if (!snap.empty) return { id: snap.docs[0].id, ...(snap.docs[0].data() || {}) };
+  }
+  return null;
+}
+
+async function readTelegramAuthSessions(db, user = {}) {
+  const queries = [];
+  const userId = String(user.id || '').trim();
+  const email = normalizeEmail(user.email || user.linkedEmail || user.normalizedEmail || '');
+  const tgUserId = String(user.linkedTelegram?.tgId || user.telegramId || user.tgId || '').replace(/^tg_/, '');
+  if (userId) queries.push(db.collection('telegramAuthSessions').where('ownerUserId', '==', userId).limit(8).get());
+  if (email) queries.push(db.collection('telegramAuthSessions').where('ownerEmail', '==', email).limit(8).get());
+  if (tgUserId) queries.push(db.collection('telegramAuthSessions').where('tgUserId', '==', tgUserId).limit(8).get());
+  const snaps = await Promise.all(queries);
+  const byId = new Map();
+  snaps.forEach(snap => snap.docs.forEach(doc => byId.set(doc.id, { id: doc.id, ...(doc.data() || {}) })));
+  return [...byId.values()]
+    .sort((a, b) => String(authDate(b.createdAt) || '').localeCompare(String(authDate(a.createdAt) || '')))
+    .slice(0, 10)
+    .map(row => ({
+      state: row.id,
+      status: row.status || '',
+      linking: row.linking === true,
+      source: row.source || '',
+      linkError: row.linkError || null,
+      createdAt: authDate(row.createdAt),
+      expiresAt: authDate(row.expiresAt),
+      completedAt: authDate(row.completedAt),
+      ownerUserId: row.ownerUserId || null,
+      ownerEmail: row.ownerEmail || null,
+      hasTelegramUser: Boolean(row.tgUserId),
+    }));
+}
+
+async function buildTelegramAuthDiagnostics(db, req) {
+  await requireAdminPermission(req, 'users:read');
+  const user = await findAuthUser(db, { userId: req.body?.userId, email: req.body?.email });
+  if (!user) return { ok: true, found: false, reason: 'user_not_found', sessions: [], tgLinks: [], conflicts: [] };
+  const tgId = user.linkedTelegram?.tgId || user.telegramId || user.tgId || (String(user.id).startsWith('tg_') ? user.id : '');
+  const [sessions, linksByUserSnap, tgProfileSnap, tgLinkSnap] = await Promise.all([
+    readTelegramAuthSessions(db, user),
+    db.collection('tgLinks').where('userId', '==', user.id).limit(10).get(),
+    tgId ? db.collection('users').doc(tgId).get() : Promise.resolve(null),
+    tgId ? db.collection('tgLinks').doc(tgId).get() : Promise.resolve(null),
+  ]);
+  const tgLinks = new Map();
+  linksByUserSnap.docs.forEach(doc => tgLinks.set(doc.id, { id: doc.id, ...(doc.data() || {}) }));
+  if (tgLinkSnap?.exists) tgLinks.set(tgLinkSnap.id, { id: tgLinkSnap.id, ...(tgLinkSnap.data() || {}) });
+  const conflicts = [];
+  [...tgLinks.values()].forEach(link => {
+    if (link.userId && String(link.userId) !== String(user.id)) conflicts.push({ type: 'tg_link_owner_mismatch', telegramId: link.id, userId: link.userId });
+  });
+  if (tgProfileSnap?.exists && tgProfileSnap.id !== user.id) conflicts.push({ type: 'telegram_profile_exists', userId: tgProfileSnap.id });
+  const activeSession = sessions.find(item => item.status === 'pending') || null;
+  const lastSession = sessions[0] || null;
+  return {
+    ok: true,
+    found: true,
+    user: authUserSummary(user.id, user),
+    emailAuthStatus: user.email || user.linkedEmail ? (user.emailVerified === false ? 'email_unverified' : 'email_present') : 'email_missing',
+    telegramLinkStatus: conflicts.length ? 'conflict' : ([...tgLinks.values()].length ? 'linked' : 'not_linked'),
+    activeSession,
+    lastSession,
+    sessions,
+    tgLinks: [...tgLinks.values()].map(link => ({ id: link.id, userId: link.userId || null, telegramId: link.telegramId || link.id, createdAt: authDate(link.createdAt), updatedAt: authDate(link.updatedAt) })),
+    conflicts,
+  };
+}
+
+async function handleTelegramAuthAdminAction(db, req, actor) {
+  const action = String(req.body?.action || '').trim();
+  if (action === 'telegram-auth:diagnostics' || action === 'telegram-auth:recheck') {
+    const diagnostics = await buildTelegramAuthDiagnostics(db, req);
+    await writeAuditLog(db, req, actor, action, 'users', req.body?.userId || req.body?.email || 'telegram-auth', { label: 'Диагностика авторизации Telegram', found: diagnostics.found, status: diagnostics.telegramLinkStatus || diagnostics.reason });
+    return diagnostics;
+  }
+  if (action === 'telegram-auth:create-link-session') {
+    await requireAdminPermission(req, 'users:update');
+    const user = await findAuthUser(db, { userId: req.body?.userId, email: req.body?.email });
+    if (!user?.id) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404 });
+    const state = randomBytes(16).toString('hex');
+    const ownerEmail = normalizeEmail(user.email || user.linkedEmail || req.body?.email || '');
+    await db.collection('telegramAuthSessions').doc(state).set({
+      status: 'pending',
+      linking: true,
+      ownerUserId: user.id,
+      ownerEmail: ownerEmail || null,
+      source: 'admin_user_card',
+      createdBy: actor.uid,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+    const url = `https://t.me/apg_zelenograd_bot?start=auth_${state}`;
+    await writeAuditLog(db, req, actor, action, 'users', user.id, { label: 'Создана Telegram linking-сессия', state });
+    return { ok: true, state, url, expiresInSec: 300 };
+  }
+  if (action === 'telegram-auth:cancel-link-session') {
+    await requireAdminPermission(req, 'users:update');
+    const state = String(req.body?.state || '').trim();
+    if (!state) throw Object.assign(new Error('Не указана сессия.'), { statusCode: 400 });
+    await db.collection('telegramAuthSessions').doc(state).set({ status: 'cancelled', cancelledAt: FieldValue.serverTimestamp(), cancelledBy: actor.uid }, { merge: true });
+    await writeAuditLog(db, req, actor, action, 'telegramAuthSessions', state, { label: 'Telegram linking-сессия отменена' });
+    return { ok: true, state };
+  }
+  throw Object.assign(new Error('Неизвестное действие Telegram-авторизации.'), { statusCode: 400 });
+}
+
 async function buildReferralAudit(db) {
   const usersSnap = await db.collection('users').limit(1500).get();
   const users = new Map(usersSnap.docs.map(doc => [doc.id, { id: doc.id, ...(doc.data() || {}) }]));
@@ -1121,6 +1256,8 @@ export default async function handler(req, res) {
         ? await handleEventModerationAction(db, req, actor)
       : action.startsWith('referrals:')
         ? await handleReferralAction(db, req, actor)
+      : action.startsWith('telegram-auth:')
+        ? await handleTelegramAuthAdminAction(db, req, actor)
       : action.startsWith('partner:')
         ? await handlePartnerOnboardingAction(db, req, actor)
         : await handleNewsAction(db, req, actor);
