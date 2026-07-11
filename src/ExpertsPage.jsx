@@ -903,9 +903,16 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
                 </GlassButton>
               ))}
             </div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 0 2px', WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()}>
+              {CATEGORY_FILTERS.map(category => (
+                <GlassButton key={category.id} onClick={() => setActiveCategory(category.id)} tone={activeCategory === category.id ? 'gold' : 'glass'} style={{ minHeight: 34, borderRadius: 999, padding: '7px 11px', fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {category.emoji} {category.label}
+                </GlassButton>
+              ))}
+            </div>
           </div>
 
-          {topExperts.length > 0 && (
+          {topExperts.length > 0 && filter === 'all' && activeCategory === 'all' && !search.trim() && (
             <GlassSection title="В топе недели">
               <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()}>
                 {topExperts.map(e => (

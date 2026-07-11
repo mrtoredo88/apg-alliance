@@ -1869,6 +1869,8 @@
 
 **Deep link:** устранена гонка cache/fresh data: ссылка нового эксперта больше не помечается обработанной, пока ID фактически не найден в загруженном каталоге.
 
+**Фильтры:** единый справочник категорий выведен в активный V2-каталог; top-блок скрывается при поиске и фильтрации, поэтому выдача содержит только подходящих экспертов.
+
 **Миграция:** `scripts/migrate-expert-directory.mjs` нормализует существующие телефоны и добавляет canonical `categories` без удаления заполненных данных.
 
 **Проверка:** scoped eslint, Vercel/Fastify parity, category integrity, phone/tel normalization, Loki tests, Admin Assistant tests и production build.
