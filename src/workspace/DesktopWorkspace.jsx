@@ -162,7 +162,7 @@ function buildContextualReply({ activeSection, data, profileStatus, text }) {
 
 function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan, onOpenShortcuts }) {
   return (
-    <div style={{ ...APG2_PROFILE.glass, borderRadius: 26, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 12, position: 'sticky', top: 14, zIndex: 10, minHeight: 64 }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: 30, padding: '11px 13px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 14, position: 'sticky', top: 16, zIndex: 10, minHeight: 66, background: APG2_PROFILE.quietSurface }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontWeight: 950, boxShadow: '0 16px 36px rgba(215,184,106,0.18)' }}>АПГ</div>
         <div>
@@ -210,7 +210,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
     return acc;
   }, []);
   return (
-    <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 9, height: 'calc(100svh - 116px)', minHeight: 0, position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 8, transition: motionTransition(['width'], 'base'), width: collapsed ? 72 : 238 }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: 32, padding: 10, height: 'calc(100svh - 124px)', minHeight: 0, position: 'sticky', top: 98, display: 'flex', flexDirection: 'column', gap: 10, transition: motionTransition(['width'], 'base'), width: collapsed ? 74 : 246, background: APG2_PROFILE.quietSurface }}>
       <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: '4px 5px 8px' }}>
         {!collapsed && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}>Навигация</div>}
         <GlassButton onClick={onToggle} style={{ minHeight: 34, width: 34, padding: 0, borderRadius: 14 }}>{collapsed ? '›' : '‹'}</GlassButton>
@@ -235,8 +235,8 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
               style={{
               border: active ? '1px solid rgba(215,184,106,0.54)' : APG2_PROFILE.glass.border,
               background: active ? APG2_PROFILE.goldSoft : hovered ? 'rgba(var(--apg2-glass-a,255,255,255),0.12)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)',
-              borderRadius: 18,
-              minHeight: 42,
+              borderRadius: 20,
+              minHeight: 44,
               padding: collapsed ? 0 : '0 12px',
               display: 'flex',
               alignItems: 'center',
@@ -267,7 +267,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
         )}
       </div>
       <div style={{ marginTop: 'auto', display: collapsed ? 'none' : 'block' }}>
-        <GlassCard style={{ borderRadius: 22, padding: 12 }}>
+        <GlassCard style={{ borderRadius: 24, padding: 13, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
           <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850 }}>Workspace 1.0</div>
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 4 }}>Платформа для партнёров, экспертов и команды АПГ.</div>
         </GlassCard>
@@ -298,29 +298,29 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
   return (
     <div style={{
       position: 'relative',
-      minHeight: 238,
+      minHeight: 282,
       overflow: 'hidden',
-      borderRadius: 38,
-      padding: 20,
+      borderRadius: APG2_PROFILE.radius.hero,
+      padding: 24,
       display: 'grid',
-      gridTemplateColumns: 'minmax(0,1.35fr) minmax(280px,0.65fr)',
-      gap: 18,
+      gridTemplateColumns: 'minmax(0,1.25fr) minmax(300px,0.75fr)',
+      gap: 22,
       alignItems: 'stretch',
-      background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.28), transparent 34%), radial-gradient(circle at 88% 18%, rgba(112,92,168,0.20), transparent 32%), linear-gradient(145deg, rgba(255,255,255,0.20), rgba(255,255,255,0.075))',
-      border: '1px solid rgba(244,217,140,0.26)',
-      boxShadow: '0 34px 90px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -32px 72px rgba(255,255,255,0.04)',
+      background: APG2_PROFILE.heroSurface,
+      border: '1px solid rgba(244,217,140,0.30)',
+      boxShadow: '0 38px 92px rgba(0,0,0,0.24), 0 0 70px rgba(215,184,106,0.08), inset 0 1.5px 0 rgba(255,255,255,0.34), inset 0 -36px 78px rgba(255,255,255,0.055)',
     }}>
       <div style={{ position: 'absolute', left: -80, right: -80, top: 74, height: 120, background: 'linear-gradient(110deg, transparent 10%, rgba(244,217,140,0.12) 38%, rgba(255,255,255,0.08) 48%, transparent 72%)', transform: 'rotate(-8deg)', filter: 'blur(8px)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
         <div>
           <GlassBadge tone="gold">🦊 Локи открыл Workspace</GlassBadge>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 38, lineHeight: '43px', fontWeight: 940, letterSpacing: -0.6, marginTop: 14 }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 42, lineHeight: '47px', fontWeight: 940, letterSpacing: -0.8, marginTop: 16 }}>
             {getDayGreeting()}, {data.userName}.
           </div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', marginTop: 8, maxWidth: 620 }}>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15, lineHeight: '23px', marginTop: 10, maxWidth: 660 }}>
             Я собрал рабочий день АПГ и подсветил то, с чего лучше начать. Workspace теперь не просто открывается — он встречает вас с контекстом.
           </div>
-          <div style={{ display: 'grid', gap: 7, marginTop: 14, maxWidth: 620 }}>
+          <div style={{ display: 'grid', gap: 8, marginTop: 18, maxWidth: 650 }}>
             {briefing.slice(0, 5).map(item => (
               <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 9, color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 760 }}>
                 <span style={{ width: 7, height: 7, borderRadius: 99, background: APG2_PROFILE.gold, boxShadow: '0 0 18px rgba(215,184,106,0.44)', flex: '0 0 auto' }} />
@@ -335,15 +335,22 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
           { id: 'loki', label: 'Спросить Локи здесь', onClick: actions.openLoki },
         ]} style={{ background: 'transparent', border: 0, padding: 0, marginTop: 18 }} />
       </div>
-      <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateRows: 'auto 1fr', gap: 10, minWidth: 0 }}>
-        <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 13 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 12, minWidth: 0 }}>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, display: 'grid', gridTemplateColumns: '52px minmax(0,1fr)', gap: 12, alignItems: 'center' }}>
+          <div style={{ width: 52, height: 52, borderRadius: 22, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 25, boxShadow: '0 18px 42px rgba(215,184,106,0.24)' }}>🦊</div>
+          <div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 930 }}>Локи на смене</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 2 }}>спокоен · внимателен · в контексте</div>
+          </div>
+        </div>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 26, padding: 14, background: APG2_PROFILE.quietSurface }}>
           <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.7 }}>Активный профиль</div>
           <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 920, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName}</div>
           <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820, marginTop: 5 }}>Заполненность {profileStatus.value}% · {profileStatus.label}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
           {heroMetrics.map(metric => (
-            <div key={metric.label} style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 12, minWidth: 0 }}>
+            <div key={metric.label} style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 13, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
               <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '28px', fontWeight: 940 }}>{metric.value}</div>
               <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '15px', marginTop: 4 }}>{metric.label}</div>
             </div>
@@ -496,24 +503,24 @@ function WorkspaceDashboard({ data, actions }) {
   };
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gap: APG2_PROFILE.rhythm.section }}>
       <LokiWorkspaceHero data={data} profileStatus={profileStatus} attention={attention} actions={actions} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 14, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 16, alignItems: 'stretch' }}>
         {renderWidget({ id: 'attention' })}
         {renderWidget({ id: 'today' })}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,0.95fr)', gap: 14, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,0.95fr)', gap: 16, alignItems: 'stretch' }}>
         {renderWidget({ id: 'business' })}
         {renderWidget({ id: 'stats' })}
       </div>
       <SectionHeader title="Контент сегодня" subtitle="Новости и мероприятия, которые формируют городской контекст" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
         {renderWidget({ id: 'latest-news' })}
         {renderWidget({ id: 'upcoming-events' })}
       </div>
       <AIActionBoard actions={actions} />
       <SectionHeader title="Дальше" subtitle="Действия, история и быстрый переход к работе" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 14, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 16, alignItems: 'stretch' }}>
         {renderWidget({ id: 'recent-actions' })}
         {renderWidget({ id: 'quick-actions' })}
       </div>
@@ -523,7 +530,7 @@ function WorkspaceDashboard({ data, actions }) {
 
 function ListRow({ title, text }) {
   return (
-    <div style={{ ...APG2_PROFILE.glass, borderRadius: 18, padding: '10px 12px' }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: '11px 13px', background: APG2_PROFILE.quietSurface }}>
       <div style={{ color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
       {text && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{text}</div>}
     </div>
@@ -653,23 +660,58 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
   const chatItems = aiHistory.length ? aiHistory.slice(-5) : [
     { id: 'loki-start', role: 'loki', text: `Я уже вижу раздел «${context.label}» и буду держать ответы внутри AI Workspace.` },
   ];
+  const primaryDecision = recommendations[0] || 'Проверить рабочий день';
   const handleSubmit = event => {
     event.preventDefault();
     onAskLoki?.(aiDraft);
   };
   return (
-    <div style={{ display: 'grid', gap: 10, position: 'sticky', top: 92 }}>
-      <WorkspacePanel title="AI Workspace" subtitle="Локи ведёт рабочий день" style={{ border: '1px solid rgba(215,184,106,0.34)', boxShadow: aiPulse ? '0 0 0 1px rgba(215,184,106,0.16), 0 24px 70px rgba(0,0,0,0.25)' : undefined }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '44px minmax(0,1fr)', gap: 11, alignItems: 'center' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 18, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 21, boxShadow: '0 16px 36px rgba(215,184,106,0.20)' }}>🦊</div>
-          <div>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '19px', fontWeight: 930 }}>Локи</div>
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 2 }}>Контекст: {context.label}</div>
+    <div style={{ position: 'sticky', top: 92 }}>
+      <div style={{ ...APG2_PROFILE.glass, borderRadius: 38, padding: 18, display: 'grid', gap: 14, border: '1px solid rgba(215,184,106,0.34)', background: 'radial-gradient(circle at 30% 0%, rgba(255,240,184,0.20), transparent 36%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.32), rgba(var(--apg2-glass-a,255,255,255),0.13))', boxShadow: aiPulse ? '0 0 0 1px rgba(215,184,106,0.18), 0 26px 72px rgba(0,0,0,0.24)' : APG2_PROFILE.glass.boxShadow }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '58px minmax(0,1fr)', gap: 13, alignItems: 'center' }}>
+          <div style={{ position: 'relative', width: 58, height: 58, borderRadius: 24, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 28, boxShadow: '0 20px 48px rgba(215,184,106,0.24)' }}>
+            🦊
+            <span style={{ position: 'absolute', right: -2, bottom: -2, width: 16, height: 16, borderRadius: 99, background: attention.length ? '#D7B86A' : '#4BB34B', border: '2px solid rgba(24,22,20,0.84)', boxShadow: '0 0 18px rgba(215,184,106,0.42)' }} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <GlassBadge tone="gold" style={{ padding: '5px 9px', fontSize: 10.5 }}>AI Workspace</GlassBadge>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '22px', fontWeight: 940, marginTop: 7 }}>Локи принимает смену</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px', marginTop: 3 }}>Контекст: {context.label}</div>
           </div>
         </div>
-        <div style={{ color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '19px', fontWeight: 760, marginTop: 12 }}>
-          {context.focus}. Я не открываю отдельные окна — вся работа с подсказками остаётся здесь.
+
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, background: APG2_PROFILE.heroSurface }}>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, letterSpacing: 0.8, textTransform: 'uppercase' }}>Следующее лучшее действие</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 930, marginTop: 7 }}>{primaryDecision}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>{context.focus}. Локи держит рекомендации внутри рабочего пространства.</div>
+          <GlassButton tone="gold" onClick={() => onAskLoki?.(context.prompt)} style={{ marginTop: 12, width: '100%', minHeight: 40, color: '#17120a' }}>Разобрать с Локи</GlassButton>
         </div>
+
+        <ContentGrid min={132} gap={8}>
+          <MetricCard label="Сигналы" value={attention.length || 0} delta="требуют внимания" tone={attention.length ? 'gold' : 'quiet'} />
+          <MetricCard label="Новости" value={data.news.length} delta="в контексте" tone="quiet" />
+          <MetricCard label="События" value={data.events.length} delta="в работе" tone="quiet" />
+          <MetricCard label="Профиль" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'quiet' : 'gold'} />
+        </ContentGrid>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <SectionHeader title="Сегодня" subtitle="Короткий briefing" style={{ marginBottom: 0 }} />
+          {briefing.slice(0, 4).map(item => <ListRow key={item} title={item} text="Реальные данные Workspace" />)}
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <SectionHeader title="Решения" subtitle="Не список, а рабочий фокус" style={{ marginBottom: 0 }} />
+          {recommendations.slice(0, 3).map((item, index) => (
+            <button key={item} type="button" onClick={() => onAskLoki?.(item)} style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 12, display: 'grid', gridTemplateColumns: '28px minmax(0,1fr)', gap: 10, alignItems: 'center', background: index === 0 ? APG2_PROFILE.goldSoft : APG2_PROFILE.quietSurface, border: index === 0 ? '1px solid rgba(215,184,106,0.34)' : APG2_PROFILE.glass.border, color: APG2_PROFILE.text, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+              <span style={{ width: 28, height: 28, borderRadius: 12, background: index === 0 ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.12)', color: index === 0 ? '#17120a' : APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontWeight: 930 }}>{index + 1}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item}</span>
+                <span style={{ display: 'block', color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{context.label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit} style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 8, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 7, alignItems: 'center', marginTop: 12 }}>
           <input
             value={aiDraft}
@@ -679,65 +721,37 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
           />
           <GlassButton type="submit" tone="gold" style={{ minHeight: 34, padding: '7px 10px', color: '#17120a' }}>Спросить</GlassButton>
         </form>
-      </WorkspacePanel>
-      <WorkspacePanel title="Сегодня" subtitle="Briefing Локи">
-        <div style={{ display: 'grid', gap: 7 }}>
-          {briefing.slice(0, 5).map(item => <ListRow key={item} title={item} text="Реальные данные Workspace" />)}
-        </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="Что требует внимания" subtitle={attention.length ? `${attention.length} сигнала` : 'Спокойный режим'}>
+
         <div style={{ display: 'grid', gap: 8 }}>
-          {attention.length ? attention.slice(0, 4).map(item => <ListRow key={item} title={item} text="Проверить" />) : <EmptyWidget text="Критичных сигналов сейчас нет." />}
-        </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="Рекомендации" subtitle="Контекстные действия">
-        <div style={{ display: 'grid', gap: 8 }}>
-          {recommendations.map(item => <ListRow key={item} title={item} text={context.label} />)}
-        </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="История" subtitle="Последние рабочие события">
-        <div style={{ display: 'grid', gap: 8 }}>
-          {data.recentActions.slice(0, 3).map(item => <ListRow key={item.id} title={item.title} text={item.text} />)}
-        </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="Чат" subtitle="Ответы остаются в AI Workspace">
-        <div style={{ display: 'grid', gap: 8 }}>
-          {chatItems.map(item => (
-            <div key={item.id} style={{
-              ...APG2_PROFILE.glass,
-              borderRadius: item.role === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
-              padding: '9px 11px',
-              marginLeft: item.role === 'user' ? 18 : 0,
-              marginRight: item.role === 'user' ? 0 : 18,
-              border: item.role === 'loki' ? '1px solid rgba(215,184,106,0.20)' : APG2_PROFILE.glass.border,
-            }}>
+          <SectionHeader title="Диалог" subtitle="Компактная рабочая память" style={{ marginBottom: 0 }} />
+          {chatItems.slice(-3).map(item => (
+            <div key={item.id} style={{ ...APG2_PROFILE.glass, borderRadius: item.role === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px', padding: '9px 11px', marginLeft: item.role === 'user' ? 22 : 0, marginRight: item.role === 'user' ? 0 : 22, border: item.role === 'loki' ? '1px solid rgba(215,184,106,0.20)' : APG2_PROFILE.glass.border, background: item.role === 'loki' ? APG2_PROFILE.quietSurface : 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
               <div style={{ color: item.role === 'loki' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6 }}>{item.role === 'loki' ? 'Локи' : 'Вы'}</div>
               <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', marginTop: 3 }}>{item.text}</div>
             </div>
           ))}
         </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="Быстрые действия" subtitle="Выполняются из Workspace">
+
         <QuickActions actions={[
           { id: 'briefing', label: 'Сводка дня', onClick: () => onAskLoki?.('Покажи сводку дня'), tone: 'gold' },
           { id: 'news', label: 'Новости', onClick: actions.openNews },
           { id: 'events', label: 'Мероприятия', onClick: actions.openEvents },
           { id: 'business', label: 'Мой бизнес', onClick: actions.openCabinet },
-        ]} style={{ background: 'transparent', padding: 0, border: 0 }} />
-      </WorkspacePanel>
+        ]} style={{ background: 'transparent', padding: 0, border: 0, marginTop: 2 }} />
+      </div>
     </div>
   );
 }
 
 function AIActionBoard({ actions }) {
   return (
-    <WorkspacePanel title="AI Dashboard" subtitle="Рабочие рекомендации Локи">
-      <ContentGrid min={210} gap={10}>
-        <ActionCard icon="📰" title="Опубликовать новость" text="Перейти к публикациям и проверить готовые материалы" onClick={actions.openNews} />
+    <WorkspacePanel title="AI Dashboard" subtitle="Рабочие рекомендации Локи" style={{ padding: 18 }}>
+      <ContentGrid min={220} gap={12}>
+        <ActionCard tone="gold" icon="📰" title="Опубликовать новость" text="Перейти к публикациям и проверить готовые материалы" onClick={actions.openNews} />
         <ActionCard icon="⭐" title="Ответить на отзыв" text="Проверить обратную связь в рабочем контексте" onClick={actions.openLoki} />
         <ActionCard icon="📅" title="Создать мероприятие" text="Открыть события и подготовить карточку" onClick={actions.openEvents} />
-        <ActionCard icon="◇" title="Проверить заявку" text="Перейти в CRM-заготовку без выхода из Workspace" onClick={actions.openCrm} />
-        <ActionCard icon="🖼" title="Добавить фотографии" text="Улучшить карточку бизнеса или эксперта" onClick={actions.openCabinet} />
+        <ActionCard tone="quiet" icon="◇" title="Проверить заявку" text="Перейти в CRM-заготовку без выхода из Workspace" onClick={actions.openCrm} />
+        <ActionCard tone="quiet" icon="🖼" title="Добавить фотографии" text="Улучшить карточку бизнеса или эксперта" onClick={actions.openCabinet} />
       </ContentGrid>
     </WorkspacePanel>
   );
@@ -967,8 +981,8 @@ export function DesktopWorkspace({
   };
 
   return (
-    <div onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100svh', background: 'radial-gradient(circle at 18% -12%, rgba(215,184,106,0.18), transparent 34%), radial-gradient(circle at 92% 8%, rgba(112,92,168,0.14), transparent 30%), linear-gradient(180deg, var(--apg2-bg-top, #17171a) 0%, var(--apg2-bg-mid, #121316) 56%, var(--apg2-bg-bottom, #101114) 100%)', color: APG2_PROFILE.text, padding: 14, boxSizing: 'border-box' }}>
-      <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: 14, minHeight: 'calc(100svh - 28px)' }}>
+    <div onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100svh', background: APG2_PROFILE.workspaceBg, color: APG2_PROFILE.text, padding: 18, boxSizing: 'border-box' }}>
+      <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: 18, minHeight: 'calc(100svh - 36px)' }}>
         <WorkspaceHeaderBar
           user={user}
           roleState={roleState}
@@ -983,7 +997,7 @@ export function DesktopWorkspace({
           onOpenScan={onOpenScan}
           onOpenShortcuts={() => setShortcutOverlayOpen(true)}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: `${sidebarCollapsed ? 72 : 238}px minmax(0, 1fr) 368px`, gap: 14, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `${sidebarCollapsed ? 74 : 246}px minmax(0, 1fr) 390px`, gap: 18, alignItems: 'start' }}>
           <WorkspaceSidebar
             items={navItems}
             activeSection={activeSection}
@@ -991,7 +1005,7 @@ export function DesktopWorkspace({
             onToggle={() => setSidebarCollapsed(value => !value)}
             onSelect={handleSelectNav}
           />
-          <main style={{ minWidth: 0 }}>
+          <main style={{ minWidth: 0, display: 'grid', gap: 4 }}>
             <SectionHeader
               title={activeSection === 'dashboard' ? 'Dashboard' : navItems.find(item => item.id === activeSection)?.label || 'Workspace'}
               subtitle={query ? `Поиск: ${query}` : `${layout.density} · ${workspaceNavigation.placement} · APG V2 Liquid Glass`}
@@ -1012,7 +1026,7 @@ export function DesktopWorkspace({
             />
           </aside>
         </div>
-        <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12 }}>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: '9px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12, background: APG2_PROFILE.quietSurface }}>
           <span>AI Workspace: active · shortcuts: ⌘K поиск, ⌘1 Dashboard, ⌘2 Мой бизнес, ⌘L Локи, ? помощь</span>
           <span>{partners.length} партнёров · {experts.length} экспертов · {news.length} новостей · {events.length} событий</span>
         </div>

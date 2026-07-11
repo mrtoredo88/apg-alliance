@@ -8,7 +8,7 @@ const safeArray = value => Array.isArray(value) ? value.filter(Boolean) : [];
 
 export function GlassContainer({ children, style, tone = 'default' }) {
   return (
-    <GlassCard tone={tone === 'gold' ? 'gold' : undefined} style={{ borderRadius: 32, padding: 16, ...style }}>
+    <GlassCard tone={tone === 'gold' ? 'gold' : undefined} style={{ borderRadius: tone === 'quiet' ? 24 : 32, padding: tone === 'compact' ? 12 : 16, background: tone === 'quiet' ? APG2_PROFILE.quietSurface : undefined, ...style }}>
       {children}
     </GlassCard>
   );
@@ -96,7 +96,7 @@ export function Sidebar({ items = [], activeId, onSelect, footer, style }) {
 
 export function WorkspacePanel({ title, subtitle, children, actions, style }) {
   return (
-    <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, minHeight: 0, ...style }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: APG2_PROFILE.radius.panel, padding: APG2_PROFILE.rhythm.panel, minHeight: 0, ...style }}>
       {(title || actions) && <SectionHeader title={title} subtitle={subtitle} actions={actions} />}
       {children}
     </div>
@@ -113,10 +113,10 @@ export function ContentGrid({ children, min = 220, gap = 12, style }) {
 
 export function DashboardCard({ title, subtitle, value, icon, action, tone, style }) {
   return (
-    <GlassContainer tone={tone} style={{ minHeight: 128, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', ...style }}>
+    <GlassContainer tone={tone} style={{ minHeight: tone === 'quiet' ? 108 : 136, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', ...style }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
         <div>
-          <div style={{ color: tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 870 }}>{title}</div>
+          <div style={{ color: tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: tone === 'quiet' ? 14.5 : 16, lineHeight: tone === 'quiet' ? '19px' : '21px', fontWeight: 870 }}>{title}</div>
           {subtitle && <div style={{ color: tone === 'gold' ? 'rgba(23,18,10,0.62)' : APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{subtitle}</div>}
         </div>
         {icon && <div style={{ width: 42, height: 42, borderRadius: 17, display: 'grid', placeItems: 'center', background: tone === 'gold' ? 'rgba(23,18,10,0.08)' : APG2_PROFILE.goldSoft, fontSize: 20 }}>{icon}</div>}
@@ -131,9 +131,9 @@ export function DashboardCard({ title, subtitle, value, icon, action, tone, styl
 
 export function MetricCard({ label, value, delta, tone, style }) {
   return (
-    <GlassContainer tone={tone} style={{ borderRadius: 24, padding: 13, ...style }}>
+    <GlassContainer tone={tone} style={{ borderRadius: tone === 'gold' ? 26 : 24, padding: tone === 'quiet' ? 11 : 13, background: tone === 'quiet' ? APG2_PROFILE.quietSurface : undefined, ...style }}>
       <div style={{ color: tone === 'gold' ? 'rgba(23,18,10,0.62)' : APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</div>
-      <div style={{ color: tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: 24, lineHeight: '27px', fontWeight: 930, marginTop: 4 }}>{value}</div>
+      <div style={{ color: tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: tone === 'quiet' ? 21 : 24, lineHeight: tone === 'quiet' ? '24px' : '27px', fontWeight: 930, marginTop: 4 }}>{value}</div>
       {delta && <div style={{ color: tone === 'gold' ? 'rgba(23,18,10,0.68)' : APG2_PROFILE.gold, fontSize: 12, fontWeight: 780, marginTop: 5 }}>{delta}</div>}
     </GlassContainer>
   );
@@ -166,9 +166,9 @@ export function InfoPanel({ icon, title, text, action, tone, style }) {
 
 export function SectionHeader({ title, subtitle, actions, style }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12, ...style }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 14, ...style }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '24px', fontWeight: 920 }}>{title}</div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 21, lineHeight: '26px', fontWeight: 920, letterSpacing: -0.15 }}>{title}</div>
         {subtitle && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>{subtitle}</div>}
       </div>
       {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
@@ -180,12 +180,12 @@ export function ActionCard({ icon, title, text, onClick, disabled, tone, style }
   return (
     <button type="button" disabled={disabled} onClick={onClick} style={{
       ...APG2_PROFILE.glass,
-      borderRadius: 28,
-      padding: 14,
-      minHeight: 112,
+      borderRadius: tone === 'quiet' ? 24 : 30,
+      padding: tone === 'quiet' ? 12 : 15,
+      minHeight: tone === 'quiet' ? 98 : 116,
       textAlign: 'left',
       color: tone === 'gold' ? '#17120a' : APG2_PROFILE.text,
-      background: tone === 'gold' ? APG2_PROFILE.goldGradient : APG2_PROFILE.glass.background,
+      background: tone === 'gold' ? APG2_PROFILE.goldGradient : tone === 'quiet' ? APG2_PROFILE.quietSurface : APG2_PROFILE.glass.background,
       fontFamily: 'inherit',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.54 : 1,

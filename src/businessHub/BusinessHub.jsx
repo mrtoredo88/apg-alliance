@@ -41,7 +41,7 @@ function valueOrEmpty(value) {
 
 function BusinessTabs({ activeTab, onChange }) {
   return (
-    <GlassCard style={{ borderRadius: 28, padding: 8, display: 'flex', gap: 7, overflowX: 'auto' }}>
+    <GlassCard style={{ borderRadius: 32, padding: 9, display: 'flex', gap: 8, overflowX: 'auto', background: APG2_PROFILE.quietSurface }}>
       {BUSINESS_HUB_TABS.map(tab => {
         const active = activeTab === tab.id;
         return (
@@ -53,8 +53,8 @@ function BusinessTabs({ activeTab, onChange }) {
               border: active ? '1px solid rgba(215,184,106,0.55)' : APG2_PROFILE.glass.border,
               background: active ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.06)',
               color: active ? APG2_PROFILE.gold : APG2_PROFILE.textSoft,
-              borderRadius: 18,
-              minHeight: 38,
+              borderRadius: 20,
+              minHeight: 40,
               padding: '8px 11px',
               display: 'flex',
               alignItems: 'center',
@@ -82,8 +82,9 @@ function ListItem({ title, text, badge, onClick }) {
       onClick={onClick}
       style={{
         ...APG2_PROFILE.glass,
-        borderRadius: 22,
-        padding: 12,
+        borderRadius: 24,
+        padding: 13,
+        background: APG2_PROFILE.quietSurface,
         color: APG2_PROFILE.text,
         fontFamily: 'inherit',
         textAlign: 'left',
@@ -116,31 +117,32 @@ function EmptyState({ title, text, action }) {
 function DashboardView({ model, actions }) {
   const profileName = model.profile?.name || model.profile?.title || model.profile?.companyName || 'Профиль не подключён';
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <ContentGrid min={180} gap={10}>
-        <MetricCard label="Заполненность" value={`${model.completion.value}%`} delta={model.completion.label} tone={model.completion.value >= 80 ? 'gold' : undefined} />
-        <MetricCard label="Новости" value={model.totals.news} delta="Связанные публикации" />
-        <MetricCard label="Мероприятия" value={model.totals.events} delta="Связанные события" />
-        <MetricCard label="Акции" value={model.totals.promotions} delta="Активные предложения" />
-        <MetricCard label="Отзывы" value={model.totals.reviews} delta="Доступные оценки" />
-        <MetricCard label="QR" value={model.stats.qr} delta="Сканы и переходы" />
-      </ContentGrid>
-      <ContentGrid min={320} gap={14}>
+    <div style={{ display: 'grid', gap: APG2_PROFILE.rhythm.section }}>
+      <ContentGrid min={340} gap={16}>
         <DashboardCard
           tone="gold"
           icon="◈"
           title={profileName}
-          subtitle={`${model.business.label} · единый Business Hub`}
+          subtitle={`${model.business.label} · единый Business Hub АПГ`}
           value={model.profile?.status || model.profile?.tariff || 'АПГ'}
           action={<GlassButton onClick={actions.openEditor} style={{ color: '#17120a' }}>Редактировать</GlassButton>}
+          style={{ minHeight: 176, borderRadius: APG2_PROFILE.radius.hero }}
         />
-        <WorkspacePanel title="Следующие шаги" subtitle="Локи будет использовать эти сигналы для рекомендаций">
+        <WorkspacePanel title="Следующие шаги" subtitle="Локи использует эти сигналы для рекомендаций" style={{ minHeight: 176 }}>
           <div style={{ display: 'grid', gap: 8 }}>
             {model.tasks.length ? model.tasks.map(task => <ListItem key={task} title={task} text="Рекомендация Business Hub" />) : <EmptyState title="Критичных задач нет" text="Профиль выглядит готовым к работе." />}
           </div>
         </WorkspacePanel>
       </ContentGrid>
-      <ContentGrid min={300} gap={14}>
+      <ContentGrid min={170} gap={12}>
+        <MetricCard label="Заполненность" value={`${model.completion.value}%`} delta={model.completion.label} tone={model.completion.value >= 80 ? 'gold' : undefined} />
+        <MetricCard label="Новости" value={model.totals.news} delta="Связанные публикации" tone="quiet" />
+        <MetricCard label="Мероприятия" value={model.totals.events} delta="Связанные события" tone="quiet" />
+        <MetricCard label="Акции" value={model.totals.promotions} delta="Активные предложения" tone="quiet" />
+        <MetricCard label="Отзывы" value={model.totals.reviews} delta="Доступные оценки" tone="quiet" />
+        <MetricCard label="QR" value={model.stats.qr} delta="Сканы и переходы" tone="quiet" />
+      </ContentGrid>
+      <ContentGrid min={300} gap={16}>
         <WorkspacePanel title="Последние новости" subtitle={`${model.relatedNews.length} материалов`}>
           <div style={{ display: 'grid', gap: 8 }}>
             {model.relatedNews.slice(0, 4).map(item => <ListItem key={item.id || item.title} title={item.title || 'Новость'} text={formatDate(item.publishedAt || item.createdAt)} badge={item.status || 'news'} onClick={actions.openNews} />)}
@@ -293,7 +295,7 @@ export function BusinessHub({
   };
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gap: APG2_PROFILE.rhythm.section }}>
       <SectionHeader
         title="Мой бизнес"
         subtitle="Единый Business Hub для партнёра и эксперта внутри Desktop Workspace."
@@ -303,6 +305,7 @@ export function BusinessHub({
         icon="◈"
         title={model.profile?.name || model.profile?.title || 'Профиль бизнеса не найден'}
         text={model.profile?.id ? `${model.business.label} · заполненность ${model.completion.value}% · данные берутся из существующих коллекций АПГ` : 'Business Hub доступен по роли, но связанный профиль партнёра или эксперта пока не найден.'}
+        style={{ borderRadius: APG2_PROFILE.radius.hero, padding: 18, background: APG2_PROFILE.heroSurface }}
         action={<QuickActions actions={[
           { id: 'edit', label: 'Редактировать профиль', onClick: actions.openEditor, tone: 'gold' },
           { id: 'loki', label: 'Спросить Локи', onClick: actions.openLoki },
@@ -311,11 +314,11 @@ export function BusinessHub({
       />
       <BusinessTabs activeTab={activeTab} onChange={setActiveTab} />
       {renderTab()}
-      <ContentGrid min={220} gap={10}>
-        <ActionCard icon="✎" title="Создать новость" text="Через существующий центр контента" onClick={actions.openNews} />
+      <ContentGrid min={220} gap={12}>
+        <ActionCard tone="gold" icon="✎" title="Создать новость" text="Через существующий центр контента" onClick={actions.openNews} />
         <ActionCard icon="◷" title="Добавить событие" text="Через существующие мероприятия" onClick={actions.openEvents} />
-        <ActionCard icon="✦" title="Запустить акцию" text="Через профиль и предложения" onClick={actions.openEditor} />
-        <ActionCard icon="🦊" title="Попросить Локи" text="Получить рекомендацию по развитию" onClick={actions.openLoki} />
+        <ActionCard tone="quiet" icon="✦" title="Запустить акцию" text="Через профиль и предложения" onClick={actions.openEditor} />
+        <ActionCard tone="quiet" icon="🦊" title="Попросить Локи" text="Получить рекомендацию по развитию" onClick={actions.openLoki} />
       </ContentGrid>
     </div>
   );

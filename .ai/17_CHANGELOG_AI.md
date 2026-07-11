@@ -2072,3 +2072,23 @@
 **Документация:** обновлены `docs/desktop-workspace.md`, `docs/desktop-ux.md`, `.ai/05_FRONTEND.md`.
 
 **Проверка:** production build успешен.
+
+## 2026-07-12 — APG Design System 2.0
+
+**Задача:** визуально объединить User Mode, Desktop Workspace и Business Hub, чтобы переключение режима не ощущалось переходом в другой продукт.
+
+**Дизайн-аудит:** User Mode был эмоциональнее, светлее и дороже за счёт hero, мягкой glass-пластики и воздуха. Workspace и Business Hub выглядели плотнее, темнее и местами как классическая рабочая админка: одинаковый вес карточек, мало визуальных пауз, правая AI Workspace-область воспринималась как список.
+
+**Что изменено:** `APG2_PROFILE` расширен до общего DS 2.0 foundation: `workspaceBg`, `heroSurface`, `quietSurface`, `rhythm`. Общий APG2 background и glass стали теплее и мягче, чтобы Workspace перестал выглядеть как отдельный тёмный продукт.
+
+**User Mode:** `HomePanelV2` переведён на `APG2_PROFILE` для базовых `pageBg`, text, glass, hero и gold tokens. Его эмоциональный стиль сохранён, но он больше не живёт на отдельном визуальном наборе.
+
+**Workspace:** hero стал крупнее и спокойнее, добавлен визуальный персонаж Локи со статусом; фон Workspace переведён на `workspaceBg`; header/sidebar/status bar используют `quietSurface`; карточки получили уровни `gold`, `default`, `quiet`; увеличен ритм и воздух между группами.
+
+**AI Workspace:** правая колонка переработана из списка панелей в decision center: аватар Локи, состояние, “следующее лучшее действие”, срез сигналов, briefing, решения, компактный диалог и быстрые действия.
+
+**Business Hub:** dashboard начинается с крупного смыслового блока профиля и следующих шагов, метрики перенесены ниже как supporting layer; табы, строки и action cards используют общие quiet/hero surfaces.
+
+**Документация:** обновлены `.ai/11_DESIGN_RULES.md` и `docs/desktop-ux.md`.
+
+**Проверка:** production build успешен.

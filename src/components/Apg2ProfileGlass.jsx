@@ -2,13 +2,17 @@ import React, { useRef, useState } from 'react';
 import { MOTION, motionTransition } from '../motion.js';
 
 export const APG2_PROFILE = {
-  bg: 'var(--apg2-bg, radial-gradient(circle at 50% -8%, rgba(219,187,111,0.15), transparent 28%), radial-gradient(circle at 100% 8%, rgba(73,61,118,0.18), transparent 34%), linear-gradient(180deg,#111113 0%,#17181b 44%,#0f1013 100%))',
+  bg: 'var(--apg2-bg, radial-gradient(circle at 16% -10%, rgba(255,240,184,0.20), transparent 34%), radial-gradient(circle at 88% 4%, rgba(126,103,182,0.18), transparent 34%), radial-gradient(circle at 50% 102%, rgba(215,184,106,0.10), transparent 36%), linear-gradient(180deg,#17161a 0%,#1a1a1f 46%,#121317 100%))',
   text: 'var(--apg2-text, #F7F1E6)',
   textSoft: 'var(--apg2-text-soft, rgba(247,241,230,0.72))',
   textMuted: 'var(--apg2-text-muted, rgba(247,241,230,0.48))',
   gold: 'var(--apg2-gold, #D7B86A)',
   goldSoft: 'rgba(215,184,106,0.18)',
   goldGradient: 'linear-gradient(135deg,#FFF0B8,#D7B86A,#9F7932)',
+  workspaceBg: 'radial-gradient(circle at 14% -8%, rgba(255,240,184,0.22), transparent 34%), radial-gradient(circle at 92% 4%, rgba(126,103,182,0.16), transparent 32%), radial-gradient(circle at 48% 110%, rgba(215,184,106,0.09), transparent 36%), linear-gradient(180deg, var(--apg2-bg-top, #19181d) 0%, var(--apg2-bg-mid, #18191e) 52%, var(--apg2-bg-bottom, #121318) 100%)',
+  workspaceStage: 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.16), rgba(var(--apg2-glass-a,255,255,255),0.055))',
+  heroSurface: 'radial-gradient(circle at 16% 0%, rgba(255,240,184,0.34), transparent 36%), radial-gradient(circle at 88% 16%, rgba(126,103,182,0.22), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.34), rgba(var(--apg2-glass-a,255,255,255),0.12))',
+  quietSurface: 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.24), rgba(var(--apg2-glass-a,255,255,255),0.10))',
   radius: {
     card: 30,
     panel: 34,
@@ -16,12 +20,18 @@ export const APG2_PROFILE = {
     button: 22,
     badge: 999,
   },
+  rhythm: {
+    page: 18,
+    section: 22,
+    panel: 16,
+    cluster: 12,
+  },
   glass: {
-    background: 'radial-gradient(circle at 18% 0%,rgba(var(--apg2-glass-a,255,255,255),0.32),transparent 34%), linear-gradient(145deg,rgba(var(--apg2-glass-a,255,255,255),0.42),rgba(var(--apg2-glass-a,255,255,255),0.20))',
-    backdropFilter: 'blur(36px) saturate(1.62)',
-    WebkitBackdropFilter: 'blur(36px) saturate(1.62)',
-    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.28))',
-    boxShadow: 'inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.40), inset 0 -22px 44px rgba(var(--apg2-glass-a,255,255,255),0.06), 0 24px 70px var(--apg2-elev-shadow, rgba(0,0,0,0.34))',
+    background: 'radial-gradient(circle at 18% 0%,rgba(var(--apg2-glass-a,255,255,255),0.34),transparent 36%), linear-gradient(145deg,rgba(var(--apg2-glass-a,255,255,255),0.38),rgba(var(--apg2-glass-a,255,255,255),0.17))',
+    backdropFilter: 'blur(44px) saturate(1.72)',
+    WebkitBackdropFilter: 'blur(44px) saturate(1.72)',
+    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.30))',
+    boxShadow: 'inset 0 1.5px 0 rgba(var(--apg2-glass-a,255,255,255),0.42), inset 0 -22px 46px rgba(var(--apg2-glass-a,255,255,255),0.065), 0 22px 58px var(--apg2-elev-shadow, rgba(0,0,0,0.26))',
   },
   goldGlass: {
     background: 'radial-gradient(circle at 24% 0%,rgba(255,248,218,0.54),transparent 42%), linear-gradient(145deg,rgba(238,210,138,0.82),rgba(164,126,49,0.62))',

@@ -9,6 +9,7 @@ import { APP_URL } from './constants.js';
 import { MOTION, motionDelay, motionTransition } from './motion.js';
 import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsPhotoItems, getNewsReactionsTotal, getNewsStats, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
 import { buildAdaptiveHomeData } from './interestEngine.js';
+import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -34,34 +35,23 @@ const profileImageOf = (item) =>
   item?.coverPhoto || item?.imageUrl || item?.logoUrl || item?.photoUrl || item?.photo || item?.image || '';
 
 const V2 = {
-  pageBg: 'var(--apg2-bg, #101012)',
-  text: 'var(--apg2-text, #F7F4EA)',
-  textSoft: 'var(--apg2-text-soft, rgba(247,244,234,0.7))',
-  textMuted: 'var(--apg2-text-muted, rgba(247,244,234,0.46))',
-  gold: 'var(--apg2-gold, #D6B766)',
-  goldMetal: 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 67%, #F4D98C 100%)',
-  glass: {
-    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.12), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.42), rgba(255,255,255,0.18))',
-    backdropFilter: 'blur(62px) saturate(1.72)',
-    WebkitBackdropFilter: 'blur(62px) saturate(1.72)',
-    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.26))',
-    boxShadow: '0 20px 58px var(--apg2-elev-shadow, rgba(0,0,0,0.27)), inset 0 1.5px 0 rgba(255,255,255,0.38), inset 0 -18px 42px rgba(255,255,255,0.06)',
-  },
+  pageBg: APG2_PROFILE.bg,
+  text: APG2_PROFILE.text,
+  textSoft: APG2_PROFILE.textSoft,
+  textMuted: APG2_PROFILE.textMuted,
+  gold: APG2_PROFILE.gold,
+  goldMetal: APG2_PROFILE.goldGradient,
+  glass: APG2_PROFILE.glass,
   glowGlass: {
-    background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.22), transparent 38%), radial-gradient(circle at 84% 12%, rgba(255,255,255,0.18), transparent 30%), linear-gradient(145deg, rgba(255,255,255,0.46), rgba(255,255,255,0.22))',
-    backdropFilter: 'blur(76px) saturate(1.82)',
-    WebkitBackdropFilter: 'blur(76px) saturate(1.82)',
+    ...APG2_PROFILE.glass,
+    background: APG2_PROFILE.heroSurface,
     border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.34))',
-    boxShadow: '0 42px 104px var(--apg2-elev-shadow, rgba(0,0,0,0.38)), 0 0 74px rgba(216,184,103,0.13), inset 0 2px 0 rgba(255,255,255,0.44), inset 0 -42px 86px rgba(255,255,255,0.08)',
+    boxShadow: '0 42px 104px var(--apg2-elev-shadow, rgba(0,0,0,0.30)), 0 0 74px rgba(216,184,103,0.12), inset 0 2px 0 rgba(255,255,255,0.42), inset 0 -42px 86px rgba(255,255,255,0.07)',
   },
   goldGlass: {
-    background: 'radial-gradient(circle at 32% 0%, rgba(255,240,184,0.36), transparent 44%), linear-gradient(135deg, rgba(244,217,140,0.32), rgba(159,121,50,0.11))',
-    backdropFilter: 'blur(46px) saturate(1.8)',
-    WebkitBackdropFilter: 'blur(46px) saturate(1.8)',
-    border: '1px solid rgba(244,217,140,0.36)',
-    boxShadow: '0 18px 52px rgba(216,184,103,0.13), inset 0 1.5px 0 rgba(255,255,255,0.28), inset 0 -12px 30px rgba(159,121,50,0.12)',
+    ...APG2_PROFILE.goldGlass,
   },
-  sectionGap: 20,
+  sectionGap: APG2_PROFILE.rhythm.section,
 };
 
 const GlassCard = {
