@@ -32,6 +32,7 @@ import { normalizeExpertRecord, registerCustomExpertCategories } from '../server
 import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
+import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -576,6 +577,7 @@ function LazyFallback() {
 export function UserApp() {
   const initialDeepLink                         = useMemo(readAppDeepLink, []);
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
+  const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
@@ -2389,19 +2391,39 @@ export function UserApp() {
     </svg>
   );
 
-  // 5 tabs + center scan button (index 2). Tasks stay available inside V2 screens.
-  const TAB_PANELS = ['home', 'offers', null, 'experts', 'profile'];
+  const workspaceMode = getWorkspaceMode(workspaceWidth);
+  const workspaceRole = user?.role || (user?.isOwner ? 'owner' : user?.isAdmin ? 'admin' : 'user');
+  const bottomNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: workspaceRole }), [workspaceRole]);
+  const tabIconByKey = {
+    home: TabHomeIcon,
+    partners: TabPartnersIcon,
+    experts: TabExpertsIcon,
+    profile: TabProfileIcon,
+  };
+  const TABS = bottomNavigation.primary.map(item => ({
+    id: item.panelId,
+    workspaceId: item.id,
+    label: item.label,
+    icon: tabIconByKey[item.iconKey] || null,
+  }));
+  const TAB_PANELS = TABS.map(tab => tab.id);
   const showTabBar = !isScannerOpen && TAB_PANELS.includes(activePanel);
   const V2GoldMetal = 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 68%, #F4D98C 100%)';
 
-  const TABS = [
-    { id: 'home',    label: 'Главная',  icon: TabHomeIcon },
-    { id: 'offers',  label: 'Партнёры', icon: TabPartnersIcon },
-    { id: null,      label: 'Скан',     icon: null },
-    { id: 'experts', label: 'Эксперты', icon: TabExpertsIcon },
-    { id: 'profile', label: 'Профиль',  icon: TabProfileIcon },
-  ];
   const activeTabIndex = TABS.findIndex(tab => tab.id === activePanel);
+
+  useEffect(() => {
+    const updateWorkspaceWidth = () => setWorkspaceWidth(window.innerWidth || 0);
+    updateWorkspaceWidth();
+    window.addEventListener('resize', updateWorkspaceWidth, { passive: true });
+    window.visualViewport?.addEventListener('resize', updateWorkspaceWidth, { passive: true });
+    window.addEventListener('orientationchange', updateWorkspaceWidth);
+    return () => {
+      window.removeEventListener('resize', updateWorkspaceWidth);
+      window.visualViewport?.removeEventListener('resize', updateWorkspaceWidth);
+      window.removeEventListener('orientationchange', updateWorkspaceWidth);
+    };
+  }, []);
 
   useEffect(() => {
     const el = tabBarRef.current;
@@ -2617,7 +2639,8 @@ export function UserApp() {
     registeredEventIds,
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
-  }), [activePanel, adaptiveInterestProfile, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, registeredEventIds, savedNews, unreadCount, user, userKeys]);
+    workspace: { mode: workspaceMode },
+  }), [activePanel, adaptiveInterestProfile, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, registeredEventIds, savedNews, unreadCount, user, userKeys, workspaceMode]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {

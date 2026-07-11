@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] feat: Workspace Core foundation
+**Коммит:** `pending`
+**Файлы:** `src/workspace/WorkspaceCore.js`, `src/workspace/WorkspaceComponents.jsx`, `src/workspace/index.js`, `src/UserApp.jsx`, `src/cabinet/CabinetCorePage.jsx`, `scripts/workspace-core-test.mjs`, `docs/workspace-core.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Workspace Core: единый Layout Engine с областями `header/leftSidebar/content/rightSidebar/bottomBar/floatingPanels`, режимами `mobile/tablet/desktop`, Navigation Engine, helper-кэшем, lazy-модулями и виртуализацией.
+- Добавлен набор общих APG V2 workspace-компонентов: `WorkspaceShell`, `WorkspaceHeader`, `Sidebar`, `WorkspacePanel`, `WorkspaceContextPanel`, `GlassContainer`, `ContentGrid`, `DashboardCard`, `MetricCard`, `QuickActions`, `InfoPanel`, `SectionHeader`, `ActionCard`.
+- `UserApp` теперь строит существующий нижний бар через общий navigation contract, а `CabinetCorePage` начал использовать общий `ContentGrid`.
+**Почему:** Desktop Workspace, Cabinet Core, CRM, календарь, админка и Локи должны развиваться поверх одной layout-системы без отдельных mobile/desktop реализаций.
+
+---
+
 ## [2026-07-11] feat: Content Lifecycle Engine V1
 **Коммит:** `pending`
 **Файлы:** `server-shared/content-lifecycle.js`, `src/contentLifecycle.js`, `server/src/routes/admin-actions.js`, `server/src/routes/public-data.js`, `src/AdminPanel.jsx`, `src/UserApp.jsx`, `src/loki/core/context/ContextEngine.js`, `src/loki/core/v2/Reasoner.js`, `scripts/content-lifecycle-test.mjs`, `docs/content-lifecycle.md`, `.ai/04_API.md`, `.ai/17_CHANGELOG_AI.md`

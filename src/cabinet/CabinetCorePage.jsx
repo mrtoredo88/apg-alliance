@@ -9,6 +9,7 @@ import { AiProfileSection, Stars } from '../PartnerCabinetPage.jsx';
 import { userAction } from '../userApi.js';
 import { normalizeExternalUrl, validateExternalUrl } from '../utils/externalUrls.js';
 import { shareLink } from '../utils/shareLink.js';
+import { ContentGrid } from '../workspace/WorkspaceComponents.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
 
@@ -471,7 +472,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
           avatar={<GlassBadge tone="gold">{activeRole.id === 'expert' ? 'Эксперт' : 'АПГ'}</GlassBadge>}
           badges={[activeRole.label, snapshot.metrics.rating ? `★ ${snapshot.metrics.rating.toFixed(1)}` : null, `${snapshot.metrics.views} просмотров`].filter(Boolean)}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 7, marginTop: 12 }}>
+        <ContentGrid min={72} gap={7} style={{ marginTop: 12 }}>
           {[
             ['dashboard', 'Дашборд', '▦'],
             ['tasks', 'Задачи', '✓'],
@@ -487,7 +488,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
               <span style={{ fontSize: 10, lineHeight: '12px', fontWeight: 760, color: APG2_PROFILE.textSoft }}>{label}</span>
             </button>
           ))}
-        </div>
+        </ContentGrid>
         <GlassCard style={{ borderRadius: 28, padding: 6, display: 'flex', gap: 6, overflowX: 'auto', marginTop: 12 }}>
           {moduleIds.map(id => <GlassButton key={id} tone={activeModule === id ? 'gold' : 'glass'} onClick={() => setActiveModule(id)} style={{ minHeight: 38, borderRadius: 18, padding: '8px 11px', whiteSpace: 'nowrap', color: activeModule === id ? '#17120a' : APG2_PROFILE.text }}>{MODULE_LABELS[id] || id}</GlassButton>)}
         </GlassCard>
