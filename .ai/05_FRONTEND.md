@@ -280,7 +280,7 @@ const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] =
 
 `WorkspaceFeatureFlags.js` поддерживает staged rollout: `off → owner → admin → partner → expert → all`. По умолчанию включён безопасный уровень `owner`.
 
-Workspace содержит header, collapsible left sidebar, content area, right context panel и status bar. Dashboard берёт реальные данные из `UserApp`: партнёры, эксперты, новости, мероприятия, уведомления и активный кабинет.
+Workspace содержит header, collapsible left sidebar, content area, AI Workspace panel и status bar. Dashboard берёт реальные данные из `UserApp`: партнёры, эксперты, новости, мероприятия, уведомления и активный кабинет. Первый экран открывается briefing-ом Локи, а пункт “Локи”, `⌘L` и CTA “Спросить Локи” работают внутри правой AI Workspace-панели без отдельного overlay и без выхода в User Mode.
 
 Подробная архитектура: `docs/desktop-workspace.md`.
 
