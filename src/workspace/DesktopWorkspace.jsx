@@ -4,6 +4,7 @@ import { MOTION, motionTransition } from '../motion.js';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
+import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import {
   ActionCard,
   ContentGrid,
@@ -14,6 +15,7 @@ import {
   WorkspacePanel,
 } from './WorkspaceComponents.jsx';
 import { buildWorkspaceLayout, getWorkspaceNavigation, WORKSPACE_MODES } from './WorkspaceCore.js';
+import { getDesktopWorkspaceLayoutPlan, WORKSPACE_LAYOUT, WORKSPACE_Z } from './WorkspaceLayoutEngine.js';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: '▦', group: 'Работа', hint: 'Главный рабочий экран', shortcut: '⌘1' },
@@ -25,7 +27,7 @@ const NAV_ITEMS = [
   { id: 'experts', label: 'Эксперты', icon: '✦', group: 'Каталоги', panelId: 'experts', hint: 'Каталог экспертов' },
   { id: 'crm', label: 'CRM', icon: '◇', group: 'Система', placeholder: true, hint: 'Заявки и клиенты, готовится' },
   { id: 'calendar', label: 'Календарь', icon: '◷', group: 'Система', placeholder: true, hint: 'Расписание и записи, готовится' },
-  { id: 'loki', label: 'Локи', icon: '🦊', group: 'Система', panelId: 'loki', hint: 'Интеллектуальная рабочая панель', shortcut: '⌘L' },
+  { id: 'loki', label: 'Локи', icon: '◈', group: 'Система', panelId: 'loki', hint: 'Интеллектуальная рабочая панель', shortcut: '⌘L' },
   { id: 'settings', label: 'Настройки', icon: '⚙', group: 'Система', panelId: 'profile', hint: 'Профиль и параметры' },
   { id: 'admin', label: 'Администрирование', icon: '🛡', group: 'Система', adminOnly: true, hint: 'Административная панель' },
 ];
@@ -160,9 +162,9 @@ function buildContextualReply({ activeSection, data, profileStatus, text }) {
     : `Сейчас открыт раздел «${context.label}». Я бы начал так: ${nextStep.toLowerCase()}.`;
 }
 
-function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan, onOpenShortcuts }) {
+function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan, onOpenShortcuts, onOpenAI, aiAsDrawer }) {
   return (
-    <div style={{ ...APG2_PROFILE.glass, borderRadius: 30, padding: '11px 13px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 14, position: 'sticky', top: 16, zIndex: 10, minHeight: 66, background: APG2_PROFILE.quietSurface }}>
+    <div data-workspace-region="header" style={{ ...APG2_PROFILE.glass, borderRadius: 30, padding: '11px 13px', display: 'grid', gridTemplateColumns: 'auto minmax(220px, 1fr) auto', alignItems: 'center', gap: 14, minHeight: WORKSPACE_LAYOUT.headerHeight, background: APG2_PROFILE.quietSurface, position: 'relative', zIndex: WORKSPACE_Z.header }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontWeight: 950, boxShadow: '0 16px 36px rgba(215,184,106,0.18)' }}>АПГ</div>
         <div>
@@ -186,6 +188,7 @@ function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onMod
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
         <GlassButton onClick={onOpenScan} style={{ minHeight: 38, padding: '9px 12px' }}>QR</GlassButton>
+        {aiAsDrawer && <GlassButton onClick={onOpenAI} tone="gold" style={{ minHeight: 38, padding: '9px 12px', color: '#17120a' }}>AI Workspace</GlassButton>}
         <GlassButton onClick={onOpenNotifications} style={{ minHeight: 38, padding: '9px 12px' }}>{unreadCount ? `Уведомления · ${unreadCount}` : 'Уведомления'}</GlassButton>
         {roleState.roles.length > 1 && (
           <select value={activeRoleId || ''} onChange={event => onRoleChange(event.target.value)} style={{ ...APG2_PROFILE.glass, color: APG2_PROFILE.text, minHeight: 38, borderRadius: 16, padding: '0 10px', fontFamily: 'inherit' }}>
@@ -210,12 +213,12 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
     return acc;
   }, []);
   return (
-    <div style={{ ...APG2_PROFILE.glass, borderRadius: 32, padding: 10, height: 'calc(100svh - 124px)', minHeight: 0, position: 'sticky', top: 98, display: 'flex', flexDirection: 'column', gap: 10, transition: motionTransition(['width'], 'base'), width: collapsed ? 74 : 246, background: APG2_PROFILE.quietSurface }}>
+    <div data-workspace-region="sidebar" style={{ ...APG2_PROFILE.glass, borderRadius: 32, padding: 10, height: '100%', minHeight: 0, overflow: 'visible', position: 'relative', zIndex: WORKSPACE_Z.sidebar, display: 'flex', flexDirection: 'column', gap: 10, transition: motionTransition(['width'], 'base'), width: '100%', background: APG2_PROFILE.quietSurface }}>
       <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: '4px 5px 8px' }}>
         {!collapsed && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}>Навигация</div>}
         <GlassButton onClick={onToggle} style={{ minHeight: 34, width: 34, padding: 0, borderRadius: 14 }}>{collapsed ? '›' : '‹'}</GlassButton>
       </div>
-      <div style={{ display: 'grid', gap: 10, position: 'relative' }}>
+      <div style={{ display: 'grid', gap: 10, position: 'relative', minHeight: 0, overflowY: 'auto', overflowX: 'visible', paddingRight: collapsed ? 0 : 2, overscrollBehavior: 'contain' }}>
         {groups.map(group => (
           <div key={group.group} style={{ display: 'grid', gap: 5 }}>
             {!collapsed && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10, lineHeight: '13px', fontWeight: 900, letterSpacing: 0.8, textTransform: 'uppercase', padding: '0 9px' }}>{group.group}</div>}
@@ -259,13 +262,13 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
             })}
           </div>
         ))}
-        {collapsed && hoveredItem && (
-          <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 74, top: 48, zIndex: 20, width: 220, borderRadius: 18, padding: 12, pointerEvents: 'none' }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 900 }}>{hoveredItem.label}</div>
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{hoveredItem.hint}</div>
-          </div>
-        )}
       </div>
+      {collapsed && hoveredItem && (
+        <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 82, top: 58, zIndex: WORKSPACE_Z.popover, width: 220, borderRadius: 18, padding: 12, pointerEvents: 'none' }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 900 }}>{hoveredItem.label}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{hoveredItem.hint}</div>
+        </div>
+      )}
       <div style={{ marginTop: 'auto', display: collapsed ? 'none' : 'block' }}>
         <GlassCard style={{ borderRadius: 24, padding: 13, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
           <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850 }}>Workspace 1.0</div>
@@ -313,7 +316,7 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
       <div style={{ position: 'absolute', left: -80, right: -80, top: 74, height: 120, background: 'linear-gradient(110deg, transparent 10%, rgba(244,217,140,0.12) 38%, rgba(255,255,255,0.08) 48%, transparent 72%)', transform: 'rotate(-8deg)', filter: 'blur(8px)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
         <div>
-          <GlassBadge tone="gold">🦊 Локи открыл Workspace</GlassBadge>
+          <GlassBadge tone="gold">Локи открыл Workspace</GlassBadge>
           <div style={{ color: APG2_PROFILE.text, fontSize: 42, lineHeight: '47px', fontWeight: 940, letterSpacing: -0.8, marginTop: 16 }}>
             {getDayGreeting()}, {data.userName}.
           </div>
@@ -336,12 +339,8 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
         ]} style={{ background: 'transparent', border: 0, padding: 0, marginTop: 18 }} />
       </div>
       <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 12, minWidth: 0 }}>
-        <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, display: 'grid', gridTemplateColumns: '52px minmax(0,1fr)', gap: 12, alignItems: 'center' }}>
-          <div style={{ width: 52, height: 52, borderRadius: 22, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 25, boxShadow: '0 18px 42px rgba(215,184,106,0.24)' }}>🦊</div>
-          <div>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 930 }}>Локи на смене</div>
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 2 }}>спокоен · внимателен · в контексте</div>
-          </div>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, background: APG2_PROFILE.quietSurface }}>
+          <LokiIdentity size={52} state={attention.length ? 'attention' : 'ready'} label="Локи на смене" sublabel="спокоен · внимателен · в контексте" />
         </div>
         <div style={{ ...APG2_PROFILE.glass, borderRadius: 26, padding: 14, background: APG2_PROFILE.quietSurface }}>
           <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.7 }}>Активный профиль</div>
@@ -553,7 +552,7 @@ function WorkspaceShortcutOverlay({ open, onClose }) {
     ['Esc', 'Закрыть панели'],
   ];
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 14000, background: 'rgba(8,8,10,0.34)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', padding: 20 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: WORKSPACE_Z.modal, background: 'rgba(8,8,10,0.34)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', padding: 20 }}>
       <div onClick={event => event.stopPropagation()} style={{ ...APG2_PROFILE.glass, width: 'min(520px, 100%)', borderRadius: 30, padding: 18 }}>
         <SectionHeader title="Горячие клавиши" subtitle="Desktop Workspace управляется без лишних переходов" actions={<GlassButton onClick={onClose} style={{ width: 36, minHeight: 36, padding: 0 }}>×</GlassButton>} />
         <div style={{ display: 'grid', gap: 8 }}>
@@ -576,10 +575,10 @@ function WorkspaceContextMenu({ menu, actions, onClose }) {
     ['business', '◈ Мой бизнес', () => actions.openCabinet?.()],
     ['news', '📰 Новости', () => actions.openNews?.()],
     ['events', '📅 Мероприятия', () => actions.openEvents?.()],
-    ['loki', '🦊 Спросить Локи', () => actions.openLoki?.()],
+    ['loki', '◈ Спросить Локи', () => actions.openLoki?.()],
   ];
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 13000, background: 'transparent' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: WORKSPACE_Z.popover, background: 'transparent' }}>
       <div style={{ ...APG2_PROFILE.glass, position: 'fixed', left: menu.x, top: menu.y, width: 220, borderRadius: 20, padding: 7, boxShadow: '0 22px 70px rgba(0,0,0,0.34), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.30)' }}>
         {items.map(([id, label, action]) => (
           <button
@@ -666,18 +665,10 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
     onAskLoki?.(aiDraft);
   };
   return (
-    <div style={{ position: 'sticky', top: 92 }}>
+    <div data-workspace-region="ai" style={{ height: '100%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain' }}>
       <div style={{ ...APG2_PROFILE.glass, borderRadius: 38, padding: 18, display: 'grid', gap: 14, border: '1px solid rgba(215,184,106,0.34)', background: 'radial-gradient(circle at 30% 0%, rgba(255,240,184,0.20), transparent 36%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.32), rgba(var(--apg2-glass-a,255,255,255),0.13))', boxShadow: aiPulse ? '0 0 0 1px rgba(215,184,106,0.18), 0 26px 72px rgba(0,0,0,0.24)' : APG2_PROFILE.glass.boxShadow }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '58px minmax(0,1fr)', gap: 13, alignItems: 'center' }}>
-          <div style={{ position: 'relative', width: 58, height: 58, borderRadius: 24, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 28, boxShadow: '0 20px 48px rgba(215,184,106,0.24)' }}>
-            🦊
-            <span style={{ position: 'absolute', right: -2, bottom: -2, width: 16, height: 16, borderRadius: 99, background: attention.length ? '#D7B86A' : '#4BB34B', border: '2px solid rgba(24,22,20,0.84)', boxShadow: '0 0 18px rgba(215,184,106,0.42)' }} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <GlassBadge tone="gold" style={{ padding: '5px 9px', fontSize: 10.5 }}>AI Workspace</GlassBadge>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '22px', fontWeight: 940, marginTop: 7 }}>Локи принимает смену</div>
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px', marginTop: 3 }}>Контекст: {context.label}</div>
-          </div>
+        <div style={{ minWidth: 0 }}>
+          <LokiIdentity size={58} state={attention.length ? 'attention' : 'ready'} label="Локи" sublabel={`Контекст: ${context.label}`} />
         </div>
 
         <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, background: APG2_PROFILE.heroSurface }}>
@@ -780,6 +771,8 @@ export function DesktopWorkspace({
   const [aiDraft, setAiDraft] = useState('');
   const [aiHistory, setAiHistory] = useState([]);
   const [aiPulse, setAiPulse] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(() => typeof window === 'undefined' ? 1440 : window.innerWidth);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const roleState = useMemo(() => getCabinetRoles({ user, partner: ownedPartner, expert: ownedExpert }), [user, ownedPartner, ownedExpert]);
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || '');
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
@@ -790,6 +783,8 @@ export function DesktopWorkspace({
   const isAdminRole = ['owner', 'super_admin', 'admin', 'moderator', 'editor'].includes(activeRole?.id);
   const businessHubFlag = useMemo(() => getBusinessHubFlag(), []);
   const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: ownedPartner, expert: ownedExpert, flag: businessHubFlag }), [user, ownedPartner, ownedExpert, businessHubFlag]);
+  const layoutPlan = useMemo(() => getDesktopWorkspaceLayoutPlan(viewportWidth, typeof window === 'undefined' ? 900 : window.innerHeight, sidebarCollapsed), [viewportWidth, sidebarCollapsed]);
+  const { aiAsDrawer, effectiveSidebarCollapsed, gridTemplateColumns: workspaceColumns } = layoutPlan;
   const navItems = NAV_ITEMS.filter(item => {
     if (item.adminOnly && !isAdminRole) return false;
     if (item.businessOnly && !businessHubAvailable) return false;
@@ -831,6 +826,17 @@ export function DesktopWorkspace({
   useEffect(() => {
     setActiveRoleId(roleState.activeRole?.id || '');
   }, [roleState.activeRole?.id]);
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!aiAsDrawer) setAiDrawerOpen(false);
+  }, [aiAsDrawer]);
 
   useEffect(() => {
     if (activeSection === 'business-hub' && !businessHubAvailable) setActiveSection('dashboard');
@@ -888,7 +894,10 @@ export function DesktopWorkspace({
     openPartners: () => setActiveSection('partners'),
     openExperts: () => setActiveSection('experts'),
     openCrm: () => setActiveSection('crm'),
-    openLoki: () => handleAskLoki(getWorkspaceContext(activeSection).prompt),
+    openLoki: () => {
+      if (aiAsDrawer) setAiDrawerOpen(true);
+      handleAskLoki(getWorkspaceContext(activeSection).prompt);
+    },
   };
 
   const handleWorkspaceContextMenu = event => {
@@ -981,8 +990,8 @@ export function DesktopWorkspace({
   };
 
   return (
-    <div onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100svh', background: APG2_PROFILE.workspaceBg, color: APG2_PROFILE.text, padding: 18, boxSizing: 'border-box' }}>
-      <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: 18, minHeight: 'calc(100svh - 36px)' }}>
+    <div onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100dvh', background: APG2_PROFILE.workspaceBg, color: APG2_PROFILE.text, padding: WORKSPACE_LAYOUT.pagePadding, boxSizing: 'border-box', overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: WORKSPACE_LAYOUT.gap, height: `calc(100dvh - ${WORKSPACE_LAYOUT.pagePadding * 2}px)`, minHeight: 0 }}>
         <WorkspaceHeaderBar
           user={user}
           roleState={roleState}
@@ -996,16 +1005,18 @@ export function DesktopWorkspace({
           onOpenProfile={() => onOpenPanel?.('profile')}
           onOpenScan={onOpenScan}
           onOpenShortcuts={() => setShortcutOverlayOpen(true)}
+          onOpenAI={() => setAiDrawerOpen(true)}
+          aiAsDrawer={aiAsDrawer}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: `${sidebarCollapsed ? 74 : 246}px minmax(0, 1fr) 390px`, gap: 18, alignItems: 'start' }}>
+        <div data-workspace-layout="desktop-grid" style={{ display: 'grid', gridTemplateColumns: workspaceColumns, gap: WORKSPACE_LAYOUT.gap, alignItems: 'stretch', minHeight: 0, height: '100%', overflow: 'hidden' }}>
           <WorkspaceSidebar
             items={navItems}
             activeSection={activeSection}
-            collapsed={sidebarCollapsed}
+            collapsed={effectiveSidebarCollapsed}
             onToggle={() => setSidebarCollapsed(value => !value)}
             onSelect={handleSelectNav}
           />
-          <main style={{ minWidth: 0, display: 'grid', gap: 4 }}>
+          <main data-workspace-region="content" style={{ minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', display: 'block', position: 'relative', zIndex: WORKSPACE_Z.content, paddingRight: 2 }}>
             <SectionHeader
               title={activeSection === 'dashboard' ? 'Dashboard' : navItems.find(item => item.id === activeSection)?.label || 'Workspace'}
               subtitle={query ? `Поиск: ${query}` : `${layout.density} · ${workspaceNavigation.placement} · APG V2 Liquid Glass`}
@@ -1013,7 +1024,30 @@ export function DesktopWorkspace({
             />
             {renderContent()}
           </main>
-          <aside>
+          {!aiAsDrawer && (
+            <aside data-workspace-region="ai-column" style={{ minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative', zIndex: WORKSPACE_Z.content }}>
+              <AIWorkspacePanel
+                data={workspaceData}
+                activeSection={activeSection}
+                aiDraft={aiDraft}
+                aiHistory={aiHistory}
+                aiPulse={aiPulse}
+                onDraftChange={setAiDraft}
+                onAskLoki={handleAskLoki}
+                actions={actions}
+              />
+            </aside>
+          )}
+        </div>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: '9px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12, background: APG2_PROFILE.quietSurface }}>
+          <span>AI Workspace: active · shortcuts: ⌘K поиск, ⌘1 Dashboard, ⌘2 Мой бизнес, ⌘L Локи, ? помощь</span>
+          <span>{partners.length} партнёров · {experts.length} экспертов · {news.length} новостей · {events.length} событий</span>
+        </div>
+      </div>
+      {aiAsDrawer && aiDrawerOpen && (
+        <div data-workspace-region="ai-drawer" onClick={() => setAiDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: WORKSPACE_Z.drawer, background: 'rgba(12,12,14,0.34)', display: 'flex', justifyContent: 'flex-end', padding: 14, boxSizing: 'border-box' }}>
+          <div onClick={event => event.stopPropagation()} style={{ width: 'min(420px, 100%)', height: '100%', minHeight: 0, position: 'relative' }}>
+            <GlassButton onClick={() => setAiDrawerOpen(false)} style={{ position: 'absolute', right: 12, top: 12, zIndex: WORKSPACE_Z.popover, width: 38, minHeight: 38, padding: 0, borderRadius: 16 }}>×</GlassButton>
             <AIWorkspacePanel
               data={workspaceData}
               activeSection={activeSection}
@@ -1024,13 +1058,9 @@ export function DesktopWorkspace({
               onAskLoki={handleAskLoki}
               actions={actions}
             />
-          </aside>
+          </div>
         </div>
-        <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: '9px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12, background: APG2_PROFILE.quietSurface }}>
-          <span>AI Workspace: active · shortcuts: ⌘K поиск, ⌘1 Dashboard, ⌘2 Мой бизнес, ⌘L Локи, ? помощь</span>
-          <span>{partners.length} партнёров · {experts.length} экспертов · {news.length} новостей · {events.length} событий</span>
-        </div>
-      </div>
+      )}
       <WorkspaceShortcutOverlay open={shortcutOverlayOpen} onClose={() => setShortcutOverlayOpen(false)} />
       <WorkspaceContextMenu menu={contextMenu} actions={actions} onClose={() => setContextMenu(null)} />
     </div>

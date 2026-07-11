@@ -2092,3 +2092,25 @@
 **Документация:** обновлены `.ai/11_DESIGN_RULES.md` и `docs/desktop-ux.md`.
 
 **Проверка:** production build успешен.
+
+## 2026-07-12 — Desktop Workspace Technical Stabilization
+
+**Задача:** стабилизировать production-компоновку Desktop Workspace: убрать перекрытия header/sidebar/content/AI, обрезание навигации, horizontal overflow и emoji/fallback Локи.
+
+**Первопричины:** Desktop Workspace использовал независимые `sticky top` для header/sidebar/AI и жёсткую трёхколоночную сетку `sidebar + content + 390px AI` на всех desktop-размерах. На 1024–1180px это сжимало content до нечитаемой ширины, правая панель визуально заходила на центр, а sidebar получал высоту через приблизительный viewport-minus-top и мог обрезать нижние пункты. Внутри Workspace оставались случайные z-index `13000/14000`, а Локи в Workspace/Business Hub отображался emoji `🦊`.
+
+**Что изменено:** добавлен `src/workspace/WorkspaceLayoutEngine.js` с единым `WORKSPACE_LAYOUT`, `WORKSPACE_Z` и `getDesktopWorkspaceLayoutPlan()`. Header встроен в основную grid-структуру как отдельная строка. Рабочая область стала единым grid `sidebar | content | ai`, root Workspace получил `overflow: hidden`, а scroll перенесён только внутрь sidebar/content/AI. На desktop уже 1180px AI Workspace переходит в drawer, sidebar принудительно collapsed до 1366px, content получает приоритет.
+
+**Sidebar:** стал независимой вертикальной областью с внутренним scroll; collapsed tooltip вынесен за scroll-контейнер, чтобы не обрезаться overflow-ом.
+
+**AI Workspace:** перестал быть sticky-слоем с top-offset; это самостоятельная колонка с внутренним scroll, а на узких desktop — drawer. Сообщения Локи остаются только внутри AI Workspace.
+
+**Z-index:** добавлен workspace scale `base/content/sticky/sidebar/header/drawer/popover/modal`; `WorkspaceShortcutOverlay`, context menu и общие `WorkspaceContextPanel/FloatingPanels` переведены off случайных `9990/12000/13000/14000`.
+
+**Локи:** добавлен общий `src/loki/LokiIdentity.jsx`, который использует реальный asset `/loki.png`. Emoji `🦊` удалён из Workspace и Business Hub как визуальный fallback.
+
+**Visual regression smoke:** добавлен `scripts/desktop-workspace-layout-regression.mjs` и npm script `test:workspace-layout`. Проверяются 1024×768, 1180×820, 1280×800, 1366×768, 1440×900, 1512×982, 1728×1117, 1920×1080: отсутствие horizontal overflow, readable content width, drawer/collapse rules, z-index order и наличие `public/loki.png`.
+
+**Документация:** обновлён `docs/desktop-workspace.md`.
+
+**Проверка:** `npm run test:workspace-layout`, `workspace-core-test`, `desktop-workspace-test`, `business-hub-test`, production build успешны.

@@ -67,6 +67,39 @@ STATUS BAR
 
 Mobile и tablet продолжают использовать привычный пользовательский интерфейс. Desktop Workspace не заменяет мобильную оболочку.
 
+## Layout stability
+
+Desktop Workspace использует единый расчёт компоновки из `src/workspace/WorkspaceLayoutEngine.js`.
+
+Ключевые правила:
+
+- header является строкой основного grid, а не плавающим слоем поверх Dashboard;
+- рабочая область — единый grid `sidebar | content | ai`;
+- `content` всегда получает `minmax(0, 1fr)` и собственный vertical scroll;
+- sidebar имеет собственный scroll и не обрезает нижние пункты меню;
+- AI Workspace является самостоятельной колонкой, а на desktop уже 1180px переходит в drawer;
+- root Workspace использует `overflow: hidden`, горизонтальный scroll страницы запрещён;
+- sticky/fixed используются только для popover/drawer/overlay, а не для основных колонок.
+
+Проверяемые desktop breakpoints:
+
+- 1024×768;
+- 1180×820;
+- 1280×800;
+- 1366×768;
+- 1440×900;
+- 1512×982;
+- 1728×1117;
+- 1920×1080.
+
+Regression smoke:
+
+```bash
+npm run test:workspace-layout
+```
+
+Тест проверяет, что sidebar/content/AI не создают horizontal overflow, AI уходит в drawer на узком desktop, content остаётся читаемым, z-index scale упорядочен, а реальный asset Локи `public/loki.png` существует.
+
 ## Header
 
 Header содержит:

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from '../components/Apg2ProfileGlass.jsx';
+import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import {
   ActionCard,
   ContentGrid,
@@ -24,7 +25,7 @@ const BUSINESS_HUB_TABS = [
   { id: 'tasks', label: 'Задачи', icon: '☑' },
   { id: 'qr', label: 'QR', icon: '▣' },
   { id: 'notifications', label: 'Уведомления', icon: '•' },
-  { id: 'loki', label: 'Локи', icon: '🦊' },
+  { id: 'loki', label: 'Локи', icon: '◈' },
 ];
 
 function formatDate(value) {
@@ -238,7 +239,7 @@ function LokiView({ model, actions }) {
   return (
     <WorkspacePanel title="Локи для бизнеса" subtitle="Контекстный помощник будет опираться на профиль, аналитику, контент и статусы заявок.">
       <QuickActions actions={prompts.map(prompt => ({ id: prompt, label: prompt, onClick: actions.openLoki }))} style={{ marginBottom: 12 }} />
-      <InfoPanel icon="🦊" title="Готов к бизнес-контексту" text={`Локи видит тип профиля: ${model.business.label}, заполненность ${model.completion.value}%, новости, события, акции и задачи.`} action={<GlassButton tone="gold" onClick={actions.openLoki} style={{ color: '#17120a' }}>Спросить Локи</GlassButton>} />
+      <InfoPanel icon={<LokiIdentity size={42} label="Локи" sublabel="в бизнес-контексте" style={{ gridTemplateColumns: '42px minmax(0,1fr)' }} />} title="Готов к бизнес-контексту" text={`Локи видит тип профиля: ${model.business.label}, заполненность ${model.completion.value}%, новости, события, акции и задачи.`} action={<GlassButton tone="gold" onClick={actions.openLoki} style={{ color: '#17120a' }}>Спросить Локи</GlassButton>} />
     </WorkspacePanel>
   );
 }
@@ -318,7 +319,7 @@ export function BusinessHub({
         <ActionCard tone="gold" icon="✎" title="Создать новость" text="Через существующий центр контента" onClick={actions.openNews} />
         <ActionCard icon="◷" title="Добавить событие" text="Через существующие мероприятия" onClick={actions.openEvents} />
         <ActionCard tone="quiet" icon="✦" title="Запустить акцию" text="Через профиль и предложения" onClick={actions.openEditor} />
-        <ActionCard tone="quiet" icon="🦊" title="Попросить Локи" text="Получить рекомендацию по развитию" onClick={actions.openLoki} />
+        <ActionCard tone="quiet" icon="◈" title="Попросить Локи" text="Получить рекомендацию по развитию" onClick={actions.openLoki} />
       </ContentGrid>
     </div>
   );

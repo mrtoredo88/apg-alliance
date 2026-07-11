@@ -5,6 +5,10 @@ import { MOTION, motionTransition } from '../motion.js';
 import { buildWorkspaceLayout, WORKSPACE_REGIONS } from './WorkspaceCore.js';
 
 const safeArray = value => Array.isArray(value) ? value.filter(Boolean) : [];
+const WORKSPACE_COMPONENT_Z = {
+  contextPanel: 50,
+  floating: 40,
+};
 
 export function GlassContainer({ children, style, tone = 'default' }) {
   return (
@@ -152,9 +156,10 @@ export function QuickActions({ actions = [], style }) {
 }
 
 export function InfoPanel({ icon, title, text, action, tone, style }) {
+  const customIcon = React.isValidElement(icon);
   return (
     <GlassContainer tone={tone} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', ...style }}>
-      {icon && <div style={{ width: 42, height: 42, flex: '0 0 auto', borderRadius: 17, display: 'grid', placeItems: 'center', background: tone === 'gold' ? 'rgba(23,18,10,0.08)' : APG2_PROFILE.goldSoft, fontSize: 21 }}>{icon}</div>}
+      {icon && (customIcon ? icon : <div style={{ width: 42, height: 42, flex: '0 0 auto', borderRadius: 17, display: 'grid', placeItems: 'center', background: tone === 'gold' ? 'rgba(23,18,10,0.08)' : APG2_PROFILE.goldSoft, fontSize: 21 }}>{icon}</div>)}
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ color: tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 870 }}>{title}</div>
         {text && <div style={{ color: tone === 'gold' ? 'rgba(23,18,10,0.62)' : APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>{text}</div>}
@@ -208,7 +213,7 @@ export function WorkspaceContextPanel({ open, title, subtitle, children, onClose
       right: docked ? 0 : 0,
       bottom: docked ? 'auto' : 0,
       width: docked ? '100%' : 'min(420px, 100vw)',
-      zIndex: docked ? 1 : 12000,
+      zIndex: docked ? 1 : WORKSPACE_COMPONENT_Z.contextPanel,
       padding: docked ? 0 : '12px',
       boxSizing: 'border-box',
       pointerEvents: 'auto',
@@ -228,7 +233,7 @@ export function WorkspaceFloatingPanels({ children, style }) {
       position: 'fixed',
       right: 14,
       bottom: 'calc(86px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
-      zIndex: 9990,
+      zIndex: WORKSPACE_COMPONENT_Z.floating,
       display: 'grid',
       gap: 10,
       pointerEvents: 'none',
