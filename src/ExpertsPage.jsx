@@ -25,6 +25,7 @@ import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { motionTransition } from './motion.js';
+import { getExpertCategory, normalizeExpertRecord } from '../server-shared/expert-directory.js';
 
 function sanitizeForVK(text) {
   if (!text) return '';
@@ -168,6 +169,7 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
 }
 
 function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan }) {
+  expert = normalizeExpertRecord(expert);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
   const [dragY, setDragY] = useState(0);
@@ -284,22 +286,24 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
   const hasScanned = scannedExperts?.[expert.id];
   const canBook = expert.bookingUrl || expert.vkUrl || expert.phone;
-  const category = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other'));
+  const category = getExpertCategory(expert.category);
 
   if (variant === 'v2') {
     const heroImage = getProfileImage(expert);
     const galleryItems = expert.gallery?.length ? expert.gallery : [heroImage].filter(Boolean);
     const status = expert.verified ? 'Проверенный эксперт' : expert.premium ? 'Premium' : 'Эксперт АПГ';
     const heroBadges = [
-      category ? `${category.emoji} ${category.label}` : null,
+      ...expert.categories.map(value => getExpertCategory(value)).filter(Boolean).map(value => `${value.emoji} ${value.label}`),
       (expert.avgRating ?? 0) > 0 ? `★ ${expert.avgRating.toFixed(1)} · ${expert.reviewCount ?? reviews.length}` : null,
     ].filter(Boolean);
     const cta = [
-      expert.phone && { label: 'Позвонить', icon: '📞', onClick: () => openUrl(`tel:${expert.phone}`), tone: 'gold' },
+      expert.telHref && { label: 'Позвонить', icon: '📞', onClick: () => openUrl(expert.telHref), tone: 'gold' },
       expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openNormalizedUrl(openUrl, expert.bookingUrl), tone: 'gold' },
-      !isVK() && expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openNormalizedUrl(openUrl, expert.websiteUrl) },
-      !isVK() && expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' }) },
-      !isVK() && expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' }) },
+      expert.whatsappUrl && { label: 'WhatsApp', icon: '🟢', onClick: () => openNormalizedUrl(openUrl, expert.whatsappUrl, { platform: 'whatsapp' }) },
+      expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openNormalizedUrl(openUrl, expert.websiteUrl) },
+      expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' }) },
+      expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' }) },
+      expert.maxUrl && { label: 'MAX', icon: '💬', onClick: () => openNormalizedUrl(openUrl, expert.maxUrl, { platform: 'max' }) },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
 
@@ -374,6 +378,26 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                 )}
               </div>
             </GlassSection>
+
+            {(expert.services || expert.experience || expert.serviceCost) && (
+              <GlassSection title="Профессиональная информация">
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 18, display: 'grid', gap: 14 }}>
+                  {expert.services && <div><div style={{ color: APG2.gold, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Услуги</div><RichText color={APG2.textSoft} fontSize={14}>{expert.services}</RichText></div>}
+                  {expert.experience && <div><div style={{ color: APG2.gold, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Опыт</div><div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>{expert.experience}</div></div>}
+                  {expert.serviceCost && <div><div style={{ color: APG2.gold, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Стоимость услуг</div><div style={{ color: APG2.text, fontSize: 15, fontWeight: 800 }}>{expert.serviceCost}</div></div>}
+                </div>
+              </GlassSection>
+            )}
+
+            {(expert.address || expert.hours) && (
+              <GlassSection title="Где и когда">
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 18, display: 'grid', gap: 10, color: APG2.textSoft, fontSize: 14, lineHeight: '20px' }}>
+                  {expert.address && <div>📍 {expert.address}</div>}
+                  {expert.hours && <div>🕒 {expert.hours}</div>}
+                  {(expert.latitude && expert.longitude || expert.address) && <GlassButton onClick={() => openUrl(expert.latitude && expert.longitude ? `https://yandex.ru/maps/?pt=${expert.longitude},${expert.latitude}&z=16&l=map` : `https://yandex.ru/maps/?text=${encodeURIComponent(expert.address)}`)}>Открыть на карте</GlassButton>}
+                </div>
+              </GlassSection>
+            )}
 
             <GlassSection title="Фото">
               <ProfileGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
@@ -501,7 +525,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                   ✓ Верифицирован АПГ
                 </div>
               )}
-              {(() => { const cat = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other')); return cat ? (
+              {(() => { const cat = getExpertCategory(expert.category); return cat ? (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: T.gold }}>
                   {cat.emoji} {cat.label}
                 </div>
@@ -592,10 +616,10 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
         )}
 
         {/* Кнопки действий */}
-        {(canBook || !isVK() && (expert.websiteUrl || expert.telegramUrl || expert.vkUrl || expert.maxUrl)) && (
+        {(canBook || expert.websiteUrl || expert.telegramUrl || expert.vkUrl || expert.maxUrl || expert.whatsappUrl) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            {expert.phone && (
-              <button onClick={() => openUrl(`tel:${expert.phone}`)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.green},#3a9a3a)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+            {expert.telHref && (
+              <button onClick={() => openUrl(expert.telHref)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.green},#3a9a3a)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 📞 Позвонить
               </button>
             )}
@@ -604,22 +628,25 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                 📅 Записаться онлайн
               </button>
             )}
-            {!isVK() && expert.websiteUrl && (
+            {expert.whatsappUrl && (
+              <button onClick={() => openNormalizedUrl(openUrl, expert.whatsappUrl, { platform: 'whatsapp' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#25D366,#149F4A)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>🟢 WhatsApp</button>
+            )}
+            {expert.websiteUrl && (
               <button onClick={() => openNormalizedUrl(openUrl, expert.websiteUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🌐 Сайт
               </button>
             )}
-            {!isVK() && expert.vkUrl && (
+            {expert.vkUrl && (
               <button onClick={() => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,#4A76A8,#2D5F8A)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🔵 ВКонтакте
               </button>
             )}
-            {!isVK() && expert.telegramUrl && (
+            {expert.telegramUrl && (
               <button onClick={() => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 ✈️ Telegram
               </button>
             )}
-            {!isVK() && expert.maxUrl && (
+            {expert.maxUrl && (
               <button onClick={() => openNormalizedUrl(openUrl, expert.maxUrl, { platform: 'max' })} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 💬 Max
               </button>
@@ -734,7 +761,7 @@ function ExpertCard({ expert, index, onClick, isTop }) {
             {expert.formats.map(f => <FormatChip key={f} format={f} />)}
           </div>
         )}
-        {(() => { const cat = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other')); return cat ? (
+        {(() => { const cat = getExpertCategory(expert.category); return cat ? (
           <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>{cat.emoji} {cat.label}</div>
         ) : null; })()}
       </div>
@@ -745,8 +772,9 @@ function ExpertCard({ expert, index, onClick, isTop }) {
 }
 
 function ExpertCardV2({ expert, onClick, isTop }) {
+  expert = normalizeExpertRecord(expert);
   const image = getProfileImage(expert);
-  const cat = EXPERT_CATEGORIES.find(c => c.id === (expert.category ?? 'other'));
+  const cat = getExpertCategory(expert.category);
   return (
     <GlassCard onClick={() => onClick(expert)} style={{ minHeight: 132, padding: 0, overflow: 'hidden', position: 'relative', borderRadius: 26 }}>
       {image && <img src={image} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.38, filter: 'saturate(1.05) contrast(1.02)' }} onError={e => { e.currentTarget.style.display = 'none'; }} />}
@@ -784,16 +812,17 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [rotation, setRotation] = useState({});
+  const directoryExperts = useMemo(() => experts.map(normalizeExpertRecord), [experts]);
   const openExpert = (expert) => {
     onExpertOpen?.(expert);
     setSelected(expert);
   };
 
   useEffect(() => {
-    if (!initialExpertId || !experts.length || selected) return;
-    const e = experts.find(e => e.id === initialExpertId);
+    if (!initialExpertId || !directoryExperts.length || selected) return;
+    const e = directoryExperts.find(e => e.id === initialExpertId);
     if (e) openExpert(e);
-  }, [initialExpertId, experts]);
+  }, [initialExpertId, directoryExperts, selected]);
 
   useEffect(() => {
     const currentWeek = getISOWeekKey();
@@ -810,24 +839,25 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
   const topExperts = useMemo(() => {
     return Object.entries(rotation)
       .map(([catId, expertId]) => {
-        const e = experts.find(x => x.id === expertId && x.active !== false);
+        const e = directoryExperts.find(x => x.id === expertId && x.active !== false);
         if (!e) return null;
-        const cat = EXPERT_CATEGORIES.find(c => c.id === catId);
+        const cat = getExpertCategory(catId);
         return { ...e, _topCategory: cat };
       })
       .filter(Boolean);
-  }, [rotation, experts]);
+  }, [rotation, directoryExperts]);
 
   const topIds = useMemo(() => new Set(Object.values(rotation)), [rotation]);
 
   const filtered = useMemo(() => {
-    const list = experts.filter(e => {
+    const list = directoryExperts.filter(e => {
       if (e.active === false) return false;
       if (filter !== 'all' && !e.formats?.includes(filter)) return false;
-      if (activeCategory !== 'all' && (e.category ?? 'other') !== activeCategory) return false;
+      if (activeCategory !== 'all' && !e.categories.includes(activeCategory)) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        return e.name?.toLowerCase().includes(q) || e.specialization?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q);
+        const categoryText = e.categories.map(id => getExpertCategory(id)?.label || id).join(' ');
+        return [e.name, e.specialization, e.description, e.services, e.offer, e.experience, categoryText].some(value => String(value || '').toLowerCase().includes(q));
       }
       return true;
     });
@@ -836,7 +866,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
       const bTop = topIds.has(b.id) ? 0 : 1;
       return aTop - bTop;
     });
-  }, [experts, filter, activeCategory, search, topIds]);
+  }, [directoryExperts, filter, activeCategory, search, topIds]);
 
   useEffect(() => {
     if (!isActive && selected) setSelected(null);

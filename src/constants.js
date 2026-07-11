@@ -5,20 +5,4 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://bbangq
 
 export const WEB_PUSH_VAPID_PUBLIC_KEY = 'BNzifwh-L302BzWUiw3hv3g9tlPBb5CJ8lGu1lfRpGdJZhyq0yzHqV0K9EkDAokVBv6OrInWqev-Vihw-2gBpYU';
 
-export const EXPERT_CATEGORIES = [
-  { id: 'food',      label: 'Еда',          emoji: '🍳' },
-  { id: 'beauty',    label: 'Красота',       emoji: '💅' },
-  { id: 'sport',     label: 'Спорт',         emoji: '🏋️' },
-  { id: 'health',    label: 'Здоровье',      emoji: '🩺' },
-  { id: 'home',      label: 'Дом и ремонт',  emoji: '🔧' },
-  { id: 'pets',      label: 'Животные',      emoji: '🐾' },
-  { id: 'fashion',   label: 'Одежда',        emoji: '👔' },
-  { id: 'auto',      label: 'Авто',          emoji: '🚙' },
-  { id: 'psychology', label: 'Психология',    emoji: '🧠' },
-  { id: 'kids',      label: 'Дети',          emoji: '🧸' },
-  { id: 'law',       label: 'Право',         emoji: '⚖️' },
-  { id: 'insurance', label: 'Страхование',   emoji: '🛡️' },
-  { id: 'photo',     label: 'Фото/Видео',    emoji: '📸' },
-  { id: 'entertainment', label: 'Развлечения', emoji: '🎉' },
-  { id: 'other',     label: 'Другое',        emoji: '✨' },
-];
+export { EXPERT_CATEGORIES } from '../server-shared/expert-directory.js';

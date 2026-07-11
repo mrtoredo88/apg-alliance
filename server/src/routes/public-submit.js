@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
+import { normalizeExpertCategory, normalizeExpertPhone, validateExpertCategories } from '../../../server-shared/expert-directory.js';
 
 const TYPES = {
   partner: { label: 'Партнёр', emoji: '🤝' },
@@ -50,15 +51,16 @@ function lineValue(text, labels) {
 function normalizeUrl(value, platform = '') {
   const raw = cleanText(value, 500).normalize('NFKC').replace(/^@+/, '');
   if (!raw) return '';
-  const hosts = { vk: 'vk.com', telegram: 't.me', max: 'max.ru' };
+  const hosts = { vk: 'vk.com', telegram: 't.me', max: 'max.ru', whatsapp: 'wa.me' };
   if (platform && hosts[platform]) {
-    const hostPattern = platform === 'vk' ? '(?:vk\\.com|vk\\.me|vkontakte\\.ru)' : platform === 'telegram' ? '(?:t\\.me|telegram\\.me)' : hosts[platform].replace('.', '\\.');
-    const path = raw
+    const hostPattern = platform === 'vk' ? '(?:vk\\.com|vk\\.me|vkontakte\\.ru)' : platform === 'telegram' ? '(?:t\\.me|telegram\\.me)' : platform === 'whatsapp' ? '(?:wa\\.me|whatsapp\\.com)' : hosts[platform].replace('.', '\\.');
+    let path = raw
       .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
       .replace(/^www\./i, '')
       .replace(new RegExp(`^${hostPattern}/?`, 'i'), '')
       .replace(/^@+/, '')
       .replace(/\s+/g, '');
+    if (platform === 'whatsapp' && !/[/?]/.test(path)) path = path.replace(/\D/g, '');
     return path ? `https://${hosts[platform]}/${path}` : '';
   }
   const next = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
@@ -244,13 +246,16 @@ function analyze(type, fields, files) {
   const isPartnerPremium = type === 'partner' && partnerTariff === 'premium';
   const isPartnerAlliance = type === 'partner' && ['alliance', 'premium'].includes(partnerTariff);
   const isExpertAmbassador = type === 'expert' && expertTariff === 'ambassador';
+  const expertCategoryIntegrity = type === 'expert'
+    ? validateExpertCategories([...(Array.isArray(fields.categories) ? fields.categories : []), fields.category, ...(Array.isArray(fields.secondaryCategories) ? fields.secondaryCategories : [])].filter(Boolean))
+    : null;
   const draftFields = {
     title,
-    category: cleanText(fields.category) || detectCategory(sourceText, type),
+    category: type === 'expert' ? (expertCategoryIntegrity.categories[0] || normalizeExpertCategory(detectCategory(sourceText, type), 'other')) : cleanText(fields.category) || detectCategory(sourceText, type),
     shortDescription: cleanText(fields.shortDescription || description.split(/[.!?]\s/)[0]),
     description,
     address: cleanText(fields.address || fields.location),
-    phone: cleanText(fields.phone),
+    phone: type === 'expert' ? normalizeExpertPhone(fields.phone) : cleanText(fields.phone),
     email: cleanText(fields.email),
     website: normalizeUrl(fields.website || fields.bookingUrl),
     telegram: normalizeUrl(fields.telegram, 'telegram'),
@@ -262,6 +267,7 @@ function analyze(type, fields, files) {
     activities: (isPartnerPremium || isExpertAmbassador || !['partner', 'expert'].includes(type)) ? cleanText(fields.activities, 3000) : '',
     instagram: normalizeUrl(fields.instagram),
     hours: cleanText(fields.hours),
+    experience: cleanText(fields.experience, 2000),
     services: cleanText(fields.services || fields.program),
     offer: cleanText(fields.offer || fields.bonus || fields.gift),
     cost: cleanText(fields.cost),
@@ -271,12 +277,14 @@ function analyze(type, fields, files) {
     firstName: cleanText(fields.firstName, 100),
     lastName: cleanText(fields.lastName, 100),
     middleName: cleanText(fields.middleName, 100),
-    categories: cleanList(fields.categories, 6, 80),
-    secondaryCategories: cleanList(fields.secondaryCategories, 5, 80),
+    categories: type === 'expert' ? expertCategoryIntegrity.categories : cleanList(fields.categories, 6, 80),
+    secondaryCategories: type === 'expert' ? expertCategoryIntegrity.categories.slice(1) : cleanList(fields.secondaryCategories, 5, 80),
+    unknownCategories: type === 'expert' ? expertCategoryIntegrity.unknown : [],
     workFormats: cleanList(fields.workFormats, 12, 80),
     audienceTags: cleanList(fields.audienceTags, 12, 80),
     videos: (isPartnerAlliance || type === 'expert') ? cleanList(fields.videos, 6) : [],
     bookingUrl: (isPartnerAlliance || type === 'expert') ? normalizeUrl(fields.bookingUrl) : '',
+    whatsapp: type === 'expert' ? normalizeUrl(fields.whatsapp, 'whatsapp') : '',
     max: normalizeUrl(fields.max, 'max'),
     otherSocials: cleanList(fields.otherSocials, 10).map(value => normalizeUrl(value)).filter(Boolean),
     tariff: type === 'expert' ? expertTariff : type === 'partner' ? partnerTariff : cleanText(fields.tariff, 30),
@@ -304,6 +312,7 @@ function analyze(type, fields, files) {
       draftFields.phone || draftFields.website || draftFields.telegram ? null : 'Добавить контакт для связи или записи',
       files.length ? null : 'Добавить хотя бы одну фотографию',
       draftFields.offer ? null : 'Уточнить бонус или акцию для пользователей АПГ',
+      draftFields.unknownCategories.length ? `Неизвестные категории: ${draftFields.unknownCategories.join(', ')}. Выберите категорию из справочника.` : null,
     ].filter(Boolean),
   };
 }

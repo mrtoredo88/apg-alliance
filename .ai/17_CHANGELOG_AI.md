@@ -1858,3 +1858,15 @@
 **Диагностика до исправления:** 326 документов; 150 уникальных fingerprint по `message + source + normalized stack`; 176 дубликатов. Если группировать только по `message + source`, получалось 92 группы и 234 повтора. В текущей версии три из трёх свежих записей имели один источник: `UserApp.markLearningAction`.
 
 **Проверка:** fingerprint stability test, dry-run migration, scoped eslint и production build проходят.
+
+## 2026-07-11 — Expert directory synchronization V3
+
+**Задача:** синхронизировать анкету эксперта, ИИ-импорт, Firestore, админку, каталог, фильтры и Локи; исправить телефон, акцию и пропавшую категорию нового эксперта.
+
+**Причины:** анкета и каталог использовали два несовместимых массива `EXPERT_CATEGORIES`; поэтому сохранённая у нового эксперта категория `real_estate` отсутствовала в каталоге. Телефоны сохранялись в произвольном формате и напрямую подставлялись в `tel:`. Production-проверка заявки Крутиковой Ольги подтвердила: категория и телефон дошли до Firestore, но старый каталог не знал `real_estate`; поле `offer` в заявке и документе было пустым, то есть акция для этой карточки не терялась при публикации.
+
+**Что изменено:** `server-shared/expert-directory.js` стал единым источником 23 категорий и normalization contract. Vercel/Fastify analyzer, анкеты, AdminPanel, UserApp, ExpertsPage, общий `EntityPreviewCard`, фильтры и Loki search используют этот контракт. Неизвестная категория показывает предупреждение и блокирует публикацию. Телефон нормализуется до международного формата, а кнопка звонка использует безопасный `tel:`. Профиль показывает акцию, категории/подкатегории, услуги, опыт, стоимость, адрес, часы работы, карту и все каналы связи.
+
+**Миграция:** `scripts/migrate-expert-directory.mjs` нормализует существующие телефоны и добавляет canonical `categories` без удаления заполненных данных.
+
+**Проверка:** scoped eslint, Vercel/Fastify parity, category integrity, phone/tel normalization, Loki tests, Admin Assistant tests и production build.

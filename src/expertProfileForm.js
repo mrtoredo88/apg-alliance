@@ -1,23 +1,7 @@
 export { EXPERT_TARIFFS, EXPERT_AUDIENCE_TAGS, hasExpertAmbassadorAccess, normalizeExpertTariff } from './tariffConfig.js';
 import { hasExpertAmbassadorAccess } from './tariffConfig.js';
-
-export const EXPERT_CATEGORIES = [
-  { id: 'law', label: 'Юриспруденция' },
-  { id: 'psychology', label: 'Психология' },
-  { id: 'finance', label: 'Финансы' },
-  { id: 'marketing', label: 'Маркетинг' },
-  { id: 'business', label: 'Бизнес' },
-  { id: 'health', label: 'Здоровье' },
-  { id: 'education', label: 'Образование' },
-  { id: 'beauty', label: 'Красота' },
-  { id: 'sport', label: 'Спорт' },
-  { id: 'children', label: 'Дети и семья' },
-  { id: 'career', label: 'Карьера' },
-  { id: 'real_estate', label: 'Недвижимость' },
-  { id: 'it', label: 'IT и цифровые услуги' },
-  { id: 'creative', label: 'Творчество' },
-  { id: 'other', label: 'Другое' },
-];
+export { EXPERT_CATEGORIES } from '../server-shared/expert-directory.js';
+import { EXPERT_CATEGORIES } from '../server-shared/expert-directory.js';
 
 export const EXPERT_WORK_FORMATS = [
   { id: 'online', label: 'Онлайн' },

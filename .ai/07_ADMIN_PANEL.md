@@ -170,7 +170,7 @@
 - Тир (member/ambassador): влияет на ротацию
 
 ### Форма эксперта (поля)
-Имя, категория (select из 15 EXPERT_CATEGORIES), специализация, описание (MdEditor), фото (PhotoUpload round), галерея (GalleryUpload), видео (текстовые URL), форматы (online/offline/group чекбоксы), ключей за скан, stampTarget, тир, активен, ownerId, ambassadorSince (date для ротации).
+Имя, категория из единого `server-shared/expert-directory.js`, специализация, описание (MdEditor), услуги, опыт, необязательная стоимость, акция, телефон в международном формате, WhatsApp, адрес, часы работы, сайт, запись, VK, Telegram, MAX, фото (PhotoUpload round), обложка, галерея, видео, форматы, ключей за скан, stampTarget, тир, активен, ownerId, ambassadorSince. Неизвестную категорию сохранить нельзя.
 
 ## Вкладка «События»
 

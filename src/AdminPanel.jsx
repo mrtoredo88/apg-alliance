@@ -20,6 +20,7 @@ import { shareLink } from './utils/shareLink.js';
 import { AdminAssistantPanel } from './adminAssistant/AdminAssistantPanel.jsx';
 import { buildAdminContext } from './adminAssistant/AdminContextEngine.js';
 import { hasExpertAmbassadorAccess, hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
+import { normalizeExpertCategory, normalizeExpertPhone, validateExpertCategories } from '../server-shared/expert-directory.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -145,11 +146,12 @@ const AI_IMPORT_LABELS = {
   services: ['Услуги', 'Что предлагаете', 'Чем полезен', 'Программа'],
   offer: ['Акция для пользователей АПГ', 'Акция', 'Бонус', 'Приз / бонус'],
   cost: ['Стоимость', 'Стоимость / условия', 'Цена'],
+  experience: ['Опыт', 'Стаж', 'Профессиональный опыт'],
   date: ['Дата', 'Дата публикации', 'Дата розыгрыша'],
   source: ['Источник', 'Автор', 'Организатор', 'Кто предоставляет'],
   lastName: ['Фамилия'], firstName: ['Имя'], middleName: ['Отчество'],
   workFormats: ['Форматы работы', 'Формат работы'], tariff: ['Тариф'], bookingUrl: ['Запись', 'Ссылка для записи'],
-  max: ['MAX'], otherSocials: ['Другие социальные сети'], newsInfo: ['Новости'], activities: ['Мероприятия'], inn: ['ИНН'],
+  max: ['MAX'], whatsapp: ['WhatsApp', 'Ватсап'], otherSocials: ['Другие социальные сети'], newsInfo: ['Новости'], activities: ['Мероприятия'], inn: ['ИНН'],
   audienceTags: ['Кому могу помочь', 'Аудитория', 'Для кого'],
 };
 
@@ -603,6 +605,7 @@ function analyzeAiImportText(type, rawText, files = []) {
     services: pickAiImportValue(text, 'services'),
     offer: pickAiImportValue(text, 'offer'),
     cost: pickAiImportValue(text, 'cost'),
+    experience: pickAiImportValue(text, 'experience'),
     date: pickAiImportValue(text, 'date'),
     source: pickAiImportValue(text, 'source'),
   };
@@ -611,18 +614,22 @@ function analyzeAiImportText(type, rawText, files = []) {
     fields.lastName = pickAiImportValue(text, 'lastName') || (nameParts.length > 1 ? nameParts[0] : '');
     fields.firstName = pickAiImportValue(text, 'firstName') || (nameParts.length > 1 ? nameParts[1] : '');
     fields.middleName = pickAiImportValue(text, 'middleName') || nameParts.slice(2).join(' ');
-    fields.categories = [fields.category].filter(Boolean);
+    const categoryIntegrity = validateExpertCategories([fields.category].filter(Boolean));
+    fields.categories = categoryIntegrity.categories;
+    fields.unknownCategories = categoryIntegrity.unknown;
+    fields.category = categoryIntegrity.categories[0] || normalizeExpertCategory(detectAiImportCategory(text, 'expert'), 'other');
+    fields.phone = normalizeExpertPhone(fields.phone);
     fields.workFormats = pickAiImportValue(text, 'workFormats').split(/[,;/]/).map(value => value.trim()).filter(Boolean);
     fields.audienceTags = pickAiImportValue(text, 'audienceTags').split(/[,;/]/).map(value => value.trim()).filter(Boolean);
     fields.tariff = normalizeExpertTariff(pickAiImportValue(text, 'tariff'));
     fields.bookingUrl = pickAiImportValue(text, 'bookingUrl');
     fields.max = pickAiImportValue(text, 'max');
+    fields.whatsapp = pickAiImportValue(text, 'whatsapp');
     fields.otherSocials = pickAiImportValue(text, 'otherSocials').split(/[,;\s]+/).filter(value => /^https?:\/\//i.test(value));
     fields.newsInfo = hasExpertAmbassadorAccess(fields.tariff) ? pickAiImportValue(text, 'newsInfo') : '';
     fields.activities = hasExpertAmbassadorAccess(fields.tariff) ? pickAiImportValue(text, 'activities') : '';
     fields.inn = hasExpertAmbassadorAccess(fields.tariff) ? pickAiImportValue(text, 'inn').replace(/\D/g, '') : '';
     fields.videos = [...text.matchAll(/https?:\/\/[^\s]+(?:youtube|youtu\.be|vk\.com\/video|vkvideo|rutube|max\.ru)[^\s]*/gi)].map(match => ({ url: match[0], title: '', platform: 'other', platformLabel: 'Видео' }));
-    delete fields.cost;
   }
   if (type === 'partner') {
     fields.tariff = normalizePartnerTariff(pickAiImportValue(text, 'tariff'));
@@ -665,9 +672,10 @@ function aiImportDraftPatch(type, draft, sourceFiles = []) {
     const coverPhoto = sourceFiles.find(file => file.role === 'cover')?.url || '';
     const logoUrl = sourceFiles.find(file => file.role === 'logo')?.url || '';
     const gallery = sourceFiles.filter(file => ['gallery', 'photo'].includes(file.role)).map(file => file.url).filter(Boolean);
-    const categories = Array.isArray(f.categories) && f.categories.length ? f.categories : [f.category].filter(Boolean);
+    const categoryIntegrity = validateExpertCategories(Array.isArray(f.categories) && f.categories.length ? f.categories : [f.category].filter(Boolean));
+    const categories = categoryIntegrity.categories;
     const tariff = normalizeExpertTariff(f.tariff);
-    return { name: f.title || [f.lastName, f.firstName, f.middleName].filter(Boolean).join(' ') || 'Новый эксперт', firstName: f.firstName || '', lastName: f.lastName || '', middleName: f.middleName || '', specialization: f.shortDescription || f.services || 'Уточнить направление', category: categories[0] || detectAiImportCategory([f.category, f.description].join(' '), 'expert'), secondaryCategories: categories.slice(1), description: f.description || f.shortDescription || '', services: f.services || '', workFormats: Array.isArray(f.workFormats) ? f.workFormats : [], audienceTags: Array.isArray(f.audienceTags) ? f.audienceTags : [], phone: f.phone || '', email: f.email || '', websiteUrl: f.website || '', bookingUrl: f.bookingUrl || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', maxUrl: f.max || '', otherSocials: Array.isArray(f.otherSocials) ? f.otherSocials : [], offer: f.offer || '', videos: Array.isArray(f.videos) ? f.videos : [], tier: tariff, tariff, inn: hasExpertAmbassadorAccess(tariff) ? f.inn || '' : '', newsInfo: hasExpertAmbassadorAccess(tariff) ? f.newsInfo || '' : '', activities: hasExpertAmbassadorAccess(tariff) ? f.activities || '' : '', photo: avatar, logoUrl, coverPhoto, gallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, futureCityProfile: f.futureCityProfile || {}, active: false, status: 'draft', verified: false, keys: 1 };
+    return { name: f.title || [f.lastName, f.firstName, f.middleName].filter(Boolean).join(' ') || 'Новый эксперт', firstName: f.firstName || '', lastName: f.lastName || '', middleName: f.middleName || '', specialization: f.shortDescription || f.services || 'Уточнить направление', category: categories[0] || normalizeExpertCategory(detectAiImportCategory([f.category, f.description].join(' '), 'expert'), 'other'), categories: categories.length ? categories : ['other'], secondaryCategories: categories.slice(1), categoryIntegrity: { valid: categoryIntegrity.valid, unknown: categoryIntegrity.unknown }, description: f.description || f.shortDescription || '', services: f.services || '', workFormats: Array.isArray(f.workFormats) ? f.workFormats : [], audienceTags: Array.isArray(f.audienceTags) ? f.audienceTags : [], phone: normalizeExpertPhone(f.phone), email: f.email || '', address: f.address || '', hours: f.hours || '', experience: f.experience || '', serviceCost: f.serviceCost || f.cost || '', websiteUrl: f.website || '', bookingUrl: f.bookingUrl || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', maxUrl: f.max || '', whatsappUrl: f.whatsapp || '', otherSocials: Array.isArray(f.otherSocials) ? f.otherSocials : [], offer: f.offer || '', videos: Array.isArray(f.videos) ? f.videos : [], tier: tariff, tariff, inn: hasExpertAmbassadorAccess(tariff) ? f.inn || '' : '', newsInfo: hasExpertAmbassadorAccess(tariff) ? f.newsInfo || '' : '', activities: hasExpertAmbassadorAccess(tariff) ? f.activities || '' : '', photo: avatar, logoUrl, coverPhoto, gallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, futureCityProfile: f.futureCityProfile || {}, active: false, status: 'draft', verified: false, keys: 1 };
   }
   if (type === 'event') {
     return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, category: f.category || 'society', active: false, status: 'draft', priority: 0 };
@@ -2202,6 +2210,11 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                   </div>
                 </div>
               )}
+              {previewType === 'expert' && previewFields.unknownCategories?.length > 0 && (
+                <div style={{ marginBottom: 12, padding: 12, borderRadius: 14, background: 'rgba(230,70,70,0.10)', border: '1px solid rgba(230,70,70,0.28)', color: '#fca5a5', fontSize: 12, lineHeight: '18px' }}>
+                  Неизвестная категория: {previewFields.unknownCategories.join(', ')}. Перед публикацией выберите значение из единого справочника экспертов.
+                </div>
+              )}
               {Object.entries(previewFields).map(([key, value]) => value ? (
                 <div key={key} style={{ padding: '9px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -2253,6 +2266,7 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                       <div style={{ marginBottom: 12 }}>
                         <EntityPreviewCard type={item.type} item={aiImportDraftPatch(item.type, item.draft, item.sourceFiles)} compact />
                       </div>
+                      {item.type === 'expert' && item.draft?.fields?.unknownCategories?.length > 0 && <div style={{ marginBottom: 12, padding: 12, borderRadius: 14, background: 'rgba(230,70,70,0.10)', border: '1px solid rgba(230,70,70,0.28)', color: '#fca5a5', fontSize: 12 }}>Публикация требует выбора категории: {item.draft.fields.unknownCategories.join(', ')}</div>}
                       {canSeeLegal && item.legalProfile && (
                         <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
                           <div style={{ padding: 12, borderRadius: 16, background: 'rgba(201,168,76,0.08)', border: `1px solid ${A.goldBrd}` }}>
@@ -3352,6 +3366,13 @@ export const AdminPanel = () => {
   const [exVideoError, setExVideoError] = useState('');
   const [exOffer, setExOffer]               = useState('');
   const [exStampTarget, setExStampTarget]   = useState('');
+  const [exServices, setExServices] = useState('');
+  const [exAddress, setExAddress] = useState('');
+  const [exHours, setExHours] = useState('');
+  const [exExperience, setExExperience] = useState('');
+  const [exCost, setExCost] = useState('');
+  const [exWhatsApp, setExWhatsApp] = useState('');
+  const [exSecondaryCategories, setExSecondaryCategories] = useState([]);
   const [editingPartner, setEditingPartner] = useState(null);
   const [editingEvent, setEditingEvent]     = useState(null);
   const [editingNews, setEditingNews]       = useState(null);
@@ -4020,6 +4041,9 @@ export const AdminPanel = () => {
   const publishAiImportDraft = async (request) => {
     if (!request?.id) return;
     const type = request.type || 'partner';
+    if (type === 'expert' && request.draft?.fields?.unknownCategories?.length) {
+      throw new Error(`Выберите существующую категорию эксперта: ${request.draft.fields.unknownCategories.join(', ')}`);
+    }
     const patch = aiImportDraftPatch(type, request.draft, request.sourceFiles);
     let created = null;
     if (type === 'news') {
@@ -4205,6 +4229,7 @@ export const AdminPanel = () => {
     setExCoverPhoto(''); setExGallery([]); setExVideos([]);
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     setExOffer(''); setExStampTarget('');
+    setExServices(''); setExAddress(''); setExHours(''); setExExperience(''); setExCost(''); setExWhatsApp(''); setExSecondaryCategories([]);
     setExError(''); setExSaving(false);
     setShowExpertModal(false);
   };
@@ -4220,10 +4245,12 @@ export const AdminPanel = () => {
     setExOffline(ex.formats?.includes('offline') ?? false);
     setExGroup(ex.formats?.includes('group') ?? false);
     setExTelegram(ex.telegramUrl ?? ''); setExWebsite(ex.websiteUrl ?? ''); setExMax(ex.maxUrl ?? '');
-    setExCategory(ex.category ?? 'other'); setExTier(ex.tier ?? 'practice');
+    setExCategory(normalizeExpertCategory(ex.category, '')); setExTier(ex.tier ?? 'practice');
     setExCoverPhoto(ex.coverPhoto ?? ''); setExGallery(ex.gallery ?? []);
     setExVideos(ex.videos ?? []);
     setExOffer(ex.offer ?? ''); setExStampTarget(ex.stampTarget ? String(ex.stampTarget) : '');
+    setExServices(ex.services ?? ''); setExAddress(ex.address ?? ''); setExHours(ex.hours ?? ''); setExExperience(ex.experience ?? ''); setExCost(ex.serviceCost ?? ex.cost ?? ''); setExWhatsApp(ex.whatsappUrl ?? '');
+    setExSecondaryCategories((ex.secondaryCategories ?? ex.categories?.slice?.(1) ?? []).map(value => normalizeExpertCategory(value)).filter(Boolean));
     setExVideoUrl(''); setExVideoTitle(''); setExVideoError('');
     setShowExpertModal(true);
   };
@@ -4231,12 +4258,15 @@ export const AdminPanel = () => {
   const saveExpert = async () => {
     if (!exName.trim()) { setExError('Укажите имя эксперта'); return; }
     if (!exSpec.trim()) { setExError('Укажите специализацию'); return; }
+    if (!normalizeExpertCategory(exCategory)) { setExError('Выберите категорию эксперта из единого справочника.'); return; }
+    if (exPhone.trim() && !normalizeExpertPhone(exPhone)) { setExError('Проверьте телефон: нужен российский или международный номер.'); return; }
     const urlError = validateUrlFields([
       { label: 'VK', value: exVkUrl, platform: 'vk' },
       { label: 'Запись', value: exBooking },
       { label: 'Telegram', value: exTelegram, platform: 'telegram' },
       { label: 'Сайт', value: exWebsite },
       { label: 'Max', value: exMax, platform: 'max' },
+      { label: 'WhatsApp', value: exWhatsApp, platform: 'whatsapp' },
     ]);
     if (urlError) { setExError(urlError); return; }
     setExError('');
@@ -4252,15 +4282,23 @@ export const AdminPanel = () => {
     const prevTier = editingExpert?.tier ?? 'practice';
     const data = {
       name: exName.trim(), specialization: exSpec.trim(), description: exDesc.trim(),
-      category: exCategory,
+      category: normalizeExpertCategory(exCategory, 'other'),
+      categories: [normalizeExpertCategory(exCategory, 'other'), ...exSecondaryCategories.filter(value => value !== normalizeExpertCategory(exCategory, 'other'))],
+      secondaryCategories: exSecondaryCategories.filter(value => value !== normalizeExpertCategory(exCategory, 'other')),
       tier: exTier,
-      photo: exPhoto.trim(), phone: exPhone.trim(), vkUrl: normalizeUrl(exVkUrl, 'vk'),
+      photo: exPhoto.trim(), phone: normalizeExpertPhone(exPhone), vkUrl: normalizeUrl(exVkUrl, 'vk'),
       bookingUrl: normalizeUrl(exBooking), keys: Number(exKeys) || 1,
       verified: exVerified, active: exActive, formats,
       ownerEmail: exOwnerEmail.trim().toLowerCase() || null,
       telegramUrl: normalizeUrl(exTelegram, 'telegram'),
       websiteUrl: normalizeUrl(exWebsite),
       maxUrl: normalizeUrl(exMax, 'max'),
+      whatsappUrl: normalizeUrl(exWhatsApp, 'whatsapp'),
+      services: exServices.trim(),
+      address: exAddress.trim(),
+      hours: exHours.trim(),
+      experience: exExperience.trim(),
+      serviceCost: exCost.trim(),
       coverPhoto: exCoverPhoto.trim(),
       gallery: exGallery,
       videos: finalExVideos,
@@ -6505,6 +6543,15 @@ export const AdminPanel = () => {
                 <label style={s.label}>Описание</label>
                 <MdEditor value={exDesc} onChange={setExDesc} placeholder="Расскажите об эксперте..." style={s.textarea} />
 
+                <label style={s.label}>Услуги</label>
+                <textarea style={s.textarea} value={exServices} onChange={e => setExServices(e.target.value)} placeholder="Какие услуги оказывает эксперт" />
+
+                <label style={s.label}>Опыт</label>
+                <textarea style={s.textarea} value={exExperience} onChange={e => setExExperience(e.target.value)} placeholder="Стаж, квалификация, достижения" />
+
+                <label style={s.label}>Стоимость услуг — необязательно</label>
+                <input style={s.input} value={exCost} onChange={e => setExCost(e.target.value)} placeholder="Например: от 3 000 ₽" />
+
                 <label style={s.label}>Специальное предложение для участников АПГ 🎁</label>
                 <input style={s.input} placeholder="Скидка 15% на первую консультацию" value={exOffer} onChange={e => setExOffer(e.target.value)} />
 
@@ -6552,7 +6599,13 @@ export const AdminPanel = () => {
                 ))}
 
                 <label style={s.label}>Телефон</label>
-                <input style={s.input} placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} />
+                <input style={s.input} type="tel" inputMode="tel" placeholder="+7 999 000-00-00" value={exPhone} onChange={e => setExPhone(e.target.value)} onBlur={() => { const value = normalizeExpertPhone(exPhone); if (value) setExPhone(value); }} />
+
+                <label style={s.label}>Адрес</label>
+                <input style={s.input} value={exAddress} onChange={e => setExAddress(e.target.value)} placeholder="Зеленоград, корпус..." />
+
+                <label style={s.label}>Часы работы</label>
+                <input style={s.input} value={exHours} onChange={e => setExHours(e.target.value)} placeholder="Пн-Пт 10:00-19:00" />
 
                 <label style={s.label}>ВКонтакте (URL)</label>
                 <input style={s.input} placeholder="https://vk.com/..." value={exVkUrl} onChange={e => setExVkUrl(e.target.value)} />
@@ -6568,6 +6621,9 @@ export const AdminPanel = () => {
 
                 <label style={s.label}>Профиль в Max</label>
                 <input style={s.input} placeholder="https://..." value={exMax} onChange={e => setExMax(e.target.value)} />
+
+                <label style={s.label}>WhatsApp</label>
+                <input style={s.input} placeholder="+7 или https://wa.me/..." value={exWhatsApp} onChange={e => setExWhatsApp(e.target.value)} />
 
                 <label style={s.label}>Ключей за QR-скан</label>
                 <input style={s.input} type="number" min="1" max="5" placeholder="1" value={exKeys} onChange={e => setExKeys(e.target.value)} />

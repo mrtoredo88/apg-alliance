@@ -3,6 +3,7 @@ import { analyzePublicSubmission as analyzeVercel } from '../api/public-submit.j
 import { analyzePublicSubmission as analyzeFastify } from '../server/src/routes/public-submit.js';
 import { calculateExpertProfileCompletion, hasPremiumExpertAccess, normalizeExpertVideo } from '../src/expertProfileForm.js';
 import { hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from '../src/tariffConfig.js';
+import { EXPERT_CATEGORIES, getExpertCategory, getExpertTelHref, normalizeExpertPhone, normalizeExpertRecord, validateExpertCategories } from '../server-shared/expert-directory.js';
 
 const fields = {
   title: 'Иванов Иван Иванович', lastName: 'Иванов', firstName: 'Иван', middleName: 'Иванович',
@@ -10,6 +11,7 @@ const fields = {
   services: 'Консультации', workFormats: ['online', 'individual'], audienceTags: ['entrepreneurs'], tariff: 'ambassador', phone: '+7 999 000-00-00',
   email: 'expert@example.ru', website: 'https://example.ru', bookingUrl: 'https://example.ru/book', vk: 'https://vk.com/expert',
   telegram: 'https://t.me/expert', max: 'https://max.ru/expert', otherSocials: ['https://example.com/social'], inn: '',
+  whatsapp: '+7 999 000-00-00', address: 'Зеленоград', hours: 'Пн-Пт 10:00-19:00', experience: '15 лет', cost: 'от 3 000 ₽', offer: 'Первая консультация бесплатно',
   videos: [{ url: 'https://youtu.be/dQw4w9WgXcQ', title: '', platform: 'youtube', platformLabel: 'YouTube' }],
   newsInfo: 'Темы публикаций', activities: 'Лекции', comment: 'Только для администрации',
 };
@@ -23,7 +25,11 @@ assert.equal(vercel.missingFields.includes('inn'), false);
 assert.deepEqual(vercel.fields.categories, ['law', 'finance']);
 assert.deepEqual(vercel.fields.workFormats, ['online', 'individual']);
 assert.deepEqual(vercel.fields.audienceTags, ['entrepreneurs']);
-assert.equal(vercel.fields.cost, '');
+assert.equal(vercel.fields.cost, 'от 3 000 ₽');
+assert.equal(vercel.fields.phone, '+79990000000');
+assert.equal(vercel.fields.experience, '15 лет');
+assert.equal(vercel.fields.offer, 'Первая консультация бесплатно');
+assert.equal(vercel.fields.whatsapp, 'https://wa.me/79990000000');
 assert.deepEqual(vercel.fields.serviceCatalog, []);
 assert.equal(vercel.fields.tariff, 'ambassador');
 assert.equal(normalizeExpertTariff('premium'), 'ambassador');
@@ -32,6 +38,16 @@ assert.equal(hasPremiumExpertAccess('practice'), false);
 assert.equal(hasPremiumExpertAccess('ambassador'), true);
 assert.equal(hasPremiumExpertAccess('standard'), false);
 assert.equal(normalizeExpertVideo('https://max.ru/video/123').platform, 'max');
+assert.equal(normalizeExpertPhone('8 (985) 548-08-59'), '+79855480859');
+assert.equal(getExpertTelHref('+7 985 548-08-59'), 'tel:+79855480859');
+assert.equal(getExpertCategory('real_estate')?.label, 'Недвижимость');
+assert.equal(validateExpertCategories(EXPERT_CATEGORIES.map(item => item.id)).unknown.length, 0);
+assert.equal(validateExpertCategories(['несуществующая']).valid, false);
+const normalizedExpert = normalizeExpertRecord({ category: 'kids', phone: '89855480859', specialOffer: 'Бонус', workFormats: ['online', 'groups'] });
+assert.equal(normalizedExpert.category, 'children');
+assert.equal(normalizedExpert.phone, '+79855480859');
+assert.equal(normalizedExpert.offer, 'Бонус');
+assert.ok(normalizedExpert.formats.includes('group'));
 
 const completion = calculateExpertProfileCompletion({ ...fields, primaryCategory: 'law', photo: files[0].url, coverPhoto: 'https://example.ru/cover.jpg' });
 assert.ok(completion >= 80);

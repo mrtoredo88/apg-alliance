@@ -28,6 +28,7 @@ import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
+import { normalizeExpertRecord } from '../server-shared/expert-directory.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -1088,7 +1089,7 @@ export function UserApp() {
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
       setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
-      const freshExperts = exSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(isNotArchived);
+      const freshExperts = exSnap.docs.map(d => normalizeExpertRecord({ id: d.id, ...d.data() })).filter(isNotArchived);
       if (isMounted.current) {
         setExperts(freshExperts);
         if (userData) {

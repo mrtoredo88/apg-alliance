@@ -3,6 +3,7 @@ import { EXPERT_CATEGORIES, EXPERT_WORK_FORMATS, calculateExpertProfileCompletio
 import { EXPERT_AUDIENCE_TAGS, EXPERT_TARIFFS, normalizeExpertTariff } from '../tariffConfig.js';
 import { parseVideoUrl } from '../utils/parseVideoUrl.js';
 import { TariffOptionCard } from './TariffOptionCard.jsx';
+import { normalizeExpertPhone, validateExpertCategories } from '../../server-shared/expert-directory.js';
 
 const FORMAT_OPTIONS = EXPERT_WORK_FORMATS;
 
@@ -72,6 +73,7 @@ export function ExpertQuestionnaire({ fields, files, onField, onFiles, uploading
     email: fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email) ? 'Проверьте email.' : '',
     inn: fields.inn && !/^\d{10}$|^\d{12}$/.test(String(fields.inn).replace(/\D/g, '')) ? 'ИНН должен содержать 10 или 12 цифр.' : '',
   };
+  const categoryIntegrity = validateExpertCategories(fields.categories);
 
   return <>
     <div style={{ position: 'sticky', top: 8, zIndex: 20, marginBottom: 12, padding: 12, borderRadius: 18, background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(201,168,76,0.30)', boxShadow: '0 10px 30px rgba(31,28,18,0.10)' }}>
@@ -94,8 +96,10 @@ export function ExpertQuestionnaire({ fields, files, onField, onFiles, uploading
       <Field label="Направления деятельности" hint="Можно выбрать несколько направлений. Первое станет основным.">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{EXPERT_CATEGORIES.map(category => { const active = listValue(fields.categories).includes(category.id); return <button key={category.id} type="button" onClick={() => toggleArray('categories', category.id)} style={{ minHeight: 36, padding: '0 10px', borderRadius: 999, border: `1px solid ${active ? 'rgba(201,168,76,0.52)' : 'rgba(25,23,19,0.12)'}`, background: active ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.58)', color: active ? '#6b5316' : '#37332b', fontWeight: 750, cursor: 'pointer' }}>{category.label}</button>; })}</div>
       </Field>
+      {categoryIntegrity.unknown.length > 0 && <div style={{ marginTop: 8, padding: 10, borderRadius: 14, background: 'rgba(185,28,28,0.08)', border: '1px solid rgba(185,28,28,0.22)', color: '#991b1b', fontSize: 12, lineHeight: '18px' }}>Неизвестная категория: {categoryIntegrity.unknown.join(', ')}. Выберите существующее направление; новую категорию можно добавить только через единый справочник администратора.</div>}
       <Field label="Коротко о себе" hint="Например: юрист, психолог, нутрициолог, финансовый консультант или коуч."><input style={inputStyle()} value={fields.shortDescription || ''} onChange={e => onField('shortDescription', e.target.value)} maxLength={160} /></Field>
       <Field label="Подробно о себе" hint="С кем вы работаете, какой у вас опыт, какие задачи решаете и чем полезны пользователям АПГ."><textarea style={textareaStyle(150)} value={fields.description || ''} onChange={e => onField('description', e.target.value)} /></Field>
+      <Field label="Опыт" hint="Стаж, ключевые проекты, квалификация или профессиональные достижения."><textarea style={textareaStyle(92)} value={fields.experience || ''} onChange={e => onField('experience', e.target.value)} /></Field>
       <Field label="Кому могу помочь" hint="Эти теги дальше будут использоваться для рекомендаций Локи.">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{EXPERT_AUDIENCE_TAGS.map(tag => { const active = listValue(fields.audienceTags).includes(tag.id); return <button key={tag.id} type="button" onClick={() => toggleArray('audienceTags', tag.id)} style={{ minHeight: 36, padding: '0 10px', borderRadius: 999, border: `1px solid ${active ? 'rgba(201,168,76,0.52)' : 'rgba(25,23,19,0.12)'}`, background: active ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.58)', color: active ? '#6b5316' : '#37332b', fontWeight: 750, cursor: 'pointer' }}>{tag.label}</button>; })}</div>
       </Field>
@@ -103,6 +107,7 @@ export function ExpertQuestionnaire({ fields, files, onField, onFiles, uploading
 
     <Section id="services" title="3. Услуги" subtitle="Что вы предлагаете и в каких форматах работаете" open={open.services} onToggle={toggle}>
       <Field label="Какие услуги оказываете" hint="Перечислите основные услуги. Стоимость будет добавлена позднее отдельным каталогом услуг."><textarea style={textareaStyle()} value={fields.services || ''} onChange={e => onField('services', e.target.value)} /></Field>
+      <Field label="Стоимость услуг — необязательно" hint="Если заполнено, значение будет показано в профиле. В дальнейшем поле перейдёт в каталог услуг."><input style={inputStyle()} value={fields.cost || ''} onChange={e => onField('cost', e.target.value)} /></Field>
       <Field label="Форматы работы"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{FORMAT_OPTIONS.map(format => { const active = listValue(fields.workFormats).includes(format.id); return <button key={format.id} type="button" onClick={() => toggleArray('workFormats', format.id)} style={{ ...inputStyle(), width: 'auto', minHeight: 36, padding: '0 10px', cursor: 'pointer', background: active ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.58)' }}>{format.label}</button>; })}</div></Field>
     </Section>
 
@@ -118,8 +123,9 @@ export function ExpertQuestionnaire({ fields, files, onField, onFiles, uploading
 
     <Section id="contacts" title="6. Контакты" subtitle="Связь, сайт и отдельная ссылка для записи" open={open.contacts} onToggle={toggle}>
       <Field label="Контактное лицо"><input style={inputStyle()} value={fields.contactName || ''} onChange={e => onField('contactName', e.target.value)} /></Field>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}><Field label="Телефон" error={fieldErrors.phone}><input style={inputStyle(!!fieldErrors.phone)} value={fields.phone || ''} onChange={e => onField('phone', e.target.value)} /></Field><Field label="Email" error={fieldErrors.email}><input type="email" style={inputStyle(!!fieldErrors.email)} value={fields.email || ''} onChange={e => onField('email', e.target.value)} /></Field></div>
-      {[['website', 'Сайт'], ['bookingUrl', 'Запись'], ['vk', 'VK'], ['telegram', 'Telegram'], ['max', 'MAX']].map(([key, label]) => <Field key={key} label={label} hint={key === 'bookingUrl' ? 'Отдельная ссылка на запись или бронирование.' : ''}><input style={inputStyle()} value={fields[key] || ''} onChange={e => onField(key, e.target.value)} placeholder="https://..." /></Field>)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}><Field label="Телефон" error={fieldErrors.phone}><input type="tel" inputMode="tel" style={inputStyle(!!fieldErrors.phone)} value={fields.phone || ''} onChange={e => onField('phone', e.target.value)} onBlur={e => { const value = normalizeExpertPhone(e.target.value); if (value) onField('phone', value); }} placeholder="+7 999 000-00-00" /></Field><Field label="Email" error={fieldErrors.email}><input type="email" style={inputStyle(!!fieldErrors.email)} value={fields.email || ''} onChange={e => onField('email', e.target.value)} /></Field></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}><Field label="Адрес"><input style={inputStyle()} value={fields.address || ''} onChange={e => onField('address', e.target.value)} /></Field><Field label="Часы работы"><input style={inputStyle()} value={fields.hours || ''} onChange={e => onField('hours', e.target.value)} /></Field></div>
+      {[['website', 'Сайт'], ['bookingUrl', 'Запись'], ['vk', 'VK'], ['telegram', 'Telegram'], ['whatsapp', 'WhatsApp'], ['max', 'MAX']].map(([key, label]) => <Field key={key} label={label} hint={key === 'bookingUrl' ? 'Отдельная ссылка на запись или бронирование.' : ''}><input style={inputStyle()} value={fields[key] || ''} onChange={e => onField(key, e.target.value)} placeholder={key === 'whatsapp' ? '+7 или https://wa.me/...' : 'https://...'} /></Field>)}
       <Field label="Другие социальные сети" hint="Можно добавить несколько ссылок."><div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}><input style={inputStyle()} value={socialInput} onChange={e => setSocialInput(e.target.value)} /><button type="button" onClick={addSocial} style={{ ...inputStyle(), width: 'auto', cursor: 'pointer' }}>Добавить</button></div></Field>
       {listValue(fields.otherSocials).map((url, index) => <div key={`${url}-${index}`} style={{ marginTop: 6, fontSize: 11, display: 'flex', gap: 8 }}><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{url}</span><button type="button" onClick={() => onField('otherSocials', listValue(fields.otherSocials).filter((_, i) => i !== index))} style={{ border: 0, background: 'transparent' }}>×</button></div>)}
     </Section>

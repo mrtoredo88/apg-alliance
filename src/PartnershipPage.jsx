@@ -3,6 +3,7 @@ import { API_BASE_URL } from './constants.js';
 import { GLASS, GLASS_GOLD, T } from './design.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl } from './utils/externalUrls.js';
+import { normalizeExpertPhone, validateExpertCategories } from '../server-shared/expert-directory.js';
 import { ExpertQuestionnaire } from './components/ExpertQuestionnaire.jsx';
 import { PartnerQuestionnaire } from './components/PartnerQuestionnaire.jsx';
 import { TariffOptionCard } from './components/TariffOptionCard.jsx';
@@ -154,16 +155,20 @@ function emptyFields(type, tariff) {
 }
 
 function normalizeForSubmit(type, fields) {
+  const expertCategories = type === 'expert' ? validateExpertCategories(fields.categories).categories : [];
   return {
     ...fields,
     title: type === 'expert' ? [fields.lastName, fields.firstName, fields.middleName].filter(Boolean).join(' ') : fields.title,
-    category: type === 'expert' ? fields.categories?.[0] || '' : fields.category,
-    secondaryCategories: type === 'expert' ? (fields.categories || []).slice(1) : fields.secondaryCategories,
+    category: type === 'expert' ? expertCategories[0] || '' : fields.category,
+    categories: type === 'expert' ? expertCategories : fields.categories,
+    secondaryCategories: type === 'expert' ? expertCategories.slice(1) : fields.secondaryCategories,
+    phone: type === 'expert' ? normalizeExpertPhone(fields.phone) : fields.phone,
     tariff: type === 'expert' ? normalizeExpertTariff(fields.tariff) : normalizePartnerTariff(fields.tariff),
     website: normalizeExternalUrl(fields.website),
     bookingUrl: normalizeExternalUrl(fields.bookingUrl),
     vk: normalizeExternalUrl(fields.vk, { platform: 'vk' }),
     telegram: normalizeExternalUrl(fields.telegram, { platform: 'telegram' }),
+    whatsapp: normalizeExternalUrl(fields.whatsapp, { platform: 'whatsapp' }),
     max: normalizeExternalUrl(fields.max),
     otherSocials: (fields.otherSocials || []).map(value => normalizeExternalUrl(value)).filter(Boolean),
   };

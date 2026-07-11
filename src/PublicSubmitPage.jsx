@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from './constants.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl } from './utils/externalUrls.js';
+import { normalizeExpertPhone, validateExpertCategories } from '../server-shared/expert-directory.js';
 import { ExpertQuestionnaire } from './components/ExpertQuestionnaire.jsx';
 import { PartnerQuestionnaire } from './components/PartnerQuestionnaire.jsx';
 import { hasExpertAmbassadorAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
@@ -321,6 +322,8 @@ export function PublicSubmitPage() {
       const required = [['lastName', 'фамилию'], ['firstName', 'имя'], ['shortDescription', 'короткое описание'], ['contactName', 'контактное лицо'], ['phone', 'телефон'], ['email', 'email']];
       const missing = required.filter(([key]) => !String(fields[key] || '').trim()).map(([, label]) => label);
       if (!Array.isArray(fields.categories) || !fields.categories.length) missing.push('направление деятельности');
+      const categoryIntegrity = validateExpertCategories(fields.categories);
+      if (categoryIntegrity.unknown.length) { setError(`Неизвестная категория: ${categoryIntegrity.unknown.join(', ')}. Выберите направление из справочника.`); return false; }
       if (missing.length) { setError(`Заполните обязательные поля: ${missing.join(', ')}.`); return false; }
       if (!/^\+?[\d\s()-]{10,20}$/.test(String(fields.phone))) { setError('Проверьте номер телефона.'); return false; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(fields.email))) { setError('Проверьте email.'); return false; }
@@ -371,11 +374,13 @@ export function PublicSubmitPage() {
         title: type === 'expert' ? [fields.lastName, fields.firstName, fields.middleName].filter(Boolean).join(' ') : fields.title,
         category: type === 'expert' ? fields.categories?.[0] || '' : fields.category,
         secondaryCategories: type === 'expert' ? (fields.categories || []).slice(1) : fields.secondaryCategories,
+        phone: type === 'expert' ? normalizeExpertPhone(fields.phone) : fields.phone,
         tariff: type === 'expert' ? normalizeExpertTariff(fields.tariff) : type === 'partner' ? normalizePartnerTariff(fields.tariff) : fields.tariff,
         website: normalizeExternalUrl(fields.website),
         bookingUrl: normalizeExternalUrl(fields.bookingUrl),
         vk: normalizeExternalUrl(fields.vk, { platform: 'vk' }),
         telegram: normalizeExternalUrl(fields.telegram, { platform: 'telegram' }),
+        whatsapp: normalizeExternalUrl(fields.whatsapp, { platform: 'whatsapp' }),
         max: normalizeExternalUrl(fields.max),
         otherSocials: (fields.otherSocials || []).map(value => normalizeExternalUrl(value)).filter(Boolean),
       };

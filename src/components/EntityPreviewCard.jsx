@@ -1,5 +1,6 @@
 import React from 'react';
 import { APG2_PROFILE, GlassBadge, GlassCard } from './Apg2ProfileGlass.jsx';
+import { getExpertCategory, normalizeExpertRecord } from '../../server-shared/expert-directory.js';
 
 const CATEGORY_LABELS = {
   food: ['Еда', '🍽️'],
@@ -50,7 +51,11 @@ function descriptionOf(type, item = {}) {
   return text(item.description || item.summary, 'Предпросмотр карточки');
 }
 
-function categoryOf(item = {}) {
+function categoryOf(item = {}, type = '') {
+  if (type === 'expert') {
+    const category = getExpertCategory(item.category || item.categories?.[0] || item.primaryCategory);
+    return category || { id: 'other', label: 'Другое', emoji: '✨' };
+  }
   const id = text(item.category || item.primaryCategory || 'other', 'other');
   const pair = CATEGORY_LABELS[id] || [text(item.categoryLabel || id, 'Другое'), '✨'];
   return { id, label: text(item.categoryLabel || pair[0], pair[0]), emoji: pair[1] };
@@ -65,19 +70,21 @@ function eventDateParts(item = {}) {
 }
 
 export function normalizeEntityPreview(type, item = {}) {
+  const normalizedItem = type === 'expert' ? normalizeExpertRecord(item) : item;
   return {
     type,
-    item,
-    title: titleOf(type, item),
-    description: descriptionOf(type, item),
-    image: imageOf(item),
-    category: categoryOf(item),
-    date: eventDateParts(item),
+    item: normalizedItem,
+    title: titleOf(type, normalizedItem),
+    description: descriptionOf(type, normalizedItem),
+    image: imageOf(normalizedItem),
+    category: categoryOf(normalizedItem, type),
+    date: eventDateParts(normalizedItem),
   };
 }
 
 export function EntityPreviewCard({ type = 'partner', item = {}, compact = false, onClick, style }) {
   const preview = normalizeEntityPreview(type, item);
+  item = preview.item;
   const isEvent = type === 'event';
   const isNews = type === 'news';
   const isExpert = type === 'expert';
@@ -135,6 +142,7 @@ export function EntityPreviewCard({ type = 'partner', item = {}, compact = false
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 760 }}>
             {isPartner && item.address && <span>📍 {item.address}</span>}
             {isExpert && (item.workFormats || item.formats)?.length > 0 && <span>{(item.workFormats || item.formats).slice(0, 2).join(' · ')}</span>}
+            {isExpert && item.offer && <span style={{ color: APG2_PROFILE.gold }}>🎁 Акция</span>}
             {isNews && <span>{item.sourceName || item.source || 'АПГ'}</span>}
             {isPrize && item.donorName && <span>{item.donorName}</span>}
             <span style={{ marginLeft: 'auto', color: APG2_PROFILE.gold, fontSize: 22, lineHeight: 1 }}>›</span>
