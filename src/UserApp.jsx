@@ -619,6 +619,7 @@ export function UserApp() {
   const [activePartner, setActivePartner]       = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
+  const [partnershipEntry, setPartnershipEntry] = useState({ type: initialDeepLink.type === 'partnership' ? 'partner' : '', nonce: 0 });
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
   const [user, setUser]                         = useState(null);
@@ -2963,7 +2964,7 @@ export function UserApp() {
                     onEmailAuthSuccess={handleEmailAuthSuccess}
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
-                    onOpenPartnership={() => goPanel('partnership')}
+                    onOpenPartnership={(type = 'partner') => { setPartnershipEntry({ type, nonce: Date.now() }); goPanel('partnership'); }}
                     onRestartLearning={restartLearning}
                     onOpenNews={() => goPanel('news')}
                     onOpenHealth={() => goPanel('health')}
@@ -3157,6 +3158,8 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <PartnershipPage
                     user={user}
+                    initialType={partnershipEntry.type}
+                    entryNonce={partnershipEntry.nonce}
                     onBack={goBackPanel}
                     onHome={() => goPanel('home')}
                   />

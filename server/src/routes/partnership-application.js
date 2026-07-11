@@ -8,6 +8,11 @@ const TYPES = {
 };
 
 const ALLOWED_EVENTS = new Set([
+  'partnership_card_opened',
+  'partnership_partner_selected',
+  'partnership_expert_selected',
+  'partnership_presentation_opened',
+  'partnership_questionnaire_started',
   'partnership_page_opened',
   'partnership_tariff_selected',
   'partnership_form_started',

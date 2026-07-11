@@ -1386,7 +1386,7 @@ function ModerationPanel({ news, comments, requests = [], onOpenNews, onOpenComm
   ) && !['published', 'rejected'].includes(String(item.status || '').toLowerCase()));
   const filterBtns = [
     { id: 'all', label: 'Вся модерация', count: pendingNews.length + pendingComments.length + partnershipRequests.length },
-    { id: 'partnership', label: 'Новые заявки на партнёрство', count: partnershipRequests.length },
+    { id: 'partnership', label: 'Новые заявки на подключение', count: partnershipRequests.length },
   ];
   return (
     <div>
@@ -1416,7 +1416,7 @@ function ModerationPanel({ news, comments, requests = [], onOpenNews, onOpenComm
         <div style={{ ...s.card }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
             <div>
-              <div style={{ color: A.text, fontSize: 18, fontWeight: 900 }}>Новые заявки на партнёрство</div>
+              <div style={{ color: A.text, fontSize: 18, fontWeight: 900 }}>Новые заявки на подключение</div>
               <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Заявки из профиля пользователя. Полная карточка доступна в разделе ИИ-импорт.</div>
             </div>
             <button type="button" onClick={onOpenPartnershipRequests} style={{ ...s.btn, ...s.btnGold, padding: '9px 12px', fontSize: 12 }}>Открыть ИИ-импорт</button>

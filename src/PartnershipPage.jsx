@@ -16,12 +16,28 @@ const LOKI_ANSWERS = [
     a: 'Бизнес получает карточку в АПГ, спецпредложение для жителей, контакты, фото и путь к продвижению через новости или мероприятия на старших тарифах. Пользователь получает понятные места, бонусы и причины возвращаться.',
   },
   {
+    q: 'Что лучше выбрать?',
+    a: 'Если вы продвигаете компанию, студию, кафе, сервис или бренд — выбирайте партнёра. Если продвигаете личную практику, консультации, экспертизу или наставничество — выбирайте эксперта.',
+  },
+  {
+    q: 'Чем отличается партнёр от эксперта?',
+    a: 'Партнёр — это бизнес-карточка с акциями, адресом, контактами, событиями и новостями. Эксперт — личный профиль специалиста с услугами, аудиторией, записью и экспертным контентом.',
+  },
+  {
     q: 'Как работают ключи?',
     a: 'Пользователь сканирует QR у партнёра и получает ключи за визит. Для партнёра это аккуратный способ видеть интерес аудитории и возвращаемость без лишней сложности.',
   },
   {
     q: 'Как происходит подключение?',
     a: 'Сначала заявка, затем проверка администрацией. Если всё в порядке, карточку можно подготовить через ИИ-импорт и опубликовать в каталоге.',
+  },
+  {
+    q: 'Сколько занимает проверка?',
+    a: 'Обычно проверка зависит от полноты анкеты и материалов. Чем понятнее описание, контакты, фото и предложение для пользователей АПГ, тем быстрее администратор сможет подготовить карточку.',
+  },
+  {
+    q: 'Что делать после отправки заявки?',
+    a: 'Дождитесь проверки. Администрация посмотрит данные, при необходимости уточнит детали и подготовит карточку к публикации или подключению кабинета.',
   },
   {
     q: 'Какой тариф выбрать?',
@@ -55,7 +71,8 @@ function buttonStyle(kind = 'gold') {
 }
 
 function StepProgress({ current }) {
-  const steps = ['Узнали о программе', 'Выбрали направление', 'Заполнили анкету', 'Отправили заявку', 'Ожидаете проверки'];
+  const steps = ['Ознакомление', 'Выбор направления', 'Заполнение анкеты', 'Проверка заявки', 'Подключение'];
+  const marks = ['①', '②', '③', '④', '⑤'];
   return (
     <div style={{ ...GLASS, borderRadius: 22, padding: 13, display: 'grid', gap: 9 }}>
       {steps.map((label, index) => {
@@ -71,7 +88,7 @@ function StepProgress({ current }) {
               color: done || active ? T.gold : T.textSec,
               fontSize: 12, fontWeight: 950,
             }}>
-              {done ? '✓' : number}
+              {done ? '✓' : marks[index]}
             </div>
             <div style={{ color: active ? T.textPri : T.textSec, fontSize: 12.5, lineHeight: '17px', fontWeight: active ? 900 : 700 }}>{label}</div>
           </div>
@@ -133,7 +150,7 @@ function LokiHelp({ open, onToggle }) {
 function emptyFields(type, tariff) {
   return type === 'expert'
     ? { tariff, categories: [], audienceTags: [], workFormats: [], videos: [], otherSocials: [] }
-    : { tariff, secondaryCategories: [], formats: [], videos: [], otherSocials: [] };
+    : { tariff, category: 'other', secondaryCategories: [], formats: [], videos: [], otherSocials: [] };
 }
 
 function normalizeForSubmit(type, fields) {
@@ -152,7 +169,40 @@ function normalizeForSubmit(type, fields) {
   };
 }
 
-export function PartnershipPage({ user, onBack, onHome }) {
+function presentationConfig(type) {
+  if (type === 'expert') {
+    return {
+      eyebrow: 'Программа для экспертов',
+      title: 'Станьте экспертом АПГ',
+      intro: 'Расскажите о своей практике, услугах и аудитории, получайте доверие жителей и развивайте личный экспертный профиль внутри городской платформы.',
+      cards: [
+        ['🧑‍💼', 'Публичный профиль', 'ФИО, направления, описание, фото, видео и понятная запись для жителей.'],
+        ['🎯', 'Точная аудитория', 'Теги “кому могу помочь” позже используются рекомендациями Локи и подборками.'],
+        ['📚', 'Контент и события', 'На тарифе Амбассадор доступны новости, мероприятия и расширенное присутствие.'],
+        ['✅', 'Проверенное подключение', 'Заявка проходит модерацию, чтобы карточка выглядела профессионально и вызывала доверие.'],
+      ],
+      tariffsTitle: 'Тарифы для экспертов',
+      tariffsSubtitle: 'Практика — профиль и услуги. Амбассадор — расширенный формат с контентом, мероприятиями и юридическим блоком.',
+      tariffs: EXPERT_TARIFFS,
+    };
+  }
+  return {
+    eyebrow: 'Программа для партнёров',
+    title: 'Подключите бизнес к АПГ',
+    intro: 'Получайте новых клиентов, запускайте акции, участвуйте в городских событиях и превращайте карточку бизнеса в рабочий канал коммуникации с жителями.',
+    cards: [
+      ['📈', 'Новые клиенты', 'Карточка, акции, контакты и запись помогают жителям быстрее выбрать ваш бизнес.'],
+      ['🗝️', 'Ключи и визиты', 'Пользователь сканирует QR у партнёра, получает ключи, возвращается и повышает свой уровень в АПГ.'],
+      ['📰', 'Новости и мероприятия', 'На старших тарифах можно публиковать новости, события и создавать поводы для повторных визитов.'],
+      ['🤝', 'Городское сообщество', 'АПГ объединяет локальный бизнес, экспертов и жителей в одной понятной экосистеме.'],
+    ],
+    tariffsTitle: 'Тарифы для бизнеса',
+    tariffsSubtitle: 'Старт — базовая карточка. Альянс — галерея, запись и видео. Премиум — новости, мероприятия и юридический профиль.',
+    tariffs: PARTNER_TARIFFS,
+  };
+}
+
+export function PartnershipPage({ user, initialType = '', entryNonce = 0, onBack, onHome }) {
   const [step, setStep] = useState('info');
   const [selectedType, setSelectedType] = useState('');
   const [infoTariff, setInfoTariff] = useState({ partner: 'start', expert: 'practice' });
@@ -165,6 +215,7 @@ export function PartnershipPage({ user, onBack, onHome }) {
   const [lokiOpen, setLokiOpen] = useState(false);
 
   useEffect(() => {
+    if (['partner', 'expert'].includes(initialType)) return;
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       if (saved && typeof saved === 'object') {
@@ -179,14 +230,28 @@ export function PartnershipPage({ user, onBack, onHome }) {
   }, []);
 
   useEffect(() => {
+    if (!['partner', 'expert'].includes(initialType)) return;
+    localStorage.removeItem(STORAGE_KEY);
+    setSelectedType(initialType);
+    setFields({});
+    setFiles([]);
+    setError('');
+    setRequestId('');
+    setStep('info');
+    trackEvent(initialType === 'expert' ? 'partnership_expert_selected' : 'partnership_partner_selected', { surface: 'profile_card' });
+    trackEvent('partnership_presentation_opened', { type: initialType });
+  }, [initialType, entryNonce]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, selectedType, infoTariff, fields, files: files.filter(file => file.url) }));
     } catch {}
   }, [step, selectedType, infoTariff, fields, files]);
 
-  const currentProgress = step === 'info' ? 1 : step === 'choose' ? 2 : step === 'form' ? 3 : 5;
+  const currentProgress = step === 'info' ? 1 : step === 'choose' ? 2 : step === 'form' ? 3 : step === 'done' ? 5 : 1;
   const typeLabel = selectedType === 'expert' ? 'Эксперт' : 'Бизнес';
   const tariffs = selectedType === 'expert' ? EXPERT_TARIFFS : PARTNER_TARIFFS;
+  const presentation = presentationConfig(selectedType);
 
   function trackEvent(event, payload = {}) {
     fetch(`${API_BASE_URL}/api/public-submit`, {
@@ -213,7 +278,17 @@ export function PartnershipPage({ user, onBack, onHome }) {
     setFiles([]);
     setError('');
     setStep('form');
-    trackEvent('partnership_form_started', { type, tariff });
+    trackEvent('partnership_questionnaire_started', { type, tariff });
+  };
+
+  const selectDirection = (type) => {
+    setSelectedType(type);
+    setFields({});
+    setFiles([]);
+    setError('');
+    setStep('info');
+    trackEvent(type === 'expert' ? 'partnership_expert_selected' : 'partnership_partner_selected', { surface: 'choice_screen' });
+    trackEvent('partnership_presentation_opened', { type });
   };
 
   const setField = (name, value) => {
@@ -306,6 +381,7 @@ export function PartnershipPage({ user, onBack, onHome }) {
     const tariff = tariffs.find(item => item.id === fields.tariff);
     return `${typeLabel}: ${tariff?.label || 'тариф выбран'}`;
   }, [fields.tariff, tariffs, typeLabel]);
+  const headerTitle = selectedType === 'expert' ? 'Стать экспертом' : selectedType === 'partner' ? 'Стать партнёром' : 'Подключиться к АПГ';
 
   return (
     <div style={{ minHeight: '100svh', background: T.bg, color: T.textPri, padding: 'calc(env(safe-area-inset-top, 0px) + 12px) 14px 88px' }}>
@@ -313,8 +389,8 @@ export function PartnershipPage({ user, onBack, onHome }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" onClick={onBack} style={{ ...buttonStyle('plain'), width: 46, padding: 0, borderRadius: 17 }}>←</button>
           <div style={{ flex: 1 }}>
-            <div style={{ color: T.gold, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 950 }}>АПГ для партнёров</div>
-            <div style={{ color: T.textPri, fontSize: 22, lineHeight: '27px', fontWeight: 950 }}>Стать партнёром АПГ</div>
+            <div style={{ color: T.gold, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 950 }}>АПГ подключение</div>
+            <div style={{ color: T.textPri, fontSize: 22, lineHeight: '27px', fontWeight: 950 }}>{headerTitle}</div>
           </div>
         </div>
 
@@ -323,37 +399,30 @@ export function PartnershipPage({ user, onBack, onHome }) {
         {step === 'info' && (
           <>
             <section style={{ ...GLASS_GOLD, borderRadius: 30, padding: 20, overflow: 'hidden' }}>
-              <div style={{ color: T.gold, fontSize: 12, fontWeight: 950, letterSpacing: 1, textTransform: 'uppercase' }}>Новый канал городского доверия</div>
-              <h1 style={{ margin: '8px 0 0', color: T.textPri, fontSize: 30, lineHeight: '34px', fontWeight: 950 }}>АПГ соединяет жителей, бизнес и экспертов</h1>
-              <p style={{ margin: '10px 0 0', color: T.textSec, fontSize: 14, lineHeight: '22px' }}>Партнёр получает понятную карточку, предложение для пользователей, заявки на запись и возможность развивать присутствие через новости, события и рекомендации.</p>
+              <div style={{ color: T.gold, fontSize: 12, fontWeight: 950, letterSpacing: 1, textTransform: 'uppercase' }}>{presentation.eyebrow}</div>
+              <h1 style={{ margin: '8px 0 0', color: T.textPri, fontSize: 30, lineHeight: '34px', fontWeight: 950 }}>{presentation.title}</h1>
+              <p style={{ margin: '10px 0 0', color: T.textSec, fontSize: 14, lineHeight: '22px' }}>{presentation.intro}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-                <button type="button" onClick={() => setStep('choose')} style={buttonStyle('gold')}>Подать заявку</button>
-                <button type="button" onClick={() => setLokiOpen(true)} style={buttonStyle('plain')}>💬 Задать вопрос Локи</button>
+                {selectedType ? (
+                  <button type="button" onClick={() => startForm(selectedType)} style={buttonStyle('gold')}>Продолжить</button>
+                ) : (
+                  <button type="button" onClick={() => setStep('choose')} style={buttonStyle('gold')}>Выбрать направление</button>
+                )}
+                <button type="button" onClick={() => setLokiOpen(true)} style={buttonStyle('plain')}>💬 Спросить Локи</button>
               </div>
             </section>
 
             <LokiHelp open={lokiOpen} onToggle={() => setLokiOpen(prev => !prev)} />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
-              <InfoCard icon="🤝" title="Что такое партнёр АПГ" text="Это компания или специалист, которого жители видят в приложении и могут выбрать по понятной карточке, акции и контактам." />
-              <InfoCard icon="📈" title="Что получает бизнес" text="Дополнительную точку контакта с аудиторией, аккуратную витрину, фото, видео, запись и расширенное продвижение на старших тарифах." />
-              <InfoCard icon="🗝️" title="Что получает пользователь" text="Бонусы, ключи за визиты, понятные предложения и доверие к проверенным участникам городской экосистемы." />
-              <InfoCard icon="⚙️" title="Как работает система" text="Вы подаёте заявку, администрация проверяет данные, ИИ-импорт помогает собрать карточку, после одобрения она появляется в АПГ." />
+              {presentation.cards.map(([icon, title, text]) => <InfoCard key={title} icon={icon} title={title} text={text} />)}
             </div>
 
             <section style={{ ...GLASS, borderRadius: 26, padding: 16 }}>
-              <div style={{ color: T.textPri, fontSize: 18, fontWeight: 950 }}>Тарифы для бизнеса</div>
-              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Выберите предварительно — анкета дальше подстроится под тариф.</div>
+              <div style={{ color: T.textPri, fontSize: 18, fontWeight: 950 }}>{presentation.tariffsTitle}</div>
+              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>{presentation.tariffsSubtitle}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', gap: 10, marginTop: 12 }}>
-                {PARTNER_TARIFFS.map(item => <TariffOptionCard key={item.id} item={item} selected={infoTariff.partner === item.id} onSelect={(id) => selectInfoTariff('partner', id)} />)}
-              </div>
-            </section>
-
-            <section style={{ ...GLASS, borderRadius: 26, padding: 16 }}>
-              <div style={{ color: T.textPri, fontSize: 18, fontWeight: 950 }}>Тарифы для экспертов</div>
-              <div style={{ color: T.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Практика — для профиля и услуг. Амбассадор — для расширенного экспертного присутствия.</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', gap: 10, marginTop: 12 }}>
-                {EXPERT_TARIFFS.map(item => <TariffOptionCard key={item.id} item={item} selected={infoTariff.expert === item.id} onSelect={(id) => selectInfoTariff('expert', id)} />)}
+                {presentation.tariffs.map(item => <TariffOptionCard key={item.id} item={item} selected={infoTariff[selectedType || 'partner'] === item.id} onSelect={(id) => selectInfoTariff(selectedType || 'partner', id)} />)}
               </div>
             </section>
           </>
@@ -365,12 +434,12 @@ export function PartnershipPage({ user, onBack, onHome }) {
             <h2 style={{ margin: '8px 0 6px', color: T.textPri, fontSize: 24, lineHeight: '29px', fontWeight: 950 }}>Выберите направление</h2>
             <div style={{ color: T.textSec, fontSize: 13, lineHeight: '20px' }}>После выбора откроется короткая анкета ИИ-импорта с полями только для выбранного типа и тарифа.</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12, marginTop: 15 }}>
-              <button type="button" onClick={() => startForm('partner')} style={{ ...GLASS_GOLD, borderRadius: 22, padding: 16, textAlign: 'left', cursor: 'pointer', color: T.textPri, fontFamily: 'inherit' }}>
+              <button type="button" onClick={() => selectDirection('partner')} style={{ ...GLASS_GOLD, borderRadius: 22, padding: 16, textAlign: 'left', cursor: 'pointer', color: T.textPri, fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 28 }}>🏪</div>
                 <div style={{ marginTop: 10, fontSize: 18, fontWeight: 950 }}>Бизнес</div>
                 <div style={{ marginTop: 6, color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Компания, студия, кафе, сервис или локальный бренд.</div>
               </button>
-              <button type="button" onClick={() => startForm('expert')} style={{ ...GLASS, borderRadius: 22, padding: 16, textAlign: 'left', cursor: 'pointer', color: T.textPri, fontFamily: 'inherit' }}>
+              <button type="button" onClick={() => selectDirection('expert')} style={{ ...GLASS, borderRadius: 22, padding: 16, textAlign: 'left', cursor: 'pointer', color: T.textPri, fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 28 }}>🧑‍💼</div>
                 <div style={{ marginTop: 10, fontSize: 18, fontWeight: 950 }}>Эксперт</div>
                 <div style={{ marginTop: 6, color: T.textSec, fontSize: 13, lineHeight: '19px' }}>Специалист, консультант, наставник или практик.</div>
@@ -403,8 +472,8 @@ export function PartnershipPage({ user, onBack, onHome }) {
           <section style={{ ...GLASS_GOLD, borderRadius: 30, padding: 22, textAlign: 'center' }}>
             <div style={{ fontSize: 42 }}>✅</div>
             <h1 style={{ margin: '12px 0 0', color: T.textPri, fontSize: 28, lineHeight: '33px', fontWeight: 950 }}>Спасибо!</h1>
-            <div style={{ color: T.textPri, fontSize: 17, fontWeight: 900, marginTop: 8 }}>Ваша заявка отправлена.</div>
-            <div style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', marginTop: 8 }}>Мы свяжемся с вами после проверки. В админке заявка уже попала в очередь модерации.</div>
+            <div style={{ color: T.textPri, fontSize: 17, fontWeight: 900, marginTop: 8 }}>Ваша заявка успешно отправлена.</div>
+            <div style={{ color: T.textSec, fontSize: 14, lineHeight: '22px', marginTop: 8 }}>Мы внимательно её рассмотрим и свяжемся с вами. В админке заявка уже попала в очередь модерации.</div>
             {requestId && <div style={{ color: T.textSec, fontSize: 11.5, marginTop: 10 }}>ID заявки: {requestId}</div>}
             <button type="button" onClick={onHome || onBack} style={{ ...buttonStyle('gold'), marginTop: 18 }}>Вернуться в приложение</button>
           </section>

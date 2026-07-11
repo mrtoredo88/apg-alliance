@@ -710,6 +710,11 @@ score =
 
 Разрешённые события:
 
+- `partnership_card_opened`
+- `partnership_partner_selected`
+- `partnership_expert_selected`
+- `partnership_presentation_opened`
+- `partnership_questionnaire_started`
 - `partnership_page_opened`
 - `partnership_tariff_selected`
 - `partnership_form_started`
@@ -719,7 +724,7 @@ score =
 ```json
 {
   "action": "track-partnership",
-  "event": "partnership_page_opened",
+  "event": "partnership_card_opened",
   "payload": { "surface": "profile" },
   "user": { "id": "user-id", "name": "Имя", "email": "mail@example.ru" }
 }

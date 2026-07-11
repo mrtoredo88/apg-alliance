@@ -677,6 +677,34 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
+  const roleValue = String(user?.role || user?.userRole || user?.authRole || '').toLowerCase();
+  const isPrivilegedProfile = String(user?.id || '') === '988504' || ['admin', 'owner', 'super_admin', 'moderator'].includes(roleValue) || user?.admin === true || user?.isAdmin === true || user?.owner === true;
+  const showPartnershipCard = Boolean(onOpenPartnership) && !ownedPartner && !ownedExpert && !isPrivilegedProfile;
+  const partnershipCardTrackedRef = useRef(false);
+
+  const trackPartnershipProfileEvent = useCallback((event, payload = {}) => {
+    fetch(`${API_BASE_URL}/api/public-submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-APG-Version': 'partnership-profile-card-v2' },
+      body: JSON.stringify({
+        action: 'track-partnership',
+        event,
+        payload,
+        user: user ? { id: user.id, name: user.displayName || [user.first_name, user.last_name].filter(Boolean).join(' '), email: user.email || user.linkedEmail || '' } : null,
+      }),
+    }).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (!showPartnershipCard || partnershipCardTrackedRef.current) return;
+    partnershipCardTrackedRef.current = true;
+    trackPartnershipProfileEvent('partnership_card_opened', { surface: 'profile', placement: 'after_user_info' });
+  }, [showPartnershipCard, trackPartnershipProfileEvent]);
+
+  const openPartnershipFlow = useCallback((type) => {
+    trackPartnershipProfileEvent(type === 'expert' ? 'partnership_expert_selected' : 'partnership_partner_selected', { surface: 'profile_card' });
+    onOpenPartnership?.(type);
+  }, [onOpenPartnership, trackPartnershipProfileEvent]);
 
   const achievements = useMemo(() =>
     ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.cond(userKeys, favorites, referralCount) })),
@@ -788,6 +816,67 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </div>
         </section>
 
+        {showPartnershipCard && (
+          <section style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 30,
+            padding: 18,
+            ...APG2.glass,
+            border: '1px solid rgba(201,168,76,0.30)',
+            background: 'linear-gradient(135deg, rgba(201,168,76,0.18), rgba(74,144,217,0.10), rgba(255,255,255,0.08))',
+            boxShadow: '0 18px 44px rgba(15,15,26,0.18), inset 0 1px 0 rgba(255,255,255,0.26)',
+            animation: 'fadeInUp 0.42s ease both',
+          }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 8% 0%, rgba(201,168,76,0.24), transparent 34%), radial-gradient(circle at 96% 18%, rgba(74,144,217,0.20), transparent 30%)' }} />
+            <div style={{ position: 'relative', zIndex: 1, display: 'grid', gap: 14 }}>
+              <div>
+                <div style={{ color: APG2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 900, letterSpacing: 1.1, textTransform: 'uppercase' }}>Подключение к АПГ</div>
+                <h2 style={{ margin: '7px 0 0', color: APG2.text, fontSize: 22, lineHeight: '27px', fontWeight: 950 }}>🤝 Развивайте своё дело вместе с АПГ</h2>
+                <p style={{ margin: '8px 0 0', color: APG2.textSoft, fontSize: 13.5, lineHeight: '21px' }}>Получайте новых клиентов, участвуйте в мероприятиях, публикуйте новости, проводите акции и станьте частью крупнейшего городского сообщества предпринимателей и экспертов.</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => openPartnershipFlow('partner')}
+                  style={{
+                    minHeight: 58,
+                    borderRadius: 20,
+                    border: '1px solid rgba(74,144,217,0.42)',
+                    background: 'linear-gradient(135deg, rgba(74,144,217,0.22), rgba(74,144,217,0.10))',
+                    color: APG2.text,
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    boxShadow: '0 12px 26px rgba(74,144,217,0.13)',
+                  }}
+                >
+                  🟦 Стать партнёром
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPartnershipFlow('expert')}
+                  style={{
+                    minHeight: 58,
+                    borderRadius: 20,
+                    border: '1px solid rgba(201,168,76,0.46)',
+                    background: 'linear-gradient(135deg, rgba(201,168,76,0.28), rgba(201,168,76,0.12))',
+                    color: APG2.text,
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    boxShadow: '0 12px 28px rgba(201,168,76,0.16)',
+                  }}
+                >
+                  🟨 Стать экспертом
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
         {isGuest && !isVK() && (
           <GlassSection title="Вход">
             <GlassCard style={{ display: 'grid', gap: 12 }}>
@@ -895,38 +984,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             {primaryActions.map(a => <GlassButton key={a.label} onClick={a.onClick}><span>{a.icon}</span>{a.label}</GlassButton>)}
           </div>
         </GlassSection>
-
-        {!ownedPartner && !ownedExpert && onOpenPartnership && (
-          <GlassSection title="Для бизнеса и экспертов">
-            <button
-              type="button"
-              onClick={onOpenPartnership}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                border: '1px solid rgba(201,168,76,0.36)',
-                borderRadius: 24,
-                padding: 16,
-                cursor: 'pointer',
-                color: APG2.text,
-                fontFamily: 'inherit',
-                background: 'linear-gradient(135deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))',
-                boxShadow: '0 14px 34px rgba(201,168,76,0.10), inset 0 1px 0 rgba(255,255,255,0.24)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-              }}
-            >
-              <div style={{ width: 52, height: 52, borderRadius: 18, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, flexShrink: 0 }}>🤝</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: APG2.gold, fontSize: 11, fontWeight: 820, letterSpacing: 1, textTransform: 'uppercase' }}>Стать партнёром АПГ</div>
-                <div style={{ color: APG2.text, fontSize: 17, lineHeight: '22px', fontWeight: 900, marginTop: 3 }}>Узнать условия и подать заявку</div>
-                <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>Информационная страница, тарифы, помощь Локи и короткая анкета.</div>
-              </div>
-              <div style={{ color: APG2.gold, fontSize: 24, flexShrink: 0 }}>›</div>
-            </button>
-          </GlassSection>
-        )}
 
         {!notificationsEnabled && (
           <GlassSection title="Уведомления">
@@ -1583,38 +1640,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </div>
         </div>
       </div>
-
-      {!ownedPartner && !ownedExpert && onOpenPartnership && (
-        <div style={{ padding: '16px 16px 0' }}>
-          <button
-            type="button"
-            onClick={onOpenPartnership}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              border: '1px solid rgba(201,168,76,0.36)',
-              borderRadius: 24,
-              padding: 16,
-              cursor: 'pointer',
-              color: APG2.text,
-              fontFamily: 'inherit',
-              background: 'linear-gradient(135deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))',
-              boxShadow: '0 14px 34px rgba(201,168,76,0.10), inset 0 1px 0 rgba(255,255,255,0.24)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-            }}
-          >
-            <div style={{ width: 52, height: 52, borderRadius: 18, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, flexShrink: 0 }}>🤝</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: APG2.gold, fontSize: 11, fontWeight: 820, letterSpacing: 1, textTransform: 'uppercase' }}>Для бизнеса и экспертов</div>
-              <div style={{ color: APG2.text, fontSize: 17, lineHeight: '22px', fontWeight: 900, marginTop: 3 }}>Стать партнёром АПГ</div>
-              <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>Узнать условия, выбрать тариф и отправить заявку за несколько минут.</div>
-            </div>
-            <div style={{ color: APG2.gold, fontSize: 24, flexShrink: 0 }}>›</div>
-          </button>
-        </div>
-      )}
 
       {/* ── Кабинет партнёра ── */}
       {ownedPartner && onOpenPartnerCabinet && (
