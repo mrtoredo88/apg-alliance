@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { analyzePublicSubmission as analyzeVercel } from '../api/public-submit.js';
 import { analyzePublicSubmission as analyzeFastify } from '../server/src/routes/public-submit.js';
 import { calculateExpertProfileCompletion, hasPremiumExpertAccess, normalizeExpertVideo } from '../src/expertProfileForm.js';
 import { hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from '../src/tariffConfig.js';
@@ -16,22 +15,20 @@ const fields = {
   newsInfo: 'Темы публикаций', activities: 'Лекции', comment: 'Только для администрации',
 };
 const files = [{ url: 'https://example.ru/avatar.jpg', role: 'avatar', size: 1000 }];
-const vercel = analyzeVercel('expert', fields, files);
 const fastify = analyzeFastify('expert', fields, files);
 
-assert.deepEqual(fastify, vercel);
-assert.equal(vercel.missingFields.includes('city'), false);
-assert.equal(vercel.missingFields.includes('inn'), false);
-assert.deepEqual(vercel.fields.categories, ['law', 'finance']);
-assert.deepEqual(vercel.fields.workFormats, ['online', 'individual']);
-assert.deepEqual(vercel.fields.audienceTags, ['entrepreneurs']);
-assert.equal(vercel.fields.cost, 'от 3 000 ₽');
-assert.equal(vercel.fields.phone, '+79990000000');
-assert.equal(vercel.fields.experience, '15 лет');
-assert.equal(vercel.fields.offer, 'Первая консультация бесплатно');
-assert.equal(vercel.fields.whatsapp, 'https://wa.me/79990000000');
-assert.deepEqual(vercel.fields.serviceCatalog, []);
-assert.equal(vercel.fields.tariff, 'ambassador');
+assert.equal(fastify.missingFields.includes('city'), false);
+assert.equal(fastify.missingFields.includes('inn'), false);
+assert.deepEqual(fastify.fields.categories, ['law', 'finance']);
+assert.deepEqual(fastify.fields.workFormats, ['online', 'individual']);
+assert.deepEqual(fastify.fields.audienceTags, ['entrepreneurs']);
+assert.equal(fastify.fields.cost, 'от 3 000 ₽');
+assert.equal(fastify.fields.phone, '+79990000000');
+assert.equal(fastify.fields.experience, '15 лет');
+assert.equal(fastify.fields.offer, 'Первая консультация бесплатно');
+assert.equal(fastify.fields.whatsapp, 'https://wa.me/79990000000');
+assert.deepEqual(fastify.fields.serviceCatalog, []);
+assert.equal(fastify.fields.tariff, 'ambassador');
 assert.equal(normalizeExpertTariff('premium'), 'ambassador');
 assert.equal(normalizeExpertTariff('start'), 'practice');
 assert.equal(hasPremiumExpertAccess('practice'), false);
@@ -52,7 +49,7 @@ assert.ok(normalizedExpert.formats.includes('group'));
 const completion = calculateExpertProfileCompletion({ ...fields, primaryCategory: 'law', photo: files[0].url, coverPhoto: 'https://example.ru/cover.jpg' });
 assert.ok(completion >= 80);
 
-const partnerStart = analyzeVercel('partner', {
+const partnerStart = analyzeFastify('partner', {
   title: 'Студия АПГ', category: 'beauty', shortDescription: 'Студия красоты', description: 'Маникюр и уход.',
   phone: '+7 999 111-22-33', email: 'studio@example.ru', tariff: 'start', bookingUrl: 'https://example.ru/book',
   newsInfo: 'Новости', activities: 'Мастер-классы', inn: '7701234567',
@@ -81,4 +78,4 @@ assert.equal(hasPartnerAllianceAccess('alliance'), true);
 assert.equal(hasPartnerPremiumAccess('alliance'), false);
 assert.equal(hasPartnerPremiumAccess('premium'), true);
 
-console.log('Tariff questionnaire V1: expert and partner schemas, API parity, gating and preview contracts passed');
+console.log('Tariff questionnaire V1: expert and partner schemas, Fastify analyzer, gating and preview contracts passed');

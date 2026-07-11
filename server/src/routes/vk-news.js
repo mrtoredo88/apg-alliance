@@ -138,6 +138,8 @@ function mapPost(post) {
     linkLabel: 'Открыть оригинал в ВКонтакте',
     isPinned,
     pinned: isPinned,
+    commentsEnabled: true,
+    allowComments: true,
     priority: isPinned ? 10 : 0,
     stats: {
       likes: Number(post.likes?.count) || 0,

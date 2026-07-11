@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-11] refactor: единая Fastify backend-архитектура
+**Коммит:** `pending`
+**Файлы:** `src/constants.js`, `server/src/server.js`, `server/deploy-cron.sh`, `server/src/routes/*`, `scripts/expert-questionnaire-v2-test.mjs`, `docs/backend-architecture.md`, `.ai/04_API.md`, `.ai/17_CHANGELOG_AI.md`, `api/*`, `vercel.json`, `ship.sh`
+**Тип:** refactor
+**Что изменено:**
+- Удалён legacy слой Vercel Functions `api/*`, `vercel.json` и старый `ship.sh`; runtime backend теперь один — Fastify в Yandex Serverless Containers.
+- Frontend больше не имеет пустого fallback на `/api` текущего домена: `API_BASE_URL` по умолчанию указывает на production Yandex Container и нормализует trailing slash.
+- Cron перенесён в Yandex timer triggers через `server/deploy-cron.sh`; raffle/activity/expert-rotation вызывают Fastify endpoint.
+- Добавлена `docs/backend-architecture.md` с картой маршрутов, cron, webhook, env и новой схемой деплоя.
+**Почему:** Проект находился в промежуточном состоянии с двумя backend runtime и двумя системами деплоя; дальнейшие крупные функции должны строиться на единой архитектуре без ограничений Vercel Hobby.
+
+---
+
 ## [2026-07-11] fix: контраст тарифов в анкетах ИИ-импорта
 **Коммит:** `pending`
 **Файлы:** `src/components/TariffOptionCard.jsx`, `src/components/ExpertQuestionnaire.jsx`, `src/components/PartnerQuestionnaire.jsx`, `.ai/17_CHANGELOG_AI.md`

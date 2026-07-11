@@ -2,13 +2,13 @@
 
 ## Общее
 
-Все API функции существуют в двух местах с идентичной логикой:
-- `api/*.js` — Vercel Serverless Functions (primary)
-- `server/src/routes/*.js` — Fastify (Docker/Yandex Serverless Containers, fallback)
+Все backend endpoint работают через единый Fastify API в Yandex Serverless Containers:
+- `server/src/routes/*.js` — единственная runtime-реализация API
+- `api/` удалён как legacy Vercel Serverless слой
 
-Переключение через переменную `VITE_API_BASE_URL`:
-- `''` (пусто) → Vercel `/api/` routes
-- URL Yandex Container → Fastify
+Frontend всегда строит backend URL через `API_BASE_URL`. По умолчанию используется production Yandex Container:
+`https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net`.
+`VITE_API_BASE_URL` допускается только как явный override для стенда/локальной проверки, но пустое значение больше не переключает приложение на Vercel.
 
 Лимит тела запроса: **8 MB**.
 
@@ -594,7 +594,7 @@ Response: `{ "ok": true, "token": "firebaseCustomToken", "user": {...} }`
 
 **Метод:** POST  
 **Auth:**
-- Cron: `Authorization: Bearer {CRON_SECRET}` (Vercel добавляет автоматически)
+- Cron: Yandex timer trigger отправляет `body.secret === RAFFLE_SECRET`
 - Ручной: `body.secret === RAFFLE_SECRET`
 
 **Request body (ручной):**
@@ -683,7 +683,7 @@ Response: `{ "ok": true, "token": "firebaseCustomToken", "user": {...} }`
 
 **Метод:** GET (cron) или POST (ручной)  
 **Auth:**
-- Cron: `Authorization: Bearer {CRON_SECRET}`
+- Cron: Yandex timer trigger отправляет `body.secret === ACTIVITY_SECRET`
 - Ручной: `body.secret === ACTIVITY_SECRET`
 
 **Request body (ручной):**
@@ -713,7 +713,7 @@ score =
 
 **Назначение:** Приём заявок на партнёрство из пользовательского сценария «Стать партнёром АПГ» и запись аналитики этого сценария.
 
-**Runtime:** Vercel Serverless + Fastify route mirror. На Vercel используется существующая функция `public-submit`, чтобы не увеличивать количество Serverless Functions. Fastify дополнительно может принимать mirror-route `/api/partnership-application`.
+**Runtime:** единый Fastify backend. Заявки пользовательского сценария принимаются через `POST /api/public-submit`; отдельный Fastify endpoint `POST /api/partnership-application` оставлен как явный маршрут сценария подключения без Vercel mirror.
 
 **Actions:**
 
@@ -811,7 +811,7 @@ score =
 | `PUSH_SECRET` | send-push.js |
 | `RAFFLE_SECRET` | raffle-draw.js, send-push.js |
 | `ACTIVITY_SECRET` | activity-index.js |
-| `CRON_SECRET` | raffle-draw.js, activity-index.js |
+| `CRON_SECRET` | опциональная backward-compatible авторизация для ручных/внешних вызовов cron endpoint; Yandex timer triggers используют `RAFFLE_SECRET` / `ACTIVITY_SECRET` |
 | `YC_ACCESS_KEY` | upload-photo.js |
 | `YC_SECRET_KEY` | upload-photo.js |
 | `TELEGRAM_BOT_TOKEN` | telegram-webhook.js, verify-telegram.js |
