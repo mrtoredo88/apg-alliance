@@ -2,6 +2,7 @@ import { buildRecommendationFeed } from '../../LokiRecommendationCenter.js';
 import { buildInterestProfile } from '../../../interestEngine.js';
 import { buildLifeGraph } from '../../../lifeGraph.js';
 import { getAiProfile } from '../../../aiProfile.js';
+import { isLifecycleArchived, isLifecycleDeleted, normalizeContentStatus } from '../../../contentLifecycle.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -19,7 +20,7 @@ function isToday(value, now = new Date()) {
 }
 
 function isActive(item) {
-  return item?.archived !== true && item?.hidden !== true && item?.deleted !== true;
+  return item?.archived !== true && item?.hidden !== true && item?.deleted !== true && !['archived', 'deleted', 'trash'].includes(normalizeContentStatus(item));
 }
 
 function hasPromotion(item = {}) {
@@ -58,6 +59,12 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
   const experts = rawExperts.map(item => ({ ...item, aiProfile: getAiProfile(item, 'expert', { partners, experts: rawExperts }) }));
   const events = cleanList(appState.events).filter(isActive);
   const news = cleanList(appState.news).filter(isActive);
+  const archive = {
+    partners: cleanList(appState.partners).filter(item => isLifecycleArchived(item) && !isLifecycleDeleted(item)),
+    experts: cleanList(appState.experts).filter(item => isLifecycleArchived(item) && !isLifecycleDeleted(item)),
+    events: cleanList(appState.events).filter(item => ['completed', 'archived'].includes(normalizeContentStatus(item)) && !isLifecycleDeleted(item)),
+    news: cleanList(appState.news).filter(item => isLifecycleArchived(item) && !isLifecycleDeleted(item)),
+  };
   const tasks = cleanList(appState.customTasks);
   const notifications = cleanList(appState.notifications);
   const favorites = cleanList(appState.favorites).map(String);
@@ -154,6 +161,7 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
       experts,
       events,
       news,
+      archive,
       customTasks: tasks,
       notifications,
       favorites,

@@ -5,6 +5,7 @@ import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { APP_URL } from '../lib/config.js';
 import { ECONOMY_VERSION, economyMigrationPatch } from '../../../server-shared/economy-engine.js';
+import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentTitle, getLifecycleAutoRecommendation, normalizeContentStatus, summarizeLifecycle } from '../../../server-shared/content-lifecycle.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
@@ -31,6 +32,11 @@ const RESOURCE_CONFIG = {
   config: { collection: 'config', scope: 'settings', label: 'настройка' },
   stats: { collection: 'stats', scope: 'stats', label: 'статистика' },
 };
+
+const LIFECYCLE_RESOURCE_CONFIG = Object.fromEntries(Object.entries(CONTENT_RESOURCES).map(([key, value]) => [key, {
+  ...value,
+  scope: RESOURCE_CONFIG[value.collection]?.scope || key,
+}]));
 
 const LIST_CONFIG = {
   users: { orderBy: null, limit: 1000 },
@@ -399,6 +405,115 @@ function withServerTimestamps(patch, fields = []) {
     if (field) next[field] = FieldValue.serverTimestamp();
   });
   return next;
+}
+
+function lifecycleResourceConfig(resource) {
+  const config = LIFECYCLE_RESOURCE_CONFIG[String(resource || '').trim()];
+  if (!config) {
+    const error = new Error('Неизвестный lifecycle-ресурс.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return config;
+}
+
+async function handleLifecycleAction(db, request, actor) {
+  const action = String(request.body?.action || '').trim();
+  const resource = String(request.body?.resource || '').trim();
+  const config = lifecycleResourceConfig(resource);
+  const idempotencyKey = String(request.headers['x-idempotency-key'] || request.body?.idempotencyKey || '').trim();
+
+  if (action === 'lifecycle:overview') {
+    await requireAdminPermission(request, `${config.scope}:read`);
+    const limitValue = Math.min(Number(request.body?.limit || 500), 1000);
+    const snap = await db.collection(config.collection).limit(limitValue).get();
+    const rows = snap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .filter(item => config.filter ? config.filter(item) : true);
+    const recommendations = rows
+      .map(item => ({ item, recommendation: getLifecycleAutoRecommendation(resource, item, request.body?.rules || {}) }))
+      .filter(row => row.recommendation)
+      .slice(0, 100)
+      .map(row => ({
+        id: row.item.id,
+        resource,
+        title: contentTitle(row.item, resource),
+        status: normalizeContentStatus(row.item),
+        targetStatus: row.recommendation.targetStatus,
+        reason: row.recommendation.reason,
+      }));
+    return {
+      ok: true,
+      resource,
+      label: config.label,
+      summary: summarizeLifecycle(rows, resource),
+      recommendations,
+      rows: rows.map(item => serializeAdminValue({
+        id: item.id,
+        title: contentTitle(item, resource),
+        status: normalizeContentStatus(item),
+        lifecycle: item.lifecycle || null,
+        lifecycleHistory: item.lifecycleHistory || [],
+        archived: item.archived === true,
+        deleted: item.deleted === true || Boolean(item.deletedAt),
+        active: item.active !== false,
+        date: item.publishedAt || item.startAt || item.eventDate || item.date || item.createdAt || null,
+        views: item.views || item.stats?.views || 0,
+        comments: item.comments || item.stats?.comments || 0,
+        likes: item.likes || item.stats?.likes || 0,
+      })),
+    };
+  }
+
+  if (action === 'lifecycle:transition' || action === 'lifecycle:bulk-transition') {
+    await requireAdminPermission(request, `${config.scope}:update`);
+    const ids = action === 'lifecycle:bulk-transition'
+      ? (Array.isArray(request.body?.ids) ? request.body.ids : [])
+      : [request.body?.id || request.body?.targetId];
+    const uniqueIds = Array.from(new Set(ids.map(id => String(id || '').trim()).filter(Boolean))).slice(0, 100);
+    if (!uniqueIds.length) {
+      const error = new Error('Не выбраны объекты для смены статуса.');
+      error.statusCode = 400;
+      throw error;
+    }
+    const nextStatus = String(request.body?.status || request.body?.nextStatus || '').trim();
+    const reason = String(request.body?.reason || '').trim();
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const results = [];
+      for (const id of uniqueIds) {
+        const ref = db.collection(config.collection).doc(id);
+        const snap = await ref.get();
+        if (!snap.exists) {
+          results.push({ id, ok: false, error: 'not_found' });
+          continue;
+        }
+        const before = { id, ...(snap.data() || {}) };
+        const patch = buildLifecyclePatch({
+          item: before,
+          resource,
+          nextStatus,
+          actorId: actor.userId || actor.uid || 'admin',
+          reason,
+          serverTimestamp: new Date().toISOString(),
+        });
+        patch.updatedAt = FieldValue.serverTimestamp();
+        await ref.set(patch, { merge: true });
+        await writeAuditLog(db, request, actor, `${config.scope}:lifecycle:${nextStatus}`, config.collection, id, {
+          label: `${CONTENT_STATUS_LABELS[nextStatus] || nextStatus}: ${contentTitle(before, resource)}`,
+          from: normalizeContentStatus(before),
+          to: nextStatus,
+          reason,
+        });
+        if (resource === 'news') await writeHistory(db, actor, id, `lifecycle:${nextStatus}`, before, patch);
+        results.push({ id, ok: true, status: nextStatus, patch: serializeAdminValue(patch) });
+      }
+      return { ok: true, resource, status: nextStatus, updated: results.filter(item => item.ok).length, results };
+    });
+  }
+
+  const error = new Error('Неизвестное lifecycle-действие.');
+  error.statusCode = 400;
+  throw error;
 }
 
 function serializeAdminValue(value) {
@@ -1641,6 +1756,8 @@ export default async function adminActionsRoutes(fastify) {
       const action = String(request.body?.action || '');
       return action.startsWith('entity:')
         ? await handleEntityAction(db, request, actor)
+        : action.startsWith('lifecycle:')
+          ? await handleLifecycleAction(db, request, actor)
         : action.startsWith('referrals:')
           ? await handleReferralAction(db, request, actor)
         : action.startsWith('telegram-auth:')

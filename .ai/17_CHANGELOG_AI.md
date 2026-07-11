@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-11] feat: Content Lifecycle Engine V1
+**Коммит:** `pending`
+**Файлы:** `server-shared/content-lifecycle.js`, `src/contentLifecycle.js`, `server/src/routes/admin-actions.js`, `server/src/routes/public-data.js`, `src/AdminPanel.jsx`, `src/UserApp.jsx`, `src/loki/core/context/ContextEngine.js`, `src/loki/core/v2/Reasoner.js`, `scripts/content-lifecycle-test.mjs`, `docs/content-lifecycle.md`, `.ai/04_API.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен единый Content Lifecycle Engine со статусами `draft/moderation/scheduled/published/completed/archived/deleted/trash` и совместимостью со старыми полями `status/active/archived/deletedAt`.
+- В `/api/admin-actions` добавлены actions `lifecycle:overview`, `lifecycle:transition`, `lifecycle:bulk-transition`; смена статуса пишет `lifecycleHistory`, audit log и историю новостей.
+- В админку добавлен «Центр контента» с поиском, фильтрами статусов, массовыми действиями и рекомендациями автоархивации.
+- Публичные данные и UserApp фильтруют архив/удалённые через общий lifecycle; прошедшие мероприятия получают отдельный статус `completed`, а Локи может искать по архиву при явном историческом запросе.
+**Почему:** Архив и завершение контента должны быть частью единой архитектуры платформы, а не отдельной кнопкой для новостей.
+
+---
+
 ## [2026-07-11] refactor: единая Fastify backend-архитектура
 **Коммит:** `pending`
 **Файлы:** `src/constants.js`, `server/src/server.js`, `server/deploy-cron.sh`, `server/src/routes/*`, `scripts/expert-questionnaire-v2-test.mjs`, `docs/backend-architecture.md`, `.ai/04_API.md`, `.ai/17_CHANGELOG_AI.md`, `api/*`, `vercel.json`, `ship.sh`

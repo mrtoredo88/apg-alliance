@@ -31,6 +31,7 @@ import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
 import { normalizeExpertRecord, registerCustomExpertCategories } from '../server-shared/expert-directory.js';
 import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
+import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -67,7 +68,11 @@ function safeScrollTop() {
 }
 
 function isNotArchived(item) {
-  return item?.archived !== true;
+  return item?.archived !== true && item?.deleted !== true && !['archived', 'deleted', 'trash'].includes(normalizeContentStatus(item));
+}
+
+function isPublicContent(item) {
+  return isLifecyclePublic(item);
 }
 
 function safeStringList(value) {
@@ -1028,6 +1033,7 @@ export function UserApp() {
 
       const freshEvents = eSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => isPublicContent(item) || normalizeContentStatus(item) === 'completed')
         .sort((a, b) => {
           const dp = (b.priority ?? 0) - (a.priority ?? 0);
           if (dp !== 0) return dp;
@@ -1051,6 +1057,7 @@ export function UserApp() {
         newsById.set(id, merged);
       });
       const freshNews = [...newsById.values()]
+        .filter(isPublicContent)
         .sort((a, b) => {
           const dp = (b.priority ?? 0) - (a.priority ?? 0);
           return dp !== 0 ? dp : getMs(b) - getMs(a);

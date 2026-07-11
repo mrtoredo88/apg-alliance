@@ -1,4 +1,5 @@
 import { getDb } from '../lib/firebase.js';
+import { isLifecyclePublic, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
 
 const PUBLIC_COLLECTIONS = {
   partners:      { collection: 'partners', limit: 100 },
@@ -22,6 +23,13 @@ function serializePublicValue(value) {
   return value;
 }
 
+function isPublicRow(collectionName, item) {
+  if (collectionName === 'events') return ['published', 'completed'].includes(normalizeContentStatus(item)) && item.archived !== true && item.deleted !== true;
+  if (['partners', 'experts', 'news', 'customTasks'].includes(collectionName)) return isLifecyclePublic(item);
+  if (collectionName === 'prizes') return isLifecyclePublic(item) || (item.active !== false && item.archived !== true && item.deleted !== true);
+  return item.archived !== true && item.deleted !== true && !['archived', 'deleted', 'trash'].includes(normalizeContentStatus(item));
+}
+
 async function readPublicCollection(db, name, config) {
   let ref = db.collection(config.collection);
   if (config.orderBy) ref = ref.orderBy(config.orderBy[0], config.orderBy[1]);
@@ -29,6 +37,7 @@ async function readPublicCollection(db, name, config) {
   const snap = await ref.get();
   return snap.docs
     .map(doc => ({ id: doc.id, ...serializePublicValue(doc.data()) }))
+    .filter(item => isPublicRow(config.collection, item))
     .filter(item => !config.activeOnly || item.active !== false)
     .filter(item => config.collection !== 'partners' || item.catalogPublished !== false);
 }

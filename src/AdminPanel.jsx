@@ -22,6 +22,7 @@ import { buildAdminContext } from './adminAssistant/AdminContextEngine.js';
 import { hasExpertAmbassadorAccess, hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
 import { listCustomExpertCategories, normalizeCustomExpertCategory, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../server-shared/expert-directory.js';
 import { buildAiImportValidation } from './aiImportValidation.js';
+import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, filterByLifecycleView, getLifecycleAutoRecommendation, lifecycleBucket, normalizeContentStatus, summarizeLifecycle } from './contentLifecycle.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -72,7 +73,7 @@ const NOTIFICATION_PRIORITIES = [
   ['critical', 'Критический'],
 ];
 
-const isArchived = item => item?.archived === true;
+const isArchived = item => item?.archived === true || ['archived', 'deleted', 'trash'].includes(normalizeContentStatus(item));
 const isErrorArchived = item => item?.archived === true;
 const isErrorResolved = item => item?.resolved === true;
 const isErrorActive = item => !isErrorResolved(item) && !isErrorArchived(item);
@@ -505,6 +506,11 @@ function toJsDate(value) {
   if (value.toDate) return value.toDate();
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function dateMs(value) {
+  const d = toJsDate(value);
+  return d ? d.getTime() : 0;
 }
 
 function dateKey(value) {
@@ -3653,6 +3659,11 @@ export const AdminPanel = () => {
   const [expertLinksFilter, setExpertLinksFilter]   = useState('unverified');
   const [partnerArchiveView, setPartnerArchiveView] = useState('active');
   const [expertArchiveView, setExpertArchiveView]   = useState('active');
+  const [contentLifecycleView, setContentLifecycleView] = useState('active');
+  const [contentLifecycleResource, setContentLifecycleResource] = useState('news');
+  const [contentLifecycleSearch, setContentLifecycleSearch] = useState('');
+  const [selectedContentIds, setSelectedContentIds] = useState([]);
+  const [contentLifecycleBusy, setContentLifecycleBusy] = useState(false);
   const [expertSearch, setExpertSearch]             = useState('');
   const [globalSearch, setGlobalSearch]     = useState('');
   const [showSearchDrop, setShowSearchDrop] = useState(false);
@@ -3964,6 +3975,78 @@ export const AdminPanel = () => {
 
   const runAdminEntityAction = (resource, verb, payload = {}) =>
     runAdminAction(`entity:${verb}`, { resource, ...payload });
+
+  const getContentRows = useCallback((resource = contentLifecycleResource) => {
+    const map = { news, events, promotions: partners, partners, experts, prizes, tasks: customTasks, banners };
+    return Array.isArray(map[resource]) ? map[resource] : [];
+  }, [banners, contentLifecycleResource, customTasks, events, experts, news, partners, prizes]);
+
+  const setContentRows = useCallback((resource, updater) => {
+    const apply = setter => setter(prev => (typeof updater === 'function' ? updater(prev) : updater));
+    if (resource === 'news') apply(setNews);
+    if (resource === 'events') apply(setEvents);
+    if (resource === 'partners' || resource === 'promotions') apply(setPartners);
+    if (resource === 'experts') apply(setExperts);
+    if (resource === 'prizes') apply(setPrizes);
+    if (resource === 'tasks') apply(setCustomTasks);
+    if (resource === 'banners') apply(setBanners);
+  }, []);
+
+  const lifecycleTransition = useCallback(async (resource, ids, status, reason = '') => {
+    const cleanIds = Array.from(new Set((Array.isArray(ids) ? ids : [ids]).map(String).filter(Boolean)));
+    if (!cleanIds.length) return null;
+    setContentLifecycleBusy(true);
+    try {
+      const data = await runAdminAction(cleanIds.length > 1 ? 'lifecycle:bulk-transition' : 'lifecycle:transition', {
+        resource,
+        ids: cleanIds,
+        id: cleanIds[0],
+        status,
+        reason,
+        idempotencyKey: `lifecycle_${resource}_${status}_${Date.now()}`,
+      });
+      const patches = new Map((data.results || []).filter(row => row.ok).map(row => [row.id, row.patch || { lifecycleStatus: status, contentStatus: status }]));
+      setContentRows(resource, prev => prev.map(item => patches.has(item.id) ? { ...item, ...patches.get(item.id) } : item));
+      setSelectedContentIds(prev => prev.filter(id => !cleanIds.includes(id)));
+      return data;
+    } catch (e) {
+      logError(e, 'AdminPanel.lifecycleTransition');
+      alert(e.message || 'Не удалось изменить статус.');
+      return null;
+    } finally {
+      setContentLifecycleBusy(false);
+    }
+  }, [runAdminAction, setContentRows]);
+
+  const lifecycleRows = useMemo(() => getContentRows(contentLifecycleResource), [getContentRows, contentLifecycleResource]);
+  const lifecycleSummary = useMemo(() => summarizeLifecycle(lifecycleRows, contentLifecycleResource), [lifecycleRows, contentLifecycleResource]);
+  const lifecycleVisibleRows = useMemo(() => {
+    const queryText = contentLifecycleSearch.trim().toLowerCase().replace(/ё/g, 'е');
+    return filterByLifecycleView(lifecycleRows, contentLifecycleView, contentLifecycleResource)
+      .filter(item => {
+        if (!queryText) return true;
+        return [item.title, item.name, item.offer, item.category, item.author, item.description, item.text, item.id]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .replace(/ё/g, 'е')
+          .includes(queryText);
+      })
+      .sort((a, b) => {
+        const bucketOrder = { moderation: 6, scheduled: 5, draft: 4, active: 3, completed: 2, archive: 1, deleted: 0 };
+        const ba = bucketOrder[lifecycleBucket(a)] ?? 0;
+        const bb = bucketOrder[lifecycleBucket(b)] ?? 0;
+        if (ba !== bb) return bb - ba;
+        const ta = dateMs(a.updatedAt || a.publishedAt || a.createdAt || a.date || a.startAt);
+        const tb = dateMs(b.updatedAt || b.publishedAt || b.createdAt || b.date || b.startAt);
+        return tb - ta;
+      });
+  }, [contentLifecycleResource, contentLifecycleSearch, contentLifecycleView, lifecycleRows]);
+
+  const lifecycleRecommendations = useMemo(() => lifecycleRows
+    .map(item => ({ item, recommendation: getLifecycleAutoRecommendation(contentLifecycleResource, item) }))
+    .filter(row => row.recommendation)
+    .slice(0, 20), [contentLifecycleResource, lifecycleRows]);
 
   const fetchAdminEntityList = async (resource, limitValue) => {
     const data = await runAdminEntityAction(resource, 'list', {
@@ -4543,20 +4626,13 @@ export const AdminPanel = () => {
 
   const archiveExpert = async (ex) => {
     if (!window.confirm(`Архивировать эксперта «${ex.name || ex.id}»? Он исчезнет из публичного приложения.`)) return;
-    await runAdminEntityAction('experts', 'update', {
-      id: ex.id,
-      patch: { archived: true, active: false, archivedBy: adminSecurity?.actor?.userId || adminSession?.uid || 'admin' },
-      serverTimestampFields: ['archivedAt'],
-    });
+    await lifecycleTransition('experts', ex.id, 'archived', 'Архивация из карточки эксперта');
     fetchData();
   };
 
   const restoreExpert = async (ex) => {
     if (!window.confirm(`Восстановить эксперта «${ex.name || ex.id}»?`)) return;
-    await runAdminEntityAction('experts', 'update', {
-      id: ex.id,
-      patch: { archived: false, archivedAt: null, archivedBy: null },
-    });
+    await lifecycleTransition('experts', ex.id, 'published', 'Восстановление эксперта из архива');
     fetchData();
   };
 
@@ -4810,20 +4886,13 @@ export const AdminPanel = () => {
 
   const archivePartner = async (p) => {
     if (!window.confirm(`Архивировать партнёра «${p.name || p.id}»? Он исчезнет из публичного приложения.`)) return;
-    await runAdminEntityAction('partners', 'update', {
-      id: p.id,
-      patch: { archived: true, active: false, catalogPublished: false, featured: false, archivedBy: adminSecurity?.actor?.userId || adminSession?.uid || 'admin' },
-      serverTimestampFields: ['archivedAt'],
-    });
+    await lifecycleTransition('partners', p.id, 'archived', 'Архивация из карточки партнёра');
     fetchData();
   };
 
   const restorePartner = async (p) => {
     if (!window.confirm(`Восстановить партнёра «${p.name || p.id}»?`)) return;
-    await runAdminEntityAction('partners', 'update', {
-      id: p.id,
-      patch: { archived: false, archivedAt: null, archivedBy: null },
-    });
+    await lifecycleTransition('partners', p.id, 'published', 'Восстановление партнёра из архива');
     fetchData();
   };
 
@@ -5519,8 +5588,8 @@ export const AdminPanel = () => {
   };
 
   const deleteEvent = async (id) => {
-    if (!window.confirm('Удалить событие?')) return;
-    await runAdminEntityAction('events', 'delete', { id });
+    if (!window.confirm('Пометить событие как удалённое? Это первый этап удаления, данные сохранятся.')) return;
+    await lifecycleTransition('events', id, 'deleted', 'Первый этап удаления события');
     fetchData();
   };
 
@@ -5684,8 +5753,8 @@ export const AdminPanel = () => {
   };
 
   const deletePrize = async (id) => {
-    if (!window.confirm('Удалить приз?')) return;
-    await runAdminEntityAction('prizes', 'delete', { id });
+    if (!window.confirm('Пометить приз как удалённый? Это первый этап удаления, данные сохранятся.')) return;
+    await lifecycleTransition('prizes', id, 'deleted', 'Первый этап удаления приза');
     fetchData();
   };
 
@@ -6210,6 +6279,7 @@ export const AdminPanel = () => {
             { id: 'users', emoji: '👥', label: 'Пользователи', count: adminMetrics.users.length || undefined },
             { id: 'referrals', emoji: '🔗', label: 'Рефералы', count: referralAudit?.summary?.grantErrors || undefined },
             { id: 'automation', emoji: '⚙️', label: 'Автоматизация', count: automationAudit?.summary?.pending || undefined },
+            { id: 'content', emoji: '🧭', label: 'Центр контента', count: lifecycleRecommendations.length || undefined },
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
             { id: 'experts',   emoji: '🧑‍💼', label: 'Эксперты',  count: experts.length },
             { id: 'events',    emoji: '🎉', label: 'События',   count: events.length },
@@ -6528,6 +6598,147 @@ export const AdminPanel = () => {
           onConfirm={(row) => runAutomationAction('automation:confirm', row)}
           onDismiss={(row) => runAutomationAction('automation:dismiss', row)}
         />
+      )}
+
+      {activeTab === 'content' && (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div style={s.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div>
+                <h2 style={{ ...s.h2, margin: '0 0 6px' }}>🧭 Центр управления контентом</h2>
+                <p style={{ margin: 0, color: A.textSec, fontSize: 13, lineHeight: '19px' }}>
+                  Единый жизненный цикл для новостей, мероприятий, акций и будущих сущностей. Архив не удаляет данные: медиа, комментарии и статистика остаются в документе.
+                </p>
+              </div>
+              <button
+                disabled={contentLifecycleBusy || !lifecycleRecommendations.length}
+                style={{ ...s.btn, ...s.btnPri, opacity: contentLifecycleBusy || !lifecycleRecommendations.length ? 0.55 : 1 }}
+                onClick={async () => {
+                  const rows = lifecycleRecommendations.filter(row => row.recommendation?.targetStatus);
+                  if (!rows.length) return;
+                  if (!window.confirm(`Применить ${rows.length} рекомендаций жизненного цикла для раздела «${CONTENT_RESOURCES[contentLifecycleResource]?.label}»?`)) return;
+                  const grouped = rows.reduce((acc, row) => {
+                    const status = row.recommendation.targetStatus;
+                    acc[status] = [...(acc[status] || []), row.item.id];
+                    return acc;
+                  }, {});
+                  for (const [status, ids] of Object.entries(grouped)) {
+                    await lifecycleTransition(contentLifecycleResource, ids, status, 'Автоматическая рекомендация Content Lifecycle Engine');
+                  }
+                }}
+              >
+                ⚡ Применить рекомендации
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '240px 1fr', gap: 12, marginTop: 16 }}>
+              <select style={s.input} value={contentLifecycleResource} onChange={e => { setContentLifecycleResource(e.target.value); setSelectedContentIds([]); }}>
+                {Object.entries(CONTENT_RESOURCES).map(([id, cfg]) => <option key={id} value={id}>{cfg.label}</option>)}
+              </select>
+              <input style={s.input} placeholder="Поиск по названию, автору, категории, тексту" value={contentLifecycleSearch} onChange={e => setContentLifecycleSearch(e.target.value)} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginTop: 14 }}>
+              {[
+                ['active', 'Активные', lifecycleSummary.active],
+                ['draft', 'Черновики', lifecycleSummary.draft],
+                ['moderation', 'Модерация', lifecycleSummary.moderation],
+                ['scheduled', 'Запланировано', lifecycleSummary.scheduled],
+                ['completed', 'Завершённые', lifecycleSummary.completed],
+                ['archive', 'Архив', lifecycleSummary.archived],
+                ['deleted', 'Удалённые', lifecycleSummary.deleted + lifecycleSummary.trash],
+                ['all', 'Все', lifecycleSummary.total],
+              ].map(([id, label, count]) => (
+                <button key={id} onClick={() => { setContentLifecycleView(id); setSelectedContentIds([]); }}
+                  style={{ border: `1px solid ${contentLifecycleView === id ? A.gold : A.border}`, background: contentLifecycleView === id ? A.goldDim : A.chip, color: contentLifecycleView === id ? A.gold : A.textSec, borderRadius: 12, padding: '10px 12px', textAlign: 'left', cursor: 'pointer' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800 }}>{label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: contentLifecycleView === id ? A.gold : A.text }}>{count || 0}</div>
+                </button>
+              ))}
+            </div>
+
+            {selectedContentIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14, padding: 12, borderRadius: 14, border: `1px solid ${A.border}`, background: A.chip }}>
+                <span style={{ color: A.textSec, fontSize: 13, alignSelf: 'center' }}>Выбрано: {selectedContentIds.length}</span>
+                {[
+                  ['draft', 'Черновик'],
+                  ['moderation', 'На модерации'],
+                  ['scheduled', 'Запланировано'],
+                  ['published', 'Опубликовать'],
+                  ['completed', 'Завершить'],
+                  ['archived', 'Архивировать'],
+                  ['deleted', 'Удалить'],
+                ].map(([status, label]) => (
+                  <button key={status} disabled={contentLifecycleBusy} style={{ ...s.btn, ...(status === 'deleted' ? s.btnDanger : status === 'published' ? s.btnPri : s.btnGray), fontSize: 12, opacity: contentLifecycleBusy ? 0.6 : 1 }}
+                    onClick={() => {
+                      if (status === 'deleted' && !window.confirm('Пометить выбранные объекты как удалённые? Это не окончательное удаление, данные сохранятся.')) return;
+                      lifecycleTransition(contentLifecycleResource, selectedContentIds, status, `Массовая смена статуса из Центра контента: ${label}`);
+                    }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {lifecycleRecommendations.length > 0 && (
+            <div style={{ ...s.card, borderColor: 'rgba(245,158,11,0.32)', background: 'rgba(245,158,11,0.06)' }}>
+              <h3 style={{ margin: '0 0 10px', color: '#f59e0b', fontSize: 16 }}>Рекомендации Content Lifecycle Engine</h3>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {lifecycleRecommendations.map(({ item, recommendation }) => (
+                  <div key={`${item.id}_${recommendation.targetStatus}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: 10, borderRadius: 12, background: A.card, border: `1px solid ${A.border}` }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: A.text, fontWeight: 800, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || item.name || item.offer || item.id}</div>
+                      <div style={{ color: A.textSec, fontSize: 12 }}>{recommendation.reason}</div>
+                    </div>
+                    <button disabled={contentLifecycleBusy} style={{ ...s.btn, ...s.btnPri, padding: '7px 10px', fontSize: 12 }} onClick={() => lifecycleTransition(contentLifecycleResource, item.id, recommendation.targetStatus, recommendation.reason)}>
+                      {CONTENT_STATUS_LABELS[recommendation.targetStatus] || recommendation.targetStatus}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={s.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <h3 style={{ margin: 0, color: A.text, fontSize: 16 }}>Материалы · {lifecycleVisibleRows.length}</h3>
+              <button style={{ ...s.btn, ...s.btnGray, fontSize: 12 }} onClick={() => setSelectedContentIds(lifecycleVisibleRows.map(item => item.id))}>Выбрать видимые</button>
+            </div>
+            {lifecycleVisibleRows.length === 0 ? (
+              <p style={{ color: A.textSec, textAlign: 'center' }}>Нет материалов в выбранном состоянии.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {lifecycleVisibleRows.map(item => {
+                  const status = normalizeContentStatus(item);
+                  const selected = selectedContentIds.includes(item.id);
+                  const recommendation = getLifecycleAutoRecommendation(contentLifecycleResource, item);
+                  return (
+                    <div key={item.id} style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '32px 1fr 140px 170px', gap: 10, alignItems: 'center', padding: 12, borderRadius: 14, border: `1px solid ${selected ? A.gold : A.border}`, background: selected ? A.goldDim : A.card }}>
+                      <input type="checkbox" checked={selected} onChange={() => setSelectedContentIds(prev => selected ? prev.filter(id => id !== item.id) : [...prev, item.id])} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: A.text, fontWeight: 850, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || item.name || item.offer || item.id}</div>
+                        <div style={{ color: A.textSec, fontSize: 12 }}>{item.category || item.author || item.partner || item.sourceName || 'Без категории'} · {item.id}</div>
+                        {recommendation && <div style={{ color: '#f59e0b', fontSize: 12, marginTop: 4 }}>⚡ {recommendation.reason}</div>}
+                      </div>
+                      <span style={{ justifySelf: isCompact ? 'start' : 'end', color: status === 'archived' ? '#f59e0b' : status === 'deleted' || status === 'trash' ? A.red : status === 'published' ? '#4ade80' : A.gold, fontSize: 12, fontWeight: 850 }}>
+                        {CONTENT_STATUS_LABELS[status] || status}
+                      </span>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: isCompact ? 'start' : 'end', flexWrap: 'wrap' }}>
+                        {status !== 'published' && <button style={{ ...s.btn, ...s.btnPri, padding: '6px 9px', fontSize: 12 }} onClick={() => lifecycleTransition(contentLifecycleResource, item.id, 'published', 'Публикация из Центра контента')}>Опубликовать</button>}
+                        {status !== 'archived' && <button style={{ ...s.btn, ...s.btnGray, padding: '6px 9px', fontSize: 12 }} onClick={() => lifecycleTransition(contentLifecycleResource, item.id, 'archived', 'Архивация из Центра контента')}>Архив</button>}
+                        {status === 'archived' && <button style={{ ...s.btn, ...s.btnPri, padding: '6px 9px', fontSize: 12 }} onClick={() => lifecycleTransition(contentLifecycleResource, item.id, 'published', 'Восстановление из архива')}>Восстановить</button>}
+                        {!['deleted', 'trash'].includes(status) && <button style={{ ...s.btn, ...s.btnDanger, padding: '6px 9px', fontSize: 12 }} onClick={() => {
+                          if (window.confirm('Пометить объект как удалённый? Это первый этап удаления, данные сохранятся.')) lifecycleTransition(contentLifecycleResource, item.id, 'deleted', 'Первый этап удаления из Центра контента');
+                        }}>Удалить</button>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {activeTab === 'ai-import' && (
