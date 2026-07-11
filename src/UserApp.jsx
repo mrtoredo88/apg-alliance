@@ -1409,7 +1409,7 @@ export function UserApp() {
     setLearningProgress(prev => {
       const next = nextLearningProgress(prev, key);
       if (next === prev || prev?.[key]) return prev;
-      if (user) {
+      if (user?.id && !String(user.id).startsWith('guest_')) {
         userAction('profile:update', {
           userId: String(user.id),
           patch: {

@@ -179,6 +179,16 @@ function isTransientFirestoreError(error) {
     || message.includes('transport');
 }
 
+function isExpectedAdminAccessError(error) {
+  const status = Number(error?.status || error?.statusCode || 0);
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return status === 401 || status === 403
+    || code === 'permission-denied'
+    || message.includes('недостаточно прав')
+    || message.includes('требуется авторизация администратора');
+}
+
 function formatAdminLoadError(error) {
   const code = error?.code ? `${error.code}: ` : '';
   const message = error?.message || String(error);
@@ -3570,6 +3580,13 @@ export const AdminPanel = () => {
   const [errorLogs, setErrorLogs]           = useState([]);
   const [errorsLoading, setErrorsLoading]   = useState(false);
   const [errFilter, setErrFilter] = useState('active');
+  const [errSearch, setErrSearch] = useState('');
+  const [errLevel, setErrLevel] = useState('all');
+  const [errVersion, setErrVersion] = useState('all');
+  const [errRoute, setErrRoute] = useState('all');
+  const [errUser, setErrUser] = useState('all');
+  const [errComponent, setErrComponent] = useState('all');
+  const [errSort, setErrSort] = useState('frequent');
   const [errExpanded, setErrExpanded]       = useState({});
   const [errDeletedCount, setErrDeletedCount] = useState(0);
   const [systemStatus, setSystemStatus] = useState(null);
@@ -3582,7 +3599,7 @@ export const AdminPanel = () => {
       setErrorLogs(rows);
       setAdminMetrics(prev => ({ ...prev, errorLogs: rows }));
     } catch (e) {
-      logError(e, 'AdminPanel.loadErrors');
+      if (!isExpectedAdminAccessError(e)) console.warn('AdminPanel.loadErrors', e);
     } finally {
       setErrorsLoading(false);
     }
@@ -4036,7 +4053,9 @@ export const AdminPanel = () => {
           return { name, label, optional, ok: true, docs: docsToItems(snap), count: snap.docs.length, attempts: attempt };
         } catch (error) {
           lastError = error;
-          logError(error, `AdminPanel.fetchData.${name}.attempt${attempt}`);
+          if (name !== 'errorLogs' && !isExpectedAdminAccessError(error)) {
+            logError(error, `AdminPanel.fetchData.${name}.attempt${attempt}`);
+          }
           if (!isTransientFirestoreError(error) || attempt > ADMIN_LOAD_RETRIES) break;
           await sleep(450 * attempt);
         }
@@ -4092,7 +4111,7 @@ export const AdminPanel = () => {
       const commentsResult = await fetchAdminNewsComments()
         .then(rows => ({ name: 'newsComments', label: 'Комментарии новостей', optional: true, ok: true, docs: rows, count: rows.length, attempts: 1 }))
         .catch(error => {
-          logError(error, 'AdminPanel.fetchData.newsComments.api');
+          if (!isExpectedAdminAccessError(error)) logError(error, 'AdminPanel.fetchData.newsComments.api');
           return {
             name: 'newsComments',
             label: 'Комментарии новостей',
@@ -8932,11 +8951,33 @@ export const AdminPanel = () => {
         const resolvedErrors = errorLogs.filter(e => isErrorResolved(e) && !isErrorArchived(e));
         const archivedErrors = errorLogs.filter(isErrorArchived);
         const resolvedToday = errorLogs.filter(e => isErrorResolved(e) && isTodayValue(e.resolvedAt || e.updatedAt || e.archivedAt)).length;
+        const valueTime = value => value?.toDate ? value.toDate().getTime() : new Date(value || 0).getTime() || 0;
+        const occurrenceCount = e => Math.max(1, Number(e.occurrences || 1));
+        const errorLevel = e => String(e.level || e.severity || 'error').toLowerCase();
+        const errorRoute = e => String(e.route || e.page || e.url || '—');
+        const errorComponent = e => String(e.component || e.source || '—');
+        const versions = [...new Set(errorLogs.map(e => String(e.version || e.build || '')).filter(Boolean))].sort();
+        const routes = [...new Set(errorLogs.map(errorRoute).filter(value => value !== '—'))].sort();
+        const usersWithErrors = [...new Set(errorLogs.map(e => String(e.userId || '')).filter(Boolean))].sort();
+        const components = [...new Set(errorLogs.map(errorComponent).filter(value => value !== '—'))].sort();
         const visible = errorLogs.filter(e => {
           if (errFilter === 'all') return true;
           if (errFilter === 'resolved') return isErrorResolved(e) && !isErrorArchived(e);
           if (errFilter === 'archive') return isErrorArchived(e);
           return isErrorActive(e);
+        }).filter(e => {
+          const haystack = `${e.message || e.error || ''} ${e.stack || ''} ${errorRoute(e)} ${errorComponent(e)} ${e.userId || ''}`.toLowerCase();
+          return (!errSearch.trim() || haystack.includes(errSearch.trim().toLowerCase()))
+            && (errLevel === 'all' || errorLevel(e) === errLevel)
+            && (errVersion === 'all' || String(e.version || e.build || '') === errVersion)
+            && (errRoute === 'all' || errorRoute(e) === errRoute)
+            && (errUser === 'all' || String(e.userId || '') === errUser)
+            && (errComponent === 'all' || errorComponent(e) === errComponent);
+        }).sort((a, b) => {
+          if (errSort === 'newest') return valueTime(b.lastSeen || b.timestamp) - valueTime(a.lastSeen || a.timestamp);
+          if (errSort === 'critical') return Number(errorLevel(b) === 'critical') - Number(errorLevel(a) === 'critical') || occurrenceCount(b) - occurrenceCount(a);
+          if (errSort === 'fixed') return Number(isErrorResolved(b)) - Number(isErrorResolved(a)) || valueTime(b.resolvedAt) - valueTime(a.resolvedAt);
+          return occurrenceCount(b) - occurrenceCount(a) || valueTime(b.lastSeen || b.timestamp) - valueTime(a.lastSeen || a.timestamp);
         });
         const filters = [
           ['all', 'Все', errorLogs.length],
@@ -8978,8 +9019,8 @@ export const AdminPanel = () => {
                   <div style={{ fontSize: 24, fontWeight: 950, color: A.gold }}>{archivedErrors.length}</div>
                 </div>
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: A.chip, border: `1px solid ${A.border}` }}>
-                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🗑 Удалённых</div>
-                  <div style={{ fontSize: 24, fontWeight: 950, color: A.text }}>{errDeletedCount}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🔁 Повторений · удалено {errDeletedCount}</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: A.text }}>{errorLogs.reduce((sum, error) => sum + occurrenceCount(error), 0)}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
@@ -8996,6 +9037,17 @@ export const AdminPanel = () => {
               <p style={{ margin: '8px 0 0', fontSize: 12, color: activeErrors.length ? A.textSec : '#4BB34B' }}>
                 {activeErrors.length ? `${activeErrors.length} требуют внимания` : 'Система здорова: активных ошибок нет'}
               </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginTop: 12 }}>
+                <input value={errSearch} onChange={event => setErrSearch(event.target.value)} placeholder="Поиск по сообщению, stack, пользователю" style={{ ...s.input, minWidth: 0 }} />
+                <select value={errLevel} onChange={event => setErrLevel(event.target.value)} style={s.input}>
+                  <option value="all">Все уровни</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option><option value="critical">Critical</option>
+                </select>
+                <select value={errVersion} onChange={event => setErrVersion(event.target.value)} style={s.input}><option value="all">Все версии</option>{versions.map(value => <option key={value} value={value}>{value}</option>)}</select>
+                <select value={errSort} onChange={event => setErrSort(event.target.value)} style={s.input}><option value="frequent">Самые частые</option><option value="newest">Самые новые</option><option value="critical">Критические</option><option value="fixed">Уже исправленные</option></select>
+                <select value={errRoute} onChange={event => setErrRoute(event.target.value)} style={s.input}><option value="all">Все маршруты</option>{routes.map(value => <option key={value} value={value}>{value}</option>)}</select>
+                <select value={errUser} onChange={event => setErrUser(event.target.value)} style={s.input}><option value="all">Все пользователи</option>{usersWithErrors.map(value => <option key={value} value={value}>{value}</option>)}</select>
+                <select value={errComponent} onChange={event => setErrComponent(event.target.value)} style={s.input}><option value="all">Все компоненты</option>{components.map(value => <option key={value} value={value}>{value}</option>)}</select>
+              </div>
             </div>
 
             {errorsLoading && !errorLogs.length ? (
@@ -9005,24 +9057,32 @@ export const AdminPanel = () => {
                 {errFilter === 'active' ? 'Активных ошибок нет. Система выглядит здоровой.' : errorLogs.length === 0 ? 'Ошибок нет' : 'В этом фильтре записей нет'}
               </div>
             ) : visible.map(e => {
-              const ts = e.timestamp?.toDate ? e.timestamp.toDate() : e.timestamp ? new Date(e.timestamp) : null;
-              const tsStr = ts ? ts.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+              const toDateString = value => {
+                const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+                return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('ru-RU') : '—';
+              };
               const isExp = errExpanded[e.id];
+              const level = errorLevel(e);
+              const levelColor = level === 'critical' ? A.red : level === 'warning' ? '#f59e0b' : level === 'info' ? A.blue : A.red;
               return (
-                <div key={e.id} style={{ ...s.card, marginBottom: 10, opacity: isErrorArchived(e) ? 0.62 : isErrorResolved(e) ? 0.72 : 1, borderLeft: `3px solid ${isErrorArchived(e) ? A.gold : isErrorResolved(e) ? '#4BB34B' : A.red}` }}>
+                <div key={e.id} style={{ ...s.card, marginBottom: 10, opacity: isErrorArchived(e) ? 0.62 : isErrorResolved(e) ? 0.72 : 1, borderLeft: `3px solid ${isErrorArchived(e) ? A.gold : isErrorResolved(e) ? '#4BB34B' : levelColor}` }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: isErrorArchived(e) ? A.gold : isErrorResolved(e) ? '#4BB34B' : A.red, wordBreak: 'break-word', lineHeight: '17px', marginBottom: 4 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isErrorArchived(e) ? A.gold : isErrorResolved(e) ? '#4BB34B' : levelColor, wordBreak: 'break-word', lineHeight: '17px', marginBottom: 4 }}>
                         {e.message}
                       </div>
                       <div style={{ fontSize: 11, color: A.textSec, display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
-                        <span>🕒 {tsStr}</span>
-                        <span>📱 {e.device} / {e.browser}</span>
+                        <span style={{ textTransform: 'uppercase', color: levelColor, fontWeight: 850 }}>{level}</span>
+                        <span>🔁 {occurrenceCount(e)}</span>
+                        <span>Первое: {toDateString(e.firstSeen || e.createdAt || e.timestamp)}</span>
+                        <span>Последнее: {toDateString(e.lastSeen || e.timestamp)}</span>
+                        <span>📱 {e.device || '—'} / {e.browser || '—'} / {e.os || '—'}</span>
                         {isErrorArchived(e) && <span>📦 архив</span>}
                         {!isErrorArchived(e) && isErrorResolved(e) && <span>✓ решена</span>}
                         {e.userId && <span>👤 {String(e.userId).slice(0, 30)}</span>}
-                        {e.version && e.version !== '?' && <span>v{e.version}</span>}
-                        {e.source && <span style={{ color: A.textSec, opacity: 0.7 }}>📄 {String(e.source).slice(0, 60)}</span>}
+                        {(e.version || e.build) && e.version !== '?' && <span>build {e.version || e.build}</span>}
+                        <span>📄 {errorComponent(e).slice(0, 80)}</span>
+                        <span>↗ {errorRoute(e).slice(0, 100)}</span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
@@ -9034,7 +9094,7 @@ export const AdminPanel = () => {
                           ✓ Решено
                         </button>
                       )}
-                      {e.stack && (
+                      {(e.stack || e.occurrenceHistory?.length) && (
                         <button
                           style={{ ...s.btn, ...s.btnGray, padding: '4px 10px', fontSize: 11 }}
                           onClick={() => setErrExpanded(prev => ({ ...prev, [e.id]: !prev[e.id] }))}
@@ -9044,10 +9104,13 @@ export const AdminPanel = () => {
                       )}
                     </div>
                   </div>
-                  {isExp && e.stack && (
-                    <pre style={{ marginTop: 10, fontSize: 10, color: A.textSec, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '15px', maxHeight: 260, overflow: 'auto' }}>
-                      {e.stack}
-                    </pre>
+                  {isExp && (
+                    <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                      {e.stack && <pre style={{ margin: 0, fontSize: 10, color: A.textSec, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '15px', maxHeight: 320, overflow: 'auto' }}>{e.stack}</pre>}
+                      {e.stackHash && <div style={{ fontSize: 10, color: A.textSec }}>stackHash: {e.stackHash}</div>}
+                      {Array.isArray(e.relatedActions) && e.relatedActions.length > 0 && <div style={{ fontSize: 11, color: A.textSec }}><b>Связанные действия:</b> {e.relatedActions.map(item => `${item.method || item.type} ${item.url || ''} ${item.status || ''}`).join(' · ')}</div>}
+                      {Array.isArray(e.occurrenceHistory) && e.occurrenceHistory.length > 0 && <div style={{ fontSize: 11, color: A.textSec }}><b>История возникновения:</b>{e.occurrenceHistory.slice().reverse().map((item, index) => <div key={`${item.at}-${index}`} style={{ paddingTop: 4 }}>{toDateString(item.at)} · {item.userId || 'без пользователя'} · {item.version || 'без версии'} · {item.route || 'без маршрута'}</div>)}</div>}
+                    </div>
                   )}
                 </div>
               );

@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
+import { upsertErrorLog } from '../../../server-shared/error-log.js';
 
 const MAX_TEXT = 4000;
 
@@ -1098,6 +1099,14 @@ async function actionLokiAnalytics(db, req, actor) {
 
 async function actionLogCreate(db, req, actor, collection, source) {
   const payload = req.body?.payload && typeof req.body.payload === 'object' ? req.body.payload : {};
+  if (collection === 'errorLogs') {
+    return upsertErrorLog(db, payload, {
+      source,
+      userId: actor?.userId,
+      version: req.headers['x-apg-version'],
+      userAgent: req.headers['user-agent'],
+    }, FieldValue);
+  }
   await db.collection(collection).add({
     ...payload,
     userId: payload.userId || actor?.userId || null,

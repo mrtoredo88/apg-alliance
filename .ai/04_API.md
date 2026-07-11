@@ -274,6 +274,12 @@
 
 **Логика:** endpoint не делает тяжёлых агрегаций и ограничивает чтение коллекций лимитами, чтобы статус можно было открывать из админки без нагрузки на production.
 
+## POST /api/user-actions — `log:error`
+
+**Назначение:** безопасная запись клиентских ошибок.
+
+**Логика:** backend нормализует stack trace, вычисляет `stackHash` и fingerprint, затем транзакционно обновляет `errorLogs/err_{fingerprint}`. Повтор не создаёт новый документ: увеличивается `occurrences`, обновляется `lastSeen`, сохраняются окружение и последние 50 occurrences. `AbortError`, отменённые fetch, `ResizeObserver`, extension noise и штатный `auth_timeout` отсекаются на клиенте.
+
 ---
 
 ## POST /api/loki-editor

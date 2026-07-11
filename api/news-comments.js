@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from './_firebase-admin.js';
 import { requireAdminPermission, writeAuditLog } from './_admin-security.js';
 import { ECONOMY_VERSION, getEconomyReward } from '../server-shared/economy-engine.js';
+import { upsertErrorLog } from '../server-shared/error-log.js';
 
 const MAX_TEXT = 900;
 
@@ -54,16 +55,14 @@ function serializeComment(doc) {
 
 async function logCommentError(db, request, error, extra = {}) {
   try {
-    await db.collection('errorLogs').add({
+    await upsertErrorLog(db, {
       source: 'api.news-comments',
       message: String(error?.message || error).slice(0, 500),
       stack: String(error?.stack || '').slice(0, 3000),
       extra,
       userAgent: String(request.headers['user-agent'] || '').slice(0, 300),
       url: String(request.url || '').slice(0, 300),
-      timestamp: FieldValue.serverTimestamp(),
-      resolved: false,
-    });
+    }, {}, FieldValue);
   } catch {
     return null;
   }
@@ -96,14 +95,13 @@ async function updateNewsCommentCount(db, newsId, delta) {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   } catch (error) {
-    await db.collection('errorLogs').add({
+    await upsertErrorLog(db, {
       source: 'api.news-comments.counter',
       message: String(error?.message || error).slice(0, 500),
+      stack: String(error?.stack || '').slice(0, 3000),
       newsId: String(newsId),
       delta,
-      timestamp: FieldValue.serverTimestamp(),
-      resolved: false,
-    }).catch(() => null);
+    }, {}, FieldValue).catch(() => null);
   }
 }
 
@@ -316,6 +314,9 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ ok: false, error: 'Unknown action' });
   } catch (error) {
+    if (error?.statusCode === 401 || error?.statusCode === 403) {
+      return res.status(error.statusCode).json({ ok: false, error: error.message });
+    }
     await logCommentError(db, req, error, {
       method: req.method,
       action: req.body?.action || null,

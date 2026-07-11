@@ -7,6 +7,7 @@ let _version = '?';
 const _seen = new Set();
 let _count = 0;
 const MAX = 15;
+let _initialized = false;
 
 fetch('/version.json').then(r => r.json()).then(d => { _version = d.v ?? '?'; }).catch(() => {});
 
@@ -18,12 +19,33 @@ function deviceInfo() {
   const ua = navigator.userAgent;
   let device = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Unknown';
   let browser = /VKAndroidApp|VKiOSApp/.test(ua) ? 'VK Mini App' : /TelegramWebApp/.test(ua) ? 'Telegram' : /SamsungBrowser/.test(ua) ? 'Samsung' : /Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : /Firefox/.test(ua) ? 'Firefox' : 'Unknown';
-  return { device, browser };
+  let os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'Unknown';
+  return { device, browser, os };
 }
 
-async function log(message, stack, source) {
+function shouldIgnore(message, source, errorName = '') {
+  const text = `${message} ${source} ${errorName}`.toLowerCase();
+  return !message
+    || /script error|resizeobserver|chrome-extension|moz-extension/.test(text)
+    || /aborterror|the operation was aborted|signal is aborted|fetch.*cancelled|fetch.*canceled/.test(text)
+    || /auth_timeout/.test(text);
+}
+
+function relatedActions() {
+  const rows = Array.isArray(window.__APG_NETWORK_LOGS__) ? window.__APG_NETWORK_LOGS__ : [];
+  return rows.slice(-8).map(item => ({
+    at: item.ts || null,
+    type: String(item.type || 'http').slice(0, 40),
+    method: String(item.method || '').slice(0, 12),
+    url: String(item.url || '').slice(0, 180),
+    status: Number(item.status || 0),
+    ok: item.ok !== false,
+  }));
+}
+
+async function log(message, stack, source, errorName = '') {
   if (_count >= MAX) return;
-  if (!message || /Script error|ResizeObserver|chrome-extension|moz-extension/.test(String(message) + String(source))) return;
+  if (shouldIgnore(message, source, errorName)) return;
 
   const key = String(message).slice(0, 120) + '|' + String(source).slice(0, 80);
   if (_seen.has(key)) return;
@@ -35,7 +57,8 @@ async function log(message, stack, source) {
   }
   if (!auth.currentUser) return;
 
-  const { device, browser } = deviceInfo();
+  const { device, browser, os } = deviceInfo();
+  const route = `${window.location.pathname}${window.location.hash || ''}`.slice(0, 300);
   try {
     await userAction('log:error', {
       payload: {
@@ -43,9 +66,16 @@ async function log(message, stack, source) {
         stack:   String(stack  ?? '').slice(0, 3000),
         source:  String(source ?? '').slice(0, 300),
         userId:  _userId,
-        device, browser,
+        device, browser, os,
         url:     window.location.href.slice(0, 300),
+        route,
+        page: window.location.pathname.slice(0, 160),
+        component: String(source ?? '').split(':')[0].slice(0, 160),
+        userAgent: navigator.userAgent.slice(0, 300),
+        relatedActions: relatedActions(),
         version: _version,
+        build: _version,
+        level: String(source || '').startsWith('ErrorBoundary:') ? 'critical' : 'error',
         resolved: false,
       },
     });
@@ -55,16 +85,19 @@ async function log(message, stack, source) {
 export function logError(error, source) {
   const msg = error?.message ?? String(error);
   const stack = error?.stack ?? String(source ?? '');
-  log(msg, stack, String(source ?? '').slice(0, 300));
+  log(msg, stack, String(source ?? '').slice(0, 300), error?.name ?? '');
 }
 
 export function initErrorLogger() {
+  if (_initialized || window.__APG_ERROR_LOGGER_INSTALLED__) return;
+  _initialized = true;
+  window.__APG_ERROR_LOGGER_INSTALLED__ = true;
   window.onerror = (msg, src, line, col, err) => {
-    log(msg, err?.stack ?? `${src}:${line}:${col}`, src);
+    log(msg, err?.stack ?? `${src}:${line}:${col}`, src, err?.name ?? '');
     return false;
   };
   window.addEventListener('unhandledrejection', e => {
     const err = e.reason;
-    log('Unhandled: ' + (err?.message ?? String(err)), err?.stack, window.location.pathname);
+    log('Unhandled: ' + (err?.message ?? String(err)), err?.stack, window.location.pathname, err?.name ?? '');
   });
 }

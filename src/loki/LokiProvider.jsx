@@ -471,7 +471,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   }, [persistSettings, user?.lokiSettings]);
 
   useEffect(() => {
-    if (!user?.id || user.isGuest) return;
+    if (!user?.id || user.isGuest || String(user.id).startsWith('guest_')) return;
     if (!settingsDirtyRef.current) return;
     userAction('loki:settings', { userId: String(user.id), settings })
       .then(() => { settingsDirtyRef.current = false; })

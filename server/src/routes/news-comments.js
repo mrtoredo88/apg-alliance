@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { ECONOMY_VERSION, getEconomyReward } from '../../../server-shared/economy-engine.js';
+import { upsertErrorLog } from '../../../server-shared/error-log.js';
 
 const MAX_TEXT = 900;
 
@@ -54,16 +55,14 @@ function serializeComment(doc) {
 
 async function logCommentError(db, request, error, extra = {}) {
   try {
-    await db.collection('errorLogs').add({
+    await upsertErrorLog(db, {
       source: 'server.news-comments',
       message: String(error?.message || error).slice(0, 500),
       stack: String(error?.stack || '').slice(0, 3000),
       extra,
       userAgent: String(request.headers['user-agent'] || '').slice(0, 300),
       url: String(request.url || '').slice(0, 300),
-      timestamp: FieldValue.serverTimestamp(),
-      resolved: false,
-    });
+    }, {}, FieldValue);
   } catch {
     return null;
   }
@@ -96,14 +95,13 @@ async function updateNewsCommentCount(db, newsId, delta) {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   } catch (error) {
-    await db.collection('errorLogs').add({
+    await upsertErrorLog(db, {
       source: 'server.news-comments.counter',
       message: String(error?.message || error).slice(0, 500),
+      stack: String(error?.stack || '').slice(0, 3000),
       newsId: String(newsId),
       delta,
-      timestamp: FieldValue.serverTimestamp(),
-      resolved: false,
-    }).catch(() => null);
+    }, {}, FieldValue).catch(() => null);
   }
 }
 
@@ -128,6 +126,9 @@ export default async function newsCommentsRoutes(fastify) {
       const comments = await listComments(db, newsId, legacyIds);
       return { ok: true, newsId, legacyIds, comments };
     } catch (error) {
+      if (error?.statusCode === 401 || error?.statusCode === 403) {
+        return reply.code(error.statusCode).send({ ok: false, error: error.message });
+      }
       await logCommentError(db, request, error, { method: 'GET', newsId: request.query?.newsId || null });
       return reply.code(500).send({ ok: false, error: 'Не удалось загрузить комментарии.' });
     }
@@ -314,6 +315,9 @@ export default async function newsCommentsRoutes(fastify) {
 
       return reply.code(400).send({ ok: false, error: 'Unknown action' });
     } catch (error) {
+      if (error?.statusCode === 401 || error?.statusCode === 403) {
+        return reply.code(error.statusCode).send({ ok: false, error: error.message });
+      }
       await logCommentError(db, request, error, {
         method: 'POST',
         action: request.body?.action || null,
