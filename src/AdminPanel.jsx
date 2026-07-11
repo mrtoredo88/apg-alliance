@@ -20,7 +20,8 @@ import { shareLink } from './utils/shareLink.js';
 import { AdminAssistantPanel } from './adminAssistant/AdminAssistantPanel.jsx';
 import { buildAdminContext } from './adminAssistant/AdminContextEngine.js';
 import { hasExpertAmbassadorAccess, hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
-import { normalizeExpertCategory, normalizeExpertPhone, validateExpertCategories } from '../server-shared/expert-directory.js';
+import { listCustomExpertCategories, normalizeCustomExpertCategory, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../server-shared/expert-directory.js';
+import { buildAiImportValidation } from './aiImportValidation.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -665,26 +666,31 @@ function aiImportDraftPatch(type, draft, sourceFiles = []) {
   const images = Array.isArray(sourceFiles) ? sourceFiles.map(file => file.url).filter(Boolean) : [];
   const mainImage = images[0] || '';
   if (type === 'news') {
-    return { title: f.title || 'Черновик новости', text: f.description || f.shortDescription || 'Текст будет заполнен редактором.', fullText: f.description || f.shortDescription || 'Текст будет заполнен редактором.', summary: f.shortDescription || '', category: f.category || 'society', sourceName: f.source || 'ИИ-импорт', linkUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, photos: images, status: 'draft', active: false, commentsEnabled: true };
+    return { title: f.title || 'Черновик новости', text: f.description || f.shortDescription || 'Текст будет заполнен редактором.', fullText: f.description || f.shortDescription || 'Текст будет заполнен редактором.', summary: f.shortDescription || '', category: f.category || 'society', sourceName: f.source || 'ИИ-импорт', linkUrl: f.website || '', videos: Array.isArray(f.videos) ? f.videos : [], adminComment: f.comment || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, photos: images, status: 'draft', active: false, commentsEnabled: true };
   }
   if (type === 'expert') {
     const avatar = sourceFiles.find(file => file.role === 'avatar')?.url || mainImage;
     const coverPhoto = sourceFiles.find(file => file.role === 'cover')?.url || '';
     const logoUrl = sourceFiles.find(file => file.role === 'logo')?.url || '';
-    const gallery = sourceFiles.filter(file => ['gallery', 'photo'].includes(file.role)).map(file => file.url).filter(Boolean);
+    const usedUrls = new Set([avatar, coverPhoto, logoUrl].filter(Boolean));
+    const gallery = [...new Set(images.filter(url => !usedUrls.has(url)))];
     const categoryIntegrity = validateExpertCategories(Array.isArray(f.categories) && f.categories.length ? f.categories : [f.category].filter(Boolean));
     const categories = categoryIntegrity.categories;
     const tariff = normalizeExpertTariff(f.tariff);
     return { name: f.title || [f.lastName, f.firstName, f.middleName].filter(Boolean).join(' ') || 'Новый эксперт', firstName: f.firstName || '', lastName: f.lastName || '', middleName: f.middleName || '', specialization: f.shortDescription || f.services || 'Уточнить направление', category: categories[0] || normalizeExpertCategory(detectAiImportCategory([f.category, f.description].join(' '), 'expert'), 'other'), categories: categories.length ? categories : ['other'], secondaryCategories: categories.slice(1), categoryIntegrity: { valid: categoryIntegrity.valid, unknown: categoryIntegrity.unknown }, description: f.description || f.shortDescription || '', services: f.services || '', workFormats: Array.isArray(f.workFormats) ? f.workFormats : [], audienceTags: Array.isArray(f.audienceTags) ? f.audienceTags : [], phone: normalizeExpertPhone(f.phone), email: f.email || '', address: f.address || '', hours: f.hours || '', experience: f.experience || '', serviceCost: f.serviceCost || f.cost || '', websiteUrl: f.website || '', bookingUrl: f.bookingUrl || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', maxUrl: f.max || '', whatsappUrl: f.whatsapp || '', otherSocials: Array.isArray(f.otherSocials) ? f.otherSocials : [], offer: f.offer || '', videos: Array.isArray(f.videos) ? f.videos : [], tier: tariff, tariff, inn: hasExpertAmbassadorAccess(tariff) ? f.inn || '' : '', newsInfo: hasExpertAmbassadorAccess(tariff) ? f.newsInfo || '' : '', activities: hasExpertAmbassadorAccess(tariff) ? f.activities || '' : '', photo: avatar, logoUrl, coverPhoto, gallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, futureCityProfile: f.futureCityProfile || {}, active: false, status: 'draft', verified: false, keys: 1 };
   }
   if (type === 'event') {
-    return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, category: f.category || 'society', active: false, status: 'draft', priority: 0 };
+    return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', services: f.services || '', cost: f.cost || '', offer: f.offer || '', socialUrl: f.website || '', adminComment: f.comment || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, category: f.category || 'society', active: false, status: 'draft', priority: 0 };
   }
   if (type === 'prize') {
-    return { name: f.title || 'Новый приз', title: f.title || 'Новый приз', description: f.description || f.shortDescription || '', donorName: f.source || '', raffleDate: f.date || '', imageUrl: mainImage, photo: mainImage, type: 'raffle', active: false, status: 'draft', cost: 0, stock: 1, emoji: '🎁' };
+    return { name: f.title || 'Новый приз', title: f.title || 'Новый приз', description: f.description || f.shortDescription || '', donorName: f.source || '', raffleDate: f.date || '', quantityInfo: f.cost || '', adminComment: f.comment || '', imageUrl: mainImage, photo: mainImage, gallery: images, type: 'raffle', active: false, status: 'draft', cost: 0, stock: 1, emoji: '🎁' };
   }
   const tariff = normalizePartnerTariff(f.tariff);
-  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', shortDescription: f.shortDescription || '', services: f.services || '', phone: f.phone || '', email: f.email || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', bookingUrl: hasPartnerAllianceAccess(tariff) ? f.bookingUrl || '' : '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', maxCommunityUrl: f.max || '', socialUrl: f.instagram || '', offer: f.offer || '', gift: f.gift || '', videos: hasPartnerAllianceAccess(tariff) && Array.isArray(f.videos) ? f.videos : [], newsInfo: hasPartnerPremiumAccess(tariff) ? f.newsInfo || '' : '', activities: hasPartnerPremiumAccess(tariff) ? f.activities || '' : '', inn: hasPartnerPremiumAccess(tariff) ? f.inn || '' : '', tier: tariff, tariff, logoUrl: sourceFiles.find(file => file.role === 'logo')?.url || mainImage, coverPhoto: sourceFiles.find(file => file.role === 'cover')?.url || mainImage, gallery: sourceFiles.filter(file => ['gallery', 'photo'].includes(file.role)).map(file => file.url).filter(Boolean).concat(images.slice(1)), serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, active: false, status: 'draft', emoji: '🏪' };
+  const partnerLogo = sourceFiles.find(file => file.role === 'logo')?.url || mainImage;
+  const partnerCover = sourceFiles.find(file => file.role === 'cover')?.url || mainImage;
+  const partnerUsedUrls = new Set([partnerLogo, partnerCover].filter(Boolean));
+  const partnerGallery = [...new Set(images.filter(url => !partnerUsedUrls.has(url)))];
+  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', shortDescription: f.shortDescription || '', services: f.services || '', phone: f.phone || '', email: f.email || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', bookingUrl: hasPartnerAllianceAccess(tariff) ? f.bookingUrl || '' : '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', maxCommunityUrl: f.max || '', socialUrl: f.instagram || '', offer: f.offer || '', gift: f.gift || '', videos: hasPartnerAllianceAccess(tariff) && Array.isArray(f.videos) ? f.videos : [], newsInfo: hasPartnerPremiumAccess(tariff) ? f.newsInfo || '' : '', activities: hasPartnerPremiumAccess(tariff) ? f.activities || '' : '', inn: hasPartnerPremiumAccess(tariff) ? f.inn || '' : '', tier: tariff, tariff, logoUrl: partnerLogo, coverPhoto: partnerCover, gallery: partnerGallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, active: false, status: 'draft', emoji: '🏪' };
 }
 
 function StatTile({ label, value, icon, color = A.gold, sub }) {
@@ -1901,7 +1907,169 @@ function AutomationPanel({ data, loading, filter, onFilter, onRefresh, onConfirm
   );
 }
 
-function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, canSeeLegal, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink }) {
+const VALIDATION_STATUS_META = {
+  ok: { icon: '✓', color: '#4ade80' },
+  internal: { icon: 'ℹ', color: '#94a3b8' },
+  tariff: { icon: '!', color: '#facc15' },
+  lost: { icon: '✗', color: '#fb7185' },
+};
+
+function AiImportValidationCenter({ request, busy, onClose, onPublish, onUpdateRequest, onCreateExpertCategory }) {
+  const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState('');
+  const [categoryPicks, setCategoryPicks] = useState({});
+  const type = request.type || 'partner';
+  const patch = useMemo(() => aiImportDraftPatch(type, request.draft, request.sourceFiles), [type, request]);
+  const validation = useMemo(() => buildAiImportValidation({ type, request, patch }), [type, request, patch]);
+
+  const applyCategory = async (unknownValue, categoryId) => {
+    if (!categoryId) { setMessage('Сначала выберите категорию из списка.'); return; }
+    setWorking(true);
+    try {
+      const fields = request.draft?.fields || {};
+      const integrity = validateExpertCategories([...(Array.isArray(fields.categories) ? fields.categories : []), categoryId].filter(Boolean));
+      await onUpdateRequest(request.id, {
+        draft: {
+          ...request.draft,
+          fields: {
+            ...fields,
+            categories: integrity.categories,
+            category: integrity.categories[0] || fields.category || 'other',
+            secondaryCategories: integrity.categories.slice(1),
+            unknownCategories: (Array.isArray(fields.unknownCategories) ? fields.unknownCategories : []).filter(value => value !== unknownValue),
+          },
+        },
+      });
+      setMessage(`Категория «${unknownValue}» сопоставлена со справочником.`);
+    } catch (e) {
+      setMessage(e.message || 'Не удалось обновить категорию.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const createCategory = async (unknownValue) => {
+    setWorking(true);
+    try {
+      const created = await onCreateExpertCategory(unknownValue);
+      setWorking(false);
+      await applyCategory(unknownValue, created.id);
+      setMessage(`Категория «${created.label}» создана: она уже доступна в анкете, админке, фильтрах, поиске и Локи.`);
+    } catch (e) {
+      setMessage(e.message || 'Не удалось создать категорию.');
+      setWorking(false);
+    }
+  };
+
+  const publish = async () => {
+    setWorking(true);
+    const ok = await onPublish(request);
+    setWorking(false);
+    if (ok) onClose();
+    else setMessage('Публикация не выполнена. Проверьте сообщение в списке заявок.');
+  };
+
+  const row = (icon, color, text, key) => (
+    <div key={key} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
+      <span style={{ color, fontWeight: 950, fontSize: 13, width: 16, flex: '0 0 auto' }}>{icon}</span>
+      <span style={{ color: A.text, fontSize: 12.5, lineHeight: '18px', minWidth: 0, overflowWrap: 'anywhere' }}>{text}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 720, maxHeight: '88vh', overflowY: 'auto', borderRadius: 22, background: A.bg, border: `1px solid ${A.goldBrd}`, padding: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+          <div>
+            <div style={{ color: A.gold, fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: 1 }}>Validation Center</div>
+            <h2 style={{ ...s.h2, margin: '4px 0 0' }}>Проверка перед публикацией</h2>
+          </div>
+          <button type="button" onClick={onClose} style={{ ...s.btn, ...s.btnGray, padding: '7px 11px', fontSize: 12 }}>Закрыть</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+          {[
+            [`Фото: ${validation.counts.sourcePhotos} из анкеты → ${validation.mediaChecks.filter(item => item.ok).length} в карточке`, validation.mediaChecks.every(item => item.ok)],
+            [`Видео: ${validation.counts.sourceVideos} → ${validation.videoChecks.filter(item => item.ok).length}`, validation.videoChecks.every(item => item.ok)],
+            [`Поля: ${validation.counts.fieldsFilled} заполнено → ${validation.counts.fieldsKept} сохранено`, validation.fieldChecks.every(item => item.status !== 'lost')],
+          ].map(([label, ok]) => (
+            <span key={label} style={{ padding: '7px 11px', borderRadius: 999, fontSize: 12, fontWeight: 900, color: ok ? '#4ade80' : '#fb7185', background: ok ? 'rgba(74,222,128,0.10)' : 'rgba(251,113,133,0.10)', border: `1px solid ${ok ? 'rgba(74,222,128,0.30)' : 'rgba(251,113,133,0.30)'}` }}>{ok ? '✓' : '✗'} {label}</span>
+          ))}
+        </div>
+
+        {validation.blockers.length > 0 && (
+          <div style={{ marginTop: 12, padding: 12, borderRadius: 14, background: 'rgba(230,70,70,0.10)', border: '1px solid rgba(230,70,70,0.30)' }}>
+            <div style={{ color: '#fca5a5', fontSize: 13, fontWeight: 950 }}>⚠ Обнаружена потеря данных. Публикация остановлена.</div>
+            {validation.blockers.map(text => <div key={text} style={{ color: '#fecaca', fontSize: 12, lineHeight: '18px', marginTop: 5 }}>• {text}</div>)}
+          </div>
+        )}
+        {validation.warnings.length > 0 && (
+          <div style={{ marginTop: 10, padding: 12, borderRadius: 14, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.26)' }}>
+            {validation.warnings.map(text => <div key={text} style={{ color: '#facc15', fontSize: 12, lineHeight: '18px' }}>• {text}</div>)}
+          </div>
+        )}
+
+        {validation.unknownCategories.length > 0 && (
+          <div style={{ marginTop: 12, padding: 12, borderRadius: 14, background: 'rgba(201,168,76,0.08)', border: `1px solid ${A.goldBrd}` }}>
+            <div style={{ color: A.gold, fontSize: 13, fontWeight: 950 }}>⚠ Категория отсутствует в справочнике</div>
+            {validation.unknownCategories.map(value => (
+              <div key={value} style={{ marginTop: 10 }}>
+                <div style={{ color: A.text, fontSize: 12.5, fontWeight: 850 }}>«{value}»</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 8, marginTop: 7 }}>
+                  <select value={categoryPicks[value] || ''} onChange={e => setCategoryPicks(prev => ({ ...prev, [value]: e.target.value }))} style={s.select}>
+                    <option value="">Выбрать существующую…</option>
+                    {EXPERT_CATEGORIES.map(category => <option key={category.id} value={category.id}>{category.emoji} {category.label}</option>)}
+                  </select>
+                  <button type="button" disabled={working} onClick={() => applyCategory(value, categoryPicks[value])} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Заменить</button>
+                  <button type="button" disabled={working} onClick={() => createCategory(value)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12 }}>Создать новую</button>
+                </div>
+                <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px', marginTop: 6 }}>Новая категория автоматически появится в анкете, админке, фильтрах, поиске и Локи — без правок кода.</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12, marginTop: 14 }}>
+          <div>
+            <h3 style={{ margin: '0 0 6px', color: A.text, fontSize: 14 }}>Медиафайлы</h3>
+            {validation.mediaChecks.length === 0 && validation.videoChecks.length === 0 && <div style={{ color: A.textSec, fontSize: 12 }}>В заявке нет медиафайлов.</div>}
+            {validation.mediaChecks.map((item, index) => row(item.ok ? '✓' : '✗', item.ok ? '#4ade80' : '#fb7185', `${item.name} (${item.role})${item.ok ? '' : ' — не попадает в карточку'}`, `media-${index}`))}
+            {validation.videoChecks.map((item, index) => row(item.ok ? '✓' : '✗', item.ok ? '#4ade80' : '#fb7185', `Видео: ${item.url}`, `video-${index}`))}
+            {validation.manifest && (validation.manifest.rejected?.length > 0 || validation.manifest.failedOnClient?.length > 0) && (
+              <div style={{ marginTop: 8, color: '#fb7185', fontSize: 11.5, lineHeight: '17px' }}>
+                Ещё на этапе анкеты потеряно файлов: {(validation.manifest.rejected?.length || 0) + (validation.manifest.failedOnClient?.length || 0)}. Запросите файлы у заявителя повторно.
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 style={{ margin: '0 0 6px', color: A.text, fontSize: 14 }}>Поля анкеты</h3>
+            {validation.fieldChecks.filter(item => item.status !== 'empty').map(item => {
+              const meta = VALIDATION_STATUS_META[item.status] || VALIDATION_STATUS_META.ok;
+              const suffix = item.status === 'lost' ? ' — потеряно' : item.status === 'tariff' ? ` — недоступно (${item.gate})` : '';
+              return row(meta.icon, meta.color, `${item.label}${suffix}`, `field-${item.key}`);
+            })}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <h3 style={{ margin: '0 0 8px', color: A.text, fontSize: 14 }}>Предпросмотр карточки</h3>
+          <EntityPreviewCard type={type} item={patch} compact />
+        </div>
+
+        {message && <div style={{ marginTop: 12, color: message.includes('Не удалось') || message.includes('не выполнена') ? A.red : A.gold, fontSize: 12, lineHeight: '18px' }}>{message}</div>}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+          <button type="button" onClick={onClose} style={{ ...s.btn, ...s.btnGray }}>Отменить публикацию</button>
+          <button type="button" disabled={!validation.ok || busy || working} onClick={publish} style={{ ...s.btn, ...s.btnPri, opacity: !validation.ok || busy || working ? 0.5 : 1 }}>
+            {busy || working ? 'Публикуем...' : validation.ok ? '✓ Проверка пройдена — создать черновик' : 'Публикация заблокирована'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading, canSeeLegal, onAnalyze, onSaveRequest, onCreatePublicLink, onRefresh, onPublishDraft, onUpdateRequest, onUpdatePublicLink, onCreateExpertCategory }) {
   const [type, setType] = useState('partner');
   const [sourceText, setSourceText] = useState('');
   const [sourceFiles, setSourceFiles] = useState([]);
@@ -1909,9 +2077,11 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
   const [activeRequestId, setActiveRequestId] = useState('');
   const [activePublicLinkId, setActivePublicLinkId] = useState('');
   const [generatedPublicLink, setGeneratedPublicLink] = useState(null);
+  const [validationRequestId, setValidationRequestId] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const activeRequest = requests.find(item => item.id === activeRequestId) || null;
+  const validationRequest = requests.find(item => item.id === validationRequestId) || null;
   const visiblePublicLinks = [...(publicLinks || [])].sort((a, b) => Number(toJsDate(b.createdAt || b.updatedAt) || 0) - Number(toJsDate(a.createdAt || a.updatedAt) || 0));
   const visibleRequests = [...requests].sort((a, b) => Number(toJsDate(b.createdAt || b.processedAt) || 0) - Number(toJsDate(a.createdAt || a.processedAt) || 0));
   const meta = aiImportTypeMeta(type);
@@ -2008,8 +2178,10 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
       await onPublishDraft(request);
       setMessage('Черновик создан в нужном разделе. Проверьте и публикуйте вручную.');
       await onRefresh();
+      return true;
     } catch (e) {
       setMessage(e.message || 'Не удалось создать черновик.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -2333,7 +2505,7 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                         <div style={{ marginBottom: 12, padding: 11, borderRadius: 14, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#facc15', fontSize: 12 }}>Юридическая карточка скрыта: нужны права owner/super_admin/admin.</div>
                       )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button type="button" disabled={busy || item.status === 'published'} onClick={() => publishActive(item)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12, opacity: item.status === 'published' ? 0.5 : 1 }}>Создать черновик</button>
+                        <button type="button" disabled={busy || item.status === 'published'} onClick={() => setValidationRequestId(item.id)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12, opacity: item.status === 'published' ? 0.5 : 1 }}>Проверка и публикация</button>
                         <button type="button" onClick={() => onUpdateRequest(item.id, { status: 'rejected' })} style={{ ...s.btn, ...s.btnDanger, padding: '8px 11px', fontSize: 12 }}>Отклонить</button>
                       </div>
                     </div>
@@ -2344,6 +2516,17 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
           </div>
         )}
       </div>
+
+      {validationRequest && (
+        <AiImportValidationCenter
+          request={validationRequest}
+          busy={busy}
+          onClose={() => setValidationRequestId('')}
+          onPublish={publishActive}
+          onUpdateRequest={onUpdateRequest}
+          onCreateExpertCategory={onCreateExpertCategory}
+        />
+      )}
     </div>
   );
 }
@@ -4004,6 +4187,30 @@ export const AdminPanel = () => {
     setAiImportRequests(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
   };
 
+  const [, setCustomCategoriesVersion] = useState(0);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/public-data?resources=expertCategories`, { headers: { 'X-APG-Version': 'admin-panel' } })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data?.data?.expertCategories) && data.data.expertCategories.length) {
+          registerCustomExpertCategories(data.data.expertCategories);
+          setCustomCategoriesVersion(value => value + 1);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const createExpertCategory = async (label, emoji = '✨') => {
+    const item = normalizeCustomExpertCategory({ label, emoji });
+    if (!item) throw new Error('Укажите название категории.');
+    const next = [...listCustomExpertCategories().filter(row => row.id !== item.id), { ...item, createdAt: new Date().toISOString() }];
+    await runAdminEntityAction('config', 'update', { id: 'expertCategories', patch: { custom: next } });
+    registerCustomExpertCategories([item]);
+    setCustomCategoriesVersion(value => value + 1);
+    return item;
+  };
+
   const createPublicFormToken = () => {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const bytes = new Uint8Array(12);
@@ -4041,10 +4248,11 @@ export const AdminPanel = () => {
   const publishAiImportDraft = async (request) => {
     if (!request?.id) return;
     const type = request.type || 'partner';
-    if (type === 'expert' && request.draft?.fields?.unknownCategories?.length) {
-      throw new Error(`Выберите существующую категорию эксперта: ${request.draft.fields.unknownCategories.join(', ')}`);
-    }
     const patch = aiImportDraftPatch(type, request.draft, request.sourceFiles);
+    const validation = buildAiImportValidation({ type, request, patch });
+    if (!validation.ok) {
+      throw new Error(`Обнаружена потеря медиафайлов или полей. Проверьте импорт: ${validation.blockers[0]}${validation.blockers.length > 1 ? ` (и ещё ${validation.blockers.length - 1})` : ''}`);
+    }
     let created = null;
     if (type === 'news') {
       created = await runAdminAction('news:create', { patch });
@@ -6336,6 +6544,7 @@ export const AdminPanel = () => {
           onPublishDraft={publishAiImportDraft}
           onUpdateRequest={updateAiImportRequest}
           onUpdatePublicLink={updatePublicFormLink}
+          onCreateExpertCategory={createExpertCategory}
         />
       )}
 

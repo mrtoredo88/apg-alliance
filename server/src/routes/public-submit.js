@@ -1,6 +1,12 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
-import { normalizeExpertCategory, normalizeExpertPhone, validateExpertCategories } from '../../../server-shared/expert-directory.js';
+import { EXPERT_CATEGORIES, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../../../server-shared/expert-directory.js';
+
+async function loadCustomExpertCategories(db) {
+  const snap = await db.collection('config').doc('expertCategories').get().catch(() => null);
+  const custom = Array.isArray(snap?.data()?.custom) ? snap.data().custom : [];
+  if (custom.length) registerCustomExpertCategories(custom);
+}
 
 const TYPES = {
   partner: { label: 'Партнёр', emoji: '🤝' },
@@ -36,6 +42,43 @@ function cleanText(value, max = 12000) {
 
 function cleanList(value, maxItems = 12, maxLength = 500) {
   return (Array.isArray(value) ? value : []).slice(0, maxItems).map(item => typeof item === 'object' ? item : cleanText(item, maxLength)).filter(Boolean);
+}
+
+function mergeVideoList(videosValue, singleVideoValue) {
+  const list = cleanList(videosValue, 12);
+  const single = normalizeUrl(singleVideoValue);
+  if (single && !list.some(item => (typeof item === 'object' ? item.url : item) === single)) {
+    list.push({ url: single, title: '', platform: 'other', platformLabel: 'Видео' });
+  }
+  return list.slice(0, 12);
+}
+
+function buildMediaManifest(rawFiles, acceptedFiles, mediaSummary, draftVideos) {
+  const raw = Array.isArray(rawFiles) ? rawFiles : [];
+  const summary = mediaSummary && typeof mediaSummary === 'object' ? mediaSummary : {};
+  const rejected = [];
+  raw.forEach((file, index) => {
+    const name = cleanText(file?.name, 180) || `file_${index + 1}`;
+    if (index >= 12) { rejected.push({ name, reason: 'Превышен лимит 12 файлов' }); return; }
+    if (!normalizeUrl(file?.url)) { rejected.push({ name, reason: 'Файл не был загружен (нет ссылки)' }); return; }
+    if (Number(file?.size || 0) > 8 * 1024 * 1024) { rejected.push({ name, reason: 'Файл больше 8 МБ' }); return; }
+  });
+  const failedOnClient = Array.isArray(summary.failed)
+    ? summary.failed.slice(0, 24).map(item => ({ name: cleanText(item?.name, 180), reason: cleanText(item?.reason || item?.error, 200) }))
+    : [];
+  const declaredTotal = Number.isFinite(Number(summary.total)) ? Number(summary.total) : raw.length;
+  const videosDeclared = Number.isFinite(Number(summary.videos)) ? Number(summary.videos) : (Array.isArray(draftVideos) ? draftVideos.length : 0);
+  const videosAccepted = Array.isArray(draftVideos) ? draftVideos.length : 0;
+  return {
+    declaredTotal,
+    received: raw.length,
+    accepted: acceptedFiles.length,
+    rejected,
+    failedOnClient,
+    videosDeclared,
+    videosAccepted,
+    ok: rejected.length === 0 && failedOnClient.length === 0 && acceptedFiles.length >= declaredTotal && videosAccepted >= videosDeclared,
+  };
 }
 
 function lineValue(text, labels) {
@@ -282,7 +325,7 @@ function analyze(type, fields, files) {
     unknownCategories: type === 'expert' ? expertCategoryIntegrity.unknown : [],
     workFormats: cleanList(fields.workFormats, 12, 80),
     audienceTags: cleanList(fields.audienceTags, 12, 80),
-    videos: (isPartnerAlliance || type === 'expert') ? cleanList(fields.videos, 6) : [],
+    videos: (isPartnerAlliance || type === 'expert') ? mergeVideoList(fields.videos, fields.video) : [],
     bookingUrl: (isPartnerAlliance || type === 'expert') ? normalizeUrl(fields.bookingUrl) : '',
     whatsapp: type === 'expert' ? normalizeUrl(fields.whatsapp, 'whatsapp') : '',
     max: normalizeUrl(fields.max, 'max'),
@@ -375,9 +418,11 @@ async function writePartnershipAnalytics(db, event, body, extra = {}) {
 async function handlePartnershipSubmit(db, body) {
   const type = cleanText(body?.type, 40);
   if (!['partner', 'expert'].includes(type)) throw linkError('Некорректный тип заявки.', 400);
+  await loadCustomExpertCategories(db);
   const fields = body?.fields && typeof body.fields === 'object' ? body.fields : {};
   const files = cleanPartnershipFiles(body?.files);
   const draft = analyze(type, fields, files);
+  const mediaManifest = buildMediaManifest(body?.files, files, body?.mediaSummary, draft.fields.videos);
   const meta = TYPES[type];
   const now = FieldValue.serverTimestamp();
   const user = cleanPartnershipUser(body?.user);
@@ -391,6 +436,7 @@ async function handlePartnershipSubmit(db, body) {
     sourceLabel: 'Заявка на партнёрство из профиля',
     sourceText: sourceText.slice(0, 20000),
     sourceFiles: files,
+    mediaManifest,
     draft,
     confidence: draft.confidence,
     missingFields: draft.missingFields,
@@ -427,7 +473,7 @@ async function handlePartnershipSubmit(db, body) {
     processedAt: now,
   });
   await writePartnershipAnalytics(db, 'partnership_application_submitted', body, { requestId: requestRef.id, type });
-  return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, confidence: draft.confidence };
+  return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, confidence: draft.confidence, mediaManifest };
 }
 
 async function findLink(db, token) {
@@ -462,8 +508,18 @@ export default async function publicSubmitRoutes(fastify) {
       const link = await findLink(db, token);
       assertLinkAvailable(link);
       await link.ref.set({ openedAt: FieldValue.serverTimestamp(), openedCount: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true }).catch(() => {});
+      await loadCustomExpertCategories(db);
       const type = link.data.type;
-      return { ok: true, token, type, typeLabel: TYPES[type].label, title: link.data.title || '', status: link.data.status || 'active', expiresAt: link.data.expiresAt || null };
+      return {
+        ok: true,
+        token,
+        type,
+        typeLabel: TYPES[type].label,
+        title: link.data.title || '',
+        status: link.data.status || 'active',
+        expiresAt: link.data.expiresAt || null,
+        expertCategories: EXPERT_CATEGORIES.map(({ id, label, emoji, custom }) => ({ id, label, emoji, custom: custom === true })),
+      };
     } catch (error) {
       request.log.error({ err: error?.message, code: error?.statusCode || 500 }, 'public-submit get failed');
       return reply.code(error?.statusCode || 500).send({ ok: false, error: error?.message || 'Не удалось открыть форму.' });
@@ -486,6 +542,7 @@ export default async function publicSubmitRoutes(fastify) {
       if (!/^[a-zA-Z0-9_-]{6,80}$/.test(token)) throw linkError('Некорректная ссылка.', 400);
       const link = await findLink(db, token);
       assertLinkAvailable(link);
+      await loadCustomExpertCategories(db);
       const fields = request.body?.fields && typeof request.body.fields === 'object' ? request.body.fields : {};
       const files = Array.isArray(request.body?.files) ? request.body.files.slice(0, 12).map(file => ({
         name: cleanText(file.name, 180),
@@ -496,6 +553,7 @@ export default async function publicSubmitRoutes(fastify) {
       })).filter(file => file.url && file.size <= 8 * 1024 * 1024) : [];
       const type = link.data.type;
       const draft = analyze(type, fields, files);
+      const mediaManifest = buildMediaManifest(request.body?.files, files, request.body?.mediaSummary, draft.fields.videos);
       const legalDocuments = normalizeLegalDocuments(request.body?.legalDocuments);
       const cooperationPlan = cleanText(request.body?.cooperationPlan, 40) === 'paid' ? 'paid' : 'not_now';
       const legalProfile = normalizeLegalProfile(request.body?.legalProfile, fields, cooperationPlan);
@@ -522,6 +580,7 @@ export default async function publicSubmitRoutes(fastify) {
         source: 'public-form',
         sourceText: sourceText.slice(0, 20000),
         sourceFiles: files,
+        mediaManifest,
         draft,
         cooperationPlan,
         cooperationStatus,
@@ -565,7 +624,7 @@ export default async function publicSubmitRoutes(fastify) {
         submittedCount: FieldValue.increment(1),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-      return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, legalCheck, confidence: draft.confidence };
+      return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, legalCheck, confidence: draft.confidence, mediaManifest };
     } catch (error) {
       request.log.error({ err: error?.message, code: error?.statusCode || 500 }, 'public-submit post failed');
       return reply.code(error?.statusCode || 500).send({ ok: false, error: error?.message || 'Не удалось обработать заявку.' });

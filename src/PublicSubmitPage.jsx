@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from './constants.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl } from './utils/externalUrls.js';
-import { normalizeExpertPhone, validateExpertCategories } from '../server-shared/expert-directory.js';
+import { normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../server-shared/expert-directory.js';
 import { ExpertQuestionnaire } from './components/ExpertQuestionnaire.jsx';
 import { PartnerQuestionnaire } from './components/PartnerQuestionnaire.jsx';
 import { hasExpertAmbassadorAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
@@ -227,6 +227,7 @@ export function PublicSubmitPage() {
       .then(res => res.json().then(data => ({ res, data })))
       .then(({ res, data }) => {
         if (!res.ok || data.ok === false) throw new Error(data.error || 'Форма недоступна.');
+        if (Array.isArray(data.expertCategories)) registerCustomExpertCategories(data.expertCategories.filter(item => item.custom));
         setFormInfo(data);
         if (['expert', 'partner'].includes(data.type) && draftKey) {
           try {
@@ -264,27 +265,40 @@ export function PublicSubmitPage() {
   const handleFiles = async (list, role = '') => {
     const replacingSingle = ['avatar', 'logo', 'cover', 'main'].includes(role);
     const existing = replacingSingle ? files.filter(file => file.role !== role) : files;
-    const incoming = Array.from(list || []).filter(file => /^image\//.test(file.type)).slice(0, replacingSingle ? 1 : Math.max(0, 12 - existing.length));
-    if (!incoming.length) return;
+    const all = Array.from(list || []);
+    const images = all.filter(file => /^image\//.test(file.type));
+    const limit = replacingSingle ? 1 : Math.max(0, 12 - existing.filter(file => file.url).length);
+    const incoming = images.slice(0, limit);
+    const issues = [
+      ...all.filter(file => !/^image\//.test(file.type)).map(file => ({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: /^video\//.test(file.type) ? 'Видео-файлы не загружаются: добавьте ссылку на видео (YouTube, VK Видео, Rutube, MAX)' : 'Файл не является изображением' })),
+      ...images.slice(limit).map(file => ({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: 'Превышен лимит 12 фотографий' })),
+    ];
+    if (!incoming.length && !issues.length) return;
     setUploading(true);
     setError('');
-    try {
-      const uploaded = [];
-      for (const file of incoming) {
-        if (file.size > 8 * 1024 * 1024) {
-          uploaded.push({ name: file.name, type: file.type, size: file.size, error: 'Файл больше 8 МБ' });
-          continue;
-        }
-        const preview = URL.createObjectURL(file);
+    const uploaded = [];
+    for (const file of incoming) {
+      if (file.size > 8 * 1024 * 1024) {
+        uploaded.push({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: 'Файл больше 8 МБ. Сожмите фото и загрузите снова' });
+        continue;
+      }
+      const preview = URL.createObjectURL(file);
+      try {
         const url = await uploadPhoto(file, `public-submissions/${route.token}`);
         uploaded.push({ name: file.name, type: file.type, size: file.size, url, preview, role: role || (files.length || uploaded.length ? 'photo' : 'main') });
+      } catch {
+        uploaded.push({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: 'Не удалось загрузить файл. Проверьте интернет и попробуйте ещё раз' });
       }
-      setFiles(prev => replacingSingle ? [...prev.filter(file => file.role !== role), ...uploaded] : [...prev, ...uploaded]);
-    } catch (e) {
-      setError(e.message || 'Не удалось загрузить фото.');
-    } finally {
-      setUploading(false);
     }
+    const next = [...uploaded, ...issues];
+    setFiles(prev => replacingSingle ? [...prev.filter(file => file.role !== role), ...next] : [...prev, ...next]);
+    const failed = next.filter(file => file.error);
+    if (failed.length) setError(`Не загружено файлов: ${failed.length} (${failed.map(file => file.name).join(', ')}). Они отмечены в списке медиа — удалите их или загрузите заново.`);
+    setUploading(false);
+  };
+
+  const removeFile = (target) => {
+    setFiles(prev => prev.filter(file => file !== target));
   };
 
   const handleLegalDocuments = async (list) => {
@@ -366,6 +380,11 @@ export function PublicSubmitPage() {
 
   const submit = async () => {
     if (!validatePublicStep()) return;
+    const failedFiles = files.filter(file => file.error);
+    if (failedFiles.length) {
+      setError(`Обнаружена потеря медиафайлов: ${failedFiles.map(file => file.name).join(', ')}. Загрузите их заново или удалите из списка — иначе они не попадут в карточку.`);
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -391,6 +410,12 @@ export function PublicSubmitPage() {
           token: route.token,
           fields: normalizedFields,
           files: files.filter(file => file.url).map(({ name, type, size, url, role }) => ({ name, type, size, url, role })),
+          mediaSummary: {
+            total: files.filter(file => file.url).length,
+            byRole: files.filter(file => file.url).reduce((acc, file) => ({ ...acc, [file.role || 'photo']: (acc[file.role || 'photo'] || 0) + 1 }), {}),
+            failed: files.filter(file => file.error).map(({ name, error: reason }) => ({ name, reason })),
+            videos: Array.isArray(fields.videos) ? fields.videos.length : (fields.video ? 1 : 0),
+          },
           cooperationPlan,
           legalProfile: {
             type: selectedLegalType,
@@ -487,7 +512,7 @@ export function PublicSubmitPage() {
             <>
               <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Публичная карточка</h2>
               <div style={{ color: 'rgba(25,23,19,0.58)', fontSize: 13, lineHeight: '20px', marginBottom: 8 }}>Эти сведения редактор использует для карточки в приложении АПГ.</div>
-              {type === 'expert' ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} /> : type === 'partner' ? <PartnerQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} /> : formFields.map(field => (
+              {type === 'expert' ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} onRemoveFile={removeFile} uploading={uploading} /> : type === 'partner' ? <PartnerQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} onRemoveFile={removeFile} uploading={uploading} /> : formFields.map(field => (
                 <PublicField key={field[0]} field={field} value={fields[field[0]]} onChange={setField} />
               ))}
 
@@ -508,9 +533,10 @@ export function PublicSubmitPage() {
               {files.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 10, marginTop: 12 }}>
                   {files.map((file, index) => (
-                    <div key={`${file.name}-${index}`} style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(25,23,19,0.06)', border: '1px solid rgba(25,23,19,0.08)' }}>
-                      {file.preview || file.url ? <img src={file.preview || file.url} alt="" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block' }} /> : null}
-                      <div style={{ padding: 8, fontSize: 10, color: file.error ? '#b91c1c' : 'rgba(25,23,19,0.62)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.error || file.name}</div>
+                    <div key={`${file.name}-${index}`} style={{ borderRadius: 16, overflow: 'hidden', background: file.error ? 'rgba(185,28,28,0.08)' : 'rgba(25,23,19,0.06)', border: `1px solid ${file.error ? 'rgba(185,28,28,0.35)' : 'rgba(25,23,19,0.08)'}`, position: 'relative' }}>
+                      {file.preview || file.url ? <img src={file.preview || file.url} alt="" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block' }} /> : <div style={{ aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>⚠️</div>}
+                      <button type="button" onClick={() => removeFile(file)} style={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24, borderRadius: 12, border: 'none', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 13, lineHeight: '24px', cursor: 'pointer', padding: 0 }}>×</button>
+                      <div style={{ padding: 8, fontSize: 10, color: file.error ? '#b91c1c' : 'rgba(25,23,19,0.62)', lineHeight: '14px' }}>{file.error ? `${file.name}: ${file.error}` : file.name}</div>
                     </div>
                   ))}
                 </div>

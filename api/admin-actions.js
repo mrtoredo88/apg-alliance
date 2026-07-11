@@ -6,7 +6,7 @@ import { adminError, requireAdminPermission, writeAuditLog } from './_admin-secu
 import { APP_URL } from './config.js';
 import { ECONOMY_VERSION, economyMigrationPatch } from '../server-shared/economy-engine.js';
 
-const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt']);
+const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
   partners: { collection: 'partners', scope: 'partners', label: 'партнёр' },
   experts: { collection: 'experts', scope: 'experts', label: 'эксперт' },

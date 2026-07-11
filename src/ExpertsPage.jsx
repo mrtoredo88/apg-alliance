@@ -804,8 +804,6 @@ const FILTERS = [
   { id: 'group',   label: 'Группа', emoji: '👥' },
 ];
 
-const CATEGORY_FILTERS = [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES];
-
 export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -813,6 +811,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
   const [selected, setSelected] = useState(null);
   const [rotation, setRotation] = useState({});
   const directoryExperts = useMemo(() => experts.map(normalizeExpertRecord), [experts]);
+  const CATEGORY_FILTERS = useMemo(() => [{ id: 'all', label: 'Все', emoji: '✦' }, ...EXPERT_CATEGORIES], [experts]);
   const openExpert = (expert) => {
     onExpertOpen?.(expert);
     setSelected(expert);

@@ -1874,3 +1874,19 @@
 **Миграция:** `scripts/migrate-expert-directory.mjs` нормализует существующие телефоны и добавляет canonical `categories` без удаления заполненных данных.
 
 **Проверка:** scoped eslint, Vercel/Fastify parity, category integrity, phone/tel normalization, Loki tests, Admin Assistant tests и production build.
+
+## 2026-07-11 — AI Import Data Integrity V1 (Media + Field Validator)
+
+**Задача:** гарантировать, что после заполнения анкеты ни одно поле, фото или видео не теряются до публикации (кейс Крутиковой Ольги: фото работ отсутствовали в опубликованной карточке).
+
+**Диагностика по production-данным:** в заявке `aiImportRequests/NKfXsrwgFDM4JuF5R8M7` был только 1 файл (аватар, role `avatar`); фото работ и видео в заявку не дошли — потеря произошла на этапе анкеты (загрузка файлов молча отбрасывала не-изображения, файлы >8 МБ, всё сверх лимита 12 и весь пакет при сбое одной загрузки; ошибочные файлы не показывались в анкете эксперта из-за фильтра `files.filter(f => f.url)`). Галерею из 4 фото админ восстановил вручную через AdminPanel (`experts/gallery/…`, на час позже заявки). Дополнительные потери на публикации: у экспертов в галерею попадали только файлы role `gallery|photo` (без страховки как у партнёров), одиночное поле `video` эксперта обнулялось в analyze().
+
+**Что изменено:**
+- Анкеты (`PublicSubmitPage`, `PartnershipPage`, `ExpertQuestionnaire`, `PartnerQuestionnaire`): ошибки загрузки видимы (файл >8 МБ, не-изображение/видео-файл, превышение лимита, сбой сети), успешно загруженная часть пакета не теряется, файлы можно удалять; отправка блокируется, пока в списке есть файлы с ошибкой; на сервер уходит `mediaSummary` (заявлено/по ролям/сбои/видео).
+- Сервер `public-submit` (Vercel + Fastify parity): одиночное `video` эксперта сливается в `videos` (лимит поднят 6→12), в каждую заявку пишется `mediaManifest` (declared/received/accepted/rejected/failedOnClient/videos + ok) — расхождение видно администратору и блокирует публикацию.
+- Публикация (`aiImportDraftPatch`): галерея эксперта и партнёра теперь включает все фото, не занятые как avatar/cover/logo (dedupe); добавлены `adminComment` у партнёра/события/новости/приза, `services/cost/offer` у события, `videos` у новости, `quantityInfo`/`gallery` у приза; `adminComment` добавлен в whitelist NEWS_FIELDS.
+- Новый модуль `src/aiImportValidation.js`: Media Validator (каждый файл заявки должен попасть в карточку; видео из черновика — в patch) + Data Integrity Validator (карты соответствия полей анкеты → карточки для expert/partner/event/news/prize; тарифные ограничения — предупреждение, потеря — блокер).
+- Validation Center в AdminPanel: кнопка «Проверка и публикация» открывает экран с чипами (фото/видео/поля), списками проверок, manifest-предупреждениями, предпросмотром EntityPreviewCard; публикация доступна только при пройденной проверке; `publishAiImportDraft` дополнительно гейтится валидатором.
+- Категории: неизвестная категория больше не тупик — в Validation Center можно выбрать существующую, создать новую или отменить. Новые категории хранятся в `config/expertCategories` (custom[]), регистрируются в едином справочнике `server-shared/expert-directory.js` (`registerCustomExpertCategories`, slugify c транслитерацией) и автоматически доступны в анкете (GET public-submit отдаёт справочник), приложении (public-data → UserApp bootstrap), админке, фильтрах ExpertsPage (CATEGORY_FILTERS перенесён в рендер), поиске и Локи — без правок кода.
+
+**Проверка:** `.tmp-ai-import-tests.mjs` — 10 сценариев (merge видео, динамические категории, валидатор: ok/потеря фото/видео/поля/категория/manifest/тарифные предупреждения) — все проходят; production build (`vite build`) успешен.

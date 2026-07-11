@@ -307,28 +307,40 @@ export function PartnershipPage({ user, initialType = '', entryNonce = 0, onBack
   const handleFiles = async (list, role = '') => {
     const replacingSingle = ['avatar', 'logo', 'cover', 'main'].includes(role);
     const existing = replacingSingle ? files.filter(file => file.role !== role) : files;
-    const incoming = Array.from(list || []).filter(file => /^image\//.test(file.type)).slice(0, replacingSingle ? 1 : Math.max(0, 12 - existing.length));
-    if (!incoming.length) return;
+    const all = Array.from(list || []);
+    const images = all.filter(file => /^image\//.test(file.type));
+    const limit = replacingSingle ? 1 : Math.max(0, 12 - existing.filter(file => file.url).length);
+    const incoming = images.slice(0, limit);
+    const issues = [
+      ...all.filter(file => !/^image\//.test(file.type)).map(file => ({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: /^video\//.test(file.type) ? 'Видео-файлы не загружаются: добавьте ссылку на видео (YouTube, VK Видео, Rutube, MAX)' : 'Файл не является изображением' })),
+      ...images.slice(limit).map(file => ({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: 'Превышен лимит 12 фотографий' })),
+    ];
+    if (!incoming.length && !issues.length) return;
     setUploading(true);
     setError('');
-    try {
-      const uploaded = [];
-      for (const file of incoming) {
-        if (file.size > 8 * 1024 * 1024) {
-          uploaded.push({ name: file.name, type: file.type, size: file.size, error: 'Файл больше 8 МБ' });
-          continue;
-        }
-        const preview = URL.createObjectURL(file);
-        const folder = `partnership-applications/${user?.id || 'guest'}`;
-        const url = await uploadPhoto(file, folder);
-        uploaded.push({ name: file.name, type: file.type, size: file.size, url, preview, role: role || (files.length || uploaded.length ? 'photo' : 'main') });
+    const uploaded = [];
+    for (const file of incoming) {
+      if (file.size > 8 * 1024 * 1024) {
+        uploaded.push({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: 'Файл больше 8 МБ. Сожмите фото и загрузите снова' });
+        continue;
       }
-      setFiles(prev => replacingSingle ? [...prev.filter(file => file.role !== role), ...uploaded] : [...prev, ...uploaded]);
-    } catch (e) {
-      setError(e.message || 'Не удалось загрузить фото.');
-    } finally {
-      setUploading(false);
+      const preview = URL.createObjectURL(file);
+      try {
+        const url = await uploadPhoto(file, `partnership-applications/${user?.id || 'guest'}`);
+        uploaded.push({ name: file.name, type: file.type, size: file.size, url, preview, role: role || (files.length || uploaded.length ? 'photo' : 'main') });
+      } catch {
+        uploaded.push({ name: file.name, type: file.type, size: file.size, role: role || 'photo', error: 'Не удалось загрузить файл. Проверьте интернет и попробуйте ещё раз' });
+      }
     }
+    const next = [...uploaded, ...issues];
+    setFiles(prev => replacingSingle ? [...prev.filter(file => file.role !== role), ...next] : [...prev, ...next]);
+    const failed = next.filter(file => file.error);
+    if (failed.length) setError(`Не загружено файлов: ${failed.length} (${failed.map(file => file.name).join(', ')}). Они отмечены в списке медиа — удалите их или загрузите заново.`);
+    setUploading(false);
+  };
+
+  const removeFile = (target) => {
+    setFiles(prev => prev.filter(file => file !== target));
   };
 
   const validate = () => {
@@ -354,6 +366,11 @@ export function PartnershipPage({ user, initialType = '', entryNonce = 0, onBack
 
   const submit = async () => {
     if (!validate()) return;
+    const failedFiles = files.filter(file => file.error);
+    if (failedFiles.length) {
+      setError(`Обнаружена потеря медиафайлов: ${failedFiles.map(file => file.name).join(', ')}. Загрузите их заново или удалите из списка — иначе они не попадут в карточку.`);
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -366,6 +383,12 @@ export function PartnershipPage({ user, initialType = '', entryNonce = 0, onBack
           type: selectedType,
           fields: normalizedFields,
           files: files.filter(file => file.url).map(({ name, type, size, url, role }) => ({ name, type, size, url, role })),
+          mediaSummary: {
+            total: files.filter(file => file.url).length,
+            byRole: files.filter(file => file.url).reduce((acc, file) => ({ ...acc, [file.role || 'photo']: (acc[file.role || 'photo'] || 0) + 1 }), {}),
+            failed: files.filter(file => file.error).map(({ name, error: reason }) => ({ name, reason })),
+            videos: Array.isArray(fields.videos) ? fields.videos.length : (fields.video ? 1 : 0),
+          },
           user: user ? { id: user.id, name: user.displayName || [user.first_name, user.last_name].filter(Boolean).join(' '), email: user.email || user.linkedEmail || '' } : null,
         }),
       });
@@ -461,8 +484,8 @@ export function PartnershipPage({ user, initialType = '', entryNonce = 0, onBack
             <div style={{ marginTop: 10, color: T.textSec, fontSize: 12, lineHeight: '18px' }}>Чтобы вернуться к выбору направления, используйте кнопку ниже.</div>
             <div style={{ marginTop: 14 }}>
               {selectedType === 'expert'
-                ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} />
-                : <PartnerQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} />
+                ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} onRemoveFile={removeFile} uploading={uploading} />
+                : <PartnerQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} onRemoveFile={removeFile} uploading={uploading} />
               }
             </div>
             {error && <div style={{ marginTop: 12, color: T.red, fontSize: 13, lineHeight: '19px', fontWeight: 800 }}>{error}</div>}

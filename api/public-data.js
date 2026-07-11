@@ -77,6 +77,9 @@ export default async function handler(req, res) {
     const statsSnap = !requested.length || requested.includes('stats')
       ? await db.collection('stats').doc('global').get().catch(() => null)
       : null;
+    const categoriesSnap = !requested.length || requested.includes('expertCategories')
+      ? await db.collection('config').doc('expertCategories').get().catch(() => null)
+      : null;
     return res.json({
       ok: errors.length === 0,
       partial: errors.length > 0,
@@ -85,6 +88,7 @@ export default async function handler(req, res) {
       data: {
         ...data,
         ...(statsSnap?.exists ? { stats: { id: statsSnap.id, ...serializePublicValue(statsSnap.data()) } } : {}),
+        expertCategories: Array.isArray(categoriesSnap?.data()?.custom) ? serializePublicValue(categoriesSnap.data().custom) : [],
       },
     });
   } catch (error) {

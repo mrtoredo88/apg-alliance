@@ -28,7 +28,7 @@ import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
-import { normalizeExpertRecord } from '../server-shared/expert-directory.js';
+import { normalizeExpertRecord, registerCustomExpertCategories } from '../server-shared/expert-directory.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -331,6 +331,7 @@ async function fetchPublicBootstrap() {
       .then(({ response, payload }) => {
         const data = payload?.data || {};
         if (!response.ok || (!Object.keys(data).length && payload?.ok === false)) throw new Error(payload?.error || 'public_data_failed');
+        if (Array.isArray(data.expertCategories) && data.expertCategories.length) registerCustomExpertCategories(data.expertCategories);
         return data;
       })
       .catch(error => {

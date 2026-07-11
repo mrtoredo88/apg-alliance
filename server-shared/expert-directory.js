@@ -24,8 +24,61 @@ export const EXPERT_CATEGORIES = [
   { id: 'other', label: 'Другое', emoji: '✨', aliases: [] },
 ];
 
-const CATEGORY_BY_ID = new Map(EXPERT_CATEGORIES.map(item => [item.id, item]));
-const CATEGORY_ALIAS = new Map(EXPERT_CATEGORIES.flatMap(item => [item.id, item.label, ...(item.aliases || [])].map(value => [String(value).trim().toLowerCase(), item.id])));
+let CATEGORY_BY_ID = new Map();
+let CATEGORY_ALIAS = new Map();
+
+function rebuildCategoryIndexes() {
+  CATEGORY_BY_ID = new Map(EXPERT_CATEGORIES.map(item => [item.id, item]));
+  CATEGORY_ALIAS = new Map(EXPERT_CATEGORIES.flatMap(item => [item.id, item.label, ...(item.aliases || [])].map(value => [String(value).trim().toLowerCase(), item.id])));
+}
+
+rebuildCategoryIndexes();
+
+export function slugifyExpertCategoryId(label) {
+  const translit = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
+  return String(label || '').trim().toLowerCase()
+    .split('').map(char => translit[char] ?? char).join('')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+}
+
+export function normalizeCustomExpertCategory(input = {}) {
+  const label = String(input.label || '').trim().slice(0, 60);
+  if (!label) return null;
+  const id = slugifyExpertCategoryId(input.id || label);
+  if (!id) return null;
+  return {
+    id,
+    label,
+    emoji: String(input.emoji || '✨').trim().slice(0, 8) || '✨',
+    aliases: (Array.isArray(input.aliases) ? input.aliases : []).map(value => String(value || '').trim()).filter(Boolean).slice(0, 12),
+    custom: true,
+  };
+}
+
+export function registerCustomExpertCategories(list) {
+  const items = (Array.isArray(list) ? list : []).map(normalizeCustomExpertCategory).filter(Boolean);
+  let added = 0;
+  items.forEach(item => {
+    const existing = EXPERT_CATEGORIES.find(row => row.id === item.id);
+    if (existing) {
+      existing.label = item.label || existing.label;
+      existing.emoji = item.emoji || existing.emoji;
+      existing.aliases = [...new Set([...(existing.aliases || []), ...item.aliases])];
+      return;
+    }
+    const otherIndex = EXPERT_CATEGORIES.findIndex(row => row.id === 'other');
+    EXPERT_CATEGORIES.splice(otherIndex === -1 ? EXPERT_CATEGORIES.length : otherIndex, 0, item);
+    added += 1;
+  });
+  if (items.length) rebuildCategoryIndexes();
+  return added;
+}
+
+export function listCustomExpertCategories() {
+  return EXPERT_CATEGORIES.filter(item => item.custom === true).map(item => ({ id: item.id, label: item.label, emoji: item.emoji, aliases: item.aliases || [] }));
+}
 
 export function normalizeExpertCategory(value, fallback = '') {
   const key = String(value ?? '').trim().toLowerCase();
