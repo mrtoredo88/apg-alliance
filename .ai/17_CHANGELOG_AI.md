@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] fix: Desktop Workspace owner activation
+**Коммит:** `pending`
+**Файлы:** `src/workspace/WorkspaceFeatureFlags.js`, `src/UserApp.jsx`, `scripts/desktop-workspace-test.mjs`, `docs/desktop-workspace.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Исправлена активация Workspace: `super_admin` теперь считается владельческим уровнем при feature flag `owner`, а проектный owner-id `988504` синхронизирован с уже существующей privileged-логикой профиля.
+- `UserApp` получил auto-mode: если `apg_app_mode` не выбран вручную и пользователь имеет доступ на desktop, открывается Workspace; явный выбор пользовательского режима сохраняется.
+- Добавлен явный переключатель `📱 Пользовательский режим / 🖥 Workspace`, а desktop detection учитывает Mac/Windows/Linux/ChromeOS от 1024px без включения iPadOS-touch.
+**Почему:** Production содержал Desktop Workspace, но владелец мог видеть обычную мобильную оболочку из-за default `appMode=user` и слишком узкой owner-проверки feature flag.
+
+---
+
 ## [2026-07-11] feat: Desktop Workspace 1.0
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceFeatureFlags.js`, `src/workspace/WorkspaceWidgets.js`, `src/workspace/WorkspaceCore.js`, `src/workspace/index.js`, `src/UserApp.jsx`, `scripts/desktop-workspace-test.mjs`, `scripts/workspace-core-test.mjs`, `docs/desktop-workspace.md`, `docs/workspace-core.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`

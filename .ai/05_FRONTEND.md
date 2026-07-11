@@ -276,7 +276,7 @@ const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] =
 - `user` — привычное приложение для жителей;
 - `workspace` — desktop SaaS-среда.
 
-Переключение происходит без повторной авторизации и без перезагрузки. Workspace доступен только на desktop-ширине и только если `canUseDesktopWorkspace()` разрешает доступ по feature flag.
+Переключение происходит без повторной авторизации и без перезагрузки. Workspace доступен только на desktop-устройстве и только если `canUseDesktopWorkspace()` разрешает доступ по feature flag. Если `apg_app_mode` не выбран вручную, владелец/`super_admin` автоматически попадает в Workspace на desktop.
 
 `WorkspaceFeatureFlags.js` поддерживает staged rollout: `off → owner → admin → partner → expert → all`. По умолчанию включён безопасный уровень `owner`.
 

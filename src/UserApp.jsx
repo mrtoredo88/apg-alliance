@@ -33,7 +33,7 @@ import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
-import { canUseDesktopWorkspace, getDesktopWorkspaceFlag } from './workspace/WorkspaceFeatureFlags.js';
+import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -61,6 +61,15 @@ const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ de
 const PublicSubmitPage     = lazy(() => import('./PublicSubmitPage.jsx').then(m => ({ default: m.PublicSubmitPage })));
 const ApgHealthPage        = lazy(() => import('./ApgHealthPage.jsx').then(m => ({ default: m.ApgHealthPage })));
 const DesktopWorkspace     = lazy(() => import('./workspace/DesktopWorkspace.jsx').then(m => ({ default: m.DesktopWorkspace })));
+
+function readInitialAppMode() {
+  try {
+    const stored = localStorage.getItem('apg_app_mode');
+    return stored === 'workspace' || stored === 'user' ? stored : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
 
 function safeScrollTop() {
   try {
@@ -580,9 +589,7 @@ export function UserApp() {
   const initialDeepLink                         = useMemo(readAppDeepLink, []);
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
-  const [appMode, setAppMode]                   = useState(() => {
-    try { return localStorage.getItem('apg_app_mode') === 'workspace' ? 'workspace' : 'user'; } catch { return 'user'; }
-  });
+  const [appMode, setAppMode]                   = useState(readInitialAppMode);
   const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
@@ -2399,12 +2406,22 @@ export function UserApp() {
 
   const workspaceMode = getWorkspaceMode(workspaceWidth);
   const workspaceRole = user?.role || (user?.isOwner ? 'owner' : user?.isAdmin ? 'admin' : 'user');
-  const desktopWorkspaceAvailable = workspaceMode === WORKSPACE_MODES.desktop && canUseDesktopWorkspace({ user, partner: ownedPartner, expert: ownedExpert, flag: desktopWorkspaceFlag });
-  const desktopWorkspaceActive = desktopWorkspaceAvailable && appMode === 'workspace';
+  const desktopDevice = isDesktopWorkspaceDevice({
+    width: workspaceWidth,
+    userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+    platform: typeof navigator === 'undefined' ? '' : navigator.platform,
+    maxTouchPoints: typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints,
+  });
+  const desktopWorkspaceAvailable = desktopDevice && canUseDesktopWorkspace({ user, partner: ownedPartner, expert: ownedExpert, flag: desktopWorkspaceFlag });
+  const resolvedAppMode = resolveDesktopWorkspaceMode({ requestedMode: appMode, available: desktopWorkspaceAvailable });
+  const desktopWorkspaceActive = resolvedAppMode === 'workspace';
   const setAppModePersisted = useCallback((mode) => {
-    const nextMode = mode === 'workspace' ? 'workspace' : 'user';
+    const nextMode = mode === 'workspace' ? 'workspace' : mode === 'auto' ? 'auto' : 'user';
     setAppMode(nextMode);
-    try { localStorage.setItem('apg_app_mode', nextMode); } catch {}
+    try {
+      if (nextMode === 'auto') localStorage.removeItem('apg_app_mode');
+      else localStorage.setItem('apg_app_mode', nextMode);
+    } catch {}
   }, []);
   const bottomNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: workspaceRole }), [workspaceRole]);
   const tabIconByKey = {
@@ -3285,29 +3302,54 @@ export function UserApp() {
           {showTabBar && !desktopWorkspaceActive && createPortal(tabBarEl, document.body)}
 
           {desktopWorkspaceAvailable && !desktopWorkspaceActive && createPortal((
-            <button
-              type="button"
-              onClick={() => setAppModePersisted('workspace')}
+            <div
+              role="group"
+              aria-label="Переключатель режима АПГ"
               style={{
                 position: 'fixed',
                 top: 18,
                 right: 18,
                 zIndex: 12000,
+                display: 'flex',
+                gap: 4,
+                padding: 5,
                 border: '1px solid rgba(215,184,106,0.32)',
                 borderRadius: 999,
-                minHeight: 44,
-                padding: '0 16px',
-                background: APG2_PROFILE.goldGradient,
-                color: '#17120a',
+                background: 'rgba(var(--apg2-glass-a,255,255,255),0.18)',
+                backdropFilter: 'blur(24px) saturate(1.5)',
+                WebkitBackdropFilter: 'blur(24px) saturate(1.5)',
                 boxShadow: '0 18px 44px rgba(0,0,0,0.22), 0 0 28px rgba(215,184,106,0.16)',
-                fontFamily: 'inherit',
-                fontSize: 13,
-                fontWeight: 900,
-                cursor: 'pointer',
               }}
             >
-              Workspace
-            </button>
+              {[
+                ['user', '📱 Пользовательский режим'],
+                ['workspace', '🖥 Workspace'],
+              ].map(([mode, label]) => {
+                const active = mode === resolvedAppMode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setAppModePersisted(mode)}
+                    style={{
+                      border: 0,
+                      borderRadius: 999,
+                      minHeight: 36,
+                      padding: '0 12px',
+                      background: active ? APG2_PROFILE.goldGradient : 'transparent',
+                      color: active ? '#17120a' : APG2_PROFILE.text,
+                      fontFamily: 'inherit',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           ), document.body)}
 
           <Suspense fallback={null}>
