@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { EXPERT_CATEGORIES, EXPERT_WORK_FORMATS, calculateExpertProfileCompletion, hasPremiumExpertAccess, normalizeExpertVideo } from '../expertProfileForm.js';
 import { EXPERT_AUDIENCE_TAGS, EXPERT_TARIFFS, normalizeExpertTariff } from '../tariffConfig.js';
 import { parseVideoUrl } from '../utils/parseVideoUrl.js';
+import { TariffOptionCard } from './TariffOptionCard.jsx';
 
 const FORMAT_OPTIONS = EXPERT_WORK_FORMATS;
 
@@ -80,10 +81,7 @@ export function ExpertQuestionnaire({ fields, files, onField, onFiles, uploading
     </div>
 
     <Section id="tariff" title="1. Тариф" subtitle="Сначала выберите формат участия — анкета перестроится автоматически" open={open.tariff} onToggle={toggle}>
-      <div style={{ display: 'grid', gap: 9 }}>{EXPERT_TARIFFS.map(item => {
-        const active = tariff === item.id;
-        return <button key={item.id} type="button" onClick={() => onField('tariff', item.id)} style={{ padding: 13, borderRadius: 15, border: `1px solid ${active ? 'rgba(201,168,76,0.52)' : 'rgba(25,23,19,0.10)'}`, background: active ? 'rgba(201,168,76,0.17)' : 'rgba(255,255,255,0.52)', textAlign: 'left', cursor: 'pointer' }}><strong>{item.label}</strong><span style={{ display: 'block', marginTop: 4, fontSize: 11.5, lineHeight: '17px', color: 'rgba(25,23,19,0.58)' }}>{item.description}</span><span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>{item.features.map(feature => <span key={feature} style={{ borderRadius: 999, padding: '4px 8px', background: 'rgba(25,23,19,0.06)', color: 'rgba(25,23,19,0.68)', fontSize: 10.5, fontWeight: 800 }}>{feature}</span>)}</span></button>;
-      })}</div>
+      <div style={{ display: 'grid', gap: 9 }}>{EXPERT_TARIFFS.map(item => <TariffOptionCard key={item.id} item={item} selected={tariff === item.id} onSelect={id => onField('tariff', id)} />)}</div>
       {!premium && <Hint>Поля новостей, мероприятий и юридических данных не показываются на тарифе Практика.</Hint>}
     </Section>
 

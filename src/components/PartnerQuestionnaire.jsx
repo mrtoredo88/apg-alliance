@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PARTNER_CATEGORIES, PARTNER_TARIFFS, hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizePartnerTariff } from '../tariffConfig.js';
 import { normalizeExpertVideo } from '../expertProfileForm.js';
 import { parseVideoUrl } from '../utils/parseVideoUrl.js';
+import { TariffOptionCard } from './TariffOptionCard.jsx';
 
 function Hint({ children }) {
   return <div style={{ marginTop: 5, color: 'rgba(25,23,19,0.52)', fontSize: 11.5, lineHeight: '17px' }}>{children}</div>;
@@ -86,10 +87,7 @@ export function PartnerQuestionnaire({ fields, files, onField, onFiles, uploadin
     </div>
 
     <Section id="tariff" title="1. Тариф" subtitle="Выберите тариф — лишние поля исчезнут из анкеты" open={open.tariff} onToggle={toggle}>
-      <div style={{ display: 'grid', gap: 9 }}>{PARTNER_TARIFFS.map(item => {
-        const active = tariff === item.id;
-        return <button key={item.id} type="button" onClick={() => onField('tariff', item.id)} style={{ padding: 13, borderRadius: 15, border: `1px solid ${active ? 'rgba(201,168,76,0.52)' : 'rgba(25,23,19,0.10)'}`, background: active ? 'rgba(201,168,76,0.17)' : 'rgba(255,255,255,0.52)', textAlign: 'left', cursor: 'pointer' }}><strong>{item.label}</strong><span style={{ display: 'block', marginTop: 4, fontSize: 11.5, lineHeight: '17px', color: 'rgba(25,23,19,0.58)' }}>{item.description}</span><span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>{item.features.map(feature => <span key={feature} style={{ borderRadius: 999, padding: '4px 8px', background: 'rgba(25,23,19,0.06)', color: 'rgba(25,23,19,0.68)', fontSize: 10.5, fontWeight: 800 }}>{feature}</span>)}</span></button>;
-      })}</div>
+      <div style={{ display: 'grid', gap: 9 }}>{PARTNER_TARIFFS.map(item => <TariffOptionCard key={item.id} item={item} selected={tariff === item.id} onSelect={id => onField('tariff', id)} />)}</div>
       {!premium && <Hint>Новости, мероприятия и юридические поля показываются только на Премиум.</Hint>}
     </Section>
 

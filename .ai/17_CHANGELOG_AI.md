@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] fix: контраст тарифов в анкетах ИИ-импорта
+**Коммит:** `pending`
+**Файлы:** `src/components/TariffOptionCard.jsx`, `src/components/ExpertQuestionnaire.jsx`, `src/components/PartnerQuestionnaire.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Выбор тарифа в анкетах партнёра и эксперта переведён на общий `TariffOptionCard`.
+- Название, описание и преимущества тарифа теперь получают контрастные цвета из дизайн-токенов АПГ.
+- Для карточек тарифов добавлены явные состояния hover, selected, active, disabled и focus.
+**Почему:** Название выбранного тарифа наследовало белый цвет и плохо читалось на светлом фоне публичной анкеты.
+
+---
+
 ## [2026-07-11] feat: тарифные анкеты ИИ-импорта
 **Коммит:** `pending`
 **Файлы:** `src/tariffConfig.js`, `src/components/ExpertQuestionnaire.jsx`, `src/components/PartnerQuestionnaire.jsx`, `src/PublicSubmitPage.jsx`, `src/AdminPanel.jsx`, `src/expertProfileForm.js`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `scripts/expert-questionnaire-v2-test.mjs`, `.ai/04_API.md`, `.ai/24_EXPERT_QUESTIONNAIRE_V2.md`, `.ai/17_CHANGELOG_AI.md`
