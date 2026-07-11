@@ -17,6 +17,8 @@ import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
+import { AdminAssistantPanel } from './adminAssistant/AdminAssistantPanel.jsx';
+import { buildAdminContext } from './adminAssistant/AdminContextEngine.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -5626,6 +5628,24 @@ export const AdminPanel = () => {
     if (activeTab === 'automation' && !automationAudit && !automationLoading) loadAutomationAudit();
   }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit]);
 
+  const adminAssistantContext = useMemo(() => buildAdminContext({
+    activeTab,
+    role: adminSecurity?.actor?.role || adminSession?.role,
+    permissions: adminSecurity?.permissions || adminSecurity?.actor?.permissions || adminSession?.permissions,
+    filters: {
+      partners: partnerLinksFilter, partnerArchive: partnerArchiveView, experts: expertLinksFilter,
+      expertArchive: expertArchiveView, events: eventLinksFilter, news: newsLinksFilter,
+      errors: errFilter, referrals: referralFilter, automation: automationFilter,
+    },
+    search: activeTab === 'partners' ? partnerSearch : activeTab === 'experts' ? expertSearch : globalSearch,
+    selected: { partnerId: expandedPartnerId, expertId: expandedExpertId, eventId: selectedEventForSheet?.id, newsIds: selectedNewsIds },
+    data: {
+      users: adminMetrics.users, partners, experts, events, news, comments: newsComments, errors: errorLogs,
+      prizes, notifications: notifs, activity: adminMetrics.adminActivity, analytics,
+    },
+    loadedAt: adminLoadInfo.lastLoadedAt,
+  }), [activeTab, adminLoadInfo.lastLoadedAt, adminMetrics.adminActivity, adminMetrics.users, adminSecurity?.actor?.permissions, adminSecurity?.actor?.role, adminSecurity?.permissions, adminSession?.permissions, adminSession?.role, analytics, automationFilter, errFilter, errorLogs, eventLinksFilter, events, expandedExpertId, expandedPartnerId, expertArchiveView, expertLinksFilter, expertSearch, experts, globalSearch, news, newsComments, newsLinksFilter, notifs, partnerArchiveView, partnerLinksFilter, partnerSearch, partners, prizes, referralFilter, selectedEventForSheet?.id, selectedNewsIds]);
+
   if (!authed) return <AdminLoginGate onAllow={(actor) => { setAdminSession(actor || null); setAuthed(true); fetchData(); }} />;
 
   const fatalAuthIssue = !loading
@@ -8968,6 +8988,13 @@ export const AdminPanel = () => {
         undo={adminUndo}
         onRestore={restoreDeletedNews}
         onClose={() => setAdminUndo(null)}
+      />
+
+      <AdminAssistantPanel
+        context={adminAssistantContext}
+        theme={A}
+        compact={isCompact}
+        onNavigate={tab => setActiveTab(tab)}
       />
 
       {/* QR-модал для партнёра */}
