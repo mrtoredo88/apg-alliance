@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from '../components/Apg2ProfileGlass.jsx';
 import { MOTION, motionTransition } from '../motion.js';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
@@ -206,22 +206,33 @@ function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onMod
 
 function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect }) {
   const [hoveredItem, setHoveredItem] = useState(null);
+  const scrollRef = useRef(null);
   const groups = items.reduce((acc, item) => {
     const group = item.group || 'Workspace';
     if (!acc.some(entry => entry.group === group)) acc.push({ group, items: [] });
     acc.find(entry => entry.group === group).items.push(item);
     return acc;
   }, []);
+  const showTooltip = (item, event) => {
+    const scrollTop = scrollRef.current?.scrollTop || 0;
+    setHoveredItem({ ...item, top: event.currentTarget.offsetTop - scrollTop });
+  };
   return (
-    <div data-workspace-region="sidebar" style={{ ...APG2_PROFILE.glass, borderRadius: 32, padding: 10, height: '100%', minHeight: 0, overflow: 'visible', position: 'relative', zIndex: WORKSPACE_Z.sidebar, display: 'flex', flexDirection: 'column', gap: 10, transition: motionTransition(['width'], 'base'), width: '100%', background: APG2_PROFILE.quietSurface }}>
-      <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: '4px 5px 8px' }}>
-        {!collapsed && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}>Навигация</div>}
-        <GlassButton onClick={onToggle} style={{ minHeight: 34, width: 34, padding: 0, borderRadius: 14 }}>{collapsed ? '›' : '‹'}</GlassButton>
+    <div data-workspace-region="sidebar" style={{ ...APG2_PROFILE.glass, borderRadius: 34, padding: collapsed ? '12px 10px' : 12, height: '100%', minHeight: 0, overflow: 'visible', position: 'relative', zIndex: WORKSPACE_Z.sidebar, display: 'flex', flexDirection: 'column', gap: 12, transition: motionTransition(['width', 'padding', 'background'], 'base'), width: '100%', background: 'linear-gradient(180deg, rgba(var(--apg2-glass-a,255,255,255),0.18), rgba(var(--apg2-glass-a,255,255,255),0.09))', boxShadow: '0 20px 70px rgba(0,0,0,0.14)' }}>
+      <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: collapsed ? '0 0 2px' : '2px 3px 6px' }}>
+        {!collapsed && (
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 900, letterSpacing: 0.8, textTransform: 'uppercase' }}>Навигация</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', marginTop: 2 }}>Рабочие области АПГ</div>
+          </div>
+        )}
+        <GlassButton onClick={onToggle} style={{ minHeight: collapsed ? 42 : 36, width: collapsed ? 42 : 36, padding: 0, borderRadius: 999, fontSize: 18, boxShadow: collapsed ? '0 12px 26px rgba(0,0,0,0.12)' : undefined }}>{collapsed ? '›' : '‹'}</GlassButton>
       </div>
-      <div style={{ display: 'grid', gap: 10, position: 'relative', minHeight: 0, overflowY: 'auto', overflowX: 'visible', paddingRight: collapsed ? 0 : 2, overscrollBehavior: 'contain' }}>
+      <div ref={scrollRef} onScroll={() => setHoveredItem(null)} style={{ display: 'grid', gap: collapsed ? 9 : 10, position: 'relative', minHeight: 0, overflowY: 'auto', overflowX: 'visible', padding: collapsed ? '1px 0 8px' : '1px 2px 8px 0', overscrollBehavior: 'contain' }}>
         {groups.map(group => (
           <div key={group.group} style={{ display: 'grid', gap: 5 }}>
             {!collapsed && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10, lineHeight: '13px', fontWeight: 900, letterSpacing: 0.8, textTransform: 'uppercase', padding: '0 9px' }}>{group.group}</div>}
+            {collapsed && <div style={{ height: 1, margin: '3px 14px 4px', background: 'linear-gradient(90deg, transparent, rgba(215,184,106,0.24), transparent)' }} />}
             {group.items.map(item => {
           const active = activeSection === item.id;
           const hovered = hoveredItem?.id === item.id;
@@ -230,17 +241,19 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
               key={item.id}
               type="button"
               onClick={() => onSelect(item)}
-              onMouseEnter={() => setHoveredItem(item)}
+              onMouseEnter={event => showTooltip(item, event)}
               onMouseLeave={() => setHoveredItem(null)}
-              onFocus={() => setHoveredItem(item)}
+              onFocus={event => showTooltip(item, event)}
               onBlur={() => setHoveredItem(null)}
               title={item.label}
               style={{
-              border: active ? '1px solid rgba(215,184,106,0.54)' : APG2_PROFILE.glass.border,
-              background: active ? APG2_PROFILE.goldSoft : hovered ? 'rgba(var(--apg2-glass-a,255,255,255),0.12)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)',
-              borderRadius: 20,
-              minHeight: 44,
+              border: active ? '1px solid rgba(215,184,106,0.58)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)',
+              background: active ? APG2_PROFILE.goldSoft : hovered ? 'rgba(var(--apg2-glass-a,255,255,255),0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.07)',
+              borderRadius: collapsed ? 999 : 22,
+              minHeight: collapsed ? 54 : 46,
+              width: collapsed ? 54 : '100%',
               padding: collapsed ? 0 : '0 12px',
+              margin: collapsed ? '0 auto' : 0,
               display: 'flex',
               alignItems: 'center',
               justifyContent: collapsed ? 'center' : 'flex-start',
@@ -250,11 +263,13 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
               fontSize: 13,
               fontWeight: 820,
               cursor: 'pointer',
-              outline: hovered ? '1px solid rgba(215,184,106,0.18)' : 'none',
-              transform: hovered && !active ? 'translateX(2px)' : 'translateX(0)',
-              transition: motionTransition(['background', 'border-color', 'transform'], 'base'),
+              outline: hovered ? '2px solid rgba(215,184,106,0.18)' : 'none',
+              outlineOffset: 2,
+              transform: hovered ? collapsed ? 'scale(1.045)' : 'translateX(2px)' : 'translateX(0) scale(1)',
+              boxShadow: active ? '0 14px 34px rgba(215,184,106,0.20)' : hovered ? '0 12px 26px rgba(0,0,0,0.12)' : 'none',
+              transition: motionTransition(['background', 'border-color', 'transform', 'box-shadow'], 'base'),
             }}>
-              <span style={{ width: 26, textAlign: 'center' }}>{item.icon}</span>
+              <span style={{ width: collapsed ? 36 : 28, height: collapsed ? 36 : 28, borderRadius: 999, display: 'grid', placeItems: 'center', textAlign: 'center', background: active ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.10)', color: active ? '#17120a' : APG2_PROFILE.gold, fontSize: item.icon.length > 1 ? 16 : 17, boxShadow: active ? '0 10px 24px rgba(215,184,106,0.24)' : 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>{item.icon}</span>
               {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{item.label}</span>}
               {!collapsed && item.shortcut && <span style={{ color: APG2_PROFILE.textMuted, fontSize: 10, fontWeight: 850 }}>{item.shortcut}</span>}
             </button>
@@ -264,7 +279,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
         ))}
       </div>
       {collapsed && hoveredItem && (
-        <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 82, top: 58, zIndex: WORKSPACE_Z.popover, width: 220, borderRadius: 18, padding: 12, pointerEvents: 'none' }}>
+        <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 84, top: Math.max(58, hoveredItem.top + 58), zIndex: WORKSPACE_Z.popover, width: 230, borderRadius: 20, padding: 12, pointerEvents: 'none', boxShadow: '0 22px 54px rgba(0,0,0,0.22)', background: APG2_PROFILE.quietSurface }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 900 }}>{hoveredItem.label}</div>
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{hoveredItem.hint}</div>
         </div>
@@ -340,7 +355,7 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
       </div>
       <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 12, minWidth: 0 }}>
         <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, background: APG2_PROFILE.quietSurface }}>
-          <LokiIdentity size={52} state={attention.length ? 'attention' : 'ready'} label="Локи на смене" sublabel="спокоен · внимателен · в контексте" />
+          <LokiIdentity size={52} state={attention.length ? 'recommending' : 'waiting'} label="Локи на смене" sublabel={attention.length ? 'подсветил важное' : 'держит Workspace в контексте'} />
         </div>
         <div style={{ ...APG2_PROFILE.glass, borderRadius: 26, padding: 14, background: APG2_PROFILE.quietSurface }}>
           <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.7 }}>Активный профиль</div>
@@ -660,6 +675,14 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
     { id: 'loki-start', role: 'loki', text: `Я уже вижу раздел «${context.label}» и буду держать ответы внутри AI Workspace.` },
   ];
   const primaryDecision = recommendations[0] || 'Проверить рабочий день';
+  const latestAction = data.recentActions?.[0];
+  const lokiState = aiDraft ? 'listening' : aiPulse ? 'answering' : attention.length ? 'recommending' : 'waiting';
+  const lokiStatusLabel = aiDraft ? 'слушает запрос' : aiPulse ? 'отвечает в Workspace' : attention.length ? 'готовит рекомендации' : 'ожидает задачи';
+  const memoryItems = [
+    `Раздел: ${context.label}`,
+    data.activeProfile?.name ? `Профиль: ${data.activeProfile.name}` : 'Профиль не выбран',
+    attention.length ? `Сигналов: ${attention.length}` : 'Критичных сигналов нет',
+  ];
   const handleSubmit = event => {
     event.preventDefault();
     onAskLoki?.(aiDraft);
@@ -668,7 +691,27 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
     <div data-workspace-region="ai" style={{ height: '100%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain' }}>
       <div style={{ ...APG2_PROFILE.glass, borderRadius: 38, padding: 18, display: 'grid', gap: 14, border: '1px solid rgba(215,184,106,0.34)', background: 'radial-gradient(circle at 30% 0%, rgba(255,240,184,0.20), transparent 36%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.32), rgba(var(--apg2-glass-a,255,255,255),0.13))', boxShadow: aiPulse ? '0 0 0 1px rgba(215,184,106,0.18), 0 26px 72px rgba(0,0,0,0.24)' : APG2_PROFILE.glass.boxShadow }}>
         <div style={{ minWidth: 0 }}>
-          <LokiIdentity size={58} state={attention.length ? 'attention' : 'ready'} label="Локи" sublabel={`Контекст: ${context.label}`} />
+          <LokiIdentity size={60} state={lokiState} label="Локи · интеллект АПГ" sublabel={`${lokiStatusLabel} · ${context.label}`} />
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 12, display: 'grid', gap: 8, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, letterSpacing: 0.7, textTransform: 'uppercase' }}>Статус</span>
+              <GlassBadge tone={attention.length ? 'gold' : 'quiet'}>{lokiStatusLabel}</GlassBadge>
+            </div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '18px', fontWeight: 820 }}>{context.focus}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 11, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.7 }}>Последнее действие</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', fontWeight: 800, marginTop: 5, overflowWrap: 'anywhere' }}>{latestAction?.title || 'Жду первого действия'}</div>
+            </div>
+            <div style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 11, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.7 }}>Рабочая память</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', fontWeight: 800, marginTop: 5, overflowWrap: 'anywhere' }}>{memoryItems.join(' · ')}</div>
+            </div>
+          </div>
         </div>
 
         <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, background: APG2_PROFILE.heroSurface }}>
@@ -718,7 +761,7 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
           {chatItems.slice(-3).map(item => (
             <div key={item.id} style={{ ...APG2_PROFILE.glass, borderRadius: item.role === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px', padding: '9px 11px', marginLeft: item.role === 'user' ? 22 : 0, marginRight: item.role === 'user' ? 0 : 22, border: item.role === 'loki' ? '1px solid rgba(215,184,106,0.20)' : APG2_PROFILE.glass.border, background: item.role === 'loki' ? APG2_PROFILE.quietSurface : 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
               <div style={{ color: item.role === 'loki' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6 }}>{item.role === 'loki' ? 'Локи' : 'Вы'}</div>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', marginTop: 3 }}>{item.text}</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', marginTop: 3, overflowWrap: 'anywhere' }}>{item.text}</div>
             </div>
           ))}
         </div>

@@ -2114,3 +2114,17 @@
 **Документация:** обновлён `docs/desktop-workspace.md`.
 
 **Проверка:** `npm run test:workspace-layout`, `workspace-core-test`, `desktop-workspace-test`, `business-hub-test`, production build успешны.
+
+## 2026-07-12 — Desktop Workspace Navigation & Loki Polish
+
+**Задача:** довести компоновку Desktop Workspace до production-качества: Sidebar должен быть полноценной колонкой Workspace, collapsed-режим — не временной заглушкой, а Локи — визуальным интеллектом платформы, а не пользовательской аватаркой.
+
+**Layout:** `WORKSPACE_LAYOUT` обновлён под более устойчивую grid-композицию: expanded Sidebar 264px, collapsed Sidebar 88px, минимальная читаемая content-область 430px. Проверяются desktop-размеры 1024, 1180, 1280, 1366, 1440, 1512, 1728, 1920 без horizontal overflow и без пересечения Hero с AI Workspace.
+
+**Collapsed Sidebar:** переработан в полноценный icon rail: круглые кнопки одинакового размера, активная подсветка, hover/focus-анимации, tooltip справа по позиции пункта, групповые разделители, корректный внутренний scroll. Это убирает ощущение overlay/заглушки и делает навигацию частью общей grid-системы.
+
+**Локи:** `LokiIdentity` получил состояния `thinking`, `answering`, `listening`, `waiting`, `recommending`, `attention`, `busy`, визуальную орбиту, статусный индикатор и мягкую анимацию. В Workspace и Business Hub Локи теперь выглядит как отдельный интеллект АПГ, а не как аватар пользователя.
+
+**AI Workspace:** правая область усилена как рабочее место Локи: добавлены статус, контекст, последнее действие, следующее лучшее действие, рабочая память, briefing, решения и компактная история. Текст диалога защищён от overflow длинными строками.
+
+**Smoke:** `desktop-workspace-layout-regression` расширен проверкой ширины icon rail и наличия новых состояний `LokiIdentity`.

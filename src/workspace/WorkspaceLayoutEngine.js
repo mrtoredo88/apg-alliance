@@ -14,15 +14,15 @@ export const WORKSPACE_LAYOUT = {
   gap: 18,
   headerHeight: 72,
   statusHeight: 42,
-  expandedSidebar: 246,
-  collapsedSidebar: 74,
+  expandedSidebar: 264,
+  collapsedSidebar: 88,
   aiWide: 390,
   aiNarrow: 354,
   aiMin: 330,
   drawerBelow: 1180,
   forceCollapsedBelow: 1366,
   wideAiFrom: 1512,
-  minReadableContent: 420,
+  minReadableContent: 430,
 };
 
 export function getDesktopWorkspaceLayoutPlan(width = 1440, height = 900, sidebarCollapsed = false) {

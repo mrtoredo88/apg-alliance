@@ -155,11 +155,15 @@ Header содержит:
 
 В ней находятся:
 
-- Локи;
+- `LokiIdentity` с состояниями `thinking`, `answering`, `listening`, `waiting`, `recommending`;
+- статус Локи;
+- текущий контекст;
+- последнее действие;
+- рабочая память;
+- следующее лучшее действие;
 - Today / briefing;
 - что требует внимания;
 - контекстные рекомендации;
-- последние действия;
 - история;
 - чат;
 - быстрые действия.
@@ -185,7 +189,8 @@ Header содержит:
 В Desktop Workspace 1.0 добавлены:
 
 - hover-ready карточки и кнопки;
-- collapsible sidebar;
+- Sidebar как отдельная grid-колонка, а не overlay;
+- polished collapsed sidebar: 88px icon rail, круглые кнопки, активная подсветка, tooltip справа;
 - wide cards;
 - рабочие списки;
 - split view `sidebar/content/context`;

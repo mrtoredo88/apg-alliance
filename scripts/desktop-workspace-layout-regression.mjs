@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getDesktopWorkspaceLayoutPlan, WORKSPACE_LAYOUT, WORKSPACE_Z } from '../src/workspace/WorkspaceLayoutEngine.js';
 
@@ -19,13 +19,19 @@ for (const [width, height] of viewports) {
   assert.equal(plan.hasHorizontalOverflow, false, `${width}x${height}: layout must not overflow horizontally`);
   assert.ok(plan.workAreaHeight >= 520, `${width}x${height}: workspace work area is too short`);
   assert.ok(plan.sidebarWidth >= WORKSPACE_LAYOUT.collapsedSidebar, `${width}x${height}: sidebar width is invalid`);
+  assert.equal(WORKSPACE_LAYOUT.collapsedSidebar, 88, 'collapsed sidebar must keep polished icon rail width');
 
   if (width < WORKSPACE_LAYOUT.drawerBelow) {
     assert.equal(plan.aiAsDrawer, true, `${width}x${height}: AI Workspace must become drawer`);
     assert.equal(plan.effectiveSidebarCollapsed, true, `${width}x${height}: sidebar must collapse on narrow desktop`);
+    assert.equal(plan.sidebarWidth, WORKSPACE_LAYOUT.collapsedSidebar, `${width}x${height}: drawer breakpoint must use icon rail`);
   } else {
     assert.equal(plan.aiAsDrawer, false, `${width}x${height}: AI Workspace must be independent column`);
     assert.ok(plan.aiPanelWidth >= WORKSPACE_LAYOUT.aiMin, `${width}x${height}: AI panel below min width`);
+  }
+
+  if (width >= WORKSPACE_LAYOUT.forceCollapsedBelow) {
+    assert.equal(plan.sidebarWidth, WORKSPACE_LAYOUT.expandedSidebar, `${width}x${height}: full desktop must use expanded sidebar`);
   }
 
   assert.equal(plan.contentReadable, true, `${width}x${height}: content column is below readable width`);
@@ -38,5 +44,9 @@ assert.ok(WORKSPACE_Z.popover < WORKSPACE_Z.modal, 'modal must be top workspace 
 const lokiAsset = resolve(process.cwd(), 'public/loki.png');
 assert.ok(existsSync(lokiAsset), 'Loki asset public/loki.png must exist');
 assert.ok(statSync(lokiAsset).size > 1024, 'Loki asset must not be an empty placeholder');
+const lokiIdentitySource = readFileSync(resolve(process.cwd(), 'src/loki/LokiIdentity.jsx'), 'utf8');
+for (const state of ['thinking', 'answering', 'listening', 'waiting', 'recommending']) {
+  assert.ok(lokiIdentitySource.includes(`${state}:`), `LokiIdentity must support ${state} state`);
+}
 
 console.log('Desktop Workspace layout regression smoke passed');

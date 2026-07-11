@@ -239,7 +239,7 @@ function LokiView({ model, actions }) {
   return (
     <WorkspacePanel title="Локи для бизнеса" subtitle="Контекстный помощник будет опираться на профиль, аналитику, контент и статусы заявок.">
       <QuickActions actions={prompts.map(prompt => ({ id: prompt, label: prompt, onClick: actions.openLoki }))} style={{ marginBottom: 12 }} />
-      <InfoPanel icon={<LokiIdentity size={42} label="Локи" sublabel="в бизнес-контексте" style={{ gridTemplateColumns: '42px minmax(0,1fr)' }} />} title="Готов к бизнес-контексту" text={`Локи видит тип профиля: ${model.business.label}, заполненность ${model.completion.value}%, новости, события, акции и задачи.`} action={<GlassButton tone="gold" onClick={actions.openLoki} style={{ color: '#17120a' }}>Спросить Локи</GlassButton>} />
+      <InfoPanel icon={<LokiIdentity size={42} state="recommending" label="Локи" sublabel="в бизнес-контексте" style={{ gridTemplateColumns: '45px minmax(0,1fr)' }} />} title="Готов к бизнес-контексту" text={`Локи видит тип профиля: ${model.business.label}, заполненность ${model.completion.value}%, новости, события, акции и задачи.`} action={<GlassButton tone="gold" onClick={actions.openLoki} style={{ color: '#17120a' }}>Спросить Локи</GlassButton>} />
     </WorkspacePanel>
   );
 }
