@@ -18,6 +18,10 @@ import { explainLastRecommendation } from '../LokiIntelligence.js';
 import { buildPersonalRoute, buildSurprisePick } from '../LokiPlanner.js';
 import { runBrainLayer } from './brain/BrainLayer.js';
 import { getLearningScreenExplanation } from '../../learningSystem.js';
+import { AdminAssistant, PlannerEngine, Reasoner } from './v2/index.js';
+import { LokiModuleRegistry } from './v2/LokiModuleRegistry.js';
+import { ScenarioRegistry } from './v2/ScenarioRegistry.js';
+import { LOKI_SCENARIOS } from './brain/lokiScenarios.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -33,11 +37,19 @@ const LOKI_MODULES = [
 ];
 
 export const LOKI_CORE_REGISTRY = {
-  core: 'Loki Core',
+  core: 'Loki Core V2',
   memory: MemoryEngine,
   personality: PersonalityEngine,
   observer: ObserverModule,
   modules: LOKI_MODULES,
+  scenarios: new ScenarioRegistry(LOKI_SCENARIOS.map(scenario => ({
+    ...scenario,
+    role: scenario.role || 'user',
+    intent: scenario.intent || scenario.id,
+    triggerConditions: scenario.utterances,
+    followUpActions: scenario.availableActions,
+  }))),
+  plugins: new LokiModuleRegistry([PlannerEngine, AdminAssistant]),
 };
 
 function nowMs() {
@@ -48,6 +60,11 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
   const sourceState = appState?.__lokiContext ? appState.appState ?? {} : appState;
   const contextUser = appState?.__lokiContext ? appState.user ?? sourceState.user : sourceState.user;
   const base = {
+    actor: {
+      id: contextUser?.id ?? null,
+      role: appState.actor?.role ?? contextUser?.role ?? contextUser?.userRole ?? 'user',
+      permissions: appState.actor?.permissions ?? contextUser?.adminPermissions ?? [],
+    },
     user: {
       name: appState.profile?.name || contextUser?.first_name || contextUser?.name || null,
       keys: Number(appState.keys?.balance ?? sourceState.userKeys ?? 0),
@@ -66,6 +83,7 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
       notifications: sourceState.notifications ?? [],
       prizesKnown: false,
     },
+    admin: appState.admin ?? sourceState.admin ?? null,
     contextEngine: appState?.__lokiContext ? appState : null,
     knowledge: {
       ...APG_KNOWLEDGE_BASE,
@@ -97,6 +115,19 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
       context,
     });
     return debug ? { ...result, debug: { provider, totalMs: Math.round(nowMs() - start), trace } } : result;
+  }
+
+  const v2Start = nowMs();
+  const v2Resolution = await LOKI_CORE_REGISTRY.plugins.resolve({ query, text, context, history });
+  trace.push({ module: v2Resolution.module?.id ?? 'v2Plugins', ms: Math.round(nowMs() - v2Start), decision: v2Resolution.result?.intent ?? 'skipped' });
+  if (v2Resolution.result) {
+    const reasoned = Reasoner.combine({ query, context });
+    const shaped = PersonalityEngine.shape({
+      result: { ...v2Resolution.result, evidence: v2Resolution.result.evidence ?? reasoned.evidence },
+      context,
+      selectedModule: v2Resolution.module,
+    });
+    return debug ? { ...shaped, debug: { provider, selectedModule: v2Resolution.module.id, totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
   const intelligenceStart = nowMs();
