@@ -16,6 +16,7 @@
     "test:news-article": "node scripts/news-article-regression.mjs",
     "test:loki": "node scripts/loki-core-v2-test.mjs",
     "test:admin-assistant": "node scripts/admin-assistant-v1-test.mjs",
+    "test:loki-personality": "node scripts/loki-personality-v1-test.mjs",
     "smoke:prod": "node scripts/prod-smoke.mjs",
     "preview": "vite preview",
     "tunnel": "vk-tunnel --http-protocol=http --host=localhost --port=5173",

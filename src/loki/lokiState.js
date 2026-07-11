@@ -14,16 +14,19 @@ export const DEFAULT_LOKI_SETTINGS = {
   hiddenPanels: [],
   bubbleEnabled: true,
   mode: 'on_demand',
+  personalityMode: 'friendly',
 };
 
 export function normalizeLokiSettings(value) {
   const settings = value && typeof value === 'object' ? value : {};
   const validModes = ['on_demand', 'minimal', 'standard', 'active'];
+  const validPersonalityModes = ['professional', 'friendly', 'charismatic'];
   return {
     ...DEFAULT_LOKI_SETTINGS,
     ...settings,
     hiddenPanels: Array.isArray(settings.hiddenPanels) ? settings.hiddenPanels.filter(Boolean) : [],
     mode: validModes.includes(settings.mode) ? settings.mode : 'on_demand',
+    personalityMode: validPersonalityModes.includes(settings.personalityMode) ? settings.personalityMode : 'friendly',
   };
 }
 

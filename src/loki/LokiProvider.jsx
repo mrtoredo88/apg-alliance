@@ -23,6 +23,8 @@ import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from './c
 import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearning.js';
 import { buildInterestProfile, buildRecommendationFeed, buildScenarioCollections } from './LokiRecommendationCenter.js';
 import { buildLokiContext } from './core/context/ContextEngine.js';
+import { rememberPersonalityPhrase } from './personality/PersonalityMemory.js';
+import { selectPersonalityPhrase } from './core/modules/PersonalityEngine.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -331,6 +333,10 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
+  useEffect(() => {
+    if (!memory.sessionStartedAt) updateMemory({ sessionStartedAt: new Date().toISOString() });
+  }, [memory.sessionStartedAt, updateMemory]);
+
   const updateHistory = useCallback((updater) => {
     setHistory(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -632,6 +638,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     const activeAdvice = memory?.lastRecommendation;
     updateMemory({
       lastAction: { ...normalized, ts: new Date().toISOString() },
+      lastActionType: normalized.type,
+      sameActionCount: memory.lastActionType === normalized.type ? Number(memory.sameActionCount || 0) + 1 : 1,
       inDialog: false,
       ...(activeAdvice ? { learning: learnFromRecommendationResult(memory.learning, activeAdvice, 'opened') } : {}),
     });
@@ -642,7 +650,15 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     try {
       await handler(normalized.payload ?? {});
       setCard(null);
-      setMessage('');
+      const personalityEvent = normalized.type === LOKI_APP_ACTIONS.START_EVENT_REGISTRATION ? 'registration_complete' : 'success';
+      const personalityPhrase = selectPersonalityPhrase({
+        event: personalityEvent,
+        mode: settings.personalityMode,
+        context: { user: { currentPanel: activePanel }, memory },
+        history: memory.personalityHistory,
+      });
+      setMessage(personalityPhrase?.text || '');
+      if (personalityPhrase) updateMemory({ personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, personalityPhrase), lastSeenAt: new Date().toISOString() });
       setAction(LOKI_ACTIONS.WAVE);
       setEmotion('happy');
       setTimeout(() => {
@@ -654,7 +670,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appActions, memory, showMessage, updateHistory, updateMemory]);
+  }, [activePanel, appActions, memory, settings.personalityMode, showMessage, updateHistory, updateMemory]);
 
   const askBrain = useCallback(async (text) => {
     if (!settings.enabled) return false;
@@ -669,10 +685,11 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     }, 1000);
     try {
       const lokiContext = buildLokiContext({ appState, user, activePanel, memory, userMemory });
-      const result = await askLokiBrain({ text, appState: lokiContext, memory, userMemory, history, debug: isLokiDebugEnabled() });
+      const result = await askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory, userMemory, history, debug: isLokiDebugEnabled() });
       clearTimeout(thinkingTimer);
       setBrainThinking(false);
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
+      if (result.personalityPhraseId) updateMemory({ personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }), conversationCount: Number(memory.conversationCount || 0) + 1, lastSeenAt: new Date().toISOString() });
       if (result.executeAction) {
         setMessage('Показываю.');
         await executeAction(result.executeAction);
@@ -692,7 +709,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appState, executeAction, history, memory, settings.enabled, showMessage, user, userMemory]);
+  }, [activePanel, appState, executeAction, history, memory, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
@@ -726,7 +743,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         return { card: null, ...contextResult };
       }
       const lokiContext = buildLokiContext({ appState: { ...appState, activeContext }, user, activePanel, memory: { ...memory, activeContext }, userMemory });
-      const result = await askLokiBrain({ text, appState: lokiContext, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() });
+      const result = await askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() });
       setBrainThinking(false);
       setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
       setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
@@ -735,6 +752,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         lastConversation: { userText: text, answer: result.text, action: result.executeAction ?? result.autoAction ?? result.card?.action ?? null },
         lastPanel: activePanel,
         inDialog: true,
+        personalityHistory: result.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) : memory.personalityHistory,
+        conversationCount: Number(memory.conversationCount || 0) + 1,
+        lastSeenAt: new Date().toISOString(),
       });
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
       userAction('loki:analytics', {
@@ -770,7 +790,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activeContext, activePanel, appState, executeAction, history, memory, settings.enabled, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, executeAction, history, memory, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const openContextExperience = useCallback((context) => {
     const normalized = normalizeLokiContext(context);
@@ -869,6 +889,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
     setMode: (mode) => persistSettings({ ...settings, mode }),
+    setPersonalityMode: (personalityMode) => persistSettings({ ...settings, personalityMode }),
   };
   }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 

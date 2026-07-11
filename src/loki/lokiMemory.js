@@ -9,6 +9,12 @@ export const DEFAULT_LOKI_MEMORY = {
   lastRecommendation: null,
   learning: null,
   emotionalState: null,
+  personalityHistory: [],
+  conversationCount: 0,
+  lastSeenAt: null,
+  sessionStartedAt: null,
+  lastActionType: null,
+  sameActionCount: 0,
   inDialog: false,
   updatedAt: null,
 };

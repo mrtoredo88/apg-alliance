@@ -65,6 +65,9 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
       role: appState.actor?.role ?? contextUser?.role ?? contextUser?.userRole ?? 'user',
       permissions: appState.actor?.permissions ?? contextUser?.adminPermissions ?? [],
     },
+    personality: {
+      mode: appState.personality?.mode ?? sourceState.lokiPersonalityMode ?? 'friendly',
+    },
     user: {
       name: appState.profile?.name || contextUser?.first_name || contextUser?.name || null,
       keys: Number(appState.keys?.balance ?? sourceState.userKeys ?? 0),

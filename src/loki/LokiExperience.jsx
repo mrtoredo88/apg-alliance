@@ -232,6 +232,19 @@ export function LokiExperience({ loki }) {
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>{voiceState === 'listening' ? 'Слушаю внимательно...' : voiceState === 'speaking' ? 'Отвечаю голосом и показываю результат.' : activeNewsContext ? `Контекст: «${getShortTitle(contextTitle)}». Можно задавать вопросы прямо по статье.` : 'Можно написать или сказать обычными словами. Я покажу результат, а не длинную инструкцию.'}</div>
           </div>
 
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 7, flexWrap: 'wrap' }}>
+            {[
+              ['professional', 'Профессиональный'],
+              ['friendly', 'Дружелюбный'],
+              ['charismatic', 'Харизматичный'],
+            ].map(([mode, label]) => {
+              const active = loki.settings.personalityMode === mode;
+              return (
+                <button key={mode} type="button" onClick={() => loki.setPersonalityMode(mode)} style={{ minHeight: 34, borderRadius: 999, padding: '0 11px', border: active ? '1px solid rgba(215,184,106,0.42)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: active ? 'rgba(215,184,106,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.05)', color: active ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 780, fontFamily: 'inherit' }}>{label}</button>
+              );
+            })}
+          </div>
+
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 4px', scrollbarWidth: 'none' }}>
             {activeNewsContext && (
               <button
