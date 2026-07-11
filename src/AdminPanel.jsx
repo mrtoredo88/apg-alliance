@@ -418,6 +418,7 @@ const s = {
   },
   btn:      { padding: '10px 16px', borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 },
   btnPri:   { background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', color: '#0F0F1A', fontWeight: 700 },
+  btnGold:  { background: 'linear-gradient(135deg, #C9A84C, #E8C76D)', color: '#0F0F1A', fontWeight: 700 },
   btnDanger:{ background: 'rgba(230,70,70,0.12)', color: '#E64646', border: '1px solid rgba(230,70,70,0.3)' },
   btnGray:  { background: 'rgba(255,255,255,0.07)', color: '#F0F0F0', border: '1px solid rgba(255,255,255,0.1)' },
   row:      {
@@ -1374,9 +1375,19 @@ function AdminCommentsPanel({ comments, news, onRefresh, onModerate }) {
   );
 }
 
-function ModerationPanel({ news, comments, onOpenNews, onOpenComments }) {
+function ModerationPanel({ news, comments, requests = [], onOpenNews, onOpenComments, onOpenPartnershipRequests }) {
+  const [filter, setFilter] = useState('all');
   const pendingNews = news.filter(n => ['draft', 'pending', 'scheduled'].includes(String(n.status || '').toLowerCase()) || n.active === false);
   const pendingComments = comments.filter(c => !c.hidden && (c.status === 'pending' || !c.moderationReviewedAt));
+  const partnershipRequests = requests.filter(item => (
+    item.source === 'partnership-flow'
+    || item.moderationStatus === 'new_partnership_application'
+    || item.crm?.lifecycleStage === 'new_partnership_application'
+  ) && !['published', 'rejected'].includes(String(item.status || '').toLowerCase()));
+  const filterBtns = [
+    { id: 'all', label: 'Вся модерация', count: pendingNews.length + pendingComments.length + partnershipRequests.length },
+    { id: 'partnership', label: 'Новые заявки на партнёрство', count: partnershipRequests.length },
+  ];
   return (
     <div>
       <div style={{ ...s.card, padding: 22, background: 'linear-gradient(135deg, rgba(245,158,11,0.13), rgba(255,255,255,0.04))' }}>
@@ -1384,6 +1395,52 @@ function ModerationPanel({ news, comments, onOpenNews, onOpenComments }) {
         <h1 style={{ ...s.h1, fontSize: 26, marginTop: 6 }}>На модерации</h1>
         <div style={{ color: A.textSec, fontSize: 14, lineHeight: '20px' }}>На телефоне карточки готовы к свайп-механике, на ноутбуке работают кнопки и контекстные действия.</div>
       </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '14px 0' }}>
+        {filterBtns.map(item => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setFilter(item.id)}
+            style={{
+              ...s.btn,
+              ...(filter === item.id ? s.btnGold : s.btnGray),
+              padding: '9px 12px',
+              fontSize: 12,
+            }}
+          >
+            {item.label}{item.count ? ` · ${item.count}` : ''}
+          </button>
+        ))}
+      </div>
+      {filter === 'partnership' ? (
+        <div style={{ ...s.card }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
+            <div>
+              <div style={{ color: A.text, fontSize: 18, fontWeight: 900 }}>Новые заявки на партнёрство</div>
+              <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Заявки из профиля пользователя. Полная карточка доступна в разделе ИИ-импорт.</div>
+            </div>
+            <button type="button" onClick={onOpenPartnershipRequests} style={{ ...s.btn, ...s.btnGold, padding: '9px 12px', fontSize: 12 }}>Открыть ИИ-импорт</button>
+          </div>
+          {partnershipRequests.length ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {partnershipRequests.slice(0, 20).map(item => (
+                <div key={item.id} style={{ border: `1px solid ${A.border}`, borderRadius: 16, padding: 13, background: 'rgba(255,255,255,0.035)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: A.text, fontSize: 15, lineHeight: '20px', fontWeight: 900, overflowWrap: 'anywhere' }}>{item.title || 'Заявка на партнёрство'}</div>
+                      <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>{item.typeLabel || item.type || 'Тип не указан'} · {item.partnershipFlow?.tariff || item.draft?.fields?.tariff || 'тариф не указан'}</div>
+                      <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>{item.submitter?.name || 'Контакт не указан'}{item.submitter?.phone ? ` · ${item.submitter.phone}` : ''}</div>
+                    </div>
+                    <div style={{ color: item.status === 'missing' ? A.gold : A.green, fontSize: 12, fontWeight: 900, flexShrink: 0 }}>{item.status === 'missing' ? 'Нужно проверить' : 'Готово'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px' }}>Новых заявок на партнёрство пока нет.</div>
+          )}
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 14 }}>
         <button type="button" onClick={onOpenNews} style={{ ...s.card, textAlign: 'left', cursor: 'pointer', border: `1px solid ${pendingNews.length ? 'rgba(245,158,11,0.34)' : A.border}` }}>
           <div style={{ fontSize: 30, marginBottom: 10 }}>📰</div>
@@ -1401,6 +1458,7 @@ function ModerationPanel({ news, comments, onOpenNews, onOpenComments }) {
           <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Место для V4.5: автоматические материалы, очередь публикаций и редакторские подсказки.</div>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -1501,10 +1559,10 @@ function AdminUsersPanel({ users, onAuthAction }) {
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                 <span style={{ padding: '4px 8px', borderRadius: 999, background: hasConsent ? 'rgba(75,179,75,0.12)' : 'rgba(230,70,70,0.12)', color: hasConsent ? A.green : A.red, fontSize: 10.5, fontWeight: 750 }}>{hasConsent ? '✓ согласие' : '⚠ без согласия'}</span>
                 <span style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: hasPush ? A.green : A.textSec, fontSize: 10.5, fontWeight: 750 }}>{hasPush ? '🔔 push вкл' : '🔕 push выкл'}</span>
-	                {['role', 'email', 'telegramId'].map(key => user[key] ? (
-	                  <span key={key} style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
-	                ) : null)}
-	              </div>
+                {['role', 'email', 'telegramId'].map(key => user[key] ? (
+                  <span key={key} style={{ padding: '4px 8px', borderRadius: 999, background: A.chip, color: A.textSec, fontSize: 10.5, fontWeight: 750 }}>{key}: {String(user[key]).slice(0, 28)}</span>
+                ) : null)}
+              </div>
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${A.border}` }}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <button type="button" disabled={authBusyId === user.id} onClick={() => loadAuthDiagnostics(user)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>
@@ -5661,7 +5719,7 @@ export const AdminPanel = () => {
   useEffect(() => {
     if (activeTab === 'system' && !systemStatus && !systemStatusLoading) loadSystemStatus();
     if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
-    if (activeTab === 'ai-import' && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
+    if ((activeTab === 'ai-import' || activeTab === 'moderation') && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
     if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
     if (activeTab === 'referrals' && !referralAudit && !referralLoading) loadReferralAudit();
     if (activeTab === 'automation' && !automationAudit && !automationLoading) loadAutomationAudit();
@@ -5911,7 +5969,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'automation') loadAutomationAudit(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'automation') loadAutomationAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -6163,8 +6221,10 @@ export const AdminPanel = () => {
         <ModerationPanel
           news={news}
           comments={newsComments}
+          requests={aiImportRequests}
           onOpenNews={() => setActiveTab('news')}
           onOpenComments={() => setActiveTab('comments')}
+          onOpenPartnershipRequests={() => setActiveTab('ai-import')}
         />
       )}
 

@@ -1810,3 +1810,17 @@
 **Что изменено:** Экспертная анкета разделена на девять раскрывающихся блоков, получила индикатор заполненности, token-scoped autosave, множественные категории, форматы работы, четыре тарифа, отдельные сайт/запись, MAX, дополнительные соцсети, несколько видео с предпросмотром и четыре роли изображений. Premium-поля динамически доступны только Премиуму и Амбассадору. Город, ИНН и стоимость исключены из обязательного набора; стоимость зарезервирована под будущий каталог услуг. Vercel/Fastify analyzer и публикация draft обновлены синхронно, отсутствующие данные не генерируются.
 
 **Проверка:** тест backend parity и тарифной схемы, lint изменённых файлов и production build проходят.
+
+## 2026-07-11 — Partnership acquisition flow V1
+
+**Задача:** Добавить сценарий привлечения партнёров из профиля обычного пользователя без прямого открытия анкеты.
+
+**Файлы:** `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `src/PartnershipPage.jsx`, `src/AdminPanel.jsx`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `server/src/routes/partnership-application.js`, `server/src/server.js`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`
+
+**Что изменено:** В профиль добавлена заметная CTA-кнопка «🤝 Стать партнёром АПГ». Новый экран `PartnershipPage` показывает информационную страницу, преимущества, логику ключей, актуальные тарифы из `tariffConfig`, встроенную FAQ-помощь Локи, пошаговый индикатор, выбор «Бизнес / Эксперт», автосохранение анкеты и экран успешной отправки. Для заполнения используются существующие `PartnerQuestionnaire` и `ExpertQuestionnaire`, поэтому тарифная логика и будущие расширения остаются едиными с ИИ-импортом.
+
+**Backend:** Для Vercel сценарий подключён через существующий `POST /api/public-submit` actions `track-partnership` и `partnership-submit`, чтобы не увеличивать количество serverless functions. Fastify дополнительно получил mirror-route `POST /api/partnership-application`. Backend принимает события аналитики и заявки из профиля, создаёт запись в `aiImportRequests` с `source: 'partnership-flow'`, `moderationStatus: 'new_partnership_application'`, CRM lifecycle `new_partnership_application` и пишет события в `partnershipAnalytics`.
+
+**Админка:** В разделе «Модерация» добавлен фильтр «Новые заявки на партнёрство» с карточками заявок и переходом в «ИИ-импорт».
+
+**Проверка:** scoped lint изменённых файлов проходит; общий lint по репозиторию остаётся заблокирован существующими ошибками вне текущего изменения.

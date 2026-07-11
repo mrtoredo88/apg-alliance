@@ -50,6 +50,7 @@ const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(
 const ExpertCabinetPage    = lazy(() => import('./ExpertCabinetPage.jsx').then(m => ({ default: m.ExpertCabinetPage })));
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
+const PartnershipPage      = lazy(() => import('./PartnershipPage.jsx').then(m => ({ default: m.PartnershipPage })));
 const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => ({ default: m.ReferencePage })));
 const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
 const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ default: m.NewsPage })));
@@ -104,7 +105,12 @@ function profileOwnedByUser(profile, userData, fallbackEmail = '') {
 function readAppDeepLink() {
   if (typeof window === 'undefined') return { type: '', id: '' };
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
+  const hashPath = window.location.hash.startsWith('#/')
+    ? window.location.hash.slice(1).split('?')[0]
+    : window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1).split('?')[0]
+      : '';
+  const parts = (path === '/' && hashPath ? hashPath : path).split('/').filter(Boolean).map(decodeURIComponent);
   const [section, id] = parts;
   if (section === 'news' && id) {
     return { type: 'news', id };
@@ -115,6 +121,7 @@ function readAppDeepLink() {
   if (section === 'event' && id) return { type: 'event', id };
   if (section === 'events') return { type: 'events', id: '' };
   if (section === 'partner' && id) return { type: 'partner', id };
+  if (section === 'partnership') return { type: 'partnership', id: '' };
   if (section === 'expert' && id) return { type: 'expert', id };
   if (section === 'experts') return { type: 'experts', id: '' };
   return { type: '', id: '' };
@@ -124,6 +131,7 @@ function getInitialPanelFromDeepLink(deepLink) {
   if (deepLink.type === 'news') return 'news';
   if (deepLink.type === 'news-list') return 'news';
   if (deepLink.type === 'event' || deepLink.type === 'events') return 'events';
+  if (deepLink.type === 'partnership') return 'partnership';
   if (deepLink.type === 'expert' || deepLink.type === 'experts') return 'experts';
   return 'home';
 }
@@ -755,7 +763,7 @@ export function UserApp() {
   }, []);
 
   const getFallbackBackPanel = useCallback((panel) => {
-    if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet') return 'profile';
+    if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet' || panel === 'partnership') return 'profile';
     return 'home';
   }, []);
 
@@ -1230,8 +1238,8 @@ export function UserApp() {
           userAction('profile:sync', syncExistingPayload)
             .then(result => {
               if (!isMounted.current) return;
-	              setUserKeys(prev => prev + 1);
-	              setUserReputation(prev => prev + 1);
+              setUserKeys(prev => prev + 1);
+              setUserReputation(prev => prev + 1);
               if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
               return result;
             })
@@ -2739,10 +2747,10 @@ export function UserApp() {
     scannedCount: Object.keys(scannedPartnerIds).length,
     unreadCount,
     registeredEventIds,
-	    userRank,
-	    userTickets,
-	    userReputation,
-	    reputationStatus: getReputationStatus(userReputation),
+    userRank,
+    userTickets,
+    userReputation,
+    reputationStatus: getReputationStatus(userReputation),
     customTasks,
     experts,
     appearance,
@@ -2955,6 +2963,7 @@ export function UserApp() {
                     onEmailAuthSuccess={handleEmailAuthSuccess}
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
+                    onOpenPartnership={() => goPanel('partnership')}
                     onRestartLearning={restartLearning}
                     onOpenNews={() => goPanel('news')}
                     onOpenHealth={() => goPanel('health')}
@@ -3074,13 +3083,13 @@ export function UserApp() {
                   <RewardsPage
                     nav="rewards"
                     variant="v2"
-	                    user={user} userKeys={userKeys}
-	                    userTickets={userTickets}
-	                    userReputation={userReputation}
-	                    onBack={goBackPanel}
-	                    onClaim={handlePrizeClaim}
-	                    onExchangeTickets={handleExchangeTickets}
-	                    onRaffleEnter={handleRaffleEnter}
+                    user={user} userKeys={userKeys}
+                    userTickets={userTickets}
+                    userReputation={userReputation}
+                    onBack={goBackPanel}
+                    onClaim={handlePrizeClaim}
+                    onExchangeTickets={handleExchangeTickets}
+                    onRaffleEnter={handleRaffleEnter}
                     partners={partners}
                     experts={experts}
                   />
@@ -3140,6 +3149,16 @@ export function UserApp() {
                     partnerCount={partners.length}
                     totalScans={platformStats.totalScans}
                     onBack={goBackPanel}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="partnership">
+                <Suspense fallback={<LazyFallback />}>
+                  <PartnershipPage
+                    user={user}
+                    onBack={goBackPanel}
+                    onHome={() => goPanel('home')}
                   />
                 </Suspense>
               </Panel>

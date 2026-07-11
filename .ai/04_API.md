@@ -696,6 +696,71 @@ score =
 
 ---
 
+## POST /api/public-submit — partnership actions
+
+**Назначение:** Приём заявок на партнёрство из пользовательского сценария «Стать партнёром АПГ» и запись аналитики этого сценария.
+
+**Runtime:** Vercel Serverless + Fastify route mirror. На Vercel используется существующая функция `public-submit`, чтобы не увеличивать количество Serverless Functions. Fastify дополнительно может принимать mirror-route `/api/partnership-application`.
+
+**Actions:**
+
+### `action: "track-partnership"`
+
+Записывает событие в `partnershipAnalytics`.
+
+Разрешённые события:
+
+- `partnership_page_opened`
+- `partnership_tariff_selected`
+- `partnership_form_started`
+- `partnership_application_submitted`
+
+**Request body:**
+```json
+{
+  "action": "track-partnership",
+  "event": "partnership_page_opened",
+  "payload": { "surface": "profile" },
+  "user": { "id": "user-id", "name": "Имя", "email": "mail@example.ru" }
+}
+```
+
+### Submit application
+
+Создаёт документ в `aiImportRequests`.
+
+**Request body:**
+```json
+{
+  "action": "partnership-submit",
+  "type": "partner",
+  "fields": { "title": "Компания", "tariff": "start" },
+  "files": [{ "name": "photo.jpg", "type": "image/jpeg", "size": 120000, "url": "https://...", "role": "main" }],
+  "user": { "id": "user-id", "name": "Имя", "email": "mail@example.ru" }
+}
+```
+
+**Запись `aiImportRequests`:**
+
+- `source: "partnership-flow"`
+- `sourceLabel: "Заявка на партнёрство из профиля"`
+- `moderationStatus: "new_partnership_application"`
+- `crm.lifecycleStage: "new_partnership_application"`
+- `draft` строится через общий analyzer публичного ИИ-импорта
+
+**Response 200:**
+```json
+{
+  "ok": true,
+  "id": "request-id",
+  "status": "processed",
+  "missingFields": [],
+  "confidence": 90
+}
+```
+
+---
+
 ## GET /health (Fastify only)
 
 **Назначение:** Health check для мониторинга Yandex Serverless Container.

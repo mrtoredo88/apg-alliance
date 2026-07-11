@@ -401,6 +401,22 @@ const [editingExpert, setEditingExpert] = useState(null);
 // ... и т.д.
 ```
 
+## Moderation: partnership applications
+
+Раздел «Модерация» также читает `aiImportRequests`, чтобы показать заявки из пользовательского сценария «Стать партнёром АПГ».
+
+Фильтр:
+
+- `Новые заявки на партнёрство`
+
+Условия попадания:
+
+- `source === 'partnership-flow'`
+- или `moderationStatus === 'new_partnership_application'`
+- или `crm.lifecycleStage === 'new_partnership_application'`
+
+Опубликованные и отклонённые заявки не показываются в фильтре. Полная обработка карточки остаётся в разделе «ИИ-импорт», куда ведёт кнопка из фильтра.
+
 ## CONTENT_CATEGORIES
 
 Определены в начале файла (~строка 33):

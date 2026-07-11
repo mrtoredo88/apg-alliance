@@ -386,7 +386,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, onRestartLearning, onOpenHealth }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, onOpenPartnership, onRestartLearning, onOpenHealth }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
@@ -895,6 +895,38 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             {primaryActions.map(a => <GlassButton key={a.label} onClick={a.onClick}><span>{a.icon}</span>{a.label}</GlassButton>)}
           </div>
         </GlassSection>
+
+        {!ownedPartner && !ownedExpert && onOpenPartnership && (
+          <GlassSection title="Для бизнеса и экспертов">
+            <button
+              type="button"
+              onClick={onOpenPartnership}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                border: '1px solid rgba(201,168,76,0.36)',
+                borderRadius: 24,
+                padding: 16,
+                cursor: 'pointer',
+                color: APG2.text,
+                fontFamily: 'inherit',
+                background: 'linear-gradient(135deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))',
+                boxShadow: '0 14px 34px rgba(201,168,76,0.10), inset 0 1px 0 rgba(255,255,255,0.24)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+              }}
+            >
+              <div style={{ width: 52, height: 52, borderRadius: 18, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, flexShrink: 0 }}>🤝</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: APG2.gold, fontSize: 11, fontWeight: 820, letterSpacing: 1, textTransform: 'uppercase' }}>Стать партнёром АПГ</div>
+                <div style={{ color: APG2.text, fontSize: 17, lineHeight: '22px', fontWeight: 900, marginTop: 3 }}>Узнать условия и подать заявку</div>
+                <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>Информационная страница, тарифы, помощь Локи и короткая анкета.</div>
+              </div>
+              <div style={{ color: APG2.gold, fontSize: 24, flexShrink: 0 }}>›</div>
+            </button>
+          </GlassSection>
+        )}
 
         {!notificationsEnabled && (
           <GlassSection title="Уведомления">
@@ -1551,6 +1583,38 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </div>
         </div>
       </div>
+
+      {!ownedPartner && !ownedExpert && onOpenPartnership && (
+        <div style={{ padding: '16px 16px 0' }}>
+          <button
+            type="button"
+            onClick={onOpenPartnership}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              border: '1px solid rgba(201,168,76,0.36)',
+              borderRadius: 24,
+              padding: 16,
+              cursor: 'pointer',
+              color: APG2.text,
+              fontFamily: 'inherit',
+              background: 'linear-gradient(135deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))',
+              boxShadow: '0 14px 34px rgba(201,168,76,0.10), inset 0 1px 0 rgba(255,255,255,0.24)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+            }}
+          >
+            <div style={{ width: 52, height: 52, borderRadius: 18, background: 'rgba(201,168,76,0.18)', border: '1px solid rgba(201,168,76,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, flexShrink: 0 }}>🤝</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: APG2.gold, fontSize: 11, fontWeight: 820, letterSpacing: 1, textTransform: 'uppercase' }}>Для бизнеса и экспертов</div>
+              <div style={{ color: APG2.text, fontSize: 17, lineHeight: '22px', fontWeight: 900, marginTop: 3 }}>Стать партнёром АПГ</div>
+              <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>Узнать условия, выбрать тариф и отправить заявку за несколько минут.</div>
+            </div>
+            <div style={{ color: APG2.gold, fontSize: 24, flexShrink: 0 }}>›</div>
+          </button>
+        </div>
+      )}
 
       {/* ── Кабинет партнёра ── */}
       {ownedPartner && onOpenPartnerCabinet && (

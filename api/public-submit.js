@@ -310,6 +310,112 @@ function analyze(type, fields, files) {
 
 export { analyze as analyzePublicSubmission };
 
+const PARTNERSHIP_EVENTS = new Set([
+  'partnership_page_opened',
+  'partnership_tariff_selected',
+  'partnership_form_started',
+  'partnership_application_submitted',
+]);
+
+function cleanPartnershipUser(value) {
+  const user = value && typeof value === 'object' ? value : {};
+  return {
+    id: cleanText(user.id, 160),
+    name: cleanText(user.name || user.displayName, 180),
+    email: cleanText(user.email, 180).toLowerCase(),
+  };
+}
+
+function cleanPartnershipPayload(value) {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(Object.entries(value).slice(0, 24).map(([key, item]) => [
+    cleanText(key, 80),
+    typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || item == null
+      ? item
+      : cleanText(JSON.stringify(item), 1200),
+  ]));
+}
+
+function cleanPartnershipFiles(value) {
+  return Array.isArray(value) ? value.slice(0, 12).map(file => ({
+    name: cleanText(file.name, 180),
+    type: cleanText(file.type, 80),
+    size: Number(file.size || 0),
+    url: normalizeUrl(file.url),
+    role: cleanText(file.role, 40),
+  })).filter(file => file.url && file.size <= 8 * 1024 * 1024) : [];
+}
+
+async function writePartnershipAnalytics(db, event, body, extra = {}) {
+  if (!PARTNERSHIP_EVENTS.has(event)) return;
+  await db.collection('partnershipAnalytics').add({
+    event,
+    payload: cleanPartnershipPayload(body?.payload),
+    user: cleanPartnershipUser(body?.user),
+    source: 'profile-partnership-flow',
+    ...extra,
+    createdAt: FieldValue.serverTimestamp(),
+  }).catch(() => {});
+}
+
+async function handlePartnershipSubmit(db, body) {
+  const type = cleanText(body?.type, 40);
+  if (!['partner', 'expert'].includes(type)) throw linkError('Некорректный тип заявки.', 400);
+  const fields = body?.fields && typeof body.fields === 'object' ? body.fields : {};
+  const files = cleanPartnershipFiles(body?.files);
+  const draft = analyze(type, fields, files);
+  const meta = TYPES[type];
+  const now = FieldValue.serverTimestamp();
+  const user = cleanPartnershipUser(body?.user);
+  const sourceText = Object.entries(fields).map(([key, value]) => `${key}: ${cleanText(value, 4000)}`).join('\n');
+  const requestRef = await db.collection('aiImportRequests').add({
+    type,
+    typeLabel: meta.label,
+    title: draft.fields.title || fields.title || 'Заявка на партнёрство',
+    status: draft.status,
+    source: 'partnership-flow',
+    sourceLabel: 'Заявка на партнёрство из профиля',
+    sourceText: sourceText.slice(0, 20000),
+    sourceFiles: files,
+    draft,
+    confidence: draft.confidence,
+    missingFields: draft.missingFields,
+    moderationStatus: 'new_partnership_application',
+    partnershipFlow: {
+      step: 'submitted',
+      type,
+      tariff: cleanText(fields.tariff, 40),
+      source: 'profile',
+    },
+    submitter: {
+      userId: user.id,
+      name: cleanText(fields.contactName || fields.name || user.name, 180),
+      email: cleanText(fields.email || user.email, 180),
+      phone: cleanText(fields.phone, 80),
+    },
+    user,
+    crm: {
+      lifecycleStage: 'new_partnership_application',
+      responsible: 'admin',
+      comments: [],
+      interactions: [],
+      meetings: [],
+      tasks: [],
+      contracts: [],
+      invoices: [],
+      acts: [],
+      commercialOffers: [],
+      edo: { status: 'planned' },
+    },
+    createdAt: now,
+    updatedAt: now,
+    submittedAt: now,
+    processedAt: now,
+  });
+  await writePartnershipAnalytics(db, 'partnership_application_submitted', body, { requestId: requestRef.id, type });
+  return { ok: true, id: requestRef.id, status: draft.status, missingFields: draft.missingFields, confidence: draft.confidence };
+}
+
 async function findLink(db, token) {
   const snap = await db.collection('publicFormLinks').where('token', '==', token).limit(1).get();
   if (snap.empty) return null;
@@ -343,6 +449,16 @@ export default async function handler(req, res) {
 
   const db = getAdminDb();
   try {
+    const action = cleanText(req.body?.action, 40);
+    if (req.method === 'POST' && action === 'track-partnership') {
+      await writePartnershipAnalytics(db, cleanText(req.body?.event, 80), req.body);
+      return res.status(200).json({ ok: true });
+    }
+    if (req.method === 'POST' && action === 'partnership-submit') {
+      const result = await handlePartnershipSubmit(db, req.body);
+      return res.status(200).json(result);
+    }
+
     const token = cleanText(req.method === 'GET' ? req.query?.token : req.body?.token, 80);
     if (!/^[a-zA-Z0-9_-]{6,80}$/.test(token)) throw linkError('Некорректная ссылка.', 400);
     const link = await findLink(db, token);
