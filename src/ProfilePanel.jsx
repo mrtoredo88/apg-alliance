@@ -387,9 +387,10 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, onOpenPartnership, onRestartLearning, onOpenHealth }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
   const [vkLoginError, setVkLoginError] = useState('');
@@ -681,6 +682,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const nextLevel = getNextLevel(userKeys);
   const roleValue = String(user?.role || user?.userRole || user?.authRole || '').toLowerCase();
   const isPrivilegedProfile = String(user?.id || '') === '988504' || ['admin', 'owner', 'super_admin', 'moderator'].includes(roleValue) || user?.admin === true || user?.isAdmin === true || user?.owner === true;
+  const showWorkspaceDiagnosticButton = Boolean(workspaceDiagnostics) && (String(user?.id || '') === '988504' || ['owner', 'super_admin'].includes(roleValue) || user?.owner === true || user?.isOwner === true);
   const showPartnershipCard = Boolean(onOpenPartnership) && !ownedPartner && !ownedExpert && !isPrivilegedProfile;
   const partnershipCardTrackedRef = useRef(false);
 
@@ -1713,6 +1715,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
             { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
+            showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
             <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
@@ -1886,6 +1889,59 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           onClose={() => setShowEmailAuth(false)}
         >
           <EmailAuth onCancel={() => setShowEmailAuth(false)} onSuccess={handleEmailAuthSuccess} />
+        </ApgModal>,
+        document.body
+      )}
+
+      {/* ── Диагностика Workspace ── */}
+      {showWorkspaceDiagnostics && createPortal(
+        <ApgModal
+          title="Диагностика Workspace"
+          subtitle="Временная диагностика доступна только владельцу / super_admin."
+          onClose={() => setShowWorkspaceDiagnostics(false)}
+          maxWidth={460}
+        >
+          {(() => {
+            const rows = [
+              ['Workspace Feature Flag', workspaceDiagnostics?.featureFlag || '—'],
+              ['Роль пользователя', workspaceDiagnostics?.userRole || '—'],
+              ['Все роли Workspace', workspaceDiagnostics?.roles?.join(', ') || '—'],
+              ['Desktop detected', workspaceDiagnostics?.desktopDetected ? 'да' : 'нет'],
+              ['Workspace allowed', workspaceDiagnostics?.workspaceAllowed ? 'да' : 'нет'],
+              ['Allowed by role/flag', workspaceDiagnostics?.workspaceAllowedByRole ? 'да' : 'нет'],
+              ['Текущий режим', workspaceDiagnostics?.currentMode || '—'],
+              ['Запрошенный режим', workspaceDiagnostics?.requestedMode || '—'],
+              ['Значение сохранённого режима', workspaceDiagnostics?.savedMode || '—'],
+              ['Ширина', workspaceDiagnostics?.width ? `${workspaceDiagnostics.width}px` : '—'],
+              ['Breakpoint', workspaceDiagnostics?.workspaceMode || '—'],
+            ];
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ ...APG2.glass, borderRadius: 18, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {rows.map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: APG2.textSoft, flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontSize: 12, color: APG2.text, fontWeight: 700, textAlign: 'right', overflowWrap: 'anywhere', userSelect: 'text' }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ ...APG2.glass, borderRadius: 18, padding: '12px 14px', border: workspaceDiagnostics?.currentMode === 'workspace' ? '1px solid rgba(75,179,75,0.28)' : '1px solid rgba(230,70,70,0.24)' }}>
+                  <div style={{ fontSize: 12, color: APG2.textSoft, marginBottom: 5 }}>Причина</div>
+                  <div style={{ fontSize: 13, lineHeight: '19px', color: APG2.text, fontWeight: 750, userSelect: 'text' }}>{workspaceDiagnostics?.reason || 'Нет данных диагностики.'}</div>
+                </div>
+                <GlassButton
+                  tone="gold"
+                  onClick={() => {
+                    onResetWorkspaceMode?.();
+                    setShowWorkspaceDiagnostics(false);
+                  }}
+                  style={{ width: '100%', color: '#17120a' }}
+                >
+                  Сбросить режим Workspace
+                </GlassButton>
+              </div>
+            );
+          })()}
         </ApgModal>,
         document.body
       )}

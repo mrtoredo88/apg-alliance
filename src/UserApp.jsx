@@ -33,7 +33,7 @@ import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
-import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
+import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -2415,6 +2415,29 @@ export function UserApp() {
   const desktopWorkspaceAvailable = desktopDevice && canUseDesktopWorkspace({ user, partner: ownedPartner, expert: ownedExpert, flag: desktopWorkspaceFlag });
   const resolvedAppMode = resolveDesktopWorkspaceMode({ requestedMode: appMode, available: desktopWorkspaceAvailable });
   const desktopWorkspaceActive = resolvedAppMode === 'workspace';
+  const workspaceDiagnostics = useMemo(() => {
+    const roles = getWorkspaceUserRoles({ user, partner: ownedPartner, expert: ownedExpert });
+    const workspaceAllowedByRole = canUseDesktopWorkspace({ user, partner: ownedPartner, expert: ownedExpert, flag: desktopWorkspaceFlag });
+    let reason = 'Workspace должен открыться.';
+    if (!desktopDevice) reason = `Desktop не определён: ширина ${workspaceWidth}px, режим ${workspaceMode}.`;
+    else if (!workspaceAllowedByRole) reason = `Workspace запрещён feature flag или ролью: flag=${desktopWorkspaceFlag}, roles=${roles.join(', ') || '—'}.`;
+    else if (appMode === 'user') reason = 'Сохранён ручной выбор пользовательского режима: apg_app_mode=user.';
+    else if (resolvedAppMode !== 'workspace') reason = `Resolved mode=${resolvedAppMode}; Workspace не выбран.`;
+    return {
+      featureFlag: desktopWorkspaceFlag,
+      userRole: String(user?.role || user?.userRole || user?.authRole || '—'),
+      roles,
+      desktopDetected: desktopDevice,
+      workspaceAllowed: desktopWorkspaceAvailable,
+      workspaceAllowedByRole,
+      currentMode: resolvedAppMode,
+      requestedMode: appMode,
+      savedMode: appMode === 'auto' ? 'нет сохранённого значения' : appMode,
+      width: workspaceWidth,
+      workspaceMode,
+      reason,
+    };
+  }, [appMode, desktopDevice, desktopWorkspaceAvailable, desktopWorkspaceFlag, ownedExpert, ownedPartner, resolvedAppMode, user, workspaceMode, workspaceWidth]);
   const setAppModePersisted = useCallback((mode) => {
     const nextMode = mode === 'workspace' ? 'workspace' : mode === 'auto' ? 'auto' : 'user';
     setAppMode(nextMode);
@@ -3058,6 +3081,8 @@ export function UserApp() {
                     onEmailAuthSuccess={handleEmailAuthSuccess}
                     onOpenReference={() => goPanel('reference')}
                     onOpenLoki={() => goPanel('loki')}
+                    workspaceDiagnostics={workspaceDiagnostics}
+                    onResetWorkspaceMode={() => setAppModePersisted('auto')}
                     onOpenPartnership={(type = 'partner') => { setPartnershipEntry({ type, nonce: Date.now() }); goPanel('partnership'); }}
                     onRestartLearning={restartLearning}
                     onOpenNews={() => goPanel('news')}

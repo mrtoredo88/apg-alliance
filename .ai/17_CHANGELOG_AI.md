@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] fix: Workspace owner diagnostics
+**Коммит:** `pending`
+**Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- В профиль owner/super_admin добавлена временная кнопка «Диагностика Workspace».
+- Диагностика показывает feature flag, роль, роли Workspace, desktop detection, разрешение Workspace, текущий/сохранённый режим и причину блокировки.
+- Добавлена кнопка «Сбросить режим Workspace», которая очищает сохранённый выбор и переводит режим в auto для немедленного повторного определения.
+**Почему:** У owner на production Workspace мог не открываться из-за сохранённого ручного выбора `apg_app_mode=user`; теперь это видно без DevTools и сбрасывается из интерфейса.
+
+---
+
 ## [2026-07-11] fix: Desktop Workspace owner activation
 **Коммит:** `pending`
 **Файлы:** `src/workspace/WorkspaceFeatureFlags.js`, `src/UserApp.jsx`, `scripts/desktop-workspace-test.mjs`, `docs/desktop-workspace.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
