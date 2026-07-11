@@ -17,18 +17,18 @@ import { buildWorkspaceLayout, getWorkspaceNavigation, WORKSPACE_MODES } from '.
 import { getWorkspaceWidgetLayout } from './WorkspaceWidgets.js';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: '▦' },
-  { id: 'content', label: 'Контент', icon: '✎' },
-  { id: 'news', label: 'Новости', icon: '📰', panelId: 'news' },
-  { id: 'events', label: 'Мероприятия', icon: '📅', panelId: 'events' },
-  { id: 'partners', label: 'Партнёры', icon: '🤝', panelId: 'offers' },
-  { id: 'experts', label: 'Эксперты', icon: '✦', panelId: 'experts' },
-  { id: 'business-hub', label: 'Мой бизнес', icon: '◈', businessOnly: true },
-  { id: 'crm', label: 'CRM', icon: '◇', placeholder: true },
-  { id: 'calendar', label: 'Календарь', icon: '◷', placeholder: true },
-  { id: 'loki', label: 'Локи', icon: '🦊', panelId: 'loki' },
-  { id: 'settings', label: 'Настройки', icon: '⚙', panelId: 'profile' },
-  { id: 'admin', label: 'Администрирование', icon: '🛡', adminOnly: true },
+  { id: 'dashboard', label: 'Dashboard', icon: '▦', group: 'Работа', hint: 'Главный рабочий экран', shortcut: '⌘1' },
+  { id: 'business-hub', label: 'Мой бизнес', icon: '◈', group: 'Работа', businessOnly: true, hint: 'Профиль, аналитика и задачи бизнеса', shortcut: '⌘2' },
+  { id: 'content', label: 'Контент', icon: '✎', group: 'Работа', hint: 'Новости и мероприятия', shortcut: '⌘3' },
+  { id: 'news', label: 'Новости', icon: '📰', group: 'Контент', panelId: 'news', hint: 'Рабочий список публикаций' },
+  { id: 'events', label: 'Мероприятия', icon: '📅', group: 'Контент', panelId: 'events', hint: 'События и календарный контекст' },
+  { id: 'partners', label: 'Партнёры', icon: '🤝', group: 'Каталоги', panelId: 'offers', hint: 'Каталог партнёров' },
+  { id: 'experts', label: 'Эксперты', icon: '✦', group: 'Каталоги', panelId: 'experts', hint: 'Каталог экспертов' },
+  { id: 'crm', label: 'CRM', icon: '◇', group: 'Система', placeholder: true, hint: 'Заявки и клиенты, готовится' },
+  { id: 'calendar', label: 'Календарь', icon: '◷', group: 'Система', placeholder: true, hint: 'Расписание и записи, готовится' },
+  { id: 'loki', label: 'Локи', icon: '🦊', group: 'Система', panelId: 'loki', hint: 'Интеллектуальная рабочая панель', shortcut: '⌘L' },
+  { id: 'settings', label: 'Настройки', icon: '⚙', group: 'Система', panelId: 'profile', hint: 'Профиль и параметры' },
+  { id: 'admin', label: 'Администрирование', icon: '🛡', group: 'Система', adminOnly: true, hint: 'Административная панель' },
 ];
 
 function toDate(value) {
@@ -61,7 +61,7 @@ function getProfileCompletion(profile) {
   };
 }
 
-function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan }) {
+function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan, onOpenShortcuts }) {
   return (
     <div style={{ ...APG2_PROFILE.glass, borderRadius: 26, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 12, position: 'sticky', top: 14, zIndex: 10, minHeight: 64 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -81,17 +81,19 @@ function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onMod
             style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 13.5 }}
           />
         </label>
-        <GlassBadge tone="gold">⌘K / Ctrl K</GlassBadge>
+        <button type="button" onClick={onOpenShortcuts} style={{ border: 0, background: 'transparent', padding: 0, fontFamily: 'inherit', cursor: 'pointer' }}>
+          <GlassBadge tone="gold">⌘K · ?</GlassBadge>
+        </button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
-        <GlassButton onClick={onOpenScan} style={{ minHeight: 40 }}>QR</GlassButton>
-        <GlassButton onClick={onOpenNotifications} style={{ minHeight: 40 }}>Уведомления {unreadCount ? `· ${unreadCount}` : ''}</GlassButton>
+        <GlassButton onClick={onOpenScan} style={{ minHeight: 38, padding: '9px 12px' }}>QR</GlassButton>
+        <GlassButton onClick={onOpenNotifications} style={{ minHeight: 38, padding: '9px 12px' }}>{unreadCount ? `Уведомления · ${unreadCount}` : 'Уведомления'}</GlassButton>
         {roleState.roles.length > 1 && (
-          <select value={activeRoleId || ''} onChange={event => onRoleChange(event.target.value)} style={{ ...APG2_PROFILE.glass, color: APG2_PROFILE.text, minHeight: 40, borderRadius: 16, padding: '0 10px', fontFamily: 'inherit' }}>
+          <select value={activeRoleId || ''} onChange={event => onRoleChange(event.target.value)} style={{ ...APG2_PROFILE.glass, color: APG2_PROFILE.text, minHeight: 38, borderRadius: 16, padding: '0 10px', fontFamily: 'inherit' }}>
             {roleState.roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}
           </select>
         )}
-        <GlassButton onClick={() => onModeChange('user')} style={{ minHeight: 40 }}>Пользовательский режим</GlassButton>
+        <GlassButton onClick={() => onModeChange('user')} style={{ minHeight: 38, padding: '9px 12px' }}>User Mode</GlassButton>
         <button type="button" onClick={onOpenProfile} style={{ border: 0, background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 40, height: 40, borderRadius: 16, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{String(user?.firstName || user?.name || 'A').slice(0, 1)}</div>
         </button>
@@ -101,21 +103,41 @@ function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onMod
 }
 
 function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect }) {
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const groups = items.reduce((acc, item) => {
+    const group = item.group || 'Workspace';
+    if (!acc.some(entry => entry.group === group)) acc.push({ group, items: [] });
+    acc.find(entry => entry.group === group).items.push(item);
+    return acc;
+  }, []);
   return (
     <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 9, height: 'calc(100svh - 116px)', minHeight: 0, position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 8, transition: motionTransition(['width'], 'base'), width: collapsed ? 72 : 238 }}>
       <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: '4px 5px 8px' }}>
         {!collapsed && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}>Навигация</div>}
         <GlassButton onClick={onToggle} style={{ minHeight: 34, width: 34, padding: 0, borderRadius: 14 }}>{collapsed ? '›' : '‹'}</GlassButton>
       </div>
-      <div style={{ display: 'grid', gap: 6 }}>
-        {items.map(item => {
+      <div style={{ display: 'grid', gap: 10, position: 'relative' }}>
+        {groups.map(group => (
+          <div key={group.group} style={{ display: 'grid', gap: 5 }}>
+            {!collapsed && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10, lineHeight: '13px', fontWeight: 900, letterSpacing: 0.8, textTransform: 'uppercase', padding: '0 9px' }}>{group.group}</div>}
+            {group.items.map(item => {
           const active = activeSection === item.id;
+          const hovered = hoveredItem?.id === item.id;
           return (
-            <button key={item.id} type="button" onClick={() => onSelect(item)} title={item.label} style={{
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item)}
+              onMouseEnter={() => setHoveredItem(item)}
+              onMouseLeave={() => setHoveredItem(null)}
+              onFocus={() => setHoveredItem(item)}
+              onBlur={() => setHoveredItem(null)}
+              title={item.label}
+              style={{
               border: active ? '1px solid rgba(215,184,106,0.54)' : APG2_PROFILE.glass.border,
-              background: active ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.07)',
-              borderRadius: 20,
-              minHeight: 46,
+              background: active ? APG2_PROFILE.goldSoft : hovered ? 'rgba(var(--apg2-glass-a,255,255,255),0.12)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)',
+              borderRadius: 18,
+              minHeight: 42,
               padding: collapsed ? 0 : '0 12px',
               display: 'flex',
               alignItems: 'center',
@@ -126,13 +148,24 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
               fontSize: 13,
               fontWeight: 820,
               cursor: 'pointer',
+              outline: hovered ? '1px solid rgba(215,184,106,0.18)' : 'none',
+              transform: hovered && !active ? 'translateX(2px)' : 'translateX(0)',
               transition: motionTransition(['background', 'border-color', 'transform'], 'base'),
             }}>
               <span style={{ width: 26, textAlign: 'center' }}>{item.icon}</span>
-              {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>}
+              {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{item.label}</span>}
+              {!collapsed && item.shortcut && <span style={{ color: APG2_PROFILE.textMuted, fontSize: 10, fontWeight: 850 }}>{item.shortcut}</span>}
             </button>
           );
-        })}
+            })}
+          </div>
+        ))}
+        {collapsed && hoveredItem && (
+          <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 74, top: 48, zIndex: 20, width: 220, borderRadius: 18, padding: 12, pointerEvents: 'none' }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 900 }}>{hoveredItem.label}</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{hoveredItem.hint}</div>
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 'auto', display: collapsed ? 'none' : 'block' }}>
         <GlassCard style={{ borderRadius: 22, padding: 12 }}>
@@ -157,6 +190,13 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const latestNews = data.news.slice(0, 4);
   const upcomingEvents = data.events.slice(0, 4);
+  const todayEvents = data.events.slice(0, 3);
+  const attention = [
+    data.unreadCount ? `${data.unreadCount} уведомлений ждут просмотра` : '',
+    profileStatus.value < 80 ? `Профиль заполнен на ${profileStatus.value}%` : '',
+    !data.news.length ? 'В системе пока нет новостей' : '',
+    !data.events.length ? 'Нет ближайших мероприятий' : '',
+  ].filter(Boolean);
   const todaySignals = [
     `${data.news.length} новостей в системе`,
     `${data.events.length} мероприятий`,
@@ -181,6 +221,26 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
           action={<GlassButton onClick={actions.openCabinet} style={{ color: '#17120a' }}>Открыть Мой бизнес</GlassButton>}
           style={{ minHeight: 156 }}
         />
+      );
+    }
+    if (widget.id === 'today') {
+      return (
+        <WorkspacePanel title="Сегодня" subtitle="Сводка рабочего дня" style={{ height: '100%' }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <ListRow title={`${data.news.length} новостей`} text="Материалы, доступные в Workspace" />
+            <ListRow title={`${data.events.length} мероприятий`} text={todayEvents[0]?.title || todayEvents[0]?.name || 'Афиша без срочных событий'} />
+            <ListRow title={`${data.unreadCount || 0} уведомлений`} text={data.unreadCount ? 'Есть что проверить' : 'Спокойный день'} />
+          </div>
+        </WorkspacePanel>
+      );
+    }
+    if (widget.id === 'attention') {
+      return (
+        <WorkspacePanel title="Требует внимания" subtitle="Без лишнего шума" style={{ height: '100%' }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {attention.length ? attention.slice(0, 4).map(item => <ListRow key={item} title={item} text="Проверить" />) : <ListRow title="Критичных задач нет" text="Workspace выглядит спокойно" />}
+          </div>
+        </WorkspacePanel>
       );
     }
     if (widget.id === 'latest-news') {
@@ -247,7 +307,7 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
       return (
         <WorkspacePanel title="Задачи" subtitle="Что лучше сделать дальше">
           <div style={{ display: 'grid', gap: 8 }}>
-            {tasks.map(task => <ListRow key={task} title={task} text="Workspace recommendation" />)}
+            {tasks.map(task => <ListRow key={task} title={task} text="Рекомендация Workspace" />)}
           </div>
         </WorkspacePanel>
       );
@@ -293,6 +353,65 @@ function ListRow({ title, text }) {
 
 function EmptyWidget({ text }) {
   return <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', padding: 12 }}>{text}</div>;
+}
+
+function WorkspaceShortcutOverlay({ open, onClose }) {
+  if (!open) return null;
+  const shortcuts = [
+    ['⌘K / Ctrl K', 'Фокус поиска'],
+    ['⌘1 / Ctrl 1', 'Dashboard'],
+    ['⌘2 / Ctrl 2', 'Мой бизнес'],
+    ['⌘3 / Ctrl 3', 'Контент'],
+    ['⌘B / Ctrl B', 'Свернуть sidebar'],
+    ['?', 'Подсказки'],
+    ['Esc', 'Закрыть панели'],
+  ];
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 14000, background: 'rgba(8,8,10,0.34)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', padding: 20 }}>
+      <div onClick={event => event.stopPropagation()} style={{ ...APG2_PROFILE.glass, width: 'min(520px, 100%)', borderRadius: 30, padding: 18 }}>
+        <SectionHeader title="Горячие клавиши" subtitle="Desktop Workspace управляется без лишних переходов" actions={<GlassButton onClick={onClose} style={{ width: 36, minHeight: 36, padding: 0 }}>×</GlassButton>} />
+        <div style={{ display: 'grid', gap: 8 }}>
+          {shortcuts.map(([keys, text]) => (
+            <div key={keys} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12, alignItems: 'center', color: APG2_PROFILE.text }}>
+              <GlassBadge tone="gold" style={{ justifyContent: 'center' }}>{keys}</GlassBadge>
+              <span style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceContextMenu({ menu, actions, onClose }) {
+  if (!menu) return null;
+  const items = [
+    ['dashboard', '▦ Dashboard', () => actions.openDashboard?.()],
+    ['business', '◈ Мой бизнес', () => actions.openCabinet?.()],
+    ['news', '📰 Новости', () => actions.openNews?.()],
+    ['events', '📅 Мероприятия', () => actions.openEvents?.()],
+    ['loki', '🦊 Спросить Локи', () => actions.openLoki?.()],
+  ];
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 13000, background: 'transparent' }}>
+      <div style={{ ...APG2_PROFILE.glass, position: 'fixed', left: menu.x, top: menu.y, width: 220, borderRadius: 20, padding: 7, boxShadow: '0 22px 70px rgba(0,0,0,0.34), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.30)' }}>
+        {items.map(([id, label, action]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              action?.();
+              onClose?.();
+            }}
+            style={{ width: '100%', minHeight: 38, border: 0, borderRadius: 14, background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 13, fontWeight: 780, textAlign: 'left', padding: '0 10px', cursor: 'pointer' }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function PlaceholderSection({ title, text, actions }) {
@@ -398,6 +517,8 @@ export function DesktopWorkspace({
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [query, setQuery] = useState('');
+  const [shortcutOverlayOpen, setShortcutOverlayOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
   const roleState = useMemo(() => getCabinetRoles({ user, partner: ownedPartner, expert: ownedExpert }), [user, ownedPartner, ownedExpert]);
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || '');
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
@@ -431,6 +552,17 @@ export function DesktopWorkspace({
   useEffect(() => {
     const onKeyDown = event => {
       const key = event.key?.toLowerCase();
+      if (key === 'escape') {
+        setShortcutOverlayOpen(false);
+        setContextMenu(null);
+      }
+      if (key === '?' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+          event.preventDefault();
+          setShortcutOverlayOpen(value => !value);
+        }
+      }
       if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault();
         const input = document.querySelector('[placeholder="Глобальный поиск по Workspace"]');
@@ -440,6 +572,18 @@ export function DesktopWorkspace({
         event.preventDefault();
         setActiveSection('dashboard');
       }
+      if ((event.metaKey || event.ctrlKey) && key === '2') {
+        event.preventDefault();
+        if (businessHubAvailable) setActiveSection('business-hub');
+      }
+      if ((event.metaKey || event.ctrlKey) && key === '3') {
+        event.preventDefault();
+        setActiveSection('content');
+      }
+      if ((event.metaKey || event.ctrlKey) && key === 'l') {
+        event.preventDefault();
+        onOpenPanel?.('loki');
+      }
       if ((event.metaKey || event.ctrlKey) && key === 'b') {
         event.preventDefault();
         setSidebarCollapsed(value => !value);
@@ -447,14 +591,25 @@ export function DesktopWorkspace({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [businessHubAvailable, onOpenPanel]);
 
   const actions = {
+    openDashboard: () => setActiveSection('dashboard'),
     openCabinet: () => businessHubAvailable ? setActiveSection('business-hub') : onOpenPanel?.(activeRole?.id === 'expert' ? 'expert-cabinet' : 'partner-cabinet'),
     openNews: () => setActiveSection('news'),
     openEvents: () => setActiveSection('events'),
     openPartners: () => setActiveSection('partners'),
     openExperts: () => setActiveSection('experts'),
+    openLoki: () => onOpenPanel?.('loki'),
+  };
+
+  const handleWorkspaceContextMenu = event => {
+    const tag = event.target?.tagName?.toLowerCase();
+    if (['input', 'textarea', 'select', 'button'].includes(tag) || event.target?.closest?.('button,input,textarea,select')) return;
+    event.preventDefault();
+    const x = Math.min(event.clientX, window.innerWidth - 240);
+    const y = Math.min(event.clientY, window.innerHeight - 260);
+    setContextMenu({ x, y });
   };
 
   const handleSelectNav = item => {
@@ -545,7 +700,7 @@ export function DesktopWorkspace({
   };
 
   return (
-    <div style={{ minHeight: '100svh', background: 'radial-gradient(circle at 18% -12%, rgba(215,184,106,0.18), transparent 34%), radial-gradient(circle at 92% 8%, rgba(112,92,168,0.14), transparent 30%), linear-gradient(180deg, var(--apg2-bg-top, #17171a) 0%, var(--apg2-bg-mid, #121316) 56%, var(--apg2-bg-bottom, #101114) 100%)', color: APG2_PROFILE.text, padding: 14, boxSizing: 'border-box' }}>
+    <div onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100svh', background: 'radial-gradient(circle at 18% -12%, rgba(215,184,106,0.18), transparent 34%), radial-gradient(circle at 92% 8%, rgba(112,92,168,0.14), transparent 30%), linear-gradient(180deg, var(--apg2-bg-top, #17171a) 0%, var(--apg2-bg-mid, #121316) 56%, var(--apg2-bg-bottom, #101114) 100%)', color: APG2_PROFILE.text, padding: 14, boxSizing: 'border-box' }}>
       <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: 14, minHeight: 'calc(100svh - 28px)' }}>
         <WorkspaceHeaderBar
           user={user}
@@ -559,6 +714,7 @@ export function DesktopWorkspace({
           onOpenNotifications={() => onOpenPanel?.('notifications')}
           onOpenProfile={() => onOpenPanel?.('profile')}
           onOpenScan={onOpenScan}
+          onOpenShortcuts={() => setShortcutOverlayOpen(true)}
         />
         <div style={{ display: 'grid', gridTemplateColumns: `${sidebarCollapsed ? 72 : 238}px minmax(0, 1fr) 326px`, gap: 14, alignItems: 'start' }}>
           <WorkspaceSidebar
@@ -587,10 +743,12 @@ export function DesktopWorkspace({
           </aside>
         </div>
         <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12 }}>
-          <span>Workspace status: готов · shortcuts: ⌘K поиск, ⌘1 Dashboard, ⌘B sidebar</span>
+          <span>Workspace status: готов · shortcuts: ⌘K поиск, ⌘1 Dashboard, ⌘2 Мой бизнес, ? помощь</span>
           <span>{partners.length} партнёров · {experts.length} экспертов · {news.length} новостей · {events.length} событий</span>
         </div>
       </div>
+      <WorkspaceShortcutOverlay open={shortcutOverlayOpen} onClose={() => setShortcutOverlayOpen(false)} />
+      <WorkspaceContextMenu menu={contextMenu} actions={actions} onClose={() => setContextMenu(null)} />
     </div>
   );
 }

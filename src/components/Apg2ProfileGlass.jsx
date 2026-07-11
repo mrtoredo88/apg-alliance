@@ -8,6 +8,7 @@ export const APG2_PROFILE = {
   textMuted: 'var(--apg2-text-muted, rgba(247,241,230,0.48))',
   gold: 'var(--apg2-gold, #D7B86A)',
   goldSoft: 'rgba(215,184,106,0.18)',
+  goldGradient: 'linear-gradient(135deg,#FFF0B8,#D7B86A,#9F7932)',
   radius: {
     card: 30,
     panel: 34,

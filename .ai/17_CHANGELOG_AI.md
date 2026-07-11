@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-12] ux: Desktop UX 1.1
+**Коммит:** `pending`
+**Файлы:** `src/components/Apg2ProfileGlass.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceWidgets.js`, `docs/desktop-ux.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** refactor
+**Что изменено:**
+- Desktop Workspace получил grouped sidebar, hover/focus-состояния, collapsed hover-preview, shortcut overlay по `?` и context menu по правому клику на свободной области.
+- Dashboard дополнен виджетами `Сегодня` и `Требует внимания`, а горячие клавиши расширены до `⌘2` для Business Hub и `⌘3` для Content.
+- В дизайн-токены APG2 добавлен общий `goldGradient`, чтобы active/gold-состояния в desktop UI не зависели от локальных хардкодов.
+**Почему:** После Desktop UX 1.0 интерфейс стал шире и плотнее, но ему не хватало desktop-поведения: группировки, command hints, контекстных действий и цельных состояний навигации.
+
+---
+
 ## [2026-07-12] ux: Desktop UX 1.0
 **Коммит:** `pending`
 **Файлы:** `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceComponents.jsx`, `src/workspace/WorkspaceWidgets.js`, `docs/desktop-ux.md`, `docs/desktop-workspace.md`, `.ai/17_CHANGELOG_AI.md`

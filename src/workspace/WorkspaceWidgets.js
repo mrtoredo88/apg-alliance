@@ -6,6 +6,16 @@ export const WORKSPACE_WIDGETS = [
     locked: true,
   },
   {
+    id: 'today',
+    title: 'Сегодня',
+    size: 'medium',
+  },
+  {
+    id: 'attention',
+    title: 'Требует внимания',
+    size: 'medium',
+  },
+  {
     id: 'latest-news',
     title: 'Последние новости',
     size: 'medium',
