@@ -80,6 +80,14 @@ export const WORKSPACE_NAV_ITEMS = [
     roles: ['partner', 'expert', 'admin', 'owner'],
   },
   {
+    id: 'business-hub',
+    panelId: 'business-hub',
+    label: 'Мой бизнес',
+    iconKey: 'business',
+    regions: [WORKSPACE_REGIONS.leftSidebar],
+    roles: ['partner', 'expert', 'admin', 'owner'],
+  },
+  {
     id: 'loki',
     panelId: 'loki',
     label: 'Локи',

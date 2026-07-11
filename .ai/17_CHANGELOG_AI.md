@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-12] feat: Business Hub 1.0
+**Коммит:** `pending`
+**Файлы:** `src/businessHub/BusinessHubCore.js`, `src/businessHub/BusinessHub.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceCore.js`, `scripts/business-hub-test.mjs`, `docs/business-hub.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Business Hub как раздел «Мой бизнес» внутри Desktop Workspace с staged feature flag `off/owner/admin/partner/expert/all`.
+- Hub использует существующие данные `ownedPartner`, `ownedExpert`, `news`, `events`, `notifications`, строит заполненность профиля, метрики, акции, отзывы, задачи и business-контекст для Локи без тяжёлых фоновых запросов.
+- Существующие редакторы партнёра и эксперта подключены как инструменты внутри Hub, без создания отдельного классического кабинета.
+**Почему:** Партнёрам и экспертам нужна единая workspace-среда управления бизнесом, которая развивается поверх Identity Core и Workspace Core без дублирования кабинетов.
+
+---
+
 ## [2026-07-11] feat: Identity Core V1
 **Коммит:** `pending`
 **Файлы:** `server/src/lib/identityCore.js`, `server/src/routes/email-auth.js`, `server/src/routes/user-actions.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-login.js`, `server/src/routes/admin-actions.js`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/workspace/WorkspaceFeatureFlags.js`, `scripts/identity-core-test.mjs`, `scripts/desktop-workspace-test.mjs`, `docs/identity-core.md`, `.ai/17_CHANGELOG_AI.md`

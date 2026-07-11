@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassPanel } from '../components/Apg2ProfileGlass.jsx';
 import { MOTION, motionTransition } from '../motion.js';
+import { BusinessHub } from '../businessHub/BusinessHub.jsx';
+import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
 import {
   ActionCard,
@@ -21,7 +23,7 @@ const NAV_ITEMS = [
   { id: 'events', label: 'Мероприятия', icon: '📅', panelId: 'events' },
   { id: 'partners', label: 'Партнёры', icon: '🤝', panelId: 'offers' },
   { id: 'experts', label: 'Эксперты', icon: '✦', panelId: 'experts' },
-  { id: 'cabinet', label: 'Кабинеты', icon: '▣', panelId: 'partner-cabinet' },
+  { id: 'business-hub', label: 'Мой бизнес', icon: '◈', businessOnly: true },
   { id: 'crm', label: 'CRM', icon: '◇', placeholder: true },
   { id: 'calendar', label: 'Календарь', icon: '◷', placeholder: true },
   { id: 'loki', label: 'Локи', icon: '🦊', panelId: 'loki' },
@@ -169,7 +171,7 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
           title={`Добро пожаловать, ${data.userName}`}
           subtitle="Это рабочее пространство АПГ. Здесь собираются кабинеты, контент, задачи, Локи и будущие CRM-инструменты."
           value={data.roleLabel}
-          action={<GlassButton onClick={actions.openCabinet} style={{ color: '#17120a' }}>Открыть кабинет</GlassButton>}
+          action={<GlassButton onClick={actions.openCabinet} style={{ color: '#17120a' }}>Открыть Мой бизнес</GlassButton>}
         />
       );
     }
@@ -359,8 +361,14 @@ export function DesktopWorkspace({
   const widgetLayout = useMemo(() => getWorkspaceWidgetLayout(), []);
   const activeProfile = activeRole?.id === 'expert' ? ownedExpert : activeRole?.id === 'partner' ? ownedPartner : user;
   const userName = user?.firstName || user?.name || user?.displayName || 'коллега';
-  const isAdminRole = ['owner', 'admin', 'moderator', 'editor'].includes(activeRole?.id);
-  const navItems = NAV_ITEMS.filter(item => !item.adminOnly || isAdminRole);
+  const isAdminRole = ['owner', 'super_admin', 'admin', 'moderator', 'editor'].includes(activeRole?.id);
+  const businessHubFlag = useMemo(() => getBusinessHubFlag(), []);
+  const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: ownedPartner, expert: ownedExpert, flag: businessHubFlag }), [user, ownedPartner, ownedExpert, businessHubFlag]);
+  const navItems = NAV_ITEMS.filter(item => {
+    if (item.adminOnly && !isAdminRole) return false;
+    if (item.businessOnly && !businessHubAvailable) return false;
+    return true;
+  });
   const recentActions = [
     { id: 'workspace-open', title: 'Workspace открыт', text: 'Рабочая среда активна без повторной авторизации' },
     { id: 'data-ready', title: 'Данные загружены', text: `${partners.length} партнёров · ${experts.length} экспертов` },
@@ -370,6 +378,10 @@ export function DesktopWorkspace({
   useEffect(() => {
     setActiveRoleId(roleState.activeRole?.id || '');
   }, [roleState.activeRole?.id]);
+
+  useEffect(() => {
+    if (activeSection === 'business-hub' && !businessHubAvailable) setActiveSection('dashboard');
+  }, [activeSection, businessHubAvailable]);
 
   useEffect(() => {
     const onKeyDown = event => {
@@ -393,7 +405,7 @@ export function DesktopWorkspace({
   }, []);
 
   const actions = {
-    openCabinet: () => onOpenPanel?.(activeRole?.id === 'expert' ? 'expert-cabinet' : 'partner-cabinet'),
+    openCabinet: () => businessHubAvailable ? setActiveSection('business-hub') : onOpenPanel?.(activeRole?.id === 'expert' ? 'expert-cabinet' : 'partner-cabinet'),
     openNews: () => setActiveSection('news'),
     openEvents: () => setActiveSection('events'),
     openPartners: () => setActiveSection('partners'),
@@ -409,7 +421,7 @@ export function DesktopWorkspace({
       setActiveSection(item.id);
       return;
     }
-    if (item.id === 'dashboard' || item.id === 'content') {
+    if (item.id === 'dashboard' || item.id === 'content' || item.id === 'business-hub') {
       setActiveSection(item.id);
       return;
     }
@@ -460,12 +472,19 @@ export function DesktopWorkspace({
     if (activeSection === 'experts') {
       return <DataSection title="Эксперты" subtitle="Рабочий каталог экспертов" items={experts} emptyText="Экспертов пока нет." onOpen={() => onOpenPanel?.('experts')} />;
     }
-    if (activeSection === 'cabinet') {
+    if (activeSection === 'business-hub') {
       return (
-        <PlaceholderSection
-          title="Кабинеты"
-          text="Cabinet Core уже подключён к Workspace. Полноценная рабочая версия кабинетов будет развиваться внутри этой области."
-          actions={[{ id: 'open-cabinet', label: 'Открыть кабинет', onClick: actions.openCabinet, tone: 'gold' }]}
+        <BusinessHub
+          user={user}
+          ownedPartner={ownedPartner}
+          ownedExpert={ownedExpert}
+          partners={partners}
+          experts={experts}
+          events={events}
+          news={news}
+          notifications={notifications}
+          activeRoleId={activeRole?.id}
+          onOpenPanel={onOpenPanel}
         />
       );
     }
