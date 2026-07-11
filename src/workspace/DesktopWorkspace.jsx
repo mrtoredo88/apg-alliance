@@ -5,6 +5,8 @@ import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
+import { NewsCard } from '../NewsPage.jsx';
+import { EventPosterCard } from '../EventsPage.jsx';
 import {
   ActionCard,
   ContentGrid,
@@ -218,7 +220,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
     setHoveredItem({ ...item, top: event.currentTarget.offsetTop - scrollTop });
   };
   return (
-    <div data-workspace-region="sidebar" style={{ ...APG2_PROFILE.glass, borderRadius: 34, padding: collapsed ? '12px 10px' : 12, height: '100%', minHeight: 0, overflow: 'visible', position: 'relative', zIndex: WORKSPACE_Z.sidebar, display: 'flex', flexDirection: 'column', gap: 12, transition: motionTransition(['width', 'padding', 'background'], 'base'), width: '100%', background: 'linear-gradient(180deg, rgba(var(--apg2-glass-a,255,255,255),0.18), rgba(var(--apg2-glass-a,255,255,255),0.09))', boxShadow: '0 20px 70px rgba(0,0,0,0.14)' }}>
+    <div data-workspace-region="sidebar" style={{ ...APG2_PROFILE.glass, borderRadius: 30, padding: collapsed ? '10px 8px' : 10, height: '100%', minHeight: 0, overflow: 'visible', position: 'relative', zIndex: WORKSPACE_Z.sidebar, display: 'flex', flexDirection: 'column', gap: 10, transition: motionTransition(['width', 'padding', 'background'], 'base'), width: '100%', background: 'linear-gradient(180deg, rgba(var(--apg2-glass-a,255,255,255),0.18), rgba(var(--apg2-glass-a,255,255,255),0.09))', boxShadow: '0 20px 70px rgba(0,0,0,0.14)' }}>
       <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: collapsed ? '0 0 2px' : '2px 3px 6px' }}>
         {!collapsed && (
           <div style={{ minWidth: 0 }}>
@@ -226,7 +228,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', marginTop: 2 }}>Рабочие области АПГ</div>
           </div>
         )}
-        <GlassButton onClick={onToggle} style={{ minHeight: collapsed ? 42 : 36, width: collapsed ? 42 : 36, padding: 0, borderRadius: 999, fontSize: 18, boxShadow: collapsed ? '0 12px 26px rgba(0,0,0,0.12)' : undefined }}>{collapsed ? '›' : '‹'}</GlassButton>
+        <GlassButton onClick={onToggle} style={{ minHeight: collapsed ? 38 : 34, width: collapsed ? 38 : 34, padding: 0, borderRadius: 999, fontSize: 18, boxShadow: collapsed ? '0 12px 26px rgba(0,0,0,0.12)' : undefined }}>{collapsed ? '›' : '‹'}</GlassButton>
       </div>
       <div ref={scrollRef} onScroll={() => setHoveredItem(null)} style={{ display: 'grid', gap: collapsed ? 9 : 10, position: 'relative', minHeight: 0, overflowY: 'auto', overflowX: 'visible', padding: collapsed ? '1px 0 8px' : '1px 2px 8px 0', overscrollBehavior: 'contain' }}>
         {groups.map(group => (
@@ -250,8 +252,8 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
               border: active ? '1px solid rgba(215,184,106,0.58)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)',
               background: active ? APG2_PROFILE.goldSoft : hovered ? 'rgba(var(--apg2-glass-a,255,255,255),0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.07)',
               borderRadius: collapsed ? 999 : 22,
-              minHeight: collapsed ? 54 : 46,
-              width: collapsed ? 54 : '100%',
+              minHeight: collapsed ? 48 : 44,
+              width: collapsed ? 48 : '100%',
               padding: collapsed ? 0 : '0 12px',
               margin: collapsed ? '0 auto' : 0,
               display: 'flex',
@@ -269,7 +271,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
               boxShadow: active ? '0 14px 34px rgba(215,184,106,0.20)' : hovered ? '0 12px 26px rgba(0,0,0,0.12)' : 'none',
               transition: motionTransition(['background', 'border-color', 'transform', 'box-shadow'], 'base'),
             }}>
-              <span style={{ width: collapsed ? 36 : 28, height: collapsed ? 36 : 28, borderRadius: 999, display: 'grid', placeItems: 'center', textAlign: 'center', background: active ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.10)', color: active ? '#17120a' : APG2_PROFILE.gold, fontSize: item.icon.length > 1 ? 16 : 17, boxShadow: active ? '0 10px 24px rgba(215,184,106,0.24)' : 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>{item.icon}</span>
+              <span style={{ width: collapsed ? 32 : 27, height: collapsed ? 32 : 27, borderRadius: 999, display: 'grid', placeItems: 'center', textAlign: 'center', background: active ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.10)', color: active ? '#17120a' : APG2_PROFILE.gold, fontSize: item.icon.length > 1 ? 15 : 16, boxShadow: active ? '0 10px 24px rgba(215,184,106,0.24)' : 'inset 0 1px 0 rgba(255,255,255,0.16)' }}>{item.icon}</span>
               {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{item.label}</span>}
               {!collapsed && item.shortcut && <span style={{ color: APG2_PROFILE.textMuted, fontSize: 10, fontWeight: 850 }}>{item.shortcut}</span>}
             </button>
@@ -279,7 +281,7 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
         ))}
       </div>
       {collapsed && hoveredItem && (
-        <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 84, top: Math.max(58, hoveredItem.top + 58), zIndex: WORKSPACE_Z.popover, width: 230, borderRadius: 20, padding: 12, pointerEvents: 'none', boxShadow: '0 22px 54px rgba(0,0,0,0.22)', background: APG2_PROFILE.quietSurface }}>
+        <div style={{ ...APG2_PROFILE.glass, position: 'absolute', left: 72, top: Math.max(54, hoveredItem.top + 54), zIndex: WORKSPACE_Z.popover, width: 230, borderRadius: 20, padding: 12, pointerEvents: 'none', boxShadow: '0 22px 54px rgba(0,0,0,0.22)', background: APG2_PROFILE.quietSurface }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 900 }}>{hoveredItem.label}</div>
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{hoveredItem.hint}</div>
         </div>
@@ -435,18 +437,16 @@ function WorkspaceDashboard({ data, actions }) {
     if (widget.id === 'latest-news') {
       return (
         <WorkspacePanel title="Последние новости" subtitle={`${data.news.length} материалов в системе`}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {latestNews.length ? latestNews.map(item => <ListRow key={item.id || item.title} title={item.title || 'Новость'} text={formatShortDate(item.publishedAt || item.createdAt)} />) : <EmptyWidget text="Новостей пока нет." />}
-          </div>
+          <NewsCardsGrid items={latestNews.slice(0, 2)} onOpen={actions.openNews} columns={2} compact />
+          {!latestNews.length && <EmptyWidget text="Новостей пока нет." />}
         </WorkspacePanel>
       );
     }
     if (widget.id === 'upcoming-events') {
       return (
         <WorkspacePanel title="Ближайшие мероприятия" subtitle={`${data.events.length} событий доступно`}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {upcomingEvents.length ? upcomingEvents.map(item => <ListRow key={item.id || item.title} title={item.title || item.name || 'Мероприятие'} text={`${formatShortDate(item.date || item.startAt)} · ${item.location || item.address || 'место уточняется'}`} />) : <EmptyWidget text="Ближайших мероприятий нет." />}
-          </div>
+          <EventCardsGrid items={upcomingEvents.slice(0, 2)} onOpen={actions.openEvents} columns={1} compact />
+          {!upcomingEvents.length && <EmptyWidget text="Ближайших мероприятий нет." />}
         </WorkspacePanel>
       );
     }
@@ -626,32 +626,73 @@ function PlaceholderSection({ title, text, actions }) {
   );
 }
 
-function DataSection({ title, subtitle, items, emptyText, onOpen, columns = 2 }) {
+function NewsCardsGrid({ items, onOpen, columns = 2, compact = false }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: compact ? 12 : 14, alignItems: 'start' }}>
+      {items.map((item, index) => (
+        <NewsCard
+          key={item.id || item.externalId || item.title || index}
+          item={item}
+          index={index + (compact ? 1 : 0)}
+          onOpen={() => onOpen?.(item)}
+          onShare={() => onOpen?.(item)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function EventCardsGrid({ items, onOpen, columns = 2, compact = false }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: compact ? 12 : 14, alignItems: 'start' }}>
+      {items.map((item, index) => (
+        <EventPosterCard
+          key={item.id || item.title || item.name || index}
+          event={item}
+          index={index}
+          compact={compact}
+          onClick={() => onOpen?.(item)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DataSection({ title, subtitle, items, emptyText, onOpen, columns = 2, type = 'default' }) {
+  const content = type === 'news'
+    ? <NewsCardsGrid items={items.slice(0, 12)} onOpen={onOpen} columns={columns} />
+    : type === 'events'
+      ? <EventCardsGrid items={items.slice(0, 12)} onOpen={onOpen} columns={columns} />
+      : (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: 10 }}>
+          {items.length ? items.slice(0, 12).map(item => (
+            <button key={item.id || item.title || item.name} type="button" onClick={() => onOpen?.(item)} style={{
+              ...APG2_PROFILE.glass,
+              borderRadius: 22,
+              padding: 12,
+              minHeight: 92,
+              color: APG2_PROFILE.text,
+              fontFamily: 'inherit',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: motionTransition(['transform', 'border-color', 'background'], 'base'),
+            }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || item.name || 'Без названия'}</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                {item.description || item.shortDescription || item.categoryLabel || item.address || formatShortDate(item.date || item.createdAt)}
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <GlassBadge>{item.status || item.category || item.tariff || 'АПГ'}</GlassBadge>
+              </div>
+            </button>
+          )) : <EmptyWidget text={emptyText} />}
+        </div>
+      );
   return (
     <WorkspacePanel title={title} subtitle={subtitle}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: 10 }}>
-        {items.length ? items.slice(0, 12).map(item => (
-          <button key={item.id || item.title || item.name} type="button" onClick={() => onOpen?.(item)} style={{
-            ...APG2_PROFILE.glass,
-            borderRadius: 22,
-            padding: 12,
-            minHeight: 92,
-            color: APG2_PROFILE.text,
-            fontFamily: 'inherit',
-            textAlign: 'left',
-            cursor: 'pointer',
-            transition: motionTransition(['transform', 'border-color', 'background'], 'base'),
-          }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || item.name || 'Без названия'}</div>
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-              {item.description || item.shortDescription || item.categoryLabel || item.address || formatShortDate(item.date || item.createdAt)}
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-              <GlassBadge>{item.status || item.category || item.tariff || 'АПГ'}</GlassBadge>
-            </div>
-          </button>
-        )) : <EmptyWidget text={emptyText} />}
-      </div>
+      {items.length ? content : <EmptyWidget text={emptyText} />}
     </WorkspacePanel>
   );
 }
@@ -994,10 +1035,10 @@ export function DesktopWorkspace({
       );
     }
     if (activeSection === 'news') {
-      return <DataSection title="Новости" subtitle="Рабочий список публикаций" items={news} emptyText="Новостей пока нет." onOpen={() => onOpenPanel?.('news')} />;
+      return <DataSection type="news" title="Новости" subtitle="Те же карточки, что и в User Mode, адаптированные широкой сеткой" items={news} emptyText="Новостей пока нет." onOpen={() => onOpenPanel?.('news')} />;
     }
     if (activeSection === 'events') {
-      return <DataSection title="Мероприятия" subtitle="События и будущий календарь" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />;
+      return <DataSection type="events" title="Мероприятия" subtitle="Единые карточки событий без отдельной workspace-версии" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />;
     }
     if (activeSection === 'partners') {
       return <DataSection title="Партнёры" subtitle="Рабочий каталог партнёров" items={partners} emptyText="Партнёров пока нет." onOpen={() => onOpenPanel?.('offers')} />;

@@ -2128,3 +2128,17 @@
 **AI Workspace:** правая область усилена как рабочее место Локи: добавлены статус, контекст, последнее действие, следующее лучшее действие, рабочая память, briefing, решения и компактная история. Текст диалога защищён от overflow длинными строками.
 
 **Smoke:** `desktop-workspace-layout-regression` расширен проверкой ширины icon rail и наличия новых состояний `LokiIdentity`.
+
+## 2026-07-12 — Desktop Workspace Visual Consistency
+
+**Задача:** финально унифицировать Desktop Workspace с User Mode: Workspace должен использовать те же визуальные компоненты АПГ, а не выглядеть отдельным приложением.
+
+**Единый Локи:** `LokiIdentity` стал единственным визуальным компонентом Локи для User Mode, Workspace, Business Hub, AI Workspace, Loki Home, Loki Experience, Assistant Mini App и кабинетов. Добавлен compact-режим `showText={false}` и состояние `speaking`. Прямые `url(/loki.png)` и emoji-аватары Локи удалены из визуальных компонентов.
+
+**Новости:** Workspace больше не рисует отдельную карточку новости через локальный `DataSection`. `NewsCard` экспортирован из `NewsPage` и используется в Desktop Workspace для dashboard-блока и раздела “Новости”. Сохраняются изображения, типографика, badges, мета и переносы из пользовательского режима.
+
+**Мероприятия:** `EventPosterCard` экспортирован из `EventsPage` и используется в Desktop Workspace для dashboard-блока и раздела “Мероприятия”. Даты, изображения, место, переносы и высоты карточек теперь идут через единый live-компонент.
+
+**Навигация:** Sidebar уменьшен до 232px в раскрытом режиме и 76px в collapsed-режиме. Icon rail сохранён как законченный продукт: круглые кнопки, hover/focus, active state, tooltip и группы, но занимает меньше полезной площади Workspace.
+
+**Regression smoke:** `desktop-workspace-layout-regression` дополнительно проверяет, что визуальные места Локи не используют прямую картинку/emoji и что Desktop Workspace переиспользует `NewsCard`/`EventPosterCard`.

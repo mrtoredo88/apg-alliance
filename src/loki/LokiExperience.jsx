@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../components/Apg2ProfileGlass.jsx';
 import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
+import { LokiIdentity } from './LokiIdentity.jsx';
 
 const QUICK_ACTIONS = [
   { label: '📍 Что рядом?', text: 'Что рядом?', action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS) },
@@ -61,14 +62,10 @@ function buildInitialConversation(loki) {
 }
 
 function LokiAvatar({ thinking, listening, speaking }) {
-  const animation = speaking ? 'lokiWave 1.35s' : listening ? 'lokiListen 1.8s' : thinking ? 'lokiThinking 1.65s' : 'lokiIdle 6.2s';
+  const state = speaking ? 'speaking' : listening ? 'listening' : thinking ? 'thinking' : 'ready';
   return (
     <div style={{ position: 'relative', width: 178, height: 178, margin: '0 auto', display: 'grid', placeItems: 'center' }}>
-      <span style={{ position: 'absolute', inset: 12, borderRadius: 60, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.24), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(10px)', opacity: thinking || listening || speaking ? 1 : 0.76, animation: thinking || speaking ? 'lokiAmbientGlow 2.8s ease-in-out infinite' : 'lokiAmbientGlow 5.2s ease-in-out infinite' }} />
-      <span style={{ width: 148, height: 148, borderRadius: 48, overflow: 'hidden', position: 'relative', border: '1px solid rgba(215,184,106,0.34)', backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', boxShadow: '0 30px 80px rgba(0,0,0,0.34), 0 0 44px rgba(215,184,106,0.22)', animation: `${animation} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
-        <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 24%, rgba(255,255,255,0.16), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.10))' }} />
-        {speaking && <span style={{ position: 'absolute', left: 58, bottom: 36, width: 34, height: 8, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiMouthSmile 820ms ease-in-out infinite' }} />}
-      </span>
+      <LokiIdentity size={148} state={state} showText={false} style={{ placeItems: 'center' }} />
     </div>
   );
 }

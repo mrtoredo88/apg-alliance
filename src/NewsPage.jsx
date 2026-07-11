@@ -886,7 +886,7 @@ function NewsSkeleton() {
   );
 }
 
-function NewsCard({ item, index, onOpen, onShare, saved, later }) {
+export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {}, saved, later }) {
   const title = getNewsTitle(item);
   const text = getNewsText(item);
   const isLarge = index % 5 === 0;

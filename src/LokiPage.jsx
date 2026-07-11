@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel } from './components/Apg2ProfileGlass.jsx';
 import { useLoki } from './loki/LokiProvider.jsx';
+import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { isVK } from './vk.js';
 
 const QUICK_ACTIONS = [
@@ -112,7 +113,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       <GlassCard style={{ borderRadius: 38, padding: 18, marginBottom: 14, overflow: 'hidden', position: 'relative' }}>
         <span style={{ position: 'absolute', inset: -80, background: 'radial-gradient(circle at 12% 6%, rgba(215,184,106,0.28), transparent 34%), radial-gradient(circle at 92% 12%, rgba(255,255,255,0.12), transparent 30%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '82px 1fr', gap: 14, alignItems: 'center' }}>
-          <div style={{ width: 82, height: 82, borderRadius: 28, backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', border: '1px solid rgba(215,184,106,0.38)', boxShadow: '0 22px 58px rgba(0,0,0,0.30), 0 0 30px rgba(215,184,106,0.18)' }} />
+          <LokiIdentity size={78} state="recommending" showText={false} style={{ placeItems: 'center' }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 22, lineHeight: '27px', fontWeight: 940 }}>{dashboard.greeting || 'Добрый день'}{dashboard.userName ? `, ${dashboard.userName}` : ''}</div>
             <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '20px', marginTop: 7 }}>{dashboard.summary || 'Я собрал для тебя события, новости, задания и полезные действия внутри АПГ.'}</div>

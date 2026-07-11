@@ -13,6 +13,7 @@ import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
 import { buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
+import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import {
   EXPERT_CATEGORIES,
   EXPERT_SOCIAL_FIELDS,
@@ -481,7 +482,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
               <GlassCard style={{ borderRadius: 30, marginTop: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 14, background: APG2_PROFILE.goldSoft, border: '1px solid rgba(215,184,106,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🦊</div>
+                  <LokiIdentity size={34} state="recommending" showText={false} style={{ placeItems: 'center', flexShrink: 0 }} />
                   <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Локи · персональный менеджер</div>
                 </div>
                 <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '21px', fontWeight: 760 }}>{loki.msg}</div>
@@ -645,7 +646,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
               <GlassCard style={{ borderRadius: 24, marginTop: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 18 }}>🦊</span>
+                  <LokiIdentity size={26} state="ready" showText={false} style={{ placeItems: 'center', flexShrink: 0 }} />
                   <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Совет Локи</span>
                 </div>
                 <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px' }}>

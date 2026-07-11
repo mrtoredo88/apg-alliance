@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { APG2_PROFILE } from '../components/Apg2ProfileGlass.jsx';
 import { useLoki } from './LokiProvider.jsx';
 import { LokiExperience } from './LokiExperience.jsx';
+import { LokiIdentity } from './LokiIdentity.jsx';
 import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { getLokiPosition } from './lokiPosition.js';
 
@@ -25,6 +26,14 @@ function getActionName(action) {
   if (action === LOKI_ACTIONS.LOOK_AROUND) return 'lokiLookAround';
   if (action === LOKI_ACTIONS.PEEK) return 'lokiPeek';
   return 'none';
+}
+
+function getIdentityState(emotion, action) {
+  if (action === LOKI_ACTIONS.LISTEN) return 'listening';
+  if (emotion === 'thinking') return 'thinking';
+  if (emotion === 'excited' || emotion === 'happy') return 'recommending';
+  if (emotion === 'sleep') return 'waiting';
+  return 'ready';
 }
 
 export function LokiAssistant() {
@@ -82,21 +91,7 @@ export function LokiAssistant() {
     return () => clearTimeout(t);
   }, [loki.visible, rendered]);
 
-  const spriteStyle = useMemo(() => ({
-    width: 82,
-    height: 82,
-    borderRadius: 31,
-    backgroundImage: 'url(/loki.png)',
-    backgroundSize: '285%',
-    backgroundPosition: '50% 23%',
-    backgroundRepeat: 'no-repeat',
-    boxShadow: '0 22px 56px rgba(0,0,0,0.34), 0 0 34px rgba(215,184,106,0.26), inset 0 1px 0 rgba(255,255,255,0.18)',
-    border: '1px solid rgba(232,201,122,0.38)',
-    display: 'block',
-    position: 'relative',
-    overflow: 'hidden',
-    willChange: 'transform',
-  }), []);
+  const identityState = getIdentityState(loki.emotion, loki.action);
 
   if (loki.experienceOpen) {
     return createPortal(<LokiExperience loki={loki} />, document.body);
@@ -133,7 +128,7 @@ export function LokiAssistant() {
           animation: 'lokiAppear 620ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both, lokiBreath 5.8s ease-in-out 700ms infinite',
         }}
       >
-        <span style={{ display: 'block', width: '100%', height: '100%', backgroundImage: 'url(/loki.png)', backgroundSize: '330%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat' }} />
+        <LokiIdentity size={42} state="ready" showText={false} style={{ width: '100%', height: '100%', placeItems: 'center' }} />
       </button>
     );
   }
@@ -312,14 +307,10 @@ export function LokiAssistant() {
           <span style={{ position: 'absolute', inset: -8, borderRadius: 38, background: isThinking ? 'radial-gradient(circle, rgba(120,214,255,0.18), transparent 68%)' : 'radial-gradient(circle, rgba(232,201,122,0.22), transparent 70%)', filter: 'blur(7px)', opacity: 0.9, animation: 'lokiAmbientGlow 4.8s ease-in-out infinite', pointerEvents: 'none' }} />
           <span style={{ display: 'block', transformOrigin: '50% 80%', animation: `${motionName} ${loki.emotion === 'excited' ? '1180ms' : '6.2s'} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
             <span style={{ display: 'block', transform: `translate3d(${look.x}px, ${look.y}px, 0) rotate(${look.x * 0.55}deg)`, transition: 'transform 420ms cubic-bezier(0.16,1,0.3,1)', animation: actionName === 'none' ? 'none' : `${actionName} 1800ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both`, willChange: 'transform' }}>
-              <span style={spriteStyle}>
-                <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 30%, rgba(255,255,255,0.14), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.08))' }} />
-                <span style={{ position: 'absolute', left: 20 + look.x, top: 20 + look.y, width: 30, height: 10, borderRadius: 999, background: 'rgba(20,14,24,0.42)', opacity: loki.action === LOKI_ACTIONS.BLINK ? 1 : 0, transform: 'scaleY(0.35)', animation: loki.action === LOKI_ACTIONS.BLINK ? 'lokiBlink 900ms ease both' : 'none', pointerEvents: 'none' }} />
-                <span style={{ position: 'absolute', left: 24 + look.x * 0.35, top: 25 + look.y * 0.35, width: 20, height: 5, borderRadius: 999, background: isThinking ? 'rgba(120,214,255,0.18)' : 'rgba(255,240,184,0.16)', opacity: 0.75, animation: isCelebrating ? 'lokiMouthSmile 1.2s ease-in-out infinite' : 'lokiMouthSmile 5.5s ease-in-out infinite', pointerEvents: 'none' }} />
-                {(loki.action === LOKI_ACTIONS.POINT || loki.action === LOKI_ACTIONS.SPARK || loki.action === LOKI_ACTIONS.CATCH_KEY) && (
-                  <span style={{ position: 'absolute', right: -7, top: 16, width: 20, height: 20, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,240,184,0.95), rgba(215,184,106,0.58) 44%, transparent 70%)', boxShadow: '0 0 18px rgba(215,184,106,0.62)', animation: 'lokiSparkle 960ms ease-in-out infinite', pointerEvents: 'none' }} />
-                )}
-              </span>
+              <LokiIdentity size={82} state={identityState} showText={false} style={{ placeItems: 'center', willChange: 'transform' }} />
+              {(loki.action === LOKI_ACTIONS.POINT || loki.action === LOKI_ACTIONS.SPARK || loki.action === LOKI_ACTIONS.CATCH_KEY) && (
+                <span style={{ position: 'absolute', right: -7, top: 16, width: 20, height: 20, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,240,184,0.95), rgba(215,184,106,0.58) 44%, transparent 70%)', boxShadow: '0 0 18px rgba(215,184,106,0.62)', animation: 'lokiSparkle 960ms ease-in-out infinite', pointerEvents: 'none' }} />
+              )}
             </span>
           </span>
         </button>

@@ -19,7 +19,7 @@ for (const [width, height] of viewports) {
   assert.equal(plan.hasHorizontalOverflow, false, `${width}x${height}: layout must not overflow horizontally`);
   assert.ok(plan.workAreaHeight >= 520, `${width}x${height}: workspace work area is too short`);
   assert.ok(plan.sidebarWidth >= WORKSPACE_LAYOUT.collapsedSidebar, `${width}x${height}: sidebar width is invalid`);
-  assert.equal(WORKSPACE_LAYOUT.collapsedSidebar, 88, 'collapsed sidebar must keep polished icon rail width');
+  assert.equal(WORKSPACE_LAYOUT.collapsedSidebar, 76, 'collapsed sidebar must keep compact polished icon rail width');
 
   if (width < WORKSPACE_LAYOUT.drawerBelow) {
     assert.equal(plan.aiAsDrawer, true, `${width}x${height}: AI Workspace must become drawer`);
@@ -48,5 +48,23 @@ const lokiIdentitySource = readFileSync(resolve(process.cwd(), 'src/loki/LokiIde
 for (const state of ['thinking', 'answering', 'listening', 'waiting', 'recommending']) {
   assert.ok(lokiIdentitySource.includes(`${state}:`), `LokiIdentity must support ${state} state`);
 }
+const visualLokiFiles = [
+  'src/loki/LokiAssistant.jsx',
+  'src/loki/LokiExperience.jsx',
+  'src/LokiPage.jsx',
+  'src/assistant/AssistantMiniApp.jsx',
+  'src/cabinet/CabinetCorePage.jsx',
+  'src/PartnerCabinetPage.jsx',
+  'src/ExpertCabinetPage.jsx',
+  'src/workspace/DesktopWorkspace.jsx',
+  'src/businessHub/BusinessHub.jsx',
+];
+for (const file of visualLokiFiles) {
+  const source = readFileSync(resolve(process.cwd(), file), 'utf8');
+  assert.ok(!source.includes("url(/loki.png)") && !source.includes("'🦊'") && !source.includes('>🦊<'), `${file}: visual Loki must use LokiIdentity`);
+}
+const desktopWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/workspace/DesktopWorkspace.jsx'), 'utf8');
+assert.ok(desktopWorkspaceSource.includes('NewsCard'), 'Desktop Workspace must reuse NewsCard');
+assert.ok(desktopWorkspaceSource.includes('EventPosterCard'), 'Desktop Workspace must reuse EventPosterCard');
 
 console.log('Desktop Workspace layout regression smoke passed');

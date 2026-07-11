@@ -190,7 +190,9 @@ Header содержит:
 
 - hover-ready карточки и кнопки;
 - Sidebar как отдельная grid-колонка, а не overlay;
-- polished collapsed sidebar: 88px icon rail, круглые кнопки, активная подсветка, tooltip справа;
+- compact Sidebar: 232px в раскрытом виде и 76px polished icon rail в collapsed-режиме;
+- новости внутри Workspace используют общий `NewsCard` из `NewsPage`;
+- мероприятия внутри Workspace используют общий `EventPosterCard` из `EventsPage`;
 - wide cards;
 - рабочие списки;
 - split view `sidebar/content/context`;

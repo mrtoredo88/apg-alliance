@@ -8,6 +8,7 @@ import { askLokiCore } from '../loki/core/LokiCore.js';
 import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from '../loki/core/lokiUserMemory.js';
 import { APG_KNOWLEDGE_BASE, findKnowledgeItems, getLatestChronicles } from '../loki/knowledge/index.js';
 import { LOKI_APP_ACTIONS } from '../loki/lokiActionTypes.js';
+import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 
 const SECTIONS = [
   { id: 'loki', label: 'Локи', icon: '◌' },
@@ -128,16 +129,12 @@ function LokiHero({ state }) {
   const listening = state === 'listening';
   const thinking = state === 'thinking';
   const speaking = state === 'speaking';
-  const animation = speaking ? 'lokiWave 1.35s' : listening ? 'lokiListen 1.8s' : thinking ? 'lokiThinking 1.65s' : 'lokiIdle 6.2s';
+  const identityState = speaking ? 'speaking' : listening ? 'listening' : thinking ? 'thinking' : 'ready';
   return (
     <GlassCard style={{ borderRadius: 38, padding: 18, display: 'grid', gap: 13, justifyItems: 'center', overflow: 'hidden', position: 'relative' }}>
       <span style={{ position: 'absolute', inset: -80, background: 'radial-gradient(circle at 50% 18%, rgba(215,184,106,0.24), transparent 28%), radial-gradient(circle at 82% 8%, rgba(255,255,255,0.10), transparent 24%)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', width: 154, height: 154, display: 'grid', placeItems: 'center' }}>
-        <span style={{ position: 'absolute', inset: 8, borderRadius: 56, background: listening ? 'radial-gradient(circle, rgba(120,214,255,0.25), transparent 68%)' : 'radial-gradient(circle, rgba(215,184,106,0.28), transparent 68%)', filter: 'blur(10px)', opacity: listening || thinking || speaking ? 1 : 0.76, animation: thinking || speaking ? 'lokiAmbientGlow 2.8s ease-in-out infinite' : 'lokiAmbientGlow 5.2s ease-in-out infinite' }} />
-        <span style={{ width: 132, height: 132, borderRadius: 44, overflow: 'hidden', position: 'relative', border: '1px solid rgba(215,184,106,0.34)', backgroundImage: 'url(/loki.png)', backgroundSize: '285%', backgroundPosition: '50% 23%', backgroundRepeat: 'no-repeat', boxShadow: '0 28px 70px rgba(0,0,0,0.32), 0 0 38px rgba(215,184,106,0.22)', animation: `${animation} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
-          <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 52% 24%, rgba(255,255,255,0.16), transparent 34%), linear-gradient(180deg, transparent, rgba(0,0,0,0.10))' }} />
-          {speaking && <span style={{ position: 'absolute', left: 52, bottom: 32, width: 30, height: 7, borderRadius: 999, background: 'rgba(20,14,24,0.34)', animation: 'lokiMouthSmile 820ms ease-in-out infinite' }} />}
-        </span>
+        <LokiIdentity size={132} state={identityState} showText={false} style={{ placeItems: 'center' }} />
       </div>
       <div style={{ position: 'relative', textAlign: 'center', display: 'grid', gap: 5 }}>
         <GlassBadge tone="gold" style={{ justifySelf: 'center' }}>Локи в Telegram</GlassBadge>

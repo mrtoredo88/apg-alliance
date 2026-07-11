@@ -401,7 +401,7 @@ function FilterChip({ active, children, onClick }) {
   );
 }
 
-function EventPosterCard({ event, index, onClick, compact = false }) {
+export function EventPosterCard({ event, index = 0, onClick = () => {}, compact = false }) {
   const image = eventImageOf(event);
   const d = eventDate(event);
   const capacity = Number(event?.maxParticipants || 0);

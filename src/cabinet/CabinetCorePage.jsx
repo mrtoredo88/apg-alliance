@@ -10,6 +10,7 @@ import { userAction } from '../userApi.js';
 import { normalizeExternalUrl, validateExternalUrl } from '../utils/externalUrls.js';
 import { shareLink } from '../utils/shareLink.js';
 import { ContentGrid } from '../workspace/WorkspaceComponents.jsx';
+import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
 
@@ -133,7 +134,7 @@ function LokiCard({ snapshot, onOpenModule }) {
   return (
     <GlassCard style={{ borderRadius: 30, marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 14, background: APG2_PROFILE.goldSoft, border: '1px solid rgba(215,184,106,0.28)', display: 'grid', placeItems: 'center', fontSize: 20 }}>🦊</div>
+        <LokiIdentity size={34} state="recommending" showText={false} style={{ placeItems: 'center' }} />
         <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Локи · кабинет</div>
       </div>
       <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '21px', fontWeight: 760 }}>{message}</div>
