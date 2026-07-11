@@ -3,6 +3,8 @@ import { API_BASE_URL } from './constants.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl } from './utils/externalUrls.js';
 import { ExpertQuestionnaire } from './components/ExpertQuestionnaire.jsx';
+import { PartnerQuestionnaire } from './components/PartnerQuestionnaire.jsx';
+import { hasExpertAmbassadorAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
 
 const TYPES = {
   partner: { label: 'партнёра', title: 'Анкета партнёра', emoji: '🤝' },
@@ -208,7 +210,8 @@ export function PublicSubmitPage() {
   const selectedLegalType = legalType || (type === 'expert' ? 'individual' : 'company');
   const legalMeta = LEGAL_ENTITY_TYPES[selectedLegalType] || LEGAL_ENTITY_TYPES.company;
   const legalFormFields = LEGAL_FIELDS[selectedLegalType] || LEGAL_FIELDS.company;
-  const draftKey = route?.token ? `apg_expert_questionnaire_v2:${route.token}` : '';
+  const isTariffQuestionnaire = type === 'expert' || type === 'partner';
+  const draftKey = route?.token && isTariffQuestionnaire ? `apg_tariff_questionnaire_v1:${type}:${route.token}` : '';
 
   useEffect(() => {
     if (!route?.token) {
@@ -224,7 +227,7 @@ export function PublicSubmitPage() {
       .then(({ res, data }) => {
         if (!res.ok || data.ok === false) throw new Error(data.error || 'Форма недоступна.');
         setFormInfo(data);
-        if (data.type === 'expert' && draftKey) {
+        if (['expert', 'partner'].includes(data.type) && draftKey) {
           try {
             const saved = JSON.parse(localStorage.getItem(draftKey) || '{}');
             if (saved.fields && typeof saved.fields === 'object') setFields(saved.fields);
@@ -237,7 +240,7 @@ export function PublicSubmitPage() {
   }, [draftKey, route?.token]);
 
   useEffect(() => {
-    if (type !== 'expert' || !draftKey || !Object.keys(fields).length) return undefined;
+    if (!isTariffQuestionnaire || !draftKey || !Object.keys(fields).length) return undefined;
     const timer = setTimeout(() => {
       try { localStorage.setItem(draftKey, JSON.stringify({ version: 2, fields, files: files.filter(file => file.url).map(({ name, type: fileType, size, url, role }) => ({ name, type: fileType, size, url, role })), updatedAt: new Date().toISOString() })); } catch {}
     }, 450);
@@ -258,7 +261,7 @@ export function PublicSubmitPage() {
   };
 
   const handleFiles = async (list, role = '') => {
-    const replacingSingle = ['avatar', 'logo', 'cover'].includes(role);
+    const replacingSingle = ['avatar', 'logo', 'cover', 'main'].includes(role);
     const existing = replacingSingle ? files.filter(file => file.role !== role) : files;
     const incoming = Array.from(list || []).filter(file => /^image\//.test(file.type)).slice(0, replacingSingle ? 1 : Math.max(0, 12 - existing.length));
     if (!incoming.length) return;
@@ -321,7 +324,16 @@ export function PublicSubmitPage() {
       if (missing.length) { setError(`Заполните обязательные поля: ${missing.join(', ')}.`); return false; }
       if (!/^\+?[\d\s()-]{10,20}$/.test(String(fields.phone))) { setError('Проверьте номер телефона.'); return false; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(fields.email))) { setError('Проверьте email.'); return false; }
-      if (['premium', 'ambassador'].includes(fields.tariff) && fields.inn && !/^\d{10}$|^\d{12}$/.test(String(fields.inn).replace(/\D/g, ''))) { setError('ИНН должен содержать 10 или 12 цифр.'); return false; }
+      if (hasExpertAmbassadorAccess(fields.tariff) && fields.inn && !/^\d{10}$|^\d{12}$/.test(String(fields.inn).replace(/\D/g, ''))) { setError('ИНН должен содержать 10 или 12 цифр.'); return false; }
+      setError(''); return true;
+    }
+    if (type === 'partner') {
+      const required = [['title', 'название'], ['category', 'категорию'], ['shortDescription', 'короткое описание'], ['description', 'описание'], ['contactName', 'контактное лицо'], ['phone', 'телефон'], ['email', 'email']];
+      const missing = required.filter(([key]) => !String(fields[key] || '').trim()).map(([, label]) => label);
+      if (missing.length) { setError(`Заполните обязательные поля: ${missing.join(', ')}.`); return false; }
+      if (!/^\+?[\d\s()-]{10,20}$/.test(String(fields.phone))) { setError('Проверьте номер телефона.'); return false; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(fields.email))) { setError('Проверьте email.'); return false; }
+      if (hasPartnerPremiumAccess(fields.tariff) && fields.inn && !/^\d{10}$|^\d{12}$/.test(String(fields.inn).replace(/\D/g, ''))) { setError('ИНН должен содержать 10 или 12 цифр.'); return false; }
       setError(''); return true;
     }
     const title = String(fields.title || '').trim();
@@ -359,6 +371,7 @@ export function PublicSubmitPage() {
         title: type === 'expert' ? [fields.lastName, fields.firstName, fields.middleName].filter(Boolean).join(' ') : fields.title,
         category: type === 'expert' ? fields.categories?.[0] || '' : fields.category,
         secondaryCategories: type === 'expert' ? (fields.categories || []).slice(1) : fields.secondaryCategories,
+        tariff: type === 'expert' ? normalizeExpertTariff(fields.tariff) : type === 'partner' ? normalizePartnerTariff(fields.tariff) : fields.tariff,
         website: normalizeExternalUrl(fields.website),
         bookingUrl: normalizeExternalUrl(fields.bookingUrl),
         vk: normalizeExternalUrl(fields.vk, { platform: 'vk' }),
@@ -394,7 +407,7 @@ export function PublicSubmitPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || 'Не удалось отправить заявку.');
       setDone(data);
-      if (type === 'expert' && draftKey) { try { localStorage.removeItem(draftKey); } catch {} }
+      if (isTariffQuestionnaire && draftKey) { try { localStorage.removeItem(draftKey); } catch {} }
     } catch (e) {
       setError(e.message || 'Не удалось отправить заявку.');
     } finally {
@@ -469,11 +482,11 @@ export function PublicSubmitPage() {
             <>
               <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Публичная карточка</h2>
               <div style={{ color: 'rgba(25,23,19,0.58)', fontSize: 13, lineHeight: '20px', marginBottom: 8 }}>Эти сведения редактор использует для карточки в приложении АПГ.</div>
-              {type === 'expert' ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} /> : formFields.map(field => (
+              {type === 'expert' ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} /> : type === 'partner' ? <PartnerQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} /> : formFields.map(field => (
                 <PublicField key={field[0]} field={field} value={fields[field[0]]} onChange={setField} />
               ))}
 
-              {type !== 'expert' && <><span style={S.label}>Фотографии и логотип</span>
+              {type !== 'expert' && type !== 'partner' && <><span style={S.label}>Фотографии и логотип</span>
               <div
                 onDragEnter={e => { e.preventDefault(); setDragActive(true); }}
                 onDragOver={e => { e.preventDefault(); setDragActive(true); }}
@@ -498,7 +511,7 @@ export function PublicSubmitPage() {
                 </div>
               )}</>}
 
-              {type !== 'expert' && <div style={{ marginTop: 18, padding: 14, borderRadius: 20, background: 'rgba(25,23,19,0.04)', border: '1px solid rgba(25,23,19,0.08)' }}>
+              {type !== 'expert' && type !== 'partner' && <div style={{ marginTop: 18, padding: 14, borderRadius: 20, background: 'rgba(25,23,19,0.04)', border: '1px solid rgba(25,23,19,0.08)' }}>
                 <div style={{ fontSize: 15, fontWeight: 920, color: '#191713' }}>Планируете платное сотрудничество с АПГ?</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                   {[
@@ -515,7 +528,7 @@ export function PublicSubmitPage() {
                 </div>
               </div>}
 
-              {type !== 'expert' && <div style={{ marginTop: 14, borderRadius: 20, border: '1px solid rgba(25,23,19,0.10)', background: 'rgba(255,255,255,0.42)', overflow: 'hidden' }}>
+              {type !== 'expert' && type !== 'partner' && <div style={{ marginTop: 14, borderRadius: 20, border: '1px solid rgba(25,23,19,0.10)', background: 'rgba(255,255,255,0.42)', overflow: 'hidden' }}>
                 <button type="button" onClick={() => setLegalExpanded(prev => !prev)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', padding: 15, cursor: 'pointer', textAlign: 'left' }}>
                   <span>
                     <span style={{ display: 'block', color: '#191713', fontSize: 15, fontWeight: 920 }}>Юридические данные (необязательно)</span>

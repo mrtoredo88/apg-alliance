@@ -1,8 +1,5 @@
-export const EXPERT_TARIFFS = [
-  { id: 'basic', label: 'Базовый' },
-  { id: 'premium', label: 'Премиум' },
-  { id: 'ambassador', label: 'Амбассадор' },
-];
+export { EXPERT_TARIFFS, EXPERT_AUDIENCE_TAGS, hasExpertAmbassadorAccess, normalizeExpertTariff } from './tariffConfig.js';
+import { hasExpertAmbassadorAccess } from './tariffConfig.js';
 
 export const EXPERT_CATEGORIES = [
   { id: 'law', label: 'Юриспруденция' },
@@ -27,8 +24,8 @@ export const EXPERT_WORK_FORMATS = [
   { id: 'offline', label: 'Офлайн' },
   { id: 'individual', label: 'Индивидуально' },
   { id: 'groups', label: 'Группы' },
-  { id: 'onsite', label: 'Выезд' },
   { id: 'consultations', label: 'Консультации' },
+  { id: 'onsite', label: 'Выезд' },
 ];
 
 export const EXPERT_SOCIAL_FIELDS = [
@@ -48,7 +45,7 @@ export const VIDEO_PLATFORMS = [
 ];
 
 export function hasPremiumExpertAccess(tariff) {
-  return ['premium', 'ambassador'].includes(String(tariff || '').trim());
+  return hasExpertAmbassadorAccess(tariff);
 }
 
 export function normalizeExpertVideo(url, title = '') {
@@ -70,6 +67,7 @@ export function calculateExpertProfileCompletion(form = {}) {
     Boolean(form.primaryCategory),
     Boolean(form.shortDescription?.trim()),
     Boolean(form.description?.trim()),
+    Array.isArray(form.audienceTags) && form.audienceTags.length > 0,
     Array.isArray(form.workFormats) && form.workFormats.length > 0,
     Boolean(form.offer?.trim()),
     Boolean(form.contactName?.trim()),

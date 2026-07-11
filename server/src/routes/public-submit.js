@@ -9,6 +9,26 @@ const TYPES = {
   prize: { label: 'Приз', emoji: '🎁' },
 };
 
+const PARTNER_TARIFFS = ['start', 'alliance', 'premium'];
+const EXPERT_TARIFFS = ['practice', 'ambassador'];
+
+function normalizePartnerTariff(value) {
+  const id = cleanText(value, 30).toLowerCase();
+  if (id === 'старт') return 'start';
+  if (id === 'альянс') return 'alliance';
+  if (id === 'премиум') return 'premium';
+  return PARTNER_TARIFFS.includes(id) ? id : 'start';
+}
+
+function normalizeExpertTariff(value) {
+  const id = cleanText(value, 30).toLowerCase();
+  if (id === 'практика') return 'practice';
+  if (id === 'амбассадор') return 'ambassador';
+  if (id === 'premium') return 'ambassador';
+  if (id === 'standard' || id === 'basic' || id === 'start') return 'practice';
+  return EXPERT_TARIFFS.includes(id) ? id : 'practice';
+}
+
 function cleanText(value, max = 12000) {
   return String(value || '').replace(/\r/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().slice(0, max);
 }
@@ -219,6 +239,11 @@ function analyze(type, fields, files) {
     .join('\n');
   const title = cleanText(fields.title || fields.name || lineValue(sourceText, ['Название', 'Заголовок', 'Имя']));
   const description = cleanText(fields.description || fields.fullDescription || fields.shortDescription || lineValue(sourceText, ['Описание', 'Подробное описание']));
+  const partnerTariff = normalizePartnerTariff(fields.tariff);
+  const expertTariff = normalizeExpertTariff(fields.tariff);
+  const isPartnerPremium = type === 'partner' && partnerTariff === 'premium';
+  const isPartnerAlliance = type === 'partner' && ['alliance', 'premium'].includes(partnerTariff);
+  const isExpertAmbassador = type === 'expert' && expertTariff === 'ambassador';
   const draftFields = {
     title,
     category: cleanText(fields.category) || detectCategory(sourceText, type),
@@ -230,11 +255,11 @@ function analyze(type, fields, files) {
     website: normalizeUrl(fields.website || fields.bookingUrl),
     telegram: normalizeUrl(fields.telegram, 'telegram'),
     vk: normalizeUrl(fields.vk, 'vk'),
-    inn: digits(fields.inn),
+    inn: (isPartnerPremium || isExpertAmbassador || !['partner', 'expert'].includes(type)) ? digits(fields.inn) : '',
     city: cleanText(fields.city),
-    video: normalizeUrl(fields.video),
-    newsInfo: cleanText(fields.newsInfo, 3000),
-    activities: cleanText(fields.activities, 3000),
+    video: isPartnerAlliance || !['partner', 'expert'].includes(type) ? normalizeUrl(fields.video) : '',
+    newsInfo: (isPartnerPremium || isExpertAmbassador || !['partner', 'expert'].includes(type)) ? cleanText(fields.newsInfo, 3000) : '',
+    activities: (isPartnerPremium || isExpertAmbassador || !['partner', 'expert'].includes(type)) ? cleanText(fields.activities, 3000) : '',
     instagram: normalizeUrl(fields.instagram),
     hours: cleanText(fields.hours),
     services: cleanText(fields.services || fields.program),
@@ -249,16 +274,19 @@ function analyze(type, fields, files) {
     categories: cleanList(fields.categories, 6, 80),
     secondaryCategories: cleanList(fields.secondaryCategories, 5, 80),
     workFormats: cleanList(fields.workFormats, 12, 80),
-    videos: cleanList(fields.videos, 6),
-    bookingUrl: normalizeUrl(fields.bookingUrl),
+    audienceTags: cleanList(fields.audienceTags, 12, 80),
+    videos: (isPartnerAlliance || type === 'expert') ? cleanList(fields.videos, 6) : [],
+    bookingUrl: (isPartnerAlliance || type === 'expert') ? normalizeUrl(fields.bookingUrl) : '',
     max: normalizeUrl(fields.max, 'max'),
     otherSocials: cleanList(fields.otherSocials, 10).map(value => normalizeUrl(value)).filter(Boolean),
-    tariff: ['start', 'standard', 'premium', 'ambassador'].includes(cleanText(fields.tariff, 30)) ? cleanText(fields.tariff, 30) : 'start',
+    tariff: type === 'expert' ? expertTariff : type === 'partner' ? partnerTariff : cleanText(fields.tariff, 30),
     serviceCatalog: [],
+    futureServiceCatalog: { enabled: false, items: [], bookingEnabled: false, paymentEnabled: false, packagesEnabled: false },
+    futureScheduleProfile: { calendarEnabled: false, timetableEnabled: false },
     futureLegalProfile: { legalType: '', ogrn: '', bik: '', checkingAccount: '' },
     futureCityProfile: { cityId: '', cityName: '' },
   };
-  const required = type === 'expert' ? ['title', 'shortDescription', 'phone', 'email'] : type === 'news' ? ['title', 'description', 'inn', 'city'] : type === 'event' ? ['title', 'date', 'description', 'inn', 'city'] : ['title', 'description', 'inn', 'city'];
+  const required = type === 'expert' ? ['title', 'shortDescription', 'phone', 'email'] : type === 'partner' ? ['title', 'category', 'shortDescription', 'description', 'phone', 'email'] : type === 'news' ? ['title', 'description', 'inn', 'city'] : type === 'event' ? ['title', 'date', 'description', 'inn', 'city'] : ['title', 'description', 'inn', 'city'];
   if (type === 'expert' && !draftFields.categories.length) required.push('categories');
   const missingFields = required.filter(key => !draftFields[key]);
   if ((type === 'partner' || type === 'expert') && !draftFields.phone && !draftFields.website && !draftFields.telegram && !draftFields.vk) missingFields.push('contact');

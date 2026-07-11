@@ -19,6 +19,7 @@ import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.
 import { shareLink } from './utils/shareLink.js';
 import { AdminAssistantPanel } from './adminAssistant/AdminAssistantPanel.jsx';
 import { buildAdminContext } from './adminAssistant/AdminContextEngine.js';
+import { hasExpertAmbassadorAccess, hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from './tariffConfig.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -149,6 +150,7 @@ const AI_IMPORT_LABELS = {
   lastName: ['Фамилия'], firstName: ['Имя'], middleName: ['Отчество'],
   workFormats: ['Форматы работы', 'Формат работы'], tariff: ['Тариф'], bookingUrl: ['Запись', 'Ссылка для записи'],
   max: ['MAX'], otherSocials: ['Другие социальные сети'], newsInfo: ['Новости'], activities: ['Мероприятия'], inn: ['ИНН'],
+  audienceTags: ['Кому могу помочь', 'Аудитория', 'Для кого'],
 };
 
 const ADMIN_LOAD_TIMEOUT_MS = 12000;
@@ -558,11 +560,11 @@ function detectAiImportCategory(text, type) {
 }
 
 function buildAiImportTemplate(type) {
-  if (type === 'expert') return ['Фамилия:', 'Имя:', 'Отчество:', 'Направление:', 'Коротко о себе:', 'Подробно о себе:', 'Услуги:', 'Форматы работы:', 'Акция для пользователей АПГ:', 'Тариф:', 'Новости:', 'Мероприятия:', 'Контактное лицо:', 'Телефон:', 'Email:', 'Сайт:', 'Запись:', 'VK:', 'Telegram:', 'MAX:', 'Другие социальные сети:', 'ИНН:', 'Видео:', 'Комментарий для администрации:'].join('\n');
+  if (type === 'expert') return ['Тип: Эксперт', 'Тариф: Практика или Амбассадор', 'Фамилия:', 'Имя:', 'Отчество:', 'Направление:', 'Коротко о себе:', 'Подробно о себе:', 'Кому могу помочь:', 'Услуги:', 'Форматы работы:', 'Акция для пользователей АПГ:', 'Новости (только Амбассадор):', 'Мероприятия (только Амбассадор):', 'Контактное лицо:', 'Телефон:', 'Email:', 'Сайт:', 'Запись:', 'VK:', 'Telegram:', 'MAX:', 'Другие социальные сети:', 'ИНН (только Амбассадор):', 'Видео:', 'Комментарий для администрации:'].join('\n');
   if (type === 'event') return ['Название:', 'Дата:', 'Время:', 'Место:', 'Для кого:', 'Описание:', 'Программа:', 'Стоимость:', 'Как записаться:', 'Организатор:', 'Контакты:', 'Фото:'].join('\n');
   if (type === 'news') return ['Заголовок:', 'Короткий анонс:', 'Основной текст:', 'Категория:', 'Источник:', 'Фото:', 'Ссылка:', 'Публиковать сразу или в черновик: черновик'].join('\n');
   if (type === 'prize') return ['Название приза:', 'Кто предоставляет:', 'Описание:', 'Условия участия:', 'Количество победителей:', 'Дата розыгрыша:', 'Фото:', 'Связанный партнёр или эксперт:'].join('\n');
-  return ['Название:', 'Категория:', 'Короткое описание:', 'Подробное описание:', 'Адрес:', 'Телефон:', 'Сайт:', 'Telegram:', 'VK:', 'Instagram:', 'График работы:', 'Что предлагаете:', 'Акция для пользователей АПГ:', 'Что можно получить за ключи:', 'Фото/логотип:', 'Видео:'].join('\n');
+  return ['Тип: Бизнес-партнёр', 'Тариф: Старт, Альянс или Премиум', 'Название:', 'Категория:', 'Короткое описание:', 'Подробное описание:', 'Адрес:', 'Телефон:', 'Email:', 'Сайт:', 'Запись (Альянс/Премиум):', 'Telegram:', 'VK:', 'MAX:', 'График работы:', 'Что предлагаете:', 'Акция для пользователей АПГ:', 'Что можно получить за ключи:', 'Новости (только Премиум):', 'Мероприятия (только Премиум):', 'ИНН (только Премиум):', 'Фото/логотип:', 'Видео (Альянс/Премиум):'].join('\n');
 }
 
 function analyzeAiImportText(type, rawText, files = []) {
@@ -600,15 +602,25 @@ function analyzeAiImportText(type, rawText, files = []) {
     fields.middleName = pickAiImportValue(text, 'middleName') || nameParts.slice(2).join(' ');
     fields.categories = [fields.category].filter(Boolean);
     fields.workFormats = pickAiImportValue(text, 'workFormats').split(/[,;/]/).map(value => value.trim()).filter(Boolean);
-    fields.tariff = pickAiImportValue(text, 'tariff').toLowerCase() || 'start';
+    fields.audienceTags = pickAiImportValue(text, 'audienceTags').split(/[,;/]/).map(value => value.trim()).filter(Boolean);
+    fields.tariff = normalizeExpertTariff(pickAiImportValue(text, 'tariff'));
     fields.bookingUrl = pickAiImportValue(text, 'bookingUrl');
     fields.max = pickAiImportValue(text, 'max');
     fields.otherSocials = pickAiImportValue(text, 'otherSocials').split(/[,;\s]+/).filter(value => /^https?:\/\//i.test(value));
-    fields.newsInfo = pickAiImportValue(text, 'newsInfo');
-    fields.activities = pickAiImportValue(text, 'activities');
-    fields.inn = pickAiImportValue(text, 'inn').replace(/\D/g, '');
+    fields.newsInfo = hasExpertAmbassadorAccess(fields.tariff) ? pickAiImportValue(text, 'newsInfo') : '';
+    fields.activities = hasExpertAmbassadorAccess(fields.tariff) ? pickAiImportValue(text, 'activities') : '';
+    fields.inn = hasExpertAmbassadorAccess(fields.tariff) ? pickAiImportValue(text, 'inn').replace(/\D/g, '') : '';
     fields.videos = [...text.matchAll(/https?:\/\/[^\s]+(?:youtube|youtu\.be|vk\.com\/video|vkvideo|rutube|max\.ru)[^\s]*/gi)].map(match => ({ url: match[0], title: '', platform: 'other', platformLabel: 'Видео' }));
     delete fields.cost;
+  }
+  if (type === 'partner') {
+    fields.tariff = normalizePartnerTariff(pickAiImportValue(text, 'tariff'));
+    fields.bookingUrl = hasPartnerAllianceAccess(fields.tariff) ? pickAiImportValue(text, 'bookingUrl') : '';
+    fields.max = pickAiImportValue(text, 'max');
+    fields.newsInfo = hasPartnerPremiumAccess(fields.tariff) ? pickAiImportValue(text, 'newsInfo') : '';
+    fields.activities = hasPartnerPremiumAccess(fields.tariff) ? pickAiImportValue(text, 'activities') : '';
+    fields.inn = hasPartnerPremiumAccess(fields.tariff) ? pickAiImportValue(text, 'inn').replace(/\D/g, '') : '';
+    fields.videos = hasPartnerAllianceAccess(fields.tariff) ? [...text.matchAll(/https?:\/\/[^\s]+(?:youtube|youtu\.be|vk\.com\/video|vkvideo|rutube|max\.ru)[^\s]*/gi)].map(match => ({ url: match[0], title: '', platform: 'other', platformLabel: 'Видео' })) : [];
   }
   const required = type === 'news' ? ['title', 'description'] : type === 'event' ? ['title', 'date', 'description'] : ['title', 'description'];
   const missingFields = required.filter(key => !fields[key]);
@@ -643,7 +655,8 @@ function aiImportDraftPatch(type, draft, sourceFiles = []) {
     const logoUrl = sourceFiles.find(file => file.role === 'logo')?.url || '';
     const gallery = sourceFiles.filter(file => ['gallery', 'photo'].includes(file.role)).map(file => file.url).filter(Boolean);
     const categories = Array.isArray(f.categories) && f.categories.length ? f.categories : [f.category].filter(Boolean);
-    return { name: f.title || [f.lastName, f.firstName, f.middleName].filter(Boolean).join(' ') || 'Новый эксперт', firstName: f.firstName || '', lastName: f.lastName || '', middleName: f.middleName || '', specialization: f.shortDescription || f.services || 'Уточнить направление', category: categories[0] || detectAiImportCategory([f.category, f.description].join(' '), 'expert'), secondaryCategories: categories.slice(1), description: f.description || f.shortDescription || '', services: f.services || '', workFormats: Array.isArray(f.workFormats) ? f.workFormats : [], phone: f.phone || '', email: f.email || '', websiteUrl: f.website || '', bookingUrl: f.bookingUrl || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', maxUrl: f.max || '', otherSocials: Array.isArray(f.otherSocials) ? f.otherSocials : [], offer: f.offer || '', videos: Array.isArray(f.videos) ? f.videos : [], tier: f.tariff || 'start', inn: ['premium', 'ambassador'].includes(f.tariff) ? f.inn || '' : '', newsInfo: ['premium', 'ambassador'].includes(f.tariff) ? f.newsInfo || '' : '', activities: ['premium', 'ambassador'].includes(f.tariff) ? f.activities || '' : '', photo: avatar, logoUrl, coverPhoto, gallery, adminComment: f.comment || '', serviceCatalog: [], futureLegalProfile: f.futureLegalProfile || {}, futureCityProfile: f.futureCityProfile || {}, active: false, status: 'draft', verified: false, keys: 1 };
+    const tariff = normalizeExpertTariff(f.tariff);
+    return { name: f.title || [f.lastName, f.firstName, f.middleName].filter(Boolean).join(' ') || 'Новый эксперт', firstName: f.firstName || '', lastName: f.lastName || '', middleName: f.middleName || '', specialization: f.shortDescription || f.services || 'Уточнить направление', category: categories[0] || detectAiImportCategory([f.category, f.description].join(' '), 'expert'), secondaryCategories: categories.slice(1), description: f.description || f.shortDescription || '', services: f.services || '', workFormats: Array.isArray(f.workFormats) ? f.workFormats : [], audienceTags: Array.isArray(f.audienceTags) ? f.audienceTags : [], phone: f.phone || '', email: f.email || '', websiteUrl: f.website || '', bookingUrl: f.bookingUrl || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', maxUrl: f.max || '', otherSocials: Array.isArray(f.otherSocials) ? f.otherSocials : [], offer: f.offer || '', videos: Array.isArray(f.videos) ? f.videos : [], tier: tariff, tariff, inn: hasExpertAmbassadorAccess(tariff) ? f.inn || '' : '', newsInfo: hasExpertAmbassadorAccess(tariff) ? f.newsInfo || '' : '', activities: hasExpertAmbassadorAccess(tariff) ? f.activities || '' : '', photo: avatar, logoUrl, coverPhoto, gallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, futureCityProfile: f.futureCityProfile || {}, active: false, status: 'draft', verified: false, keys: 1 };
   }
   if (type === 'event') {
     return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, category: f.category || 'society', active: false, status: 'draft', priority: 0 };
@@ -651,7 +664,8 @@ function aiImportDraftPatch(type, draft, sourceFiles = []) {
   if (type === 'prize') {
     return { name: f.title || 'Новый приз', title: f.title || 'Новый приз', description: f.description || f.shortDescription || '', donorName: f.source || '', raffleDate: f.date || '', imageUrl: mainImage, photo: mainImage, type: 'raffle', active: false, status: 'draft', cost: 0, stock: 1, emoji: '🎁' };
   }
-  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', phone: f.phone || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', socialUrl: f.instagram || '', offer: f.offer || '', logoUrl: mainImage, coverPhoto: mainImage, gallery: images, active: false, status: 'draft', emoji: '🏪' };
+  const tariff = normalizePartnerTariff(f.tariff);
+  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', shortDescription: f.shortDescription || '', services: f.services || '', phone: f.phone || '', email: f.email || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', bookingUrl: hasPartnerAllianceAccess(tariff) ? f.bookingUrl || '' : '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', maxCommunityUrl: f.max || '', socialUrl: f.instagram || '', offer: f.offer || '', gift: f.gift || '', videos: hasPartnerAllianceAccess(tariff) && Array.isArray(f.videos) ? f.videos : [], newsInfo: hasPartnerPremiumAccess(tariff) ? f.newsInfo || '' : '', activities: hasPartnerPremiumAccess(tariff) ? f.activities || '' : '', inn: hasPartnerPremiumAccess(tariff) ? f.inn || '' : '', tier: tariff, tariff, logoUrl: sourceFiles.find(file => file.role === 'logo')?.url || mainImage, coverPhoto: sourceFiles.find(file => file.role === 'cover')?.url || mainImage, gallery: sourceFiles.filter(file => ['gallery', 'photo'].includes(file.role)).map(file => file.url).filter(Boolean).concat(images.slice(1)), serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, active: false, status: 'draft', emoji: '🏪' };
 }
 
 function StatTile({ label, value, icon, color = A.gold, sub }) {

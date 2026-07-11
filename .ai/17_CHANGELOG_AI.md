@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] feat: тарифные анкеты ИИ-импорта
+**Коммит:** `pending`
+**Файлы:** `src/tariffConfig.js`, `src/components/ExpertQuestionnaire.jsx`, `src/components/PartnerQuestionnaire.jsx`, `src/PublicSubmitPage.jsx`, `src/AdminPanel.jsx`, `src/expertProfileForm.js`, `api/public-submit.js`, `server/src/routes/public-submit.js`, `scripts/expert-questionnaire-v2-test.mjs`, `.ai/04_API.md`, `.ai/24_EXPERT_QUESTIONNAIRE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Публичные анкеты партнёра и эксперта перестроены вокруг тарифов: бизнес `Старт/Альянс/Премиум`, эксперты `Практика/Амбассадор`.
+- Добавлена отдельная анкета партнёра, обновлена анкета эксперта с тегами аудитории, автосохранением, индикатором заполненности и скрытием недоступных полей.
+- Backend analyzer, AI-import template и draft-публикация синхронно нормализуют тарифы, не выдумывают данные и отбрасывают поля, недоступные выбранному тарифу.
+**Почему:** Анкеты ИИ-импорта должны объяснять возможности тарифа и не показывать поля, которыми участник не сможет воспользоваться.
+
+---
+
 ## [2026-07-10] refactor: единый renderer карточек для AI Editor
 **Коммит:** `pending`
 **Файлы:** `src/components/EntityPreviewCard.jsx`, `src/AdminPanel.jsx`, `.ai/17_CHANGELOG_AI.md`
