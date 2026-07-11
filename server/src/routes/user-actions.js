@@ -1051,8 +1051,8 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   const data = snap.data() || {};
   if (!actorOwnsProfile(data, actor)) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
   const allowedFields = type === 'expert'
-    ? new Set(['name', 'lastName', 'firstName', 'middleName', 'category', 'categoryLabel', 'primaryCategory', 'secondaryCategories', 'specialization', 'shortDescription', 'description', 'workFormats', 'formats', 'offer', 'tariff', 'contactName', 'phone', 'email', 'inn', 'city', 'websiteUrl', 'bookingUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'comment', 'photo', 'logoUrl', 'coverPhoto', 'gallery', 'videos', 'servicesDraftReady', 'aiProfile'])
-    : new Set(['description', 'offer', 'phone', 'hours', 'socialUrl', 'logoUrl', 'aiProfile']);
+    ? new Set(['name', 'lastName', 'firstName', 'middleName', 'category', 'categoryLabel', 'primaryCategory', 'secondaryCategories', 'specialization', 'shortDescription', 'description', 'workFormats', 'formats', 'offer', 'tariff', 'contactName', 'phone', 'whatsappUrl', 'email', 'inn', 'city', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'comment', 'photo', 'logoUrl', 'coverPhoto', 'gallery', 'videos', 'services', 'serviceDescription', 'serviceCost', 'experience', 'servicesDraftReady', 'aiProfile'])
+    : new Set(['description', 'offer', 'phone', 'whatsappUrl', 'email', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'socialUrl', 'logoUrl', 'coverPhoto', 'gallery', 'photos', 'aiProfile']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (!allowedFields.has(key)) return;

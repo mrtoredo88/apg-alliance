@@ -160,6 +160,13 @@
 
 **Запуск партнёра:** actions `partner:onboarding-check`, `partner:bind-owner`, `partner:send-invite`, `partner:publish-catalog`, `partner:mark-verified`, `partner:remind-later` ведут партнёра от черновика до статуса “Проверенный партнёр АПГ”. Backend возвращает `readiness.checks`, `wizard` с шагами мастера публикации, `launchActions` и пишет `partnerConnectionEvents`. `partner:publish-catalog` публикует карточку в каталог, поиск, карту, рекомендации Локи и блок “Новые партнёры” на 14 дней; при первой публикации backend идемпотентно создаёт черновик приветственной новости, но push-рассылка остаётся только предложением для администратора. `partner:mark-verified` разрешён только после публикации и проверки владельца, контактов и согласия на публикацию.
 
+**Cabinet Core 2.0:** actions `partner:profileUpdate` и `expert:profileUpdate` используются единым личным кабинетом. Они принимают только whitelisted поля, проверяют владельца профиля через `ownerId`/привязку пользователя и пишут `profileUpdatedAt`. Для общего модуля контактов whitelist расширен:
+
+- партнёр: `phone`, `whatsappUrl`, `email`, `address`, `hours`, `workingHours`, `websiteUrl`, `bookingUrl`, `vkUrl`, `telegramUrl`, `maxUrl`, `socialUrl`, медиа и `aiProfile`;
+- эксперт: все поля анкеты эксперта плюс `whatsappUrl`, `address`, `hours`, `workingHours`, `services`, `serviceDescription`, `serviceCost`, `experience`, медиа и `aiProfile`.
+
+Новых endpoint для кабинетов 2.0 не добавлено: общий frontend-слой использует существующий `/api/user-actions`, чтобы не раздваивать права и аудит.
+
 ---
 
 ## GET/POST /api/public-submit

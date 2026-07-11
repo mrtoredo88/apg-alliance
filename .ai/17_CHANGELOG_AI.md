@@ -1811,6 +1811,22 @@
 
 **Проверка:** тест backend parity и тарифной схемы, lint изменённых файлов и production build проходят.
 
+## 2026-07-11 — Cabinet Core / Личные кабинеты 2.0
+
+**Задача:** создать фундамент личных кабинетов 2.0 без отдельной реализации кабинета партнёра и кабинета эксперта.
+
+**Что изменено:** добавлен `src/cabinet/CabinetCorePage.jsx` — единый lazy-loaded экран кабинета. Существующие nav entrypoints `partner-cabinet` и `expert-cabinet` сохранены, но оба рендерят Cabinet Core с разным `preferredRole`. Если пользователь одновременно партнёр и эксперт, ядро показывает переключатель ролей.
+
+**Role Engine:** добавлен `src/cabinet/CabinetRoleEngine.js`. Сейчас он определяет роли `partner`, `expert`, `owner`, `admin`, `moderator`, `editor`, поддерживает multi-role и возвращает список модулей. Новую роль можно добавить role definition-ом и role-specific modules без копирования кабинета.
+
+**Модули:** добавлен `src/cabinet/CabinetModules.js`. Общий snapshot строит Dashboard, метрики, заполненность профиля, центр задач, аналитику, медиа, контакты, контент, отзывы, уведомления, Локи, подписку, настройки и историю. Ролевые модули: для партнёра — акции, мероприятия, будущий каталог товаров; для эксперта — услуги, опыт, запись.
+
+**Backend contract:** `partner:profileUpdate` и `expert:profileUpdate` в Vercel/Fastify расширены под общий модуль контактов и будущие role modules: `whatsappUrl`, `email`, `address`, `hours/workingHours`, `websiteUrl`, `bookingUrl`, соцсети, медиа, услуги/опыт для эксперта. Новых endpoint не добавлено.
+
+**Файлы:** `src/cabinet/CabinetCorePage.jsx`, `src/cabinet/CabinetRoleEngine.js`, `src/cabinet/CabinetModules.js`, `src/UserApp.jsx`, `api/user-actions.js`, `server/src/routes/user-actions.js`, `.ai/04_API.md`, `.ai/05_FRONTEND.md`, `.ai/06_BACKEND.md`, `.ai/09_BUSINESS_LOGIC.md`, `.ai/14_ROADMAP.md`, `.ai/16_DECISIONS.md`, `.ai/17_CHANGELOG_AI.md`.
+
+**Проверка:** scoped eslint по frontend/Vercel-файлам, node smoke Role Engine + Cabinet Modules, production build. Линтер Fastify-файла отдельно всё ещё видит существующие вне текущей правки `no-undef` (`assertOwnedProfile`, `actionEventPropose`), это не связано с whitelist Cabinet Core.
+
 ## 2026-07-11 — Partnership onboarding card V2
 
 **Задача:** Заменить невидимую/слишком низкую кнопку «Стать партнёром АПГ» полноценной карточкой вступления для партнёров и экспертов в профиле обычного пользователя.

@@ -47,8 +47,7 @@ const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ def
 const RewardsPage     = lazy(() => import('./RewardsPage.jsx').then(m => ({ default: m.RewardsPage })));
 const MapPage              = lazy(() => import('./MapPage.jsx').then(m => ({ default: m.MapPage })));
 const NearbyPage           = lazy(() => import('./NearbyPage.jsx').then(m => ({ default: m.NearbyPage })));
-const PartnerCabinetPage   = lazy(() => import('./PartnerCabinetPage.jsx').then(m => ({ default: m.PartnerCabinetPage })));
-const ExpertCabinetPage    = lazy(() => import('./ExpertCabinetPage.jsx').then(m => ({ default: m.ExpertCabinetPage })));
+const CabinetCorePage      = lazy(() => import('./cabinet/CabinetCorePage.jsx').then(m => ({ default: m.CabinetCorePage })));
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
 const PartnershipPage      = lazy(() => import('./PartnershipPage.jsx').then(m => ({ default: m.PartnershipPage })));
@@ -3048,17 +3047,25 @@ export function UserApp() {
 
               <Panel id="partner-cabinet">
                 <Suspense fallback={<LazyFallback />}>
-                  <PartnerCabinetPage
-                    variant="v2"
+                  <CabinetCorePage
+                    nav="partner-cabinet"
+                    user={user}
+                    preferredRole="partner"
                     partner={ownedPartner}
                     expert={ownedExpert}
                     events={events}
                     onBack={goBackPanel}
                     onToast={showToast}
                     onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
-                    onPartnerUpdate={(updated) => {
-                      setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
-                      setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                    onProfileUpdate={(role, updated) => {
+                      if (role === 'partner') {
+                        setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
+                        setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                      }
+                      if (role === 'expert') {
+                        setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
+                        setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                      }
                     }}
                   />
                 </Suspense>
@@ -3066,16 +3073,25 @@ export function UserApp() {
 
               <Panel id="expert-cabinet">
                 <Suspense fallback={<LazyFallback />}>
-                  <ExpertCabinetPage
-                    variant="v2"
+                  <CabinetCorePage
+                    nav="expert-cabinet"
+                    user={user}
+                    preferredRole="expert"
+                    partner={ownedPartner}
                     expert={ownedExpert}
                     events={events}
                     onBack={goBackPanel}
                     onToast={showToast}
                     onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
-                    onExpertUpdate={(updated) => {
-                      setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
-                      setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                    onProfileUpdate={(role, updated) => {
+                      if (role === 'partner') {
+                        setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
+                        setOwnedPartner(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                      }
+                      if (role === 'expert') {
+                        setExperts(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
+                        setOwnedExpert(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+                      }
                     }}
                   />
                 </Suspense>
