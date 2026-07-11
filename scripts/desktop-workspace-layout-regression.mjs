@@ -45,6 +45,10 @@ const lokiAsset = resolve(process.cwd(), 'public/loki.png');
 assert.ok(existsSync(lokiAsset), 'Loki asset public/loki.png must exist');
 assert.ok(statSync(lokiAsset).size > 1024, 'Loki asset must not be an empty placeholder');
 const lokiIdentitySource = readFileSync(resolve(process.cwd(), 'src/loki/LokiIdentity.jsx'), 'utf8');
+assert.ok(lokiIdentitySource.includes("LOKI_CANONICAL_ASSET = '/loki.png'"), 'LokiIdentity must use canonical Loki asset');
+assert.ok(lokiIdentitySource.includes("backgroundSize: '285%'"), 'LokiIdentity must use canonical Loki crop size');
+assert.ok(lokiIdentitySource.includes("backgroundPosition: '50% 23%'"), 'LokiIdentity must use canonical Loki crop position');
+assert.ok(!lokiIdentitySource.includes('<img'), 'LokiIdentity must not render the full poster as img');
 for (const state of ['thinking', 'answering', 'listening', 'waiting', 'recommending']) {
   assert.ok(lokiIdentitySource.includes(`${state}:`), `LokiIdentity must support ${state} state`);
 }

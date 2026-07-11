@@ -2142,3 +2142,13 @@
 **Навигация:** Sidebar уменьшен до 232px в раскрытом режиме и 76px в collapsed-режиме. Icon rail сохранён как законченный продукт: круглые кнопки, hover/focus, active state, tooltip и группы, но занимает меньше полезной площади Workspace.
 
 **Regression smoke:** `desktop-workspace-layout-regression` дополнительно проверяет, что визуальные места Локи не используют прямую картинку/emoji и что Desktop Workspace переиспользует `NewsCard`/`EventPosterCard`.
+
+## 2026-07-12 — Restore Canonical Loki Visual
+
+**Задача:** срочно восстановить правильный образ Локи после унификации `LokiIdentity`, не откатывая архитектуру единого компонента.
+
+**Первопричина:** в `d210bf91` каноническим стал `LokiIdentity`, но внутри он отображал `public/loki.png` как обычный `<img>` с полным квадратным постером. До унификации правильный Локи показывался в `LokiAssistant`, `LokiExperience` и `LokiPage` как crop из того же asset через `backgroundImage: url(/loki.png)`, `backgroundSize: 285%`, `backgroundPosition: 50% 23%`. Поэтому неправильным был не файл, а способ отображения.
+
+**Исправление:** `LokiIdentity` теперь использует канонический asset `/loki.png` только через сохранённый исторический crop (`285%`, `50% 23%`) и больше не рендерит полный постер через `<img>`. Состояния и единая архитектура сохранены.
+
+**Защита:** `desktop-workspace-layout-regression` проверяет наличие `LOKI_CANONICAL_ASSET`, канонический crop, отсутствие `<img>` в `LokiIdentity`, существование `public/loki.png`, отсутствие прямых альтернативных Loki-изображений/emoji в основных визуальных экранах и использование единого `LokiIdentity`.
