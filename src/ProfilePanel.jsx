@@ -12,6 +12,7 @@ import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
+import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -388,6 +389,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 
 export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, onOpenPartnership, onRestartLearning, onOpenHealth }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
   const [vkLoginError, setVkLoginError] = useState('');
@@ -1710,6 +1712,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '🎓', label: 'Повторить обучение', action: onRestartLearning,      right: '1 мин' },
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
+            { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
             <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
@@ -1809,7 +1812,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       </div>
 
       {/* ── Администрирование (только для админа) ── */}
-      {(user?.id === 988504 || ['admin', 'owner'].includes(String(user?.role || user?.userRole || '').toLowerCase())) && (
+      {(user?.id === 988504 || ['admin', 'owner', 'super_admin'].includes(String(user?.role || user?.userRole || '').toLowerCase())) && (
         <div style={{ padding: '16px 16px 0' }}>
           <button
             onClick={() => { window.location.assign('/admin-app'); }}
@@ -1883,6 +1886,59 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           onClose={() => setShowEmailAuth(false)}
         >
           <EmailAuth onCancel={() => setShowEmailAuth(false)} onSuccess={handleEmailAuthSuccess} />
+        </ApgModal>,
+        document.body
+      )}
+
+      {/* ── Диагностика профиля ── */}
+      {showDiagnostics && createPortal(
+        <ApgModal
+          title="Диагностика профиля"
+          subtitle="Идентификаторы, роли и доступ к кабинетам этого профиля."
+          onClose={() => setShowDiagnostics(false)}
+          maxWidth={460}
+        >
+          {(() => {
+            const diag = buildCabinetDiagnostics({ userData: user || {}, ownedPartner, ownedExpert, partners, role: roleValue });
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ ...APG2.glass, borderRadius: 18, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {[
+                    ['UID', diag.userId || '—'],
+                    ['Firebase UID', diag.firebaseUid || '—'],
+                    ['Email', diag.emails.join(', ') || '—'],
+                    ['Роли', diag.roles.join(', ')],
+                    ['Partner ID', diag.partnerId || diag.partnerCabinetIds.join(', ') || '—'],
+                    ['Expert ID', diag.expertId || diag.expertCabinetIds.join(', ') || '—'],
+                    ['Все ID профиля', diag.identityIds.join(', ') || '—'],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: APG2.textSoft, flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontSize: 12, color: APG2.text, fontWeight: 600, textAlign: 'right', overflowWrap: 'anywhere', userSelect: 'text' }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {diag.cabinets.map(cabinet => (
+                    <div key={cabinet.key} style={{ ...APG2.glass, borderRadius: 18, padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 14, color: APG2.text, fontWeight: 700 }}>{cabinet.label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 10, color: cabinet.available ? '#4BB34B' : '#E64646', background: cabinet.available ? 'rgba(75,179,75,0.10)' : 'rgba(230,70,70,0.09)' }}>
+                          {cabinet.available ? 'доступен' : 'скрыт'}
+                        </span>
+                      </div>
+                      {cabinet.available && cabinet.source && (
+                        <div style={{ fontSize: 12, color: APG2.textSoft, marginTop: 5 }}>{cabinet.source}</div>
+                      )}
+                      {!cabinet.available && cabinet.reasons.map(reason => (
+                        <div key={reason} style={{ fontSize: 12, color: APG2.textSoft, lineHeight: '17px', marginTop: 5 }}>• {reason}</div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </ApgModal>,
         document.body
       )}

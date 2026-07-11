@@ -29,6 +29,7 @@ import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
 import { normalizeExpertRecord, registerCustomExpertCategories } from '../server-shared/expert-directory.js';
+import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -71,35 +72,6 @@ function isNotArchived(item) {
 
 function safeStringList(value) {
   return Array.isArray(value) ? value.map(item => String(item || '').trim()).filter(Boolean) : [];
-}
-
-function profileOwnedByUser(profile, userData, fallbackEmail = '') {
-  if (!profile || !userData) return false;
-  const userIds = [
-    userData.id,
-    userData.uid,
-    userData.firebaseUid,
-    userData.authUid,
-  ].map(item => String(item || '').trim()).filter(Boolean);
-  const emails = [
-    userData.email,
-    userData.linkedEmail,
-    fallbackEmail,
-  ].map(item => String(item || '').trim().toLowerCase()).filter(Boolean);
-  const ownerUserIds = safeStringList(profile.ownerUserIds);
-  const ownerEmails = safeStringList(profile.ownerEmails).map(item => item.toLowerCase());
-  const userPartnerIds = safeStringList(userData.partnerCabinetIds);
-  return userIds.some(id => (
-    String(profile.ownerId || '') === id
-    || String(profile.vkOwnerId || '') === id
-    || ownerUserIds.includes(id)
-  ))
-    || emails.some(email => (
-      String(profile.ownerEmail || '').toLowerCase() === email
-      || String(profile.connectionEmail || '').toLowerCase() === email
-      || ownerEmails.includes(email)
-    ))
-    || userPartnerIds.includes(String(profile.id || ''));
 }
 
 function readAppDeepLink() {
@@ -1196,14 +1168,56 @@ export function UserApp() {
         setLastBonusDate(data.lastBonusDate ?? null);
         setScannedExperts(data.scannedExperts ?? {});
 
-        // Если email в userData не пришёл (VK/Telegram), проверяем email из Firestore.
-        // Это нужно чтобы ownerEmail у партнёра/эксперта матчился даже для VK-пользователей.
+        // localStorage-сессия не содержит partnerId/expertId, выставленных админом после привязки — владение перепроверяется по свежему документу
         const fsEmail = (data.email || data.linkedEmail)?.trim().toLowerCase();
-        if (fsEmail && isMounted.current) {
-          const exByEmail = freshExperts.find(e => profileOwnedByUser(e, userData, fsEmail));
-          if (exByEmail) setOwnedExpert(exByEmail);
-          const ptByEmail = freshPartners.find(p => profileOwnedByUser(p, userData, fsEmail));
-          if (ptByEmail) setOwnedPartner(ptByEmail);
+        const identityUser = {
+          ...userData,
+          firebaseUid: data.firebaseUid || data.uid || userData.firebaseUid,
+          linkedTelegram: data.linkedTelegram || userData.linkedTelegram,
+          linkedEmail: data.linkedEmail || userData.linkedEmail,
+          normalizedEmail: data.normalizedEmail,
+          partnerId: data.partnerId,
+          partnerCabinetIds: data.partnerCabinetIds,
+          expertId: data.expertId,
+          expertCabinetIds: data.expertCabinetIds,
+        };
+        if (isMounted.current) {
+          setUser(u => u ? ({
+            ...u,
+            partnerId: data.partnerId ?? null,
+            partnerCabinetIds: safeStringList(data.partnerCabinetIds),
+            expertId: data.expertId ?? null,
+            expertCabinetIds: safeStringList(data.expertCabinetIds),
+            role: data.role ?? u.role ?? null,
+            roles: Array.isArray(data.roles) ? data.roles : (u.roles ?? null),
+            firebaseUid: data.firebaseUid || data.uid || u.firebaseUid || null,
+          }) : u);
+          const exOwned = freshExperts.find(e => profileOwnedByUser(e, identityUser, fsEmail));
+          if (exOwned) setOwnedExpert(exOwned);
+          else if (data.expertId || safeStringList(data.expertCabinetIds).length) {
+            const wantedExpert = String(data.expertId || safeStringList(data.expertCabinetIds)[0]);
+            getDoc(doc(db, 'experts', wantedExpert))
+              .then(snap => {
+                if (snap.exists() && isMounted.current) {
+                  const expert = normalizeExpertRecord({ id: snap.id, ...snap.data() });
+                  if (isNotArchived(expert)) setOwnedExpert(expert);
+                }
+              })
+              .catch(() => {});
+          }
+          const ptOwned = freshPartners.find(p => profileOwnedByUser(p, identityUser, fsEmail));
+          if (ptOwned) setOwnedPartner(ptOwned);
+          else if (data.partnerId || safeStringList(data.partnerCabinetIds).length) {
+            const wantedPartner = String(data.partnerId || safeStringList(data.partnerCabinetIds)[0]);
+            getDoc(doc(db, 'partners', wantedPartner))
+              .then(snap => {
+                if (snap.exists() && isMounted.current) {
+                  const partner = { id: snap.id, ...snap.data() };
+                  if (isNotArchived(partner)) setOwnedPartner(partner);
+                }
+              })
+              .catch(() => {});
+          }
         }
 
         if (data.notificationsEnabled) {

@@ -1906,3 +1906,19 @@
 - Категории: неизвестная категория больше не тупик — в Validation Center можно выбрать существующую, создать новую или отменить. Новые категории хранятся в `config/expertCategories` (custom[]), регистрируются в едином справочнике `server-shared/expert-directory.js` (`registerCustomExpertCategories`, slugify c транслитерацией) и автоматически доступны в анкете (GET public-submit отдаёт справочник), приложении (public-data → UserApp bootstrap), админке, фильтрах ExpertsPage (CATEGORY_FILTERS перенесён в рендер), поиске и Локи — без правок кода.
 
 **Проверка:** `.tmp-ai-import-tests.mjs` — 10 сценариев (merge видео, динамические категории, валидатор: ok/потеря фото/видео/поля/категория/manifest/тарифные предупреждения) — все проходят; production build (`vite build`) успешен.
+
+## 2026-07-11 — Partner Cabinet Binding Integrity (кейс Татьяны)
+
+**Задача:** business-профиль привязан к двум пользователям; у одного кабинет партнёра появился, у Татьяны — нет.
+
+**Первопричина (production-данные):** у Татьяны три документа пользователя (VK `15065594`, TG `tg_875814883`, активный `email:gordeeva.tatyana@mail.ru`). Привязка `demo-partner-apg` попала на неактивный VK-документ (`ownerUserIds`), её email не был записан в `ownerEmails`, а активный email-документ не получил `partnerId`. Клиент дополнительно имел дефект Cabinet Loader: свежий документ пользователя читается при старте, но его `partnerId`/`partnerCabinetIds` не участвовали в определении `ownedPartner` — проверка шла по localStorage-сессии (там этих полей нет), после чтения Firestore перепроверялся только email.
+
+**Изменения:**
+- `src/utils/profileOwnership.js` (новый): единая проверка владения `profileOwnedByUser` с расширенными идентичностями (id, firebaseUid, vkId, telegramId, linkedTelegram.tgId, normalizedEmail, partnerCabinetIds + expertCabinetIds) + `buildCabinetDiagnostics`.
+- `UserApp`: после чтения свежего документа пользователя владение перепроверяется по объединённой идентичности; при наличии `partnerId`/`expertId` карточка догружается напрямую даже если не опубликована в каталоге; поля привязки и роли мержатся в state `user`.
+- `partner:bind-owner` (Vercel + Fastify): `collectPartnerOwnerIdentity` — привязка записывается на ВСЕ документы пользователя (email/tg/vk/uid + документы с `linkedEmail`), все идентичности и email-ы уходят в `ownerUserIds`/`ownerEmails` партнёра.
+- Мульти-роли: кнопка «Администрирование» в профиле теперь видна и для `super_admin`; кабинеты партнёра/эксперта/админа отображаются одновременно (независимые состояния).
+- Диагностика: пункт «Диагностика профиля» в настройках — UID, Firebase UID, email, роли, Partner/Expert ID, все идентичности профиля, доступность каждого кабинета и причины скрытия.
+- Миграция данных: `demo-partner-apg` получил все идентичности Татьяны в `ownerUserIds` + её email в `ownerEmails`; документы `email:gordeeva.tatyana@mail.ru` и `tg_875814883` получили `partnerId`/`partnerCabinetIds`/`partnerCabinetEnabled` (роль super_admin сохранена).
+
+**Проверка:** `.tmp-ownership-tests.mjs` — 10 сценариев (воспроизведение бага,совпадения по email/tg/vk/cabinetIds, повторная привязка, несколько бизнесов, партнёр+эксперт одновременно, диагностика) — проходят; production build успешен.

@@ -978,6 +978,23 @@ async function createPartnerWelcomeNewsDraft(db, request, actor, partner) {
   return { created: true, id: ref.id };
 }
 
+async function collectPartnerOwnerIdentity(db, user, email) {
+  const ids = new Set([String(user.id)]);
+  [user.firebaseUid, user.uid, user.authUid, user.linkedTelegram?.tgId, user.telegramId, user.tgId, user.vkId, user.vkUserId]
+    .forEach(value => { const id = String(value || '').trim(); if (id) ids.add(id); });
+  const normalized = normalizeEmail(email);
+  const linkedSnap = await db.collection('users').where('linkedEmail', '==', normalized).limit(5).get().catch(() => null);
+  linkedSnap?.docs?.forEach(docSnap => ids.add(docSnap.id));
+  const emails = new Set([normalized]);
+  [user.email, user.linkedEmail, user.normalizedEmail].forEach(value => { const item = normalizeEmail(value); if (item) emails.add(item); });
+  const docs = [];
+  for (const id of ids) {
+    const snap = await db.collection('users').doc(id).get().catch(() => null);
+    if (snap?.exists) docs.push({ id, data: snap.data() || {} });
+  }
+  return { ids: [...ids], emails: [...emails], docs };
+}
+
 async function findUserByEmail(db, email) {
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
@@ -1179,6 +1196,7 @@ async function handlePartnerOnboardingAction(db, request, actor) {
         error.conflicts = conflicts;
         throw error;
       }
+      const identity = await collectPartnerOwnerIdentity(db, user, email);
       const nextPartner = { ...partner, ownerId: user.id, ownerEmail: email, connectionEmail: email };
       const nextReadiness = buildPartnerReadiness(nextPartner);
       const lifecycleStatus = partnerLifecycleStatus({ ...nextPartner, connectionStatus: 'cabinet_linked' }, nextReadiness);
@@ -1186,25 +1204,29 @@ async function handlePartnerOnboardingAction(db, request, actor) {
       await updatePartnerOnboarding(db, request, actor, id, {
         ownerId: user.id,
         ownerEmail: email,
-        ownerUserIds: FieldValue.arrayUnion(user.id),
-        ownerEmails: FieldValue.arrayUnion(email),
+        ownerUserIds: FieldValue.arrayUnion(...identity.ids),
+        ownerEmails: FieldValue.arrayUnion(...identity.emails),
         connectionEmail: email,
         partnerCabinetEnabled: true,
         connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked',
         connectionStatusLabel: nextReadiness.percent >= 100 ? PARTNER_STATUS_LABELS.card_active : PARTNER_STATUS_LABELS.cabinet_linked,
         lifecycleStatus,
         lifecycleStatusLabel: PARTNER_STATUS_LABELS[lifecycleStatus],
-        partnerOnboarding: { readiness: nextReadiness, recommendations: nextReadiness.recommendations, launchActions: buildPartnerLaunchActions(nextPartner), wizard, lastCheckedAt: new Date().toISOString(), linkedUserId: user.id },
-      }, partnerEvent(actor, 'cabinet_linked', `Кабинет партнёра привязан к пользователю ${email}`, { email, userId: user.id }));
-      await db.collection('users').doc(user.id).set({
-        partnerId: id,
-        partnerCabinetIds: FieldValue.arrayUnion(id),
-        partnerCabinetEnabled: true,
-        linkedPartnerAt: FieldValue.serverTimestamp(),
-        role: user.role && user.role !== 'user' ? user.role : 'partner',
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-      return { ok: true, partnerId: id, user: publicUserSummary(user), connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked', lifecycleStatus, readiness: nextReadiness, launchActions: buildPartnerLaunchActions(nextPartner), wizard };
+        partnerOnboarding: { readiness: nextReadiness, recommendations: nextReadiness.recommendations, launchActions: buildPartnerLaunchActions(nextPartner), wizard, lastCheckedAt: new Date().toISOString(), linkedUserId: user.id, linkedIdentityIds: identity.ids },
+      }, partnerEvent(actor, 'cabinet_linked', `Кабинет партнёра привязан к пользователю ${email}`, { email, userId: user.id, identityIds: identity.ids }));
+      const batch = db.batch();
+      identity.docs.forEach(({ id: docId, data }) => {
+        batch.set(db.collection('users').doc(docId), {
+          partnerId: id,
+          partnerCabinetIds: FieldValue.arrayUnion(id),
+          partnerCabinetEnabled: true,
+          linkedPartnerAt: FieldValue.serverTimestamp(),
+          role: data.role && data.role !== 'user' ? data.role : 'partner',
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+      await batch.commit();
+      return { ok: true, partnerId: id, user: publicUserSummary(user), linkedUserDocs: identity.docs.map(item => item.id), connectionStatus: nextReadiness.percent >= 100 ? 'card_active' : 'cabinet_linked', lifecycleStatus, readiness: nextReadiness, launchActions: buildPartnerLaunchActions(nextPartner), wizard };
     });
   }
 
