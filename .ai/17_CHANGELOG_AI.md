@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-12] ux: UX Convergence Dashboard
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `docs/desktop-ux.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** refactor
+**Что изменено:**
+- Dashboard перестроен вокруг сценария рабочего дня, а не равномерной сетки карточек.
+- Добавлен рабочий hero-блок `Сегодня в АПГ` с ключевыми сигналами: уведомления, мероприятия, новости, рекомендации Локи и активный профиль.
+- Ниже hero выстроена смысловая последовательность: требует внимания → сегодня → бизнес → статистика → контент → последние действия → быстрые действия.
+**Почему:** User Mode ощущался более живым благодаря hero и повествованию, а Workspace — профессиональным, но карточным; convergence объединяет живость User Mode с архитектурой Workspace.
+
+---
+
 ## [2026-07-12] ux: Desktop UX 1.1
 **Коммит:** `pending`
 **Файлы:** `src/components/Apg2ProfileGlass.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceWidgets.js`, `docs/desktop-ux.md`, `.ai/17_CHANGELOG_AI.md`

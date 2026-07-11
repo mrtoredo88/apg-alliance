@@ -186,6 +186,66 @@ function WidgetShell({ widget, children }) {
   );
 }
 
+function WorkspaceDayHero({ data, profileStatus, attention, actions }) {
+  const profileName = data.activeProfile?.name || data.activeProfile?.title || data.roleLabel || 'Workspace';
+  const lokiCount = attention.length || (profileStatus.value < 100 ? 1 : 0) || 1;
+  const heroMetrics = [
+    { label: 'Уведомления', value: data.unreadCount || 0 },
+    { label: 'Мероприятия', value: data.events.length },
+    { label: 'Новости', value: data.news.length },
+    { label: 'Рекомендации Локи', value: lokiCount },
+  ];
+  return (
+    <div style={{
+      position: 'relative',
+      minHeight: 238,
+      overflow: 'hidden',
+      borderRadius: 38,
+      padding: 20,
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0,1.35fr) minmax(280px,0.65fr)',
+      gap: 18,
+      alignItems: 'stretch',
+      background: 'radial-gradient(circle at 18% 0%, rgba(255,240,184,0.28), transparent 34%), radial-gradient(circle at 88% 18%, rgba(112,92,168,0.20), transparent 32%), linear-gradient(145deg, rgba(255,255,255,0.20), rgba(255,255,255,0.075))',
+      border: '1px solid rgba(244,217,140,0.26)',
+      boxShadow: '0 34px 90px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -32px 72px rgba(255,255,255,0.04)',
+    }}>
+      <div style={{ position: 'absolute', left: -80, right: -80, top: 74, height: 120, background: 'linear-gradient(110deg, transparent 10%, rgba(244,217,140,0.12) 38%, rgba(255,255,255,0.08) 48%, transparent 72%)', transform: 'rotate(-8deg)', filter: 'blur(8px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+        <div>
+          <GlassBadge tone="gold">Рабочий день</GlassBadge>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 38, lineHeight: '43px', fontWeight: 940, letterSpacing: -0.6, marginTop: 14 }}>
+            Сегодня в АПГ
+          </div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', marginTop: 8, maxWidth: 620 }}>
+            Начните с того, что требует внимания, затем проверьте бизнес, контент и рекомендации Локи. Workspace собрал рабочий контекст в одном месте.
+          </div>
+        </div>
+        <QuickActions actions={[
+          { id: 'attention', label: attention.length ? `Проверить ${attention.length} задач` : 'Проверить день', onClick: actions.openDashboard, tone: 'gold' },
+          { id: 'business', label: 'Мой бизнес', onClick: actions.openCabinet },
+          { id: 'loki', label: 'Спросить Локи', onClick: actions.openLoki },
+        ]} style={{ background: 'transparent', border: 0, padding: 0, marginTop: 18 }} />
+      </div>
+      <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateRows: 'auto 1fr', gap: 10, minWidth: 0 }}>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 13 }}>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.7 }}>Активный профиль</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 920, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName}</div>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820, marginTop: 5 }}>Заполненность {profileStatus.value}% · {profileStatus.label}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+          {heroMetrics.map(metric => (
+            <div key={metric.label} style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 12, minWidth: 0 }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '28px', fontWeight: 940 }}>{metric.value}</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '15px', marginTop: 4 }}>{metric.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WorkspaceDashboard({ data, actions, widgetLayout }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const latestNews = data.news.slice(0, 4);
@@ -328,15 +388,25 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
   };
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <ContentGrid min={170} gap={10}>
-        <MetricCard label="Партнёры" value={data.partners.length} />
-        <MetricCard label="Эксперты" value={data.experts.length} />
-        <MetricCard label="Новости" value={data.news.length} />
-        <MetricCard label="События" value={data.events.length} />
-      </ContentGrid>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,minmax(0,1fr))', gap: 12, alignItems: 'stretch' }}>
-        {widgetLayout.map(widget => <WidgetShell key={widget.id} widget={widget}>{renderWidget(widget)}</WidgetShell>)}
+    <div style={{ display: 'grid', gap: 18 }}>
+      <WorkspaceDayHero data={data} profileStatus={profileStatus} attention={attention} actions={actions} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 14, alignItems: 'stretch' }}>
+        {renderWidget({ id: 'attention' })}
+        {renderWidget({ id: 'today' })}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,0.95fr)', gap: 14, alignItems: 'stretch' }}>
+        {renderWidget({ id: 'business' })}
+        {renderWidget({ id: 'stats' })}
+      </div>
+      <SectionHeader title="Контент сегодня" subtitle="Новости и мероприятия, которые формируют городской контекст" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, alignItems: 'stretch' }}>
+        {renderWidget({ id: 'latest-news' })}
+        {renderWidget({ id: 'upcoming-events' })}
+      </div>
+      <SectionHeader title="Дальше" subtitle="Действия, история и быстрый переход к работе" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 14, alignItems: 'stretch' }}>
+        {renderWidget({ id: 'recent-actions' })}
+        {renderWidget({ id: 'quick-actions' })}
       </div>
     </div>
   );
