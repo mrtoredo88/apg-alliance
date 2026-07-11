@@ -146,6 +146,9 @@ const AI_IMPORT_LABELS = {
   cost: ['Стоимость', 'Стоимость / условия', 'Цена'],
   date: ['Дата', 'Дата публикации', 'Дата розыгрыша'],
   source: ['Источник', 'Автор', 'Организатор', 'Кто предоставляет'],
+  lastName: ['Фамилия'], firstName: ['Имя'], middleName: ['Отчество'],
+  workFormats: ['Форматы работы', 'Формат работы'], tariff: ['Тариф'], bookingUrl: ['Запись', 'Ссылка для записи'],
+  max: ['MAX'], otherSocials: ['Другие социальные сети'], newsInfo: ['Новости'], activities: ['Мероприятия'], inn: ['ИНН'],
 };
 
 const ADMIN_LOAD_TIMEOUT_MS = 12000;
@@ -555,7 +558,7 @@ function detectAiImportCategory(text, type) {
 }
 
 function buildAiImportTemplate(type) {
-  if (type === 'expert') return ['Имя и фамилия:', 'Направление:', 'Коротко о себе:', 'Чем полезен:', 'Услуги:', 'Опыт:', 'Формат работы:', 'Стоимость / условия:', 'Контакты:', 'Соцсети:', 'Фото:', 'Видео:', 'Акция для пользователей АПГ:'].join('\n');
+  if (type === 'expert') return ['Фамилия:', 'Имя:', 'Отчество:', 'Направление:', 'Коротко о себе:', 'Подробно о себе:', 'Услуги:', 'Форматы работы:', 'Акция для пользователей АПГ:', 'Тариф:', 'Новости:', 'Мероприятия:', 'Контактное лицо:', 'Телефон:', 'Email:', 'Сайт:', 'Запись:', 'VK:', 'Telegram:', 'MAX:', 'Другие социальные сети:', 'ИНН:', 'Видео:', 'Комментарий для администрации:'].join('\n');
   if (type === 'event') return ['Название:', 'Дата:', 'Время:', 'Место:', 'Для кого:', 'Описание:', 'Программа:', 'Стоимость:', 'Как записаться:', 'Организатор:', 'Контакты:', 'Фото:'].join('\n');
   if (type === 'news') return ['Заголовок:', 'Короткий анонс:', 'Основной текст:', 'Категория:', 'Источник:', 'Фото:', 'Ссылка:', 'Публиковать сразу или в черновик: черновик'].join('\n');
   if (type === 'prize') return ['Название приза:', 'Кто предоставляет:', 'Описание:', 'Условия участия:', 'Количество победителей:', 'Дата розыгрыша:', 'Фото:', 'Связанный партнёр или эксперт:'].join('\n');
@@ -590,6 +593,23 @@ function analyzeAiImportText(type, rawText, files = []) {
     date: pickAiImportValue(text, 'date'),
     source: pickAiImportValue(text, 'source'),
   };
+  if (type === 'expert') {
+    const nameParts = title.split(/\s+/).filter(Boolean);
+    fields.lastName = pickAiImportValue(text, 'lastName') || (nameParts.length > 1 ? nameParts[0] : '');
+    fields.firstName = pickAiImportValue(text, 'firstName') || (nameParts.length > 1 ? nameParts[1] : '');
+    fields.middleName = pickAiImportValue(text, 'middleName') || nameParts.slice(2).join(' ');
+    fields.categories = [fields.category].filter(Boolean);
+    fields.workFormats = pickAiImportValue(text, 'workFormats').split(/[,;/]/).map(value => value.trim()).filter(Boolean);
+    fields.tariff = pickAiImportValue(text, 'tariff').toLowerCase() || 'start';
+    fields.bookingUrl = pickAiImportValue(text, 'bookingUrl');
+    fields.max = pickAiImportValue(text, 'max');
+    fields.otherSocials = pickAiImportValue(text, 'otherSocials').split(/[,;\s]+/).filter(value => /^https?:\/\//i.test(value));
+    fields.newsInfo = pickAiImportValue(text, 'newsInfo');
+    fields.activities = pickAiImportValue(text, 'activities');
+    fields.inn = pickAiImportValue(text, 'inn').replace(/\D/g, '');
+    fields.videos = [...text.matchAll(/https?:\/\/[^\s]+(?:youtube|youtu\.be|vk\.com\/video|vkvideo|rutube|max\.ru)[^\s]*/gi)].map(match => ({ url: match[0], title: '', platform: 'other', platformLabel: 'Видео' }));
+    delete fields.cost;
+  }
   const required = type === 'news' ? ['title', 'description'] : type === 'event' ? ['title', 'date', 'description'] : ['title', 'description'];
   const missingFields = required.filter(key => !fields[key]);
   const confidence = Math.max(42, Math.min(96, 58 + Object.values(fields).filter(Boolean).length * 4 - missingFields.length * 10 + (files.length ? 4 : 0)));
@@ -618,7 +638,12 @@ function aiImportDraftPatch(type, draft, sourceFiles = []) {
     return { title: f.title || 'Черновик новости', text: f.description || f.shortDescription || 'Текст будет заполнен редактором.', fullText: f.description || f.shortDescription || 'Текст будет заполнен редактором.', summary: f.shortDescription || '', category: f.category || 'society', sourceName: f.source || 'ИИ-импорт', linkUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, photos: images, status: 'draft', active: false, commentsEnabled: true };
   }
   if (type === 'expert') {
-    return { name: f.title || 'Новый эксперт', specialization: f.category || f.services || 'Уточнить направление', category: detectAiImportCategory([f.category, f.description].join(' '), 'expert'), description: f.description || f.shortDescription || '', phone: f.phone || '', websiteUrl: f.website || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', offer: f.offer || '', photo: mainImage, gallery: images, active: false, status: 'draft', verified: false, keys: 1 };
+    const avatar = sourceFiles.find(file => file.role === 'avatar')?.url || mainImage;
+    const coverPhoto = sourceFiles.find(file => file.role === 'cover')?.url || '';
+    const logoUrl = sourceFiles.find(file => file.role === 'logo')?.url || '';
+    const gallery = sourceFiles.filter(file => ['gallery', 'photo'].includes(file.role)).map(file => file.url).filter(Boolean);
+    const categories = Array.isArray(f.categories) && f.categories.length ? f.categories : [f.category].filter(Boolean);
+    return { name: f.title || [f.lastName, f.firstName, f.middleName].filter(Boolean).join(' ') || 'Новый эксперт', firstName: f.firstName || '', lastName: f.lastName || '', middleName: f.middleName || '', specialization: f.shortDescription || f.services || 'Уточнить направление', category: categories[0] || detectAiImportCategory([f.category, f.description].join(' '), 'expert'), secondaryCategories: categories.slice(1), description: f.description || f.shortDescription || '', services: f.services || '', workFormats: Array.isArray(f.workFormats) ? f.workFormats : [], phone: f.phone || '', email: f.email || '', websiteUrl: f.website || '', bookingUrl: f.bookingUrl || '', telegramUrl: f.telegram || '', vkUrl: f.vk || '', maxUrl: f.max || '', otherSocials: Array.isArray(f.otherSocials) ? f.otherSocials : [], offer: f.offer || '', videos: Array.isArray(f.videos) ? f.videos : [], tier: f.tariff || 'start', inn: ['premium', 'ambassador'].includes(f.tariff) ? f.inn || '' : '', newsInfo: ['premium', 'ambassador'].includes(f.tariff) ? f.newsInfo || '' : '', activities: ['premium', 'ambassador'].includes(f.tariff) ? f.activities || '' : '', photo: avatar, logoUrl, coverPhoto, gallery, adminComment: f.comment || '', serviceCatalog: [], futureLegalProfile: f.futureLegalProfile || {}, futureCityProfile: f.futureCityProfile || {}, active: false, status: 'draft', verified: false, keys: 1 };
   }
   if (type === 'event') {
     return { title: f.title || 'Новое событие', date: f.date || '', location: f.address || '', address: f.address || '', partner: f.source || '', description: f.description || f.shortDescription || '', socialUrl: f.website || '', imageUrl: mainImage, coverPhoto: mainImage, gallery: images, category: f.category || 'society', active: false, status: 'draft', priority: 0 };

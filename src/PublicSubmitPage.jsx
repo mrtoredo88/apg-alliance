@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from './constants.js';
 import { uploadPhoto } from './utils/uploadPhoto.js';
 import { normalizeExternalUrl } from './utils/externalUrls.js';
+import { ExpertQuestionnaire } from './components/ExpertQuestionnaire.jsx';
 
 const TYPES = {
   partner: { label: 'партнёра', title: 'Анкета партнёра', emoji: '🤝' },
@@ -40,18 +41,7 @@ const FIELDS = {
     ['comment', 'Комментарий', 'textarea', 'Что ещё важно знать редактору'],
   ],
   expert: [
-    ['title', 'Имя и фамилия', 'text', 'Иван Иванов'],
-    ['category', 'Направление', 'text', 'Психология, здоровье, обучение...'],
-    ['shortDescription', 'Коротко о себе', 'textarea', '1-2 предложения'],
-    ['description', 'Подробно о себе', 'textarea', 'Опыт, подход, чем помогаете'],
-    ['services', 'Услуги / форматы работы', 'textarea', 'Консультации, группы, онлайн...'],
-    ['cost', 'Стоимость / условия', 'text', 'Если можно указывать публично'],
-    ['offer', 'Акция для пользователей АПГ', 'textarea', 'Скидка, бонус, бесплатная встреча'],
-    ['video', 'Видео', 'url', 'Ссылка на видео, если есть'],
-    ['newsInfo', 'Новости', 'textarea', 'Что можно рассказать пользователям'],
-    ['activities', 'Мероприятия', 'textarea', 'Встречи, эфиры, консультации'],
-    ...COMMON_FIELDS,
-    ['comment', 'Комментарий', 'textarea', 'Что ещё важно знать редактору'],
+    ['description', 'Описание', 'textarea', ''],
   ],
   event: [
     ['title', 'Название события', 'text', 'Мастер-класс, встреча, лекция...'],
@@ -218,6 +208,7 @@ export function PublicSubmitPage() {
   const selectedLegalType = legalType || (type === 'expert' ? 'individual' : 'company');
   const legalMeta = LEGAL_ENTITY_TYPES[selectedLegalType] || LEGAL_ENTITY_TYPES.company;
   const legalFormFields = LEGAL_FIELDS[selectedLegalType] || LEGAL_FIELDS.company;
+  const draftKey = route?.token ? `apg_expert_questionnaire_v2:${route.token}` : '';
 
   useEffect(() => {
     if (!route?.token) {
@@ -233,10 +224,25 @@ export function PublicSubmitPage() {
       .then(({ res, data }) => {
         if (!res.ok || data.ok === false) throw new Error(data.error || 'Форма недоступна.');
         setFormInfo(data);
+        if (data.type === 'expert' && draftKey) {
+          try {
+            const saved = JSON.parse(localStorage.getItem(draftKey) || '{}');
+            if (saved.fields && typeof saved.fields === 'object') setFields(saved.fields);
+            if (Array.isArray(saved.files)) setFiles(saved.files.filter(file => file?.url));
+          } catch {}
+        }
       })
       .catch(e => setError(e.message || 'Форма недоступна.'))
       .finally(() => setLoading(false));
-  }, [route?.token]);
+  }, [draftKey, route?.token]);
+
+  useEffect(() => {
+    if (type !== 'expert' || !draftKey || !Object.keys(fields).length) return undefined;
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(draftKey, JSON.stringify({ version: 2, fields, files: files.filter(file => file.url).map(({ name, type: fileType, size, url, role }) => ({ name, type: fileType, size, url, role })), updatedAt: new Date().toISOString() })); } catch {}
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [draftKey, fields, files, type]);
 
   const setField = (name, value) => {
     setFields(prev => ({ ...prev, [name]: value }));
@@ -251,8 +257,10 @@ export function PublicSubmitPage() {
     if (value === 'paid') setLegalExpanded(true);
   };
 
-  const handleFiles = async (list) => {
-    const incoming = Array.from(list || []).filter(file => /^image\//.test(file.type)).slice(0, Math.max(0, 8 - files.length));
+  const handleFiles = async (list, role = '') => {
+    const replacingSingle = ['avatar', 'logo', 'cover'].includes(role);
+    const existing = replacingSingle ? files.filter(file => file.role !== role) : files;
+    const incoming = Array.from(list || []).filter(file => /^image\//.test(file.type)).slice(0, replacingSingle ? 1 : Math.max(0, 12 - existing.length));
     if (!incoming.length) return;
     setUploading(true);
     setError('');
@@ -265,9 +273,9 @@ export function PublicSubmitPage() {
         }
         const preview = URL.createObjectURL(file);
         const url = await uploadPhoto(file, `public-submissions/${route.token}`);
-        uploaded.push({ name: file.name, type: file.type, size: file.size, url, preview, role: files.length || uploaded.length ? 'photo' : 'main' });
+        uploaded.push({ name: file.name, type: file.type, size: file.size, url, preview, role: role || (files.length || uploaded.length ? 'photo' : 'main') });
       }
-      setFiles(prev => [...prev, ...uploaded]);
+      setFiles(prev => replacingSingle ? [...prev.filter(file => file.role !== role), ...uploaded] : [...prev, ...uploaded]);
     } catch (e) {
       setError(e.message || 'Не удалось загрузить фото.');
     } finally {
@@ -306,6 +314,16 @@ export function PublicSubmitPage() {
   };
 
   const validatePublicStep = () => {
+    if (type === 'expert') {
+      const required = [['lastName', 'фамилию'], ['firstName', 'имя'], ['shortDescription', 'короткое описание'], ['contactName', 'контактное лицо'], ['phone', 'телефон'], ['email', 'email']];
+      const missing = required.filter(([key]) => !String(fields[key] || '').trim()).map(([, label]) => label);
+      if (!Array.isArray(fields.categories) || !fields.categories.length) missing.push('направление деятельности');
+      if (missing.length) { setError(`Заполните обязательные поля: ${missing.join(', ')}.`); return false; }
+      if (!/^\+?[\d\s()-]{10,20}$/.test(String(fields.phone))) { setError('Проверьте номер телефона.'); return false; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(fields.email))) { setError('Проверьте email.'); return false; }
+      if (['premium', 'ambassador'].includes(fields.tariff) && fields.inn && !/^\d{10}$|^\d{12}$/.test(String(fields.inn).replace(/\D/g, ''))) { setError('ИНН должен содержать 10 или 12 цифр.'); return false; }
+      setError(''); return true;
+    }
     const title = String(fields.title || '').trim();
     const description = String(fields.description || fields.shortDescription || '').trim();
     const required = [
@@ -338,9 +356,15 @@ export function PublicSubmitPage() {
     try {
       const normalizedFields = {
         ...fields,
-        website: normalizeExternalUrl(fields.website || fields.bookingUrl),
+        title: type === 'expert' ? [fields.lastName, fields.firstName, fields.middleName].filter(Boolean).join(' ') : fields.title,
+        category: type === 'expert' ? fields.categories?.[0] || '' : fields.category,
+        secondaryCategories: type === 'expert' ? (fields.categories || []).slice(1) : fields.secondaryCategories,
+        website: normalizeExternalUrl(fields.website),
+        bookingUrl: normalizeExternalUrl(fields.bookingUrl),
         vk: normalizeExternalUrl(fields.vk, { platform: 'vk' }),
         telegram: normalizeExternalUrl(fields.telegram, { platform: 'telegram' }),
+        max: normalizeExternalUrl(fields.max),
+        otherSocials: (fields.otherSocials || []).map(value => normalizeExternalUrl(value)).filter(Boolean),
       };
       const res = await fetch(`${API_BASE_URL}/api/public-submit`, {
         method: 'POST',
@@ -370,6 +394,7 @@ export function PublicSubmitPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || 'Не удалось отправить заявку.');
       setDone(data);
+      if (type === 'expert' && draftKey) { try { localStorage.removeItem(draftKey); } catch {} }
     } catch (e) {
       setError(e.message || 'Не удалось отправить заявку.');
     } finally {
@@ -444,11 +469,11 @@ export function PublicSubmitPage() {
             <>
               <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Публичная карточка</h2>
               <div style={{ color: 'rgba(25,23,19,0.58)', fontSize: 13, lineHeight: '20px', marginBottom: 8 }}>Эти сведения редактор использует для карточки в приложении АПГ.</div>
-              {formFields.map(field => (
+              {type === 'expert' ? <ExpertQuestionnaire fields={fields} files={files} onField={setField} onFiles={handleFiles} uploading={uploading} /> : formFields.map(field => (
                 <PublicField key={field[0]} field={field} value={fields[field[0]]} onChange={setField} />
               ))}
 
-              <span style={S.label}>Фотографии и логотип</span>
+              {type !== 'expert' && <><span style={S.label}>Фотографии и логотип</span>
               <div
                 onDragEnter={e => { e.preventDefault(); setDragActive(true); }}
                 onDragOver={e => { e.preventDefault(); setDragActive(true); }}
@@ -471,9 +496,9 @@ export function PublicSubmitPage() {
                     </div>
                   ))}
                 </div>
-              )}
+              )}</>}
 
-              <div style={{ marginTop: 18, padding: 14, borderRadius: 20, background: 'rgba(25,23,19,0.04)', border: '1px solid rgba(25,23,19,0.08)' }}>
+              {type !== 'expert' && <div style={{ marginTop: 18, padding: 14, borderRadius: 20, background: 'rgba(25,23,19,0.04)', border: '1px solid rgba(25,23,19,0.08)' }}>
                 <div style={{ fontSize: 15, fontWeight: 920, color: '#191713' }}>Планируете платное сотрудничество с АПГ?</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                   {[
@@ -488,9 +513,9 @@ export function PublicSubmitPage() {
                     ? 'Локи рекомендует заполнить юридические данные сразу, чтобы быстрее подготовить документы.'
                     : 'Для бесплатной карточки юридические реквизиты сейчас не нужны. Их можно будет запросить позже.'}
                 </div>
-              </div>
+              </div>}
 
-              <div style={{ marginTop: 14, borderRadius: 20, border: '1px solid rgba(25,23,19,0.10)', background: 'rgba(255,255,255,0.42)', overflow: 'hidden' }}>
+              {type !== 'expert' && <div style={{ marginTop: 14, borderRadius: 20, border: '1px solid rgba(25,23,19,0.10)', background: 'rgba(255,255,255,0.42)', overflow: 'hidden' }}>
                 <button type="button" onClick={() => setLegalExpanded(prev => !prev)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', padding: 15, cursor: 'pointer', textAlign: 'left' }}>
                   <span>
                     <span style={{ display: 'block', color: '#191713', fontSize: 15, fontWeight: 920 }}>Юридические данные (необязательно)</span>
@@ -535,7 +560,7 @@ export function PublicSubmitPage() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
 
               {error && <div style={{ marginTop: 14, padding: 13, borderRadius: 16, background: 'rgba(220,38,38,0.10)', color: '#b91c1c', fontSize: 13, lineHeight: '19px' }}>{error}</div>}
 

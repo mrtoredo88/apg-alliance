@@ -13,6 +13,10 @@ function cleanText(value, max = 12000) {
   return String(value || '').replace(/\r/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().slice(0, max);
 }
 
+function cleanList(value, maxItems = 12, maxLength = 500) {
+  return (Array.isArray(value) ? value : []).slice(0, maxItems).map(item => typeof item === 'object' ? item : cleanText(item, maxLength)).filter(Boolean);
+}
+
 function lineValue(text, labels) {
   const lines = String(text || '').split('\n').map(line => line.trim()).filter(Boolean);
   for (const label of labels) {
@@ -239,8 +243,23 @@ function analyze(type, fields, files) {
     date: cleanText(fields.date || fields.eventDate),
     source: cleanText(fields.source || fields.organizer || fields.provider),
     comment: cleanText(fields.comment, 3000),
+    firstName: cleanText(fields.firstName, 100),
+    lastName: cleanText(fields.lastName, 100),
+    middleName: cleanText(fields.middleName, 100),
+    categories: cleanList(fields.categories, 6, 80),
+    secondaryCategories: cleanList(fields.secondaryCategories, 5, 80),
+    workFormats: cleanList(fields.workFormats, 12, 80),
+    videos: cleanList(fields.videos, 6),
+    bookingUrl: normalizeUrl(fields.bookingUrl),
+    max: normalizeUrl(fields.max, 'max'),
+    otherSocials: cleanList(fields.otherSocials, 10).map(value => normalizeUrl(value)).filter(Boolean),
+    tariff: ['start', 'standard', 'premium', 'ambassador'].includes(cleanText(fields.tariff, 30)) ? cleanText(fields.tariff, 30) : 'start',
+    serviceCatalog: [],
+    futureLegalProfile: { legalType: '', ogrn: '', bik: '', checkingAccount: '' },
+    futureCityProfile: { cityId: '', cityName: '' },
   };
-  const required = type === 'news' ? ['title', 'description', 'inn', 'city'] : type === 'event' ? ['title', 'date', 'description', 'inn', 'city'] : ['title', 'description', 'inn', 'city'];
+  const required = type === 'expert' ? ['title', 'shortDescription', 'phone', 'email'] : type === 'news' ? ['title', 'description', 'inn', 'city'] : type === 'event' ? ['title', 'date', 'description', 'inn', 'city'] : ['title', 'description', 'inn', 'city'];
+  if (type === 'expert' && !draftFields.categories.length) required.push('categories');
   const missingFields = required.filter(key => !draftFields[key]);
   if ((type === 'partner' || type === 'expert') && !draftFields.phone && !draftFields.website && !draftFields.telegram && !draftFields.vk) missingFields.push('contact');
   if ((type === 'partner' || type === 'expert') && !files.length) missingFields.push('photo');
@@ -260,6 +279,8 @@ function analyze(type, fields, files) {
     ].filter(Boolean),
   };
 }
+
+export { analyze as analyzePublicSubmission };
 
 async function findLink(db, token) {
   const snap = await db.collection('publicFormLinks').where('token', '==', token).limit(1).get();
