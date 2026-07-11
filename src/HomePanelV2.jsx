@@ -186,6 +186,7 @@ function V2FirstScreen({
   onOpenTasks,
   onOpenReference,
   onOpenLoki,
+  desktopMode = false,
 }) {
   const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
   const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
@@ -249,12 +250,12 @@ function V2FirstScreen({
       position: 'relative',
       minHeight: 'auto',
       boxSizing: 'border-box',
-      padding: 'calc(14px + var(--safe-top, 0px)) 18px 24px',
+      padding: desktopMode ? 'calc(20px + var(--safe-top, 0px)) 26px 18px' : 'calc(14px + var(--safe-top, 0px)) 18px 24px',
       overflow: 'hidden',
       background: V2.pageBg,
     }}>
       <div style={{ position: 'absolute', left: -80, right: -80, top: 128, height: 230, background: 'linear-gradient(110deg, transparent 8%, rgba(244,217,140,0.055) 35%, rgba(255,255,255,0.04) 48%, transparent 74%)', transform: 'rotate(-8deg)', filter: 'blur(1px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 1, ...revealMotion(0, 'splash') }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: desktopMode ? 1180 : 'none', margin: desktopMode ? '0 auto' : 0, ...revealMotion(0, 'splash') }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 'clamp(16px, 2.4svh, 22px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <picture>
@@ -301,11 +302,12 @@ function V2FirstScreen({
 
         </div>
 
+        <div style={{ display: desktopMode ? 'grid' : 'block', gridTemplateColumns: desktopMode ? 'minmax(0, 1.45fr) minmax(320px, 0.85fr)' : undefined, gap: desktopMode ? 16 : undefined, alignItems: 'stretch' }}>
         <button
           onClick={heroAction}
           {...pressMotion}
           style={{
-            width: '100%', minHeight: 'clamp(176px, 26svh, 236px)', border: 'none', borderRadius: 34, padding: 0,
+            width: '100%', minHeight: desktopMode ? 330 : 'clamp(176px, 26svh, 236px)', border: 'none', borderRadius: desktopMode ? 38 : 34, padding: 0,
             cursor: 'pointer', textAlign: 'left', overflow: 'hidden', position: 'relative',
             ...GlassHero,
             ...revealMotion(1, 'splash'),
@@ -328,7 +330,7 @@ function V2FirstScreen({
             <div style={{ position: 'absolute', inset: '1px', borderRadius: 47, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 0 0 2px rgba(244,217,140,0.08), inset 0 38px 96px rgba(255,255,255,0.07), inset 0 -46px 94px rgba(216,184,103,0.055)', pointerEvents: 'none' }} />
           </div>
 
-          <div style={{ position: 'relative', zIndex: 1, minHeight: 'clamp(176px, 26svh, 236px)', padding: 'clamp(14px, 2.5svh, 18px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ position: 'relative', zIndex: 1, minHeight: desktopMode ? 330 : 'clamp(176px, 26svh, 236px)', padding: desktopMode ? 24 : 'clamp(14px, 2.5svh, 18px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
               <div style={{ alignSelf: 'flex-start', ...GlassBadge, padding: 'clamp(5px, 0.9svh, 7px) 11px', fontSize: 'clamp(10px, 1.5svh, 11px)' }}>
                 Сегодня нельзя пропустить
@@ -338,7 +340,7 @@ function V2FirstScreen({
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--apg2-hero-text, var(--apg2-text, #F7F1E6))', fontSize: 'clamp(21px, 3.4svh, 25px)', lineHeight: 'clamp(25px, 4.1svh, 30px)', fontWeight: 800, letterSpacing: 0, marginBottom: 'clamp(6px, 1.2svh, 10px)', textShadow: '0 2px 8px rgba(0,0,0,0.18), 0 18px 42px rgba(0,0,0,0.16)' }}>
+              <div style={{ color: 'var(--apg2-hero-text, var(--apg2-text, #F7F1E6))', fontSize: desktopMode ? 34 : 'clamp(21px, 3.4svh, 25px)', lineHeight: desktopMode ? '39px' : 'clamp(25px, 4.1svh, 30px)', fontWeight: 800, letterSpacing: 0, marginBottom: 'clamp(6px, 1.2svh, 10px)', textShadow: '0 2px 8px rgba(0,0,0,0.18), 0 18px 42px rgba(0,0,0,0.16)' }}>
                 {heroTitle}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'var(--apg2-hero-muted, rgba(247,244,234,0.78))', fontSize: 'clamp(12px, 1.75svh, 13px)', lineHeight: 'clamp(16px, 2.45svh, 19px)', fontWeight: 400, maxWidth: 300, marginBottom: 'clamp(8px, 1.8svh, 15px)', textShadow: '0 2px 8px rgba(0,0,0,0.14)' }}>
@@ -352,12 +354,12 @@ function V2FirstScreen({
           </div>
         </button>
 
-        <div style={{ marginTop: 'clamp(10px, 1.9svh, 16px)', ...revealMotion(2, 'splash') }}>
+        <div style={{ marginTop: desktopMode ? 0 : 'clamp(10px, 1.9svh, 16px)', ...revealMotion(2, 'splash') }}>
           <div style={{ color: V2.text, fontSize: 'clamp(15px, 2.5svh, 17px)', lineHeight: 'clamp(18px, 3svh, 21px)', fontWeight: 850, marginBottom: 'clamp(7px, 1.4svh, 10px)', opacity: 0.92 }}>
             Сегодня можно
           </div>
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+            display: 'grid', gridTemplateColumns: desktopMode ? '1fr' : '1fr 1fr', gap: 10,
             padding: 'clamp(6px, 1.2svh, 9px)', borderRadius: 34,
             ...GlassIsland,
           }}>
@@ -386,6 +388,7 @@ function V2FirstScreen({
             ))}
           </div>
         </div>
+        </div>
       </div>
     </section>
   );
@@ -406,6 +409,7 @@ function V2SecondScreen({
   onOpenNews,
   onOpenNewsItem,
   interestProfile,
+  desktopMode = false,
 }) {
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
@@ -492,14 +496,15 @@ function V2SecondScreen({
   return (
     <section style={{
       ...GlassPanel,
-      padding: '24px 0 calc(96px + env(safe-area-inset-bottom, 0px))',
+      padding: desktopMode ? '12px 26px calc(104px + env(safe-area-inset-bottom, 0px))' : '24px 0 calc(96px + env(safe-area-inset-bottom, 0px))',
       background: V2.pageBg,
       border: 'none',
       borderRadius: 0,
       boxShadow: 'none',
       overflow: 'hidden',
     }}>
-      <div style={{ padding: '0 22px 18px' }}>
+      <div style={{ maxWidth: desktopMode ? 1180 : 'none', margin: desktopMode ? '0 auto' : 0 }}>
+      <div style={{ padding: desktopMode ? '0 0 18px' : '0 22px 18px' }}>
         <div style={{ color: V2.text, fontSize: 30, lineHeight: '35px', fontWeight: 780, letterSpacing: 0, marginBottom: 9 }}>
           Что интересного сегодня
         </div>
@@ -508,16 +513,16 @@ function V2SecondScreen({
         </div>
       </div>
 
-      <div data-apg-horizontal-scroll="true" onTouchStart={e => e.stopPropagation()}>
-          <div style={{ ...horizontalSnapTrack, alignItems: 'stretch', gap: 12, padding: '0 18px 26px', scrollPaddingLeft: 18 }}>
+      <div data-apg-horizontal-scroll={!desktopMode ? 'true' : undefined} onTouchStart={e => e.stopPropagation()}>
+          <div style={desktopMode ? { display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', alignItems: 'stretch', gap: 12, padding: '0 0 22px' } : { ...horizontalSnapTrack, alignItems: 'stretch', gap: 12, padding: '0 18px 26px', scrollPaddingLeft: 18 }}>
             {forYouCards.map((card, index) => (
               <button
                 key={`${card.label}-${index}`}
                 onClick={card.onClick}
                 {...pressMotion}
                 style={{
-                  flex: '0 0 min(74vw, 244px)',
-                  height: 286,
+                  flex: desktopMode ? undefined : '0 0 min(74vw, 244px)',
+                  height: desktopMode ? 246 : 286,
                   border: 'none', borderRadius: 32,
                   overflow: 'hidden', padding: 0, position: 'relative', textAlign: 'left', cursor: 'pointer',
                   ...horizontalSnapItem,
@@ -543,9 +548,12 @@ function V2SecondScreen({
           </div>
       </div>
 
-      <div style={{ padding: '0 0 0' }}>
+      <div style={{ padding: '0 0 0', display: desktopMode ? 'grid' : 'block', gridTemplateColumns: desktopMode ? 'minmax(0, 1fr) minmax(340px, 0.62fr)' : undefined, gap: desktopMode ? 18 : undefined, alignItems: 'start' }}>
+        <div>
         <NewsFeed news={newsItems} onOpenNews={onOpenNews} onOpenNewsItem={onOpenNewsItem} />
+        </div>
 
+        <div>
         <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780, marginBottom: 16 }}>
           Ближайшие мероприятия
         </div>
@@ -630,6 +638,8 @@ function V2SecondScreen({
             ))}
           </div>
         )}
+        </div>
+      </div>
       </div>
     </section>
   );
@@ -1354,6 +1364,7 @@ export function HomePanelV2({
   userCount = 0, onOpenForPartners,
   counterPulse = false,
   interestProfile = null,
+  desktopMode = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1483,6 +1494,7 @@ export function HomePanelV2({
         onOpenTasks={onOpenTasks}
         onOpenReference={onOpenReference}
         onOpenLoki={onOpenLoki}
+        desktopMode={desktopMode}
       />
 
       {/* Pull-to-refresh indicator */}
@@ -1560,6 +1572,7 @@ export function HomePanelV2({
               onOpenRewards={onOpenRewards}
               onOpenNews={onOpenNews}
               onOpenNewsItem={onOpenNewsItem}
+              desktopMode={desktopMode}
             />
 
           </>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { APG2_PROFILE, GlassButton, GlassCard, GlassPanel } from '../components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE, GlassButton, GlassCard } from '../components/Apg2ProfileGlass.jsx';
 import { T } from '../design.js';
 import { MOTION, motionTransition } from '../motion.js';
 import { buildWorkspaceLayout, WORKSPACE_REGIONS } from './WorkspaceCore.js';
@@ -62,7 +62,7 @@ export function WorkspaceHeader({ title, subtitle, kicker, actions, onBack, styl
 
 export function Sidebar({ items = [], activeId, onSelect, footer, style }) {
   return (
-    <GlassPanel style={{ minHeight: 'calc(100svh - 36px)', borderRadius: 34, padding: 12, position: 'sticky', top: 18, ...style }}>
+    <div style={{ ...APG2_PROFILE.glass, minHeight: 'calc(100svh - 36px)', borderRadius: 34, padding: 12, position: 'sticky', top: 18, ...style }}>
       <div style={{ display: 'grid', gap: 7 }}>
         {items.map(item => {
           const active = activeId === item.panelId || activeId === item.id;
@@ -90,16 +90,16 @@ export function Sidebar({ items = [], activeId, onSelect, footer, style }) {
         })}
       </div>
       {footer && <div style={{ marginTop: 14 }}>{footer}</div>}
-    </GlassPanel>
+    </div>
   );
 }
 
 export function WorkspacePanel({ title, subtitle, children, actions, style }) {
   return (
-    <GlassPanel style={{ borderRadius: 34, padding: 16, ...style }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, minHeight: 0, ...style }}>
       {(title || actions) && <SectionHeader title={title} subtitle={subtitle} actions={actions} />}
       {children}
-    </GlassPanel>
+    </div>
   );
 }
 

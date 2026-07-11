@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-12] ux: Desktop UX 1.0
+**Коммит:** `pending`
+**Файлы:** `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceComponents.jsx`, `src/workspace/WorkspaceWidgets.js`, `docs/desktop-ux.md`, `docs/desktop-workspace.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** refactor
+**Что изменено:**
+- Desktop User Mode перестал быть мобильной колонкой на 480px: главная получила широкую desktop-сетку, hero + быстрые действия, grid-подборки, двухколоночные новости и мероприятия.
+- В Workspace исправлено использование экранного `GlassPanel` как маленькой панели; header, sidebar, status bar и виджеты стали нормальными desktop-surfaces без `minHeight: 100svh`.
+- Dashboard уплотнён и получил более профессиональную иерархию: 12-column widget grid, сегодняшняя сводка, статистика, бизнес-виджет и контекстный Локи в правой колонке.
+**Почему:** Desktop Workspace должен восприниматься как законченный SaaS-интерфейс, а пользовательский режим на desktop — как самостоятельный широкий интерфейс, а не растянутая мобильная версия.
+
+---
+
 ## [2026-07-12] feat: Business Hub 1.0
 **Коммит:** `pending`
 **Файлы:** `src/businessHub/BusinessHubCore.js`, `src/businessHub/BusinessHub.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceCore.js`, `scripts/business-hub-test.mjs`, `docs/business-hub.md`, `.ai/17_CHANGELOG_AI.md`

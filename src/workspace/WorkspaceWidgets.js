@@ -21,6 +21,16 @@ export const WORKSPACE_WIDGETS = [
     size: 'medium',
   },
   {
+    id: 'stats',
+    title: 'Статистика',
+    size: 'medium',
+  },
+  {
+    id: 'business',
+    title: 'Бизнес',
+    size: 'medium',
+  },
+  {
     id: 'profile-status',
     title: 'Статус профиля',
     size: 'medium',

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassPanel } from '../components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from '../components/Apg2ProfileGlass.jsx';
 import { MOTION, motionTransition } from '../motion.js';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
@@ -63,7 +63,7 @@ function getProfileCompletion(profile) {
 
 function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan }) {
   return (
-    <GlassPanel style={{ borderRadius: 30, padding: '12px 14px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 14, position: 'sticky', top: 14, zIndex: 10 }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: 26, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 12, position: 'sticky', top: 14, zIndex: 10, minHeight: 64 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontWeight: 950, boxShadow: '0 16px 36px rgba(215,184,106,0.18)' }}>АПГ</div>
         <div>
@@ -96,13 +96,13 @@ function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onMod
           <div style={{ width: 40, height: 40, borderRadius: 16, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{String(user?.firstName || user?.name || 'A').slice(0, 1)}</div>
         </button>
       </div>
-    </GlassPanel>
+    </div>
   );
 }
 
 function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect }) {
   return (
-    <GlassPanel style={{ borderRadius: 32, padding: 10, height: 'calc(100svh - 116px)', position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 8, transition: motionTransition(['width'], 'base'), width: collapsed ? 78 : 258 }}>
+    <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 9, height: 'calc(100svh - 116px)', minHeight: 0, position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 8, transition: motionTransition(['width'], 'base'), width: collapsed ? 72 : 238 }}>
       <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center', padding: '4px 5px 8px' }}>
         {!collapsed && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}>Навигация</div>}
         <GlassButton onClick={onToggle} style={{ minHeight: 34, width: 34, padding: 0, borderRadius: 14 }}>{collapsed ? '›' : '‹'}</GlassButton>
@@ -140,13 +140,14 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 4 }}>Платформа для партнёров, экспертов и команды АПГ.</div>
         </GlassCard>
       </div>
-    </GlassPanel>
+    </div>
   );
 }
 
 function WidgetShell({ widget, children }) {
+  const columns = widget.size === 'wide' ? 'span 6' : 'span 3';
   return (
-    <div data-workspace-widget={widget.id} data-drag-handle={widget.dragHandleId} style={{ gridColumn: widget.size === 'wide' ? 'span 2' : 'span 1', minWidth: 0 }}>
+    <div data-workspace-widget={widget.id} data-drag-handle={widget.dragHandleId} style={{ gridColumn: columns, minWidth: 0 }}>
       {children}
     </div>
   );
@@ -156,6 +157,12 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const latestNews = data.news.slice(0, 4);
   const upcomingEvents = data.events.slice(0, 4);
+  const todaySignals = [
+    `${data.news.length} новостей в системе`,
+    `${data.events.length} мероприятий`,
+    data.unreadCount ? `${data.unreadCount} уведомлений` : 'уведомлений нет',
+    data.activeProfile?.name ? `профиль: ${data.activeProfile.name}` : 'профиль не выбран',
+  ];
   const tasks = [
     profileStatus.value < 100 ? `Заполнить профиль: ${profileStatus.label}` : '',
     data.unreadCount ? `Проверить уведомления: ${data.unreadCount}` : '',
@@ -169,9 +176,10 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
           tone="gold"
           icon="☼"
           title={`Добро пожаловать, ${data.userName}`}
-          subtitle="Это рабочее пространство АПГ. Здесь собираются кабинеты, контент, задачи, Локи и будущие CRM-инструменты."
+          subtitle={`Сегодня: ${todaySignals.join(' · ')}`}
           value={data.roleLabel}
           action={<GlassButton onClick={actions.openCabinet} style={{ color: '#17120a' }}>Открыть Мой бизнес</GlassButton>}
+          style={{ minHeight: 156 }}
         />
       );
     }
@@ -195,10 +203,33 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
     }
     if (widget.id === 'recent-actions') {
       return (
-        <WorkspacePanel title="Последние действия" subtitle="Живая лента Workspace">
+        <WorkspacePanel title="Последние действия" subtitle="Живая лента Workspace" style={{ height: '100%' }}>
           <div style={{ display: 'grid', gap: 8 }}>
             {data.recentActions.map(item => <ListRow key={item.id} title={item.title} text={item.text} />)}
           </div>
+        </WorkspacePanel>
+      );
+    }
+    if (widget.id === 'stats') {
+      return (
+        <WorkspacePanel title="Статистика" subtitle="Быстрый срез платформы" style={{ height: '100%' }}>
+          <ContentGrid min={120} gap={8}>
+            <MetricCard label="Партнёры" value={data.partners.length} />
+            <MetricCard label="Эксперты" value={data.experts.length} />
+            <MetricCard label="Новости" value={data.news.length} />
+            <MetricCard label="События" value={data.events.length} />
+          </ContentGrid>
+        </WorkspacePanel>
+      );
+    }
+    if (widget.id === 'business') {
+      return (
+        <WorkspacePanel title="Бизнес" subtitle={data.activeProfile?.name || 'Профиль Workspace'} style={{ height: '100%' }}>
+          <ContentGrid min={120} gap={8}>
+            <MetricCard label="Заполненность" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'gold' : undefined} />
+            <MetricCard label="Роль" value={data.roleLabel} delta="активный режим" />
+          </ContentGrid>
+          <GlassButton onClick={actions.openCabinet} style={{ width: '100%', marginTop: 10 }}>Мой бизнес</GlassButton>
         </WorkspacePanel>
       );
     }
@@ -238,13 +269,13 @@ function WorkspaceDashboard({ data, actions, widgetLayout }) {
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
-      <ContentGrid min={180} gap={10}>
+      <ContentGrid min={170} gap={10}>
         <MetricCard label="Партнёры" value={data.partners.length} />
         <MetricCard label="Эксперты" value={data.experts.length} />
         <MetricCard label="Новости" value={data.news.length} />
         <MetricCard label="События" value={data.events.length} />
       </ContentGrid>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,minmax(0,1fr))', gap: 12, alignItems: 'stretch' }}>
         {widgetLayout.map(widget => <WidgetShell key={widget.id} widget={widget}>{renderWidget(widget)}</WidgetShell>)}
       </div>
     </div>
@@ -307,11 +338,25 @@ function DataSection({ title, subtitle, items, emptyText, onOpen, columns = 2 })
 }
 
 function RightContextPanel({ notifications, events, onOpenLoki, onOpenNotifications, onOpenEvents }) {
+  const recommendations = [
+    notifications.length ? `Разобрать ${notifications.length} уведомлений` : 'Проверить, что сегодня требует внимания',
+    events.length ? 'Посмотреть ближайшие мероприятия' : 'Подготовить новое мероприятие',
+    'Попросить Локи найти слабые места карточек',
+  ];
   return (
-    <div style={{ display: 'grid', gap: 12, position: 'sticky', top: 92 }}>
-      <WorkspacePanel title="Локи" subtitle="Desktop context">
-        <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '21px', fontWeight: 760 }}>Я теперь не плаваю поверх рабочего стола, а живу в правой колонке Workspace. Так спокойнее для интерфейса и полезнее для работы.</div>
-        <GlassButton onClick={onOpenLoki} tone="gold" style={{ marginTop: 12, width: '100%', color: '#17120a' }}>Открыть Локи</GlassButton>
+    <div style={{ display: 'grid', gap: 10, position: 'sticky', top: 92 }}>
+      <WorkspacePanel title="Локи" subtitle="Рабочий контекст" style={{ border: '1px solid rgba(215,184,106,0.26)' }}>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '20px', fontWeight: 780 }}>Я рядом как правая панель: меньше плаваю, больше помогаю.</div>
+        <div style={{ display: 'grid', gap: 7, marginTop: 11 }}>
+          {recommendations.map(item => <ListRow key={item} title={item} text="Рекомендация" />)}
+        </div>
+        <GlassButton onClick={onOpenLoki} tone="gold" style={{ marginTop: 12, width: '100%', color: '#17120a' }}>Спросить Локи</GlassButton>
+      </WorkspacePanel>
+      <WorkspacePanel title="Сегодня" subtitle="Оперативный срез">
+        <ContentGrid min={120} gap={8}>
+          <MetricCard label="Уведомления" value={notifications.length} />
+          <MetricCard label="События" value={events.length} />
+        </ContentGrid>
       </WorkspacePanel>
       <WorkspacePanel title="Быстрые действия">
         <QuickActions actions={[
@@ -500,7 +545,7 @@ export function DesktopWorkspace({
   };
 
   return (
-    <div style={{ minHeight: '100svh', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 14, boxSizing: 'border-box' }}>
+    <div style={{ minHeight: '100svh', background: 'radial-gradient(circle at 18% -12%, rgba(215,184,106,0.18), transparent 34%), radial-gradient(circle at 92% 8%, rgba(112,92,168,0.14), transparent 30%), linear-gradient(180deg, var(--apg2-bg-top, #17171a) 0%, var(--apg2-bg-mid, #121316) 56%, var(--apg2-bg-bottom, #101114) 100%)', color: APG2_PROFILE.text, padding: 14, boxSizing: 'border-box' }}>
       <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: 14, minHeight: 'calc(100svh - 28px)' }}>
         <WorkspaceHeaderBar
           user={user}
@@ -515,7 +560,7 @@ export function DesktopWorkspace({
           onOpenProfile={() => onOpenPanel?.('profile')}
           onOpenScan={onOpenScan}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: `${sidebarCollapsed ? 78 : 258}px minmax(0, 1fr) 344px`, gap: 14, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `${sidebarCollapsed ? 72 : 238}px minmax(0, 1fr) 326px`, gap: 14, alignItems: 'start' }}>
           <WorkspaceSidebar
             items={navItems}
             activeSection={activeSection}
@@ -541,10 +586,10 @@ export function DesktopWorkspace({
             />
           </aside>
         </div>
-        <GlassPanel style={{ borderRadius: 24, padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12 }}>
+        <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: APG2_PROFILE.textSoft, fontSize: 12 }}>
           <span>Workspace status: готов · shortcuts: ⌘K поиск, ⌘1 Dashboard, ⌘B sidebar</span>
           <span>{partners.length} партнёров · {experts.length} экспертов · {news.length} новостей · {events.length} событий</span>
-        </GlassPanel>
+        </div>
       </div>
     </div>
   );
