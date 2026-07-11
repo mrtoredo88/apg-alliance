@@ -391,6 +391,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
+  const [showIdentityDiagnostics, setShowIdentityDiagnostics] = useState(false);
+  const [identityDiagnostics, setIdentityDiagnostics] = useState(null);
+  const [identityDiagnosticsLoading, setIdentityDiagnosticsLoading] = useState(false);
+  const [identityDiagnosticsError, setIdentityDiagnosticsError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [vkLoginLoading, setVkLoginLoading] = useState(false);
   const [vkLoginError, setVkLoginError] = useState('');
@@ -682,9 +686,31 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const nextLevel = getNextLevel(userKeys);
   const roleValue = String(user?.role || user?.userRole || user?.authRole || '').toLowerCase();
   const isPrivilegedProfile = String(user?.id || '') === '988504' || ['admin', 'owner', 'super_admin', 'moderator'].includes(roleValue) || user?.admin === true || user?.isAdmin === true || user?.owner === true;
-  const showWorkspaceDiagnosticButton = Boolean(workspaceDiagnostics) && (String(user?.id || '') === '988504' || ['owner', 'super_admin'].includes(roleValue) || user?.owner === true || user?.isOwner === true);
+  const roleList = Array.isArray(user?.roles) ? user.roles.map(item => String(item || '').toLowerCase()) : [];
+  const showWorkspaceDiagnosticButton = Boolean(workspaceDiagnostics) && (['owner', 'super_admin'].includes(roleValue) || roleList.some(role => ['owner', 'super_admin'].includes(role)) || user?.owner === true || user?.isOwner === true);
+  const showIdentityDiagnosticButton = !!user && !String(user.id || '').startsWith('guest_');
   const showPartnershipCard = Boolean(onOpenPartnership) && !ownedPartner && !ownedExpert && !isPrivilegedProfile;
   const partnershipCardTrackedRef = useRef(false);
+
+  const openIdentityDiagnostics = useCallback(async () => {
+    setShowIdentityDiagnostics(true);
+    setIdentityDiagnosticsLoading(true);
+    setIdentityDiagnosticsError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/user-actions`, {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: 'identity:diagnostics', userId: String(user?.id || ''), email: user?.email || user?.linkedEmail || '' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || 'Не удалось получить диагностику Identity.');
+      setIdentityDiagnostics(data);
+    } catch (error) {
+      setIdentityDiagnosticsError(error?.message || 'Не удалось получить диагностику Identity.');
+    } finally {
+      setIdentityDiagnosticsLoading(false);
+    }
+  }, [user]);
 
   const trackPartnershipProfileEvent = useCallback((event, payload = {}) => {
     fetch(`${API_BASE_URL}/api/public-submit`, {
@@ -1715,6 +1741,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
             { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
+            showIdentityDiagnosticButton && { icon: '🪪', label: 'Диагностика Identity', action: openIdentityDiagnostics, right: user?.canonicalUserId ? 'core' : null },
             showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
@@ -1942,6 +1969,58 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
             );
           })()}
+        </ApgModal>,
+        document.body
+      )}
+
+      {/* ── Диагностика Identity ── */}
+      {showIdentityDiagnostics && createPortal(
+        <ApgModal
+          title="Диагностика Identity"
+          subtitle="Canonical User, роли и связанные документы."
+          onClose={() => setShowIdentityDiagnostics(false)}
+          maxWidth={520}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {identityDiagnosticsLoading && (
+              <div style={{ ...APG2.glass, borderRadius: 18, padding: '14px', color: APG2.textSoft, fontSize: 13 }}>Загружаем Identity Core...</div>
+            )}
+            {identityDiagnosticsError && (
+              <div style={{ ...APG2.glass, borderRadius: 18, padding: '14px', color: '#E64646', fontSize: 13, border: '1px solid rgba(230,70,70,0.24)' }}>{identityDiagnosticsError}</div>
+            )}
+            {!identityDiagnosticsLoading && !identityDiagnosticsError && (
+              <>
+                <div style={{ ...APG2.glass, borderRadius: 18, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {[
+                    ['Canonical User', identityDiagnostics?.canonicalUserId || '—'],
+                    ['Открытый профиль', identityDiagnostics?.openedUserId || String(user?.id || '—')],
+                    ['Роли', identityDiagnostics?.roles?.join(', ') || roleValue || '—'],
+                    ['Partner cabinets', identityDiagnostics?.cabinets?.partnerCabinetIds?.join(', ') || '—'],
+                    ['Expert cabinets', identityDiagnostics?.cabinets?.expertCabinetIds?.join(', ') || '—'],
+                    ['Причина', identityDiagnostics?.reason || '—'],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: APG2.textSoft, flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontSize: 12, color: APG2.text, fontWeight: 700, textAlign: 'right', overflowWrap: 'anywhere', userSelect: 'text' }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(identityDiagnostics?.documents || []).map(doc => (
+                    <div key={doc.id} style={{ ...APG2.glass, borderRadius: 18, padding: '12px 14px', border: doc.id === identityDiagnostics?.canonicalUserId ? '1px solid rgba(75,179,75,0.28)' : '1px solid rgba(255,255,255,0.12)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, color: APG2.text, fontWeight: 800, overflowWrap: 'anywhere', userSelect: 'text' }}>{doc.id}</span>
+                        <span style={{ fontSize: 11, color: doc.id === identityDiagnostics?.canonicalUserId ? '#4BB34B' : APG2.textSoft, fontWeight: 800 }}>{doc.identityStatus || 'legacy'}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: APG2.textSoft, lineHeight: '18px', userSelect: 'text' }}>
+                        role: {doc.role || '—'} · userRole: {doc.userRole || '—'} · canonical: {doc.canonicalUserId || '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </ApgModal>,
         document.body
       )}

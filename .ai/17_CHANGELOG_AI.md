@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] feat: Identity Core V1
+**Коммит:** `pending`
+**Файлы:** `server/src/lib/identityCore.js`, `server/src/routes/email-auth.js`, `server/src/routes/user-actions.js`, `server/src/lib/adminSecurity.js`, `server/src/routes/admin-login.js`, `server/src/routes/admin-actions.js`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `src/workspace/WorkspaceFeatureFlags.js`, `scripts/identity-core-test.mjs`, `scripts/desktop-workspace-test.mjs`, `docs/identity-core.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Identity Core: email/Firebase resolver выбирает canonical user, обновляет `emailIndex`, `identityLinks`, `canonicalUsers` и помечает legacy-документы без удаления.
+- Email login, admin login, user-actions и admin security переведены на canonical identity; `UserApp` уточняет canonical user на старте, а Workspace больше не использует VK id `988504` как owner-доступ.
+- В профиль добавлена «Диагностика Identity», показывающая canonical user, роли, кабинеты и найденные документы.
+**Почему:** Один человек мог существовать как VK/email/Firebase/Telegram-документы одновременно, из-за чего owner определялся как partner и Workspace/кабинеты получали неверные роли.
+
+---
+
 ## [2026-07-11] fix: Workspace owner diagnostics
 **Коммит:** `pending`
 **Файлы:** `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `.ai/17_CHANGELOG_AI.md`

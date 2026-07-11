@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { APP_URL } from '../lib/config.js';
+import { resolveEmailIdentity } from '../lib/identityCore.js';
 import { ECONOMY_VERSION, economyMigrationPatch } from '../../../server-shared/economy-engine.js';
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentTitle, getLifecycleAutoRecommendation, normalizeContentStatus, summarizeLifecycle } from '../../../server-shared/content-lifecycle.js';
 
@@ -1113,6 +1114,11 @@ async function collectPartnerOwnerIdentity(db, user, email) {
 async function findUserByEmail(db, email) {
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
+  const identity = await resolveEmailIdentity(db, { email: normalized, createIfMissing: false }).catch(() => null);
+  if (identity?.userId) {
+    const snap = await db.collection('users').doc(identity.userId).get().catch(() => null);
+    if (snap?.exists) return { id: snap.id, ...serializeAdminValue(snap.data() || {}) };
+  }
   const indexSnap = await db.collection('emailIndex').doc(normalized).get().catch(() => null);
   const candidates = [];
   if (indexSnap?.exists && indexSnap.data()?.userId) candidates.push(String(indexSnap.data().userId));

@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from './firebase.js';
+import { resolveFirebaseIdentity } from './identityCore.js';
 
 export const ROLE_PERMISSIONS = {
   owner: ['*'],
@@ -35,6 +36,9 @@ function getBearerToken(request) {
 }
 
 async function findUserByFirebaseUid(db, uid) {
+  const identity = await resolveFirebaseIdentity(db, uid).catch(() => null);
+  if (identity?.userId) return { id: identity.userId, data: identity.user || {}, source: identity.source || 'identity_core' };
+
   const direct = await db.collection('users').doc(uid).get().catch(() => null);
   if (direct?.exists) return { id: direct.id, data: direct.data() || {}, source: 'users.uid' };
 

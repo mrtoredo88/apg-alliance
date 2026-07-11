@@ -926,7 +926,7 @@ export function UserApp() {
       });
     });
 
-    const [, userData] = await Promise.all([
+    const [, rawUserData] = await Promise.all([
       authReady,
       Promise.race([
         vkBridge.send('VKWebAppGetUserInfo'),
@@ -951,6 +951,7 @@ export function UserApp() {
         return { id: guestId, first_name: 'Участник', last_name: 'АПГ', photo_200: null };
       }),
     ]);
+      let userData = rawUserData;
 
       if (!isMounted.current) return;
       setUser(userData);
@@ -1002,6 +1003,29 @@ export function UserApp() {
           await signOut(auth).catch(() => {});
           window.location.reload();
           return;
+        }
+
+        try {
+          const identity = await userAction('identity:diagnostics', {
+            userId: String(userData.id),
+            email: userData.email || userData.linkedEmail || '',
+          });
+          if (identity?.canonicalUserId && String(identity.canonicalUserId) !== String(userData.id)) {
+            userData = {
+              ...userData,
+              id: identity.canonicalUserId,
+              canonicalUserId: identity.canonicalUserId,
+              role: identity.roles?.[0] || userData.role,
+              roles: identity.roles || userData.roles,
+            };
+            setUser(userData);
+            setErrorLoggerUser(String(userData.id));
+            if (userData.email || userData.linkedEmail) {
+              try { localStorage.setItem('apg_email_user', JSON.stringify(userData)); } catch {}
+            }
+          }
+        } catch (error) {
+          traceAuthStage('identity_core_deferred', { userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
         }
       }
 
@@ -1159,11 +1183,13 @@ export function UserApp() {
         const reputationStatus = data.reputationStatusLabel ? { label: data.reputationStatusLabel } : getReputationStatus(reputation);
         setUser(u => u ? ({
           ...u,
+          canonicalUserId: data.canonicalUserId || data.id || String(userData.id),
           ...(data.displayName ? { displayName: data.displayName } : {}),
           ...(data.email ? { email: data.email } : {}),
           ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
           ...(data.linkedTelegram ? { linkedTelegram: data.linkedTelegram } : {}),
           ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
+          ...(Array.isArray(data.linkedEmails) ? { linkedEmails: data.linkedEmails } : {}),
           ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),
           ...(data.notificationsEnabled !== undefined ? { notificationsEnabled: data.notificationsEnabled } : {}),
         }) : u);
@@ -1211,6 +1237,8 @@ export function UserApp() {
             expertId: data.expertId ?? null,
             expertCabinetIds: safeStringList(data.expertCabinetIds),
             role: data.role ?? u.role ?? null,
+            userRole: data.userRole ?? u.userRole ?? null,
+            authRole: data.authRole ?? u.authRole ?? null,
             roles: Array.isArray(data.roles) ? data.roles : (u.roles ?? null),
             firebaseUid: data.firebaseUid || data.uid || u.firebaseUid || null,
           }) : u);

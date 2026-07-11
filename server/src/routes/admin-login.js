@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { verifyPasswordRecord } from '../../../server-shared/admin-password.js';
+import { resolveEmailIdentity } from '../lib/identityCore.js';
 
 const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'editor', 'moderator', 'analyst']);
 
@@ -41,9 +42,9 @@ export default async function adminLoginRoutes(fastify) {
     }).catch(() => {});
 
     try {
-      const userSnap = await db.collection('users').where('email', '==', email).limit(1).get();
-      const userDoc = userSnap.docs[0];
-      if (!userDoc) {
+      const identity = await resolveEmailIdentity(db, { email, createIfMissing: false }).catch(() => null);
+      const userDoc = identity?.userId ? await db.collection('users').doc(identity.userId).get() : null;
+      if (!userDoc?.exists) {
         await log('error', { code: 'ADMIN_NOT_FOUND' });
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }

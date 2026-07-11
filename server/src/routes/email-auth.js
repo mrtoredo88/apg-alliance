@@ -2,6 +2,7 @@ import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { APP_URL } from '../lib/config.js';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { resolveEmailIdentity, resolveFirebaseIdentity } from '../lib/identityCore.js';
 
 const FROM = 'noreply@myapg.ru';
 
@@ -115,6 +116,8 @@ async function getActor(request, db) {
   }
   const decoded = await getDbAuth().verifyIdToken(token);
   const uid = decoded.uid;
+  const identity = await resolveFirebaseIdentity(db, uid).catch(() => null);
+  if (identity?.userId) return identity;
   const direct = await db.collection('users').doc(uid).get().catch(() => null);
   if (direct?.exists) return { uid, userId: uid, user: direct.data() || {}, source: 'users.uid' };
   const map = await db.collection('auth_map').doc(uid).get().catch(() => null);
@@ -135,8 +138,16 @@ async function auditAccountLink(db, request, payload) {
   }).catch(() => {});
 }
 
-async function createFirebaseToken(userId) {
-  return getDbAuth().createCustomToken(String(userId));
+async function createFirebaseToken(userId, user = {}) {
+  const role = safeString(user.role || user.userRole, 80).toLowerCase();
+  const roles = Array.isArray(user.roles) ? user.roles.map(item => safeString(item, 80).toLowerCase()).filter(Boolean) : [];
+  const claims = {
+    ...(role ? { role } : {}),
+    ...(roles.length ? { roles } : {}),
+    ...(role === 'owner' || roles.includes('owner') ? { owner: true } : {}),
+    ...(role === 'admin' || roles.includes('admin') || roles.includes('super_admin') ? { admin: true } : {}),
+  };
+  return getDbAuth().createCustomToken(String(userId), claims);
 }
 
 async function sendVerificationEmail(db, email, userId, appUrl) {
@@ -167,55 +178,10 @@ async function sendVerificationEmail(db, email, userId, appUrl) {
 }
 
 async function resolveEmailUser(db, email, ref) {
-  const indexSnap = await db.collection('emailIndex').doc(email).get();
-  if (indexSnap.exists) {
-    const { userId } = indexSnap.data();
-    db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
-    return userId;
-  }
-
-  const userId   = `email:${email}`;
-  const userSnap = await db.collection('users').doc(userId).get();
-  if (userSnap.exists) {
-    await db.collection('emailIndex').doc(email).set({ userId, createdAt: FieldValue.serverTimestamp() });
-    db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
-    return userId;
-  }
-
-  const isValidRef = ref && ref !== userId;
-  const today = new Date().toLocaleDateString('sv');
-  await db.collection('users').doc(userId).set({
-    authProvider: 'email',
-    email,
-    displayName: email.split('@')[0],
-    firstName: email.split('@')[0],
-    lastName: null,
-    photo: null,
-    keys: isValidRef ? 2 : 0,
-    favorites: [],
-    scannedPartners: {},
-    completedTasks: [],
-    streak: 0,
-    onboardingDone: false,
-    scanDates: [],
-    lastBonusDate: today,
-    referredBy: isValidRef ? ref : null,
-    emailVerified: false,
-    registeredAt: FieldValue.serverTimestamp(),
-  });
-
-  await db.collection('emailIndex').doc(email).set({ userId, createdAt: FieldValue.serverTimestamp() });
+  const identity = await resolveEmailIdentity(db, { email, ref, createIfMissing: true });
+  const userId = identity.userId;
+  db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
   await attachPendingPartnerInvites(db, email, userId).catch(() => {});
-
-  if (isValidRef) {
-    db.collection('users').doc(ref).update({
-      keys: FieldValue.increment(2),
-      referralCount: FieldValue.increment(1),
-    }).catch(() => {});
-  }
-
-  db.collection('stats').doc('global').set({ userCount: FieldValue.increment(1) }, { merge: true }).catch(() => {});
-
   return userId;
 }
 
@@ -308,17 +274,23 @@ export default async function emailAuthRoutes(fastify) {
       await codeRef.delete();
 
       const userId = await resolveEmailUser(db, email, ref ?? null);
+      const userSnap = await db.collection('users').doc(userId).get();
+      const ud = userSnap.data() ?? {};
 
-      const token = await createFirebaseToken(userId);
+      const token = await createFirebaseToken(userId, ud);
       return {
         ok: true,
         token,
+        canonicalUserId: userId,
         user: {
           id: userId,
-          first_name: email.split('@')[0],
-          last_name: '',
-          photo_200: null,
+          canonicalUserId: userId,
+          first_name: ud.firstName ?? email.split('@')[0],
+          last_name: ud.lastName ?? '',
+          photo_200: ud.photo ?? null,
           email,
+          role: ud.role ?? null,
+          roles: Array.isArray(ud.roles) ? ud.roles : null,
         },
       };
     }
@@ -442,17 +414,21 @@ export default async function emailAuthRoutes(fastify) {
           request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox verification email failed');
         });
       }
-      const token = await createFirebaseToken(userId);
+      const token = await createFirebaseToken(userId, ud);
       return {
         ok: true,
         token,
+        canonicalUserId: userId,
         user: {
           id: userId,
+          canonicalUserId: userId,
           first_name: ud.firstName ?? email.split('@')[0],
           last_name:  ud.lastName  ?? '',
           photo_200:  ud.photo     ?? null,
           email,
           emailVerified: ud.emailVerified ?? null,
+          role: ud.role ?? null,
+          roles: Array.isArray(ud.roles) ? ud.roles : null,
         },
       };
     }

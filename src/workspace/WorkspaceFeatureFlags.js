@@ -18,7 +18,6 @@ const FLAG_ORDER = [
 
 const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'moderator', 'editor']);
 const OWNER_ROLES = new Set(['owner', 'super_admin']);
-const APG_OWNER_USER_IDS = new Set(['988504']);
 
 export function normalizeWorkspaceFlag(value, fallback = DESKTOP_WORKSPACE_FLAG.owner) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -35,14 +34,21 @@ export function getDesktopWorkspaceFlag(storage = globalThis.localStorage) {
 
 export function getWorkspaceUserRoles({ user, partner, expert } = {}) {
   const roles = new Set();
-  const userRole = String(user?.role || user?.userRole || user?.authRole || '').toLowerCase();
-  if (userRole) {
-    roles.add(userRole);
-    if (userRole === 'super_admin') roles.add('admin');
+  const rawRoles = [
+    user?.role,
+    user?.userRole,
+    user?.authRole,
+    ...(Array.isArray(user?.roles) ? user.roles : []),
+  ].map(item => String(item || '').trim().toLowerCase()).filter(Boolean);
+  rawRoles.forEach(role => {
+    roles.add(role);
+    if (role === 'super_admin') roles.add('admin');
+  });
+  if (rawRoles.length) {
+    if (rawRoles.includes('super_admin')) roles.add('admin');
   }
   if (user?.owner === true || user?.isOwner === true) roles.add('owner');
   if (user?.admin === true || user?.isAdmin === true) roles.add('admin');
-  if (APG_OWNER_USER_IDS.has(String(user?.id || ''))) roles.add('owner');
   if (partner?.id || user?.partnerId || user?.partnerCabinetEnabled || (Array.isArray(user?.partnerCabinetIds) && user.partnerCabinetIds.length)) roles.add('partner');
   if (expert?.id || user?.expertId || user?.expertCabinetEnabled || (Array.isArray(user?.expertCabinetIds) && user.expertCabinetIds.length)) roles.add('expert');
   if (!roles.size) roles.add('user');

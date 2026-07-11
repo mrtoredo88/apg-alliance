@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
+import { buildIdentityDiagnostics, resolveFirebaseIdentity } from '../lib/identityCore.js';
 
 const MAX_TEXT = 4000;
 
@@ -120,6 +121,9 @@ function sanitizeWebPushSubscription(input = {}) {
 }
 
 async function resolveActor(db, decoded) {
+  const identity = await resolveFirebaseIdentity(db, decoded.uid).catch(() => null);
+  if (identity?.userId) return identity;
+
   const direct = await db.collection('users').doc(decoded.uid).get().catch(() => null);
   if (direct?.exists) return { uid: decoded.uid, userId: decoded.uid, user: direct.data() || {}, source: 'users.uid' };
 
@@ -199,12 +203,29 @@ async function actionAuthLink(db, req, actor) {
   await db.collection('auth_map').doc(actor.uid).set({
     vkId: userId,
     userId,
+    canonicalUserId: actor.user?.canonicalUserId || userId,
     source: safeString(req.body?.source || 'user-actions', 80),
+    identityVersion: 'identity-core-v1',
     updatedAt: FieldValue.serverTimestamp(),
     createdAt: FieldValue.serverTimestamp(),
   }, { merge: true });
   await audit(db, req, { ...actor, userId }, 'auth:linkUser', 'auth_map', actor.uid);
-  return { ok: true, userId };
+  return { ok: true, userId, canonicalUserId: actor.user?.canonicalUserId || userId };
+}
+
+async function actionIdentityDiagnostics(db, req, actor) {
+  const requestedUserId = safeUserId(req.body?.userId || actor.userId);
+  if (requestedUserId && requestedUserId !== actor.userId && actor.uid !== requestedUserId) {
+    assertOwner(actor);
+  }
+  const email = safeString(req.body?.email || actor.user?.email || actor.user?.linkedEmail, 220).toLowerCase();
+  const diagnostics = await buildIdentityDiagnostics(db, {
+    userId: requestedUserId || actor.userId,
+    email,
+    firebaseUid: actor.uid,
+  });
+  await audit(db, req, actor, 'identity:diagnostics', 'users', diagnostics.canonicalUserId || requestedUserId, 'success', { documents: diagnostics.documents.length });
+  return diagnostics;
 }
 
 async function actionProfileSync(db, req, actor) {
@@ -1136,6 +1157,7 @@ async function actionGuestSession(db, req, actor) {
 async function routeAction(db, req, actor) {
   const action = safeString(req.body?.action, 80);
   if (action === 'auth:linkUser') return actionAuthLink(db, req, actor);
+  if (action === 'identity:diagnostics') return actionIdentityDiagnostics(db, req, actor);
   if (action === 'profile:sync') return actionProfileSync(db, req, actor);
   if (action === 'profile:update') return actionProfilePatch(db, req, actor);
   if (action === 'profile:acceptConsent') return actionProfileAcceptConsent(db, req, actor);
