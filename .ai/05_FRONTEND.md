@@ -23,6 +23,9 @@ src/
 ├── workspace/
 │   ├── WorkspaceCore.js       ← Layout Engine, breakpoints, regions, navigation, cache/virtualization helpers
 │   ├── WorkspaceComponents.jsx← общие APG V2 компоненты Workspace
+│   ├── DesktopWorkspace.jsx   ← рабочая desktop-среда Workspace 1.0
+│   ├── WorkspaceFeatureFlags.js← staged rollout Workspace
+│   ├── WorkspaceWidgets.js    ← архитектура виджетов Workspace
 │   └── index.js               ← публичный экспорт Workspace Core
 ├── PartnerCabinetPage.jsx     ← legacy-компонент кабинета партнёра
 ├── ExpertCabinetPage.jsx      ← legacy-компонент кабинета эксперта
@@ -263,6 +266,23 @@ const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] =
 `src/workspace/WorkspaceComponents.jsx` содержит общие APG V2 компоненты: `WorkspaceShell`, `WorkspaceHeader`, `Sidebar`, `WorkspacePanel`, `WorkspaceContextPanel`, `GlassContainer`, `ContentGrid`, `DashboardCard`, `MetricCard`, `QuickActions`, `InfoPanel`, `SectionHeader`, `ActionCard`. Новые экраны должны использовать эти компоненты вместо отдельной mobile/desktop JSX-реализации.
 
 Подробная архитектура: `docs/workspace-core.md`.
+
+### Desktop Workspace 1.0
+
+`src/workspace/DesktopWorkspace.jsx` — вторая среда использования АПГ для партнёров, экспертов и команды проекта. Она не заменяет пользовательский режим и не является растянутой мобильной версией.
+
+В `UserApp.jsx` добавлен `appMode`:
+
+- `user` — привычное приложение для жителей;
+- `workspace` — desktop SaaS-среда.
+
+Переключение происходит без повторной авторизации и без перезагрузки. Workspace доступен только на desktop-ширине и только если `canUseDesktopWorkspace()` разрешает доступ по feature flag.
+
+`WorkspaceFeatureFlags.js` поддерживает staged rollout: `off → owner → admin → partner → expert → all`. По умолчанию включён безопасный уровень `owner`.
+
+Workspace содержит header, collapsible left sidebar, content area, right context panel и status bar. Dashboard берёт реальные данные из `UserApp`: партнёры, эксперты, новости, мероприятия, уведомления и активный кабинет.
+
+Подробная архитектура: `docs/desktop-workspace.md`.
 
 ### components/MdEditor.jsx
 

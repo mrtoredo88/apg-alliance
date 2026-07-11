@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-11] feat: Desktop Workspace 1.0
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceFeatureFlags.js`, `src/workspace/WorkspaceWidgets.js`, `src/workspace/WorkspaceCore.js`, `src/workspace/index.js`, `src/UserApp.jsx`, `scripts/desktop-workspace-test.mjs`, `scripts/workspace-core-test.mjs`, `docs/desktop-workspace.md`, `docs/workspace-core.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Desktop Workspace 1.0 как вторая среда использования АПГ: header, collapsible left sidebar, content, right context panel, status bar и dashboard на реальных данных.
+- Добавлен staged feature flag `off/owner/admin/partner/expert/all`; переключение `Пользовательский режим ↔ Workspace` работает внутри `UserApp` без повторной авторизации и перезагрузки.
+- Добавлена архитектура workspace-виджетов и drag-ready layout, а плавающий Локи скрывается в Workspace и становится частью правой панели.
+**Почему:** Партнёрам, экспертам и команде АПГ нужна профессиональная SaaS-среда, при этом пользовательский режим должен остаться простым городским приложением.
+
+---
+
 ## [2026-07-11] feat: Workspace Core foundation
 **Коммит:** `pending`
 **Файлы:** `src/workspace/WorkspaceCore.js`, `src/workspace/WorkspaceComponents.jsx`, `src/workspace/index.js`, `src/UserApp.jsx`, `src/cabinet/CabinetCorePage.jsx`, `scripts/workspace-core-test.mjs`, `docs/workspace-core.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`

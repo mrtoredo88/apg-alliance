@@ -33,6 +33,7 @@ import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
+import { canUseDesktopWorkspace, getDesktopWorkspaceFlag } from './workspace/WorkspaceFeatureFlags.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -59,6 +60,7 @@ const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ de
 const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ default: m.NewsPage })));
 const PublicSubmitPage     = lazy(() => import('./PublicSubmitPage.jsx').then(m => ({ default: m.PublicSubmitPage })));
 const ApgHealthPage        = lazy(() => import('./ApgHealthPage.jsx').then(m => ({ default: m.ApgHealthPage })));
+const DesktopWorkspace     = lazy(() => import('./workspace/DesktopWorkspace.jsx').then(m => ({ default: m.DesktopWorkspace })));
 
 function safeScrollTop() {
   try {
@@ -578,6 +580,10 @@ export function UserApp() {
   const initialDeepLink                         = useMemo(readAppDeepLink, []);
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
+  const [appMode, setAppMode]                   = useState(() => {
+    try { return localStorage.getItem('apg_app_mode') === 'workspace' ? 'workspace' : 'user'; } catch { return 'user'; }
+  });
+  const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
@@ -2393,6 +2399,13 @@ export function UserApp() {
 
   const workspaceMode = getWorkspaceMode(workspaceWidth);
   const workspaceRole = user?.role || (user?.isOwner ? 'owner' : user?.isAdmin ? 'admin' : 'user');
+  const desktopWorkspaceAvailable = workspaceMode === WORKSPACE_MODES.desktop && canUseDesktopWorkspace({ user, partner: ownedPartner, expert: ownedExpert, flag: desktopWorkspaceFlag });
+  const desktopWorkspaceActive = desktopWorkspaceAvailable && appMode === 'workspace';
+  const setAppModePersisted = useCallback((mode) => {
+    const nextMode = mode === 'workspace' ? 'workspace' : 'user';
+    setAppMode(nextMode);
+    try { localStorage.setItem('apg_app_mode', nextMode); } catch {}
+  }, []);
   const bottomNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: workspaceRole }), [workspaceRole]);
   const tabIconByKey = {
     home: TabHomeIcon,
@@ -2844,6 +2857,25 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
+          {desktopWorkspaceActive ? (
+            <Suspense fallback={<LazyFallback />}>
+              <DesktopWorkspace
+                user={user}
+                ownedPartner={ownedPartner}
+                ownedExpert={ownedExpert}
+                partners={enrichedPartners}
+                experts={experts}
+                events={events}
+                news={news}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onModeChange={setAppModePersisted}
+                onOpenPanel={(panel) => { setAppModePersisted('user'); goPanel(panel); }}
+                onOpenAdmin={() => { window.location.assign('/admin-app'); }}
+                onOpenScan={() => setIsScannerOpen(true)}
+              />
+            </Suspense>
+          ) : (
           <div
             style={{ maxWidth: 480, margin: '0 auto', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip' }}
             onTouchStart={handleSwipeStart}
@@ -3248,8 +3280,35 @@ export function UserApp() {
             </View>
             </div>
           </div>
+          )}
 
-          {showTabBar && createPortal(tabBarEl, document.body)}
+          {showTabBar && !desktopWorkspaceActive && createPortal(tabBarEl, document.body)}
+
+          {desktopWorkspaceAvailable && !desktopWorkspaceActive && createPortal((
+            <button
+              type="button"
+              onClick={() => setAppModePersisted('workspace')}
+              style={{
+                position: 'fixed',
+                top: 18,
+                right: 18,
+                zIndex: 12000,
+                border: '1px solid rgba(215,184,106,0.32)',
+                borderRadius: 999,
+                minHeight: 44,
+                padding: '0 16px',
+                background: APG2_PROFILE.goldGradient,
+                color: '#17120a',
+                boxShadow: '0 18px 44px rgba(0,0,0,0.22), 0 0 28px rgba(215,184,106,0.16)',
+                fontFamily: 'inherit',
+                fontSize: 13,
+                fontWeight: 900,
+                cursor: 'pointer',
+              }}
+            >
+              Workspace
+            </button>
+          ), document.body)}
 
           <Suspense fallback={null}>
             <ScannerComponent
@@ -3400,7 +3459,7 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant />}
+          {splashDone && !desktopWorkspaceActive && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant />}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>

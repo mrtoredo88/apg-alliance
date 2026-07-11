@@ -15,6 +15,7 @@ export const WORKSPACE_REGIONS = {
   leftSidebar: 'leftSidebar',
   content: 'content',
   rightSidebar: 'rightSidebar',
+  statusBar: 'statusBar',
   bottomBar: 'bottomBar',
   floatingPanels: 'floatingPanels',
 };
@@ -147,6 +148,12 @@ export function buildWorkspaceLayout({ width, mode, modules, contextOpen = false
       overlay: !desktop,
       mode: resolvedMode,
       role: 'context',
+    },
+    [WORKSPACE_REGIONS.statusBar]: {
+      id: WORKSPACE_REGIONS.statusBar,
+      visible: desktop,
+      mode: resolvedMode,
+      role: 'status',
     },
     [WORKSPACE_REGIONS.bottomBar]: {
       id: WORKSPACE_REGIONS.bottomBar,

@@ -31,6 +31,7 @@ assert.equal(desktop.mode, WORKSPACE_MODES.desktop);
 assert.equal(desktop.regions[WORKSPACE_REGIONS.leftSidebar].visible, true);
 assert.equal(desktop.regions[WORKSPACE_REGIONS.bottomBar].visible, false);
 assert.equal(desktop.regions[WORKSPACE_REGIONS.rightSidebar].visible, true);
+assert.equal(desktop.regions[WORKSPACE_REGIONS.statusBar].visible, true);
 assert.equal(desktop.contextPresentation, 'docked');
 
 const mobileNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: 'user' });
