@@ -1867,6 +1867,8 @@
 
 **Что изменено:** `server-shared/expert-directory.js` стал единым источником 23 категорий и normalization contract. Vercel/Fastify analyzer, анкеты, AdminPanel, UserApp, ExpertsPage, общий `EntityPreviewCard`, фильтры и Loki search используют этот контракт. Неизвестная категория показывает предупреждение и блокирует публикацию. Телефон нормализуется до международного формата, а кнопка звонка использует безопасный `tel:`. Профиль показывает акцию, категории/подкатегории, услуги, опыт, стоимость, адрес, часы работы, карту и все каналы связи.
 
+**Deep link:** устранена гонка cache/fresh data: ссылка нового эксперта больше не помечается обработанной, пока ID фактически не найден в загруженном каталоге.
+
 **Миграция:** `scripts/migrate-expert-directory.mjs` нормализует существующие телефоны и добавляет canonical `categories` без удаления заполненных данных.
 
 **Проверка:** scoped eslint, Vercel/Fastify parity, category integrity, phone/tel normalization, Loki tests, Admin Assistant tests и production build.

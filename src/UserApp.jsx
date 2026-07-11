@@ -1732,9 +1732,9 @@ export function UserApp() {
   // Открываем эксперта из публичного deep link ?expert=ID
   useEffect(() => {
     if (!pendingExpertId || !experts.length || expertDeepLinkOpened.current) return;
-    expertDeepLinkOpened.current = true;
     const e = experts.find(e => e.id === pendingExpertId);
     if (e) {
+      expertDeepLinkOpened.current = true;
       navigatePanel('experts');
       userAction('publicQr:view', { type: 'expert', id: e.id }).catch(() => {});
     }
