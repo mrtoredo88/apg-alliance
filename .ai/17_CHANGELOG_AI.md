@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: finalize Workspace 2.2 single-screen role dashboard
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`
+**Тип:** feat
+**Что изменено:**
+- Header Workspace унифицирован с пользовательским режимом: используется фирменный логотип АПГ, заголовок `АПГ: ЗЕЛЕНОГРАД` и пользовательская навигация.
+- Нижний блок `Быстрые действия` полностью удалён из JSX; hero, KPI, левая панель и отступы уплотнены под одноэкранный Dashboard.
+- Добавлен общий role-view слой Workspace (`partner`, `expert`, `admin`) поверх единого Layout/Engine: меняются задачи, KPI-подписи и контекст, но не создаются отдельные приложения.
+**Почему:** Workspace должен быть ролевым рабочим кабинетом участника АПГ и помещаться в один desktop viewport без ощущения второй главной страницы.
+
+---
+
 ## [2026-07-13] feat: optimize Workspace 2.1 to single-screen dashboard
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`
