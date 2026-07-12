@@ -87,7 +87,7 @@ assert.equal(diag.cacheClearCount, 0, 'second start must not clear cache');
 fetchVersion = 'v2';
 await manager.checkPwaUpdate({ autoReload: false });
 diag = manager.getPwaUpdateDiagnostics();
-assert.equal(diag.installedVersion, 'v2');
+assert.equal(diag.installedVersion, 'v1');
 assert.equal(diag.availableVersion, 'v2');
 assert.equal(diag.cacheVersion, 'v2');
 assert.equal(diag.updateStatus, 'updated_pending_reload');
@@ -95,11 +95,22 @@ assert.equal(diag.cacheClearCount, 1, 'new version must clear old cache once');
 assert.deepEqual(cacheKeys, []);
 assert.equal(reloadCount, 0, 'autoReload=false must not reload during test update');
 assert.match(diag.cacheMigrationResult, /^ok:version:v2/);
+assert.equal(localStorage.getItem('apg_build'), 'v1', 'pending update must not be marked installed before reload');
+assert.equal(localStorage.getItem('apg_pwa_pending_version'), 'v2');
 
 await manager.checkPwaUpdate({ autoReload: false });
 diag = manager.getPwaUpdateDiagnostics();
 assert.equal(diag.cacheClearCount, 1, 'same migrated version must not clear cache again');
+assert.equal(diag.updateStatus, 'updated_pending_reload');
+assert.equal(localStorage.getItem('apg_build'), 'v1');
+
+sessionStorage.setItem('apg_pwa_reloaded_for', 'v2');
+await manager.checkPwaUpdate({ autoReload: true });
+diag = manager.getPwaUpdateDiagnostics();
 assert.equal(diag.updateStatus, 'current');
+assert.equal(diag.installedVersion, 'v2');
+assert.equal(localStorage.getItem('apg_build'), 'v2');
+assert.equal(localStorage.getItem('apg_pwa_pending_version'), null);
 
 await manager.requestPwaDiagnostics();
 diag = manager.getPwaUpdateDiagnostics();

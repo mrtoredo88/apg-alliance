@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] fix: prevent PWA update from marking version installed before reload
+**Коммит:** `pending`
+**Файлы:** `src/pwa/PwaUpdateManager.js`, `scripts/pwa-update-manager-test.mjs`
+**Тип:** fix
+**Что изменено:**
+- PWA Update Manager больше не записывает новую версию в `apg_build` до фактической reload-сессии; новая версия хранится как pending update.
+- Если reload не произошёл, следующий запуск не считает старый bundle актуальным и продолжает требовать обновление.
+- Regression-тест проверяет, что pending version не становится installed до reload и очищается только после подтверждённой reload-сессии.
+**Почему:** production мог показывать новый `version.json`, но продолжать работать на старом JS, потому что версия помечалась установленной до реальной перезагрузки.
+
+---
+
 ## [2026-07-13] fix: replace legacy workspace components in Workspace 2.0
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`

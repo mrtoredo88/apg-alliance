@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   installedVersion: 'apg_build',
   cacheVersion: 'apg_cache_version',
   migratedVersion: 'apg_cache_migrated_to',
+  pendingVersion: 'apg_pwa_pending_version',
   lastUpdateAt: 'apg_pwa_last_update_at',
   lastMigrationResult: 'apg_pwa_cache_migration_result',
 };
@@ -248,30 +249,46 @@ export async function registerPwaServiceWorker({ noServiceWorker = false } = {})
 export async function checkPwaUpdate({ autoReload = true } = {}) {
   const availableVersion = await fetchPwaVersion({ force: true });
   const installedVersion = readStorage(STORAGE_KEYS.installedVersion, '');
+  const pendingVersion = readStorage(STORAGE_KEYS.pendingVersion, '');
+  const sessionStorage = safeStorage('sessionStorage');
+  const reloadedFor = sessionStorage?.getItem?.(SESSION_KEYS.reloadedForVersion) || '';
   setState({ installedVersion, availableVersion, bootstrapSource: installedVersion ? 'stored-version' : 'first-install' });
   if (!availableVersion || availableVersion === '?') return getPwaUpdateDiagnostics();
+  if (pendingVersion === availableVersion && reloadedFor === availableVersion) {
+    writeStorage(STORAGE_KEYS.installedVersion, availableVersion);
+    writeStorage(STORAGE_KEYS.cacheVersion, availableVersion);
+    removeStorage(STORAGE_KEYS.pendingVersion);
+    setState({ installedVersion: availableVersion, cacheVersion: availableVersion, updateStatus: 'current', pendingReload: false });
+    return getPwaUpdateDiagnostics();
+  }
   if (!installedVersion) {
     writeStorage(STORAGE_KEYS.installedVersion, availableVersion);
     writeStorage(STORAGE_KEYS.cacheVersion, availableVersion);
+    removeStorage(STORAGE_KEYS.pendingVersion);
     setState({ installedVersion: availableVersion, cacheVersion: availableVersion, updateStatus: 'current' });
     return getPwaUpdateDiagnostics();
   }
-  if (installedVersion === availableVersion) {
+  if (installedVersion === availableVersion && pendingVersion !== availableVersion) {
     setState({ updateStatus: 'current', cacheVersion: readStorage(STORAGE_KEYS.cacheVersion, installedVersion) });
     return getPwaUpdateDiagnostics();
   }
 
   setState({ updateStatus: 'update_available', pendingReload: true });
   await migrateCacheForVersion(availableVersion);
-  writeStorage(STORAGE_KEYS.installedVersion, availableVersion);
+  writeStorage(STORAGE_KEYS.pendingVersion, availableVersion);
   writeStorage(STORAGE_KEYS.lastUpdateAt, new Date().toISOString());
-  setState({ installedVersion: availableVersion, updateStatus: 'updated_pending_reload', lastUpdateTime: readStorage(STORAGE_KEYS.lastUpdateAt, ''), pendingReload: true });
+  setState({ installedVersion, updateStatus: 'updated_pending_reload', lastUpdateTime: readStorage(STORAGE_KEYS.lastUpdateAt, ''), pendingReload: true });
 
-  const sessionStorage = safeStorage('sessionStorage');
-  const reloadedFor = sessionStorage?.getItem?.(SESSION_KEYS.reloadedForVersion) || '';
   if (autoReload && reloadedFor !== availableVersion && isSafeToReload()) {
     sessionStorage?.setItem?.(SESSION_KEYS.reloadedForVersion, availableVersion);
     window.location.reload();
+    return getPwaUpdateDiagnostics();
+  }
+  if (autoReload && reloadedFor === availableVersion) {
+    writeStorage(STORAGE_KEYS.installedVersion, availableVersion);
+    writeStorage(STORAGE_KEYS.cacheVersion, availableVersion);
+    removeStorage(STORAGE_KEYS.pendingVersion);
+    setState({ installedVersion: availableVersion, cacheVersion: availableVersion, updateStatus: 'current', pendingReload: false });
   }
   return getPwaUpdateDiagnostics();
 }
@@ -293,5 +310,6 @@ export async function recoverPwaAndReload() {
   removeStorage(STORAGE_KEYS.installedVersion);
   removeStorage(STORAGE_KEYS.cacheVersion);
   removeStorage(STORAGE_KEYS.migratedVersion);
+  removeStorage(STORAGE_KEYS.pendingVersion);
   if (hasWindow()) window.location.reload();
 }
