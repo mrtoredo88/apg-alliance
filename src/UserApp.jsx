@@ -34,9 +34,8 @@ import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from 
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
-import { CONTENT_LIFECYCLE_VERSION } from '../server-shared/content-lifecycle.js';
-import { CAPABILITIES, getRoleDiagnostics, hasCapability } from './roleEngine.js';
-import { getPwaUpdateDiagnostics, requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
+import { getRoleDiagnostics } from './roleEngine.js';
+import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -610,8 +609,6 @@ export function UserApp() {
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
   const [appMode, setAppMode]                   = useState(readInitialAppMode);
-  const [diagOpen, setDiagOpen]                 = useState(false);
-  const [pwaUpdateDiag, setPwaUpdateDiag]       = useState(() => getPwaUpdateDiagnostics());
   const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
@@ -621,7 +618,7 @@ export function UserApp() {
   const tabSlotRefs                             = useRef([]);
 
   useEffect(() => {
-    const unsubscribe = subscribePwaUpdate(setPwaUpdateDiag);
+    const unsubscribe = subscribePwaUpdate(() => {});
     requestPwaDiagnostics().catch(() => {});
     return unsubscribe;
   }, []);
@@ -2526,7 +2523,13 @@ export function UserApp() {
   }));
   const TAB_PANELS = TABS.map(tab => tab.id);
   const showTabBar = !desktopDevice && !isScannerOpen && TAB_PANELS.includes(activePanel);
-  const userAppBranch = desktopWorkspaceActive ? 'DesktopWorkspace' : publicSubmitRoute ? 'PublicSubmit' : loggedOut ? 'LoggedOut' : 'PWA User Mode';
+  const userAppBranch = desktopWorkspaceActive
+    ? 'UserApp Branch: DesktopWorkspace'
+    : publicSubmitRoute
+      ? 'UserApp Branch: PublicSubmit'
+      : loggedOut
+        ? 'UserApp Branch: LoggedOut'
+        : 'UserApp Branch: PWA User Mode';
   const activeNavigation = bottomNavigation.primary.map(item => `${item.id}:${item.panelId ?? 'action'}`).join(', ') || 'empty';
   const tabBarReason = showTabBar
     ? 'visible'
@@ -2539,7 +2542,6 @@ export function UserApp() {
         : 'hidden';
   const currentRoute = typeof window === 'undefined' ? '—' : `${window.location.pathname}${window.location.search}${window.location.hash}`;
   const canonicalUserId = user?.canonicalUserId || user?.id || '—';
-  const swCacheVersion = pwaUpdateDiag.cacheKeys?.length ? pwaUpdateDiag.cacheKeys.join(', ') : (pwaUpdateDiag.cacheVersion || 'empty');
   const V2GoldMetal = 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 68%, #F4D98C 100%)';
 
   const activeTabIndex = TABS.findIndex(tab => tab.id === activePanel);
@@ -2985,69 +2987,6 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
-          {hasCapability(roleIdentity, CAPABILITIES.canViewDiagnostics) && createPortal(
-            <div style={{ position: 'fixed', bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', right: 10, zIndex: 12000 }}>
-              {diagOpen ? (
-                <div style={{ width: 306, padding: 12, borderRadius: 16, background: 'rgba(12,12,20,0.94)', border: '1px solid rgba(201,168,76,0.4)', color: '#eee', fontSize: 11, lineHeight: '16px', boxShadow: '0 18px 50px rgba(0,0,0,0.5)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
-                    <span style={{ color: '#C9A84C', fontWeight: 900 }}>PWA Diagnostics</span>
-                    <button type="button" onClick={() => setDiagOpen(false)} style={{ border: 'none', background: 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
-                  </div>
-                  {[
-                    ['App Version', pwaUpdateDiag.appVersion || '…'],
-                    ['Installed Version', pwaUpdateDiag.installedVersion || '—'],
-                    ['Available Version', pwaUpdateDiag.availableVersion || '—'],
-                    ['UserApp Branch', userAppBranch],
-                    ['Active Layout', desktopWorkspaceActive ? `Workspace (${workspaceMode})` : `User Mode (${workspaceMode})`],
-                    ['Active Navigation', activeNavigation],
-                    ['TabBar Visible', `${showTabBar ? 'yes' : 'no'} · ${tabBarReason}`],
-                    ['Canonical User', canonicalUserId],
-                    ['Active Profile', user?.id || '—'],
-                    ['Role', user?.role || '—'],
-                    ['Roles', [user?.role, ...(Array.isArray(user?.roles) ? user.roles : [])].filter(Boolean).join(', ') || '—'],
-                    ['Workspace Role', workspaceRole],
-                    ['Role Engine', `${roleDiagnostics.primaryRole} · ${roleDiagnostics.capabilities.join(', ') || '—'}`],
-                    ['Current Route', currentRoute],
-                    ['Service Worker', pwaUpdateDiag.serviceWorkerVersion || '—'],
-                    ['Cache Version', swCacheVersion],
-                    ['Cache Age', pwaUpdateDiag.cacheAge || (cacheTs ? formatCacheAge(cacheTs) : '—')],
-                    ['Bootstrap Source', pwaUpdateDiag.bootstrapSource || '—'],
-                    ['Update Status', pwaUpdateDiag.updateStatus || '—'],
-                    ['Last Update', pwaUpdateDiag.lastUpdateTime || '—'],
-                    ['Cache Migration', pwaUpdateDiag.cacheMigrationResult || '—'],
-                    ['public-data', `${publicDataDiag.source}${publicDataDiag.fallbacks.length ? ` · fallback: ${publicDataDiag.fallbacks.join(',')}` : ''}${publicDataDiag.errors ? ` · errors: ${publicDataDiag.errors}` : ''}`],
-                    ['Cache', cacheTs ? formatCacheAge(cacheTs) : '—'],
-                    ['Content Lifecycle', CONTENT_LIFECYCLE_VERSION],
-                    ['Feature Flags', `workspace=${desktopWorkspaceFlag}, appMode=${appMode}`],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0' }}>
-                      <span style={{ color: 'rgba(238,238,238,0.55)', flexShrink: 0 }}>{label}</span>
-                      <span style={{ fontWeight: 700, textAlign: 'right', overflowWrap: 'anywhere', userSelect: 'text' }}>{String(value)}</span>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => requestPwaDiagnostics().catch(() => {})}
-                    style={{ marginTop: 8, width: '100%', minHeight: 30, borderRadius: 10, border: '1px solid rgba(201,168,76,0.36)', background: 'rgba(201,168,76,0.12)', color: '#C9A84C', fontWeight: 900, cursor: 'pointer' }}
-                  >
-                    Обновить диагностику
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDiagOpen(true);
-                    requestPwaDiagnostics().catch(() => {});
-                  }}
-                  style={{ width: 34, height: 34, borderRadius: 17, border: '1px solid rgba(201,168,76,0.45)', background: 'rgba(12,12,20,0.8)', color: '#C9A84C', fontSize: 14, fontWeight: 900, cursor: 'pointer', opacity: 0.75 }}
-                >
-                  ⌗
-                </button>
-              )}
-            </div>,
-            document.body,
-          )}
           {desktopWorkspaceActive ? (
             <Suspense fallback={<LazyFallback />}>
               <DesktopWorkspace
@@ -3626,7 +3565,7 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !desktopWorkspaceActive && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant desktopMode={desktopDevice} />}
+          {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant desktopMode={desktopDevice} />}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>

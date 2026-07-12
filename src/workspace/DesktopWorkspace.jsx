@@ -260,7 +260,7 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
             ♧
             {!!unreadCount && <span style={{ position: 'absolute', right: 8, top: 6, minWidth: 20, height: 20, borderRadius: 999, background: '#B94135', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900 }}>{Math.min(unreadCount, 9)}</span>}
           </button>
-          <WorkspaceButton onClick={() => onModeChange?.('workspace')} style={{ minHeight: 48, borderRadius: 19, padding: '0 20px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B', boxShadow: '0 14px 30px rgba(201,155,60,0.22)' }}>▣ Workspace</WorkspaceButton>
+          <WorkspaceButton onClick={() => onModeChange?.('user')} style={{ minHeight: 48, borderRadius: 19, padding: '0 20px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B', boxShadow: '0 14px 30px rgba(201,155,60,0.22)' }}>Выйти в АПГ</WorkspaceButton>
         </div>
       </div>
     </header>
