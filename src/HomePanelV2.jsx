@@ -10,6 +10,7 @@ import { MOTION, motionDelay, motionTransition } from './motion.js';
 import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsPhotoItems, getNewsReactionsTotal, getNewsStats, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
 import { buildAdaptiveHomeData } from './interestEngine.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
+import { LokiIdentity } from './loki/LokiIdentity.jsx';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -128,6 +129,18 @@ const GlassHero = {
   borderRadius: 42,
 };
 
+const DESKTOP_LAYOUT = {
+  containerMax: 'min(1880px, calc(100vw - 56px))',
+  pagePaddingX: 'clamp(16px, 3vw, 40px)',
+  firstHeroColumns: 'minmax(0, 1.2fr) minmax(300px, 372px)',
+  secondColumns: 'minmax(0, 1fr) minmax(300px, 380px)',
+  highlightColumns: 'repeat(auto-fit, minmax(188px, 1fr))',
+  sectionGap: 16,
+  compactGap: 10,
+  topPad: 'calc(18px + var(--safe-top, 0px))',
+  sidePad: 'calc(104px + env(safe-area-inset-bottom, 0px))',
+};
+
 const horizontalSnapTrack = {
   display: 'flex',
   overflowX: 'auto',
@@ -163,6 +176,7 @@ function getDayGreeting() {
 function V2FirstScreen({
   user,
   userKeys,
+  partners = [],
   counterPulse,
   events,
   featuredPartner,
@@ -176,7 +190,99 @@ function V2FirstScreen({
   onOpenTasks,
   onOpenReference,
   onOpenLoki,
+  onOpenProfile,
+  onOpenOffers,
+  onOpenNews,
+  onOpenMap,
+  onOpenExperts,
+  onSearchQueryChange,
+  searchQuery = '',
+  searchInputRef,
+  searchLoading = false,
+  searchResultsCount = 0,
+  onSearchKeyDown,
+  desktopWorkspaceAvailable = false,
+  onSwitchAppMode,
+  desktopWorkspaceMode = 'user',
   desktopMode = false,
+  isOffline = false,
+}) {
+  if (desktopMode) {
+    return (
+      <V2FirstScreenDesktop
+        user={user}
+        userKeys={userKeys}
+        partners={partners}
+        events={events}
+        featuredPartner={featuredPartner}
+        partnerOfMonth={partnerOfMonth}
+        unreadCount={unreadCount}
+        counterPulse={counterPulse}
+        onOpenNotifications={onOpenNotifications}
+        onOpenPartner={onOpenPartner}
+        onOpenNearby={onOpenNearby}
+        onOpenEvents={onOpenEvents}
+        onOpenRewards={onOpenRewards}
+        onOpenTasks={onOpenTasks}
+        onOpenReference={onOpenReference}
+        onOpenLoki={onOpenLoki}
+        onOpenProfile={onOpenProfile}
+        onOpenOffers={onOpenOffers}
+        onOpenNews={onOpenNews}
+        onOpenMap={onOpenMap}
+        onOpenExperts={onOpenExperts}
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        searchInputRef={searchInputRef}
+        searchLoading={searchLoading}
+        searchResultsCount={searchResultsCount}
+        onSearchKeyDown={onSearchKeyDown}
+        desktopWorkspaceAvailable={desktopWorkspaceAvailable}
+        desktopWorkspaceMode={desktopWorkspaceMode}
+        onSwitchAppMode={onSwitchAppMode}
+        isOffline={isOffline}
+      />
+    );
+  }
+  return (
+    <V2FirstScreenMobile
+      user={user}
+      userKeys={userKeys}
+      events={events}
+      featuredPartner={featuredPartner}
+      partnerOfMonth={partnerOfMonth}
+      unreadCount={unreadCount}
+      onOpenNotifications={onOpenNotifications}
+      onOpenPartner={onOpenPartner}
+      onOpenNearby={onOpenNearby}
+      onOpenEvents={onOpenEvents}
+      onOpenRewards={onOpenRewards}
+      onOpenTasks={onOpenTasks}
+      onOpenReference={onOpenReference}
+      onOpenLoki={onOpenLoki}
+      isOffline={isOffline}
+      desktopMode={desktopMode}
+    />
+  );
+}
+
+function V2FirstScreenMobile({
+  user,
+  userKeys,
+  events,
+  featuredPartner,
+  partnerOfMonth,
+  unreadCount,
+  onOpenNotifications,
+  onOpenPartner,
+  onOpenNearby,
+  onOpenEvents,
+  onOpenRewards,
+  onOpenTasks,
+  onOpenReference,
+  onOpenLoki,
+  desktopMode = false,
+  isOffline = false,
 }) {
   const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
   const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
@@ -384,7 +490,448 @@ function V2FirstScreen({
   );
 }
 
+function V2FirstScreenDesktop({
+  user,
+  userKeys,
+  partners = [],
+  events,
+  featuredPartner,
+  partnerOfMonth,
+  unreadCount,
+  onOpenNotifications,
+  onOpenPartner,
+  onOpenNearby,
+  onOpenEvents,
+  onOpenRewards,
+  onOpenTasks,
+  onOpenLoki,
+  onOpenProfile,
+  onOpenOffers,
+  onOpenNews,
+  onOpenMap,
+  onOpenExperts,
+  onSearchQueryChange,
+  searchQuery = '',
+  searchInputRef,
+  searchLoading = false,
+  searchResultsCount = 0,
+  onSearchKeyDown,
+  desktopWorkspaceAvailable = false,
+  desktopWorkspaceMode = 'user',
+  onSwitchAppMode,
+  desktopMode = false,
+  isOffline = false,
+}) {
+  const firstName = getUserFirstName(user);
+  const greeting = firstName ? `${getDayGreeting()}, ${firstName}!` : `${getDayGreeting()}!`;
+  const heroPartner = partnerOfMonth ?? featuredPartner ?? partners[0] ?? null;
+  const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
+  const heroImage = heroEvent ? contentImageOf(heroEvent) : profileImageOf(heroPartner);
+  const heroTitle = heroEvent?.title ?? heroPartner?.name ?? 'Пульс города сегодня';
+  const heroMeta = heroEvent?.date ?? heroPartner?.offer ?? 'Главный повод выйти в город';
+  const heroAction = heroEvent ? onOpenEvents : heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenEvents;
+  const level = getLevel(userKeys);
+  const nextLevel = getNextLevel(userKeys);
+  const keysToNext = getKeysToNext(userKeys);
+  const fullName = [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник';
+  const initials = fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
+  const avatarUrl = user?.photo_200 || user?.photo || user?.avatarUrl || '';
+  const recentActivity = [
+    { label: 'Партнёров', value: partners.length },
+    { label: 'Экспертов', value: (featuredPartner?.relatedExpertsCount ?? 0) + events.length },
+    { label: 'Мероприятий', value: events.length },
+    { label: 'Новостей', value: partnerOfMonth ? 1 : 0 },
+    { label: 'Пользователей', value: '2.4к' },
+  ];
+
+  const navItems = [
+    { label: 'Главная', isActive: true, onClick: () => {} },
+    { label: 'Новости', onClick: onOpenNews },
+    { label: 'Мероприятия', onClick: onOpenEvents },
+    { label: 'Партнёры', onClick: onOpenOffers },
+    { label: 'Эксперты', onClick: onOpenExperts },
+    { label: 'Акции', onClick: onOpenOffers },
+    { label: 'Подарки', onClick: onOpenRewards },
+    { label: 'О проекте', onClick: () => onOpenMap?.() },
+  ];
+
+  const todayCards = [
+    { title: 'Мероприятие дня', value: heroTitle, onClick: heroAction, icon: '🎉' },
+    { title: 'Партнёр дня', value: heroPartner?.name || 'Выберите партнёра', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : undefined, icon: '🏢' },
+    { title: 'Рекомендация Локи', value: 'Посмотреть сейчас', onClick: onOpenLoki, icon: '✨' },
+    { title: 'Рядом', value: 'Найти место рядом', onClick: onOpenNearby, icon: '📍' },
+  ];
+
+  return (
+    <section style={{
+      position: 'relative',
+      minHeight: 'auto',
+      boxSizing: 'border-box',
+      padding: `${DESKTOP_LAYOUT.topPad} ${DESKTOP_LAYOUT.pagePaddingX} 18px`,
+      overflow: 'hidden',
+      background: V2.pageBg,
+    }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: DESKTOP_LAYOUT.containerMax, margin: '0 auto' }}>
+        {isOffline ? (
+          <div style={{
+            marginBottom: 12,
+            padding: '10px 12px',
+            borderRadius: 16,
+            color: V2.text,
+            background: 'linear-gradient(145deg, rgba(230,70,70,0.18), rgba(255,255,255,0.06))',
+            border: '1px solid rgba(230,70,70,0.34)',
+            fontSize: 13,
+            fontWeight: 720,
+            letterSpacing: 0.2,
+          }}>
+            Работа в офлайн-режиме: новые действия недоступны до восстановления сети.
+          </div>
+        ) : null}
+        <header style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr auto',
+          gap: 14,
+          alignItems: 'center',
+          marginBottom: 15,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <picture>
+              <source srcSet="/logo.webp" type="image/webp" />
+              <img src="/logo.png" alt="АПГ" style={{ width: 44, height: 44, borderRadius: 18, objectFit: 'cover', boxShadow: '0 14px 34px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.18)' }} />
+            </picture>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 880 }}>АПГ</div>
+              <div style={{ color: V2.textMuted, fontSize: 11, lineHeight: '14px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Альянс партнёров города</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 7, flexWrap: 'wrap' }}>
+            {navItems.map(item => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => item.onClick?.()}
+                style={{
+                  ...GlassBadge,
+                  borderRadius: 999,
+                  borderColor: item.isActive ? 'rgba(201,168,76,0.70)' : 'rgba(255,255,255,0.33)',
+                  background: item.isActive
+                    ? 'linear-gradient(145deg, rgba(201,168,76,0.26), rgba(201,168,76,0.08))'
+                    : 'linear-gradient(145deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08))',
+                  color: item.isActive ? V2.gold : V2.textSoft,
+                  cursor: 'pointer',
+                  minHeight: 34,
+                  fontWeight: 760,
+                  padding: '0 12px',
+                  boxShadow: item.isActive ? '0 0 0 1px rgba(201,168,76,0.32)' : undefined,
+                  transition: motionTransition(['background', 'transform', 'border-color'], 'base'),
+                  ...pressMotion,
+                }}
+                aria-current={item.isActive ? 'page' : undefined}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 18, ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: 10, gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 840, lineHeight: '44px' }}>⌕</span>
+              <input
+                aria-label="Поиск"
+                type="text"
+                value={searchQuery}
+                ref={searchInputRef}
+                onChange={(event) => onSearchQueryChange?.(event.target.value)}
+                onKeyDown={onSearchKeyDown}
+                autoComplete="off"
+                placeholder="Поиск по городу"
+                style={{
+                  width: 190,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: V2.text,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                }}
+              />
+              {searchLoading ? (
+                <span style={{ fontSize: 12, color: V2.textMuted }}>⏳</span>
+              ) : null}
+              {searchResultsCount > 0 ? (
+                <span style={{ marginRight: 4, color: V2.textMuted, fontSize: 11 }}>{searchResultsCount}</span>
+              ) : null}
+            </div>
+            <button
+              onClick={onOpenNotifications}
+              aria-label="Уведомления"
+              style={{
+                width: 44, height: 44, flexShrink: 0, borderRadius: 18, cursor: 'pointer',
+                ...V2.glass,
+                color: V2.text, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative',
+              }}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />
+              )}
+            </button>
+            <button
+              aria-label="Профиль"
+              onClick={onOpenProfile}
+              style={{ width: 44, height: 44, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 850 }}
+            >
+              {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+            </button>
+            {desktopWorkspaceAvailable && typeof onSwitchAppMode === 'function' && (
+              <button
+                onClick={() => {
+                  onSwitchAppMode(desktopWorkspaceMode === 'workspace' ? 'user' : 'workspace');
+                }}
+                style={{
+                  ...GlassBadge,
+                  borderRadius: 999,
+                  background: 'linear-gradient(145deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))',
+                  borderColor: 'rgba(201,168,76,0.42)',
+                  color: V2.text,
+                  cursor: 'pointer',
+                  minHeight: 34,
+                  padding: '0 11px',
+                  fontWeight: 760,
+                  fontSize: 12,
+                }}
+              >
+                {desktopWorkspaceMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
+              </button>
+            )}
+          </div>
+        </header>
+
+        <div style={{ display: 'grid', gridTemplateColumns: DESKTOP_LAYOUT.firstHeroColumns, gap: DESKTOP_LAYOUT.sectionGap, alignItems: 'start' }}>
+          <div>
+            <div style={{ marginBottom: 14 }}>
+              <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(33px, 4.2svh, 40px)', lineHeight: '1.15', fontWeight: 780, letterSpacing: 0 }}>
+                {greeting}
+              </h1>
+              <p style={{ margin: '9px 0 0', color: V2.textSoft, fontSize: 14, lineHeight: '21px', maxWidth: 470 }}>
+                Сегодня в Зеленограде происходит много интересного.
+              </p>
+            </div>
+
+            <button
+              onClick={heroAction}
+              {...pressMotion}
+              style={{
+                width: '100%',
+                minHeight: 300,
+                border: 'none',
+                borderRadius: 36,
+                padding: 0,
+                cursor: 'pointer',
+                textAlign: 'left',
+                overflow: 'hidden',
+                position: 'relative',
+                ...GlassHero,
+                animation: 'fadeInUp 0.5s ease both',
+              }}
+            >
+              <div style={{ position: 'absolute', inset: -28, pointerEvents: 'none' }}>
+                {heroImage ? (
+                  <img src={heroImage} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.48, filter: 'saturate(1.12) contrast(1.04)' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: 'radial-gradient(circle at 28% 18%, rgba(244,217,140,0.28), transparent 42%), linear-gradient(135deg, rgba(24,29,48,0.70), rgba(255,255,255,0.08) 46%, rgba(14,12,18,0.32))' }} />
+                )}
+                <div style={{ position: 'absolute', inset: 0, background: 'var(--apg2-hero-overlay, radial-gradient(circle at 18% 12%, rgba(255,240,184,0.20), transparent 34%), linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.24) 42%, rgba(12,12,14,0.74)))' }} />
+              </div>
+
+              <div style={{ position: 'relative', zIndex: 1, minHeight: 300, padding: 26, display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'end' }}>
+                <div>
+                  <div style={{ color: V2.gold, fontWeight: 800, fontSize: 11, letterSpacing: 0.8, marginBottom: 8 }}>СЕГОДНЯ В АПГ</div>
+                  <div style={{ color: 'var(--apg2-hero-text, var(--apg2-text, #F7F1E6))', fontSize: '34px', lineHeight: 1.05, fontWeight: 800, letterSpacing: 0, marginBottom: 10 }}>{heroTitle}</div>
+                  <div style={{ color: 'var(--apg2-hero-muted, rgba(247,244,234,0.8))', fontSize: 13, lineHeight: '18px', marginBottom: 14 }}>{heroMeta}</div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={onOpenEvents} style={{ ...GlassButton, minHeight: 36, padding: '0 16px' }}>Все мероприятия</button>
+                    <button type="button" onClick={heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenOffers} style={{ ...GlassButton, minHeight: 36, padding: '0 16px', color: '#17120A' }}>Найти партнёра</button>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: 8, alignSelf: 'end' }}>
+                  <span style={{ ...GlassBadge, padding: '7px 11px', fontSize: 11 }}>Рядом с вами</span>
+                  <span style={{ ...GlassBadge, padding: '7px 11px', fontSize: 11 }}>{events.length} мероприятий сегодня</span>
+                </div>
+              </div>
+            </button>
+
+            <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: DESKTOP_LAYOUT.compactGap }}>
+              {recentActivity.map(card => (
+                <div key={card.label} style={{ ...GlassCard, padding: '14px 12px', borderRadius: 22, textAlign: 'left', animation: 'fadeInUp 0.5s ease both' }}>
+                  <div style={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: V2.textSoft, marginBottom: 6 }}>{card.label}</div>
+                  <div style={{ fontSize: 21, lineHeight: 1, fontWeight: 860, color: V2.text }}>{card.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ ...GlassPanel, borderRadius: 30, padding: 14, animation: 'fadeInUp 0.5s ease both' }}>
+              <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: V2.text, fontWeight: 870, fontSize: 15 }}>Локи</div>
+                <span style={{ color: V2.textMuted, fontSize: 11 }}>интеллектуальный центр</span>
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <LokiIdentity
+                  size={68}
+                  state="recommending"
+                  label="Локи"
+                  sublabel="Собрал для вас рекомендации"
+                  showText={false}
+                />
+              </div>
+              <div style={{ color: V2.text, fontSize: 15, lineHeight: '20px', marginBottom: 8 }}>Добрый день. Что я подготовил:</div>
+              <ul style={{ margin: 0, padding: '0 0 0 18px', color: V2.textSoft, fontSize: 12, lineHeight: '18px', display: 'grid', gap: 5 }}>
+                <li>ближайшее мероприятие</li>
+                <li>акцию партнёра</li>
+                <li>нового эксперта</li>
+                <li>свежую новость</li>
+              </ul>
+              <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, width: '100%', marginTop: 12, minHeight: 40, padding: '0 12px', color: '#17120A' }}>Посмотреть рекомендации</button>
+            </div>
+
+            <div style={{ ...GlassPanel, borderRadius: 30, padding: 14, animation: 'fadeInUp 0.5s ease both', animationDelay: '0.05s' }}>
+              <div style={{ color: V2.textSoft, fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Прогресс</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+                <div style={{ color: V2.text, fontSize: 27, fontWeight: 900 }}>{userKeys} <span style={{ fontSize: 14, color: V2.gold }}>🗝️</span></div>
+                <div style={{ color: level.color, fontSize: 11, fontWeight: 820 }}>{level.label}</div>
+              </div>
+              <div style={{ height: 8, borderRadius: 8, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ height: '100%', width: `${getLevelProgress(userKeys)}%`, background: `linear-gradient(90deg, ${level.color}, ${level?.color ?? '#E8C97A'})`, borderRadius: 8 }} />
+              </div>
+              <div style={{ color: V2.textSoft, fontSize: 11 }}>
+                До следующего уровня {nextLevel ? `${nextLevel.label}: ${keysToNext}` : 'максимальный уровень'}. {counterPulse ? 'Добыт сегодня +3 ключа.' : 'Ваша следующая задача рядом.'}
+              </div>
+            </div>
+
+            <div style={{ ...GlassPanel, borderRadius: 30, padding: 14, animation: 'fadeInUp 0.5s ease both', animationDelay: '0.1s' }}>
+              <div style={{ color: V2.text, fontSize: 14, fontWeight: 820, marginBottom: 8 }}>Сегодня можно</div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {todayCards.map(card => (
+                  <button
+                    key={card.title}
+                    onClick={card.onClick}
+                    type="button"
+                    style={{
+                      ...GlassCard,
+                      border: '1px solid rgba(255,255,255,0.16)',
+                      borderRadius: 20,
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      cursor: card.onClick ? 'pointer' : 'default',
+                    }}
+                  >
+                    <div style={{ color: V2.text, fontSize: 13, fontWeight: 820, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <span>{card.icon} {card.title}</span>
+                      <span style={{ color: V2.textMuted }}>→</span>
+                    </div>
+                    <div style={{ color: V2.textSoft, fontSize: 11, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.value}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function V2SecondScreen({
+  user,
+  partners,
+  experts = [],
+  events,
+  news,
+  featuredPartner,
+  partnerOfMonth,
+  onOpenPartner,
+  onOpenEvents,
+  onOpenExperts,
+  onOpenOffers,
+  onOpenRewards,
+  onOpenNews,
+  onOpenNewsItem,
+  onOpenLoki,
+  onOpenNearby,
+  onSearchQueryChange,
+  searchQuery = '',
+  loading = false,
+  searchLoading = false,
+  searchError = null,
+  searchResultsProp = { partners: [], experts: [], events: [], news: [], all: [] },
+  searchFlatResults = [],
+  searchActiveIndex = -1,
+  onSearchResultFocus,
+  searchResultsRef,
+  interestProfile,
+  isOffline = false,
+  desktopMode = false,
+}) {
+  if (desktopMode) {
+    return (
+      <V2SecondScreenDesktop
+        user={user}
+        partners={partners}
+        experts={experts}
+        events={events}
+        news={news}
+        featuredPartner={featuredPartner}
+        partnerOfMonth={partnerOfMonth}
+        onOpenPartner={onOpenPartner}
+        onOpenEvents={onOpenEvents}
+        onOpenExperts={onOpenExperts}
+        onOpenOffers={onOpenOffers}
+        onOpenRewards={onOpenRewards}
+        onOpenNews={onOpenNews}
+        onOpenNewsItem={onOpenNewsItem}
+        onOpenLoki={onOpenLoki}
+        onOpenNearby={onOpenNearby}
+        searchQuery={searchQuery}
+        loading={loading}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        searchResults={searchResultsProp}
+        searchFlatResults={searchFlatResults}
+        searchActiveIndex={searchActiveIndex}
+        onSearchResultFocus={onSearchResultFocus}
+        onSearchQueryChange={onSearchQueryChange}
+        searchResultsRef={searchResultsRef}
+        isOffline={isOffline}
+      />
+    );
+  }
+  return (
+    <V2SecondScreenMobile
+      user={user}
+      partners={partners}
+      experts={experts}
+      events={events}
+      news={news}
+      featuredPartner={featuredPartner}
+      partnerOfMonth={partnerOfMonth}
+      onOpenPartner={onOpenPartner}
+      onOpenEvents={onOpenEvents}
+      onOpenExperts={onOpenExperts}
+      onOpenRewards={onOpenRewards}
+      onOpenNews={onOpenNews}
+      onOpenNewsItem={onOpenNewsItem}
+      isOffline={isOffline}
+      interestProfile={interestProfile}
+      desktopMode={desktopMode}
+    />
+  );
+}
+
+function V2SecondScreenMobile({
   user,
   partners,
   experts = [],
@@ -399,6 +946,7 @@ function V2SecondScreen({
   onOpenNews,
   onOpenNewsItem,
   interestProfile,
+  isOffline = false,
   desktopMode = false,
 }) {
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
@@ -630,6 +1178,731 @@ function V2SecondScreen({
         )}
         </div>
       </div>
+      </div>
+    </section>
+  );
+}
+
+function V2SecondScreenDesktop({
+  user,
+  partners = [],
+  experts = [],
+  events = [],
+  news = [],
+  featuredPartner,
+  onOpenPartner,
+  onOpenEvents,
+  onOpenExperts,
+  onOpenOffers,
+  onOpenRewards,
+  onOpenNews,
+  onOpenNewsItem,
+  onOpenNearby,
+  onOpenLoki,
+  searchQuery = '',
+  loading = false,
+  searchLoading = false,
+  searchError = null,
+  searchResults = { partners: [], experts: [], events: [], news: [], all: [] },
+  searchFlatResults = [],
+  searchActiveIndex = -1,
+  onSearchResultFocus,
+  onSearchQueryChange,
+  searchResultsRef,
+  isOffline = false,
+}) {
+  const today = new Date();
+  const dayName = today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
+  const eventDayParts = (event) => {
+    const parts = String(event?.date || 'Скоро').split(/[,\s]+/).filter(Boolean);
+    return {
+      day: parts[0] || 'Скоро',
+      month: parts.slice(1, 2).join(' ') || '',
+      time: String(event?.time || 'Время уточняется'),
+      place: event?.address || event?.partner || 'Зеленоград',
+      status: event?.status || (event?.isCompleted ? 'Завершено' : 'Ожидает'),
+      participants: Number.isFinite(Number(event?.participants)) ? Number(event?.participants) : 0,
+    };
+  };
+  const newsForYou = useMemo(() => {
+    const prepared = (Array.isArray(news) ? news : [])
+      .filter(Boolean)
+      .slice()
+      .sort((a, b) => {
+        const ta = new Date(a?.publishedAt || a?.createdAt || 0).getTime();
+        const tb = new Date(b?.publishedAt || b?.createdAt || 0).getTime();
+        return tb - ta;
+      });
+    return prepared.slice(0, 4);
+  }, [news]);
+
+  const nearbyPartners = useMemo(() => {
+    return partners.slice(0, 6);
+  }, [partners]);
+
+  const topExperts = useMemo(() => experts.slice(0, 5), [experts]);
+  const offers = useMemo(() => partners.filter(p => p.offer).slice(0, 8), [partners]);
+  const topEvents = useMemo(() => events.slice(0, 5), [events]);
+  const allEvents = useMemo(() => topEvents.filter(Boolean), [topEvents]);
+  const nearbyCategories = useMemo(() => {
+    const grouped = new Map();
+    nearbyPartners.forEach((partner) => {
+      const key = partner?.categoryLabel || (CATEGORIES.find(c => c.id === partner?.category)?.label) || 'Без категории';
+      const count = grouped.get(key) || 0;
+      grouped.set(key, count + 1);
+    });
+    return [...grouped.entries()].map(([label, count]) => ({ label, count })).slice(0, 6);
+  }, [nearbyPartners]);
+  const highlightCards = [
+    { label: 'Партнёр дня', value: featuredPartner?.name || 'Открыт', onClick: featuredPartner ? () => onOpenPartner?.(featuredPartner) : undefined, image: profileImageOf(featuredPartner) },
+    { label: 'Акция дня', value: offers[0]?.offer || 'Скоро появится', onClick: offers[0] ? () => onOpenPartner?.(offers[0]) : onOpenOffers, image: profileImageOf(offers[0]) },
+    { label: 'Главное мероприятие', value: topEvents[0]?.title || 'Поиск по карте', onClick: onOpenEvents, image: contentImageOf(topEvents[0] || {}) },
+    { label: 'Главная новость', value: newsForYou[0]?.title || 'Новости обновляются', onClick: newsForYou[0] ? () => onOpenNewsItem?.(newsForYou[0]) : onOpenNews, image: getNewsImage(newsForYou[0] || {}) },
+  ];
+
+  const hasSearchQuery = String(searchQuery || '').trim().length > 0;
+  const groupedSearchResults = useMemo(() => {
+    const grouped = searchResults || {};
+    return [
+      { key: 'partners', title: 'Партнёры', items: Array.isArray(grouped.partners) ? grouped.partners : [] },
+      { key: 'experts', title: 'Эксперты', items: Array.isArray(grouped.experts) ? grouped.experts : [] },
+      { key: 'events', title: 'События', items: Array.isArray(grouped.events) ? grouped.events : [] },
+      { key: 'news', title: 'Новости', items: Array.isArray(grouped.news) ? grouped.news : [] },
+    ];
+  }, [searchResults]);
+  const searchableResults = useMemo(() => {
+    let idx = 0;
+    return groupedSearchResults.map((section) => ({
+      ...section,
+      items: (section.items || []).map((item) => ({ ...item, index: idx++ })),
+    }));
+  }, [groupedSearchResults]);
+  const lokiInsights = useMemo(() => {
+    const list = [];
+    if (topEvents[0]?.title) {
+      list.push({
+        label: 'Событие дня',
+        title: topEvents[0].title,
+        desc: topEvents[0].partner || topEvents[0].address || 'Посмотрите подробности',
+        onOpen: onOpenEvents,
+      });
+    }
+    if (featuredPartner?.name) {
+      list.push({
+        label: 'Партнёр дня',
+        title: featuredPartner.name,
+        desc: featuredPartner.offer || 'Откройте карточку',
+        onOpen: () => onOpenPartner?.(featuredPartner),
+      });
+    }
+    if (offers[0]?.offer) {
+      list.push({
+        label: 'Лучшее предложение',
+        title: offers[0].offer,
+        desc: offers[0].name || 'Партнёрский профиль',
+        onOpen: () => onOpenPartner?.(offers[0]),
+      });
+    }
+    if (newsForYou[0]) {
+      list.push({
+        label: 'Главная новость',
+        title: getNewsTitle(newsForYou[0]),
+        desc: getNewsCategoryLabel(newsForYou[0]),
+        onOpen: () => onOpenNewsItem?.(newsForYou[0]),
+      });
+    }
+    if (topExperts[0]?.name) {
+      list.push({
+        label: 'Эксперт рядом',
+        title: topExperts[0].name,
+        desc: topExperts[0].specialization || 'Посмотреть подборку',
+        onOpen: onOpenExperts,
+      });
+    }
+    return list.slice(0, 5);
+  }, [featuredPartner, offers, newsForYou, onOpenEvents, onOpenExperts, onOpenNewsItem, onOpenPartner, topEvents, topExperts]);
+
+  const recentActions = useMemo(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem('apg-home-recent-actions');
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.slice(0, 5);
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const addRecentAction = (item, type) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('apg-home-recent-actions');
+      const parsed = raw ? JSON.parse(raw) : [];
+      const existing = Array.isArray(parsed) ? parsed : [];
+      const next = [
+        { id: item?.id || `${type}-${Date.now()}`, label: titleOf(item, type), type, timestamp: Date.now() },
+        ...existing.filter((row) => row?.id !== item?.id),
+      ].slice(0, 10);
+      window.localStorage.setItem('apg-home-recent-actions', JSON.stringify(next));
+    } catch {
+      // no-op
+    }
+  };
+
+  const getRecentActionAction = (row) => {
+    if (!row?.type) return undefined;
+    if (row.type === 'news') {
+      return () => {
+        if (newsForYou?.[0] && row.id === newsForYou[0].id) {
+          onOpenNewsItem?.(newsForYou[0]);
+          return;
+        }
+        const fromStorage = recentActions.find((entry) => entry.id === row.id);
+        if (fromStorage?.label) {
+          const target = (Array.isArray(news) ? news : []).find((item) => item?.id === row.id);
+          if (target) {
+            onOpenNewsItem?.(target);
+          }
+        }
+      };
+    }
+    if (row.type === 'event') return () => onOpenEvents?.();
+    if (row.type === 'expert') return () => onOpenExperts?.();
+    if (row.type === 'partner' || row.type === 'offer') return () => onOpenOffers?.();
+    return undefined;
+  };
+
+  return (
+    <section style={{
+      ...GlassPanel,
+      padding: `8px ${DESKTOP_LAYOUT.pagePaddingX} ${DESKTOP_LAYOUT.sidePad}`,
+      background: V2.pageBg,
+      border: 'none',
+      borderRadius: 0,
+      boxShadow: 'none',
+      overflow: 'hidden',
+    }}>
+      <div style={{ maxWidth: DESKTOP_LAYOUT.containerMax, margin: '0 auto' }}>
+        {isOffline ? (
+          <div style={{
+            marginBottom: 12,
+            borderRadius: 14,
+            padding: '10px 12px',
+            color: V2.text,
+            background: 'linear-gradient(145deg, rgba(230,70,70,0.17), rgba(255,255,255,0.06))',
+            border: '1px solid rgba(230,70,70,0.34)',
+            fontSize: 13,
+            fontWeight: 720,
+            letterSpacing: 0.2,
+          }}>
+            Переход в офлайн-режим. Показываем закешированные данные.
+          </div>
+        ) : null}
+        {hasSearchQuery ? (
+          <div style={{ paddingBottom: 14 }} ref={searchResultsRef}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ color: V2.text, fontSize: 28, lineHeight: '34px', fontWeight: 790 }}>
+                Результаты поиска
+              </div>
+              <button
+                type="button"
+                onClick={() => onSearchQueryChange?.('')}
+                style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}
+              >
+                Очистить
+              </button>
+            </div>
+            {searchLoading ? (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div style={{ ...GlassCard, borderRadius: 18, padding: 14 }}>
+                  <Skel h={17} w={220} radius={6} style={{ marginBottom: 8 }} />
+                  <Skel h={14} w={280} radius={6} />
+                </div>
+                <div style={{ ...GlassCard, borderRadius: 18, padding: 14 }}>
+                  <Skel h={17} w={190} radius={6} style={{ marginBottom: 8 }} />
+                  <Skel h={14} w={240} radius={6} />
+                </div>
+              </div>
+            ) : searchError ? (
+              <div style={{ ...GlassCard, borderRadius: 20, padding: 14, color: V2.textSoft }}>
+                Не удалось выполнить поиск: {searchError}
+              </div>
+            ) : searchableResults.every((section) => !section.items.length) ? (
+              <div style={{ ...GlassCard, borderRadius: 20, padding: 14, color: V2.textSoft }}>Ничего не найдено по вашему запросу.</div>
+            ) : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {searchableResults.map((section) => (
+                  section.items.length === 0 ? null : (
+                    <div key={section.key} style={{ display: 'grid', gap: 8 }}>
+                      <div style={{ color: V2.textMuted, fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                        {section.accent ? `${section.accent} ` : ''}{section.title}
+                      </div>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {section.items.map((item) => {
+                          const isActive = item.index === searchActiveIndex;
+                          return (
+                            <button
+                              key={`${section.key}-${item.id}`}
+                              type="button"
+                              onMouseEnter={() => onSearchResultFocus?.(item.index)}
+                              onFocus={() => onSearchResultFocus?.(item.index)}
+                              onClick={() => {
+                                item.onClick?.();
+                                onSearchResultFocus?.(item.index);
+                              }}
+                              style={{
+                                ...GlassCard,
+                                border: isActive ? '1px solid rgba(244,217,140,0.55)' : '1px solid rgba(255,255,255,0.17)',
+                                borderRadius: 18,
+                                padding: 12,
+                                textAlign: 'left',
+                                display: 'grid',
+                                gap: 6,
+                                cursor: item.onClick ? 'pointer' : 'default',
+                                transform: isActive ? 'translateY(-1px)' : undefined,
+                              }}
+                            >
+                              <div style={{ color: V2.gold, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>{item.type}</div>
+                              <div style={{ color: V2.text, fontSize: 16, fontWeight: 800, lineHeight: '20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                              <div style={{ color: V2.textSoft, fontSize: 12, lineHeight: '16px' }}>{item.description}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 18, paddingTop: 8 }}>
+              <div style={{ color: V2.text, fontSize: 32, lineHeight: '37px', fontWeight: 790, letterSpacing: 0, marginBottom: 6 }}>
+                Сегодня для вас
+              </div>
+              <div style={{ color: V2.textMuted, fontSize: 14, lineHeight: '20px', marginBottom: 16 }}>
+                {dayName} · Ваш персональный маршрут в городе
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: DESKTOP_LAYOUT.highlightColumns, gap: DESKTOP_LAYOUT.compactGap }}>
+                {loading ? (
+                  <>
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={`highlight-skel-${i}`}
+                        style={{
+                          ...GlassCard,
+                          borderRadius: 24,
+                          padding: 14,
+                          background: 'rgba(255,255,255,0.08)',
+                          display: 'grid',
+                          gap: 10,
+                          gridTemplateColumns: '86px 1fr',
+                          minHeight: 112,
+                        }}
+                      >
+                        <Skel w={86} h={62} radius={18} />
+                        <div style={{ paddingTop: 3 }}>
+                          <Skel w={54} h={10} radius={6} style={{ marginBottom: 8 }} />
+                          <Skel w={120} h={17} radius={7} />
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  highlightCards.map((card, index) => (
+                    <button
+                      key={`${card.label}-${index}`}
+                      onClick={card.onClick}
+                      type="button"
+                      style={{
+                        border: 'none',
+                        borderRadius: 24,
+                        overflow: 'hidden',
+                        padding: 14,
+                        textAlign: 'left',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: V2.text,
+                        cursor: 'pointer',
+                        ...GlassCard,
+                        display: 'grid',
+                        gap: 10,
+                        gridTemplateColumns: '86px 1fr',
+                        minHeight: 112,
+                        animation: 'fadeInUp 0.5s ease both',
+                        animationDelay: `${index * 0.04}s`,
+                      }}
+                    >
+                      <div style={{ width: 86, height: 62, borderRadius: 18, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
+                        {card.image ? <img src={card.image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: V2.gold, fontWeight: 820, textTransform: 'uppercase', letterSpacing: 1 }}>{card.label}</div>
+                        <div style={{ marginTop: 6, color: V2.text, fontSize: 17, fontWeight: 820, lineHeight: '20px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.value}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: DESKTOP_LAYOUT.secondColumns, gap: DESKTOP_LAYOUT.sectionGap, alignItems: 'start' }}>
+              <div style={{ display: 'grid', gap: 16 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780 }}>Новости</div>
+                      <div style={{ color: V2.textSoft, fontSize: 12 }}>Сводка важного дня</div>
+                    </div>
+                    <button type="button" onClick={() => onOpenNews?.()} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Все новости</button>
+                  </div>
+                  {loading ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                      <div style={{ ...GlassCard, borderRadius: 24, padding: 0, minHeight: 250 }}>
+                        <div style={{ height: 164, position: 'relative', background: 'rgba(255,255,255,0.08)', overflow: 'hidden', borderRadius: '24px 24px 0 0' }}>
+                          <Skel h={164} w="100%" radius={0} />
+                        </div>
+                        <div style={{ padding: 14 }}>
+                          <Skel h={11} w={140} radius={5} style={{ marginBottom: 7 }} />
+                          <Skel h={18} w={220} radius={6} style={{ marginBottom: 8 }} />
+                          <Skel h={12} w={120} radius={5} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {[0, 1, 2].map((i) => (
+                          <div key={`news-skel-${i}`} style={{ ...GlassCard, borderRadius: 18, padding: 12 }}>
+                            <Skel h={12} w="70%" radius={6} style={{ marginBottom: 9 }} />
+                            <Skel h={10} w="85%" radius={5} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : newsForYou.length === 0 ? (
+                    <div style={{ ...GlassCard, borderRadius: 28, padding: 16, color: V2.textSoft }}>Новости появятся после обновления контента.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => { addRecentAction(newsForYou[0], 'news'); onOpenNewsItem?.(newsForYou[0]); }}
+                        style={{ ...GlassCard, border: 'none', borderRadius: 24, textAlign: 'left', overflow: 'hidden', padding: 0, minHeight: 250 }}
+                      >
+                        <div style={{ height: 164, position: 'relative', background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
+                          {getNewsImage(newsForYou[0]) && <img src={getNewsImage(newsForYou[0])} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent, rgba(8,8,10,0.7))' }} />
+                          <span style={{ position: 'absolute', left: 12, top: 12, ...GlassBadge, background: 'rgba(8,8,10,0.54)' }}>{getNewsCategoryLabel(newsForYou[0])}</span>
+                        </div>
+                        <div style={{ padding: 14 }}>
+                          <div style={{ display: 'flex', gap: 8, color: V2.textMuted, fontSize: 11, marginBottom: 8 }}>
+                            <span>{formatNewsDate(newsForYou[0])}</span>
+                            <span>·</span>
+                            <span>{getNewsViews(newsForYou[0])} просмотров</span>
+                          </div>
+                          <div style={{ color: V2.text, fontSize: 19, lineHeight: '23px', fontWeight: 900, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{getNewsTitle(newsForYou[0])}</div>
+                          <div style={{ marginTop: 6, color: V2.textSoft, fontSize: 12, lineHeight: '17px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(newsForYou[0])}</div>
+                        </div>
+                      </button>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {(newsForYou.slice(1, 4).map((newsItem, index) => {
+                          const stats = getNewsStats(newsItem);
+                          return (
+                            <button
+                              key={newsItem?.id || `${getNewsTitle(newsItem)}-${index}`}
+                              type="button"
+                              onClick={() => { addRecentAction(newsItem, 'news'); onOpenNewsItem?.(newsItem); }}
+                              style={{ ...GlassCard, border: 'none', borderRadius: 18, padding: 12, textAlign: 'left', cursor: 'pointer' }}
+                            >
+                              <div style={{ color: V2.text, fontWeight: 820, lineHeight: '18px', marginBottom: 6, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{getNewsTitle(newsItem)}</div>
+                              <div style={{ color: V2.textMuted, fontSize: 10.5, display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span>{getNewsCategoryLabel(newsItem)}</span>
+                                <span>•</span>
+                                <span>{formatNewsDate(newsItem)}</span>
+                                <span>•</span>
+                                <span>{getNewsViews(newsItem)} 👁</span>
+                                <span>•</span>
+                                <span>💬 {stats.comments}</span>
+                              </div>
+                            </button>
+                          );
+                        }))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780 }}>Ближайшие мероприятия</div>
+                      <div style={{ color: V2.textSoft, fontSize: 12 }}>События, которые стоит не пропустить</div>
+                    </div>
+                    <button type="button" onClick={onOpenEvents} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Все мероприятия</button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {loading ? (
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        {[0, 1, 2].map((i) => (
+                          <div key={`event-skel-${i}`} style={{ ...GlassCard, borderRadius: 24, minHeight: 86, padding: 16 }}>
+                            <Skel h={13} w="40%" radius={6} style={{ marginBottom: 7 }} />
+                            <Skel h={16} w="65%" radius={6} style={{ marginBottom: 10 }} />
+                            <Skel h={11} w="80%" radius={5} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : allEvents.length === 0 ? (
+                      <div style={{ ...GlassCard, borderRadius: 24, padding: 14, color: V2.textSoft }}>Сейчас нет запланированных мероприятий.</div>
+                    ) : (
+                      allEvents.map((event, index) => {
+                        const parsed = eventDayParts(event);
+                        return (
+                          <button
+                            key={event.id || `event-${index}`}
+                            onClick={() => { addRecentAction(event, 'event'); onOpenEvents(); }}
+                            type="button"
+                            style={{ ...GlassCard, border: 'none', borderRadius: 24, padding: '16px', textAlign: 'left', display: 'grid', gridTemplateColumns: '88px 1fr auto', alignItems: 'center', gap: 12 }}
+                          >
+                            <div style={{ borderRadius: 16, background: 'rgba(255,255,255,0.14)', padding: '10px 8px', textAlign: 'center' }}>
+                              <div style={{ fontSize: 22, fontWeight: 920, color: V2.gold }}>{parsed.day}</div>
+                              <div style={{ fontSize: 11, opacity: 0.72, marginTop: 2 }}>{parsed.month}</div>
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ color: V2.text, fontSize: 17, fontWeight: 820, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleOf(event, 'Мероприятие АПГ')}</div>
+                              <div style={{ color: V2.textMuted, fontSize: 12, marginBottom: 7, display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <span>{parsed.time}</span> · <span>{parsed.place}</span> · <span>{parsed.participants ? `${parsed.participants} чел.` : 'Открытые записи'}</span> · <span>{parsed.status}</span>
+                              </div>
+                            </div>
+                            <span style={{ color: V2.textMuted }}>→</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: 12 }}>
+                <section>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Акции</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: V2.textMuted, fontSize: 11 }}>{offers.length}</span>
+                      <button type="button" onClick={onOpenOffers} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Все акции</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', overflow: 'auto', gap: 10, paddingBottom: 4 }}>
+                    {loading ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                        {[0, 1, 2].map((i) => (
+                          <div key={`offers-skel-${i}`} style={{ ...GlassCard, borderRadius: 22, padding: 12, minHeight: 130 }}>
+                            <Skel h={11} w={74} radius={6} style={{ marginBottom: 9 }} />
+                            <Skel h={18} w="70%" radius={6} style={{ marginBottom: 6 }} />
+                            <Skel h={11} w="60%" radius={6} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : offers.length ? offers.map((offer, index) => (
+                      <button
+                        key={offer.id || `offer-${index}`}
+                        type="button"
+                        onClick={() => { addRecentAction(offer, 'offer'); onOpenPartner?.(offer); }}
+                        style={{
+                          ...GlassCard,
+                          border: 'none',
+                          borderRadius: 22,
+                          padding: 12,
+                          minWidth: 210,
+                          maxWidth: 210,
+                          textAlign: 'left',
+                          display: 'grid',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ fontSize: 11, color: V2.gold, fontWeight: 820 }}>🎁 Акция</div>
+                        <div style={{ color: V2.text, fontWeight: 820, fontSize: 14, lineHeight: '18px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {offer.offer || 'Спецпредложение'}
+                        </div>
+                        <div style={{ color: V2.textSoft, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offer.name}</div>
+                      </button>
+                    )) : (
+                      <div style={{ ...GlassCard, borderRadius: 22, padding: 14, color: V2.textSoft }}>Сейчас акции обновляются.</div>
+                    )}
+                  </div>
+                </section>
+
+                <section>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Популярные партнёры</div>
+                    <button type="button" onClick={onOpenOffers} style={{ ...GlassButton, minHeight: 30, padding: '0 11px', fontSize: 11 }}>Все партнёры</button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {loading ? (
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {[0, 1, 2, 3].map((i) => (
+                          <div key={`partner-skel-${i}`} style={{ ...GlassCard, borderRadius: 20, padding: 10, display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: 10 }}>
+                            <Skel w={52} h={52} radius={16} />
+                            <div style={{ minWidth: 0 }}>
+                              <Skel h={14} w="68%" radius={6} style={{ marginBottom: 4 }} />
+                              <Skel h={11} w="52%" radius={5} />
+                            </div>
+                            <Skel w={18} h={18} radius={9} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : nearbyPartners.length === 0 ? (
+                      <div style={{ ...GlassCard, borderRadius: 20, padding: 12, color: V2.textSoft }}>Пока нет популярных партнёров в этой подборке.</div>
+                    ) : (
+                      nearbyPartners.map((partner) => (
+                        <button
+                          key={partner.id || partner.name}
+                          onClick={() => { addRecentAction(partner, 'partner'); onOpenPartner?.(partner); }}
+                          type="button"
+                          style={{ ...GlassCard, border: 'none', borderRadius: 20, padding: 10, textAlign: 'left', display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: 10, alignItems: 'center' }}
+                        >
+                          <PartnerLogo partner={partner} size={52} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ color: V2.text, fontWeight: 820, fontSize: 14, lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.name}</div>
+                            <div style={{ color: V2.textSoft, fontSize: 11, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {partner.categoryLabel || (CATEGORIES.find(c => c.id === partner.category)?.label) || 'Категория не указана'}
+                            </div>
+                          </div>
+                          <span style={{ color: V2.textMuted }}>→</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Эксперты</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: V2.textMuted, fontSize: 11 }}>{topExperts.length}</span>
+                      <button type="button" onClick={onOpenExperts} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Все эксперты</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {loading ? (
+                      [0, 1, 2, 3, 4].slice(0, topExperts.length || 3).map((i) => (
+                        <div
+                          key={`experts-skel-${i}`}
+                          style={{ ...GlassCard, borderRadius: 20, padding: 10, display: 'grid', gridTemplateColumns: '56px 1fr auto', gap: 10 }}
+                        >
+                          <Skel w={56} h={56} radius={16} />
+                          <div style={{ minWidth: 0 }}>
+                            <Skel h={14} w="74%" radius={6} style={{ marginBottom: 4 }} />
+                            <Skel h={11} w="55%" radius={5} />
+                          </div>
+                          <Skel w={46} h={28} radius={12} />
+                        </div>
+                      ))
+                    ) : topExperts.map((expert, index) => (
+                      <button
+                        key={expert.id || `${expert.name}-${index}`}
+                        onClick={onOpenExperts}
+                        type="button"
+                        style={{ ...GlassCard, border: 'none', borderRadius: 20, padding: 10, textAlign: 'left', display: 'grid', gridTemplateColumns: '56px 1fr auto', gap: 10, alignItems: 'center' }}
+                      >
+                        <img src={profileImageOf(expert)} alt={expert?.name} loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 16, objectFit: 'cover', background: 'rgba(255,255,255,0.14)' }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ color: V2.text, fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expert.name || expert.specialization || 'Эксперт АПГ'}</div>
+                          <div style={{ color: V2.textSoft, fontSize: 11, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expert.specialization || expert.category || 'Консультации'}</div>
+                          {expert.rating ? <div style={{ marginTop: 4, color: V2.gold, fontSize: 11 }}>{'★'.repeat(Math.min(5, Math.round(expert.rating)))}</div> : null}
+                        </div>
+                        <span style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Подробнее</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Что рядом</div>
+                    <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Открыть карту</button>
+                  </div>
+                  <div style={{ ...GlassCard, borderRadius: 22, padding: 12 }}>
+                    <div style={{ color: V2.textSoft, fontSize: 12, marginBottom: 8 }}>Сейчас доступны разделы по категориям</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {nearbyCategories.length === 0 ? (
+                        <div style={{ color: V2.textMuted, fontSize: 12 }}>Сейчас нет выделенных категорий рядом.</div>
+                      ) : nearbyCategories.map((item) => (
+                        <button
+                          key={`${item.label}-${item.count}`}
+                          type="button"
+                          onClick={onOpenNearby}
+                          style={{ border: 'none', borderRadius: 14, background: 'rgba(255,255,255,0.08)', color: V2.text, padding: '8px 12px', textAlign: 'left', cursor: 'pointer', ...pressMotion }}
+                        >
+                          <span style={{ fontSize: 11, color: V2.textSoft }}>•</span> Рядом есть {item.label} ({item.count})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <div style={{ color: V2.text, fontWeight: 820, fontSize: 18, marginBottom: 10 }}>Продолжить</div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {recentActions.length === 0 ? (
+                      <div style={{ ...GlassCard, borderRadius: 20, padding: 12, color: V2.textSoft }}>Откройте первый раздел, и здесь появится история посещений.</div>
+                    ) : (
+                      recentActions.map((row) => (
+                        <button
+                          key={`${row.type}-${row.id}`}
+                          type="button"
+                          onClick={getRecentActionAction(row)}
+                          style={{
+                            ...GlassCard,
+                            border: '1px solid rgba(255,255,255,0.16)',
+                            borderRadius: 16,
+                            padding: 10,
+                            color: V2.text,
+                            textAlign: 'left',
+                            width: '100%',
+                            cursor: getRecentActionAction(row) ? 'pointer' : 'default',
+                          }}
+                        >
+                          <span style={{ color: V2.textMuted, fontSize: 11, textTransform: 'uppercase' }}>{row.type}</span>
+                          <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Рекомендации Локи</div>
+                    <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Открыть диалог</button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {lokiInsights.length === 0 ? (
+                      <div style={{ ...GlassCard, borderRadius: 20, padding: 12, color: V2.textSoft }}>Нет активных рекомендаций — откройте Локи, чтобы получить их.</div>
+                    ) : lokiInsights.map((item, index) => (
+                      <button
+                        key={`${item.label}-${index}`}
+                        type="button"
+                        onClick={item.onOpen}
+                        style={{
+                          ...GlassCard,
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: 16,
+                          padding: 12,
+                          textAlign: 'left',
+                          minHeight: 84,
+                          cursor: item.onOpen ? 'pointer' : 'default',
+                        }}
+                      >
+                        <div style={{ color: V2.gold, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6 }}>{item.label}</div>
+                        <div style={{ color: V2.text, fontWeight: 830, fontSize: 13, marginTop: 6, lineHeight: '18px' }}>{item.title}</div>
+                        <div style={{ color: V2.textSoft, fontSize: 11, marginTop: 4 }}>{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
@@ -1356,10 +2629,21 @@ export function HomePanelV2({
   interestProfile = null,
   desktopMode = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
+  onOpenProfile,
+  desktopWorkspaceAvailable = false,
+  onSwitchAppMode,
+  desktopWorkspaceMode = 'user',
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [searchInputValue, setSearchInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
+  const [isOffline, setIsOffline] = useState(() => typeof navigator === 'undefined' ? false : !navigator.onLine);
+  const searchInputRef = useRef(null);
+  const searchResultsRef = useRef(null);
 
   // ─── Pull-to-refresh ────────────────────────────────────────────────────────
   const [pullY, setPullY] = useState(0);
@@ -1453,16 +2737,151 @@ export function HomePanelV2({
     return [...claimable, ...inProgress].slice(0, 2);
   }, [userKeys, favorites.length, referralCount, streak, scannedCount, completedTasks, customTasks]);
 
-  const isSearching = searchQuery.trim().length > 0;
-  const filteredPartners = useMemo(() => partners
-    .filter(p => isSearching || activeCategory === 'all' || p.category === activeCategory)
-    .filter(p => !isSearching || (() => {
-      const q = searchQuery.trim().toLowerCase();
-      return p.name?.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q) ||
-        p.categoryLabel?.toLowerCase().includes(q) ||
-        p.offer?.toLowerCase().includes(q);
-    })()), [partners, isSearching, activeCategory, searchQuery]);
+  useEffect(() => {
+    if (!desktopMode) {
+      setSearchQuery('');
+      setSearchLoading(false);
+      setSearchError(null);
+      setSearchActiveIndex(-1);
+      return;
+    }
+    if (!searchInputValue.trim()) {
+      setSearchError(null);
+      setSearchActiveIndex(-1);
+      setSearchLoading(false);
+      setSearchQuery('');
+      return;
+    }
+    setSearchLoading(true);
+    setSearchError(null);
+    const timer = window.setTimeout(() => {
+      setSearchQuery(searchInputValue.trim());
+      setSearchLoading(false);
+      setSearchActiveIndex(-1);
+    }, 240);
+    return () => window.clearTimeout(timer);
+  }, [desktopMode, searchInputValue]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const updateConnection = () => setIsOffline(!window.navigator.onLine);
+    updateConnection();
+    window.addEventListener('online', updateConnection);
+    window.addEventListener('offline', updateConnection);
+    return () => {
+      window.removeEventListener('online', updateConnection);
+      window.removeEventListener('offline', updateConnection);
+    };
+  }, []);
+
+  const searchComputation = useMemo(() => {
+    if (!searchQuery) {
+      return {
+        results: { partners: [], experts: [], events: [], news: [], all: [] },
+        error: null,
+      };
+    }
+    try {
+      const q = String(searchQuery).trim().toLowerCase();
+      const out = { partners: [], experts: [], events: [], news: [] };
+      const add = (bucket, item, type, label, description, action) => {
+        const baseId = item?.id || item?.title || label || `${type}-item`;
+        const uniqueId = `${bucket}-${baseId}-${out[bucket].length}`;
+        out[bucket].push({ id: uniqueId, type: type, title: label, description, action });
+      };
+      partners.forEach((partner) => {
+        const haystack = [partner?.name, partner?.description, partner?.offer, partner?.category, partner?.categoryLabel].filter(Boolean).join(' ').toLowerCase();
+        if (haystack.includes(q)) {
+          add('partners', partner, 'Партнёр', partner?.name || 'Партнёр', partner?.description || 'Открыть партнёра', () => onOpenPartner?.(partner));
+        }
+      });
+      experts.forEach((expert) => {
+        const haystack = [expert?.name, expert?.specialization, expert?.services, expert?.bio].filter(Boolean).join(' ').toLowerCase();
+        if (haystack.includes(q)) {
+          add('experts', expert, 'Эксперт', expert?.name || expert?.specialization || 'Эксперт', expert?.specialization || 'Открыть эксперта', () => onOpenExperts?.());
+        }
+      });
+      events.forEach((event) => {
+        const haystack = [event?.title, event?.description, event?.partner, event?.address].filter(Boolean).join(' ').toLowerCase();
+        if (haystack.includes(q)) {
+          add('events', event, 'Событие', event?.title || 'Событие', [event?.date, event?.address].filter(Boolean).join(' · ') || 'Открыть событие', () => onOpenEvents?.());
+        }
+      });
+      (Array.isArray(news) ? news : []).forEach((newsItem) => {
+        const haystack = [newsItem?.title, newsItem?.text, newsItem?.description].filter(Boolean).join(' ').toLowerCase();
+        if (haystack.includes(q)) {
+          add('news', newsItem, 'Новость', getNewsTitle(newsItem) || 'Новость', `${getNewsCategoryLabel(newsItem)} · ${formatNewsDate(newsItem)}`, () => onOpenNewsItem?.(newsItem));
+        }
+      });
+      const all = [];
+      ['partners', 'experts', 'events', 'news'].forEach(bucket => {
+        out[bucket].forEach((item) => all.push(item));
+      });
+      return { results: { ...out, all }, error: null };
+    } catch (err) {
+      return { results: { partners: [], experts: [], events: [], news: [], all: [] }, error: err?.message || 'Ошибка поиска' };
+    }
+  }, [searchQuery, partners, experts, events, news, onOpenEvents, onOpenExperts, onOpenNewsItem, onOpenPartner]);
+
+  const searchResultState = desktopMode
+    ? searchComputation
+    : { results: { partners: [], experts: [], events: [], news: [], all: [] }, error: null };
+  const searchFlatResults = searchResultState.results?.all || [];
+  const hasSearchQuery = searchInputValue.trim().length > 0;
+  const searchResultsCount = searchFlatResults.length;
+
+  useEffect(() => {
+    setSearchError(searchResultState.error || null);
+  }, [searchResultState.error]);
+
+  useEffect(() => {
+    if (!desktopMode) return;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (searchInputRef.current?.contains?.(target)) return;
+      if (searchResultsRef.current?.contains?.(target)) return;
+      setSearchInputValue('');
+      setSearchQuery('');
+      setSearchActiveIndex(-1);
+    };
+    document.addEventListener('pointerdown', onPointerDown, { passive: true });
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [desktopMode, searchResultsRef, searchInputRef]);
+
+  const handleDesktopSearchKeyDown = useCallback((event) => {
+    if (!searchResultsCount || !hasSearchQuery || searchLoading) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setSearchInputValue('');
+      setSearchQuery('');
+      setSearchActiveIndex(-1);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setSearchActiveIndex((prev) => {
+        const next = prev + 1;
+        return next >= searchResultsCount ? 0 : next;
+      });
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setSearchActiveIndex((prev) => {
+        const next = prev - 1;
+        return next < 0 ? Math.max(searchResultsCount - 1, 0) : next;
+      });
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (searchActiveIndex < 0) return;
+      const active = searchFlatResults[searchActiveIndex];
+      if (active?.action) {
+        event.preventDefault();
+        active.action();
+      }
+    }
+  }, [hasSearchQuery, searchLoading, searchResultsCount, searchActiveIndex, searchFlatResults]);
 
   return (
     <Panel id="home" data-home-version="v2">
@@ -1479,11 +2898,25 @@ export function HomePanelV2({
         onOpenNotifications={onOpenNotifications}
         onOpenPartner={onOpenPartner}
         onOpenNearby={onOpenNearby}
+        onOpenOffers={onOpenOffers}
         onOpenEvents={onOpenEvents}
         onOpenRewards={onOpenRewards}
         onOpenTasks={onOpenTasks}
         onOpenReference={onOpenReference}
         onOpenLoki={onOpenLoki}
+        onOpenProfile={onOpenProfile}
+        onOpenNews={onOpenNews}
+        onOpenMap={onOpenMap}
+        onSearchQueryChange={setSearchInputValue}
+        searchQuery={searchInputValue}
+        searchInputRef={searchInputRef}
+        searchLoading={searchLoading}
+        searchResultsCount={searchResultsCount}
+        onSearchKeyDown={handleDesktopSearchKeyDown}
+        isOffline={isOffline}
+        desktopWorkspaceAvailable={desktopWorkspaceAvailable}
+        onSwitchAppMode={onSwitchAppMode}
+        desktopWorkspaceMode={desktopWorkspaceMode}
         desktopMode={desktopMode}
       />
 
@@ -1545,7 +2978,7 @@ export function HomePanelV2({
           </div>
         )}
 
-        {!loading && !error && (
+        {!error && (
           <>
             <V2SecondScreen
               user={user}
@@ -1562,6 +2995,20 @@ export function HomePanelV2({
               onOpenRewards={onOpenRewards}
               onOpenNews={onOpenNews}
               onOpenNewsItem={onOpenNewsItem}
+              onOpenOffers={onOpenOffers}
+              onOpenLoki={onOpenLoki}
+              onOpenNearby={onOpenNearby}
+              loading={loading}
+              searchQuery={searchQuery}
+              searchLoading={searchLoading}
+              searchError={searchError}
+              searchResultsProp={searchResultState.results || { partners: [], experts: [], events: [], news: [], all: [] }}
+              searchFlatResults={searchFlatResults}
+              searchActiveIndex={searchActiveIndex}
+              onSearchResultFocus={setSearchActiveIndex}
+              onSearchQueryChange={setSearchInputValue}
+              searchResultsRef={searchResultsRef}
+              isOffline={isOffline}
               desktopMode={desktopMode}
             />
 
