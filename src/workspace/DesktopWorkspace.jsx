@@ -8,7 +8,6 @@ import { NewsCard } from '../NewsPage.jsx';
 import { EventPosterCard } from '../EventsPage.jsx';
 import { PartnerCard } from '../HomePanelV2.jsx';
 import { ExpertCardV2 } from '../ExpertsPage.jsx';
-import { ContentGrid, SectionHeader, WorkspacePanel } from './WorkspaceComponents.jsx';
 import { WORKSPACE_LAYOUT, WORKSPACE_Z, getDesktopWorkspaceLayoutPlan } from './WorkspaceLayoutEngine.js';
 import { CAPABILITIES, hasCapability } from '../roleEngine.js';
 import { motionTransition } from '../motion.js';
@@ -106,6 +105,35 @@ function Sparkline({ tone = 'gold' }) {
       <path d="M2 22 C14 16, 18 20, 28 13 S44 17, 54 9 S70 13, 82 6 S91 7, 94 4" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" />
       <path d="M2 27 C14 20, 18 22, 28 15 S44 20, 54 12 S70 15, 82 9 S91 9, 94 6 L94 28 L2 28 Z" fill={tone === 'green' ? 'rgba(80,190,130,0.10)' : 'rgba(215,184,106,0.12)'} />
     </svg>
+  );
+}
+
+function WorkspaceV2SectionHeader({ title, subtitle, actions, style }) {
+  return (
+    <div data-workspace-v2-section-header style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 14, ...style }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 930, letterSpacing: -0.12 }}>{title}</div>
+        {subtitle && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.8, lineHeight: '18px', marginTop: 3 }}>{subtitle}</div>}
+      </div>
+      {actions && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>{actions}</div>}
+    </div>
+  );
+}
+
+function WorkspaceV2Panel({ title, subtitle, children, actions, style }) {
+  return (
+    <section data-workspace-v2-panel style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, minHeight: 0, background: APG2_PROFILE.quietSurface, ...style }}>
+      {(title || actions) && <WorkspaceV2SectionHeader title={title} subtitle={subtitle} actions={actions} />}
+      {children}
+    </section>
+  );
+}
+
+function WorkspaceV2Grid({ children, min = 220, gap = 12, style }) {
+  return (
+    <div data-workspace-v2-grid style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`, gap, ...style }}>
+      {children}
+    </div>
   );
 }
 
@@ -337,33 +365,33 @@ function WorkspaceDashboard({ data, actions }) {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <DashboardHero data={data} profileStatus={profileStatus} tasks={tasks} actions={actions} />
-      <WorkspacePanel title="Рабочие задачи" subtitle="Сначала закрываем то, что влияет на пользователей сегодня" style={{ padding: 14 }}>
+      <WorkspaceV2Panel title="Рабочие задачи" subtitle="Сначала закрываем то, что влияет на пользователей сегодня" style={{ padding: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(168px, 1fr))', gap: 12 }}>
           <TaskColumn title="Сегодня" items={taskGroups.today} tone="gold" />
           <TaskColumn title="В работе" items={taskGroups.progress} />
           <TaskColumn title="Ожидает" items={taskGroups.waiting} />
           <TaskColumn title="Завершено" items={taskGroups.done} />
         </div>
-      </WorkspacePanel>
+      </WorkspaceV2Panel>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 0.95fr)', gap: 16 }}>
-        <WorkspacePanel title="Ближайшие мероприятия" subtitle="Компактный рабочий список" style={{ padding: 14 }}>
+        <WorkspaceV2Panel title="Ближайшие мероприятия" subtitle="Компактный рабочий список" style={{ padding: 14 }}>
           <div style={{ display: 'grid', gap: 9 }}>
             {data.events.slice(0, 5).map((event, index) => (
               <ListRow key={event.id || index} icon="📅" title={safeTitle(event, 'Мероприятие')} text={event.place || event.address || 'Место уточняется'} meta={formatShortDate(event.eventDate || event.date || event.createdAt)} onClick={actions.openEvents} />
             ))}
             {!data.events.length && <EmptyWidget text="Ближайших мероприятий пока нет." />}
           </div>
-        </WorkspacePanel>
-        <WorkspacePanel title="Последние сообщения" subtitle="Входящие сигналы и действия" style={{ padding: 14 }}>
+        </WorkspaceV2Panel>
+        <WorkspaceV2Panel title="Последние сообщения" subtitle="Входящие сигналы и действия" style={{ padding: 14 }}>
           <div style={{ display: 'grid', gap: 9 }}>
             {data.notifications.slice(0, 5).map((item, index) => (
               <ListRow key={item.id || index} icon="💬" title={safeTitle(item, 'Уведомление')} text={item.text || item.body || 'Новое сообщение'} meta={formatShortDate(item.createdAt || item.date)} onClick={actions.openMessages} />
             ))}
             {!data.notifications.length && <EmptyWidget text="Новых сообщений нет — можно заняться задачами." />}
           </div>
-        </WorkspacePanel>
+        </WorkspaceV2Panel>
       </div>
-      <WorkspacePanel title="Быстрые действия" subtitle="Важные рабочие сценарии в один клик" style={{ padding: 14 }}>
+      <WorkspaceV2Panel title="Быстрые действия" subtitle="Важные рабочие сценарии в один клик" style={{ padding: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 10 }}>
           {[
             ['📰', 'Создать новость', 'Контент', actions.openNews],
@@ -380,7 +408,7 @@ function WorkspaceDashboard({ data, actions }) {
             </button>
           ))}
         </div>
-      </WorkspacePanel>
+      </WorkspaceV2Panel>
     </div>
   );
 }
@@ -410,28 +438,28 @@ function RightWorkspacePanel({ data, activeSection, aiDraft, aiHistory, onDraftC
         <LokiIdentity size={54} state="recommending" label="Локи" sublabel={`контекст: ${context.label}`} />
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 10 }}>Workspace показывает не всё подряд, а следующий лучший шаг.</div>
       </div>
-      <WorkspacePanel title="Ключевые показатели" subtitle="Коротко о состоянии платформы" style={{ margin: 0, padding: 12 }}>
-        <ContentGrid min={130} gap={8}>
+      <WorkspaceV2Panel title="Ключевые показатели" subtitle="Коротко о состоянии платформы" style={{ margin: 0, padding: 12 }}>
+        <WorkspaceV2Grid min={130} gap={8}>
           <MetricTile label="Пользователи" value={data.userCount || '—'} delta="+ сегодня" tone="green" />
           <MetricTile label="Партнёры" value={data.partners.length} delta="+2%" />
           <MetricTile label="Эксперты" value={data.experts.length} delta="+1%" />
           <MetricTile label="Ключи" value={data.userKeys || 0} delta="активно" />
           <MetricTile label="Заявки" value={data.unreadCount || 0} delta="новые" tone={data.unreadCount ? 'green' : 'gold'} />
           <MetricTile label="Отклики" value={data.notifications.length} delta="live" />
-        </ContentGrid>
-      </WorkspacePanel>
-      <WorkspacePanel title="Живая активность" subtitle="Что изменилось недавно" style={{ margin: 0, padding: 12 }}>
+        </WorkspaceV2Grid>
+      </WorkspaceV2Panel>
+      <WorkspaceV2Panel title="Живая активность" subtitle="Что изменилось недавно" style={{ margin: 0, padding: 12 }}>
         <div style={{ display: 'grid', gap: 8 }}>
           {activity.map(item => <ListRow key={item.id} icon={item.icon} title={item.title} text={item.text} />)}
           {!activity.length && <EmptyWidget text="Активность появится после обновления данных." />}
         </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="Напоминания" subtitle="Не потерять важное" style={{ margin: 0, padding: 12 }}>
+      </WorkspaceV2Panel>
+      <WorkspaceV2Panel title="Напоминания" subtitle="Не потерять важное" style={{ margin: 0, padding: 12 }}>
         <div style={{ display: 'grid', gap: 8 }}>
           {reminders.map((item, index) => <ListRow key={item} icon={index === 0 ? '⚑' : '•'} title={item} text={index === 0 ? 'приоритет дня' : 'рабочая подсказка'} />)}
         </div>
-      </WorkspacePanel>
-      <WorkspacePanel title="Спросить Локи" subtitle="Быстрый рабочий вопрос" style={{ margin: 0, padding: 12 }}>
+      </WorkspaceV2Panel>
+      <WorkspaceV2Panel title="Спросить Локи" subtitle="Быстрый рабочий вопрос" style={{ margin: 0, padding: 12 }}>
         {aiHistory.slice(-2).map(item => (
           <div key={item.id} style={{ ...APG2_PROFILE.glass, borderRadius: 16, padding: 10, marginTop: 8, background: item.role === 'loki' ? APG2_PROFILE.goldSoft : APG2_PROFILE.quietSurface }}>
             <div style={{ color: item.role === 'loki' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 900, textTransform: 'uppercase' }}>{item.role === 'loki' ? 'Локи' : 'Вы'}</div>
@@ -442,30 +470,30 @@ function RightWorkspacePanel({ data, activeSection, aiDraft, aiHistory, onDraftC
           <input value={aiDraft} onChange={event => onDraftChange(event.target.value)} placeholder={context.prompt} style={{ width: '100%', minHeight: 34, border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 12.5 }} />
           <GlassButton type="submit" tone="gold" style={{ minHeight: 34, padding: '7px 10px', color: '#17120a' }}>Спросить</GlassButton>
         </form>
-      </WorkspacePanel>
+      </WorkspaceV2Panel>
     </div>
   );
 }
 
 function PlaceholderSection({ title, text, actions = [] }) {
   return (
-    <WorkspacePanel title={title} subtitle={text}>
+    <WorkspaceV2Panel title={title} subtitle={text}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         {actions.map(action => (
           <GlassButton key={action.id || action.label} onClick={action.onClick} tone={action.tone} style={{ minHeight: 44 }}>{action.label}</GlassButton>
         ))}
         {!actions.length && <EmptyWidget text="Раздел подготовлен в Workspace Core и будет наполнен рабочими сценариями без отдельной архитектуры." />}
       </div>
-    </WorkspacePanel>
+    </WorkspaceV2Panel>
   );
 }
 
 function DataSection({ type, title, subtitle, items = [], emptyText, onOpen }) {
   const visible = items.slice(0, 8);
   return (
-    <WorkspacePanel title={title} subtitle={subtitle} actions={<GlassButton onClick={onOpen} tone="gold" style={{ color: '#17120a' }}>Открыть раздел</GlassButton>}>
+    <WorkspaceV2Panel title={title} subtitle={subtitle} actions={<GlassButton onClick={onOpen} tone="gold" style={{ color: '#17120a' }}>Открыть раздел</GlassButton>}>
       {!visible.length ? <EmptyWidget text={emptyText} /> : (
-        <ContentGrid min={type === 'news' || type === 'events' ? 260 : 220} gap={12}>
+        <WorkspaceV2Grid min={type === 'news' || type === 'events' ? 260 : 220} gap={12}>
           {visible.map((item, index) => {
             if (type === 'news') return <NewsCard key={item.id || index} item={item} index={index} onOpen={onOpen} />;
             if (type === 'events') return <EventPosterCard key={item.id || index} event={item} index={index} onClick={onOpen} compact />;
@@ -473,9 +501,9 @@ function DataSection({ type, title, subtitle, items = [], emptyText, onOpen }) {
             if (type === 'experts') return <ExpertCardV2 key={item.id || index} expert={item} onClick={onOpen} />;
             return <ListRow key={item.id || index} title={safeTitle(item)} text={item.description || item.shortDescription || ''} onClick={onOpen} />;
           })}
-        </ContentGrid>
+        </WorkspaceV2Grid>
       )}
-    </WorkspacePanel>
+    </WorkspaceV2Panel>
   );
 }
 
@@ -646,13 +674,13 @@ export function DesktopWorkspace({
   const activeLabel = navItems.find(item => item.id === activeSection)?.label || 'Workspace';
 
   return (
-    <div onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100dvh', background: APG2_PROFILE.workspaceBg, color: APG2_PROFILE.text, padding: WORKSPACE_LAYOUT.pagePadding, boxSizing: 'border-box', overflow: 'hidden' }}>
+    <div data-workspace-version="2.0" data-workspace-v2-root onContextMenu={handleWorkspaceContextMenu} style={{ minHeight: '100dvh', background: APG2_PROFILE.workspaceBg, color: APG2_PROFILE.text, padding: WORKSPACE_LAYOUT.pagePadding, boxSizing: 'border-box', overflow: 'hidden' }}>
       <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: WORKSPACE_LAYOUT.gap, height: `calc(100dvh - ${WORKSPACE_LAYOUT.pagePadding * 2}px)`, minHeight: 0 }}>
         <WorkspaceHeaderBar user={user} onModeChange={onModeChange} unreadCount={unreadCount} query={query} onQueryChange={setQuery} onOpenNotifications={() => setActiveSection('messages')} onOpenProfile={() => onOpenPanel?.('profile')} />
         <div data-workspace-layout="desktop-grid" style={{ display: 'grid', gridTemplateColumns: workspaceColumns, gap: WORKSPACE_LAYOUT.gap, alignItems: 'stretch', minHeight: 0, height: '100%', overflow: 'hidden' }}>
           <WorkspaceSidebar items={navItems} activeSection={activeSection} collapsed={effectiveSidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} onSelect={handleSelectNav} user={user} onModeChange={onModeChange} />
           <main data-workspace-region="content" style={{ minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', display: 'block', position: 'relative', zIndex: WORKSPACE_Z.content, paddingRight: 2 }}>
-            <SectionHeader title={activeLabel} subtitle={query ? `Поиск: ${query}` : 'профессиональная рабочая панель АПГ'} actions={<GlassBadge tone="gold">Workspace 2.0</GlassBadge>} />
+            <WorkspaceV2SectionHeader title={activeLabel} subtitle={query ? `Поиск: ${query}` : 'профессиональная рабочая панель АПГ'} actions={<GlassBadge tone="gold">Workspace 2.0</GlassBadge>} />
             {renderContent()}
           </main>
           {!aiAsDrawer && (
@@ -691,7 +719,7 @@ function WorkspaceShortcutOverlay({ onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: WORKSPACE_Z.modal, background: 'rgba(12,12,14,0.32)', display: 'grid', placeItems: 'center', padding: 18 }}>
       <div onClick={event => event.stopPropagation()} style={{ ...APG2_PROFILE.glass, borderRadius: 30, padding: 18, width: 'min(440px, 100%)', background: APG2_PROFILE.quietSurface }}>
-        <SectionHeader title="Горячие клавиши" subtitle="Workspace управляется без лишних переходов" actions={<GlassButton onClick={onClose} style={{ width: 36, minHeight: 36, padding: 0 }}>×</GlassButton>} />
+        <WorkspaceV2SectionHeader title="Горячие клавиши" subtitle="Workspace управляется без лишних переходов" actions={<GlassButton onClick={onClose} style={{ width: 36, minHeight: 36, padding: 0 }}>×</GlassButton>} />
         <div style={{ display: 'grid', gap: 8 }}>
           {shortcuts.map(([key, text]) => <ListRow key={key} title={key} text={text} icon="⌘" />)}
         </div>

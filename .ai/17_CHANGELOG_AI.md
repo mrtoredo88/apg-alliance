@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] fix: replace legacy workspace components in Workspace 2.0
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`
+**Тип:** fix
+**Что изменено:**
+- `DesktopWorkspace` больше не импортирует и не рендерит legacy `WorkspaceComponents.jsx`: `WorkspacePanel`, `SectionHeader`, `ContentGrid` заменены локальными V2-компонентами.
+- Корень Workspace получил явный маркер `data-workspace-version="2.0"`, а панели/сетки — V2-маркеры для DOM-проверки единственной реализации.
+- Новый Workspace больше не опирается на старый dashboard/component-layer внутри React-дерева; старые общие компоненты остаются только для Business Hub/Cabinet Core, где они реально используются.
+**Почему:** production показал визуальное наложение старого Workspace-слоя; Workspace 2.0 должен быть единственной реализацией рабочего пространства.
+
+---
+
 ## [2026-07-13] feat: Workspace 2.0 dashboard redesign
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`
