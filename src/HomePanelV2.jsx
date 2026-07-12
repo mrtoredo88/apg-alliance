@@ -668,6 +668,7 @@ function V2FirstScreenDesktop({
   desktopMode = false,
   isOffline = false,
 }) {
+  const [desktopSearchQuery, setDesktopSearchQuery] = useState('');
   const firstName = getUserFirstName(user);
   const greeting = firstName ? `${getDayGreeting()}, ${firstName}!` : `${getDayGreeting()}!`;
   const heroPartner = partnerOfMonth ?? featuredPartner ?? partners[0] ?? null;
@@ -712,6 +713,36 @@ function V2FirstScreenDesktop({
     { label: 'Подарки', onClick: onOpenRewards },
     { label: 'О проекте', onClick: onOpenReference },
   ];
+  const runDesktopSearch = useCallback(() => {
+    const text = desktopSearchQuery.trim();
+    if (!text) return;
+    const query = text.toLowerCase().replace(/ё/g, 'е');
+    if (query.includes('новост') || query.includes('обновлен') || query.includes('объявлен')) {
+      onOpenNews?.();
+      return;
+    }
+    if (query.includes('событ') || query.includes('мероприят') || query.includes('афиш')) {
+      onOpenEvents?.();
+      return;
+    }
+    if (query.includes('партнер') || query.includes('партн') || query.includes('акци') || query.includes('скид')) {
+      onOpenOffers?.();
+      return;
+    }
+    if (query.includes('эксперт') || query.includes('консультац')) {
+      onOpenExperts?.();
+      return;
+    }
+    if (query.includes('подар') || query.includes('приз') || query.includes('наград')) {
+      onOpenRewards?.();
+      return;
+    }
+    if (query.includes('рядом') || query.includes('карт')) {
+      onOpenNearby?.();
+      return;
+    }
+    onOpenLoki?.();
+  }, [desktopSearchQuery, onOpenEvents, onOpenExperts, onOpenLoki, onOpenNearby, onOpenNews, onOpenOffers, onOpenRewards]);
 
   const todayCards = [
     { title: 'Мероприятие дня', value: heroTitle, onClick: heroAction, icon: '🎉' },
@@ -793,7 +824,97 @@ function V2FirstScreenDesktop({
             ))}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{
+              ...V2.glass,
+              width: 'clamp(178px, 14.2vw, 246px)',
+              height: 38,
+              borderRadius: 999,
+              display: 'grid',
+              gridTemplateColumns: '18px 1fr auto',
+              alignItems: 'center',
+              gap: 7,
+              padding: '0 10px 0 12px',
+              boxSizing: 'border-box',
+              color: V2.textMuted,
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08))',
+              border: '1px solid rgba(255,255,255,0.30)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 30px rgba(0,0,0,0.10)',
+            }}>
+              <span aria-hidden="true" style={{ fontSize: 13, lineHeight: '18px', opacity: 0.82 }}>⌕</span>
+              <input
+                type="search"
+                value={desktopSearchQuery}
+                onChange={(event) => setDesktopSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    runDesktopSearch();
+                  }
+                }}
+                placeholder="Поиск по АПГ..."
+                aria-label="Поиск по АПГ"
+                style={{
+                  minWidth: 0,
+                  width: '100%',
+                  height: '100%',
+                  border: 0,
+                  outline: 0,
+                  background: 'transparent',
+                  color: V2.text,
+                  fontSize: 12,
+                  lineHeight: '16px',
+                  fontWeight: 720,
+                }}
+              />
+              {desktopSearchQuery.trim() ? (
+                <button
+                  type="button"
+                  aria-label="Очистить поиск"
+                  onClick={() => setDesktopSearchQuery('')}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    border: '1px solid rgba(255,255,255,0.20)',
+                    background: 'rgba(255,255,255,0.10)',
+                    color: V2.textMuted,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    lineHeight: '18px',
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Запустить поиск"
+                  onClick={runDesktopSearch}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    border: '1px solid rgba(201,168,76,0.22)',
+                    background: 'rgba(201,168,76,0.10)',
+                    color: V2.gold,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    lineHeight: '18px',
+                    padding: 0,
+                  }}
+                >
+                  ↵
+                </button>
+              )}
+            </div>
             <button
               onClick={onOpenNotifications}
               aria-label="Уведомления"
@@ -1387,12 +1508,11 @@ function V2SecondScreenDesktop({
   const sideNews = useMemo(() => {
     const list = [];
 
-    const addNews = () => {
-      const article = newsForYou[1];
+    const addNews = (article, index = 1) => {
       if (!article) return;
       list.push({
-        kind: 'news',
-        key: `news-${article.id || article.title || 1}`,
+        kind: index === 1 ? 'Новость' : 'Лента',
+        key: `news-${article.id || article.title || index}`,
         title: getNewsTitle(article),
         subtitle: getNewsCategoryLabel(article),
         extra: formatNewsDate(article),
@@ -1408,7 +1528,7 @@ function V2SecondScreenDesktop({
       const partner = nearbyPartners[1] || nearbyPartners[0] || null;
       if (!partner) return;
       list.push({
-        kind: 'partner',
+        kind: partner.offer ? 'Партнёр' : 'Город',
         key: `partner-${partner?.id || partner?.name || 0}`,
         title: partner.name || 'Партнёр',
         subtitle: partner.categoryLabel || (CATEGORIES.find(c => c.id === partner?.category)?.label) || 'Место рядом',
@@ -1425,7 +1545,7 @@ function V2SecondScreenDesktop({
       const offerPartner = dayOffer || offers[0] || nearbyPartners[1] || null;
       if (!offerPartner) return;
       list.push({
-        kind: offerPartner.offer ? 'offer' : 'partner',
+        kind: offerPartner.offer ? 'Акция' : 'Партнёр',
         key: `offer-${offerPartner?.id || offerPartner?.name || 0}`,
         title: offerPartner.offer || offerPartner.name || 'Актуальная акция',
         subtitle: offerPartner.name || 'Выберите предложение',
@@ -1441,14 +1561,32 @@ function V2SecondScreenDesktop({
         },
       });
     };
-
-    addNews();
-    if (list.length < 3) addPartner();
-    if (list.length < 3) addOffer();
-
-    while (list.length < 3) {
+    const addExpert = () => {
+      const expert = topExperts[0] || null;
+      if (!expert) return;
       list.push({
-        kind: list.length === 0 ? 'news' : list.length === 1 ? 'partner' : 'offer',
+        kind: 'Эксперт',
+        key: `expert-news-${expert?.id || expert?.name || 0}`,
+        title: expert.name || expert.specialization || 'Эксперт АПГ',
+        subtitle: expert.specialization || expert.category || 'Практическая помощь',
+        extra: expert.rating ? `${Number(expert.rating).toFixed(1)} ★` : 'Открыть раздел',
+        image: profileImageOf(expert),
+        onAction: () => {
+          addRecentAction(expert, 'expert');
+          onOpenExperts?.();
+        },
+      });
+    };
+
+    addNews(newsForYou[1], 1);
+    addNews(newsForYou[2], 2);
+    if (list.length < 4) addPartner();
+    if (list.length < 4) addExpert();
+    if (list.length < 4) addOffer();
+
+    while (list.length < 4) {
+      list.push({
+        kind: list.length === 0 ? 'Новость' : list.length === 1 ? 'Партнёр' : list.length === 2 ? 'Эксперт' : 'Обновление',
         key: `side-empty-${list.length}`,
         title: 'Загрузка данных',
         subtitle: 'Скоро появится',
@@ -1457,8 +1595,8 @@ function V2SecondScreenDesktop({
       });
     }
 
-    return list.slice(0, 3);
-  }, [addRecentAction, dayOffer, newsForYou, onOpenNews, onOpenNewsItem, onOpenOffers, onOpenPartner, offers, nearbyPartners]);
+    return list.slice(0, 4);
+  }, [addRecentAction, dayOffer, newsForYou, onOpenExperts, onOpenNews, onOpenNewsItem, onOpenOffers, onOpenPartner, offers, nearbyPartners, topExperts]);
   const todayInApg = useMemo(() => {
     const expertForToday = todayExpert || (topExperts[0] ? { name: 'Профессиональные консультации', specialization: 'Эксперт АПГ', rating: 0, id: 'expert-today-fallback' } : null);
     const cards = [
@@ -1612,10 +1750,11 @@ function V2SecondScreenDesktop({
     ? 'minmax(0, 1.18fr) minmax(154px, 0.82fr)'
     : 'minmax(0, 1.14fr) minmax(138px, 0.78fr)';
   const desktopNewsCardColumns = desktopWidth >= 1500
-    ? 'minmax(0, 1.7fr) minmax(136px, 0.74fr)'
-    : 'minmax(0, 1.62fr) minmax(124px, 0.72fr)';
+    ? 'minmax(0, 1.52fr) minmax(176px, 0.86fr)'
+    : 'minmax(0, 1.46fr) minmax(154px, 0.82fr)';
   const compactSectionTileHeight = 132;
   const compactSectionLeadImageHeight = 110;
+  const compactNewsLeadImageHeight = 126;
   const compactSectionTileMetaGap = 4;
 
   return (
@@ -1705,14 +1844,13 @@ function V2SecondScreenDesktop({
                       <Skel h={16} w="82%" radius={8} />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gap: 8, gridTemplateRows: 'repeat(2, minmax(0, 1fr))', height: '100%' }}>
-                    {[0, 1].map((i) => (
-                      <div key={`main-news-side-skel-${i}`} style={{ ...DesktopDenseTile, border: 'none', padding: 10, display: 'grid', gridTemplateColumns: '46px 1fr', gap: 8, alignItems: 'center', minHeight: 82, height: '100%' }}>
-                        <Skel w={46} h={46} radius={12} />
+                  <div style={{ display: 'grid', gap: 6, gridTemplateRows: 'repeat(4, minmax(0, 1fr))', height: '100%' }}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={`main-news-side-skel-${i}`} style={{ ...DesktopDenseTile, border: 'none', padding: '7px 8px', display: 'grid', gridTemplateColumns: '34px 1fr', gap: 7, alignItems: 'center', minHeight: 0, height: '100%' }}>
+                        <Skel w={34} h={34} radius={10} />
                         <div style={{ display: 'grid', gap: 4 }}>
                           <Skel h={9.5} w={56} radius={4} />
-                          <Skel h={16} w="98%" radius={5} />
-                          <Skel h={10} w="84%" radius={4} />
+                          <Skel h={14} w="98%" radius={5} />
                         </div>
                       </div>
                     ))}
@@ -1726,34 +1864,34 @@ function V2SecondScreenDesktop({
                       type="button"
                       onClick={() => { addRecentAction(mainNews, 'news'); onOpenNewsItem?.(mainNews); }}
                       {...pressMotion}
-                      style={{ ...DesktopTile, border: 'none', padding: 0, overflow: 'hidden', textAlign: 'left', cursor: 'pointer', display: 'grid', gridTemplateRows: `${compactSectionLeadImageHeight}px 1fr`, height: '100%' }}
+                      style={{ ...DesktopTile, border: 'none', padding: 0, overflow: 'hidden', textAlign: 'left', cursor: 'pointer', display: 'grid', gridTemplateRows: `${compactNewsLeadImageHeight}px 1fr`, height: '100%' }}
                     >
                     <div style={{ position: 'relative', background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
                       {getNewsImage(mainNews) ? <img src={getNewsImage(mainNews)} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
                       <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent, rgba(8,8,10,0.72))' }} />
                       <span style={{ position: 'absolute', left: 16, top: 16, ...GlassBadge, background: 'rgba(8,8,10,0.52)' }}>{getNewsCategoryLabel(mainNews)}</span>
                     </div>
-                    <div style={{ padding: 11, display: 'grid', alignContent: 'start', gap: compactSectionTileMetaGap }}>
+                    <div style={{ padding: '12px 12px 11px', display: 'grid', alignContent: 'start', gap: compactSectionTileMetaGap }}>
                         <div style={{ color: V2.textMuted, fontSize: 10.8, lineHeight: '13px', marginBottom: 1 }}>{formatNewsDate(mainNews)}</div>
-                        <div style={{ color: V2.text, fontSize: 16.3, lineHeight: '19px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(mainNews)}</div>
-                        <div style={{ marginTop: 1, color: V2.textSoft, fontSize: 10.6, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(mainNews)}</div>
+                        <div style={{ color: V2.text, fontSize: 17.1, lineHeight: '20px', fontWeight: 920, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(mainNews)}</div>
+                        <div style={{ marginTop: 1, color: V2.textSoft, fontSize: 10.9, lineHeight: '13.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(mainNews)}</div>
                       </div>
                   </button>
-                  <div style={{ display: 'grid', gap: 8, gridTemplateRows: 'repeat(2, minmax(0, 1fr))', height: '100%' }}>
-                    {sideNews.slice(0, 2).map((sideItem, index) => (
+                  <div style={{ display: 'grid', gap: 6, gridTemplateRows: 'repeat(4, minmax(0, 1fr))', height: '100%' }}>
+                    {sideNews.slice(0, 4).map((sideItem, index) => (
                       <button
                         key={sideItem?.key || sideItem?.id || `${sideItem?.title}-${index}`}
                         type="button"
                         onClick={sideItem?.onAction}
-                        style={{ ...DesktopDenseTile, border: 'none', height: '100%', padding: 10, textAlign: 'left', cursor: sideItem?.onAction ? 'pointer' : 'default', display: 'grid', gap: 8, gridTemplateColumns: sideItem.image ? '46px 1fr' : '1fr', alignItems: 'center', minHeight: 82 }}
+                        style={{ ...DesktopDenseTile, border: 'none', height: '100%', padding: '7px 8px', textAlign: 'left', cursor: sideItem?.onAction ? 'pointer' : 'default', display: 'grid', gap: 7, gridTemplateColumns: sideItem.image ? '34px 1fr' : '1fr', alignItems: 'center', minHeight: 0 }}
                       >
-                          <div style={{ minWidth: 0, gridColumn: sideItem.image ? '2 / 3' : '1 / -1', display: 'grid', gap: 4 }}>
-                          <div style={{ color: V2.gold, fontSize: 9.6, lineHeight: '11px', fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.45 }}>{sideItem.kind}</div>
-                          <div style={{ color: V2.text, fontSize: 13.4, lineHeight: '16px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sideItem.title}</div>
-                          <div style={{ color: V2.textSoft, fontSize: 10.5, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{[sideItem.subtitle, sideItem.extra].filter(Boolean).join(' · ') || 'Актуальная информация'}</div>
+                          <div style={{ minWidth: 0, gridColumn: sideItem.image ? '2 / 3' : '1 / -1', display: 'grid', gap: 2 }}>
+                          <div style={{ color: V2.gold, fontSize: 8.8, lineHeight: '10px', fontWeight: 840, textTransform: 'uppercase', letterSpacing: 0.42 }}>{sideItem.kind}</div>
+                          <div style={{ color: V2.text, fontSize: 11.9, lineHeight: '14px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sideItem.title}</div>
+                          <div style={{ color: V2.textSoft, fontSize: 9.6, lineHeight: '11.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{[sideItem.subtitle, sideItem.extra].filter(Boolean).join(' · ') || 'Актуальная информация'}</div>
                         </div>
                         {sideItem.image ? (
-                          <div style={{ width: 46, height: 46, borderRadius: 12, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
                             <img src={sideItem.image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         ) : null}
