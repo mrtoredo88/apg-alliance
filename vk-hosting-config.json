@@ -5,5 +5,8 @@
     "mobile": "index.html",
     "mvk": "index.html",
     "web": "index.html"
-  }
+  },
+  "noprompt": true,
+  "update_prod": true,
+  "update_dev": true
 }
