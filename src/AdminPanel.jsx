@@ -497,13 +497,13 @@ function PushReportModal({ report, onClose }) {
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ ...s.card, width: '100%', maxWidth: 480, maxHeight: '84vh', overflowY: 'auto', marginBottom: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h2 style={{ ...s.h2, margin: 0 }}>{report.error ? '⚠️ Публикация без push' : '✅ Опубликовано'}</h2>
+          <h2 style={{ ...s.h2, margin: 0 }}>{report.error ? '⚠️ Push не отправлен' : report.manual ? '📲 Push отправлен' : '✅ Опубликовано'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
         </div>
         <div style={{ fontSize: 13, color: A.text, fontWeight: 700, marginBottom: 12 }}>{report.context}</div>
         {report.error ? (
           <div style={{ padding: '10px 12px', borderRadius: 12, background: A.redDim, border: `1px solid ${A.redBrd}`, color: '#f87171', fontSize: 13, marginBottom: 12 }}>
-            Материал опубликован, но push-рассылка не выполнена: {report.error}
+            {report.manual ? 'Push-рассылка не выполнена' : 'Материал опубликован, но push-рассылка не выполнена'}: {report.error}
           </div>
         ) : (
           <>
@@ -4206,6 +4206,12 @@ export const AdminPanel = () => {
     }
   }, [runAdminAction, setContentRows]);
 
+  // Удалённые события скрываются из рабочих списков, но остаются в «Жизненном цикле»
+  const visibleEvents = useMemo(
+    () => events.filter(item => !['deleted', 'trash'].includes(normalizeContentStatus(item))),
+    [events],
+  );
+
   const lifecycleRows = useMemo(() => getContentRows(contentLifecycleResource), [getContentRows, contentLifecycleResource]);
   const lifecycleSummary = useMemo(() => summarizeLifecycle(lifecycleRows, contentLifecycleResource), [lifecycleRows, contentLifecycleResource]);
   const lifecycleVisibleRows = useMemo(() => {
@@ -5613,7 +5619,7 @@ export const AdminPanel = () => {
   };
 
   // Публикация контента → in-app уведомление + push broadcast + отчёт администратору
-  const publishContentPush = async ({ context, title, body, category, deepLink, imageUrl }) => {
+  const publishContentPush = async ({ context, title, body, category, deepLink, imageUrl, manual = false }) => {
     const notifData = {
       title,
       body: body || '',
@@ -5634,11 +5640,21 @@ export const AdminPanel = () => {
     try {
       const created = await runAdminEntityAction('notifications', 'create', { patch: notifData });
       const stats = await sendPushForNotification(notifData, created.id);
-      setPushReport({ context, stats });
+      setPushReport({ context, stats, manual });
     } catch (e) {
       logError(e, 'AdminPanel.publishContentPush');
-      setPushReport({ context, error: e.message || 'Не удалось отправить push.' });
+      setPushReport({ context, error: e.message || 'Не удалось отправить push.', manual });
     }
+  };
+
+  // Ручная (повторная) рассылка из редактора — не зависит от публикации, не блокируется
+  const sendManualContentPush = async (payload) => {
+    if (!payload.title || !payload.title.trim()) {
+      window.alert('Сначала заполните заголовок — он станет текстом уведомления.');
+      return;
+    }
+    if (!window.confirm('Отправить push-уведомление всем подходящим пользователям?')) return;
+    await publishContentPush({ ...payload, manual: true });
   };
 
   const formatPushResult = (prefix, result = {}) => {
@@ -5803,7 +5819,7 @@ export const AdminPanel = () => {
         window.alert('Конец события должен быть позже начала.');
         return;
       }
-      const conflicts = findEventConflicts(events, start, end, editingEvent?.id || null);
+      const conflicts = findEventConflicts(visibleEvents, start, end, editingEvent?.id || null);
       if (conflicts.length) {
         const list = conflicts.slice(0, 5).map(formatConflictLabel).join('\n');
         const ok = window.confirm(`⚠️ Пересечение по времени с существующими мероприятиями:\n\n${list}\n\nОпубликовать несмотря на конфликт?`);
@@ -5859,9 +5875,25 @@ export const AdminPanel = () => {
   };
 
   const deleteEvent = async (id) => {
-    if (!window.confirm('Пометить событие как удалённое? Это первый этап удаления, данные сохранятся.')) return;
-    await lifecycleTransition('events', id, 'deleted', 'Первый этап удаления события');
-    fetchData();
+    const item = events.find(ev => ev.id === id);
+    if (!item) {
+      window.alert('Событие не найдено в загруженном списке. Обновите данные.');
+      return;
+    }
+    if (!window.confirm(`Удалить событие «${item.title || id}»? Оно исчезнет из приложения, данные сохранятся в разделе «Жизненный цикл».`)) return;
+    const result = await lifecycleTransition('events', id, 'deleted', 'Удаление события из админки');
+    if (result) {
+      setShowEventDetailSheet(false);
+      showUndo({ type: 'event-delete', item, label: `Событие удалено: ${item.title || 'без названия'}` });
+    }
+  };
+
+  const restoreDeletedEvent = async () => {
+    if (!adminUndo?.item) return;
+    const item = adminUndo.item;
+    const prevStatus = ['draft', 'moderation', 'scheduled'].includes(normalizeContentStatus(item)) ? normalizeContentStatus(item) : 'published';
+    await lifecycleTransition('events', item.id, prevStatus, 'Отмена удаления события');
+    setAdminUndo(null);
   };
 
   const moderateEvent = async (event, action) => {
@@ -6811,7 +6843,7 @@ export const AdminPanel = () => {
         <AdminDashboard
           partners={partners}
           experts={experts}
-          events={events}
+          events={visibleEvents}
           news={news}
           banners={banners}
           customTasks={customTasks}
@@ -8288,10 +8320,25 @@ export const AdminPanel = () => {
                     📣 Отправить push-уведомление подписчикам после публикации
                   </label>
                 )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveEvent}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button style={{ ...s.btn, ...s.btnPri, flex: 1, minWidth: 160 }} onClick={saveEvent}>
                     {editingEvent ? '💾 Сохранить' : '➕ Добавить'}
                   </button>
+                  {editingEvent && (
+                    <button
+                      style={{ ...s.btn, background: 'rgba(74,144,217,0.14)', border: '1px solid rgba(74,144,217,0.35)', color: '#6AABEC' }}
+                      onClick={() => sendManualContentPush({
+                        context: `Мероприятие «${eTitle.trim()}»`,
+                        title: `${eEmoji || '🎉'} ${eTitle.trim()}`,
+                        body: [eDate.trim() || (eStartAt ? new Date(eStartAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : ''), eAddress.trim() || eLocation.trim()].filter(Boolean).join(' · ') || 'Мероприятие АПГ',
+                        category: 'events',
+                        deepLink: '/events',
+                        imageUrl: eCoverPhoto.trim(),
+                      })}
+                    >
+                      📲 Отправить push
+                    </button>
+                  )}
                   {editingEvent && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetEventForm}>Отмена</button>}
                 </div>
                 </div>
@@ -8324,7 +8371,7 @@ export const AdminPanel = () => {
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все события</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
-                  {events.length} · <span style={{ color: events.filter(e => !isCheckedRecently(e.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{events.filter(e => !isCheckedRecently(e.linksCheckedAt)).length} не проверено</span>
+                  {visibleEvents.length} · <span style={{ color: visibleEvents.filter(e => !isCheckedRecently(e.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{visibleEvents.filter(e => !isCheckedRecently(e.linksCheckedAt)).length} не проверено</span>
                 </span>
               </div>
               <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetEventForm(); setShowEventModal(true); }}>➕ Добавить</button>
@@ -8338,8 +8385,8 @@ export const AdminPanel = () => {
               ))}
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
-              : events.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
-              : [...events]
+              : visibleEvents.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
+              : [...visibleEvents]
                 .filter(e => eventLinksFilter === 'all' || !isCheckedRecently(e.linksCheckedAt))
                 .sort(byPriorityDate)
                 .map((e, idx, arr) => {
@@ -8439,7 +8486,7 @@ export const AdminPanel = () => {
             )}
           </div>
           <EventsCalendar
-            events={events}
+            events={visibleEvents}
             A={A}
             onEventClick={openEventDetail}
             onCreateEvent={() => { resetEventForm(); setShowEventModal(true); }}
@@ -8637,10 +8684,25 @@ export const AdminPanel = () => {
                     📣 Отправить push-уведомление подписчикам после публикации
                   </label>
                 )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button style={{ ...s.btn, ...s.btnPri, flex: 1, minWidth: 160 }} onClick={saveNews}>
                     {editingNews ? '💾 Сохранить' : '➕ Опубликовать'}
                   </button>
+                  {editingNews && (
+                    <button
+                      style={{ ...s.btn, background: 'rgba(74,144,217,0.14)', border: '1px solid rgba(74,144,217,0.35)', color: '#6AABEC' }}
+                      onClick={() => sendManualContentPush({
+                        context: `Новость «${nTitle.trim()}»`,
+                        title: `${nEmoji || '📰'} ${nTitle.trim()}`,
+                        body: nSummary.trim() || nSubtitle.trim() || nText.trim().slice(0, 120),
+                        category: 'news',
+                        deepLink: '/news',
+                        imageUrl: (nCoverPhoto || nImage).trim(),
+                      })}
+                    >
+                      📲 Отправить push
+                    </button>
+                  )}
                   {editingNews && <button style={{ ...s.btn, ...s.btnGray }} onClick={resetNewsForm}>Отмена</button>}
                 </div>
               </div>
@@ -9950,7 +10012,7 @@ export const AdminPanel = () => {
 
       <AdminUndoBar
         undo={adminUndo}
-        onRestore={restoreDeletedNews}
+        onRestore={() => (adminUndo?.type === 'event-delete' ? restoreDeletedEvent() : restoreDeletedNews())}
         onClose={() => setAdminUndo(null)}
       />
 
