@@ -3899,6 +3899,7 @@ export const AdminPanel = () => {
   const [ePriceIsFrom, setEPriceIsFrom] = useState(false);
   const [eSendPush, setESendPush]   = useState(true);
   const [nSendPush, setNSendPush]   = useState(true);
+  const [eSaving, setESaving]       = useState(false);
   const [pushReport, setPushReport] = useState(null);
 
   // ─── Автосохранение черновиков форм ────────────────────────────────────────
@@ -5266,6 +5267,11 @@ export const AdminPanel = () => {
     return tb - ta;
   };
 
+  // Единая выборка вкладки «События»: счётчик, список и бейджи считаются от неё
+  const eventListRows = [...visibleEvents]
+    .filter(e => eventLinksFilter === 'all' || !isCheckedRecently(e.linksCheckedAt))
+    .sort(byPriorityDate);
+
   const moveItem = async (col, items, setItems, item, dir) => {
     const sorted = [...items].sort(byPriorityDate);
     const idx    = sorted.findIndex(x => x.id === item.id);
@@ -5807,6 +5813,7 @@ export const AdminPanel = () => {
   };
 
   const saveEvent = async () => {
+    if (eSaving) return;
     if (!eTitle.trim()) return;
     if (ePriceType === 'paid' && (!Number(ePrice) || Number(ePrice) <= 0)) {
       window.alert('Для платного мероприятия укажите корректную стоимость.');
@@ -5853,11 +5860,27 @@ export const AdminPanel = () => {
       priceIsFrom: ePriceType === 'paid' ? ePriceIsFrom : false,
     };
     const isNew = !editingEvent;
-    if (editingEvent) {
-      await runAdminEntityAction('events', 'update', { id: editingEvent.id, patch: data });
-    } else {
-      await runAdminEntityAction('events', 'create', { patch: data });
+    setESaving(true);
+    try {
+      if (editingEvent) {
+        await runAdminEntityAction('events', 'update', {
+          id: editingEvent.id,
+          patch: data,
+          idempotencyKey: `event_update_${editingEvent.id}_${Date.now()}`,
+        });
+      } else {
+        await runAdminEntityAction('events', 'create', {
+          patch: data,
+          idempotencyKey: `event_create_${data.title}_${eStartAt || eDate}`,
+        });
+      }
+    } catch (err) {
+      logError(err, 'AdminPanel.saveEvent');
+      window.alert(`Не удалось сохранить событие: ${err.message || 'проверьте соединение'}`);
+      setESaving(false);
+      return;
     }
+    setESaving(false);
     clearAdminDraft('event');
     const wantPush = isNew && eSendPush;
     resetEventForm();
@@ -8321,8 +8344,8 @@ export const AdminPanel = () => {
                   </label>
                 )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button style={{ ...s.btn, ...s.btnPri, flex: 1, minWidth: 160 }} onClick={saveEvent}>
-                    {editingEvent ? '💾 Сохранить' : '➕ Добавить'}
+                  <button style={{ ...s.btn, ...s.btnPri, flex: 1, minWidth: 160, opacity: eSaving ? 0.6 : 1 }} disabled={eSaving} onClick={saveEvent}>
+                    {eSaving ? '⏳ Сохранение…' : editingEvent ? '💾 Сохранить' : '➕ Добавить'}
                   </button>
                   {editingEvent && (
                     <button
@@ -8371,7 +8394,7 @@ export const AdminPanel = () => {
               <div>
                 <h2 style={{ ...s.h2, margin: '0 0 2px' }}>Все события</h2>
                 <span style={{ fontSize: 12, color: A.textSec }}>
-                  {visibleEvents.length} · <span style={{ color: visibleEvents.filter(e => !isCheckedRecently(e.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{visibleEvents.filter(e => !isCheckedRecently(e.linksCheckedAt)).length} не проверено</span>
+                  {eventListRows.length}{eventLinksFilter !== 'all' ? ` из ${visibleEvents.length}` : ''} · <span style={{ color: visibleEvents.filter(e => !isCheckedRecently(e.linksCheckedAt)).length > 0 ? '#f59e0b' : '#4ade80' }}>{visibleEvents.filter(e => !isCheckedRecently(e.linksCheckedAt)).length} не проверено</span>
                 </span>
               </div>
               <button style={{ ...s.btn, ...s.btnPri, padding: '8px 16px', fontSize: 13 }} onClick={() => { resetEventForm(); setShowEventModal(true); }}>➕ Добавить</button>
@@ -8385,10 +8408,8 @@ export const AdminPanel = () => {
               ))}
             </div>
             {loading ? <p style={{ color: A.textSec, textAlign: 'center' }}>Загрузка...</p>
-              : visibleEvents.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>Нет событий</p>
-              : [...visibleEvents]
-                .filter(e => eventLinksFilter === 'all' || !isCheckedRecently(e.linksCheckedAt))
-                .sort(byPriorityDate)
+              : eventListRows.length === 0 ? <p style={{ color: A.textSec, textAlign: 'center' }}>{eventLinksFilter === 'all' ? 'Нет событий' : 'Нет непроверенных событий'}</p>
+              : eventListRows
                 .map((e, idx, arr) => {
                 const pri = e.priority ?? 0;
                 const previewImage = contentImageOf(e);
