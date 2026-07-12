@@ -843,6 +843,7 @@ function V2FirstScreenDesktop({
                   padding: '0 10px',
                   fontWeight: 760,
                   fontSize: 10.8,
+                  marginTop: 2,
                 }}
               >
                 {desktopWorkspaceMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
@@ -2101,7 +2102,7 @@ function V2SecondScreenDesktop({
               </div>
             </section>
 
-            <section style={{ ...desktopSectionShell, gridColumn: '1 / -1', padding: '9px 12px 10px', marginTop: 6 }}>
+            <section style={{ ...desktopSectionShell, gridColumn: '1 / -1', padding: '9px 12px 10px', marginTop: 0 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'center' }}>
                 <div>
                   <div style={{ color: V2.text, fontWeight: 850, fontSize: 18, lineHeight: '22px' }}>Быстрый доступ</div>
