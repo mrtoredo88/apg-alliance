@@ -2,13 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { verifyPasswordRecord } from '../../../server-shared/admin-password.js';
 import { resolveEmailIdentity } from '../lib/identityCore.js';
-
-const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'editor', 'moderator', 'analyst']);
-
-function normalizeRole(value) {
-  const role = String(value || '').trim().toLowerCase();
-  return ADMIN_ROLES.has(role) ? role : 'user';
-}
+import { CAPABILITIES, getPrimaryRole, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
 
 function getDeviceInfo(request) {
   return {
@@ -49,9 +43,9 @@ export default async function adminLoginRoutes(fastify) {
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
       const user = userDoc.data() || {};
-      const role = normalizeRole(user.role || user.userRole);
+      const role = getPrimaryRole(user);
       const status = String(user.adminStatus || user.status || 'active').toLowerCase();
-      if (!ADMIN_ROLES.has(role) || status !== 'active') {
+      if (!hasCapability(user, CAPABILITIES.canOpenAdminPanel) || status !== 'active') {
         await log('error', { code: 'FORBIDDEN_ROLE', role, status });
         return reply.code(403).send({ ok: false, code: 'FORBIDDEN_ROLE', error: 'Доступ администратора отключён.' });
       }
@@ -63,8 +57,9 @@ export default async function adminLoginRoutes(fastify) {
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
       await auth.updateUser(uid, { email, emailVerified: true, disabled: false }).catch(() => {});
-      await auth.setCustomUserClaims(uid, { role, owner: role === 'owner' }).catch(() => {});
-      const customToken = await auth.createCustomToken(uid, { role, owner: role === 'owner' });
+      const owner = hasRole(user, ROLES.owner);
+      await auth.setCustomUserClaims(uid, { role, owner, admin: true }).catch(() => {});
+      const customToken = await auth.createCustomToken(uid, { role, owner, admin: true });
       await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       await log('success', { role, uid });
       return reply.send({ ok: true, customToken, actor: { uid, email, role, mustChangePassword: Boolean(user.mustChangePassword) } });

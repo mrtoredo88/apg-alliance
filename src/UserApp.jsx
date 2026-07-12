@@ -32,9 +32,10 @@ import { normalizeExpertRecord, registerCustomExpertCategories } from '../server
 import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
-import { getWorkspaceMode, getWorkspaceNavigation, normalizeWorkspaceRole, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
+import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { CONTENT_LIFECYCLE_VERSION } from '../server-shared/content-lifecycle.js';
+import { CAPABILITIES, getRoleDiagnostics, hasCapability } from './roleEngine.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -2478,7 +2479,13 @@ export function UserApp() {
   );
 
   const workspaceMode = getWorkspaceMode(workspaceWidth);
-  const workspaceRole = normalizeWorkspaceRole(user?.role || (user?.isOwner ? 'owner' : user?.isAdmin ? 'admin' : 'user'));
+  const roleIdentity = useMemo(() => ({
+    ...(user || {}),
+    partnerId: user?.partnerId || ownedPartner?.id,
+    expertId: user?.expertId || ownedExpert?.id,
+  }), [user, ownedPartner?.id, ownedExpert?.id]);
+  const roleDiagnostics = useMemo(() => getRoleDiagnostics(roleIdentity), [roleIdentity]);
+  const workspaceRole = roleDiagnostics.primaryRole;
   const desktopDevice = isDesktopWorkspaceDevice({
     width: workspaceWidth,
     userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
@@ -2500,6 +2507,9 @@ export function UserApp() {
       featureFlag: desktopWorkspaceFlag,
       userRole: String(user?.role || user?.userRole || user?.authRole || '—'),
       roles,
+      permissions: roleDiagnostics.permissions,
+      capabilities: roleDiagnostics.capabilities,
+      unknownRoles: roleDiagnostics.unknownRoles,
       desktopDetected: desktopDevice,
       workspaceAllowed: desktopWorkspaceAvailable,
       workspaceAllowedByRole,
@@ -2510,7 +2520,7 @@ export function UserApp() {
       workspaceMode,
       reason,
     };
-  }, [appMode, desktopDevice, desktopWorkspaceAvailable, desktopWorkspaceFlag, ownedExpert, ownedPartner, resolvedAppMode, user, workspaceMode, workspaceWidth]);
+  }, [appMode, desktopDevice, desktopWorkspaceAvailable, desktopWorkspaceFlag, ownedExpert, ownedPartner, resolvedAppMode, roleDiagnostics, user, workspaceMode, workspaceWidth]);
   const setAppModePersisted = useCallback((mode) => {
     const nextMode = mode === 'workspace' ? 'workspace' : mode === 'auto' ? 'auto' : 'user';
     setAppMode(nextMode);
@@ -2519,7 +2529,7 @@ export function UserApp() {
       else localStorage.setItem('apg_app_mode', nextMode);
     } catch {}
   }, []);
-  const bottomNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: workspaceRole }), [workspaceRole]);
+  const bottomNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, identity: roleIdentity }), [roleIdentity]);
   const tabIconByKey = {
     home: TabHomeIcon,
     partners: TabPartnersIcon,
@@ -2983,7 +2993,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
-          {['owner', 'super_admin'].some(role => role === String(user?.role || '').toLowerCase() || (Array.isArray(user?.roles) && user.roles.includes(role))) && createPortal(
+          {hasCapability(roleIdentity, CAPABILITIES.canViewDiagnostics) && createPortal(
             <div style={{ position: 'fixed', bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', right: 10, zIndex: 12000 }}>
               {diagOpen ? (
                 <div style={{ width: 306, padding: 12, borderRadius: 16, background: 'rgba(12,12,20,0.94)', border: '1px solid rgba(201,168,76,0.4)', color: '#eee', fontSize: 11, lineHeight: '16px', boxShadow: '0 18px 50px rgba(0,0,0,0.5)' }}>
@@ -3002,6 +3012,7 @@ export function UserApp() {
                     ['Role', user?.role || '—'],
                     ['Roles', [user?.role, ...(Array.isArray(user?.roles) ? user.roles : [])].filter(Boolean).join(', ') || '—'],
                     ['Workspace Role', workspaceRole],
+                    ['Role Engine', `${roleDiagnostics.primaryRole} · ${roleDiagnostics.capabilities.join(', ') || '—'}`],
                     ['Current Route', currentRoute],
                     ['Service Worker', swDiag.version || '—'],
                     ['Cache Version', swCacheVersion],

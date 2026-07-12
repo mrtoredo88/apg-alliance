@@ -1,6 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { getPrimaryRole, getUserRoles, normalizeRole as normalizeRoleShared, ROLE_REGISTRY } from '../../../server-shared/role-engine.js';
 
-const ROLE_ORDER = ['user', 'expert', 'partner', 'analyst', 'moderator', 'editor', 'admin', 'super_admin', 'owner'];
 const ADMIN_STATUS_ACTIVE = new Set(['active', 'enabled', '']);
 
 function safeString(value, max = 300) {
@@ -16,31 +16,19 @@ function uniq(values = []) {
 }
 
 export function normalizeRole(value) {
-  const role = safeString(value, 80).toLowerCase();
-  return ROLE_ORDER.includes(role) ? role : '';
+  return normalizeRoleShared(value);
 }
 
 function roleRank(role) {
-  const index = ROLE_ORDER.indexOf(normalizeRole(role) || 'user');
-  return index < 0 ? 0 : index;
+  return ROLE_REGISTRY[normalizeRole(role) || 'user']?.rank || 0;
 }
 
 function normalizeRolesFromUser(user = {}) {
-  const roles = [
-    user.role,
-    user.userRole,
-    user.authRole,
-    ...(Array.isArray(user.roles) ? user.roles : []),
-    user.owner === true || user.isOwner === true ? 'owner' : '',
-    user.admin === true || user.isAdmin === true ? 'admin' : '',
-    user.partnerId || user.partnerCabinetEnabled || (Array.isArray(user.partnerCabinetIds) && user.partnerCabinetIds.length) ? 'partner' : '',
-    user.expertId || user.expertCabinetEnabled || (Array.isArray(user.expertCabinetIds) && user.expertCabinetIds.length) ? 'expert' : '',
-  ].map(normalizeRole).filter(Boolean);
-  return uniq(roles.length ? roles : ['user']);
+  return uniq(getUserRoles(user));
 }
 
 function primaryRole(roles = []) {
-  return roles.map(normalizeRole).filter(Boolean).sort((a, b) => roleRank(b) - roleRank(a))[0] || 'user';
+  return getPrimaryRole(roles);
 }
 
 function statusActive(user = {}) {

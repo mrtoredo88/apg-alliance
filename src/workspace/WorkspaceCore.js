@@ -1,3 +1,5 @@
+import { CAPABILITIES, getRoleDiagnostics, hasCapability } from '../roleEngine.js';
+
 export const WORKSPACE_MODES = {
   mobile: 'mobile',
   tablet: 'tablet',
@@ -29,22 +31,22 @@ export const WORKSPACE_MODULES = {
   quickActions: 'quickActions',
 };
 
-export const WORKSPACE_NAV_ITEMS = [
+export const USER_MODE_NAV_ITEMS = [
   {
     id: 'home',
     panelId: 'home',
     label: 'Главная',
     iconKey: 'home',
-    regions: [WORKSPACE_REGIONS.leftSidebar, WORKSPACE_REGIONS.bottomBar],
-    roles: ['user', 'partner', 'expert', 'admin', 'owner'],
+    regions: [WORKSPACE_REGIONS.bottomBar],
+    capability: CAPABILITIES.canUseUserMode,
   },
   {
     id: 'offers',
     panelId: 'offers',
     label: 'Партнёры',
     iconKey: 'partners',
-    regions: [WORKSPACE_REGIONS.leftSidebar, WORKSPACE_REGIONS.bottomBar],
-    roles: ['user', 'partner', 'expert', 'admin', 'owner'],
+    regions: [WORKSPACE_REGIONS.bottomBar],
+    capability: CAPABILITIES.canUseUserMode,
   },
   {
     id: 'scan',
@@ -53,31 +55,34 @@ export const WORKSPACE_NAV_ITEMS = [
     iconKey: 'scan',
     isPrimaryAction: true,
     regions: [WORKSPACE_REGIONS.bottomBar, WORKSPACE_REGIONS.floatingPanels],
-    roles: ['user', 'partner', 'expert', 'admin', 'owner'],
+    capability: CAPABILITIES.canUseUserMode,
   },
   {
     id: 'experts',
     panelId: 'experts',
     label: 'Эксперты',
     iconKey: 'experts',
-    regions: [WORKSPACE_REGIONS.leftSidebar, WORKSPACE_REGIONS.bottomBar],
-    roles: ['user', 'partner', 'expert', 'admin', 'owner'],
+    regions: [WORKSPACE_REGIONS.bottomBar],
+    capability: CAPABILITIES.canUseUserMode,
   },
   {
     id: 'profile',
     panelId: 'profile',
     label: 'Профиль',
     iconKey: 'profile',
-    regions: [WORKSPACE_REGIONS.leftSidebar, WORKSPACE_REGIONS.bottomBar],
-    roles: ['user', 'partner', 'expert', 'admin', 'owner'],
+    regions: [WORKSPACE_REGIONS.bottomBar],
+    capability: CAPABILITIES.canUseUserMode,
   },
+];
+
+export const WORKSPACE_NAV_ITEMS = [
   {
-    id: 'cabinet',
-    panelId: 'cabinet',
-    label: 'Кабинет',
-    iconKey: 'cabinet',
+    id: 'dashboard',
+    panelId: 'dashboard',
+    label: 'Dashboard',
+    iconKey: 'home',
     regions: [WORKSPACE_REGIONS.leftSidebar],
-    roles: ['partner', 'expert', 'admin', 'owner'],
+    capability: CAPABILITIES.canUseWorkspace,
   },
   {
     id: 'business-hub',
@@ -85,7 +90,31 @@ export const WORKSPACE_NAV_ITEMS = [
     label: 'Мой бизнес',
     iconKey: 'business',
     regions: [WORKSPACE_REGIONS.leftSidebar],
-    roles: ['partner', 'expert', 'admin', 'owner'],
+    capability: CAPABILITIES.canUseBusinessHub,
+  },
+  {
+    id: 'content',
+    panelId: 'content',
+    label: 'Контент',
+    iconKey: 'content',
+    regions: [WORKSPACE_REGIONS.leftSidebar],
+    capability: CAPABILITIES.canUseWorkspace,
+  },
+  {
+    id: 'catalogs',
+    panelId: 'catalogs',
+    label: 'Каталоги',
+    iconKey: 'catalogs',
+    regions: [WORKSPACE_REGIONS.leftSidebar],
+    capability: CAPABILITIES.canUseWorkspace,
+  },
+  {
+    id: 'system',
+    panelId: 'system',
+    label: 'Система',
+    iconKey: 'system',
+    regions: [WORKSPACE_REGIONS.leftSidebar],
+    capability: CAPABILITIES.canOpenAdminPanel,
   },
   {
     id: 'loki',
@@ -93,17 +122,11 @@ export const WORKSPACE_NAV_ITEMS = [
     label: 'Локи',
     iconKey: 'loki',
     regions: [WORKSPACE_REGIONS.rightSidebar, WORKSPACE_REGIONS.floatingPanels],
-    roles: ['user', 'partner', 'expert', 'admin', 'owner'],
+    capability: CAPABILITIES.canUseWorkspace,
   },
 ];
 
-export function normalizeWorkspaceRole(role = 'user') {
-  const normalized = String(role || 'user').toLowerCase();
-  if (normalized === 'super_admin' || normalized === 'owner') return 'owner';
-  if (normalized === 'administrator') return 'admin';
-  if (['user', 'partner', 'expert', 'admin'].includes(normalized)) return normalized;
-  return 'user';
-}
+export const NAV_ITEMS = [...USER_MODE_NAV_ITEMS, ...WORKSPACE_NAV_ITEMS];
 
 const DEFAULT_ENABLED_MODULES = {
   [WORKSPACE_MODULES.navigation]: true,
@@ -197,25 +220,29 @@ export function buildWorkspaceLayout({ width, mode, modules, contextOpen = false
   };
 }
 
-export function getWorkspaceNavigation({ mode = WORKSPACE_MODES.mobile, role = 'user', items = WORKSPACE_NAV_ITEMS, includeSecondary = false } = {}) {
-  const normalizedRole = normalizeWorkspaceRole(role);
+export function getWorkspaceNavigation({ mode = WORKSPACE_MODES.mobile, role = 'user', identity, items, includeSecondary = false } = {}) {
+  const navIdentity = identity || { role };
+  const diagnostics = getRoleDiagnostics(navIdentity);
   const placement = mode === WORKSPACE_MODES.desktop ? 'sidebar' : mode === WORKSPACE_MODES.tablet ? 'rail' : 'bottom';
   const primaryRegion = placement === 'sidebar' || placement === 'rail' ? WORKSPACE_REGIONS.leftSidebar : WORKSPACE_REGIONS.bottomBar;
-  const visibleItems = items.filter(item => {
-    const roleAllowed = !item.roles || item.roles.includes(normalizedRole) || normalizedRole === 'owner';
+  const sourceItems = items || (placement === 'bottom' ? USER_MODE_NAV_ITEMS : WORKSPACE_NAV_ITEMS);
+  const visibleItems = sourceItems.filter(item => {
+    const accessAllowed = !item.capability || hasCapability(navIdentity, item.capability);
     const regionAllowed = item.regions?.includes(primaryRegion) || (includeSecondary && item.regions?.length);
-    return roleAllowed && regionAllowed;
+    return accessAllowed && regionAllowed;
   });
   const primary = visibleItems.filter(item => item.id !== 'loki' || includeSecondary);
-  const secondary = items.filter(item => {
+  const secondary = sourceItems.filter(item => {
     if (!item.regions?.includes(WORKSPACE_REGIONS.rightSidebar) && !item.regions?.includes(WORKSPACE_REGIONS.floatingPanels)) return false;
-    return !item.roles || item.roles.includes(normalizedRole) || normalizedRole === 'owner';
+    return !item.capability || hasCapability(navIdentity, item.capability);
   });
 
   return {
     mode,
     placement,
-    role: normalizedRole,
+    role: diagnostics.primaryRole,
+    roles: diagnostics.roles,
+    unknownRoles: diagnostics.unknownRoles,
     primary,
     secondary,
     ids: primary.map(item => item.id),

@@ -2206,3 +2206,11 @@
 - `fetchPublicBootstrap`/`loadPublicSnap` фиксируют источник данных (backend / firestore-fallback) для диагностики.
 
 **Деплой:** VK-хостинг обновлён до актуальной сборки — во всех каналах одна версия.
+# 2026-07-12 — Role Engine V1
+
+- Создан единый `server-shared/role-engine.js` и frontend re-export `src/roleEngine.js`.
+- Зафиксированы канонические роли, permissions и capabilities для User Mode, Workspace, Business Hub, кабинетов и админки.
+- Убрана долгосрочная зависимость от workaround `super_admin → owner`: `super_admin` сохраняет собственную роль и получает доступ через capabilities.
+- Переведены ключевые точки доступа: Identity Core, Workspace navigation/feature flags, Business Hub, Cabinet Role Engine, UserApp/ProfilePanel diagnostics, admin login/security/actions, email auth claims и owner-only user actions.
+- Добавлен контрактный тест `scripts/role-engine-test.mjs`; `npm run test:roles` включён в `npm run test:core`.
+- Документация: `docs/role-engine-v1.md`.

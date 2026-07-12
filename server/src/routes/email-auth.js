@@ -3,6 +3,7 @@ import { APP_URL } from '../lib/config.js';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { resolveEmailIdentity, resolveFirebaseIdentity } from '../lib/identityCore.js';
+import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
 
 const FROM = 'noreply@myapg.ru';
 
@@ -139,13 +140,13 @@ async function auditAccountLink(db, request, payload) {
 }
 
 async function createFirebaseToken(userId, user = {}) {
-  const role = safeString(user.role || user.userRole, 80).toLowerCase();
-  const roles = Array.isArray(user.roles) ? user.roles.map(item => safeString(item, 80).toLowerCase()).filter(Boolean) : [];
+  const role = getPrimaryRole(user);
+  const roles = getUserRoles(user);
   const claims = {
-    ...(role ? { role } : {}),
+    role,
     ...(roles.length ? { roles } : {}),
-    ...(role === 'owner' || roles.includes('owner') ? { owner: true } : {}),
-    ...(role === 'admin' || roles.includes('admin') || roles.includes('super_admin') ? { admin: true } : {}),
+    ...(hasRole(user, ROLES.owner) ? { owner: true } : {}),
+    ...(hasCapability(user, CAPABILITIES.canOpenAdminPanel) ? { admin: true } : {}),
   };
   return getDbAuth().createCustomToken(String(userId), claims);
 }

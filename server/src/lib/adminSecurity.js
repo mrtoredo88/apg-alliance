@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from './firebase.js';
 import { resolveFirebaseIdentity } from './identityCore.js';
+import { getPrimaryRole, normalizeRole as normalizeSharedRole, ROLE_REGISTRY } from '../../../server-shared/role-engine.js';
 
 export const ROLE_PERMISSIONS = {
   owner: ['*'],
@@ -14,11 +15,12 @@ export const ROLE_PERMISSIONS = {
   user: [],
 };
 
-const ROLE_ORDER = ['user', 'expert', 'partner', 'analyst', 'moderator', 'editor', 'admin', 'super_admin', 'owner'];
-
 function normalizeRole(value) {
-  const role = String(value || '').trim().toLowerCase();
-  return ROLE_ORDER.includes(role) ? role : 'user';
+  return normalizeSharedRole(value) || 'user';
+}
+
+function roleRank(role) {
+  return ROLE_REGISTRY[normalizeRole(role)]?.rank || 0;
 }
 
 function hasPermission(role, permission) {
@@ -75,8 +77,8 @@ export async function requireAdminPermission(request, permission) {
     error.role = normalizeRole(userRecord.data.role || userRecord.data.userRole || claimRole);
     throw error;
   }
-  const userRole = normalizeRole(userRecord?.data?.role || userRecord?.data?.userRole || claimRole);
-  const role = ROLE_ORDER.indexOf(claimRole) > ROLE_ORDER.indexOf(userRole) ? claimRole : userRole;
+  const userRole = getPrimaryRole(userRecord?.data || { role: claimRole });
+  const role = roleRank(claimRole) > roleRank(userRole) ? claimRole : userRole;
 
   if (!hasPermission(role, permission)) {
     const error = new Error('Недостаточно прав для административного действия.');

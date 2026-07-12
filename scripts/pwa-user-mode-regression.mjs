@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   getWorkspaceNavigation,
-  normalizeWorkspaceRole,
   WORKSPACE_MODES,
 } from '../src/workspace/WorkspaceCore.js';
+import { getPrimaryRole, normalizeRole } from '../src/roleEngine.js';
 
 const expectedUserModePanels = ['home', 'offers', null, 'experts', 'profile'];
 
@@ -18,8 +18,8 @@ for (const role of ['user', 'owner', 'super_admin', 'administrator']) {
   );
 }
 
-assert.equal(normalizeWorkspaceRole('super_admin'), 'owner');
-assert.equal(normalizeWorkspaceRole('administrator'), 'admin');
+assert.equal(getPrimaryRole({ role: 'super_admin' }), 'super_admin');
+assert.equal(normalizeRole('administrator'), 'admin');
 
 const userAppSource = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
 assert.match(userAppSource, /readCachedArray\('apg_news_cache'\)\.filter\(item => isNotArchived\(item\) && isPublicContent\(item\)\)/);

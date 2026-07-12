@@ -13,6 +13,7 @@ import { logError } from './errorLogger.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
+import { CAPABILITIES, hasCapability } from './roleEngine.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -684,10 +685,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
-  const roleValue = String(user?.role || user?.userRole || user?.authRole || '').toLowerCase();
-  const isPrivilegedProfile = String(user?.id || '') === '988504' || ['admin', 'owner', 'super_admin', 'moderator'].includes(roleValue) || user?.admin === true || user?.isAdmin === true || user?.owner === true;
-  const roleList = Array.isArray(user?.roles) ? user.roles.map(item => String(item || '').toLowerCase()) : [];
-  const showWorkspaceDiagnosticButton = Boolean(workspaceDiagnostics) && (['owner', 'super_admin'].includes(roleValue) || roleList.some(role => ['owner', 'super_admin'].includes(role)) || user?.owner === true || user?.isOwner === true);
+  const isPrivilegedProfile = String(user?.id || '') === '988504' || hasCapability(user || {}, CAPABILITIES.canOpenAdminPanel);
+  const showWorkspaceDiagnosticButton = Boolean(workspaceDiagnostics) && hasCapability(user || {}, CAPABILITIES.canViewDiagnostics);
   const showIdentityDiagnosticButton = !!user && !String(user.id || '').startsWith('guest_');
   const showPartnershipCard = Boolean(onOpenPartnership) && !ownedPartner && !ownedExpert && !isPrivilegedProfile;
   const partnershipCardTrackedRef = useRef(false);

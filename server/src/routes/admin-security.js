@@ -2,13 +2,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ROLE_PERMISSIONS, adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { createPasswordRecord, requireStrongAdminPassword } from '../../../server-shared/admin-password.js';
-
-const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'editor', 'moderator', 'analyst']);
-const MANAGE_ROLES = new Set(['owner', 'super_admin']);
+import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, normalizeRole as normalizeSharedRole, ROLES } from '../../../server-shared/role-engine.js';
 
 function normalizeRole(value) {
-  const role = String(value || '').trim().toLowerCase();
-  return ADMIN_ROLES.has(role) || ['partner', 'expert', 'user'].includes(role) ? role : 'user';
+  return normalizeSharedRole(value) || 'user';
 }
 
 function serializeValue(value) {
@@ -50,7 +47,7 @@ async function listAdmins(db) {
   const snap = await db.collection('users').limit(1000).get();
   return snap.docs
     .map(doc => ({ id: doc.id, ...serializeValue(doc.data() || {}) }))
-    .filter(user => ADMIN_ROLES.has(normalizeRole(user.role || user.userRole)))
+    .filter(user => hasCapability(user, CAPABILITIES.canOpenAdminPanel))
     .map(user => ({
       id: user.id,
       uid: user.firebaseUid || user.authUid || user.id,
@@ -60,14 +57,14 @@ async function listAdmins(db) {
       phone: user.phone || '',
       photo: user.photo || user.avatar || user.photo_100 || '',
       position: user.position || user.jobTitle || '',
-      role: normalizeRole(user.role || user.userRole),
-      roles: Array.isArray(user.roles) ? user.roles.map(normalizeRole) : [normalizeRole(user.role || user.userRole)],
+      role: getPrimaryRole(user),
+      roles: getUserRoles(user),
       status: user.adminStatus || user.status || 'active',
       createdAt: user.createdAt || user.registeredAt || null,
       lastLoginAt: user.lastLoginAt || user.lastSeen || null,
       activeDevices: Number(user.activeDevices || user.devicesCount || 0),
       trustedDevices: Array.isArray(user.trustedDevices) ? user.trustedDevices : [],
-      permissions: Array.isArray(user.adminPermissions) ? user.adminPermissions : ROLE_PERMISSIONS[normalizeRole(user.role || user.userRole)] || [],
+      permissions: Array.isArray(user.adminPermissions) ? user.adminPermissions : ROLE_PERMISSIONS[getPrimaryRole(user)] || [],
     }));
 }
 
@@ -113,12 +110,12 @@ async function findAdminUserRef(db, id) {
 }
 
 async function assertCanManage(actor, currentData, nextRole = '') {
-  if (!MANAGE_ROLES.has(actor.role)) {
+  if (!hasRole({ role: actor.role }, ROLES.owner) && !hasRole({ role: actor.role }, ROLES.superAdmin)) {
     const error = new Error('Недостаточно прав для управления администраторами.');
     error.statusCode = 403;
     throw error;
   }
-  const currentRole = normalizeRole(currentData?.role || currentData?.userRole);
+  const currentRole = getPrimaryRole(currentData || {});
   if (currentRole === 'owner' && actor.role !== 'owner') {
     const error = new Error('Только Owner может изменять доступ Owner.');
     error.statusCode = 403;
@@ -236,7 +233,7 @@ export default async function adminSecurityRoutes(fastify) {
           emailVerified: true,
           disabled: false,
         });
-        await auth.setCustomUserClaims(record.uid, { role: nextAdmin.role });
+        await auth.setCustomUserClaims(record.uid, { role: nextAdmin.role, owner: nextAdmin.role === ROLES.owner, admin: hasCapability({ role: nextAdmin.role }, CAPABILITIES.canOpenAdminPanel) });
         await db.collection('adminCredentials').doc(record.uid).set({
           email: nextAdmin.email,
           password: createPasswordRecord(password),
@@ -284,8 +281,8 @@ export default async function adminSecurityRoutes(fastify) {
           updatedAt: FieldValue.serverTimestamp(),
         };
         await ref.set(patch, { merge: true });
-        await getDbAuth().setCustomUserClaims(String(currentData.firebaseUid || currentData.authUid || snap.id), { role: nextRole }).catch(() => {});
-        await writeSecurityLog(db, request, actor, 'admin:updateRole', snap.id, { before: normalizeRole(currentData.role || currentData.userRole), after: nextRole });
+        await getDbAuth().setCustomUserClaims(String(currentData.firebaseUid || currentData.authUid || snap.id), { role: nextRole, owner: nextRole === ROLES.owner, admin: hasCapability({ role: nextRole }, CAPABILITIES.canOpenAdminPanel) }).catch(() => {});
+        await writeSecurityLog(db, request, actor, 'admin:updateRole', snap.id, { before: getPrimaryRole(currentData || {}), after: nextRole });
         return reply.send({ ok: true, id: snap.id, patch });
       }
 
@@ -325,7 +322,7 @@ export default async function adminSecurityRoutes(fastify) {
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
         const patch = {
-          mustChangePassword: normalizeRole(currentData.role || currentData.userRole) !== 'owner',
+          mustChangePassword: getPrimaryRole(currentData || {}) !== ROLES.owner,
           passwordChangedAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         };
@@ -336,7 +333,7 @@ export default async function adminSecurityRoutes(fastify) {
 
       if (['admin:block', 'admin:unblock', 'admin:disable', 'admin:deleteAccess'].includes(action)) {
         await assertCanManage(actor, currentData);
-        if (normalizeRole(currentData.role || currentData.userRole) === 'owner' && action !== 'admin:unblock') {
+        if (getPrimaryRole(currentData || {}) === ROLES.owner && action !== 'admin:unblock') {
           const error = new Error('Owner нельзя заблокировать, отключить или удалить через интерфейс.');
           error.statusCode = 403;
           throw error;
