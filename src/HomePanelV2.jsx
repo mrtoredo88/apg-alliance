@@ -555,7 +555,7 @@ function V2FirstScreenMobile({
 
         <div style={{ marginTop: desktopMode ? 0 : 'clamp(10px, 1.9svh, 16px)', ...revealMotion(2, 'splash') }}>
           <div style={{ color: V2.text, fontSize: 'clamp(15px, 2.5svh, 17px)', lineHeight: 'clamp(18px, 3svh, 21px)', fontWeight: 850, marginBottom: 'clamp(7px, 1.4svh, 10px)', opacity: 0.92 }}>
-            Сегодня можно
+            Что важно сейчас
           </div>
           <div style={{
             display: 'grid', gridTemplateColumns: desktopMode ? '1fr' : '1fr 1fr', gap: 10,
@@ -918,7 +918,7 @@ function V2FirstScreenDesktop({
             </div>
 
             <div style={{ ...GlassPanel, borderRadius: 30, padding: 14, animation: 'fadeInUp 0.5s ease both', animationDelay: '0.1s' }}>
-              <div style={{ color: V2.text, fontSize: 14, fontWeight: 820, marginBottom: 8 }}>Сегодня можно</div>
+              <div style={{ color: V2.text, fontSize: 14, fontWeight: 820, marginBottom: 8 }}>Ваши рекомендации</div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {todayCards.map(card => (
                   <button
@@ -1586,81 +1586,21 @@ function V2SecondScreenDesktop({
             )}
           </div>
         ) : (
-          <>
-              <div style={{ marginBottom: 18, paddingTop: 8 }}>
-                <div style={{ ...DesktopSectionHeader, fontSize: 32, marginBottom: 6 }}>
-                  Сегодня для вас
-                </div>
-                <div style={{ ...DesktopSubheader, marginBottom: 16 }}>
-                  {dayName} · Ваш персональный маршрут в городе
-                </div>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, desktopLayout.recentActivityCols))}, minmax(0, 1fr))`, gap: desktopLayout.compactGap }}>
-                {loading ? (
-                  <>
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={`highlight-skel-${i}`}
-                        style={{
-                          ...DesktopTile,
-                          padding: 14,
-                          background: 'rgba(255,255,255,0.08)',
-                          display: 'grid',
-                          gap: 10,
-                          gridTemplateColumns: '86px 1fr',
-                          minHeight: 112,
-                        }}
-                      >
-                        <Skel w={86} h={62} radius={18} />
-                        <div style={{ paddingTop: 3 }}>
-                          <Skel w={54} h={10} radius={6} style={{ marginBottom: 8 }} />
-                          <Skel w={120} h={17} radius={7} />
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  highlightCards.map((card, index) => (
-                    <button
-                      key={`${card.label}-${index}`}
-                      onClick={card.onClick}
-                      type="button"
-                      style={{
-                        border: 'none',
-                        overflow: 'hidden',
-                        padding: 14,
-                        textAlign: 'left',
-                        background: 'rgba(255,255,255,0.08)',
-                        color: V2.text,
-                        cursor: 'pointer',
-                        ...GlassCard,
-                        display: 'grid',
-                        gap: 10,
-                        gridTemplateColumns: '86px 1fr',
-                        minHeight: 112,
-                        animation: 'fadeInUp 0.5s ease both',
-                        animationDelay: `${index * 0.04}s`,
-                      }}
-                    >
-                      <div style={{ width: 86, height: 62, borderRadius: 18, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
-                        {card.image ? <img src={card.image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: V2.gold, fontWeight: 820, textTransform: 'uppercase', letterSpacing: 1 }}>{card.label}</div>
-                        <div style={{ marginTop: 6, color: V2.text, fontSize: 17, fontWeight: 820, lineHeight: '20px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.value}</div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: desktopLayout.secondColumns, gap: desktopLayout.sectionGap, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: 18 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.15fr) minmax(0, 1fr)',
+                gap: desktopLayout.sectionGap,
+                alignItems: 'start',
+              }}
+            >
               <div style={{ display: 'grid', gap: 16 }}>
-                <div>
+                <section>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
                     <div>
                       <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780 }}>Новости</div>
-                      <div style={{ color: V2.textSoft, fontSize: 12 }}>Сводка важного дня</div>
+                      <div style={{ color: V2.textSoft, fontSize: 12 }}>Главная новость города сегодня</div>
                     </div>
                     <button type="button" onClick={() => onOpenNews?.()} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Все новости</button>
                   </div>
@@ -1710,7 +1650,7 @@ function V2SecondScreenDesktop({
                         </div>
                       </button>
                       <div style={{ display: 'grid', gap: 8 }}>
-                        {(newsForYou.slice(1, 4).map((newsItem, index) => {
+                        {newsForYou.slice(1, 4).map((newsItem, index) => {
                           const stats = getNewsStats(newsItem);
                           return (
                             <button
@@ -1731,17 +1671,17 @@ function V2SecondScreenDesktop({
                               </div>
                             </button>
                           );
-                        }))}
+                        })}
                       </div>
                     </div>
                   )}
-                </div>
+                </section>
 
-                <div>
+                <section>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
                     <div>
                       <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780 }}>Ближайшие мероприятия</div>
-                      <div style={{ color: V2.textSoft, fontSize: 12 }}>События, которые стоит не пропустить</div>
+                      <div style={{ color: V2.textSoft, fontSize: 12 }}>Что важно сегодня</div>
                     </div>
                     <button type="button" onClick={onOpenEvents} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Все мероприятия</button>
                   </div>
@@ -1764,7 +1704,7 @@ function V2SecondScreenDesktop({
                         return (
                           <button
                             key={event.id || `event-${index}`}
-                            onClick={() => { addRecentAction(event, 'event'); onOpenEvents(); }}
+                            onClick={() => { addRecentAction(event, 'event'); onOpenEvents?.(); }}
                             type="button"
                             style={{ ...DesktopTile, border: 'none', padding: '16px', textAlign: 'left', display: 'grid', gridTemplateColumns: '88px 1fr auto', alignItems: 'center', gap: 12 }}
                           >
@@ -1775,7 +1715,7 @@ function V2SecondScreenDesktop({
                             <div style={{ minWidth: 0 }}>
                               <div style={{ color: V2.text, fontSize: 17, fontWeight: 820, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleOf(event, 'Мероприятие АПГ')}</div>
                               <div style={{ color: V2.textMuted, fontSize: 12, marginBottom: 7, display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
-                                <span>{parsed.time}</span> · <span>{parsed.place}</span> · <span>{parsed.participants ? `${parsed.participants} чел.` : 'Открытые записи'}</span> · <span>{parsed.status}</span>
+                                <span>{parsed.time}</span> · <span>{parsed.place}</span> · <span>{parsed.status}</span> · <span>{parsed.participants ? `${parsed.participants} чел.` : 'Открытые записи'}</span>
                               </div>
                             </div>
                             <span style={{ color: V2.textMuted }}>→</span>
@@ -1784,10 +1724,10 @@ function V2SecondScreenDesktop({
                       })
                     )}
                   </div>
-                </div>
+                </section>
               </div>
 
-              <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 16 }}>
                 <section>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
                     <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Акции</div>
@@ -1824,9 +1764,7 @@ function V2SecondScreenDesktop({
                         }}
                       >
                         <div style={{ fontSize: 11, color: V2.gold, fontWeight: 820 }}>🎁 Акция</div>
-                        <div style={{ color: V2.text, fontWeight: 820, fontSize: 14, lineHeight: '18px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {offer.offer || 'Спецпредложение'}
-                        </div>
+                        <div style={{ color: V2.text, fontWeight: 820, fontSize: 14, lineHeight: '18px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{offer.offer || 'Спецпредложение'}</div>
                         <div style={{ color: V2.textSoft, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offer.name}</div>
                       </button>
                     )) : (
@@ -1919,28 +1857,39 @@ function V2SecondScreenDesktop({
                     ))}
                   </div>
                 </section>
+              </div>
 
+              <div style={{ display: 'grid', gap: 16 }}>
                 <section>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Что рядом</div>
-                    <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Открыть карту</button>
-                  </div>
-                  <div style={{ ...DesktopTile, padding: 12 }}>
-                    <div style={{ color: V2.textSoft, fontSize: 12, marginBottom: 8 }}>Сейчас доступны разделы по категориям</div>
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      {nearbyCategories.length === 0 ? (
-                        <div style={{ color: V2.textMuted, fontSize: 12 }}>Сейчас нет выделенных категорий рядом.</div>
-                      ) : nearbyCategories.map((item) => (
-                        <button
-                          key={`${item.label}-${item.count}`}
-                          type="button"
-                          onClick={onOpenNearby}
-                          style={{ border: 'none', borderRadius: 14, background: 'rgba(255,255,255,0.08)', color: V2.text, padding: '8px 12px', textAlign: 'left', cursor: 'pointer', ...pressMotion }}
-                        >
-                          <span style={{ fontSize: 11, color: V2.textSoft }}>•</span> Рядом есть {item.label} ({item.count})
-                        </button>
-                      ))}
+                    <div>
+                      <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780 }}>Ваши рекомендации</div>
+                      <div style={{ color: V2.textSoft, fontSize: 12 }}>Локи подбирает для вашего города</div>
                     </div>
+                    <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Посмотреть рекомендации</button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {lokiInsights.length === 0 ? (
+                      <div style={{ ...EmptyDesktopCard }}>Пока нет активных рекомендаций — откройте Локи, чтобы получить персональный маршрут.</div>
+                    ) : lokiInsights.map((item, index) => (
+                      <button
+                        key={`${item.label}-${index}`}
+                        type="button"
+                        onClick={item.onOpen}
+                        style={{
+                          ...DesktopDenseTile,
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          padding: 12,
+                          textAlign: 'left',
+                          minHeight: 84,
+                          cursor: item.onOpen ? 'pointer' : 'default',
+                        }}
+                      >
+                        <div style={{ color: V2.gold, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6 }}>{item.label}</div>
+                        <div style={{ color: V2.text, fontWeight: 830, fontSize: 13, marginTop: 6, lineHeight: '18px' }}>{item.title}</div>
+                        <div style={{ color: V2.textSoft, fontSize: 11, marginTop: 4 }}>{item.desc}</div>
+                      </button>
+                    ))}
                   </div>
                 </section>
 
@@ -1975,36 +1924,30 @@ function V2SecondScreenDesktop({
 
                 <section>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Рекомендации Локи</div>
-                    <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Открыть диалог</button>
+                    <div style={{ color: V2.text, fontWeight: 820, fontSize: 18 }}>Что рядом</div>
+                    <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 28, padding: '0 10px', fontSize: 11 }}>Открыть карту</button>
                   </div>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {lokiInsights.length === 0 ? (
-                      <div style={{ ...EmptyDesktopCard }}>Нет активных рекомендаций — откройте Локи, чтобы получить их.</div>
-                    ) : lokiInsights.map((item, index) => (
-                      <button
-                        key={`${item.label}-${index}`}
-                        type="button"
-                        onClick={item.onOpen}
-                        style={{
-                          ...DesktopDenseTile,
-                          border: '1px solid rgba(255,255,255,0.14)',
-                          padding: 12,
-                          textAlign: 'left',
-                          minHeight: 84,
-                          cursor: item.onOpen ? 'pointer' : 'default',
-                        }}
-                      >
-                        <div style={{ color: V2.gold, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6 }}>{item.label}</div>
-                        <div style={{ color: V2.text, fontWeight: 830, fontSize: 13, marginTop: 6, lineHeight: '18px' }}>{item.title}</div>
-                        <div style={{ color: V2.textSoft, fontSize: 11, marginTop: 4 }}>{item.desc}</div>
-                      </button>
-                    ))}
+                  <div style={{ ...DesktopTile, padding: 12 }}>
+                    <div style={{ color: V2.textSoft, fontSize: 12, marginBottom: 8 }}>Сейчас доступны разделы рядом</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {nearbyCategories.length === 0 ? (
+                        <div style={{ color: V2.textMuted, fontSize: 12 }}>Сейчас нет выделенных категорий рядом.</div>
+                      ) : nearbyCategories.map((item) => (
+                        <button
+                          key={`${item.label}-${item.count}`}
+                          type="button"
+                          onClick={onOpenNearby}
+                          style={{ border: 'none', borderRadius: 14, background: 'rgba(255,255,255,0.08)', color: V2.text, padding: '8px 12px', textAlign: 'left', cursor: 'pointer', ...pressMotion }}
+                        >
+                          <span style={{ fontSize: 11, color: V2.textSoft }}>•</span> Рядом есть {item.label} ({item.count})
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </section>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </section>
