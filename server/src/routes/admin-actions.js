@@ -1717,6 +1717,21 @@ async function handleEntityAction(db, request, actor) {
       Object.entries(increments).forEach(([key, value]) => {
         patch[key] = FieldValue.increment(Number(value) || 0);
       });
+      // включение карточки = публикация: active:true без явного статуса не должно оставлять её невидимым draft
+      const LIFECYCLE_BRIDGE_RESOURCES = new Set(['partners', 'experts', 'events', 'news', 'prizes', 'customTasks', 'banners']);
+      if (patch.active === true && !patch.status && !patch.lifecycleStatus && !patch.lifecycle && LIFECYCLE_BRIDGE_RESOURCES.has(resource)) {
+        const beforeSnap = await ref.get().catch(() => null);
+        const before = beforeSnap?.exists ? beforeSnap.data() : null;
+        if (before && ['draft', 'moderation', 'scheduled'].includes(normalizeContentStatus(before))) {
+          Object.assign(patch, buildLifecyclePatch({
+            item: before,
+            resource: resource === 'customTasks' ? 'tasks' : resource,
+            nextStatus: 'published',
+            actorId: actor.userId || actor.uid || 'admin',
+            reason: 'Автопубликация: администратор включил карточку (active: true).',
+          }));
+        }
+      }
       patch.updatedAt = FieldValue.serverTimestamp();
       await ref.set(patch, { merge: true });
       await writeAuditLog(db, request, actor, `${config.scope}:update`, config.collection, id, { label: `Обновлён ${config.label}: ${patch.name || patch.title || id}`, fields: Object.keys(patch) });

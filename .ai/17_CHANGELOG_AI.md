@@ -2170,3 +2170,15 @@
 **Regression-тесты:** `npm run test:identity` (scripts/identity-core-test.mjs) — постоянный кейс «16 → 9» + сценарии: только Email, только Telegram, Email+Telegram, Email+VK, Partner+Expert; проверяются: единый canonical при любом способе входа и порядке кандидатов, сумма ключей при слиянии в обе стороны, перенос рефералов, объединение ролей/кабинетов без понижения, идемпотентность, запрет переизбрания опустошённого legacy, отсутствие нового профиля. Запускать при каждом изменении Identity Core.
 
 **Live-проверка на production:** email-вход ×2 → canonical tg_1424650385, 25 ключей, 2 реферала (стабильно); tg-вход и legacy-док ведут к тому же canonical; Ольга — canonical tg_1670282567, 21 ключ; количество документов users не изменилось (102/102).
+
+## 2026-07-12 — Content Lifecycle: восстановление публичности карточки Ольги + regression-аудит
+
+**Причина исчезновения:** карточка `experts/GmocLuICfZAEwyKE14xR` создана ИИ-импортом 11.07 со `status: 'draft', active: false`; админ включил `active: true`, не меняя status (старый каталог смотрел только на active — карточка была публичной). После внедрения Content Lifecycle `status` стал главнее `active` → normalizeContentStatus вернул draft, карточка выпала из публичной выдачи. Identity Core не при чём.
+
+**Восстановление:** `scripts/content-lifecycle-repair.mjs` (постоянный, с --dry-run) — аудит всех коллекций «публично по старым правилам vs по lifecycle». Результат аудита: партнёры 16/16, события 3/3, новости 37/37, призы 17/17 — без потерь; **единственная потерянная карточка во всей базе — эксперт Ольги**. Восстановлена через buildLifecyclePatch(published) с записью в lifecycleHistory. Данные карточки не тронуты: телефон, галерея 4 фото, Telegram, категория real_estate, услуги, описание, акция («Скидка 30% на CashFlow») — на месте; telHref генерируется.
+
+**Защита от первопричины:** в `entity:update` (admin-actions) добавлен lifecycle-мост — если админ ставит `active: true` карточке в статусе draft/moderation/scheduled без явного статуса, карточка автоматически публикуется (buildLifecyclePatch published c причиной в истории). Ловушка «active включён, status забыт» больше невозможна.
+
+**Полное восстановление пользователя:** карточка эксперта привязана к Canonical User `tg_1670282567` (ownerId/ownerUserIds/ownerEmails на карточке; expertId/expertCabinetIds/role: expert на пользователе) — кабинет эксперта виден в профиле/Workspace/Business Hub; ключи 21 и реферал на месте.
+
+**Постоянный regression-тест:** `npm run test:content-lifecycle` — кейс карточки Ольги (active:true + status:draft: воспроизведение, обнаружение repair-правилом, восстановление без потери данных) + инварианты: published не понижается молча (только явный nextStatus с причиной в истории), неизвестный статус не превращает published в draft, lifecycle.status — источник истины. Сводный `npm run test:core` = Identity Core + Content Lifecycle + Business Hub + Workspace — запускать при каждом изменении этих подсистем.

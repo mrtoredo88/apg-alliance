@@ -20,6 +20,8 @@
     "test:expert-questionnaire": "node scripts/expert-questionnaire-v2-test.mjs",
     "test:workspace-layout": "node scripts/desktop-workspace-layout-regression.mjs",
     "test:identity": "node scripts/identity-core-test.mjs",
+    "test:content-lifecycle": "node scripts/content-lifecycle-test.mjs",
+    "test:core": "node scripts/identity-core-test.mjs && node scripts/content-lifecycle-test.mjs && node scripts/business-hub-test.mjs && node scripts/workspace-core-test.mjs",
     "smoke:prod": "node scripts/prod-smoke.mjs",
     "preview": "vite preview",
     "tunnel": "vk-tunnel --http-protocol=http --host=localhost --port=5173",
