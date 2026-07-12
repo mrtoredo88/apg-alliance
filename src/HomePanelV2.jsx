@@ -1661,7 +1661,7 @@ function V2SecondScreenDesktop({
   const desktopSideCardColumns = 'minmax(0, 1.2fr) minmax(158px, 1fr)';
   const compactSectionTileHeight = 132;
   const compactSectionLeadImageHeight = 110;
-  const compactMainCardMetaGap = 4;
+  const compactSectionTileMetaGap = 4;
   const quickAccessItems = [
     { label: 'Мероприятия', icon: '⌖', onClick: onOpenEvents, tone: 'rgba(101,163,255,0.22)' },
     { label: 'Партнёры', icon: '◈', onClick: onOpenOffers, tone: 'rgba(244,217,140,0.22)' },
