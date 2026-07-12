@@ -182,8 +182,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(2260px, calc(100vw - 48px))',
       pagePaddingX: 'clamp(14px, 1.55vw, 30px)',
+      rightRailColumn: 'minmax(390px, 430px)',
       firstHeroColumns: 'minmax(0, 1.58fr) minmax(390px, 430px)',
-      secondColumns: 'minmax(0, 1fr) minmax(380px, 0.52fr)',
+      secondColumns: 'minmax(0, 1fr) minmax(390px, 430px)',
       sectionGap: 20,
       compactGap: 12,
       sidePad: 'calc(126px + env(safe-area-inset-bottom, 0px))',
@@ -201,8 +202,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(2100px, calc(100vw - 40px))',
       pagePaddingX: 'clamp(12px, 1.55vw, 28px)',
+      rightRailColumn: 'minmax(370px, 410px)',
       firstHeroColumns: 'minmax(0, 1.52fr) minmax(370px, 410px)',
-      secondColumns: 'minmax(0, 1fr) minmax(350px, 0.53fr)',
+      secondColumns: 'minmax(0, 1fr) minmax(370px, 410px)',
       sectionGap: 18,
       compactGap: 11,
       sidePad: 'calc(120px + env(safe-area-inset-bottom, 0px))',
@@ -220,8 +222,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(1880px, calc(100vw - 34px))',
       pagePaddingX: 'clamp(12px, 1.5vw, 26px)',
+      rightRailColumn: 'minmax(350px, 398px)',
       firstHeroColumns: 'minmax(0, 1.46fr) minmax(350px, 398px)',
-      secondColumns: 'minmax(0, 1fr) minmax(340px, 0.54fr)',
+      secondColumns: 'minmax(0, 1fr) minmax(350px, 398px)',
       sectionGap: 16,
       compactGap: 11,
       sidePad: 'calc(114px + env(safe-area-inset-bottom, 0px))',
@@ -239,8 +242,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(1660px, calc(100vw - 28px))',
       pagePaddingX: 'clamp(10px, 1.35vw, 22px)',
+      rightRailColumn: 'minmax(326px, 382px)',
       firstHeroColumns: 'minmax(0, 1.38fr) minmax(326px, 382px)',
-      secondColumns: 'minmax(0, 1fr) minmax(330px, 0.56fr)',
+      secondColumns: 'minmax(0, 1fr) minmax(326px, 382px)',
       sectionGap: 16,
       compactGap: 10,
       heroHeight: 158,
@@ -1585,8 +1589,8 @@ function V2SecondScreenDesktop({
   const desktopContentGrid = {
     display: 'grid',
     gridTemplateColumns: desktopWidth >= 1500
-      ? 'minmax(380px, 1.05fr) minmax(330px, 0.82fr) minmax(420px, 1.08fr)'
-      : 'minmax(330px, 1fr) minmax(300px, 0.86fr) minmax(340px, 1fr)',
+      ? `minmax(340px, 0.88fr) minmax(520px, 1.54fr) ${desktopLayout.rightRailColumn || 'minmax(350px, 398px)'}`
+      : `minmax(292px, 0.84fr) minmax(440px, 1.48fr) ${desktopLayout.rightRailColumn || 'minmax(326px, 382px)'}`,
     gap: desktopLayout.sectionGap,
     alignItems: 'start',
     alignContent: 'start',
@@ -1605,8 +1609,12 @@ function V2SecondScreenDesktop({
     gridTemplateRows: 'auto minmax(0, 1fr)',
     alignItems: 'stretch',
   };
-  const desktopSideCardColumns = 'minmax(0, 1.2fr) minmax(158px, 1fr)';
-  const desktopNewsCardColumns = 'minmax(0, 1.85fr) minmax(112px, 0.82fr)';
+  const desktopSideCardColumns = desktopWidth >= 1500
+    ? 'minmax(0, 1.28fr) minmax(176px, 0.92fr)'
+    : 'minmax(0, 1.18fr) minmax(144px, 0.86fr)';
+  const desktopNewsCardColumns = desktopWidth >= 1500
+    ? 'minmax(0, 2.18fr) minmax(150px, 0.78fr)'
+    : 'minmax(0, 2fr) minmax(126px, 0.76fr)';
   const compactSectionTileHeight = 132;
   const compactSectionLeadImageHeight = 110;
   const compactSectionTileMetaGap = 4;
