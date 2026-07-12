@@ -3487,23 +3487,25 @@ export function UserApp() {
               aria-label="Переключатель режима АПГ"
               style={{
                 position: 'fixed',
-                top: 18,
-                right: 18,
+                top: 'calc(var(--safe-top, 0px) + 72px)',
+                right: 12,
                 zIndex: 12000,
-                display: 'flex',
-                gap: 4,
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: 5,
                 padding: 5,
                 border: '1px solid rgba(215,184,106,0.32)',
-                borderRadius: 999,
+                borderRadius: 20,
                 background: 'rgba(var(--apg2-glass-a,255,255,255),0.18)',
                 backdropFilter: 'blur(24px) saturate(1.5)',
                 WebkitBackdropFilter: 'blur(24px) saturate(1.5)',
                 boxShadow: '0 18px 44px rgba(0,0,0,0.22), 0 0 28px rgba(215,184,106,0.16)',
+                width: 132,
               }}
             >
               {[
-                ['user', '📱 Пользовательский режим'],
-                ['workspace', '🖥 Workspace'],
+                ['user', 'Пользовательский режим'],
+                ['workspace', 'Workspace'],
               ].map(([mode, label]) => {
                 const active = mode === resolvedAppMode;
                 return (
@@ -3513,16 +3515,18 @@ export function UserApp() {
                     onClick={() => setAppModePersisted(mode)}
                     style={{
                       border: 0,
-                      borderRadius: 999,
-                      minHeight: 36,
-                      padding: '0 12px',
+                      borderRadius: 15,
+                      minHeight: 38,
+                      padding: '0 8px',
                       background: active ? APG2_PROFILE.goldGradient : 'transparent',
                       color: active ? '#17120a' : APG2_PROFILE.text,
                       fontFamily: 'inherit',
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 900,
                       cursor: 'pointer',
-                      whiteSpace: 'nowrap',
+                      whiteSpace: 'normal',
+                      lineHeight: 1.08,
+                      textAlign: 'center',
                     }}
                   >
                     {label}
