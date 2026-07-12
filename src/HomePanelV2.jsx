@@ -600,6 +600,7 @@ function V2FirstScreenDesktop({
   featuredPartner,
   partnerOfMonth,
   unreadCount,
+  counterPulse = false,
   onOpenNotifications,
   onOpenPartner,
   onOpenNearby,
