@@ -3,6 +3,8 @@ import {
   findEventConflicts,
   findFreeWindows,
   getEventInterval,
+  isEventFinished,
+  selectActualEvents,
 } from '../src/eventSchedule.js';
 
 let failed = 0;
@@ -95,6 +97,23 @@ const interval = getEventInterval(tsLike);
 check('Timestamp-подобные значения поддерживаются',
   [interval.start.getHours(), interval.end.getHours()],
   [11, 16]);
+
+// 12. Актуальность событий для главной (единые правила hero/списков)
+const NOW = new Date('2026-07-12T15:00:00').getTime();
+const pastEvent = { id: 'past', title: 'Девичник', startAt: '2026-07-11T04:05:00', endAt: '2026-07-11T15:05:00' };
+const futureEvent = { id: 'future', title: 'Нетворкинг', startAt: '2026-07-22T11:00:00', endAt: '2026-07-22T16:00:00' };
+const ongoingEvent = { id: 'ongoing', title: 'Идёт сейчас', startAt: '2026-07-12T14:00:00', endAt: '2026-07-12T18:00:00' };
+const deletedFuture = { id: 'del', title: 'Удалённое', startAt: '2026-07-30T11:00:00', status: 'deleted' };
+const archivedFuture = { id: 'arch', title: 'Архивное', startAt: '2026-07-30T11:00:00', archived: true, lifecycleStatus: 'archived' };
+const legacyPast = { id: 'legacy', title: 'Легаси', eventDate: '2026-07-01' };
+
+check('прошедшее событие завершено', isEventFinished(pastEvent, NOW), true);
+check('будущее событие не завершено', isEventFinished(futureEvent, NOW), false);
+check('идущее сейчас не завершено', isEventFinished(ongoingEvent, NOW), false);
+check('легаси-событие по eventDate завершено', isEventFinished(legacyPast, NOW), true);
+check('selectActualEvents: только идущие/будущие, ближайшие первыми',
+  selectActualEvents([pastEvent, futureEvent, deletedFuture, archivedFuture, ongoingEvent, legacyPast], NOW).map(e => e.id),
+  ['ongoing', 'future']);
 
 if (failed) {
   console.error(`\n${failed} проверок провалено`);

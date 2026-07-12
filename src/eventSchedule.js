@@ -95,6 +95,33 @@ export function findFreeWindows(slots) {
   return windows;
 }
 
+const FINISHED_GRACE_MS = 2 * HOUR_MS;
+
+export function isEventFinished(event, now = Date.now()) {
+  const interval = getEventInterval(event);
+  if (interval) return interval.end.getTime() < now - FINISHED_GRACE_MS;
+  const fallback = [event?.eventDate, event?.deadline].find(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v));
+  if (!fallback) return false;
+  const d = new Date(fallback.length === 10 ? `${fallback}T23:59:59` : fallback);
+  return !Number.isNaN(d.getTime()) && d.getTime() < now - FINISHED_GRACE_MS;
+}
+
+// Единые правила актуальности: опубликовано, не архив/удалено, не завершилось; ближайшие первыми
+export function selectActualEvents(events, now = Date.now()) {
+  return (Array.isArray(events) ? events.filter(Boolean) : [])
+    .filter(isScheduleRelevant)
+    .filter(ev => !isEventFinished(ev, now))
+    .sort((a, b) => {
+      const ia = getEventInterval(a);
+      const ib = getEventInterval(b);
+      if (!ia && !ib) return (Number(b.priority) || 0) - (Number(a.priority) || 0);
+      if (!ia) return 1;
+      if (!ib) return -1;
+      const dt = ia.start.getTime() - ib.start.getTime();
+      return dt !== 0 ? dt : (Number(b.priority) || 0) - (Number(a.priority) || 0);
+    });
+}
+
 export function formatConflictLabel(event) {
   const interval = getEventInterval(event);
   const time = interval

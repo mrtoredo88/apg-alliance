@@ -6,6 +6,7 @@ import { APG2_PROFILE, ApgModal, EmptyStateV2, GlassBadge, GlassButton, GlassCar
 import { EventDetailSheet } from './EventDetailSheet.jsx';
 import { openUrl } from './vk.js';
 import { formatEventPrice, isFreeEvent, isPaidEvent } from './eventPrice.js';
+import { isEventFinished } from './eventSchedule.js';
 
 const GRADIENTS_DARK = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
@@ -70,10 +71,7 @@ function isWeekendDate(date) {
 }
 
 function isEventPast(event) {
-  const d = eventDate(event);
-  if (!d) return false;
-  const end = toDateValue(event?.endAt);
-  return (end || d).getTime() < Date.now() - 2 * 60 * 60 * 1000;
+  return isEventFinished(event);
 }
 
 function isKidsEvent(event) {

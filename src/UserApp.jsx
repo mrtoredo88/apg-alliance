@@ -2941,7 +2941,10 @@ export function UserApp() {
     onScan: () => setIsScannerOpen(true),
     onRetry: () => loadData(mountedRef),
     onRefresh: handleRefresh,
-    onOpenEvents: () => goPanel('events'),
+    onOpenEvents: (target) => {
+      if (target?.id) setPendingLokiEventTarget({ id: String(target.id), nonce: Date.now() });
+      goPanel('events');
+    },
     onOpenExperts: () => goPanel('experts'),
     onOpenTasks: () => goPanel('tasks'),
     onOpenLeaderboard: () => goPanel('leaderboard'),

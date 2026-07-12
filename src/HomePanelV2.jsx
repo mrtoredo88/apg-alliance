@@ -11,6 +11,7 @@ import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, ge
 import { buildAdaptiveHomeData } from './interestEngine.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
+import { selectActualEvents } from './eventSchedule.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -391,7 +392,7 @@ function V2FirstScreenMobile({
   const heroImage = heroEvent ? contentImageOf(heroEvent) : profileImageOf(heroPartner);
   const heroTitle = heroEvent?.title ?? heroPartner?.name ?? 'Пульс города рядом';
   const heroMeta = heroEvent?.date ?? heroPartner?.offer ?? 'Главный повод выйти в город сегодня';
-  const heroAction = heroEvent ? onOpenEvents : heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenEvents;
+  const heroAction = heroEvent ? () => onOpenEvents?.(heroEvent) : heroPartner ? () => onOpenPartner?.(heroPartner) : () => onOpenEvents?.();
   const firstName = getUserFirstName(user);
   const greeting = firstName ? `${getDayGreeting()}, ${firstName}!` : `${getDayGreeting()}!`;
   const heroMediaRef = useRef(null);
@@ -632,7 +633,7 @@ function V2FirstScreenDesktop({
   const heroImage = heroEvent ? contentImageOf(heroEvent) : profileImageOf(heroPartner);
   const heroTitle = heroEvent?.title ?? heroPartner?.name ?? 'Пульс города сегодня';
   const heroMeta = heroEvent?.date ?? heroPartner?.offer ?? 'Главный повод выйти в город';
-  const heroAction = heroEvent ? onOpenEvents : heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenEvents;
+  const heroAction = heroEvent ? () => onOpenEvents?.(heroEvent) : heroPartner ? () => onOpenPartner?.(heroPartner) : () => onOpenEvents?.();
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
   const keysToNext = getKeysToNext(userKeys);
@@ -2720,7 +2721,7 @@ function SkeletonHome() {
 }
 
 export function HomePanelV2({
-  user, userKeys = 0, favorites = [], partners = [], experts = [], events = [], news = [], recentReviews = [],
+  user, userKeys = 0, favorites = [], partners = [], experts = [], events: rawEvents = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
   completedTasks = [], referralCount = 0, scannedCount = 0, unreadCount = 0, isWebMode = false,
   registeredEventIds = [], onEventRegister, userRank = null, customTasks = [],
@@ -2736,6 +2737,9 @@ export function HomePanelV2({
   onSwitchAppMode,
   desktopWorkspaceMode = 'user',
 }) {
+  // Главная показывает только актуальные события: не удалённые/архивные и не завершившиеся, ближайшие первыми
+  const events = useMemo(() => selectActualEvents(rawEvents), [rawEvents]);
+
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchInputValue, setSearchInputValue] = useState('');
