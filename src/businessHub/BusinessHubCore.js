@@ -1,4 +1,4 @@
-import { getWorkspaceUserRoles } from '../workspace/WorkspaceFeatureFlags.js';
+import { CAPABILITIES, getUserRoles, hasCapability, isRoleWithinRolloutStage } from '../roleEngine.js';
 
 export const BUSINESS_HUB_FLAG = {
   off: 'off',
@@ -17,9 +17,6 @@ const FLAG_ORDER = [
   BUSINESS_HUB_FLAG.expert,
   BUSINESS_HUB_FLAG.all,
 ];
-
-const OWNER_ROLES = new Set(['owner', 'super_admin']);
-const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'moderator', 'editor']);
 
 const text = value => String(value || '').trim();
 const lower = value => text(value).toLowerCase();
@@ -40,16 +37,13 @@ export function getBusinessHubFlag(storage = globalThis.localStorage) {
 
 export function canUseBusinessHub({ user, partner, expert, flag } = {}) {
   const resolvedFlag = normalizeBusinessHubFlag(flag, BUSINESS_HUB_FLAG.owner);
+  const identity = {
+    ...(user || {}),
+    partnerId: user?.partnerId || partner?.id,
+    expertId: user?.expertId || expert?.id,
+  };
   if (resolvedFlag === BUSINESS_HUB_FLAG.off) return false;
-  if (resolvedFlag === BUSINESS_HUB_FLAG.all) return true;
-
-  const roles = getWorkspaceUserRoles({ user, partner, expert });
-  if (roles.some(role => OWNER_ROLES.has(role))) return true;
-  if (resolvedFlag === BUSINESS_HUB_FLAG.owner) return false;
-  if (resolvedFlag === BUSINESS_HUB_FLAG.admin) return roles.some(role => ADMIN_ROLES.has(role));
-  if (resolvedFlag === BUSINESS_HUB_FLAG.partner) return roles.some(role => ADMIN_ROLES.has(role)) || roles.includes('partner');
-  if (resolvedFlag === BUSINESS_HUB_FLAG.expert) return roles.some(role => ADMIN_ROLES.has(role)) || roles.includes('partner') || roles.includes('expert');
-  return false;
+  return hasCapability(identity, CAPABILITIES.canUseBusinessHub) && isRoleWithinRolloutStage(identity, resolvedFlag);
 }
 
 export function getBusinessProfile({ user, partner, expert, preferredRole } = {}) {
@@ -57,7 +51,11 @@ export function getBusinessProfile({ user, partner, expert, preferredRole } = {}
   if (preferredRole === 'partner' && partner?.id) return { kind: 'partner', label: 'Партнёр', profile: partner };
   if (partner?.id) return { kind: 'partner', label: 'Партнёр', profile: partner };
   if (expert?.id) return { kind: 'expert', label: 'Эксперт', profile: expert };
-  const roles = getWorkspaceUserRoles({ user, partner, expert });
+  const roles = getUserRoles({
+    ...(user || {}),
+    partnerId: user?.partnerId || partner?.id,
+    expertId: user?.expertId || expert?.id,
+  });
   return { kind: roles.includes('expert') ? 'expert' : 'partner', label: roles.includes('expert') ? 'Эксперт' : 'Партнёр', profile: null };
 }
 

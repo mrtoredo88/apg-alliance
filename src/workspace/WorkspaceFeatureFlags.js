@@ -1,3 +1,5 @@
+import { CAPABILITIES, getUserRoles, hasCapability, hasRole, isRoleWithinRolloutStage, ROLES } from '../roleEngine.js';
+
 export const DESKTOP_WORKSPACE_FLAG = {
   off: 'off',
   owner: 'owner',
@@ -16,9 +18,6 @@ const FLAG_ORDER = [
   DESKTOP_WORKSPACE_FLAG.all,
 ];
 
-const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'moderator', 'editor']);
-const OWNER_ROLES = new Set(['owner', 'super_admin']);
-
 export function normalizeWorkspaceFlag(value, fallback = DESKTOP_WORKSPACE_FLAG.owner) {
   const normalized = String(value || '').trim().toLowerCase();
   return FLAG_ORDER.includes(normalized) ? normalized : fallback;
@@ -33,45 +32,30 @@ export function getDesktopWorkspaceFlag(storage = globalThis.localStorage) {
 }
 
 export function getWorkspaceUserRoles({ user, partner, expert } = {}) {
-  const roles = new Set();
-  const rawRoles = [
-    user?.role,
-    user?.userRole,
-    user?.authRole,
-    ...(Array.isArray(user?.roles) ? user.roles : []),
-  ].map(item => String(item || '').trim().toLowerCase()).filter(Boolean);
-  rawRoles.forEach(role => {
-    roles.add(role);
-    if (role === 'super_admin') roles.add('admin');
+  return getUserRoles({
+    ...(user || {}),
+    partnerId: user?.partnerId || partner?.id,
+    expertId: user?.expertId || expert?.id,
   });
-  if (rawRoles.length) {
-    if (rawRoles.includes('super_admin')) roles.add('admin');
-  }
-  if (user?.owner === true || user?.isOwner === true) roles.add('owner');
-  if (user?.admin === true || user?.isAdmin === true) roles.add('admin');
-  if (partner?.id || user?.partnerId || user?.partnerCabinetEnabled || (Array.isArray(user?.partnerCabinetIds) && user.partnerCabinetIds.length)) roles.add('partner');
-  if (expert?.id || user?.expertId || user?.expertCabinetEnabled || (Array.isArray(user?.expertCabinetIds) && user.expertCabinetIds.length)) roles.add('expert');
-  if (!roles.size) roles.add('user');
-  return Array.from(roles);
 }
 
 export function isWorkspaceOwner({ user, partner, expert } = {}) {
-  const roles = getWorkspaceUserRoles({ user, partner, expert });
-  return roles.some(role => OWNER_ROLES.has(role));
+  return hasRole({
+    ...(user || {}),
+    partnerId: user?.partnerId || partner?.id,
+    expertId: user?.expertId || expert?.id,
+  }, ROLES.owner);
 }
 
 export function canUseDesktopWorkspace({ user, partner, expert, flag } = {}) {
   const resolvedFlag = normalizeWorkspaceFlag(flag, DESKTOP_WORKSPACE_FLAG.owner);
+  const identity = {
+    ...(user || {}),
+    partnerId: user?.partnerId || partner?.id,
+    expertId: user?.expertId || expert?.id,
+  };
   if (resolvedFlag === DESKTOP_WORKSPACE_FLAG.off) return false;
-  if (resolvedFlag === DESKTOP_WORKSPACE_FLAG.all) return true;
-
-  const roles = getWorkspaceUserRoles({ user, partner, expert });
-  if (roles.some(role => OWNER_ROLES.has(role))) return true;
-  if (resolvedFlag === DESKTOP_WORKSPACE_FLAG.owner) return false;
-  if (resolvedFlag === DESKTOP_WORKSPACE_FLAG.admin && roles.some(role => ADMIN_ROLES.has(role))) return true;
-  if (resolvedFlag === DESKTOP_WORKSPACE_FLAG.partner && (roles.some(role => ADMIN_ROLES.has(role)) || roles.includes('partner'))) return true;
-  if (resolvedFlag === DESKTOP_WORKSPACE_FLAG.expert && (roles.some(role => ADMIN_ROLES.has(role)) || roles.includes('partner') || roles.includes('expert'))) return true;
-  return false;
+  return hasCapability(identity, CAPABILITIES.canUseWorkspace) && isRoleWithinRolloutStage(identity, resolvedFlag);
 }
 
 export function isDesktopWorkspaceDevice({ width = 0, userAgent = '', platform = '', maxTouchPoints = 0 } = {}) {

@@ -3,6 +3,7 @@ import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
 import { buildIdentityDiagnostics, resolveFirebaseIdentity } from '../lib/identityCore.js';
+import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 
 const MAX_TEXT = 4000;
 
@@ -160,8 +161,7 @@ function assertOwn(actor, userId) {
 }
 
 function assertOwner(actor) {
-  const role = String(actor?.user?.role || actor?.user?.userRole || '').toLowerCase();
-  if (role !== 'owner') throw Object.assign(new Error('Действие доступно только Owner.'), { statusCode: 403, code: 'OWNER_REQUIRED' });
+  if (!hasRole(actor?.user || {}, ROLES.owner)) throw Object.assign(new Error('Действие доступно только Owner.'), { statusCode: 403, code: 'OWNER_REQUIRED' });
 }
 
 async function findUserRefForOwner(db, req) {

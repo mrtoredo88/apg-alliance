@@ -7,6 +7,7 @@ import { APP_URL } from '../lib/config.js';
 import { resolveEmailIdentity } from '../lib/identityCore.js';
 import { ECONOMY_VERSION, economyMigrationPatch } from '../../../server-shared/economy-engine.js';
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentTitle, getLifecycleAutoRecommendation, normalizeContentStatus, summarizeLifecycle } from '../../../server-shared/content-lifecycle.js';
+import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
@@ -56,7 +57,6 @@ const LIST_CONFIG = {
   publicFormLinks: { orderBy: ['createdAt', 'desc'], limit: 300 },
 };
 
-const LEGAL_ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin']);
 const LEGAL_PRIVATE_FIELDS = new Set(['legalProfile', 'legalDocuments', 'legalCheck', 'legalMissingFields', 'counterparty', 'crm', 'legalAdminComments']);
 const PARTNER_STATUS_LABELS = {
   new_request: 'Новая заявка',
@@ -170,7 +170,7 @@ const AUTOMATION_ACTION_LABELS = {
 let partnerSes = null;
 
 function canAccessLegalData(actor) {
-  return LEGAL_ADMIN_ROLES.has(String(actor?.role || '').toLowerCase());
+  return [ROLES.owner, ROLES.superAdmin, ROLES.admin].some(role => hasRole({ role: actor?.role }, role));
 }
 
 function stripLegalData(row) {

@@ -18,6 +18,7 @@ import {
 } from './WorkspaceComponents.jsx';
 import { buildWorkspaceLayout, getWorkspaceNavigation, WORKSPACE_MODES } from './WorkspaceCore.js';
 import { getDesktopWorkspaceLayoutPlan, WORKSPACE_LAYOUT, WORKSPACE_Z } from './WorkspaceLayoutEngine.js';
+import { CAPABILITIES, hasCapability } from '../roleEngine.js';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: '▦', group: 'Работа', hint: 'Главный рабочий экран', shortcut: '⌘1' },
@@ -861,10 +862,11 @@ export function DesktopWorkspace({
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || '');
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
   const layout = useMemo(() => buildWorkspaceLayout({ mode: WORKSPACE_MODES.desktop, contextOpen: true, pinnedContext: true }), []);
-  const workspaceNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.desktop, role: activeRole?.id || 'user', includeSecondary: true }), [activeRole?.id]);
+  const activeRoleIdentity = useMemo(() => ({ ...(user || {}), role: activeRole?.id || user?.role || 'user' }), [activeRole?.id, user]);
+  const workspaceNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.desktop, identity: activeRoleIdentity, includeSecondary: true }), [activeRoleIdentity]);
   const activeProfile = activeRole?.id === 'expert' ? ownedExpert : activeRole?.id === 'partner' ? ownedPartner : user;
   const userName = user?.firstName || user?.name || user?.displayName || 'коллега';
-  const isAdminRole = ['owner', 'super_admin', 'admin', 'moderator', 'editor'].includes(activeRole?.id);
+  const isAdminRole = hasCapability(activeRoleIdentity, CAPABILITIES.canOpenAdminPanel);
   const businessHubFlag = useMemo(() => getBusinessHubFlag(), []);
   const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: ownedPartner, expert: ownedExpert, flag: businessHubFlag }), [user, ownedPartner, ownedExpert, businessHubFlag]);
   const layoutPlan = useMemo(() => getDesktopWorkspaceLayoutPlan(viewportWidth, typeof window === 'undefined' ? 900 : window.innerHeight, sidebarCollapsed), [viewportWidth, sidebarCollapsed]);

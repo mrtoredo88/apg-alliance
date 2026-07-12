@@ -1,3 +1,5 @@
+import { getUserRoles } from '../roleEngine.js';
+
 export const CABINET_ROLE_DEFINITIONS = {
   partner: {
     id: 'partner',
@@ -25,6 +27,12 @@ export const CABINET_ROLE_DEFINITIONS = {
     modules: ['audit', 'billing'],
     taskKeys: [],
   },
+  super_admin: {
+    id: 'super_admin',
+    label: 'Главный администратор',
+    modules: ['moderation', 'audit', 'security'],
+    taskKeys: [],
+  },
   admin: {
     id: 'admin',
     label: 'Администратор',
@@ -43,9 +51,13 @@ export const CABINET_ROLE_DEFINITIONS = {
     modules: ['editorial'],
     taskKeys: [],
   },
+  analyst: {
+    id: 'analyst',
+    label: 'Аналитик',
+    modules: ['analytics', 'audit'],
+    taskKeys: [],
+  },
 };
-
-const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'moderator', 'editor']);
 
 function hasProfile(profile) {
   return Boolean(profile?.id);
@@ -56,13 +68,10 @@ export function getCabinetRoles({ user, partner, expert, preferredRole } = {}) {
   if (hasProfile(partner)) roles.push({ ...CABINET_ROLE_DEFINITIONS.partner, profile: partner });
   if (hasProfile(expert)) roles.push({ ...CABINET_ROLE_DEFINITIONS.expert, profile: expert });
 
-  const userRole = String(user?.role || user?.userRole || user?.authRole || '').toLowerCase();
-  if (ADMIN_ROLES.has(userRole)) {
-    const key = userRole === 'super_admin' ? 'admin' : userRole;
-    roles.push({ ...(CABINET_ROLE_DEFINITIONS[key] || CABINET_ROLE_DEFINITIONS.admin), profile: user });
-  }
-  if (user?.owner === true || user?.isOwner === true) roles.push({ ...CABINET_ROLE_DEFINITIONS.owner, profile: user });
-  if (user?.admin === true || user?.isAdmin === true) roles.push({ ...CABINET_ROLE_DEFINITIONS.admin, profile: user });
+  getUserRoles(user).forEach(role => {
+    const definition = CABINET_ROLE_DEFINITIONS[role];
+    if (definition && !['partner', 'expert'].includes(role)) roles.push({ ...definition, profile: user });
+  });
 
   const unique = roles.filter((role, index, list) => list.findIndex(item => item.id === role.id) === index);
   const preferred = unique.find(role => role.id === preferredRole);
