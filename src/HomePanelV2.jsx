@@ -157,6 +157,7 @@ const GlassHero = {
 const DESKTOP_LAYOUT = {
   containerMax: 'min(1960px, calc(100vw - 28px))',
   pagePaddingX: 'clamp(10px, 1.45vw, 24px)',
+  rightRailColumn: 'minmax(316px, 386px)',
   firstHeroColumns: 'minmax(0, 1.36fr) minmax(316px, 386px)',
   secondColumns: 'minmax(0, 1fr) minmax(300px, 380px)',
   highlightColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
@@ -762,7 +763,7 @@ function V2FirstScreenDesktop({
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 5, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
             {navItems.map(item => (
               <button
                 key={item.label}
@@ -777,10 +778,10 @@ function V2FirstScreenDesktop({
                     : 'linear-gradient(145deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08))',
                   color: item.isActive ? V2.gold : V2.textSoft,
                   cursor: 'pointer',
-                  minHeight: 30,
-                  fontWeight: 760,
-                  padding: '0 8px',
-                  fontSize: 11.2,
+                  minHeight: 32,
+                  fontWeight: 780,
+                  padding: '0 12px',
+                  fontSize: 11.7,
                   boxShadow: item.isActive ? '0 0 0 1px rgba(201,168,76,0.32)' : undefined,
                   transition: motionTransition(['background', 'transform', 'border-color'], 'base'),
                   ...pressMotion,
@@ -1588,9 +1589,7 @@ function V2SecondScreenDesktop({
   const desktopSecondRowGap = Math.max(7, desktopLayout.compactGap - 3);
   const desktopContentGrid = {
     display: 'grid',
-    gridTemplateColumns: desktopWidth >= 1500
-      ? `minmax(340px, 0.88fr) minmax(520px, 1.54fr) ${desktopLayout.rightRailColumn || 'minmax(350px, 398px)'}`
-      : `minmax(292px, 0.84fr) minmax(440px, 1.48fr) ${desktopLayout.rightRailColumn || 'minmax(326px, 382px)'}`,
+    gridTemplateColumns: `minmax(0, 1fr) minmax(0, 1fr) ${desktopLayout.rightRailColumn || 'minmax(326px, 382px)'}`,
     gap: desktopLayout.sectionGap,
     alignItems: 'start',
     alignContent: 'start',
@@ -1610,11 +1609,11 @@ function V2SecondScreenDesktop({
     alignItems: 'stretch',
   };
   const desktopSideCardColumns = desktopWidth >= 1500
-    ? 'minmax(0, 1.28fr) minmax(176px, 0.92fr)'
-    : 'minmax(0, 1.18fr) minmax(144px, 0.86fr)';
+    ? 'minmax(0, 1.18fr) minmax(154px, 0.82fr)'
+    : 'minmax(0, 1.14fr) minmax(138px, 0.78fr)';
   const desktopNewsCardColumns = desktopWidth >= 1500
-    ? 'minmax(0, 2.18fr) minmax(150px, 0.78fr)'
-    : 'minmax(0, 2fr) minmax(126px, 0.76fr)';
+    ? 'minmax(0, 1.7fr) minmax(136px, 0.74fr)'
+    : 'minmax(0, 1.62fr) minmax(124px, 0.72fr)';
   const compactSectionTileHeight = 132;
   const compactSectionLeadImageHeight = 110;
   const compactSectionTileMetaGap = 4;
