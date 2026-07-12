@@ -2182,3 +2182,15 @@
 **Полное восстановление пользователя:** карточка эксперта привязана к Canonical User `tg_1670282567` (ownerId/ownerUserIds/ownerEmails на карточке; expertId/expertCabinetIds/role: expert на пользователе) — кабинет эксперта виден в профиле/Workspace/Business Hub; ключи 21 и реферал на месте.
 
 **Постоянный regression-тест:** `npm run test:content-lifecycle` — кейс карточки Ольги (active:true + status:draft: воспроизведение, обнаружение repair-правилом, восстановление без потери данных) + инварианты: published не понижается молча (только явный nextStatus с причиной в истории), неизвестный статус не превращает published в draft, lifecycle.status — источник истины. Сводный `npm run test:core` = Identity Core + Content Lifecycle + Business Hub + Workspace — запускать при каждом изменении этих подсистем.
+
+## 2026-07-12 — Расхождение каналов раздачи: «после email-входа открывается старая версия»
+
+**Первопричина:** каналы раздачи фронтенда разошлись. myapg.ru и Yandex Storage отдают актуальную сборку, а **VK-хостинг мини-аппа (app_id 54601851) остался на v4.4.2** — деплой шёл только через ./deploy-frontend.sh (storage), `vk-miniapps-deploy` не запускался. Доказательство: adminActivity Татьяны от 11.07 записана с `appVersion: v4.4.2`. Пользователь до входа видит свежую версию (браузер/ссылка на myapg.ru), а «приложение» открывает VK Mini App со старым бандлом: старая главная, старый клиентский фильтр новостей (без lifecycle — видна «архивная» новость про баню), старая навигация без нижнего таббара новой версии. Identity Core у Татьяны в порядке: canonical email:gordeeva.tatyana@mail.ru, ключи и роли на месте, ошибок входа в errorLogs нет. Примечание: новость «про баню» в Firestore вообще не архивирована (нет status/archived) — публична и в новой выдаче; «архив» — впечатление от старого интерфейса.
+
+**Изменения:**
+- `deploy-frontend.sh` теперь деплоит и VK-хостинг (`vk-miniapps-deploy`, токен из .env.deploy.local) — каналы больше не могут разойтись; при отсутствии токена — громкое предупреждение.
+- `scripts/release-parity-test.mjs` (`npm run test:release-parity`) — постоянный regression: version.json всех каналов идентичен (опция --expect-head сверяет с git HEAD), публичная выдача public-data не содержит архивных/удалённых объектов и проходит lifecycle-фильтр.
+- Диагностический оверлей в приложении (кнопка ⌗, только owner/super_admin): App version, Canonical User, Active Profile, роли, Navigation (+таббар), Layout (User Mode/Workspace), источник public-data (backend/fallback по коллекциям), возраст кэша, версия Content Lifecycle, feature flags.
+- `fetchPublicBootstrap`/`loadPublicSnap` фиксируют источник данных (backend / firestore-fallback) для диагностики.
+
+**Деплой:** VK-хостинг обновлён до актуальной сборки — во всех каналах одна версия.

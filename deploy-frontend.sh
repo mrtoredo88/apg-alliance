@@ -61,3 +61,12 @@ aws s3 sync dist/ "s3://$BUCKET/" $S3 \
 
 echo ""
 echo "Done: $ENDPOINT/$BUCKET/"
+
+# VK Mini App hosting — та же сборка, что и web: расхождение версий каналов недопустимо
+VK_TOKEN="$(grep '^MINI_APPS_ACCESS_TOKEN=' "$SCRIPT_DIR/.env.deploy.local" 2>/dev/null | cut -d'=' -f2-)"
+if [ -n "$VK_TOKEN" ]; then
+  echo "Deploying VK Mini App hosting..."
+  MINI_APPS_ACCESS_TOKEN="$VK_TOKEN" npx vk-miniapps-deploy || echo "⚠️  VK deploy failed — VK Mini App останется на старой версии!"
+else
+  echo "⚠️  MINI_APPS_ACCESS_TOKEN не найден в .env.deploy.local — VK Mini App останется на старой версии!"
+fi

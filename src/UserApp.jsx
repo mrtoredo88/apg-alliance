@@ -34,6 +34,7 @@ import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from 
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
+import { CONTENT_LIFECYCLE_VERSION } from '../server-shared/content-lifecycle.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -310,6 +311,8 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 5200) {
   }
 }
 
+const publicDataDiag = { source: 'pending', fallbacks: [], errors: 0, at: null };
+
 async function fetchPublicBootstrap() {
   if (!publicBootstrapPromise) {
     publicBootstrapPromise = fetchJsonWithTimeout(`${API_BASE_URL}/api/public-data`, {
@@ -320,10 +323,15 @@ async function fetchPublicBootstrap() {
         const data = payload?.data || {};
         if (!response.ok || (!Object.keys(data).length && payload?.ok === false)) throw new Error(payload?.error || 'public_data_failed');
         if (Array.isArray(data.expertCategories) && data.expertCategories.length) registerCustomExpertCategories(data.expertCategories);
+        publicDataDiag.source = 'backend';
+        publicDataDiag.errors = Array.isArray(payload?.errors) ? payload.errors.length : 0;
+        publicDataDiag.at = new Date().toISOString();
         return data;
       })
       .catch(error => {
         publicBootstrapPromise = null;
+        publicDataDiag.source = 'backend_failed';
+        publicDataDiag.at = new Date().toISOString();
         throw error;
       });
   }
@@ -353,6 +361,7 @@ async function loadPublicSnap(label, promiseFactory) {
     return snapFromPublicRows(rows);
   } catch (error) {
     logError(error, `UserApp.loadData.${label}.publicData`);
+    if (!publicDataDiag.fallbacks.includes(label)) publicDataDiag.fallbacks.push(label);
     return await promiseFactory();
   }
 }
@@ -590,6 +599,8 @@ export function UserApp() {
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
   const [appMode, setAppMode]                   = useState(readInitialAppMode);
+  const [diagOpen, setDiagOpen]                 = useState(false);
+  const [appVersionInfo, setAppVersionInfo]     = useState(null);
   const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
@@ -2926,6 +2937,47 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
+          {['owner', 'super_admin'].some(role => role === String(user?.role || '').toLowerCase() || (Array.isArray(user?.roles) && user.roles.includes(role))) && createPortal(
+            <div style={{ position: 'fixed', bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', right: 10, zIndex: 12000 }}>
+              {diagOpen ? (
+                <div style={{ width: 262, padding: 12, borderRadius: 16, background: 'rgba(12,12,20,0.94)', border: '1px solid rgba(201,168,76,0.4)', color: '#eee', fontSize: 11, lineHeight: '16px', boxShadow: '0 18px 50px rgba(0,0,0,0.5)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                    <span style={{ color: '#C9A84C', fontWeight: 900 }}>APG Diagnostics</span>
+                    <button type="button" onClick={() => setDiagOpen(false)} style={{ border: 'none', background: 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
+                  </div>
+                  {[
+                    ['App version', appVersionInfo?.v || '…'],
+                    ['Canonical User', user?.canonicalUserId || '—'],
+                    ['Active Profile', user?.id || '—'],
+                    ['Roles', [user?.role, ...(Array.isArray(user?.roles) ? user.roles : [])].filter(Boolean).join(', ') || '—'],
+                    ['Navigation', `${activePanel}${showTabBar && !desktopWorkspaceActive ? ' + tabbar' : ' (без таббара)'}`],
+                    ['Layout', desktopWorkspaceActive ? `Workspace (${workspaceMode})` : `User Mode (${workspaceMode})`],
+                    ['public-data', `${publicDataDiag.source}${publicDataDiag.fallbacks.length ? ` · fallback: ${publicDataDiag.fallbacks.join(',')}` : ''}${publicDataDiag.errors ? ` · errors: ${publicDataDiag.errors}` : ''}`],
+                    ['Cache', cacheTs ? formatCacheAge(cacheTs) : '—'],
+                    ['Lifecycle', CONTENT_LIFECYCLE_VERSION],
+                    ['Flags', `workspace=${desktopWorkspaceFlag}, appMode=${appMode}`],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0' }}>
+                      <span style={{ color: 'rgba(238,238,238,0.55)', flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontWeight: 700, textAlign: 'right', overflowWrap: 'anywhere', userSelect: 'text' }}>{String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiagOpen(true);
+                    if (!appVersionInfo) fetch('/version.json', { cache: 'no-store' }).then(res => res.json()).then(setAppVersionInfo).catch(() => setAppVersionInfo({ v: 'недоступно' }));
+                  }}
+                  style={{ width: 34, height: 34, borderRadius: 17, border: '1px solid rgba(201,168,76,0.45)', background: 'rgba(12,12,20,0.8)', color: '#C9A84C', fontSize: 14, fontWeight: 900, cursor: 'pointer', opacity: 0.75 }}
+                >
+                  ⌗
+                </button>
+              )}
+            </div>,
+            document.body,
+          )}
           {desktopWorkspaceActive ? (
             <Suspense fallback={<LazyFallback />}>
               <DesktopWorkspace
