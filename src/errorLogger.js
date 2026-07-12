@@ -1,6 +1,7 @@
 import { auth } from './firebase.js';
 import { signInAnonymously } from 'firebase/auth';
 import { userAction } from './userApi.js';
+import { getPwaVersion } from './pwa/PwaUpdateManager.js';
 
 let _userId = null;
 let _version = '?';
@@ -9,7 +10,7 @@ let _count = 0;
 const MAX = 15;
 let _initialized = false;
 
-fetch('/version.json').then(r => r.json()).then(d => { _version = d.v ?? '?'; }).catch(() => {});
+getPwaVersion().then(v => { _version = v || '?'; }).catch(() => {});
 
 export function setErrorLoggerUser(uid) {
   _userId = uid;

@@ -36,6 +36,7 @@ import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './wor
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { CONTENT_LIFECYCLE_VERSION } from '../server-shared/content-lifecycle.js';
 import { CAPABILITIES, getRoleDiagnostics, hasCapability } from './roleEngine.js';
+import { getPwaUpdateDiagnostics, requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -614,8 +615,7 @@ export function UserApp() {
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
   const [appMode, setAppMode]                   = useState(readInitialAppMode);
   const [diagOpen, setDiagOpen]                 = useState(false);
-  const [appVersionInfo, setAppVersionInfo]     = useState(null);
-  const [swDiag, setSwDiag]                     = useState({ version: '—', cacheKeys: [] });
+  const [pwaUpdateDiag, setPwaUpdateDiag]       = useState(() => getPwaUpdateDiagnostics());
   const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
@@ -625,23 +625,9 @@ export function UserApp() {
   const tabSlotRefs                             = useRef([]);
 
   useEffect(() => {
-    if (!navigator.serviceWorker) return undefined;
-    const handler = (event) => {
-      if (event.data?.type === 'APG_SW_DIAGNOSTICS_RESULT') {
-        setSwDiag({
-          version: event.data.version || '—',
-          cacheKeys: Array.isArray(event.data.cacheKeys) ? event.data.cacheKeys : [],
-        });
-      }
-      if (event.data?.type === 'APG_SW_CACHE_CLEARED') {
-        setSwDiag(prev => ({ ...prev, version: event.data.version || prev.version, cacheKeys: [] }));
-      }
-    };
-    navigator.serviceWorker.addEventListener('message', handler);
-    navigator.serviceWorker.ready
-      .then(() => navigator.serviceWorker.controller?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' }))
-      .catch(() => {});
-    return () => navigator.serviceWorker.removeEventListener('message', handler);
+    const unsubscribe = subscribePwaUpdate(setPwaUpdateDiag);
+    requestPwaDiagnostics().catch(() => {});
+    return unsubscribe;
   }, []);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
@@ -2555,7 +2541,7 @@ export function UserApp() {
         : 'hidden';
   const currentRoute = typeof window === 'undefined' ? '—' : `${window.location.pathname}${window.location.search}${window.location.hash}`;
   const canonicalUserId = user?.canonicalUserId || user?.id || '—';
-  const swCacheVersion = swDiag.cacheKeys.length ? swDiag.cacheKeys.join(', ') : 'empty';
+  const swCacheVersion = pwaUpdateDiag.cacheKeys?.length ? pwaUpdateDiag.cacheKeys.join(', ') : (pwaUpdateDiag.cacheVersion || 'empty');
   const V2GoldMetal = 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 68%, #F4D98C 100%)';
 
   const activeTabIndex = TABS.findIndex(tab => tab.id === activePanel);
@@ -3002,7 +2988,9 @@ export function UserApp() {
                     <button type="button" onClick={() => setDiagOpen(false)} style={{ border: 'none', background: 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
                   </div>
                   {[
-                    ['App version', appVersionInfo?.v || '…'],
+                    ['App Version', pwaUpdateDiag.appVersion || '…'],
+                    ['Installed Version', pwaUpdateDiag.installedVersion || '—'],
+                    ['Available Version', pwaUpdateDiag.availableVersion || '—'],
                     ['UserApp Branch', userAppBranch],
                     ['Active Layout', desktopWorkspaceActive ? `Workspace (${workspaceMode})` : `User Mode (${workspaceMode})`],
                     ['Active Navigation', activeNavigation],
@@ -3014,8 +3002,13 @@ export function UserApp() {
                     ['Workspace Role', workspaceRole],
                     ['Role Engine', `${roleDiagnostics.primaryRole} · ${roleDiagnostics.capabilities.join(', ') || '—'}`],
                     ['Current Route', currentRoute],
-                    ['Service Worker', swDiag.version || '—'],
+                    ['Service Worker', pwaUpdateDiag.serviceWorkerVersion || '—'],
                     ['Cache Version', swCacheVersion],
+                    ['Cache Age', pwaUpdateDiag.cacheAge || (cacheTs ? formatCacheAge(cacheTs) : '—')],
+                    ['Bootstrap Source', pwaUpdateDiag.bootstrapSource || '—'],
+                    ['Update Status', pwaUpdateDiag.updateStatus || '—'],
+                    ['Last Update', pwaUpdateDiag.lastUpdateTime || '—'],
+                    ['Cache Migration', pwaUpdateDiag.cacheMigrationResult || '—'],
                     ['public-data', `${publicDataDiag.source}${publicDataDiag.fallbacks.length ? ` · fallback: ${publicDataDiag.fallbacks.join(',')}` : ''}${publicDataDiag.errors ? ` · errors: ${publicDataDiag.errors}` : ''}`],
                     ['Cache', cacheTs ? formatCacheAge(cacheTs) : '—'],
                     ['Content Lifecycle', CONTENT_LIFECYCLE_VERSION],
@@ -3028,10 +3021,7 @@ export function UserApp() {
                   ))}
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.serviceWorker?.controller?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' });
-                      if (!appVersionInfo) fetch('/version.json', { cache: 'no-store' }).then(res => res.json()).then(setAppVersionInfo).catch(() => setAppVersionInfo({ v: 'недоступно' }));
-                    }}
+                    onClick={() => requestPwaDiagnostics().catch(() => {})}
                     style={{ marginTop: 8, width: '100%', minHeight: 30, borderRadius: 10, border: '1px solid rgba(201,168,76,0.36)', background: 'rgba(201,168,76,0.12)', color: '#C9A84C', fontWeight: 900, cursor: 'pointer' }}
                   >
                     Обновить диагностику
@@ -3042,8 +3032,7 @@ export function UserApp() {
                   type="button"
                   onClick={() => {
                     setDiagOpen(true);
-                    if (!appVersionInfo) fetch('/version.json', { cache: 'no-store' }).then(res => res.json()).then(setAppVersionInfo).catch(() => setAppVersionInfo({ v: 'недоступно' }));
-                    navigator.serviceWorker?.controller?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' });
+                    requestPwaDiagnostics().catch(() => {});
                   }}
                   style={{ width: 34, height: 34, borderRadius: 17, border: '1px solid rgba(201,168,76,0.45)', background: 'rgba(12,12,20,0.8)', color: '#C9A84C', fontSize: 14, fontWeight: 900, cursor: 'pointer', opacity: 0.75 }}
                 >
