@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: replace dark Workspace shell with light SaaS dashboard
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`
+**Тип:** feat
+**Что изменено:**
+- Основной Desktop Workspace больше не использует старый тёмный `WorkspaceLayoutEngine`, постоянную AI-column и нижний status bar.
+- Workspace собран как светлая SaaS-панель по референсу: верхний APG-header, левая навигация, большой рабочий hero, KPI-график, задачи, мероприятия, сообщения и быстрые действия.
+- Корень получил маркер `data-workspace-shell="light-saas"` для проверки, что рендерится новый shell, а не старая dark glass-оболочка.
+**Почему:** production визуально смешивал новый Workspace 2.0 со старым тёмным shell; нужно было заменить именно сцену и композицию, а не чинить наложение стилями.
+
+---
+
 ## [2026-07-13] fix: prevent PWA update from marking version installed before reload
 **Коммит:** `pending`
 **Файлы:** `src/pwa/PwaUpdateManager.js`, `scripts/pwa-update-manager-test.mjs`
