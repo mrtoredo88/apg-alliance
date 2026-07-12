@@ -32,7 +32,7 @@ import { normalizeExpertRecord, registerCustomExpertCategories } from '../server
 import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
-import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
+import { getWorkspaceMode, getWorkspaceNavigation, normalizeWorkspaceRole, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { CONTENT_LIFECYCLE_VERSION } from '../server-shared/content-lifecycle.js';
 
@@ -86,6 +86,19 @@ function isNotArchived(item) {
 
 function isPublicContent(item) {
   return isLifecyclePublic(item);
+}
+
+function readCachedArray(key) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedArray(key, items) {
+  try { localStorage.setItem(key, JSON.stringify(items)); } catch {}
 }
 
 function safeStringList(value) {
@@ -601,6 +614,7 @@ export function UserApp() {
   const [appMode, setAppMode]                   = useState(readInitialAppMode);
   const [diagOpen, setDiagOpen]                 = useState(false);
   const [appVersionInfo, setAppVersionInfo]     = useState(null);
+  const [swDiag, setSwDiag]                     = useState({ version: '—', cacheKeys: [] });
   const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
@@ -608,6 +622,26 @@ export function UserApp() {
   const claimingPrizeRef                        = useRef(false);
   const tabBarRef                               = useRef(null);
   const tabSlotRefs                             = useRef([]);
+
+  useEffect(() => {
+    if (!navigator.serviceWorker) return undefined;
+    const handler = (event) => {
+      if (event.data?.type === 'APG_SW_DIAGNOSTICS_RESULT') {
+        setSwDiag({
+          version: event.data.version || '—',
+          cacheKeys: Array.isArray(event.data.cacheKeys) ? event.data.cacheKeys : [],
+        });
+      }
+      if (event.data?.type === 'APG_SW_CACHE_CLEARED') {
+        setSwDiag(prev => ({ ...prev, version: event.data.version || prev.version, cacheKeys: [] }));
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    navigator.serviceWorker.ready
+      .then(() => navigator.serviceWorker.controller?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' }))
+      .catch(() => {});
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
   const [scanSuccess, setScanSuccess]           = useState(null);
@@ -900,22 +934,22 @@ export function UserApp() {
     setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
 
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
-    try {
-      const cached = localStorage.getItem('apg_partners_cache');
-      if (cached) setPartners(JSON.parse(cached).filter(isNotArchived));
-    } catch {}
-    try {
-      const cachedE = localStorage.getItem('apg_events_cache');
-      if (cachedE) setEvents(JSON.parse(cachedE));
-    } catch {}
-    try {
-      const cachedN = localStorage.getItem('apg_news_cache');
-      if (cachedN) setNews(JSON.parse(cachedN));
-    } catch {}
-    try {
-      const cachedNt = localStorage.getItem('apg_notif_cache');
-      if (cachedNt) setNotifications(JSON.parse(cachedNt));
-    } catch {}
+    const cachedPartners = readCachedArray('apg_partners_cache').filter(item => item.catalogPublished !== false && isNotArchived(item));
+    if (cachedPartners.length) setPartners(cachedPartners);
+    writeCachedArray('apg_partners_cache', cachedPartners);
+
+    const cachedEvents = readCachedArray('apg_events_cache')
+      .filter(item => isNotArchived(item) && (isPublicContent(item) || normalizeContentStatus(item) === 'completed'));
+    if (cachedEvents.length) setEvents(cachedEvents);
+    writeCachedArray('apg_events_cache', cachedEvents);
+
+    const cachedNews = readCachedArray('apg_news_cache').filter(item => isNotArchived(item) && isPublicContent(item));
+    if (cachedNews.length) setNews(cachedNews);
+    writeCachedArray('apg_news_cache', cachedNews);
+
+    const cachedNotifications = readCachedArray('apg_notif_cache').filter(isNotArchived);
+    if (cachedNotifications.length) setNotifications(cachedNotifications);
+    writeCachedArray('apg_notif_cache', cachedNotifications);
 
     fetch('/manifest.json').catch(error => logError(error, 'UserApp.staticManifest'));
 
@@ -1062,7 +1096,7 @@ export function UserApp() {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(item => item.catalogPublished !== false && isNotArchived(item));
       setPartners(freshPartners);
-      try { localStorage.setItem('apg_partners_cache', JSON.stringify(freshPartners)); } catch {}
+      writeCachedArray('apg_partners_cache', freshPartners);
       if (userData && isMounted.current) {
         const owned = freshPartners.find(p => profileOwnedByUser(p, userData));
         if (owned) {
@@ -1092,7 +1126,7 @@ export function UserApp() {
           return tb - ta;
         });
       setEvents(freshEvents);
-      try { localStorage.setItem('apg_events_cache', JSON.stringify(freshEvents)); } catch {}
+      writeCachedArray('apg_events_cache', freshEvents);
 
       const firestoreNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const getMs = n => n.createdAt?.toDate ? n.createdAt.toDate().getTime() : (n.createdAt ?? 0);
@@ -1114,7 +1148,7 @@ export function UserApp() {
         })
         .slice(0, 50);
       setNews(freshNews);
-      try { localStorage.setItem('apg_news_cache', JSON.stringify(freshNews)); } catch {}
+      writeCachedArray('apg_news_cache', freshNews);
 
       setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
       setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
@@ -1133,7 +1167,7 @@ export function UserApp() {
       }
       const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setNotifications(notifList);
-      try { localStorage.setItem('apg_notif_cache', JSON.stringify(notifList)); } catch {}
+      writeCachedArray('apg_notif_cache', notifList);
 
       const nowTs = Date.now();
       try { localStorage.setItem('apg_cache_ts', String(nowTs)); } catch {}
@@ -2444,7 +2478,7 @@ export function UserApp() {
   );
 
   const workspaceMode = getWorkspaceMode(workspaceWidth);
-  const workspaceRole = user?.role || (user?.isOwner ? 'owner' : user?.isAdmin ? 'admin' : 'user');
+  const workspaceRole = normalizeWorkspaceRole(user?.role || (user?.isOwner ? 'owner' : user?.isAdmin ? 'admin' : 'user'));
   const desktopDevice = isDesktopWorkspaceDevice({
     width: workspaceWidth,
     userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
@@ -2500,6 +2534,18 @@ export function UserApp() {
   }));
   const TAB_PANELS = TABS.map(tab => tab.id);
   const showTabBar = !isScannerOpen && TAB_PANELS.includes(activePanel);
+  const userAppBranch = desktopWorkspaceActive ? 'DesktopWorkspace' : publicSubmitRoute ? 'PublicSubmit' : loggedOut ? 'LoggedOut' : 'PWA User Mode';
+  const activeNavigation = bottomNavigation.primary.map(item => `${item.id}:${item.panelId ?? 'action'}`).join(', ') || 'empty';
+  const tabBarReason = showTabBar
+    ? 'visible'
+    : isScannerOpen
+      ? 'scanner open'
+      : !TAB_PANELS.includes(activePanel)
+        ? `activePanel=${activePanel} not in ${TAB_PANELS.join(',') || 'empty navigation'}`
+        : 'hidden';
+  const currentRoute = typeof window === 'undefined' ? '—' : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const canonicalUserId = user?.canonicalUserId || user?.id || '—';
+  const swCacheVersion = swDiag.cacheKeys.length ? swDiag.cacheKeys.join(', ') : 'empty';
   const V2GoldMetal = 'linear-gradient(135deg, #FFF0B8 0%, #D9B965 34%, #9F7932 68%, #F4D98C 100%)';
 
   const activeTabIndex = TABS.findIndex(tab => tab.id === activePanel);
@@ -2940,28 +2986,45 @@ export function UserApp() {
           {['owner', 'super_admin'].some(role => role === String(user?.role || '').toLowerCase() || (Array.isArray(user?.roles) && user.roles.includes(role))) && createPortal(
             <div style={{ position: 'fixed', bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', right: 10, zIndex: 12000 }}>
               {diagOpen ? (
-                <div style={{ width: 262, padding: 12, borderRadius: 16, background: 'rgba(12,12,20,0.94)', border: '1px solid rgba(201,168,76,0.4)', color: '#eee', fontSize: 11, lineHeight: '16px', boxShadow: '0 18px 50px rgba(0,0,0,0.5)' }}>
+                <div style={{ width: 306, padding: 12, borderRadius: 16, background: 'rgba(12,12,20,0.94)', border: '1px solid rgba(201,168,76,0.4)', color: '#eee', fontSize: 11, lineHeight: '16px', boxShadow: '0 18px 50px rgba(0,0,0,0.5)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
-                    <span style={{ color: '#C9A84C', fontWeight: 900 }}>APG Diagnostics</span>
+                    <span style={{ color: '#C9A84C', fontWeight: 900 }}>PWA Diagnostics</span>
                     <button type="button" onClick={() => setDiagOpen(false)} style={{ border: 'none', background: 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
                   </div>
                   {[
                     ['App version', appVersionInfo?.v || '…'],
-                    ['Canonical User', user?.canonicalUserId || '—'],
+                    ['UserApp Branch', userAppBranch],
+                    ['Active Layout', desktopWorkspaceActive ? `Workspace (${workspaceMode})` : `User Mode (${workspaceMode})`],
+                    ['Active Navigation', activeNavigation],
+                    ['TabBar Visible', `${showTabBar ? 'yes' : 'no'} · ${tabBarReason}`],
+                    ['Canonical User', canonicalUserId],
                     ['Active Profile', user?.id || '—'],
+                    ['Role', user?.role || '—'],
                     ['Roles', [user?.role, ...(Array.isArray(user?.roles) ? user.roles : [])].filter(Boolean).join(', ') || '—'],
-                    ['Navigation', `${activePanel}${showTabBar && !desktopWorkspaceActive ? ' + tabbar' : ' (без таббара)'}`],
-                    ['Layout', desktopWorkspaceActive ? `Workspace (${workspaceMode})` : `User Mode (${workspaceMode})`],
+                    ['Workspace Role', workspaceRole],
+                    ['Current Route', currentRoute],
+                    ['Service Worker', swDiag.version || '—'],
+                    ['Cache Version', swCacheVersion],
                     ['public-data', `${publicDataDiag.source}${publicDataDiag.fallbacks.length ? ` · fallback: ${publicDataDiag.fallbacks.join(',')}` : ''}${publicDataDiag.errors ? ` · errors: ${publicDataDiag.errors}` : ''}`],
                     ['Cache', cacheTs ? formatCacheAge(cacheTs) : '—'],
-                    ['Lifecycle', CONTENT_LIFECYCLE_VERSION],
-                    ['Flags', `workspace=${desktopWorkspaceFlag}, appMode=${appMode}`],
+                    ['Content Lifecycle', CONTENT_LIFECYCLE_VERSION],
+                    ['Feature Flags', `workspace=${desktopWorkspaceFlag}, appMode=${appMode}`],
                   ].map(([label, value]) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0' }}>
                       <span style={{ color: 'rgba(238,238,238,0.55)', flexShrink: 0 }}>{label}</span>
                       <span style={{ fontWeight: 700, textAlign: 'right', overflowWrap: 'anywhere', userSelect: 'text' }}>{String(value)}</span>
                     </div>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.serviceWorker?.controller?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' });
+                      if (!appVersionInfo) fetch('/version.json', { cache: 'no-store' }).then(res => res.json()).then(setAppVersionInfo).catch(() => setAppVersionInfo({ v: 'недоступно' }));
+                    }}
+                    style={{ marginTop: 8, width: '100%', minHeight: 30, borderRadius: 10, border: '1px solid rgba(201,168,76,0.36)', background: 'rgba(201,168,76,0.12)', color: '#C9A84C', fontWeight: 900, cursor: 'pointer' }}
+                  >
+                    Обновить диагностику
+                  </button>
                 </div>
               ) : (
                 <button
@@ -2969,6 +3032,7 @@ export function UserApp() {
                   onClick={() => {
                     setDiagOpen(true);
                     if (!appVersionInfo) fetch('/version.json', { cache: 'no-store' }).then(res => res.json()).then(setAppVersionInfo).catch(() => setAppVersionInfo({ v: 'недоступно' }));
+                    navigator.serviceWorker?.controller?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' });
                   }}
                   style={{ width: 34, height: 34, borderRadius: 17, border: '1px solid rgba(201,168,76,0.45)', background: 'rgba(12,12,20,0.8)', color: '#C9A84C', fontSize: 14, fontWeight: 900, cursor: 'pointer', opacity: 0.75 }}
                 >

@@ -17,6 +17,16 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'APG_SW_DIAGNOSTICS') {
+    event.waitUntil(
+      caches.keys().then((keys) => event.source?.postMessage?.({
+        type: 'APG_SW_DIAGNOSTICS_RESULT',
+        version: SW_VERSION,
+        cacheKeys: keys,
+      }))
+    );
+    return;
+  }
   if (event.data?.type !== 'APG_CLEAR_SW_CACHE') return;
   event.waitUntil(
     clearAllCaches().then(() => event.source?.postMessage?.({

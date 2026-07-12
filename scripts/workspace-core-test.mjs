@@ -5,6 +5,7 @@ import {
   getWorkspaceMode,
   getWorkspaceNavigation,
   makeVirtualWindow,
+  normalizeWorkspaceRole,
   WORKSPACE_BREAKPOINTS,
   WORKSPACE_MODES,
   WORKSPACE_NAV_ITEMS,
@@ -37,6 +38,13 @@ assert.equal(desktop.contextPresentation, 'docked');
 const mobileNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: 'user' });
 assert.equal(mobileNav.placement, 'bottom');
 assert.deepEqual(mobileNav.primary.map(item => item.id), ['home', 'offers', 'scan', 'experts', 'profile']);
+
+const superAdminMobileNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: 'super_admin' });
+assert.equal(superAdminMobileNav.role, 'owner');
+assert.deepEqual(superAdminMobileNav.primary.map(item => item.id), ['home', 'offers', 'scan', 'experts', 'profile']);
+assert.deepEqual(superAdminMobileNav.primary.map(item => item.panelId), ['home', 'offers', null, 'experts', 'profile']);
+assert.equal(normalizeWorkspaceRole('administrator'), 'admin');
+assert.equal(normalizeWorkspaceRole('unknown-role'), 'user');
 
 const desktopPartnerNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.desktop, role: 'partner' });
 assert.equal(desktopPartnerNav.placement, 'sidebar');

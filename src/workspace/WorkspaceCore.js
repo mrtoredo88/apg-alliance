@@ -97,6 +97,14 @@ export const WORKSPACE_NAV_ITEMS = [
   },
 ];
 
+export function normalizeWorkspaceRole(role = 'user') {
+  const normalized = String(role || 'user').toLowerCase();
+  if (normalized === 'super_admin' || normalized === 'owner') return 'owner';
+  if (normalized === 'administrator') return 'admin';
+  if (['user', 'partner', 'expert', 'admin'].includes(normalized)) return normalized;
+  return 'user';
+}
+
 const DEFAULT_ENABLED_MODULES = {
   [WORKSPACE_MODULES.navigation]: true,
   [WORKSPACE_MODULES.workArea]: true,
@@ -190,22 +198,24 @@ export function buildWorkspaceLayout({ width, mode, modules, contextOpen = false
 }
 
 export function getWorkspaceNavigation({ mode = WORKSPACE_MODES.mobile, role = 'user', items = WORKSPACE_NAV_ITEMS, includeSecondary = false } = {}) {
+  const normalizedRole = normalizeWorkspaceRole(role);
   const placement = mode === WORKSPACE_MODES.desktop ? 'sidebar' : mode === WORKSPACE_MODES.tablet ? 'rail' : 'bottom';
   const primaryRegion = placement === 'sidebar' || placement === 'rail' ? WORKSPACE_REGIONS.leftSidebar : WORKSPACE_REGIONS.bottomBar;
   const visibleItems = items.filter(item => {
-    const roleAllowed = !item.roles || item.roles.includes(role) || role === 'owner';
+    const roleAllowed = !item.roles || item.roles.includes(normalizedRole) || normalizedRole === 'owner';
     const regionAllowed = item.regions?.includes(primaryRegion) || (includeSecondary && item.regions?.length);
     return roleAllowed && regionAllowed;
   });
   const primary = visibleItems.filter(item => item.id !== 'loki' || includeSecondary);
   const secondary = items.filter(item => {
     if (!item.regions?.includes(WORKSPACE_REGIONS.rightSidebar) && !item.regions?.includes(WORKSPACE_REGIONS.floatingPanels)) return false;
-    return !item.roles || item.roles.includes(role) || role === 'owner';
+    return !item.roles || item.roles.includes(normalizedRole) || normalizedRole === 'owner';
   });
 
   return {
     mode,
     placement,
+    role: normalizedRole,
     primary,
     secondary,
     ids: primary.map(item => item.id),

@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-12] fix: PWA Email auth User Mode stability
+**Коммит:** `pending`
+**Файлы:** `src/UserApp.jsx`, `src/workspace/WorkspaceCore.js`, `public/sw.js`, `scripts/workspace-core-test.mjs`, `scripts/pwa-user-mode-regression.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Исправлена нормализация роли `super_admin` в Workspace Core, чтобы после Email-авторизации PWA User Mode не терял нижнюю навигацию.
+- Bootstrap-кэш новостей, мероприятий, партнёров и уведомлений теперь очищается теми же lifecycle-фильтрами, что и свежие public-data, чтобы старые публикации не всплывали после входа.
+- Добавлена PWA-диагностика для owner/super_admin и regression-test `test:pwa-user-mode`.
+**Почему:** после Email login Identity Core мог вернуть роль `super_admin`, которую навигационное ядро не считало допустимой, а локальный кэш новостей читался без lifecycle-фильтрации.
+
+---
+
 ## [2026-07-12] ux: UX Convergence Dashboard
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `docs/desktop-ux.md`, `.ai/17_CHANGELOG_AI.md`
