@@ -36,7 +36,7 @@ function getIdentityState(emotion, action) {
   return 'ready';
 }
 
-export function LokiAssistant() {
+export function LokiAssistant({ desktopMode = false }) {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -49,7 +49,17 @@ export function LokiAssistant() {
   const shouldShowRestore = loki.dismissed || !loki.settings.enabled || loki.isHiddenOnPanel;
   const motionName = getMotionName(loki.emotion);
   const actionName = getActionName(loki.action);
-  const position = getLokiPosition(loki.anchor);
+  const position = desktopMode
+    ? {
+      right: 'max(18px, env(safe-area-inset-right, 0px))',
+      bottom: 'max(18px, env(safe-area-inset-bottom, 0px))',
+      width: 'auto',
+      maxWidth: 'calc(100vw - 36px)',
+      justifyItems: 'end',
+      justifyContent: 'end',
+      boxSizing: 'border-box',
+    }
+    : getLokiPosition(loki.anchor);
   const bubbleText = String(loki.message || '');
   const isLongMessage = bubbleText.length > 86;
   const isCelebrating = loki.emotion === 'happy' || loki.emotion === 'excited';
@@ -111,7 +121,7 @@ export function LokiAssistant() {
         style={{
           position: 'fixed',
           right: 'max(14px, env(safe-area-inset-right, 0px))',
-          bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
+          bottom: desktopMode ? 'max(18px, env(safe-area-inset-bottom, 0px))' : 'calc(84px + env(safe-area-inset-bottom, 0px))',
           zIndex: 9997,
           width: 46,
           height: 46,
@@ -152,7 +162,7 @@ export function LokiAssistant() {
         willChange: 'transform, opacity, filter',
       }}
     >
-      {loki.message && loki.canTalk && (
+      {loki.message && loki.canTalk && !desktopMode && (
         <div
           style={{
             ...lokiPanelStyle,

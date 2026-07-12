@@ -2529,12 +2529,14 @@ export function UserApp() {
     icon: tabIconByKey[item.iconKey] || null,
   }));
   const TAB_PANELS = TABS.map(tab => tab.id);
-  const showTabBar = !isScannerOpen && TAB_PANELS.includes(activePanel);
+  const showTabBar = !desktopDevice && !isScannerOpen && TAB_PANELS.includes(activePanel);
   const userAppBranch = desktopWorkspaceActive ? 'DesktopWorkspace' : publicSubmitRoute ? 'PublicSubmit' : loggedOut ? 'LoggedOut' : 'PWA User Mode';
   const activeNavigation = bottomNavigation.primary.map(item => `${item.id}:${item.panelId ?? 'action'}`).join(', ') || 'empty';
   const tabBarReason = showTabBar
     ? 'visible'
-    : isScannerOpen
+    : desktopDevice
+      ? 'desktop user mode'
+      : isScannerOpen
       ? 'scanner open'
       : !TAB_PANELS.includes(activePanel)
         ? `activePanel=${activePanel} not in ${TAB_PANELS.join(',') || 'empty navigation'}`
@@ -3557,7 +3559,7 @@ export function UserApp() {
             </Suspense>
           )}
 
-          {activeLearningHint && !showOnboarding && !isScannerOpen && (
+          {activeLearningHint && !desktopDevice && !showOnboarding && !isScannerOpen && (
             <div style={{ position: 'fixed', left: 14, right: 14, bottom: 'calc(92px + env(safe-area-inset-bottom, 0px))', zIndex: 4200, pointerEvents: 'none' }}>
               <GlassCard style={{ maxWidth: 520, margin: '0 auto', borderRadius: 26, padding: 14, pointerEvents: 'auto', border: '1px solid rgba(215,184,106,0.24)' }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -3679,7 +3681,7 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !desktopWorkspaceActive && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant />}
+          {splashDone && !desktopWorkspaceActive && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant desktopMode={desktopDevice} />}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>
