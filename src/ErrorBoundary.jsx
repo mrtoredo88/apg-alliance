@@ -2,6 +2,7 @@ import React from 'react';
 import { logError } from './errorLogger.js';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
+import { recoverPwaAndReload } from './pwa/PwaUpdateManager.js';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -35,18 +36,7 @@ export class ErrorBoundary extends React.Component {
   }
 
   async clearCacheAndReload() {
-    try {
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(reg => reg.unregister().catch(() => {})));
-      }
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map(key => caches.delete(key)));
-      }
-      localStorage.removeItem('apg_build');
-    } catch {}
-    window.location.reload();
+    await recoverPwaAndReload();
   }
 
   openLiteDiagnostics() {

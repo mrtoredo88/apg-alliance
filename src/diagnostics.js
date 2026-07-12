@@ -3,9 +3,10 @@ import { API_BASE_URL } from './constants.js';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { userAction } from './userApi.js';
+import { getPwaVersion } from './pwa/PwaUpdateManager.js';
 
 let _version = '?';
-fetch('/version.json').then(r => r.json()).then(d => { _version = d.v ?? '?'; }).catch(() => {});
+getPwaVersion().then(v => { _version = v || '?'; }).catch(() => {});
 
 export function getDeviceInfo() {
   const ua = navigator.userAgent;

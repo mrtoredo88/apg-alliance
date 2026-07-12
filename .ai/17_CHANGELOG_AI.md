@@ -2214,3 +2214,13 @@
 - Переведены ключевые точки доступа: Identity Core, Workspace navigation/feature flags, Business Hub, Cabinet Role Engine, UserApp/ProfilePanel diagnostics, admin login/security/actions, email auth claims и owner-only user actions.
 - Добавлен контрактный тест `scripts/role-engine-test.mjs`; `npm run test:roles` включён в `npm run test:core`.
 - Документация: `docs/role-engine-v1.md`.
+
+# 2026-07-12 — PWA Update Manager V1
+
+- Создан единый `src/pwa/PwaUpdateManager.js` для регистрации Service Worker, чтения `version.json`, сравнения версий, очистки/migration cache, recovery reload и диагностики.
+- `main.jsx` запускает PWA Update Manager до React render; старый update flow из `App.jsx` удалён.
+- `UserApp` теперь подписывается на диагностику Update Manager вместо прямых запросов к Service Worker/version.json.
+- `ErrorBoundary`, `errorLogger`, `diagnostics` и `userApi` больше не управляют версией/cache самостоятельно.
+- `public/sw.js` перестал очищать Cache Storage на install/activate и выполняет очистку только по команде менеджера.
+- Добавлен regression test `scripts/pwa-update-manager-test.mjs`; `npm run test:pwa-update` включён в `npm run test:core`.
+- Документация: `docs/pwa-update-manager-v1.md`.

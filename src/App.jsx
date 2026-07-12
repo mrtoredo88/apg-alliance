@@ -2,24 +2,6 @@ import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
-async function checkForUpdate() {
-  try {
-    const res = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' });
-    const { v } = await res.json();
-    const stored = localStorage.getItem('apg_build');
-    if (!stored) {
-      localStorage.setItem('apg_build', v);
-    } else if (stored !== v) {
-      localStorage.setItem('apg_build', v);
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map(k => caches.delete(k)));
-      }
-      window.location.reload();
-    }
-  } catch {}
-}
-
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
 const NetworkDiagnosticsPage = lazy(() => import('./NetworkDiagnosticsPage.jsx').then(m => ({ default: m.NetworkDiagnosticsPage })));
@@ -40,7 +22,6 @@ export function App() {
   useEffect(() => {
     window.__APG_BOOT_MARK?.('app_mounted');
     window.__APG_BOOT_OK = true;
-    checkForUpdate();
   }, []);
   return (
     <ErrorBoundary>

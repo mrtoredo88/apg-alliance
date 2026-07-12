@@ -7,13 +7,11 @@ async function clearAllCaches() {
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(clearAllCaches());
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clearAllCaches().catch(() => null));
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('message', (event) => {
