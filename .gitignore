@@ -1,5 +1,9 @@
 .vercel
 .env*
 node_modules/
-dist/assets/
+dist/
 .local-https/
+.release-backups/
+.backup/
+.tmp*
+build.zip

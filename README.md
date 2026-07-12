@@ -1,55 +1,221 @@
-# Basic [VK Bridge](https://github.com/VKCOM/vk-bridge) + [VKUI](https://github.com/VKCOM/VKUI) + [VK Miniapps Router](https://github.com/VKCOM/vk-mini-apps-router) app
+# АПГ — Альянс Партнёров Города
 
-Этот шаблон предоставляет базовый код и настройки для создания мини-приложения внутри ВКонтакте.  
-В качестве сборщика проекта выступает [Vite](https://vite-docs-ru.vercel.app/guide/), подробнее про его конфигурацию и дополнительные плагины можно прочитать [здесь](https://vite-docs-ru.vercel.app/config/) и [здесь]().
+АПГ — городская PWA-платформа для жителей, партнёров, экспертов и администрации. Приложение объединяет новости, мероприятия, партнёрские предложения, экспертов, QR/ключи, личные кабинеты, Workspace и Локи — интеллектуального помощника платформы.
 
-## 🚀 Запуск мини приложения
+Этот репозиторий фиксирует production baseline проекта. PWA на `https://myapg.ru` является основной платформой продукта. VK Mini App остаётся дополнительным каналом, но не является основным production-сценарием.
 
-Запустите ваш мини апп
+## Основные сценарии
 
-```sh
- yarn start
+- Жители открывают PWA, читают новости, находят партнёров и экспертов, участвуют в событиях, получают ключи и награды.
+- Партнёры и эксперты управляют профилями, заявками, контентом и видимостью через кабинеты и Workspace.
+- Администрация модерирует контент, заявки, ошибки, пользователей, партнёров, экспертов и события.
+- Локи помогает пользователям и администраторам ориентироваться в приложении, данных и рабочих действиях.
+
+## Архитектура
+
+```text
+PWA / Web
+  ↓
+React 18 + Vite
+  ↓
+Fastify API / server routes
+  ↓
+Firebase Firestore
+  ↓
+Yandex Object Storage
+  ↓
+Push / Cron / Webhooks
 ```
 
-Перейдите на [devportal](https://dev.vk.ru/ru) или в [управление](https://vk.ru/apps?act=manage) и создайте новый мини апп.  
-Вставьте URL на котором работает ваше приложение в настройки, предварительно включив режим разработки.
-Теперь можете открыть мини апп, нажав на его иконку.
-Список всех созданных вами мини приложений вы сможете найти [тут](https://vk.ru/apps?act=manage) или [тут](https://dev.vk.ru/ru/admin/apps-list).
+Исторически в проекте присутствовали Vercel Serverless functions и VK Mini App hosting. Текущий production baseline фиксирует фактическое рабочее состояние проекта; дальнейшее инфраструктурное разделение выполняется отдельными задачами после baseline.
 
-## 🌐 Деплой мини приложения
+## Frontend
 
-Для того чтобы поделиться приложением запущенным на localhost со своими друзьями, вы можете скачать утилиту vk-tunnel и запустить уже подготовленный скрипт из package.json
+Frontend написан на React 18 и Vite.
 
-```sh
-yarn global add @vkontakte/vk-tunnel
-yarn run tunnel
+Ключевые файлы:
+
+- `src/UserApp.jsx` — основной shell приложения, bootstrap, авторизация, навигация, PWA/User Mode.
+- `src/HomePanelV2.jsx` — главная пользовательская витрина.
+- `src/AdminPanel.jsx` — административная панель.
+- `src/ProfilePanel.jsx` — профиль пользователя и кабинеты.
+- `src/design.js` и `src/components/Apg2ProfileGlass.jsx` — дизайн-токены и APG V2 glass-компоненты.
+- `src/workspace/` — Workspace Core и Desktop Workspace.
+- `src/businessHub/` — Business Hub.
+- `src/loki/` — Локи, его контекст, личность, знания и AI-слои.
+
+Стили в проекте преимущественно inline. Дизайн должен использовать существующие APG V2 tokens и не создавать параллельные визуальные системы.
+
+## Backend
+
+Backend расположен в `server/` и `server-shared/`.
+
+Ключевые части:
+
+- `server/src/routes/` — Fastify routes для публичных данных, авторизации, user actions, admin actions, webhook, push, cron и загрузок.
+- `server/src/lib/identityCore.js` — единое ядро идентификации.
+- `server-shared/content-lifecycle.js` — общая логика жизненного цикла контента.
+- `api/` — legacy serverless endpoints, если они ещё присутствуют в рабочем состоянии проекта.
+
+Документация backend: `docs/backend-architecture.md`.
+
+## Identity Core
+
+Identity Core объединяет разные способы входа и профили пользователя:
+
+- Email auth
+- Firebase auth
+- Telegram
+- VK legacy identity
+- canonical user
+- роли и связи с партнёром/экспертом
+
+Цель Identity Core — чтобы один человек не распадался на несколько независимых аккаунтов и корректно получал свои роли, кабинеты и доступы.
+
+Документация: `docs/identity-core.md`.
+
+## Workspace
+
+Workspace Core — общий layout-фундамент для desktop, tablet и mobile-сценариев.
+
+Основные зоны:
+
+- header
+- left sidebar
+- content
+- right sidebar / AI Workspace
+- bottom bar
+- floating panels
+
+Desktop Workspace строится поверх Workspace Core и предназначен для профессиональной работы владельца, администраторов, партнёров и экспертов.
+
+Документация:
+
+- `docs/workspace-core.md`
+- `docs/desktop-workspace.md`
+- `docs/desktop-ux.md`
+
+## Business Hub
+
+Business Hub — рабочая зона партнёров и экспертов внутри Workspace. Он показывает состояние бизнеса/профиля, рекомендации, задачи, контент, мероприятия и действия, связанные с развитием карточки в АПГ.
+
+Документация: `docs/business-hub.md`.
+
+## Content Lifecycle
+
+Content Lifecycle управляет статусами контента и защищает пользовательское приложение от показа архивных, удалённых или неготовых материалов.
+
+Используется для:
+
+- новостей;
+- мероприятий;
+- партнёров;
+- экспертов;
+- публичных данных;
+- локального PWA-кэша.
+
+Документация: `docs/content-lifecycle.md`.
+
+## Локи
+
+Локи — интеллектуальный помощник АПГ. Он работает в пользовательском режиме, Workspace, Business Hub, кабинетах и административных сценариях.
+
+В проекте есть:
+
+- единый визуальный компонент Локи;
+- Context Engine;
+- Personality Engine;
+- Admin Assistant;
+- knowledge base;
+- рекомендации и сценарии действий.
+
+Код расположен в `src/loki/`.
+
+## Структура проекта
+
+```text
+src/             frontend React/Vite
+server/          Fastify backend and Yandex deploy scripts
+server-shared/   shared backend/frontend domain logic
+api/             legacy serverless API layer
+public/          static public assets and service worker source
+scripts/         regression, smoke and maintenance scripts
+docs/            architecture documentation
+.ai/             AI working documentation and project notes
 ```
 
-После чего вы получите ссылку, по которой ваше приложение будет доступно с любого устройства, подробнее про vk-tunnel можно прочитать [тут](https://dev.vk.ru/ru/libraries/tunnel).
+Не коммитить:
 
-Для того чтобы захостить ваше приложение на сервера ВКонтакте нужно зайти в vk-hosting-config.json и указать id вашего приложения. Далее можно запустить уже подготовленный скрипт:
+- `dist/`
+- `node_modules/`
+- `.env*`
+- локальные сертификаты;
+- временные `.tmp*` файлы;
+- backup-архивы и release backups.
 
-```sh
-yarn run deploy
+## Локальный запуск
+
+```bash
+npm install
+npm run start
 ```
 
-После чего, вы получите бессрочную ссылку на ваш мини апп.
+Локальная production-сборка:
 
-## 🗂️ Предустановленные библиотеки
+```bash
+npm run build
+npm run preview
+```
 
-Мы подготовили для вас набор пакетов, с которыми вам будет легко начать разрабатывать мини аппы
-| Пакет | Назначение |
-| ------ | ------ |
-| [vk-bridge](https://dev.vk.ru/ru/mini-apps/bridge) | Библиотека для отправки команд и обмена данными с платформой ВКонтакте. |
-| [VKUI](https://vkcom.github.io/VKUI/) | Библиотека React-компонентов для создания мини-приложений в стиле ВКонтакте. |
-| [vk-bridge-react](https://www.npmjs.com/package/@vkontakte/vk-bridge-react) | Пакет, который даёт возможность использовать события библиотеки VK Bridge в React-приложениях. |
-| [vk-mini-apps-router](https://dev.vk.ru/ru/libraries/router) | Библиотека для маршрутизации и навигации в мини-приложениях, созданных с помощью VKUI. |
-| [icons](https://vkcom.github.io/icons/) | Набор иконок для использования в компонентах VKUI. |
-| [vk-miniapps-deploy](https://dev.vk.ru/ru/mini-apps/development/hosting) | Пакет для размещения файлов мини-приложения на хостинге ВКонтакте. |
-| [eruda](https://www.npmjs.com/package/eruda) | Консоль для мобильного браузера|
+Локальная PWA-проверка:
 
-## 📎 Полезные ссылки
+```bash
+npm run local:pwa
+```
 
-[Dev портал разработчиков](https://dev.vk.ru/ru)  
-[Пример мини приложения](https://dev.vk.ru/ru/mini-apps/examples/shop)  
-[Если столкнулись с проблемами](https://github.com/VKCOM/create-vk-mini-app/issues)
+## Тестирование
+
+Основные проверки:
+
+```bash
+npm run test:core
+npm run test:identity
+npm run test:content-lifecycle
+npm run test:pwa-user-mode
+npm run test:release-parity
+npm run smoke:prod
+```
+
+`test:core` запускает ключевые regression-тесты ядра: Identity Core, Content Lifecycle, Business Hub и Workspace Core.
+
+## Production
+
+Основной production URL:
+
+```text
+https://myapg.ru
+```
+
+Проверка версии production:
+
+```bash
+curl -fsSL https://myapg.ru/version.json
+```
+
+`version.json` должен соответствовать Git commit, из которого собран production.
+
+## Деплой
+
+Текущий baseline фиксирует существующее production-состояние. PWA deploy выполняется через frontend deploy script и Yandex Object Storage. Backend deploy выполняется через scripts в `server/`.
+
+Инфраструктурное разделение deploy pipeline, CI/CD и GitHub Actions не входит в baseline и выполняется отдельным этапом после синхронизации GitHub с production.
+
+## Production Baseline
+
+Production baseline нужен, чтобы GitHub стал единственным Source of Truth проекта:
+
+```text
+Local HEAD = Production version = GitHub baseline branch
+```
+
+После baseline все дальнейшие архитектурные изменения, CI/CD, Role Engine, UserApp splitting и инфраструктурный рефакторинг должны выполняться уже относительно этого состояния.
