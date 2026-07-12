@@ -168,12 +168,14 @@ export const openUrl = (url) => {
     return;
   }
 
-  // tel: — пробуем VK Bridge (работает в нативном WebView), потом fallback
-  if (normalized.startsWith('tel:')) {
-    _vkBridge.send('VKWebAppOpenLink', { link: normalized }).catch(() => {
-      // fallback для браузера
-      window.location.href = normalized;
-    });
+  // tel:/mailto: — VKWebAppOpenLink поддерживает только https и молча глотает такие ссылки,
+  // поэтому открываем через нативный обработчик WebView/браузера
+  if (/^(tel:|mailto:)/i.test(normalized)) {
+    const a = document.createElement('a');
+    a.href = normalized;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 100);
     return;
   }
 
