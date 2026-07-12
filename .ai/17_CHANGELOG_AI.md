@@ -2345,3 +2345,11 @@
 - Убрана постоянная правая колонка; Локи перенесён в самостоятельный смысловой блок страницы.
 - Минимизированы повторы: афиша берёт следующие события после главного, а подборка Локи по возможности использует следующие новости/акции/события.
 - Проверки: `npm run test:core`, `npm run build`.
+
+# 2026-07-12 — Premium Splash Screen / Loading Experience
+
+- Полностью заменён старый постерный Splash Screen (`splash-v43.png` в мобильной рамке) на единый full-viewport loading experience в `src/SplashScreen.jsx`.
+- Новый Splash использует существующий логотип АПГ, тёмный графитово-индиговый живой фон, фиолетово-золотое свечение, минимальный текст и кастомную анимированную progress-line без HTML progress.
+- Единый `SplashScreen` подключён как главный загрузочный экран `UserApp` и как общий Suspense fallback в `App.jsx`/`UserApp`, чтобы Web/PWA/Desktop/miniapp surfaces не показывали разные loader-стили.
+- Сохранён safety max-timeout загрузки: если данные долго не готовы, splash всё равно мягко закрывается; при readiness выполняется завершение progress → glow → fade out.
+- Проверки: `npm run test:core`, `npm run build`, локальная visual-check 1512×982 и 390×844: старый постер не используется, logo/progress присутствуют, horizontal overflow и JS errors отсутствуют.

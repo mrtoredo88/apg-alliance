@@ -19,7 +19,7 @@ import {
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
-import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassLoader, GlassToast } from './components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassToast } from './components/Apg2ProfileGlass.jsx';
 import { MOTION, motionTransition } from './motion.js';
 import { LokiProvider } from './loki/LokiProvider.jsx';
 import { LokiAssistant } from './loki/LokiAssistant.jsx';
@@ -602,11 +602,7 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
 }
 
 function LazyFallback() {
-  return (
-    <div style={{ minHeight: '100svh', padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: APG2_PROFILE.bg }}>
-      <GlassLoader title="Загружаем" text="Подготавливаем экран АПГ." style={{ width: '100%', maxWidth: 340 }} />
-    </div>
-  );
+  return <SplashScreen isReady={false} autoTimeout={false} status="Подготавливаем экран АПГ…" />;
 }
 
 export function UserApp() {

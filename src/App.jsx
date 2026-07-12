@@ -1,21 +1,15 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
+import { SplashScreen } from './SplashScreen.jsx';
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
 const NetworkDiagnosticsPage = lazy(() => import('./NetworkDiagnosticsPage.jsx').then(m => ({ default: m.NetworkDiagnosticsPage })));
 const UserApp = lazy(() => import('./UserApp.jsx').then(m => ({ default: m.UserApp })));
 
-const T = { bg: '#0F0F1A', gold: '#C9A84C' };
-
 function AppFallback({ label = 'Загрузка...' }) {
-  return (
-    <div style={{ background: T.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 28 }}>⚙️</div>
-      <div style={{ color: T.gold, fontSize: 14, fontWeight: 600 }}>{label}</div>
-    </div>
-  );
+  return <SplashScreen isReady={false} autoTimeout={false} status={label} />;
 }
 
 export function App() {
