@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from '../components/Apg2ProfileGlass.jsx';
-import { MOTION, motionTransition } from '../motion.js';
+import { motionTransition } from '../motion.js';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { NewsCard } from '../NewsPage.jsx';
 import { EventPosterCard } from '../EventsPage.jsx';
+import { PartnerCard } from '../HomePanelV2.jsx';
+import { ExpertCardV2 } from '../ExpertsPage.jsx';
 import {
   ActionCard,
   ContentGrid,
@@ -16,7 +18,7 @@ import {
   SectionHeader,
   WorkspacePanel,
 } from './WorkspaceComponents.jsx';
-import { buildWorkspaceLayout, getWorkspaceNavigation, WORKSPACE_MODES } from './WorkspaceCore.js';
+import { buildWorkspaceLayout, WORKSPACE_MODES } from './WorkspaceCore.js';
 import { getDesktopWorkspaceLayoutPlan, WORKSPACE_LAYOUT, WORKSPACE_Z } from './WorkspaceLayoutEngine.js';
 import { CAPABILITIES, hasCapability } from '../roleEngine.js';
 
@@ -165,42 +167,27 @@ function buildContextualReply({ activeSection, data, profileStatus, text }) {
     : `Сейчас открыт раздел «${context.label}». Я бы начал так: ${nextStep.toLowerCase()}.`;
 }
 
-function WorkspaceHeaderBar({ user, roleState, activeRoleId, onRoleChange, onModeChange, unreadCount, query, onQueryChange, onOpenNotifications, onOpenProfile, onOpenScan, onOpenShortcuts, onOpenAI, aiAsDrawer }) {
+function WorkspaceHeaderBar({ user, unreadCount, query, onQueryChange, onModeChange, onOpenNotifications, onOpenProfile }) {
   return (
-    <div data-workspace-region="header" style={{ ...APG2_PROFILE.glass, borderRadius: 30, padding: '11px 13px', display: 'grid', gridTemplateColumns: 'auto minmax(220px, 1fr) auto', alignItems: 'center', gap: 14, minHeight: WORKSPACE_LAYOUT.headerHeight, background: APG2_PROFILE.quietSurface, position: 'relative', zIndex: WORKSPACE_Z.header }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontWeight: 950, boxShadow: '0 16px 36px rgba(215,184,106,0.18)' }}>АПГ</div>
-        <div>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 930 }}>Workspace</div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '15px' }}>Рабочая среда АПГ</div>
-        </div>
+    <div data-workspace-region="header" style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: '11px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(260px, 1fr) auto', alignItems: 'center', gap: 14, minHeight: WORKSPACE_LAYOUT.headerHeight, background: APG2_PROFILE.quietSurface, position: 'relative', zIndex: WORKSPACE_Z.header }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 14, background: APG2_PROFILE.goldGradient, color: '#17120a', display: 'grid', placeItems: 'center', fontWeight: 950, fontSize: 14 }}>АПГ</div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '19px', fontWeight: 930 }}>Workspace</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) auto', gap: 10, alignItems: 'center' }}>
-        <label style={{ ...APG2_PROFILE.glass, borderRadius: 18, minHeight: 42, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: APG2_PROFILE.gold, fontSize: 15 }}>⌕</span>
-          <input
-            value={query}
-            onChange={event => onQueryChange(event.target.value)}
-            placeholder="Глобальный поиск по Workspace"
-            style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 13.5 }}
-          />
-        </label>
-        <button type="button" onClick={onOpenShortcuts} style={{ border: 0, background: 'transparent', padding: 0, fontFamily: 'inherit', cursor: 'pointer' }}>
-          <GlassBadge tone="gold">⌘K · ?</GlassBadge>
-        </button>
-      </div>
+      <label style={{ ...APG2_PROFILE.glass, borderRadius: 16, minHeight: 38, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: APG2_PROFILE.gold, fontSize: 15 }}>⌕</span>
+        <input
+          value={query}
+          onChange={event => onQueryChange(event.target.value)}
+          placeholder="Поиск по Workspace"
+          style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 13.5 }}
+        />
+      </label>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
-        <GlassButton onClick={onOpenScan} style={{ minHeight: 38, padding: '9px 12px' }}>QR</GlassButton>
-        {aiAsDrawer && <GlassButton onClick={onOpenAI} tone="gold" style={{ minHeight: 38, padding: '9px 12px', color: '#17120a' }}>AI Workspace</GlassButton>}
-        <GlassButton onClick={onOpenNotifications} style={{ minHeight: 38, padding: '9px 12px' }}>{unreadCount ? `Уведомления · ${unreadCount}` : 'Уведомления'}</GlassButton>
-        {roleState.roles.length > 1 && (
-          <select value={activeRoleId || ''} onChange={event => onRoleChange(event.target.value)} style={{ ...APG2_PROFILE.glass, color: APG2_PROFILE.text, minHeight: 38, borderRadius: 16, padding: '0 10px', fontFamily: 'inherit' }}>
-            {roleState.roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}
-          </select>
-        )}
-        <GlassButton onClick={() => onModeChange('user')} style={{ minHeight: 38, padding: '9px 12px' }}>User Mode</GlassButton>
+        <GlassButton onClick={onOpenNotifications} style={{ minHeight: 36, padding: '8px 12px' }}>{unreadCount ? `Уведомления · ${unreadCount}` : 'Уведомления'}</GlassButton>
+        <GlassButton onClick={() => onModeChange?.('user')} style={{ minHeight: 36, padding: '8px 12px' }}>Пользовательский режим</GlassButton>
         <button type="button" onClick={onOpenProfile} style={{ border: 0, background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 16, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{String(user?.firstName || user?.name || 'A').slice(0, 1)}</div>
+          <div style={{ width: 36, height: 36, borderRadius: 12, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{String(user?.firstName || user?.name || 'A').slice(0, 1)}</div>
         </button>
       </div>
     </div>
@@ -289,19 +276,10 @@ function WorkspaceSidebar({ items, activeSection, collapsed, onToggle, onSelect 
       )}
       <div style={{ marginTop: 'auto', display: collapsed ? 'none' : 'block' }}>
         <GlassCard style={{ borderRadius: 24, padding: 13, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
-          <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850 }}>Workspace 1.0</div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 4 }}>Платформа для партнёров, экспертов и команды АПГ.</div>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 850 }}>Workspace 2.1</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 4 }}>Рабочая среда, где Локи ведёт рабочий день.</div>
         </GlassCard>
       </div>
-    </div>
-  );
-}
-
-function WidgetShell({ widget, children }) {
-  const columns = widget.size === 'wide' ? 'span 6' : 'span 3';
-  return (
-    <div data-workspace-widget={widget.id} data-drag-handle={widget.dragHandleId} style={{ gridColumn: columns, minWidth: 0 }}>
-      {children}
     </div>
   );
 }
@@ -334,12 +312,12 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
       <div style={{ position: 'absolute', left: -80, right: -80, top: 74, height: 120, background: 'linear-gradient(110deg, transparent 10%, rgba(244,217,140,0.12) 38%, rgba(255,255,255,0.08) 48%, transparent 72%)', transform: 'rotate(-8deg)', filter: 'blur(8px)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
         <div>
-          <GlassBadge tone="gold">Локи открыл Workspace</GlassBadge>
+          <GlassBadge tone="gold">Рабочий день</GlassBadge>
           <div style={{ color: APG2_PROFILE.text, fontSize: 42, lineHeight: '47px', fontWeight: 940, letterSpacing: -0.8, marginTop: 16 }}>
             {getDayGreeting()}, {data.userName}.
           </div>
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15, lineHeight: '23px', marginTop: 10, maxWidth: 660 }}>
-            Я собрал рабочий день АПГ и подсветил то, с чего лучше начать. Workspace теперь не просто открывается — он встречает вас с контекстом.
+            Сегодня ваш рабочий день уже собран: в приоритете неформальный шум, а только то, что нужно сделать.
           </div>
           <div style={{ display: 'grid', gap: 8, marginTop: 18, maxWidth: 650 }}>
             {briefing.slice(0, 5).map(item => (
@@ -351,9 +329,9 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
           </div>
         </div>
         <QuickActions actions={[
-          { id: 'attention', label: attention.length ? `Начать с ${attention.length} задач` : 'Начать день', onClick: actions.openDashboard, tone: 'gold' },
+          { id: 'start', label: 'Начать рабочий день', onClick: actions.openDashboard, tone: 'gold' },
           { id: 'business', label: 'Мой бизнес', onClick: actions.openCabinet },
-          { id: 'loki', label: 'Спросить Локи здесь', onClick: actions.openLoki },
+          { id: 'loki', label: 'Спросить Локи', onClick: actions.openLoki },
         ]} style={{ background: 'transparent', border: 0, padding: 0, marginTop: 18 }} />
       </div>
       <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 12, minWidth: 0 }}>
@@ -366,179 +344,91 @@ function LokiWorkspaceHero({ data, profileStatus, attention, actions }) {
           <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820, marginTop: 5 }}>Заполненность {profileStatus.value}% · {profileStatus.label}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
-          {heroMetrics.map(metric => (
-            <div key={metric.label} style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 13, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '28px', fontWeight: 940 }}>{metric.value}</div>
-              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '15px', marginTop: 4 }}>{metric.label}</div>
-            </div>
-          ))}
+          <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 13, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '28px', fontWeight: 940 }}>{data.news.length}</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '15px', marginTop: 4 }}>новостей</div>
+          </div>
+          <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 13, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '28px', fontWeight: 940 }}>{data.events.length}</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '15px', marginTop: 4 }}>мероприятий</div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+
 function WorkspaceDashboard({ data, actions }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const latestNews = data.news.slice(0, 4);
-  const upcomingEvents = data.events.slice(0, 4);
-  const todayEvents = data.events.slice(0, 3);
+  const latestEvents = data.events.slice(0, 4);
+  const todayEvents = data.events.slice(0, 2);
   const attention = [
-    data.unreadCount ? `${data.unreadCount} уведомлений ждут просмотра` : '',
-    profileStatus.value < 80 ? `Профиль заполнен на ${profileStatus.value}%` : '',
-    !data.news.length ? 'В системе пока нет новостей' : '',
-    !data.events.length ? 'Нет ближайших мероприятий' : '',
+    data.unreadCount ? `${data.unreadCount} уведомлений ждут просмотра` : 'Уведомлений нет',
+    data.news.length ? `${data.news.length} новостей в ожидании` : '',
+    data.events.length ? `${data.events.length} мероприятий в календаре` : '',
+    profileStatus.value < 100 ? `Профиль заполнен на ${profileStatus.value}%` : '',
   ].filter(Boolean);
-  const todaySignals = [
-    `${data.news.length} новостей в системе`,
-    `${data.events.length} мероприятий`,
-    data.unreadCount ? `${data.unreadCount} уведомлений` : 'уведомлений нет',
-    data.activeProfile?.name ? `профиль: ${data.activeProfile.name}` : 'профиль не выбран',
-  ];
-  const tasks = [
-    profileStatus.value < 100 ? `Заполнить профиль: ${profileStatus.label}` : '',
-    data.unreadCount ? `Проверить уведомления: ${data.unreadCount}` : '',
-    data.news.length ? 'Проверить последние публикации' : 'Добавить первую новость',
-  ].filter(Boolean);
-
-  const renderWidget = (widget) => {
-    if (widget.id === 'welcome') {
-      return (
-        <DashboardCard
-          tone="gold"
-          icon="☼"
-          title={`Добро пожаловать, ${data.userName}`}
-          subtitle={`Сегодня: ${todaySignals.join(' · ')}`}
-          value={data.roleLabel}
-          action={<GlassButton onClick={actions.openCabinet} style={{ color: '#17120a' }}>Открыть Мой бизнес</GlassButton>}
-          style={{ minHeight: 156 }}
-        />
-      );
-    }
-    if (widget.id === 'today') {
-      return (
-        <WorkspacePanel title="Сегодня" subtitle="Сводка рабочего дня" style={{ height: '100%' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <ListRow title={`${data.news.length} новостей`} text="Материалы, доступные в Workspace" />
-            <ListRow title={`${data.events.length} мероприятий`} text={todayEvents[0]?.title || todayEvents[0]?.name || 'Афиша без срочных событий'} />
-            <ListRow title={`${data.unreadCount || 0} уведомлений`} text={data.unreadCount ? 'Есть что проверить' : 'Спокойный день'} />
-          </div>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'attention') {
-      return (
-        <WorkspacePanel title="Требует внимания" subtitle="Без лишнего шума" style={{ height: '100%' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {attention.length ? attention.slice(0, 4).map(item => <ListRow key={item} title={item} text="Проверить" />) : <ListRow title="Критичных задач нет" text="Workspace выглядит спокойно" />}
-          </div>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'latest-news') {
-      return (
-        <WorkspacePanel title="Последние новости" subtitle={`${data.news.length} материалов в системе`}>
-          <NewsCardsGrid items={latestNews.slice(0, 2)} onOpen={actions.openNews} columns={2} compact />
-          {!latestNews.length && <EmptyWidget text="Новостей пока нет." />}
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'upcoming-events') {
-      return (
-        <WorkspacePanel title="Ближайшие мероприятия" subtitle={`${data.events.length} событий доступно`}>
-          <EventCardsGrid items={upcomingEvents.slice(0, 2)} onOpen={actions.openEvents} columns={1} compact />
-          {!upcomingEvents.length && <EmptyWidget text="Ближайших мероприятий нет." />}
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'recent-actions') {
-      return (
-        <WorkspacePanel title="Последние действия" subtitle="Живая лента Workspace" style={{ height: '100%' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {data.recentActions.map(item => <ListRow key={item.id} title={item.title} text={item.text} />)}
-          </div>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'stats') {
-      return (
-        <WorkspacePanel title="Статистика" subtitle="Быстрый срез платформы" style={{ height: '100%' }}>
-          <ContentGrid min={120} gap={8}>
-            <MetricCard label="Партнёры" value={data.partners.length} />
-            <MetricCard label="Эксперты" value={data.experts.length} />
-            <MetricCard label="Новости" value={data.news.length} />
-            <MetricCard label="События" value={data.events.length} />
-          </ContentGrid>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'business') {
-      return (
-        <WorkspacePanel title="Бизнес" subtitle={data.activeProfile?.name || 'Профиль Workspace'} style={{ height: '100%' }}>
-          <ContentGrid min={120} gap={8}>
-            <MetricCard label="Заполненность" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'gold' : undefined} />
-            <MetricCard label="Роль" value={data.roleLabel} delta="активный режим" />
-          </ContentGrid>
-          <GlassButton onClick={actions.openCabinet} style={{ width: '100%', marginTop: 10 }}>Мой бизнес</GlassButton>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'profile-status') {
-      return (
-        <WorkspacePanel title="Статус профиля" subtitle={data.activeProfile?.name || 'Профиль Workspace'}>
-          <MetricCard label="Заполненность" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'gold' : undefined} />
-          <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
-            {profileStatus.missing.slice(0, 3).map(item => <GlassBadge key={item}>{item}</GlassBadge>)}
-          </div>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'tasks') {
-      return (
-        <WorkspacePanel title="Задачи" subtitle="Что лучше сделать дальше">
-          <div style={{ display: 'grid', gap: 8 }}>
-            {tasks.map(task => <ListRow key={task} title={task} text="Рекомендация Workspace" />)}
-          </div>
-        </WorkspacePanel>
-      );
-    }
-    if (widget.id === 'quick-actions') {
-      return (
-        <WorkspacePanel title="Быстрые действия" subtitle="Главные действия без перехода по меню">
-          <ContentGrid min={180} gap={10}>
-            <ActionCard icon="📰" title="Новости" text="Открыть ленту и публикации" onClick={actions.openNews} />
-            <ActionCard icon="📅" title="Мероприятия" text="Проверить события" onClick={actions.openEvents} />
-            <ActionCard icon="🤝" title="Партнёры" text="Каталог партнёров" onClick={actions.openPartners} />
-            <ActionCard icon="✦" title="Эксперты" text="Каталог экспертов" onClick={actions.openExperts} />
-          </ContentGrid>
-        </WorkspacePanel>
-      );
-    }
-    return null;
-  };
 
   return (
     <div style={{ display: 'grid', gap: APG2_PROFILE.rhythm.section }}>
       <LokiWorkspaceHero data={data} profileStatus={profileStatus} attention={attention} actions={actions} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 16, alignItems: 'stretch' }}>
-        {renderWidget({ id: 'attention' })}
-        {renderWidget({ id: 'today' })}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,0.95fr)', gap: 16, alignItems: 'stretch' }}>
-        {renderWidget({ id: 'business' })}
-        {renderWidget({ id: 'stats' })}
-      </div>
-      <SectionHeader title="Контент сегодня" subtitle="Новости и мероприятия, которые формируют городской контекст" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
-        {renderWidget({ id: 'latest-news' })}
-        {renderWidget({ id: 'upcoming-events' })}
-      </div>
-      <AIActionBoard actions={actions} />
-      <SectionHeader title="Дальше" subtitle="Действия, история и быстрый переход к работе" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 16, alignItems: 'stretch' }}>
-        {renderWidget({ id: 'recent-actions' })}
-        {renderWidget({ id: 'quick-actions' })}
-      </div>
+
+      <WorkspacePanel title="Требует внимания" subtitle="Что лучше закрыть в первую очередь" style={{ minHeight: 170 }}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {attention.length ? attention.map(item => <ListRow key={item} title={item} text="Рекомендовано для начала" />) : <EmptyWidget text="Критичных сигналов не найдено." />}
+        </div>
+        <div style={{ marginTop: 12 }}><QuickActions actions={[{ id: 'loki', label: 'Что советует Локи?', onClick: actions.openLoki }, { id: 'business', label: 'Перейти в бизнес', onClick: actions.openCabinet }]} /></div>
+      </WorkspacePanel>
+
+      <WorkspacePanel title="Сегодня" subtitle="Операционный срез дня" style={{ minHeight: 170 }}>
+        <ContentGrid min={170} gap={10}>
+          <MetricCard label="Новости" value={data.news.length} delta="готовность публикаций" />
+          <MetricCard label="Мероприятия" value={data.events.length} delta="ожидают проверки" />
+          <MetricCard label="Уведомления" value={data.unreadCount || 0} delta="требуют действий" />
+          <MetricCard label="Партнёры" value={data.partners.length} delta="в каталоге" />
+        </ContentGrid>
+      </WorkspacePanel>
+
+      <WorkspacePanel title="Мой бизнес" subtitle="Быстрый статус профиля владельца" style={{ minHeight: 170 }}>
+        <ContentGrid min={180} gap={10}>
+          <MetricCard label="Заполненность профиля" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'gold' : undefined} />
+          <MetricCard label="Роль" value={data.roleLabel} delta="активный контур" />
+        </ContentGrid>
+        <div style={{ marginTop: 12 }}><GlassButton onClick={actions.openCabinet} style={{ width: '100%' }}>Открыть карточку бизнеса</GlassButton></div>
+      </WorkspacePanel>
+
+      <SectionHeader title="Контент сегодня" subtitle="Что нужно проверить прямо сейчас" />
+      <WorkspacePanel title="Контент сегодня" subtitle="Новости и мероприятия для проверки" style={{ minHeight: 300 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+          <div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, marginBottom: 8 }}>Новости</div>
+            <NewsCardsGrid items={latestNews.slice(0, 2)} onOpen={actions.openNews} columns={1} compact />
+            {!latestNews.length && <EmptyWidget text="Новостей не найдено" />}
+          </div>
+          <div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, marginBottom: 8 }}>Мероприятия</div>
+            <EventCardsGrid items={latestEvents.slice(0, 2)} onOpen={actions.openEvents} columns={1} compact />
+            {!latestEvents.length && <EmptyWidget text="Мероприятий не найдено" />}
+          </div>
+        </div>
+      </WorkspacePanel>
+
+      <WorkspacePanel title="Последние события" subtitle="Что изменилось в публичной среде" style={{ minHeight: 210 }}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {todayEvents.length ? todayEvents.map(event => <ListRow key={event.id || event.title || event.name} title={event.title || event.name} text={formatShortDate(event.startDate || event.date || event.createdAt)} />) : <EmptyWidget text="Событий сегодня пока нет." />}
+        </div>
+      </WorkspacePanel>
+
+      <WorkspacePanel title="Быстрые действия" subtitle="Переходите сразу к рабочему фокусу" style={{ minHeight: 170 }}>
+        <ContentGrid min={180} gap={10}>
+          <ActionCard icon="📰" title="Новости" text="Открыть ленту и публикации" onClick={actions.openNews} />
+          <ActionCard icon="📅" title="Мероприятия" text="Проверить ближайшие события" onClick={actions.openEvents} />
+          <ActionCard icon="🤝" title="Партнёры" text="Каталог партнёров" onClick={actions.openPartners} />
+          <ActionCard icon="✦" title="Эксперты" text="Каталог экспертов" onClick={actions.openExperts} />
+        </ContentGrid>
+      </WorkspacePanel>
     </div>
   );
 }
@@ -661,11 +551,49 @@ function EventCardsGrid({ items, onOpen, columns = 2, compact = false }) {
   );
 }
 
+function PartnerCardsGrid({ items, onOpen, columns = 2 }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: 10, alignItems: 'start' }}>
+      {items.slice(0, 12).map((partner, index) => (
+        <PartnerCard
+          key={partner.id || partner.title || partner.name || index}
+          partner={partner}
+          index={index}
+          isFavorite={false}
+          onOpen={(item) => onOpen?.(item)}
+          onToggleFavorite={() => {}}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ExpertCardsGrid({ items, onOpen, columns = 2 }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: 10, alignItems: 'start' }}>
+      {items.slice(0, 12).map((expert, index) => (
+        <ExpertCardV2
+          key={expert.id || expert.title || expert.name || index}
+          expert={expert}
+          onClick={(item) => onOpen?.(item)}
+          isTop={false}
+        />
+      ))}
+    </div>
+  );
+}
+
 function DataSection({ title, subtitle, items, emptyText, onOpen, columns = 2, type = 'default' }) {
   const content = type === 'news'
     ? <NewsCardsGrid items={items.slice(0, 12)} onOpen={onOpen} columns={columns} />
     : type === 'events'
       ? <EventCardsGrid items={items.slice(0, 12)} onOpen={onOpen} columns={columns} />
+      : type === 'partners'
+        ? <PartnerCardsGrid items={items.slice(0, 12)} onOpen={onOpen} columns={columns} />
+        : type === 'experts'
+          ? <ExpertCardsGrid items={items.slice(0, 12)} onOpen={onOpen} columns={columns} />
       : (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))`, gap: 10 }}>
           {items.length ? items.slice(0, 12).map(item => (
@@ -702,134 +630,108 @@ function AIWorkspacePanel({ data, activeSection, aiDraft, aiHistory, aiPulse, on
   const profileStatus = getProfileCompletion(data.activeProfile);
   const context = getWorkspaceContext(activeSection);
   const attention = [
-    data.unreadCount ? `${data.unreadCount} уведомлений ждут просмотра` : '',
+    data.unreadCount ? `${data.unreadCount} уведомлений ждут внимания` : 'Уведомлений нет',
     profileStatus.value < 80 ? `Профиль заполнен на ${profileStatus.value}%` : '',
-    !data.news.length ? 'В системе пока нет новостей' : '',
-    !data.events.length ? 'Нет ближайших мероприятий' : '',
+    !data.news.length ? 'Нет новых новостей в рабочем контексте' : '',
+    !data.events.length ? 'Нет активных мероприятий' : '',
   ].filter(Boolean);
+
   const briefing = buildLokiBriefing({ data, profileStatus, attention });
   const recommendations = [
     ...context.recommendations,
     data.unreadCount ? `Разобрать ${data.unreadCount} уведомлений` : '',
     data.events.length ? 'Посмотреть ближайшие мероприятия' : '',
+    data.news.length ? 'Проверить свежие публикации' : '',
   ].filter(Boolean).slice(0, 5);
-  const chatItems = aiHistory.length ? aiHistory.slice(-5) : [
-    { id: 'loki-start', role: 'loki', text: `Я уже вижу раздел «${context.label}» и буду держать ответы внутри AI Workspace.` },
-  ];
-  const primaryDecision = recommendations[0] || 'Проверить рабочий день';
-  const latestAction = data.recentActions?.[0];
-  const lokiState = aiDraft ? 'listening' : aiPulse ? 'answering' : attention.length ? 'recommending' : 'waiting';
-  const lokiStatusLabel = aiDraft ? 'слушает запрос' : aiPulse ? 'отвечает в Workspace' : attention.length ? 'готовит рекомендации' : 'ожидает задачи';
+
   const memoryItems = [
     `Раздел: ${context.label}`,
     data.activeProfile?.name ? `Профиль: ${data.activeProfile.name}` : 'Профиль не выбран',
-    attention.length ? `Сигналов: ${attention.length}` : 'Критичных сигналов нет',
+    `Событий: ${data.events.length}`,
+    `Новостей: ${data.news.length}`,
   ];
+
+  const latestAction = data.recentActions?.[0];
+  const chatItems = aiHistory.length ? aiHistory.slice(-6) : [
+    { id: 'loki-start', role: 'loki', text: `Доброе утро, я собрал рабочий день по разделу «${context.label}». Две новости, одно мероприятие и регистрация пользователя уже ждут решения.` },
+  ];
+
+  const lokiState = aiPulse ? 'answering' : aiDraft ? 'listening' : attention.length ? 'recommending' : 'waiting';
+
   const handleSubmit = event => {
     event.preventDefault();
     onAskLoki?.(aiDraft);
   };
+
   return (
-    <div data-workspace-region="ai" style={{ height: '100%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain' }}>
-      <div style={{ ...APG2_PROFILE.glass, borderRadius: 38, padding: 18, display: 'grid', gap: 14, border: '1px solid rgba(215,184,106,0.34)', background: 'radial-gradient(circle at 30% 0%, rgba(255,240,184,0.20), transparent 36%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.32), rgba(var(--apg2-glass-a,255,255,255),0.13))', boxShadow: aiPulse ? '0 0 0 1px rgba(215,184,106,0.18), 0 26px 72px rgba(0,0,0,0.24)' : APG2_PROFILE.glass.boxShadow }}>
-        <div style={{ minWidth: 0 }}>
-          <LokiIdentity size={60} state={lokiState} label="Локи · интеллект АПГ" sublabel={`${lokiStatusLabel} · ${context.label}`} />
+    <div data-workspace-region="ai" style={{ height: '100%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', paddingRight: 1 }}>
+      <div style={{ ...APG2_PROFILE.glass, borderRadius: 34, padding: 18, display: 'grid', gap: 12, border: '1px solid rgba(215,184,106,0.28)' }}>
+        <div style={{ minWidth: 0, ...APG2_PROFILE.glass, borderRadius: 24, padding: 12 }}>
+          <LokiIdentity size={56} state={lokiState} label="Локи" sublabel={`${context.label} · ${context.focus}`} />
+          <div style={{ marginTop: 10, color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px' }}>Локи всегда в этой колонке и не уходит в модальные окна.</div>
         </div>
 
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={{ ...APG2_PROFILE.glass, borderRadius: 24, padding: 12, display: 'grid', gap: 8, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, letterSpacing: 0.7, textTransform: 'uppercase' }}>Статус</span>
-              <GlassBadge tone={attention.length ? 'gold' : 'quiet'}>{lokiStatusLabel}</GlassBadge>
-            </div>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '18px', fontWeight: 820 }}>{context.focus}</div>
+        <WorkspacePanel title="Briefing" subtitle="Короткий срез дня" style={{ margin: 0, padding: 12 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {briefing.slice(0, 4).map(item => <ListRow key={item} title={item} text="Из данных Workspace" />)}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 11, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
-              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.7 }}>Последнее действие</div>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', fontWeight: 800, marginTop: 5, overflowWrap: 'anywhere' }}>{latestAction?.title || 'Жду первого действия'}</div>
-            </div>
-            <div style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 11, minWidth: 0, background: APG2_PROFILE.quietSurface }}>
-              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.7 }}>Рабочая память</div>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', fontWeight: 800, marginTop: 5, overflowWrap: 'anywhere' }}>{memoryItems.join(' · ')}</div>
-            </div>
+        </WorkspacePanel>
+
+        <WorkspacePanel title="История" subtitle="Последние рабочие события" style={{ margin: 0, padding: 12 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {data.recentActions.map(item => <ListRow key={item.id} title={item.title} text={item.text} />)}
+            {!data.recentActions.length && <EmptyWidget text="История пока пустая" />}
           </div>
-        </div>
+        </WorkspacePanel>
 
-        <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 14, background: APG2_PROFILE.heroSurface }}>
-          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 900, letterSpacing: 0.8, textTransform: 'uppercase' }}>Следующее лучшее действие</div>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 930, marginTop: 7 }}>{primaryDecision}</div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>{context.focus}. Локи держит рекомендации внутри рабочего пространства.</div>
-          <GlassButton tone="gold" onClick={() => onAskLoki?.(context.prompt)} style={{ marginTop: 12, width: '100%', minHeight: 40, color: '#17120a' }}>Разобрать с Локи</GlassButton>
-        </div>
+        <WorkspacePanel title="Контекст" subtitle="Что сейчас важно для этого раздела" style={{ margin: 0, padding: 12 }}>
+          <ContentGrid min={150} gap={8}>
+            <MetricCard label="Контекст" value={context.label} delta={context.focus} />
+            <MetricCard label="Профиль" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'quiet' : 'gold'} />
+            <MetricCard label="Последнее действие" value={latestAction?.title || '—'} delta={latestAction?.text || 'Ждём действий'} />
+            <MetricCard label="Последняя память" value={memoryItems.join(' · ')} delta="актуальный срез" />
+          </ContentGrid>
+        </WorkspacePanel>
 
-        <ContentGrid min={132} gap={8}>
-          <MetricCard label="Сигналы" value={attention.length || 0} delta="требуют внимания" tone={attention.length ? 'gold' : 'quiet'} />
-          <MetricCard label="Новости" value={data.news.length} delta="в контексте" tone="quiet" />
-          <MetricCard label="События" value={data.events.length} delta="в работе" tone="quiet" />
-          <MetricCard label="Профиль" value={`${profileStatus.value}%`} delta={profileStatus.label} tone={profileStatus.value >= 80 ? 'quiet' : 'gold'} />
-        </ContentGrid>
+        <WorkspacePanel title="Рекомендации" subtitle="Чем лучше продолжить" style={{ margin: 0, padding: 12 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {recommendations.slice(0, 4).map((item, index) => (
+              <button key={item} type="button" onClick={() => onAskLoki?.(item)} style={{ ...APG2_PROFILE.glass, borderRadius: 18, padding: 10, display: 'grid', gridTemplateColumns: '24px minmax(0,1fr)', gap: 9, alignItems: 'center', background: index === 0 ? APG2_PROFILE.goldSoft : APG2_PROFILE.quietSurface, border: '1px solid rgba(215,184,106,0.22)', textAlign: 'left', cursor: 'pointer', color: APG2_PROFILE.text }}>
+                <span style={{ width: 24, height: 24, borderRadius: 8, display: 'grid', placeItems: 'center', background: index === 0 ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.16)', color: index === 0 ? '#17120a' : APG2_PROFILE.gold, fontWeight: 900 }}>{index + 1}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, lineHeight: '18px' }}>{item}</span>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 12 }}><GlassButton tone="gold" onClick={() => onAskLoki?.(context.prompt)} style={{ width: '100%', color: '#17120a' }}>Проверить сегодня с Локи</GlassButton></div>
+        </WorkspacePanel>
 
-        <div style={{ display: 'grid', gap: 8 }}>
-          <SectionHeader title="Сегодня" subtitle="Короткий briefing" style={{ marginBottom: 0 }} />
-          {briefing.slice(0, 4).map(item => <ListRow key={item} title={item} text="Реальные данные Workspace" />)}
-        </div>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          <SectionHeader title="Решения" subtitle="Не список, а рабочий фокус" style={{ marginBottom: 0 }} />
-          {recommendations.slice(0, 3).map((item, index) => (
-            <button key={item} type="button" onClick={() => onAskLoki?.(item)} style={{ ...APG2_PROFILE.glass, borderRadius: 22, padding: 12, display: 'grid', gridTemplateColumns: '28px minmax(0,1fr)', gap: 10, alignItems: 'center', background: index === 0 ? APG2_PROFILE.goldSoft : APG2_PROFILE.quietSurface, border: index === 0 ? '1px solid rgba(215,184,106,0.34)' : APG2_PROFILE.glass.border, color: APG2_PROFILE.text, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
-              <span style={{ width: 28, height: 28, borderRadius: 12, background: index === 0 ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.12)', color: index === 0 ? '#17120a' : APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontWeight: 930 }}>{index + 1}</span>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item}</span>
-                <span style={{ display: 'block', color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{context.label}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 8, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 7, alignItems: 'center', marginTop: 12 }}>
-          <input
-            value={aiDraft}
-            onChange={event => onDraftChange(event.target.value)}
-            placeholder={context.prompt}
-            style={{ width: '100%', minHeight: 34, border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 12.5 }}
-          />
-          <GlassButton type="submit" tone="gold" style={{ minHeight: 34, padding: '7px 10px', color: '#17120a' }}>Спросить</GlassButton>
-        </form>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          <SectionHeader title="Диалог" subtitle="Компактная рабочая память" style={{ marginBottom: 0 }} />
-          {chatItems.slice(-3).map(item => (
-            <div key={item.id} style={{ ...APG2_PROFILE.glass, borderRadius: item.role === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px', padding: '9px 11px', marginLeft: item.role === 'user' ? 22 : 0, marginRight: item.role === 'user' ? 0 : 22, border: item.role === 'loki' ? '1px solid rgba(215,184,106,0.20)' : APG2_PROFILE.glass.border, background: item.role === 'loki' ? APG2_PROFILE.quietSurface : 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
-              <div style={{ color: item.role === 'loki' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6 }}>{item.role === 'loki' ? 'Локи' : 'Вы'}</div>
+        <WorkspacePanel title="Чат" subtitle="Диалог с рабочими рекомендациями" style={{ margin: 0, padding: 12 }}>
+          {chatItems.slice(-4).map(item => (
+            <div key={item.id} style={{ ...APG2_PROFILE.glass, borderRadius: item.role === 'user' ? '16px 16px 6px 16px' : '16px 16px 16px 6px', padding: '9px 10px', marginLeft: item.role === 'user' ? 18 : 0, marginRight: item.role === 'user' ? 0 : 18, marginTop: 8, border: item.role === 'loki' ? '1px solid rgba(215,184,106,0.2)' : APG2_PROFILE.glass.border }}>
+              <div style={{ color: item.role === 'loki' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 900, textTransform: 'uppercase' }}>{item.role === 'loki' ? 'Локи' : 'Вы'}</div>
               <div style={{ color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '17px', marginTop: 3, overflowWrap: 'anywhere' }}>{item.text}</div>
             </div>
           ))}
-        </div>
+          <form onSubmit={handleSubmit} style={{ ...APG2_PROFILE.glass, borderRadius: 18, padding: 8, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 7, alignItems: 'center', marginTop: 12 }}>
+            <input
+              value={aiDraft}
+              onChange={event => onDraftChange(event.target.value)}
+              placeholder={context.prompt}
+              style={{ width: '100%', minHeight: 34, border: 0, outline: 'none', background: 'transparent', color: APG2_PROFILE.text, fontFamily: 'inherit', fontSize: 12.5 }}
+            />
+            <GlassButton type="submit" tone="gold" style={{ minHeight: 34, padding: '7px 10px', color: '#17120a' }}>Спросить</GlassButton>
+          </form>
+        </WorkspacePanel>
 
-        <QuickActions actions={[
-          { id: 'briefing', label: 'Сводка дня', onClick: () => onAskLoki?.('Покажи сводку дня'), tone: 'gold' },
-          { id: 'news', label: 'Новости', onClick: actions.openNews },
-          { id: 'events', label: 'Мероприятия', onClick: actions.openEvents },
-          { id: 'business', label: 'Мой бизнес', onClick: actions.openCabinet },
-        ]} style={{ background: 'transparent', padding: 0, border: 0, marginTop: 2 }} />
+        <WorkspacePanel title="Быстрые действия" subtitle="Переходите без потери контекста" style={{ margin: 0, padding: 12 }}>
+          <ContentGrid min={150} gap={8}>
+            <ActionCard icon="📰" title="Новости" text="Открыть ленту" onClick={actions.openNews} />
+            <ActionCard icon="📅" title="Мероприятия" text="Открыть события" onClick={actions.openEvents} />
+            <ActionCard icon="◈" title="Мой бизнес" text="Проверить профиль и карточки" onClick={actions.openCabinet} />
+          </ContentGrid>
+        </WorkspacePanel>
       </div>
     </div>
-  );
-}
-
-function AIActionBoard({ actions }) {
-  return (
-    <WorkspacePanel title="AI Dashboard" subtitle="Рабочие рекомендации Локи" style={{ padding: 18 }}>
-      <ContentGrid min={220} gap={12}>
-        <ActionCard tone="gold" icon="📰" title="Опубликовать новость" text="Перейти к публикациям и проверить готовые материалы" onClick={actions.openNews} />
-        <ActionCard icon="⭐" title="Ответить на отзыв" text="Проверить обратную связь в рабочем контексте" onClick={actions.openLoki} />
-        <ActionCard icon="📅" title="Создать мероприятие" text="Открыть события и подготовить карточку" onClick={actions.openEvents} />
-        <ActionCard tone="quiet" icon="◇" title="Проверить заявку" text="Перейти в CRM-заготовку без выхода из Workspace" onClick={actions.openCrm} />
-        <ActionCard tone="quiet" icon="🖼" title="Добавить фотографии" text="Улучшить карточку бизнеса или эксперта" onClick={actions.openCabinet} />
-      </ContentGrid>
-    </WorkspacePanel>
   );
 }
 
@@ -846,7 +748,6 @@ export function DesktopWorkspace({
   onModeChange,
   onOpenPanel,
   onOpenAdmin,
-  onOpenScan,
 }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -859,11 +760,9 @@ export function DesktopWorkspace({
   const [viewportWidth, setViewportWidth] = useState(() => typeof window === 'undefined' ? 1440 : window.innerWidth);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const roleState = useMemo(() => getCabinetRoles({ user, partner: ownedPartner, expert: ownedExpert }), [user, ownedPartner, ownedExpert]);
-  const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || '');
-  const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
+  const activeRole = roleState.activeRole;
   const layout = useMemo(() => buildWorkspaceLayout({ mode: WORKSPACE_MODES.desktop, contextOpen: true, pinnedContext: true }), []);
   const activeRoleIdentity = useMemo(() => ({ ...(user || {}), role: activeRole?.id || user?.role || 'user' }), [activeRole?.id, user]);
-  const workspaceNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.desktop, identity: activeRoleIdentity, includeSecondary: true }), [activeRoleIdentity]);
   const activeProfile = activeRole?.id === 'expert' ? ownedExpert : activeRole?.id === 'partner' ? ownedPartner : user;
   const userName = user?.firstName || user?.name || user?.displayName || 'коллега';
   const isAdminRole = hasCapability(activeRoleIdentity, CAPABILITIES.canOpenAdminPanel);
@@ -910,8 +809,17 @@ export function DesktopWorkspace({
   };
 
   useEffect(() => {
-    setActiveRoleId(roleState.activeRole?.id || '');
-  }, [roleState.activeRole?.id]);
+    if (aiHistory.length) return;
+    const startSection = getWorkspaceContext(activeSection);
+    const startProfile = getProfileCompletion(activeProfile);
+    const greeting = `Доброе утро. В рабочем контексте «${startSection.label}» есть ${startProfile.value < 100 ? `${startProfile.value}% заполненности профиля` : 'подготовленная рабочая среда'}.`;
+    const startup = buildLokiBriefing({ data: workspaceData, profileStatus: startProfile, attention: [startSection.prompt || startSection.focus] });
+    setAiHistory([{
+      id: `loki-start-${Date.now()}`,
+      role: 'loki',
+      text: `${greeting} ${startup.join(' · ')}`,
+    }]);
+  }, [aiHistory.length, activeProfile?.id, activeSection, news.length, events.length, unreadCount]);
 
   useEffect(() => {
     const onResize = () => setViewportWidth(window.innerWidth);
@@ -944,7 +852,7 @@ export function DesktopWorkspace({
       }
       if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault();
-        const input = document.querySelector('[placeholder="Глобальный поиск по Workspace"]');
+      const input = document.querySelector('[placeholder="Поиск по Workspace"]');
         input?.focus?.();
       }
       if ((event.metaKey || event.ctrlKey) && key === '1') {
@@ -1043,10 +951,10 @@ export function DesktopWorkspace({
       return <DataSection type="events" title="Мероприятия" subtitle="Единые карточки событий без отдельной workspace-версии" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />;
     }
     if (activeSection === 'partners') {
-      return <DataSection title="Партнёры" subtitle="Рабочий каталог партнёров" items={partners} emptyText="Партнёров пока нет." onOpen={() => onOpenPanel?.('offers')} />;
+      return <DataSection type="partners" title="Партнёры" subtitle="Рабочий каталог партнёров" items={partners} emptyText="Партнёров пока нет." onOpen={() => onOpenPanel?.('offers')} />;
     }
     if (activeSection === 'experts') {
-      return <DataSection title="Эксперты" subtitle="Рабочий каталог экспертов" items={experts} emptyText="Экспертов пока нет." onOpen={() => onOpenPanel?.('experts')} />;
+      return <DataSection type="experts" title="Эксперты" subtitle="Рабочий каталог экспертов" items={experts} emptyText="Экспертов пока нет." onOpen={() => onOpenPanel?.('experts')} />;
     }
     if (activeSection === 'business-hub') {
       return (
@@ -1080,19 +988,12 @@ export function DesktopWorkspace({
       <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: WORKSPACE_LAYOUT.gap, height: `calc(100dvh - ${WORKSPACE_LAYOUT.pagePadding * 2}px)`, minHeight: 0 }}>
         <WorkspaceHeaderBar
           user={user}
-          roleState={roleState}
-          activeRoleId={activeRole?.id || activeRoleId}
-          onRoleChange={setActiveRoleId}
           onModeChange={onModeChange}
           unreadCount={unreadCount}
           query={query}
           onQueryChange={setQuery}
           onOpenNotifications={() => onOpenPanel?.('notifications')}
           onOpenProfile={() => onOpenPanel?.('profile')}
-          onOpenScan={onOpenScan}
-          onOpenShortcuts={() => setShortcutOverlayOpen(true)}
-          onOpenAI={() => setAiDrawerOpen(true)}
-          aiAsDrawer={aiAsDrawer}
         />
         <div data-workspace-layout="desktop-grid" style={{ display: 'grid', gridTemplateColumns: workspaceColumns, gap: WORKSPACE_LAYOUT.gap, alignItems: 'stretch', minHeight: 0, height: '100%', overflow: 'hidden' }}>
           <WorkspaceSidebar
@@ -1105,8 +1006,8 @@ export function DesktopWorkspace({
           <main data-workspace-region="content" style={{ minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', display: 'block', position: 'relative', zIndex: WORKSPACE_Z.content, paddingRight: 2 }}>
             <SectionHeader
               title={activeSection === 'dashboard' ? 'Dashboard' : navItems.find(item => item.id === activeSection)?.label || 'Workspace'}
-              subtitle={query ? `Поиск: ${query}` : `${layout.density} · ${workspaceNavigation.placement} · APG V2 Liquid Glass`}
-              actions={<GlassBadge tone="gold">Desktop Workspace 1.0</GlassBadge>}
+              subtitle={query ? `Поиск: ${query}` : `${layout.density} · APG V2 Liquid Glass`}
+              actions={<GlassBadge tone="gold">Desktop Workspace 2.1</GlassBadge>}
             />
             {renderContent()}
           </main>

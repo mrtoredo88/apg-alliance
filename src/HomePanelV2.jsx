@@ -777,7 +777,7 @@ function PartnerLogo({ partner, size = 56 }) {
 
 // ─── Карточка партнёра ────────────────────────────────────────────────────────
 
-function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 }) {
+export function PartnerCard({ partner, isFavorite, onOpen, onToggleFavorite, index = 0 }) {
   const isNew = (() => {
     if (!partner.createdAt) return false;
     const ts = partner.createdAt.toDate ? partner.createdAt.toDate() : new Date(partner.createdAt);

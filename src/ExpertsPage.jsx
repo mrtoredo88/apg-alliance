@@ -771,7 +771,7 @@ function ExpertCard({ expert, index, onClick, isTop }) {
   );
 }
 
-function ExpertCardV2({ expert, onClick, isTop }) {
+export function ExpertCardV2({ expert, onClick, isTop }) {
   expert = normalizeExpertRecord(expert);
   const image = getProfileImage(expert);
   const cat = getExpertCategory(expert.category);
