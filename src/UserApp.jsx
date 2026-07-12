@@ -3068,7 +3068,7 @@ export function UserApp() {
             </Suspense>
           ) : (
           <div
-            style={{ maxWidth: desktopDevice ? 1240 : 480, margin: '0 auto', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip', boxShadow: desktopDevice ? '0 0 0 1px rgba(255,255,255,0.04), 0 32px 120px rgba(0,0,0,0.18)' : 'none' }}
+            style={{ width: desktopDevice ? '100%' : undefined, maxWidth: desktopDevice ? 'none' : 480, margin: '0 auto', minHeight: '100svh', position: 'relative', zIndex: 1, overflowX: 'clip', boxShadow: desktopDevice ? '0 0 0 1px rgba(255,255,255,0.04), 0 32px 120px rgba(0,0,0,0.18)' : 'none' }}
             onTouchStart={handleSwipeStart}
             onTouchMove={handleSwipeMove}
             onTouchEnd={handleSwipeEnd}

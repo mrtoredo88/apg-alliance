@@ -155,9 +155,9 @@ const GlassHero = {
 };
 
 const DESKTOP_LAYOUT = {
-  containerMax: 'min(1880px, calc(100vw - 56px))',
-  pagePaddingX: 'clamp(16px, 3vw, 40px)',
-  firstHeroColumns: 'minmax(0, 1.2fr) minmax(300px, 372px)',
+  containerMax: 'min(1960px, calc(100vw - 28px))',
+  pagePaddingX: 'clamp(10px, 1.45vw, 24px)',
+  firstHeroColumns: 'minmax(0, 1.36fr) minmax(316px, 386px)',
   secondColumns: 'minmax(0, 1fr) minmax(300px, 380px)',
   highlightColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
   sectionGap: 15,
@@ -180,9 +180,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
   if (width >= 1728) {
     return {
       ...DESKTOP_LAYOUT,
-      containerMax: 'min(2140px, calc(100vw - 104px))',
-      pagePaddingX: 'clamp(24px, 2.4vw, 52px)',
-      firstHeroColumns: 'minmax(0, 1.5fr) minmax(380px, 420px)',
+      containerMax: 'min(2260px, calc(100vw - 48px))',
+      pagePaddingX: 'clamp(14px, 1.55vw, 30px)',
+      firstHeroColumns: 'minmax(0, 1.58fr) minmax(390px, 430px)',
       secondColumns: 'minmax(0, 1fr) minmax(380px, 0.52fr)',
       sectionGap: 20,
       compactGap: 12,
@@ -199,9 +199,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
   if (width >= 1600) {
     return {
       ...DESKTOP_LAYOUT,
-      containerMax: 'min(1980px, calc(100vw - 88px))',
-      pagePaddingX: 'clamp(20px, 2.6vw, 46px)',
-      firstHeroColumns: 'minmax(0, 1.45fr) minmax(350px, 400px)',
+      containerMax: 'min(2100px, calc(100vw - 40px))',
+      pagePaddingX: 'clamp(12px, 1.55vw, 28px)',
+      firstHeroColumns: 'minmax(0, 1.52fr) minmax(370px, 410px)',
       secondColumns: 'minmax(0, 1fr) minmax(350px, 0.53fr)',
       sectionGap: 18,
       compactGap: 11,
@@ -218,9 +218,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
   if (width >= 1440) {
     return {
       ...DESKTOP_LAYOUT,
-      containerMax: 'min(1760px, calc(100vw - 76px))',
-      pagePaddingX: 'clamp(18px, 2.3vw, 42px)',
-      firstHeroColumns: 'minmax(0, 1.38fr) minmax(340px, 390px)',
+      containerMax: 'min(1880px, calc(100vw - 34px))',
+      pagePaddingX: 'clamp(12px, 1.5vw, 26px)',
+      firstHeroColumns: 'minmax(0, 1.46fr) minmax(350px, 398px)',
       secondColumns: 'minmax(0, 1fr) minmax(340px, 0.54fr)',
       sectionGap: 16,
       compactGap: 11,
@@ -237,9 +237,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
   if (width >= 1280) {
     return {
       ...DESKTOP_LAYOUT,
-      containerMax: 'min(1560px, calc(100vw - 56px))',
-      pagePaddingX: 'clamp(16px, 2.1vw, 36px)',
-      firstHeroColumns: 'minmax(0, 1.3fr) minmax(330px, 372px)',
+      containerMax: 'min(1660px, calc(100vw - 28px))',
+      pagePaddingX: 'clamp(10px, 1.35vw, 22px)',
+      firstHeroColumns: 'minmax(0, 1.38fr) minmax(326px, 382px)',
       secondColumns: 'minmax(0, 1fr) minmax(330px, 0.56fr)',
       sectionGap: 16,
       compactGap: 10,
@@ -316,6 +316,12 @@ function getDayGreeting() {
 function V2FirstScreen({
   user,
   userKeys,
+  streak = 0,
+  completedTasks = [],
+  referralCount = 0,
+  scannedCount = 0,
+  registeredEventIds = [],
+  favorites = [],
   partners = [],
   counterPulse,
   events,
@@ -335,12 +341,6 @@ function V2FirstScreen({
   onOpenNews,
   onOpenMap,
   onOpenExperts,
-  onSearchQueryChange,
-  searchQuery = '',
-  searchInputRef,
-  searchLoading = false,
-  searchResultsCount = 0,
-  onSearchKeyDown,
   desktopWorkspaceAvailable = false,
   onSwitchAppMode,
   desktopWorkspaceMode = 'user',
@@ -352,6 +352,12 @@ function V2FirstScreen({
       <V2FirstScreenDesktop
         user={user}
         userKeys={userKeys}
+        streak={streak}
+        completedTasks={completedTasks}
+        referralCount={referralCount}
+        scannedCount={scannedCount}
+        registeredEventIds={registeredEventIds}
+        favorites={favorites}
         partners={partners}
         events={events}
         featuredPartner={featuredPartner}
@@ -371,12 +377,6 @@ function V2FirstScreen({
         onOpenNews={onOpenNews}
         onOpenMap={onOpenMap}
         onOpenExperts={onOpenExperts}
-        searchQuery={searchQuery}
-        onSearchQueryChange={onSearchQueryChange}
-        searchInputRef={searchInputRef}
-        searchLoading={searchLoading}
-        searchResultsCount={searchResultsCount}
-        onSearchKeyDown={onSearchKeyDown}
         desktopWorkspaceAvailable={desktopWorkspaceAvailable}
         desktopWorkspaceMode={desktopWorkspaceMode}
         onSwitchAppMode={onSwitchAppMode}
@@ -632,6 +632,12 @@ function V2FirstScreenMobile({
 function V2FirstScreenDesktop({
   user,
   userKeys,
+  streak = 0,
+  completedTasks = [],
+  referralCount = 0,
+  scannedCount = 0,
+  registeredEventIds = [],
+  favorites = [],
   partners = [],
   events,
   featuredPartner,
@@ -651,12 +657,6 @@ function V2FirstScreenDesktop({
   onOpenNews,
   onOpenMap,
   onOpenExperts,
-  onSearchQueryChange,
-  searchQuery = '',
-  searchInputRef,
-  searchLoading = false,
-  searchResultsCount = 0,
-  onSearchKeyDown,
   desktopWorkspaceAvailable = false,
   desktopWorkspaceMode = 'user',
   onSwitchAppMode,
@@ -675,10 +675,28 @@ function V2FirstScreenDesktop({
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
   const keysToNext = getKeysToNext(userKeys);
+  const levelProgress = getLevelProgress(userKeys);
   const fullName = [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник';
   const initials = fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
   const avatarUrl = user?.photo_200 || user?.photo || user?.avatarUrl || '';
   const desktopLayout = getDesktopLayout(typeof window === 'undefined' ? 1280 : window.innerWidth);
+  const nextAchievement = TASKS
+    .map(task => ({
+      ...task,
+      done: completedTasks.includes(task.id),
+      progressValue: task.progress ? task.progress(userKeys, favorites.length, referralCount, streak, scannedCount) : 0,
+    }))
+    .filter(task => !task.done)
+    .sort((a, b) => (b.progressValue || 0) - (a.progressValue || 0))[0] || null;
+  const nextAchievementProgress = Math.max(0, Math.min(100, Math.round(nextAchievement?.progressValue || levelProgress || 0)));
+  const profileStats = [
+    { label: 'Ключи', value: userKeys, accent: V2.gold },
+    { label: 'Серия', value: streak, accent: '#FF8C42' },
+    { label: 'Достижений', value: completedTasks.length },
+    { label: 'Партнёров', value: scannedCount },
+    { label: 'Событий', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0 },
+    { label: 'Друзей', value: referralCount },
+  ];
   const navItems = [
     { label: 'Главная', isActive: true, onClick: () => {} },
     { label: 'Новости', onClick: onOpenNews },
@@ -771,36 +789,6 @@ function V2FirstScreenDesktop({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-            <div style={{ width: 'clamp(154px, 11vw, 190px)', height: 38, borderRadius: 16, ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px', gap: 7, boxSizing: 'border-box', transition: motionTransition(['border-color', 'background', 'box-shadow'], 'base') }}>
-              <span style={{ fontSize: 13.5, fontWeight: 840, lineHeight: '38px', color: V2.textMuted, flexShrink: 0 }}>⌕</span>
-              <input
-                aria-label="Поиск"
-                type="text"
-                value={searchQuery}
-                ref={searchInputRef}
-                onChange={(event) => onSearchQueryChange?.(event.target.value)}
-                onKeyDown={onSearchKeyDown}
-                autoComplete="off"
-                placeholder="Поиск по АПГ..."
-                style={{
-                  width: '100%',
-                  minWidth: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  color: V2.text,
-                  fontFamily: 'inherit',
-                  fontSize: 12.2,
-                  fontWeight: 650,
-                }}
-              />
-              {searchLoading ? (
-                <span style={{ fontSize: 12, color: V2.textMuted }}>⏳</span>
-              ) : null}
-              {searchResultsCount > 0 ? (
-                <span style={{ color: V2.textMuted, fontSize: 11, flexShrink: 0 }}>{searchResultsCount}</span>
-              ) : null}
-            </div>
             <button
               onClick={onOpenNotifications}
               aria-label="Уведомления"
@@ -815,13 +803,6 @@ function V2FirstScreenDesktop({
               {unreadCount > 0 && (
                 <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />
               )}
-            </button>
-            <button
-              aria-label="Профиль"
-              onClick={onOpenProfile}
-              style={{ width: 38, height: 38, borderRadius: 16, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13.5, fontWeight: 850 }}
-            >
-              {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
             </button>
             {desktopWorkspaceAvailable && typeof onSwitchAppMode === 'function' && (
               <button
@@ -918,40 +899,59 @@ function V2FirstScreenDesktop({
               <div style={{
                 ...GlassPanel,
                 borderRadius: 30,
-                padding: 8,
+                padding: 10,
                 height: desktopLayout.heroHeight,
                 boxSizing: 'border-box',
                 display: 'grid',
-                gridTemplateRows: 'auto auto auto auto',
+                gridTemplateRows: '40px 36px minmax(0, 1fr) 25px',
                 gap: 4,
                 overflow: 'hidden',
                 animation: 'fadeInUp 0.5s ease both',
               }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr', gap: 8, alignItems: 'center', minHeight: 38 }}>
-                <LokiIdentity size={36} state="recommending" label="Локи" sublabel="Собрал для вас рекомендации" showText={false} />
+              <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 8, alignItems: 'center', minHeight: 40 }}>
+                <button
+                  type="button"
+                  aria-label="Открыть профиль"
+                  onClick={onOpenProfile}
+                  style={{ width: 40, height: 40, border: 'none', padding: 0, borderRadius: 16, overflow: 'hidden', ...V2.goldGlass, color: '#17120A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13.5, fontWeight: 900, cursor: 'pointer', boxShadow: '0 12px 28px rgba(201,168,76,0.20), inset 0 1px 0 rgba(255,255,255,0.42)' }}
+                >
+                  {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+                </button>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: V2.text, fontWeight: 870, fontSize: 14.2, lineHeight: '16px' }}>Локи</div>
-                  <div style={{ color: V2.textMuted, fontSize: 10.2, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>ваш гид по АПГ</div>
+                  <div style={{ color: V2.text, fontWeight: 880, fontSize: 14.2, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Мой профиль</div>
+                  <div style={{ color: V2.textMuted, fontSize: 10.2, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
                 </div>
+                <div style={{ ...GlassBadge, padding: '5px 8px', fontSize: 9.6, color: level.color, borderColor: `${level.color}70`, background: `${level.color}1F`, maxWidth: 92, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{level.label}</div>
               </div>
-              <div>
-                  <div style={{ color: V2.text, fontSize: 13.4, lineHeight: '15px', fontWeight: 850, marginBottom: 2 }}>С чего начать сегодня</div>
-                <div style={{ color: V2.textSoft, fontSize: 9.8, lineHeight: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  Ближайшее событие, полезное место и несколько рекомендаций без лишнего шума.
-                </div>
-              </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4, alignItems: 'stretch', minHeight: 36 }}>
-                    {todayCards.slice(0, 3).map(card => (
-                  <button key={card.title} onClick={card.onClick} type="button" style={{ ...GlassCard, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 14, textAlign: 'left', padding: '4px 6px', cursor: card.onClick ? 'pointer' : 'default', minHeight: 36, maxHeight: 36, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden' }}>
-                    <div style={{ color: V2.text, fontSize: 9.2, fontWeight: 820, display: 'flex', justifyContent: 'space-between', gap: 4, lineHeight: '10px', minWidth: 0 }}>
-                      <span>{card.icon} {card.title}</span>
-                      <span style={{ color: V2.textMuted }}>→</span>
-                    </div>
-                    <div style={{ color: V2.textSoft, fontSize: 7.8, lineHeight: '9px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.value}</div>
-                  </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 4, alignItems: 'stretch', minHeight: 36 }}>
+                {profileStats.map(stat => (
+                  <div key={stat.label} style={{ ...GlassCard, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, padding: '4px 3px', minHeight: 34, display: 'grid', alignContent: 'center', textAlign: 'center', overflow: 'hidden' }}>
+                    <div style={{ color: stat.accent || V2.text, fontSize: 12.2, lineHeight: '12px', fontWeight: 900 }}>{stat.value}</div>
+                    <div style={{ color: V2.textMuted, fontSize: 7.1, lineHeight: '8px', fontWeight: 720, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stat.label}</div>
+                  </div>
                 ))}
+              </div>
+              <div style={{ display: 'grid', gap: 3, alignSelf: 'stretch', minHeight: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: V2.text, fontSize: 10.2, lineHeight: '11px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {nextAchievement?.title || `До уровня ${nextLevel.label}`}
+                    </div>
+                    <div style={{ color: V2.textMuted, fontSize: 7.8, lineHeight: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {nextAchievement ? 'Следующее достижение' : keysToNext > 0 ? `Осталось ${keysToNext} ключей` : 'Новый уровень открыт'}
+                    </div>
+                  </div>
+                  <div style={{ color: V2.gold, fontSize: 10.2, lineHeight: '11px', fontWeight: 880 }}>{nextAchievementProgress}%</div>
                 </div>
-              <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, width: '100%', minHeight: 26, padding: '0 10px', color: '#17120A', fontSize: 10.4 }}>Посмотреть рекомендации</button>
+                <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <div style={{ width: `${nextAchievementProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${level.color}, #E8C97A)`, boxShadow: `0 0 16px ${level.color}80`, transition: 'width 0.3s ease' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+                <button type="button" onClick={onOpenProfile} style={{ ...GlassButton, minHeight: 25, padding: '0 7px', fontSize: 9.4, color: '#17120A' }}>Профиль</button>
+                <button type="button" onClick={onOpenTasks} style={{ ...GlassButton, minHeight: 25, padding: '0 7px', fontSize: 9.4 }}>Достижения</button>
+                <button type="button" onClick={onOpenRewards} style={{ ...GlassButton, minHeight: 25, padding: '0 7px', fontSize: 9.4 }}>Награды</button>
+              </div>
             </div>
           </div>
         </div>
@@ -978,16 +978,7 @@ function V2SecondScreen({
   onOpenNewsItem,
   onOpenLoki,
   onOpenNearby,
-  onSearchQueryChange,
-  searchQuery = '',
   loading = false,
-  searchLoading = false,
-  searchError = null,
-  searchResultsProp = { partners: [], experts: [], events: [], news: [], all: [] },
-  searchFlatResults = [],
-  searchActiveIndex = -1,
-  onSearchResultFocus,
-  searchResultsRef,
   interestProfile,
   isOffline = false,
   desktopMode = false,
@@ -1012,16 +1003,7 @@ function V2SecondScreen({
         onOpenNewsItem={onOpenNewsItem}
         onOpenLoki={onOpenLoki}
         onOpenNearby={onOpenNearby}
-        searchQuery={searchQuery}
         loading={loading}
-        searchLoading={searchLoading}
-        searchError={searchError}
-        searchResults={searchResultsProp}
-        searchFlatResults={searchFlatResults}
-        searchActiveIndex={searchActiveIndex}
-        onSearchResultFocus={onSearchResultFocus}
-        onSearchQueryChange={onSearchQueryChange}
-        searchResultsRef={searchResultsRef}
         isOffline={isOffline}
       />
     );
@@ -1318,16 +1300,7 @@ function V2SecondScreenDesktop({
   onOpenNewsItem,
   onOpenNearby,
   onOpenLoki,
-  searchQuery = '',
   loading = false,
-  searchLoading = false,
-  searchError = null,
-  searchResults = { partners: [], experts: [], events: [], news: [], all: [] },
-  searchFlatResults = [],
-  searchActiveIndex = -1,
-  onSearchResultFocus,
-  onSearchQueryChange,
-  searchResultsRef,
   isOffline = false,
 }) {
   const desktopWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
@@ -1564,23 +1537,6 @@ function V2SecondScreenDesktop({
     }
     return list.slice(0, 4);
   }, [allEvents, onOpenEvents, onOpenExperts, onOpenPartner, primaryEvent, nearbyPartners, topExperts]);
-  const hasSearchQuery = String(searchQuery || '').trim().length > 0;
-  const groupedSearchResults = useMemo(() => {
-    const grouped = searchResults || {};
-    return [
-      { key: 'partners', title: 'Партнёры', items: Array.isArray(grouped.partners) ? grouped.partners : [] },
-      { key: 'experts', title: 'Эксперты', items: Array.isArray(grouped.experts) ? grouped.experts : [] },
-      { key: 'events', title: 'События', items: Array.isArray(grouped.events) ? grouped.events : [] },
-      { key: 'news', title: 'Новости', items: Array.isArray(grouped.news) ? grouped.news : [] },
-    ];
-  }, [searchResults]);
-  const searchableResults = useMemo(() => {
-    let idx = 0;
-    return groupedSearchResults.map((section) => ({
-      ...section,
-      items: (section.items || []).map((item) => ({ ...item, index: idx++ })),
-    }));
-  }, [groupedSearchResults]);
   const recentActions = useMemo(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -1681,86 +1637,6 @@ function V2SecondScreenDesktop({
             Переход в офлайн-режим. Показываем закешированные данные.
           </div>
         ) : null}
-        {hasSearchQuery ? (
-          <div style={{ paddingBottom: 14 }} ref={searchResultsRef}>
-            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ ...DesktopSectionHeader, fontSize: 28 }}>
-                Результаты поиска
-              </div>
-              <button
-                type="button"
-                onClick={() => onSearchQueryChange?.('')}
-                style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}
-              >
-                Очистить
-              </button>
-            </div>
-            {searchLoading ? (
-              <div style={{ display: 'grid', gap: 10 }}>
-                <div style={{ ...DesktopDenseTile }}>
-                  <Skel h={17} w={220} radius={6} style={{ marginBottom: 8 }} />
-                  <Skel h={14} w={280} radius={6} />
-                </div>
-                <div style={{ ...DesktopDenseTile }}>
-                  <Skel h={17} w={190} radius={6} style={{ marginBottom: 8 }} />
-                  <Skel h={14} w={240} radius={6} />
-                </div>
-              </div>
-            ) : searchError ? (
-              <div style={{ ...EmptyDesktopCard }}>
-                Не удалось выполнить поиск: {searchError}
-              </div>
-            ) : searchableResults.every((section) => !section.items.length) ? (
-              <div style={{ ...EmptyDesktopCard }}>
-                Ничего не найдено по вашему запросу.
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {searchableResults.map((section) => (
-                  section.items.length === 0 ? null : (
-                    <div key={section.key} style={{ display: 'grid', gap: 8 }}>
-                      <div style={{ color: V2.textMuted, fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                        {section.accent ? `${section.accent} ` : ''}{section.title}
-                      </div>
-                      <div style={{ display: 'grid', gap: 8 }}>
-                        {section.items.map((item) => {
-                          const isActive = item.index === searchActiveIndex;
-                          return (
-                            <button
-                              key={`${section.key}-${item.id}`}
-                              type="button"
-                              onMouseEnter={() => onSearchResultFocus?.(item.index)}
-                              onFocus={() => onSearchResultFocus?.(item.index)}
-                              onClick={() => {
-                                item.onClick?.();
-                                onSearchResultFocus?.(item.index);
-                              }}
-                              style={{
-                                ...GlassCard,
-                                border: isActive ? '1px solid rgba(244,217,140,0.55)' : '1px solid rgba(255,255,255,0.17)',
-                                ...DesktopDenseTile,
-                                padding: 12,
-                                textAlign: 'left',
-                                display: 'grid',
-                                gap: 6,
-                                cursor: item.onClick ? 'pointer' : 'default',
-                                transform: isActive ? 'translateY(-1px)' : undefined,
-                              }}
-                            >
-                              <div style={{ color: V2.gold, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>{item.type}</div>
-                              <div style={{ color: V2.text, fontSize: 16, fontWeight: 800, lineHeight: '20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                              <div style={{ color: V2.textSoft, fontSize: 12, lineHeight: '16px' }}>{item.description}</div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
           <div style={desktopContentGrid}>
             <section style={desktopFirstRowStyle}>
               <div style={{ marginBottom: 6 }}>
@@ -2085,7 +1961,6 @@ function V2SecondScreenDesktop({
             </section>
 
           </div>
-        )}
       </div>
     </section>
   );
@@ -2822,14 +2697,7 @@ export function HomePanelV2({
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [searchInputValue, setSearchInputValue] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState(null);
-  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
   const [isOffline, setIsOffline] = useState(() => typeof navigator === 'undefined' ? false : !navigator.onLine);
-  const searchInputRef = useRef(null);
-  const searchResultsRef = useRef(null);
 
   // ─── Pull-to-refresh ────────────────────────────────────────────────────────
   const [pullY, setPullY] = useState(0);
@@ -2924,31 +2792,6 @@ export function HomePanelV2({
   }, [userKeys, favorites.length, referralCount, streak, scannedCount, completedTasks, customTasks]);
 
   useEffect(() => {
-    if (!desktopMode) {
-      setSearchQuery('');
-      setSearchLoading(false);
-      setSearchError(null);
-      setSearchActiveIndex(-1);
-      return;
-    }
-    if (!searchInputValue.trim()) {
-      setSearchError(null);
-      setSearchActiveIndex(-1);
-      setSearchLoading(false);
-      setSearchQuery('');
-      return;
-    }
-    setSearchLoading(true);
-    setSearchError(null);
-    const timer = window.setTimeout(() => {
-      setSearchQuery(searchInputValue.trim());
-      setSearchLoading(false);
-      setSearchActiveIndex(-1);
-    }, 240);
-    return () => window.clearTimeout(timer);
-  }, [desktopMode, searchInputValue]);
-
-  useEffect(() => {
     if (typeof window === 'undefined') return;
     const updateConnection = () => setIsOffline(!window.navigator.onLine);
     updateConnection();
@@ -2960,115 +2803,6 @@ export function HomePanelV2({
     };
   }, []);
 
-  const searchComputation = useMemo(() => {
-    if (!searchQuery) {
-      return {
-        results: { partners: [], experts: [], events: [], news: [], all: [] },
-        error: null,
-      };
-    }
-    try {
-      const q = String(searchQuery).trim().toLowerCase();
-      const out = { partners: [], experts: [], events: [], news: [] };
-      const add = (bucket, item, type, label, description, action) => {
-        const baseId = item?.id || item?.title || label || `${type}-item`;
-        const uniqueId = `${bucket}-${baseId}-${out[bucket].length}`;
-        out[bucket].push({ id: uniqueId, type: type, title: label, description, action });
-      };
-      partners.forEach((partner) => {
-        const haystack = [partner?.name, partner?.description, partner?.offer, partner?.category, partner?.categoryLabel].filter(Boolean).join(' ').toLowerCase();
-        if (haystack.includes(q)) {
-          add('partners', partner, 'Партнёр', partner?.name || 'Партнёр', partner?.description || 'Открыть партнёра', () => onOpenPartner?.(partner));
-        }
-      });
-      experts.forEach((expert) => {
-        const haystack = [expert?.name, expert?.specialization, expert?.services, expert?.bio].filter(Boolean).join(' ').toLowerCase();
-        if (haystack.includes(q)) {
-          add('experts', expert, 'Эксперт', expert?.name || expert?.specialization || 'Эксперт', expert?.specialization || 'Открыть эксперта', () => onOpenExperts?.());
-        }
-      });
-      events.forEach((event) => {
-        const haystack = [event?.title, event?.description, event?.partner, event?.address].filter(Boolean).join(' ').toLowerCase();
-        if (haystack.includes(q)) {
-          add('events', event, 'Событие', event?.title || 'Событие', [event?.date, event?.address].filter(Boolean).join(' · ') || 'Открыть событие', () => onOpenEvents?.());
-        }
-      });
-      (Array.isArray(news) ? news : []).forEach((newsItem) => {
-        const haystack = [newsItem?.title, newsItem?.text, newsItem?.description].filter(Boolean).join(' ').toLowerCase();
-        if (haystack.includes(q)) {
-          add('news', newsItem, 'Новость', getNewsTitle(newsItem) || 'Новость', `${getNewsCategoryLabel(newsItem)} · ${formatNewsDate(newsItem)}`, () => onOpenNewsItem?.(newsItem));
-        }
-      });
-      const all = [];
-      ['partners', 'experts', 'events', 'news'].forEach(bucket => {
-        out[bucket].forEach((item) => all.push(item));
-      });
-      return { results: { ...out, all }, error: null };
-    } catch (err) {
-      return { results: { partners: [], experts: [], events: [], news: [], all: [] }, error: err?.message || 'Ошибка поиска' };
-    }
-  }, [searchQuery, partners, experts, events, news, onOpenEvents, onOpenExperts, onOpenNewsItem, onOpenPartner]);
-
-  const searchResultState = desktopMode
-    ? searchComputation
-    : { results: { partners: [], experts: [], events: [], news: [], all: [] }, error: null };
-  const searchFlatResults = searchResultState.results?.all || [];
-  const hasSearchQuery = searchInputValue.trim().length > 0;
-  const searchResultsCount = searchFlatResults.length;
-
-  useEffect(() => {
-    setSearchError(searchResultState.error || null);
-  }, [searchResultState.error]);
-
-  useEffect(() => {
-    if (!desktopMode) return;
-    const onPointerDown = (event) => {
-      const target = event.target;
-      if (searchInputRef.current?.contains?.(target)) return;
-      if (searchResultsRef.current?.contains?.(target)) return;
-      setSearchInputValue('');
-      setSearchQuery('');
-      setSearchActiveIndex(-1);
-    };
-    document.addEventListener('pointerdown', onPointerDown, { passive: true });
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [desktopMode, searchResultsRef, searchInputRef]);
-
-  const handleDesktopSearchKeyDown = useCallback((event) => {
-    if (!searchResultsCount || !hasSearchQuery || searchLoading) return;
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setSearchInputValue('');
-      setSearchQuery('');
-      setSearchActiveIndex(-1);
-      return;
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setSearchActiveIndex((prev) => {
-        const next = prev + 1;
-        return next >= searchResultsCount ? 0 : next;
-      });
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setSearchActiveIndex((prev) => {
-        const next = prev - 1;
-        return next < 0 ? Math.max(searchResultsCount - 1, 0) : next;
-      });
-      return;
-    }
-    if (event.key === 'Enter') {
-      if (searchActiveIndex < 0) return;
-      const active = searchFlatResults[searchActiveIndex];
-      if (active?.action) {
-        event.preventDefault();
-        active.action();
-      }
-    }
-  }, [hasSearchQuery, searchLoading, searchResultsCount, searchActiveIndex, searchFlatResults]);
-
   return (
     <Panel id="home" data-home-version="v2">
       <span data-home-version="v2" style={{ display: 'none' }} />
@@ -3076,6 +2810,12 @@ export function HomePanelV2({
       <V2FirstScreen
         user={user}
         userKeys={userKeys}
+        streak={streak}
+        completedTasks={completedTasks}
+        referralCount={referralCount}
+        scannedCount={scannedCount}
+        registeredEventIds={registeredEventIds}
+        favorites={favorites}
         events={adaptiveHome.events}
         featuredPartner={featuredPartner}
         partnerOfMonth={partnerOfMonth}
@@ -3093,12 +2833,6 @@ export function HomePanelV2({
         onOpenProfile={onOpenProfile}
         onOpenNews={onOpenNews}
         onOpenMap={onOpenMap}
-        onSearchQueryChange={setSearchInputValue}
-        searchQuery={searchInputValue}
-        searchInputRef={searchInputRef}
-        searchLoading={searchLoading}
-        searchResultsCount={searchResultsCount}
-        onSearchKeyDown={handleDesktopSearchKeyDown}
         isOffline={isOffline}
         desktopWorkspaceAvailable={desktopWorkspaceAvailable}
         onSwitchAppMode={onSwitchAppMode}
@@ -3185,15 +2919,6 @@ export function HomePanelV2({
               onOpenLoki={onOpenLoki}
               onOpenNearby={onOpenNearby}
               loading={loading}
-              searchQuery={searchQuery}
-              searchLoading={searchLoading}
-              searchError={searchError}
-              searchResultsProp={searchResultState.results || { partners: [], experts: [], events: [], news: [], all: [] }}
-              searchFlatResults={searchFlatResults}
-              searchActiveIndex={searchActiveIndex}
-              onSearchResultFocus={setSearchActiveIndex}
-              onSearchQueryChange={setSearchInputValue}
-              searchResultsRef={searchResultsRef}
               isOffline={isOffline}
               desktopMode={desktopMode}
             />
