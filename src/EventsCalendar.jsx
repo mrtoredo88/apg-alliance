@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { buildDaySlots, findFreeWindows } from './eventSchedule';
 
 const MONTHS_RU = [
   'Январь','Февраль','Март','Апрель','Май','Июнь',
@@ -72,19 +73,8 @@ function formatDayLabel(date) {
   return `${day}, ${d.getDate()}${month ? ` ${month}` : ''}`;
 }
 
-function buildDayWindows(events) {
-  const list = Array.isArray(events) ? events.filter(Boolean) : [];
-  const busy = new Set(list.map(ev => {
-    const d = getEventDate(ev);
-    return d ? d.getHours() : null;
-  }).filter(v => v !== null));
-  return [9, 12, 15, 18, 20].map(hour => {
-    const event = list.find(ev => {
-      const d = getEventDate(ev);
-      return d && d.getHours() === hour;
-    });
-    return { hour, free: !busy.has(hour), event };
-  });
+function formatHour(hour) {
+  return `${String(hour).padStart(2, '0')}:00`;
 }
 
 const card = {
@@ -167,26 +157,47 @@ function EventRow({ ev, onEventClick, A, showDate = false }) {
   );
 }
 
+const SLOT_STYLES = {
+  free:    { bg: 'rgba(75,179,75,0.08)',  brd: 'rgba(75,179,75,0.22)',  color: '#4ade80', label: 'свободно' },
+  partial: { bg: 'rgba(251,146,60,0.10)', brd: 'rgba(251,146,60,0.30)', color: '#fb923c', label: 'частично занято' },
+  busy:    { bg: 'rgba(201,168,76,0.10)', brd: 'rgba(201,168,76,0.35)', color: '#C9A84C', label: 'занято' },
+};
+
 function FreeWindows({ date, events, onCreateEvent, A }) {
-  const windows = buildDayWindows(events);
+  const slots = buildDaySlots(events, date);
+  const freeWindows = findFreeWindows(slots);
   return (
     <div style={{ ...card, padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <div>
-          <div style={{ color: A.text, fontSize: 14, fontWeight: 800 }}>Свободные окна</div>
+          <div style={{ color: A.text, fontSize: 14, fontWeight: 800 }}>Занятость дня</div>
           <div style={{ color: A.textSec, fontSize: 11, marginTop: 2 }}>{formatDayLabel(date)}</div>
         </div>
         <button onClick={onCreateEvent} style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid ${A.goldBrd}`, background: 'rgba(201,168,76,0.12)', color: A.gold, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>+ Событие</button>
       </div>
-      <div style={{ display: 'grid', gap: 7 }}>
-        {windows.map(item => (
-          <div key={item.hour} style={{ display: 'grid', gridTemplateColumns: '48px 1fr', gap: 10, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: item.free ? 'rgba(75,179,75,0.08)' : 'rgba(201,168,76,0.10)', border: `1px solid ${item.free ? 'rgba(75,179,75,0.22)' : A.goldBrd}` }}>
-            <div style={{ color: item.free ? '#4ade80' : A.gold, fontSize: 12, fontWeight: 900 }}>{String(item.hour).padStart(2, '0')}:00</div>
-            <div style={{ color: item.free ? A.textSec : A.text, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {item.free ? 'свободно' : (item.event?.title || 'мероприятие')}
+      {freeWindows.length > 0 && (
+        <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 12, background: 'rgba(75,179,75,0.06)', border: '1px solid rgba(75,179,75,0.18)', fontSize: 11, color: '#4ade80', fontWeight: 700, lineHeight: '16px' }}>
+          Свободные окна: {freeWindows.map(w => `${formatHour(w.from)}–${formatHour(w.to)}`).join(', ')}
+        </div>
+      )}
+      {freeWindows.length === 0 && (
+        <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 12, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.24)', fontSize: 11, color: '#fb923c', fontWeight: 700 }}>
+          Свободных окон нет — день полностью занят
+        </div>
+      )}
+      <div style={{ display: 'grid', gap: 5 }}>
+        {slots.map(slot => {
+          const st = SLOT_STYLES[slot.state];
+          const titles = slot.events.map(ev => ev?.title).filter(Boolean).join(' · ');
+          return (
+            <div key={slot.hour} style={{ display: 'grid', gridTemplateColumns: '48px 1fr', gap: 10, alignItems: 'center', padding: '6px 10px', borderRadius: 10, background: st.bg, border: `1px solid ${st.brd}` }}>
+              <div style={{ color: st.color, fontSize: 12, fontWeight: 900 }}>{formatHour(slot.hour)}</div>
+              <div style={{ color: slot.state === 'free' ? A.textSec : A.text, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {slot.state === 'free' ? 'свободно' : `${titles || 'мероприятие'}${slot.state === 'partial' ? ' (частично)' : ''}`}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -23,6 +23,9 @@ import { hasExpertAmbassadorAccess, hasPartnerAllianceAccess, hasPartnerPremiumA
 import { listCustomExpertCategories, normalizeCustomExpertCategory, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../server-shared/expert-directory.js';
 import { buildAiImportValidation } from './aiImportValidation.js';
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, filterByLifecycleView, getLifecycleAutoRecommendation, lifecycleBucket, normalizeContentStatus, summarizeLifecycle } from './contentLifecycle.js';
+import { useAdminFormDraft, formatDraftTime, clearAdminDraft } from './adminFormDrafts.js';
+import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
+import { formatEventPrice, isPaidEvent } from './eventPrice.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -453,6 +456,107 @@ const s = {
   tabs:     { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   tab:      { padding: '9px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, textAlign: 'center' },
 };
+
+function DraftRestoreBanner({ draft, onRestore, onDiscard }) {
+  if (!draft) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, marginBottom: 12, background: A.goldDim, border: `1px solid ${A.goldBrd}` }}>
+      <div style={{ flex: 1, fontSize: 13, color: A.gold, fontWeight: 700 }}>
+        💾 Найден несохранённый черновик от {formatDraftTime(draft.savedAt)}
+      </div>
+      <button onClick={onRestore} style={{ ...s.btn, ...s.btnPri, padding: '7px 12px', fontSize: 12 }}>Восстановить</button>
+      <button onClick={onDiscard} style={{ ...s.btn, background: A.chip, color: A.textSec, padding: '7px 12px', fontSize: 12 }}>Удалить</button>
+    </div>
+  );
+}
+
+function AutosaveStatus({ status, savedAt }) {
+  if (status === 'idle') return null;
+  const text = status === 'saving' ? 'Сохраняется…'
+    : status === 'saved' ? `Черновик сохранён ${formatDraftTime(savedAt)}`
+    : 'Ошибка сохранения черновика';
+  const color = status === 'error' ? '#f87171' : status === 'saving' ? A.textSec : A.green;
+  return <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 10 }}>{text}</div>;
+}
+
+const PUSH_SKIP_LABELS = {
+  noConsent: 'Уведомления отключены пользователем',
+  vkProvider: 'VK-провайдер (web push недоступен в VK Mini App)',
+  categoryOptOut: 'Категория отключена в настройках пользователя',
+  audienceMismatch: 'Не входит в целевую аудиторию',
+  noSubscription: 'Нет push-подписки (не выдано разрешение браузера)',
+};
+
+function PushReportModal({ report, onClose }) {
+  if (!report) return null;
+  const stats = report.stats || {};
+  const reasons = stats.skippedReasons || {};
+  const errors = Array.isArray(stats.errors) ? stats.errors : [];
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ ...s.card, width: '100%', maxWidth: 480, maxHeight: '84vh', overflowY: 'auto', marginBottom: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h2 style={{ ...s.h2, margin: 0 }}>{report.error ? '⚠️ Публикация без push' : '✅ Опубликовано'}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
+        </div>
+        <div style={{ fontSize: 13, color: A.text, fontWeight: 700, marginBottom: 12 }}>{report.context}</div>
+        {report.error ? (
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: A.redDim, border: `1px solid ${A.redBrd}`, color: '#f87171', fontSize: 13, marginBottom: 12 }}>
+            Материал опубликован, но push-рассылка не выполнена: {report.error}
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {[
+                ['Получателей (подписки)', stats.subscribers ?? 0, A.text],
+                ['Доставлено', stats.sent ?? 0, A.green],
+                ['Не доставлено', stats.failed ?? 0, (stats.failed ?? 0) > 0 ? '#f87171' : A.textSec],
+                ['Пользователей всего', stats.totalUsers ?? '—', A.textSec],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ padding: '10px 12px', borderRadius: 12, background: A.chip, border: `1px solid ${A.border}` }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {Object.entries(reasons).some(([, count]) => count > 0) && (
+              <>
+                <div style={{ ...s.label }}>Кому push не отправлялся</div>
+                <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
+                  {Object.entries(reasons).filter(([, count]) => count > 0).map(([key, count]) => (
+                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: A.textSec, padding: '7px 10px', borderRadius: 10, background: A.chip }}>
+                      <span>{PUSH_SKIP_LABELS[key] || key}</span>
+                      <b style={{ color: A.text, flexShrink: 0 }}>{count}</b>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {errors.length > 0 && (
+              <>
+                <div style={{ ...s.label }}>Ошибки доставки</div>
+                <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
+                  {errors.slice(0, 8).map((err, i) => (
+                    <div key={i} style={{ fontSize: 11, color: '#f87171', padding: '7px 10px', borderRadius: 10, background: A.redDim, wordBreak: 'break-word' }}>
+                      <b>{err.code}</b>{err.message ? ` — ${String(err.message).slice(0, 160)}` : ''}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {(stats.skipped === true || (stats.subscribers ?? 0) === 0) && (
+              <div style={{ padding: '10px 12px', borderRadius: 12, background: A.goldDim, border: `1px solid ${A.goldBrd}`, color: A.gold, fontSize: 12, marginBottom: 12 }}>
+                Нет подходящих push-подписчиков. Подписки создаются в PWA (myapg.ru) после разрешения уведомлений.
+              </div>
+            )}
+          </>
+        )}
+        <button onClick={onClose} style={{ ...s.btn, ...s.btnPri, width: '100%' }}>Понятно</button>
+      </div>
+    </div>
+  );
+}
 
 function MiniBarChart({ data, labelKey, valueKey, color = A.gold, shortDate = false }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
@@ -3790,6 +3894,90 @@ export const AdminPanel = () => {
   const [eStartAt, setEStartAt]     = useState('');
   const [eEndAt, setEEndAt]         = useState('');
   const [eLocation, setELocation]   = useState('');
+  const [ePriceType, setEPriceType] = useState('free');
+  const [ePrice, setEPrice]         = useState('');
+  const [ePriceIsFrom, setEPriceIsFrom] = useState(false);
+  const [eSendPush, setESendPush]   = useState(true);
+  const [nSendPush, setNSendPush]   = useState(true);
+  const [pushReport, setPushReport] = useState(null);
+
+  // ─── Автосохранение черновиков форм ────────────────────────────────────────
+  const eventDraftData = { eTitle, eDate, ePartner, eEmoji, eDesc, eSocial, eAddress, eDeadline, eIsPrivate, eMinKeys, eMaxParticipants, eEventDate, eIsExpert, ePriceClub, ePricePublic, ePartnerId, eLinkLabel, eLinkUrl, ePriority, eCategory, eCoverPhoto, eStartAt, eEndAt, eLocation, ePriceType, ePrice, ePriceIsFrom };
+  const eventDraft = useAdminFormDraft({
+    formKey: 'event',
+    enabled: showEventModal,
+    editingId: editingEvent?.id || '',
+    data: eventDraftData,
+    isEmpty: !eTitle.trim() && !eDesc.trim() && !eStartAt && !eCoverPhoto,
+  });
+  const restoreEventDraft = (d) => {
+    setETitle(d.eTitle ?? ''); setEDate(d.eDate ?? ''); setEPartner(d.ePartner ?? ''); setEEmoji(d.eEmoji ?? '🎉');
+    setEDesc(d.eDesc ?? ''); setESocial(d.eSocial ?? ''); setEAddress(d.eAddress ?? ''); setEDeadline(d.eDeadline ?? '');
+    setEIsPrivate(!!d.eIsPrivate); setEMinKeys(d.eMinKeys ?? ''); setEMaxParticipants(d.eMaxParticipants ?? ''); setEEventDate(d.eEventDate ?? '');
+    setEIsExpert(!!d.eIsExpert); setEPriceClub(d.ePriceClub ?? ''); setEPricePublic(d.ePricePublic ?? ''); setEPartnerId(d.ePartnerId ?? '');
+    setELinkLabel(d.eLinkLabel ?? ''); setELinkUrl(d.eLinkUrl ?? ''); setEPriority(d.ePriority ?? 0); setECategory(d.eCategory ?? '');
+    setECoverPhoto(d.eCoverPhoto ?? ''); setEStartAt(d.eStartAt ?? ''); setEEndAt(d.eEndAt ?? ''); setELocation(d.eLocation ?? '');
+    setEPriceType(d.ePriceType ?? 'free'); setEPrice(d.ePrice ?? ''); setEPriceIsFrom(!!d.ePriceIsFrom);
+  };
+
+  const newsDraftData = { nTitle, nSubtitle, nSummary, nText, nEmoji, nImage, nLinkUrl, nLinkLabel, nPriority, nCategory, nCoverPhoto, nGallery, nPhotoCaptions, nVideos, nSocialLinks, nContentBlocks, nTags, nAuthor, nSourceName, nExpiresAt, nCommentsEnabled, nPublishedAt };
+  const newsDraft = useAdminFormDraft({
+    formKey: 'news',
+    enabled: showNewsModal,
+    editingId: editingNews?.id || '',
+    data: newsDraftData,
+    isEmpty: !nTitle.trim() && !nText.trim() && !nCoverPhoto,
+  });
+  const restoreNewsDraft = (d) => {
+    setNTitle(d.nTitle ?? ''); setNSubtitle(d.nSubtitle ?? ''); setNSummary(d.nSummary ?? ''); setNText(d.nText ?? '');
+    setNEmoji(d.nEmoji ?? '📢'); setNImage(d.nImage ?? ''); setNLinkUrl(d.nLinkUrl ?? ''); setNLinkLabel(d.nLinkLabel ?? '');
+    setNPriority(d.nPriority ?? 0); setNCategory(d.nCategory ?? ''); setNCoverPhoto(d.nCoverPhoto ?? '');
+    setNGallery(Array.isArray(d.nGallery) ? d.nGallery : []); setNPhotoCaptions(d.nPhotoCaptions || {});
+    setNVideos(Array.isArray(d.nVideos) ? d.nVideos : []); setNSocialLinks(Array.isArray(d.nSocialLinks) ? d.nSocialLinks : []);
+    setNContentBlocks(Array.isArray(d.nContentBlocks) ? d.nContentBlocks : []); setNTags(d.nTags ?? '');
+    setNAuthor(d.nAuthor ?? ''); setNSourceName(d.nSourceName ?? ''); setNExpiresAt(d.nExpiresAt ?? '');
+    setNCommentsEnabled(d.nCommentsEnabled !== false); setNPublishedAt(d.nPublishedAt ?? new Date().toISOString().slice(0, 10));
+  };
+
+  const partnerDraftData = { pName, pDesc, pCategory, pEmoji, pLogo, pPhone, pAddress, pHours, pTier, pSocial, pVkGroup, pOffer, pStampTarget, pOwnerEmail, pPublicationConsent, pBooking, pWebsite, pTelegramCom, pMaxCom, pCoverPhoto, pGallery, pVideos, pLat, pLon };
+  const partnerDraft = useAdminFormDraft({
+    formKey: 'partner',
+    enabled: showPartnerModal,
+    editingId: editingPartner?.id || '',
+    data: partnerDraftData,
+    isEmpty: !pName.trim() && !pDesc.trim(),
+  });
+  const restorePartnerDraft = (d) => {
+    setPName(d.pName ?? ''); setPDesc(d.pDesc ?? ''); setPCategory(d.pCategory ?? 'other'); setPEmoji(d.pEmoji ?? '🏪');
+    setPLogo(d.pLogo ?? ''); setPPhone(d.pPhone ?? ''); setPAddress(d.pAddress ?? ''); setPHours(d.pHours ?? '');
+    setPTier(d.pTier ?? 'start'); setPSocial(d.pSocial ?? ''); setPVkGroup(d.pVkGroup ?? ''); setPOffer(d.pOffer ?? '');
+    setPStampTarget(d.pStampTarget ?? ''); setPOwnerEmail(d.pOwnerEmail ?? ''); setPPublicationConsent(!!d.pPublicationConsent);
+    setPBooking(d.pBooking ?? ''); setPWebsite(d.pWebsite ?? ''); setPTelegramCom(d.pTelegramCom ?? ''); setPMaxCom(d.pMaxCom ?? '');
+    setPCoverPhoto(d.pCoverPhoto ?? ''); setPGallery(Array.isArray(d.pGallery) ? d.pGallery : []); setPVideos(Array.isArray(d.pVideos) ? d.pVideos : []);
+    setPLat(d.pLat ?? ''); setPLon(d.pLon ?? '');
+  };
+
+  const expertDraftData = { exName, exSpec, exDesc, exPhoto, exPhone, exVkUrl, exBooking, exKeys, exVerified, exOwnerEmail, exActive, exOnline, exOffline, exGroup, exTelegram, exWebsite, exMax, exCategory, exTier, exCoverPhoto, exGallery, exVideos, exOffer, exStampTarget, exServices, exAddress, exHours, exExperience, exCost, exWhatsApp, exSecondaryCategories };
+  const expertDraft = useAdminFormDraft({
+    formKey: 'expert',
+    enabled: showExpertModal,
+    editingId: editingExpert?.id || '',
+    data: expertDraftData,
+    isEmpty: !exName.trim() && !exSpec.trim() && !exDesc.trim(),
+  });
+  const restoreExpertDraft = (d) => {
+    setExName(d.exName ?? ''); setExSpec(d.exSpec ?? ''); setExDesc(d.exDesc ?? ''); setExPhoto(d.exPhoto ?? '');
+    setExPhone(d.exPhone ?? ''); setExVkUrl(d.exVkUrl ?? ''); setExBooking(d.exBooking ?? ''); setExKeys(d.exKeys ?? '1');
+    setExVerified(!!d.exVerified); setExOwnerEmail(d.exOwnerEmail ?? ''); setExActive(d.exActive !== false);
+    setExOnline(!!d.exOnline); setExOffline(!!d.exOffline); setExGroup(!!d.exGroup);
+    setExTelegram(d.exTelegram ?? ''); setExWebsite(d.exWebsite ?? ''); setExMax(d.exMax ?? '');
+    setExCategory(d.exCategory ?? 'other'); setExTier(d.exTier ?? 'practice'); setExCoverPhoto(d.exCoverPhoto ?? '');
+    setExGallery(Array.isArray(d.exGallery) ? d.exGallery : []); setExVideos(Array.isArray(d.exVideos) ? d.exVideos : []);
+    setExOffer(d.exOffer ?? ''); setExStampTarget(d.exStampTarget ?? ''); setExServices(d.exServices ?? '');
+    setExAddress(d.exAddress ?? ''); setExHours(d.exHours ?? ''); setExExperience(d.exExperience ?? '');
+    setExCost(d.exCost ?? ''); setExWhatsApp(d.exWhatsApp ?? '');
+    setExSecondaryCategories(Array.isArray(d.exSecondaryCategories) ? d.exSecondaryCategories : []);
+  };
 
   // Ошибки
   const [errorLogs, setErrorLogs]           = useState([]);
@@ -4609,6 +4797,7 @@ export const AdminPanel = () => {
           serverTimestampFields: exTier === 'ambassador' ? ['ambassadorSince'] : [],
         });
       }
+      clearAdminDraft('expert');
       resetExpertForm();
       fetchData();
     } catch (e) {
@@ -4873,6 +5062,7 @@ export const AdminPanel = () => {
         },
       }).catch(() => {});
     }
+    clearAdminDraft('partner');
     resetPartnerForm();
     await fetchData();
     if (savedPartnerId) openPartnerConnectionWizard(savedPartnerId, data.ownerEmail, editingPartner ? 'update' : 'create');
@@ -5180,13 +5370,26 @@ export const AdminPanel = () => {
       publishedAt: nPublishedAt ? new Date(nPublishedAt) : new Date(),
       expiresAt: nExpiresAt ? new Date(nExpiresAt) : null,
     };
+    const isNew = !editingNews;
     if (editingNews) {
       await runAdminAction('news:update', { id: editingNews.id, patch: data });
     } else {
       await runAdminAction('news:create', { patch: data });
     }
+    clearAdminDraft('news');
+    const wantPush = isNew && nSendPush;
     resetNewsForm();
     fetchData();
+    if (wantPush) {
+      await publishContentPush({
+        context: `Новость «${data.title}»`,
+        title: `${data.emoji || '📰'} ${data.title}`,
+        body: data.summary || data.subtitle || data.text.slice(0, 120),
+        category: 'news',
+        deepLink: '/news',
+        imageUrl: data.coverPhoto || '',
+      });
+    }
   };
 
   const showUndo = (payload) => {
@@ -5409,6 +5612,35 @@ export const AdminPanel = () => {
     return result;
   };
 
+  // Публикация контента → in-app уведомление + push broadcast + отчёт администратору
+  const publishContentPush = async ({ context, title, body, category, deepLink, imageUrl }) => {
+    const notifData = {
+      title,
+      body: body || '',
+      emoji: category === 'events' ? '🎉' : '📰',
+      targetType: 'all',
+      category,
+      type: 'info',
+      priority: 'normal',
+      actionLabel: 'Открыть',
+      deepLink: deepLink || '',
+      imageUrl: imageUrl || '',
+      audience: { type: 'all' },
+      scheduleMode: 'now',
+      status: 'published',
+      source: 'auto-publish',
+      pushStatus: 'pending',
+    };
+    try {
+      const created = await runAdminEntityAction('notifications', 'create', { patch: notifData });
+      const stats = await sendPushForNotification(notifData, created.id);
+      setPushReport({ context, stats });
+    } catch (e) {
+      logError(e, 'AdminPanel.publishContentPush');
+      setPushReport({ context, error: e.message || 'Не удалось отправить push.' });
+    }
+  };
+
   const formatPushResult = (prefix, result = {}) => {
     const base = `${prefix}: ${result.sent ?? 0} отправлено · ${result.failed ?? 0} ошибок · ${result.subscribers ?? 0} получателей`;
     const firstError = Array.isArray(result.errors) ? result.errors[0] : null;
@@ -5512,6 +5744,7 @@ export const AdminPanel = () => {
     setEPartnerId('');
     setELinkLabel(''); setELinkUrl(''); setEPriority(0);
     setECategory(''); setECoverPhoto(''); setEStartAt(''); setEEndAt(''); setELocation('');
+    setEPriceType('free'); setEPrice(''); setEPriceIsFrom(false); setESendPush(true);
     setEditingEvent(null); setShowEventModal(false);
   };
 
@@ -5537,6 +5770,9 @@ export const AdminPanel = () => {
     setEStartAt(toDateStr(e.startAt));
     setEEndAt(toDateStr(e.endAt));
     setELocation(e.location ?? '');
+    setEPriceType(e.priceType ?? (isPaidEvent(e) ? 'paid' : 'free'));
+    setEPrice(e.price != null && e.price !== '' ? String(e.price) : '');
+    setEPriceIsFrom(!!e.priceIsFrom);
     setShowEventModal(true);
   };
 
@@ -5556,6 +5792,24 @@ export const AdminPanel = () => {
 
   const saveEvent = async () => {
     if (!eTitle.trim()) return;
+    if (ePriceType === 'paid' && (!Number(ePrice) || Number(ePrice) <= 0)) {
+      window.alert('Для платного мероприятия укажите корректную стоимость.');
+      return;
+    }
+    if (eStartAt) {
+      const start = new Date(eStartAt);
+      const end = eEndAt ? new Date(eEndAt) : null;
+      if (end && end.getTime() <= start.getTime()) {
+        window.alert('Конец события должен быть позже начала.');
+        return;
+      }
+      const conflicts = findEventConflicts(events, start, end, editingEvent?.id || null);
+      if (conflicts.length) {
+        const list = conflicts.slice(0, 5).map(formatConflictLabel).join('\n');
+        const ok = window.confirm(`⚠️ Пересечение по времени с существующими мероприятиями:\n\n${list}\n\nОпубликовать несмотря на конфликт?`);
+        if (!ok) return;
+      }
+    }
     const data = {
       title: eTitle.trim(), date: eDate.trim(), partner: ePartner.trim(),
       emoji: eEmoji, description: eDesc.trim(),
@@ -5577,14 +5831,31 @@ export const AdminPanel = () => {
       startAt:   eStartAt ? new Date(eStartAt) : null,
       endAt:     eEndAt ? new Date(eEndAt) : null,
       location:  eLocation.trim(),
+      priceType: ePriceType,
+      price:     ePriceType === 'paid' ? Number(ePrice) : 0,
+      currency:  '₽',
+      priceIsFrom: ePriceType === 'paid' ? ePriceIsFrom : false,
     };
+    const isNew = !editingEvent;
     if (editingEvent) {
       await runAdminEntityAction('events', 'update', { id: editingEvent.id, patch: data });
     } else {
       await runAdminEntityAction('events', 'create', { patch: data });
     }
+    clearAdminDraft('event');
+    const wantPush = isNew && eSendPush;
     resetEventForm();
     fetchData();
+    if (wantPush) {
+      await publishContentPush({
+        context: `Мероприятие «${data.title}»`,
+        title: `${data.emoji || '🎉'} ${data.title}`,
+        body: [data.date || (data.startAt ? new Date(eStartAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : ''), data.address || data.location].filter(Boolean).join(' · ') || 'Новое мероприятие АПГ',
+        category: 'events',
+        deepLink: '/events',
+        imageUrl: data.coverPhoto || '',
+      });
+    }
   };
 
   const deleteEvent = async (id) => {
@@ -6936,6 +7207,9 @@ export const AdminPanel = () => {
                   <button onClick={resetExpertForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
                 </div>
 
+                <DraftRestoreBanner draft={expertDraft.pendingDraft} onRestore={() => { restoreExpertDraft(expertDraft.pendingDraft.data); expertDraft.acceptDraft(); }} onDiscard={expertDraft.discardDraft} />
+                <AutosaveStatus status={expertDraft.status} savedAt={expertDraft.savedAt} />
+
                 <label style={s.label}>Имя *</label>
                 <input style={s.input} placeholder="Анна Смирнова" value={exName} onChange={e => setExName(e.target.value)} />
 
@@ -7262,6 +7536,9 @@ export const AdminPanel = () => {
                   <h2 style={{ ...s.h2, margin: 0 }}>{editingPartner ? `✏️ ${editingPartner.name}` : '➕ Новый партнёр'}</h2>
                   <button onClick={resetPartnerForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
                 </div>
+
+                <DraftRestoreBanner draft={partnerDraft.pendingDraft} onRestore={() => { restorePartnerDraft(partnerDraft.pendingDraft.data); partnerDraft.acceptDraft(); }} onDiscard={partnerDraft.discardDraft} />
+                <AutosaveStatus status={partnerDraft.status} savedAt={partnerDraft.savedAt} />
 
                 <label style={s.label}>Название *</label>
                 <input style={s.input} placeholder="Студия красоты SEIUNA" value={pName} onChange={e => setPName(e.target.value)} />
@@ -7825,6 +8102,9 @@ export const AdminPanel = () => {
                   <button onClick={resetEventForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
                 </div>
 
+            <DraftRestoreBanner draft={eventDraft.pendingDraft} onRestore={() => { restoreEventDraft(eventDraft.pendingDraft.data); eventDraft.acceptDraft(); }} onDiscard={eventDraft.discardDraft} />
+            <AutosaveStatus status={eventDraft.status} savedAt={eventDraft.savedAt} />
+
             <label style={s.label}>Название *</label>
             <input style={s.input} placeholder="Мастер-класс по флористике" value={eTitle} onChange={e => setETitle(e.target.value)} />
 
@@ -7947,6 +8227,35 @@ export const AdminPanel = () => {
               )}
             </div>
 
+            <label style={s.label}>Тип мероприятия</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {[['free', '🆓 Бесплатное'], ['paid', '💰 Платное']].map(([value, label]) => (
+                <button key={value} onClick={() => setEPriceType(value)}
+                  style={{ flex: 1, padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    border: `2px solid ${ePriceType === value ? A.gold : A.border}`,
+                    background: ePriceType === value ? A.goldDim : 'transparent',
+                    color: ePriceType === value ? A.gold : A.textSec }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {ePriceType === 'paid' && (
+              <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                <label style={{ ...s.label, color: A.gold }}>💰 Стоимость *</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input style={{ ...s.input, marginBottom: 0, flex: 1 }} type="number" min="0" placeholder="500" value={ePrice} onChange={e => setEPrice(e.target.value)} />
+                  <span style={{ color: A.gold, fontSize: 16, fontWeight: 800, flexShrink: 0 }}>₽</span>
+                </div>
+                <label style={{ ...s.label, display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, marginBottom: 0, textTransform: 'none', letterSpacing: 0 }}>
+                  <input type="checkbox" checked={ePriceIsFrom} onChange={e => setEPriceIsFrom(e.target.checked)} />
+                  Цена «от» (например, «от 700 ₽»)
+                </label>
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 8 }}>
+                  В карточках будет показано: {Number(ePrice) > 0 ? `${ePriceIsFrom ? 'от ' : ''}${Number(ePrice).toLocaleString('ru-RU')} ₽` : 'укажите стоимость'}
+                </div>
+              </div>
+            )}
+
             <label style={s.label}>Эмодзи события</label>
             <EmojiPicker emojis={EVENT_EMOJIS} value={eEmoji} onChange={setEEmoji} />
 
@@ -7973,6 +8282,12 @@ export const AdminPanel = () => {
             <label style={s.label}>Место проведения</label>
             <input style={s.input} placeholder="Зеленоград, корп. 1234" value={eLocation} onChange={e => setELocation(e.target.value)} />
 
+                {!editingEvent && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, color: eSendPush ? A.gold : A.textSec, fontWeight: 700, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={eSendPush} onChange={e => setESendPush(e.target.checked)} />
+                    📣 Отправить push-уведомление подписчикам после публикации
+                  </label>
+                )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveEvent}>
                     {editingEvent ? '💾 Сохранить' : '➕ Добавить'}
@@ -7999,6 +8314,7 @@ export const AdminPanel = () => {
         onRequestChanges={(event) => moderateEvent(event, 'event:request_changes')}
         onReject={(event) => moderateEvent(event, 'event:reject')}
       />
+      <PushReportModal report={pushReport} onClose={() => setPushReport(null)} />
 
       {/* ── СОБЫТИЯ ── */}
       {activeTab === 'events' && (
@@ -8047,6 +8363,7 @@ export const AdminPanel = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
                         {e.category && (() => { const cat = CONTENT_CATEGORIES.find(c => c.id === e.category); return cat ? <span style={{ fontSize: 10, fontWeight: 700, color: cat.color, background: cat.color + '22', border: `1px solid ${cat.color}55`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{cat.label}</span> : null; })()}
+                        {(() => { const priceLabel = formatEventPrice(e); return priceLabel ? <span style={{ fontSize: 10, fontWeight: 700, color: isPaidEvent(e) ? A.gold : '#4ade80', background: isPaidEvent(e) ? A.goldDim : 'rgba(75,179,75,0.10)', border: `1px solid ${isPaidEvent(e) ? A.goldBrd : 'rgba(75,179,75,0.25)'}`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{priceLabel}</span> : null; })()}
                       </div>
                       <div style={{ fontSize: 12, color: A.textSec }}>
                         {e.startAt && (() => { const d = e.startAt?.toDate ? e.startAt.toDate() : new Date(e.startAt); return `📅 ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · `; })()}
@@ -8141,6 +8458,9 @@ export const AdminPanel = () => {
                   <h2 style={{ ...s.h2, margin: 0 }}>{editingNews ? `✏️ ${editingNews.title}` : '➕ Новая новость'}</h2>
                   <button onClick={resetNewsForm} style={{ background: 'none', border: 'none', color: A.textSec, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' }}>✕</button>
                 </div>
+
+            <DraftRestoreBanner draft={newsDraft.pendingDraft} onRestore={() => { restoreNewsDraft(newsDraft.pendingDraft.data); newsDraft.acceptDraft(); }} onDiscard={newsDraft.discardDraft} />
+            <AutosaveStatus status={newsDraft.status} savedAt={newsDraft.savedAt} />
 
             <label style={s.label}>Заголовок *</label>
             <input style={s.input} placeholder="Новый партнёр АПГ!" value={nTitle} onChange={e => setNTitle(e.target.value)} />
@@ -8311,6 +8631,12 @@ export const AdminPanel = () => {
               Комментарии включены
             </label>
 
+                {!editingNews && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, color: nSendPush ? A.gold : A.textSec, fontWeight: 700, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={nSendPush} onChange={e => setNSendPush(e.target.checked)} />
+                    📣 Отправить push-уведомление подписчикам после публикации
+                  </label>
+                )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1 }} onClick={saveNews}>
                     {editingNews ? '💾 Сохранить' : '➕ Опубликовать'}

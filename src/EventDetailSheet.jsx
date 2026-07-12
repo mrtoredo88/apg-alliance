@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motionTransition } from './motion.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { shareLink } from './utils/shareLink.js';
+import { formatEventPrice } from './eventPrice.js';
 
 const A = {
   text: APG2_PROFILE.text,
@@ -246,7 +247,7 @@ function normalizeDetailEvent(event, partners, experts) {
     deadline: event.deadline || event.registrationDeadline || event.registrationEndsAt,
     maxParticipants,
     registeredCount,
-    price: firstText(event.price, event.priceClub, event.pricePublic, event.cost),
+    price: formatEventPrice(event) || firstText(event.price, event.priceClub, event.pricePublic, event.cost),
     category: firstText(event.category, event.categoryName, event.type),
     linkUrl: firstText(event.linkUrl, event.socialUrl, event.url, event.website, event.registrationUrl),
     linkLabel: firstText(event.linkLabel, event.buttonLabel, event.ctaLabel, 'Перейти по ссылке'),
@@ -1119,6 +1120,11 @@ export function EventDetailSheet({
           {isAdminRole && <ConflictSection event={detailEvent} allEvents={allEvents} />}
           <DateSection event={detailEvent} status={status} />
           <LocationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />
+          {detailEvent.price ? (
+            <div style={SECTION}>
+              <Row label="Стоимость" value={detailEvent.price} />
+            </div>
+          ) : null}
           <DescriptionSection event={detailEvent} />
           <ModerationSection event={detailEvent} canManage={isAdminRole} />
           {isAdminRole && <PreviewSection event={detailEvent} partnerName={partnerName} />}

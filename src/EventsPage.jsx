@@ -5,6 +5,7 @@ import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, ApgModal, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import { EventDetailSheet } from './EventDetailSheet.jsx';
 import { openUrl } from './vk.js';
+import { formatEventPrice, isFreeEvent, isPaidEvent } from './eventPrice.js';
 
 const GRADIENTS_DARK = [
   'linear-gradient(135deg, #1a1a4e, #2d4a8a)',
@@ -73,11 +74,6 @@ function isEventPast(event) {
   if (!d) return false;
   const end = toDateValue(event?.endAt);
   return (end || d).getTime() < Date.now() - 2 * 60 * 60 * 1000;
-}
-
-function isFreeEvent(event) {
-  const text = `${event?.priceClub || ''} ${event?.pricePublic || ''} ${event?.price || ''}`.toLowerCase();
-  return !text.trim() || text.includes('бесплат') || text.includes('free') || text === '0';
 }
 
 function isKidsEvent(event) {
@@ -285,7 +281,7 @@ function EventCardV2({ event, index, onClick }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
           {event.deadline && <GlassBadge>до регистрации</GlassBadge>}
-          {event.priceClub && <GlassBadge tone="gold">{event.priceClub}</GlassBadge>}
+          {(() => { const priceLabel = formatEventPrice(event); return priceLabel ? <GlassBadge tone="gold">{priceLabel}</GlassBadge> : null; })()}
           <span style={{ marginLeft: 'auto', color: APG2_PROFILE.gold, fontSize: 22, lineHeight: 1 }}>›</span>
         </div>
       </div>
@@ -344,7 +340,14 @@ function EventListCard({ event, index, onClick, isDark = true }) {
               📍 {event.address}
             </div>
           )}
-          {(event.priceClub || event.pricePublic) && (
+          {event.priceType && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: isPaidEvent(event) ? T.gold : '#4ade80', background: isPaidEvent(event) ? 'rgba(201,168,76,0.12)' : 'rgba(75,179,75,0.12)', border: `1px solid ${isPaidEvent(event) ? 'rgba(201,168,76,0.25)' : 'rgba(75,179,75,0.25)'}`, borderRadius: 8, padding: '2px 7px' }}>
+                {formatEventPrice(event)}
+              </div>
+            </div>
+          )}
+          {!event.priceType && (event.priceClub || event.pricePublic) && (
             <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
               {event.priceClub && (
                 <div style={{ fontSize: 11, fontWeight: 700, color: T.gold, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 8, padding: '2px 7px' }}>
@@ -423,7 +426,7 @@ export function EventPosterCard({ event, index = 0, onClick = () => {}, compact 
       </div>
       <div style={{ padding: compact ? 13 : 16, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
-          {isFreeEvent(event) && <GlassBadge tone="gold" style={{ fontSize: 10, padding: '4px 7px' }}>Бесплатно</GlassBadge>}
+          {(() => { const priceLabel = formatEventPrice(event); return priceLabel ? <GlassBadge tone="gold" style={{ fontSize: 10, padding: '4px 7px' }}>{priceLabel}</GlassBadge> : null; })()}
           {deadlineSoon(event) && <GlassBadge style={{ fontSize: 10, padding: '4px 7px' }}>Регистрация скоро</GlassBadge>}
           {event.isExpertEvent && <GlassBadge style={{ fontSize: 10, padding: '4px 7px' }}>Эксперт</GlassBadge>}
         </div>
@@ -566,6 +569,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
       if (filters.includes('weekend') && !isWeekendDate(d)) return false;
       if (filters.includes('week') && (!d || d < today || d > weekEnd)) return false;
       if (filters.includes('free') && !isFreeEvent(event)) return false;
+      if (filters.includes('paid') && !isPaidEvent(event)) return false;
       if (filters.includes('kids') && !isKidsEvent(event)) return false;
       if (filters.includes('adult') && !isAdultEvent(event)) return false;
       if (filters.includes('popular') && Number(event.registeredCount || 0) < 5 && Number(event.priority || 0) < 8) return false;
@@ -633,7 +637,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 2px 12px', margin: '0 -2px 4px' }}>
           {[
             ['today', 'Сегодня'], ['tomorrow', 'Завтра'], ['weekend', 'Выходные'], ['week', 'Эта неделя'],
-            ['free', 'Бесплатно'], ['kids', 'Детям'], ['adult', '18+'],
+            ['free', 'Бесплатно'], ['paid', 'Платные'], ['kids', 'Детям'], ['adult', '18+'],
             ...(userLocation ? [['near', 'Рядом']] : []),
             ['popular', 'Популярное'], ['deadline', 'Скоро регистрация закроется'],
           ].map(([id, label]) => <FilterChip key={id} active={filters.includes(id)} onClick={() => toggleFilter(id)}>{label}</FilterChip>)}

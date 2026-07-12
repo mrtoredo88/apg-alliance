@@ -266,25 +266,68 @@ export default async function sendPushRoutes(fastify) {
         const tokenUserIds = [];
         const subscriptions = [];
         const subscriptionUserIds = [];
+        const skippedReasons = {
+          noConsent: 0,        // уведомления не включены пользователем
+          vkProvider: 0,       // провайдер VK — web push недоступен
+          categoryOptOut: 0,   // категория отключена в настройках
+          audienceMismatch: 0, // не попал в целевую аудиторию
+          noSubscription: 0,   // согласие есть, но нет push-подписки
+        };
+        let reachedUsers = 0;
         snap.docs.forEach(d => {
           const data = d.data() || {};
           const prefs = data.notificationPreferences || DEFAULT_CATEGORIES;
           const hasConsent = data.notificationsEnabled === true || data.notificationConsent === true;
-          if (!hasConsent || (data.notificationProvider && data.notificationProvider !== 'webpush')) return;
-          if (!boolPref(prefs, category)) return;
-          if (!userMatchesAudience(data, audience)) return;
-          (data.fcmTokens ?? []).forEach(t => {
+          if (!hasConsent) { skippedReasons.noConsent += 1; return; }
+          if (data.notificationProvider && data.notificationProvider !== 'webpush') { skippedReasons.vkProvider += 1; return; }
+          if (!boolPref(prefs, category)) { skippedReasons.categoryOptOut += 1; return; }
+          if (!userMatchesAudience(data, audience)) { skippedReasons.audienceMismatch += 1; return; }
+          const fcmTokens = data.fcmTokens ?? [];
+          const webPushSubs = data.webPushSubscriptions ?? [];
+          if (!fcmTokens.length && !webPushSubs.length) { skippedReasons.noSubscription += 1; return; }
+          reachedUsers += 1;
+          fcmTokens.forEach(t => {
             tokens.push(t);
             tokenUserIds.push(d.id);
           });
-          (data.webPushSubscriptions ?? []).forEach(s => {
+          webPushSubs.forEach(s => {
             subscriptions.push(s);
             subscriptionUserIds.push(d.id);
           });
         });
 
+        const audienceSummary = {
+          totalUsers: snap.size,
+          reachedUsers,
+          skippedReasons,
+        };
+
+        const writePushLog = async (stats) => {
+          const logEntry = {
+            title,
+            body: body ?? '',
+            category,
+            priority,
+            audience,
+            notificationId: notificationId ?? null,
+            actorUid: actor?.uid || null,
+            actorName: actor?.name || (secret ? 'system-secret' : null),
+            ...audienceSummary,
+            subscribers: stats.subscribers ?? 0,
+            sent: stats.sent ?? 0,
+            failed: stats.failed ?? 0,
+            cleaned: stats.cleaned ?? 0,
+            errors: stats.errors ?? [],
+            skipped: stats.skipped === true,
+            createdAt: FieldValue.serverTimestamp(),
+          };
+          request.log.info({ push: { title, category, ...audienceSummary, sent: stats.sent, failed: stats.failed, errors: stats.errors } }, 'push broadcast result');
+          await db.collection('pushLogs').add(logEntry).catch(() => {});
+        };
+
         if (!tokens.length && !subscriptions.length) {
-          const skipped = { skipped: true, reason: 'no matching webpush subscribers', subscribers: 0, sent: 0, failed: 0, cleaned: 0 };
+          const skipped = { skipped: true, reason: 'no matching webpush subscribers', subscribers: 0, sent: 0, failed: 0, cleaned: 0, ...audienceSummary };
+          await writePushLog(skipped);
           if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
             pushStatus: 'skipped',
             pushStats: skipped,
@@ -306,7 +349,8 @@ export default async function sendPushRoutes(fastify) {
           fcmTotal.errors = [...(fcmTotal.errors || []), ...(s.errors || [])].slice(0, 20);
         }
         const nativeTotal = await sendToWebPushSubscriptions(subscriptions, subscriptionUserIds, title, body, url, tag, { notificationId, category, type, priority, imageUrl, actionLabel });
-        const total = mergeStats(nativeTotal, fcmTotal, subscriptions.length + tokens.length);
+        const total = { ...mergeStats(nativeTotal, fcmTotal, subscriptions.length + tokens.length), ...audienceSummary };
+        await writePushLog(total);
         if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
           pushStatus: total.failed ? 'partial' : 'sent',
           pushStats: total,
