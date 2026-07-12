@@ -169,9 +169,10 @@ const DESKTOP_LAYOUT = {
   heroHeightMobileSecond: 330,
   heroText: 34,
   heroTagline: 14,
-  topContentRowHeight: 286,
-  lowerContentRowHeight: 276,
+  topContentRowHeight: 290,
+  lowerContentRowHeight: 278,
   quickBarHeight: 86,
+  headerRowGap: 8,
 };
 
 const getDesktopLayout = (rawWidth = 1280) => {
@@ -189,8 +190,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       heroHeight: 168,
       heroText: 33,
       heroTagline: 14,
-      topContentRowHeight: 306,
-      lowerContentRowHeight: 292,
+      topContentRowHeight: 308,
+      lowerContentRowHeight: 294,
+      headerRowGap: 8,
       quickBarHeight: 84,
     };
   }
@@ -207,8 +209,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       heroHeight: 166,
       heroText: 33,
       heroTagline: 14,
-      topContentRowHeight: 300,
-      lowerContentRowHeight: 288,
+      topContentRowHeight: 302,
+      lowerContentRowHeight: 290,
+      headerRowGap: 8,
       quickBarHeight: 86,
     };
   }
@@ -225,8 +228,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       heroHeight: 162,
       heroText: 32,
       heroTagline: 13,
-      topContentRowHeight: 292,
-      lowerContentRowHeight: 280,
+      topContentRowHeight: 296,
+      lowerContentRowHeight: 284,
+      headerRowGap: 8,
       quickBarHeight: 86,
     };
   }
@@ -242,8 +246,9 @@ const getDesktopLayout = (rawWidth = 1280) => {
       heroHeight: 158,
       heroText: 31,
       heroTagline: 13,
-      topContentRowHeight: 286,
-      lowerContentRowHeight: 272,
+      topContentRowHeight: 288,
+      lowerContentRowHeight: 276,
+      headerRowGap: 8,
       quickBarHeight: 86,
     };
   }
@@ -254,6 +259,7 @@ const DesktopSectionHeader = {
   color: V2.text,
   fontWeight: 780,
   lineHeight: 1.15,
+  whiteSpace: 'nowrap',
 };
 
 const DesktopSubheader = {
@@ -725,22 +731,22 @@ function V2FirstScreenDesktop({
         <header style={{
           display: 'grid',
           gridTemplateColumns: 'auto 1fr auto',
-          gap: 14,
+          gap: 11,
           alignItems: 'center',
-          marginBottom: 15,
+          marginBottom: desktopLayout.headerRowGap,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <picture>
               <source srcSet="/logo.webp" type="image/webp" />
-              <img src="/logo.png" alt="АПГ" style={{ width: 44, height: 44, borderRadius: 18, objectFit: 'cover', boxShadow: '0 14px 34px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.18)' }} />
+              <img src="/logo.png" alt="АПГ" style={{ width: 40, height: 40, borderRadius: 16, objectFit: 'cover', boxShadow: '0 12px 30px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.18)' }} />
             </picture>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 880 }}>АПГ</div>
-              <div style={{ color: V2.textMuted, fontSize: 11, lineHeight: '14px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Альянс партнёров города</div>
+              <div style={{ color: V2.text, fontSize: 16, lineHeight: '19px', fontWeight: 880 }}>АПГ</div>
+              <div style={{ color: V2.textMuted, fontSize: 10.5, lineHeight: '13px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Альянс партнёров города</div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 7, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
             {navItems.map(item => (
               <button
                 key={item.label}
@@ -755,9 +761,10 @@ function V2FirstScreenDesktop({
                     : 'linear-gradient(145deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08))',
                   color: item.isActive ? V2.gold : V2.textSoft,
                   cursor: 'pointer',
-                  minHeight: 34,
+                  minHeight: 30,
                   fontWeight: 760,
-                  padding: '0 12px',
+                  padding: '0 10px',
+                  fontSize: 11.6,
                   boxShadow: item.isActive ? '0 0 0 1px rgba(201,168,76,0.32)' : undefined,
                   transition: motionTransition(['background', 'transform', 'border-color'], 'base'),
                   ...pressMotion,
@@ -769,9 +776,9 @@ function V2FirstScreenDesktop({
             ))}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 18, ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: 10, gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 840, lineHeight: '44px' }}>⌕</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 16, ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: 9, gap: 7 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 840, lineHeight: '38px' }}>⌕</span>
               <input
                 aria-label="Поиск"
                 type="text"
@@ -782,13 +789,13 @@ function V2FirstScreenDesktop({
                 autoComplete="off"
                 placeholder="Поиск по городу"
                 style={{
-                  width: 'clamp(170px, 16vw, 260px)',
+                  width: 'clamp(154px, 14vw, 226px)',
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
                   color: V2.text,
                   fontFamily: 'inherit',
-                  fontSize: 13,
+                  fontSize: 12.2,
                 }}
               />
               {searchLoading ? (
@@ -802,7 +809,7 @@ function V2FirstScreenDesktop({
               onClick={onOpenNotifications}
               aria-label="Уведомления"
               style={{
-                width: 44, height: 44, flexShrink: 0, borderRadius: 18, cursor: 'pointer',
+                width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer',
                 ...V2.glass,
                 color: V2.text, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 position: 'relative',
@@ -816,7 +823,7 @@ function V2FirstScreenDesktop({
             <button
               aria-label="Профиль"
               onClick={onOpenProfile}
-              style={{ width: 44, height: 44, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 850 }}
+              style={{ width: 38, height: 38, borderRadius: 16, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13.5, fontWeight: 850 }}
             >
               {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
             </button>
@@ -832,10 +839,10 @@ function V2FirstScreenDesktop({
                   borderColor: 'rgba(201,168,76,0.42)',
                   color: V2.text,
                   cursor: 'pointer',
-                  minHeight: 34,
-                  padding: '0 11px',
+                  minHeight: 30,
+                  padding: '0 10px',
                   fontWeight: 760,
-                  fontSize: 12,
+                  fontSize: 10.8,
                 }}
               >
                 {desktopWorkspaceMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
@@ -910,15 +917,26 @@ function V2FirstScreenDesktop({
             </div>
           </div>
 
-            <div style={{ display: 'grid', gap: 12, alignSelf: 'stretch' }}>
-              <div style={{ ...GlassPanel, borderRadius: 30, padding: 12, height: desktopLayout.heroHeight, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', animation: 'fadeInUp 0.5s ease both' }}>
-              <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ color: V2.text, fontWeight: 870, fontSize: 14.5 }}>Локи</div>
-                <span style={{ color: V2.textMuted, fontSize: 11 }}>ваш гид по АПГ</span>
+        <div style={{ display: 'grid', gap: 11, alignSelf: 'stretch' }}>
+              <div style={{
+                ...GlassPanel,
+                borderRadius: 30,
+                padding: 10,
+                height: desktopLayout.heroHeight,
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                overflow: 'hidden',
+                animation: 'fadeInUp 0.5s ease both',
+              }}>
+              <div style={{ marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: V2.text, fontWeight: 870, fontSize: 14.2 }}>Локи</div>
+                <span style={{ color: V2.textMuted, fontSize: 10.4 }}>ваш гид по АПГ</span>
               </div>
               <div style={{ marginBottom: 6 }}>
                 <LokiIdentity
-                  size={50}
+                  size={46}
                   state="recommending"
                   label="Локи"
                   sublabel="Собрал для вас рекомендации"
@@ -926,23 +944,23 @@ function V2FirstScreenDesktop({
                 />
               </div>
               <div>
-                  <div style={{ color: V2.text, fontSize: 14.8, lineHeight: '17px', fontWeight: 850, marginBottom: 3 }}>Я собрал, с чего начать сегодня</div>
-                <div style={{ color: V2.textSoft, fontSize: 11, lineHeight: '15px', marginBottom: 8 }}>
+                  <div style={{ color: V2.text, fontSize: 14.2, lineHeight: '17px', fontWeight: 850, marginBottom: 3 }}>Я собрал, с чего начать сегодня</div>
+                <div style={{ color: V2.textSoft, fontSize: 10.6, lineHeight: '14px', marginBottom: 7 }}>
                   Ближайшее событие, полезное место и несколько рекомендаций без лишнего шума.
                 </div>
               </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 5, alignItems: 'stretch' }}>
                     {todayCards.slice(0, 3).map(card => (
-                  <button key={card.title} onClick={card.onClick} type="button" style={{ ...GlassCard, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 16, textAlign: 'left', padding: '6px 7px', cursor: card.onClick ? 'pointer' : 'default', minHeight: 48 }}>
-                    <div style={{ color: V2.text, fontSize: 10.5, fontWeight: 820, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                  <button key={card.title} onClick={card.onClick} type="button" style={{ ...GlassCard, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 16, textAlign: 'left', padding: '5px 7px', cursor: card.onClick ? 'pointer' : 'default', minHeight: 44, maxHeight: 44, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div style={{ color: V2.text, fontSize: 10.1, fontWeight: 820, display: 'flex', justifyContent: 'space-between', gap: 6, lineHeight: '11px' }}>
                       <span>{card.icon} {card.title}</span>
                       <span style={{ color: V2.textMuted }}>→</span>
                     </div>
-                    <div style={{ color: V2.textSoft, fontSize: 9.2, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.value}</div>
+                    <div style={{ color: V2.textSoft, fontSize: 8.4, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.value}</div>
                   </button>
                 ))}
                 </div>
-              <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, width: '100%', marginTop: 6, minHeight: 30, padding: '0 11px', color: '#17120A', fontSize: 11.8 }}>Посмотреть рекомендации</button>
+              <button type="button" onClick={onOpenLoki} style={{ ...GlassButton, width: '100%', marginTop: 4, minHeight: 28, padding: '0 10px', color: '#17120A', fontSize: 10.8 }}>Посмотреть рекомендации</button>
             </div>
           </div>
         </div>
@@ -1615,8 +1633,8 @@ function V2SecondScreenDesktop({
     boxSizing: 'border-box',
     overflow: 'hidden',
   };
-  const desktopRowGap = Math.max(8, desktopLayout.compactGap - 2);
-  const desktopSecondRowGap = Math.max(9, desktopLayout.compactGap - 1);
+  const desktopRowGap = Math.max(7, desktopLayout.compactGap - 3);
+  const desktopSecondRowGap = Math.max(8, desktopLayout.compactGap - 2);
   const desktopContentGrid = {
     display: 'grid',
     gridTemplateColumns: desktopWidth >= 1500
@@ -1630,17 +1648,20 @@ function V2SecondScreenDesktop({
     ...desktopSectionShell,
     height: desktopLayout.topContentRowHeight,
     display: 'grid',
-    gridTemplateRows: 'auto 1fr',
+    gridTemplateRows: 'auto minmax(0, 1fr)',
     alignItems: 'stretch',
   };
   const desktopSecondRowStyle = {
     ...desktopSectionShell,
     height: desktopLayout.lowerContentRowHeight,
     display: 'grid',
-    gridTemplateRows: 'auto 1fr',
+    gridTemplateRows: 'auto minmax(0, 1fr)',
     alignItems: 'stretch',
   };
   const desktopSideCardColumns = 'minmax(0, 1.2fr) minmax(158px, 1fr)';
+  const compactSectionTileHeight = 132;
+  const compactSectionLeadImageHeight = 110;
+  const compactMainCardMetaGap = 4;
   const quickAccessItems = [
     { label: 'Мероприятия', icon: '⌖', onClick: onOpenEvents, tone: 'rgba(101,163,255,0.22)' },
     { label: 'Партнёры', icon: '◈', onClick: onOpenOffers, tone: 'rgba(244,217,140,0.22)' },
@@ -1811,8 +1832,8 @@ function V2SecondScreenDesktop({
               </div>
               {loading ? (
                 <div style={{ display: 'grid', gridTemplateColumns: desktopSideCardColumns, gap: desktopRowGap, alignItems: 'stretch', minHeight: 0, alignContent: 'start', height: '100%' }}>
-                  <div style={{ ...DesktopTile, border: 'none', padding: 0, minHeight: Math.max(200, desktopLayout.topContentRowHeight - 78), height: Math.max(200, desktopLayout.topContentRowHeight - 78), overflow: 'hidden' }}>
-                    <Skel h={96} w="100%" radius={0} />
+                  <div style={{ ...DesktopTile, border: 'none', padding: 0, height: '100%', overflow: 'hidden' }}>
+                    <Skel h={compactSectionLeadImageHeight} w="100%" radius={0} />
                     <div style={{ padding: 10, display: 'grid', gap: 6 }}>
                       <Skel h={10} w={110} radius={5} />
                       <Skel h={30} w="94%" radius={9} />
@@ -1821,7 +1842,7 @@ function V2SecondScreenDesktop({
                   </div>
                   <div style={{ display: 'grid', gap: 6, gridTemplateRows: 'repeat(3, minmax(0, 1fr))', height: '100%' }}>
                     {[0, 1, 2].map((i) => (
-                      <div key={`main-news-side-skel-${i}`} style={{ ...DesktopDenseTile, border: 'none', padding: 7, display: 'grid', gridTemplateColumns: '40px 1fr', gap: 6, alignItems: 'center', minHeight: 52 }}>
+                      <div key={`main-news-side-skel-${i}`} style={{ ...DesktopDenseTile, border: 'none', padding: 7, display: 'grid', gridTemplateColumns: '40px 1fr', gap: 6, alignItems: 'center', minHeight: 56, height: '100%' }}>
                         <Skel w={40} h={40} radius={10} />
                         <div style={{ display: 'grid', gap: 4 }}>
                           <Skel h={9.5} w={56} radius={4} />
@@ -1840,17 +1861,17 @@ function V2SecondScreenDesktop({
                       type="button"
                       onClick={() => { addRecentAction(mainNews, 'news'); onOpenNewsItem?.(mainNews); }}
                       {...pressMotion}
-                      style={{ ...DesktopTile, border: 'none', padding: 0, overflow: 'hidden', textAlign: 'left', cursor: 'pointer', display: 'grid', gridTemplateRows: '110px 1fr', height: '100%' }}
+                      style={{ ...DesktopTile, border: 'none', padding: 0, overflow: 'hidden', textAlign: 'left', cursor: 'pointer', display: 'grid', gridTemplateRows: `${compactSectionLeadImageHeight}px 1fr`, height: '100%' }}
                     >
                     <div style={{ position: 'relative', background: 'radial-gradient(circle at 20% 16%, rgba(244,217,140,0.26), transparent 42%), rgba(255,255,255,0.06)' }}>
                       {getNewsImage(mainNews) ? <img src={getNewsImage(mainNews)} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
                       <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent, rgba(8,8,10,0.72))' }} />
                       <span style={{ position: 'absolute', left: 16, top: 16, ...GlassBadge, background: 'rgba(8,8,10,0.52)' }}>{getNewsCategoryLabel(mainNews)}</span>
                     </div>
-                      <div style={{ padding: 11, display: 'grid', alignContent: 'start', gap: 5 }}>
-                        <div style={{ color: V2.textMuted, fontSize: 10.8, lineHeight: '13px', marginBottom: 3 }}>{formatNewsDate(mainNews)}</div>
-                        <div style={{ color: V2.text, fontSize: 17.1, lineHeight: '20px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(mainNews)}</div>
-                        <div style={{ marginTop: 2, color: V2.textSoft, fontSize: 11, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(mainNews)}</div>
+                    <div style={{ padding: 11, display: 'grid', alignContent: 'start', gap: compactSectionTileMetaGap }}>
+                        <div style={{ color: V2.textMuted, fontSize: 10.8, lineHeight: '13px', marginBottom: 1 }}>{formatNewsDate(mainNews)}</div>
+                        <div style={{ color: V2.text, fontSize: 16.3, lineHeight: '19px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(mainNews)}</div>
+                        <div style={{ marginTop: 1, color: V2.textSoft, fontSize: 10.6, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsText(mainNews)}</div>
                       </div>
                   </button>
                   <div style={{ display: 'grid', gap: 6, gridTemplateRows: 'repeat(3, minmax(0, 1fr))', height: '100%' }}>
@@ -1859,12 +1880,12 @@ function V2SecondScreenDesktop({
                         key={sideItem?.key || sideItem?.id || `${sideItem?.title}-${index}`}
                         type="button"
                         onClick={sideItem?.onAction}
-                        style={{ ...DesktopDenseTile, border: 'none', height: '100%', padding: 8, textAlign: 'left', cursor: sideItem?.onAction ? 'pointer' : 'default', display: 'grid', gap: 6, gridTemplateColumns: sideItem.image ? '34px 1fr' : '1fr', alignItems: 'center', minHeight: 52 }}
+                        style={{ ...DesktopDenseTile, border: 'none', height: '100%', padding: 8, textAlign: 'left', cursor: sideItem?.onAction ? 'pointer' : 'default', display: 'grid', gap: 6, gridTemplateColumns: sideItem.image ? '34px 1fr' : '1fr', alignItems: 'center', minHeight: 56 }}
                       >
-                        <div style={{ minWidth: 0, gridColumn: sideItem.image ? '2 / 3' : '1 / -1', display: 'grid', gap: 4 }}>
+                          <div style={{ minWidth: 0, gridColumn: sideItem.image ? '2 / 3' : '1 / -1', display: 'grid', gap: 4 }}>
                           <div style={{ color: V2.gold, fontSize: 9.6, lineHeight: '11px', fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.45 }}>{sideItem.kind}</div>
-                          <div style={{ color: V2.text, fontSize: 12.1, lineHeight: '14px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sideItem.title}</div>
-                          <div style={{ color: V2.textSoft, fontSize: 10.8, lineHeight: '12px', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{[sideItem.subtitle, sideItem.extra].filter(Boolean).join(' · ') || 'Актуальная информация'}</div>
+                          <div style={{ color: V2.text, fontSize: 12.6, lineHeight: '14px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sideItem.title}</div>
+                          <div style={{ color: V2.textSoft, fontSize: 10.2, lineHeight: '12px', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{[sideItem.subtitle, sideItem.extra].filter(Boolean).join(' · ') || 'Актуальная информация'}</div>
                         </div>
                         {sideItem.image ? (
                           <div style={{ width: 34, height: 34, borderRadius: 9, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
@@ -1898,7 +1919,7 @@ function V2SecondScreenDesktop({
                     alignItems: 'center',
                     justifyContent: 'center',
                     textAlign: 'center',
-                    maxWidth: 360,
+                    width: '100%',
                   }}>
                     Сейчас нет запланированных мероприятий.
                   </div>
@@ -1946,7 +1967,7 @@ function V2SecondScreenDesktop({
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactPartnerColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
                 {loading ? [0, 1, 2].map(i => (
-                  <div key={`partner-skel-${i}`} style={{ ...DesktopDenseTile, minHeight: 132, height: '100%', padding: 8, display: 'grid', gap: 6, gridTemplateColumns: '1fr', alignContent: 'start' }}>
+                  <div key={`partner-skel-${i}`} style={{ ...DesktopDenseTile, minHeight: compactSectionTileHeight, height: '100%', padding: 10, display: 'grid', gap: 6, gridTemplateColumns: '1fr', alignContent: 'start' }}>
                     <Skel h={44} w="100%" radius={11} />
                     <Skel h={13} w="84%" radius={6} />
                     <Skel h={10} w="68%" radius={4} />
@@ -1956,7 +1977,7 @@ function V2SecondScreenDesktop({
                     key={partner.id || partner.name}
                     onClick={() => { addRecentAction(partner, 'partner'); onOpenPartner?.(partner); }}
                     type="button"
-                    style={{ ...DesktopDenseTile, border: 'none', minHeight: 132, height: '100%', padding: 10, textAlign: 'left', display: 'grid', gap: 7, alignItems: 'start', cursor: 'pointer', gridTemplateRows: 'auto auto 1fr' }}
+                    style={{ ...DesktopDenseTile, border: 'none', minHeight: compactSectionTileHeight, height: '100%', padding: 10, textAlign: 'left', display: 'grid', gap: 7, alignItems: 'start', cursor: 'pointer', gridTemplateRows: 'auto auto 1fr' }}
                   >
                     <PartnerLogo partner={partner} size={42} />
                     <div style={{ minWidth: 0 }}>
@@ -1994,7 +2015,7 @@ function V2SecondScreenDesktop({
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactExpertsColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
                 {loading ? [0, 1, 2].map(i => (
-                  <div key={`expert-skel-${i}`} style={{ ...DesktopDenseTile, minHeight: 132, height: '100%', padding: 10, display: 'grid', gap: 6, alignItems: 'start', justifyItems: 'start', gridTemplateRows: 'auto auto auto' }}>
+                  <div key={`expert-skel-${i}`} style={{ ...DesktopDenseTile, minHeight: compactSectionTileHeight, height: '100%', padding: 10, display: 'grid', gap: 6, alignItems: 'start', justifyItems: 'start', gridTemplateRows: 'auto auto auto' }}>
                     <Skel h={50} w={50} radius={12} />
                     <Skel h={11} w="92%" radius={6} />
                     <Skel h={9} w="76%" radius={4} />
@@ -2006,7 +2027,7 @@ function V2SecondScreenDesktop({
                     key={expert.id || `${expert.name}-${index}`}
                     onClick={onOpenExperts}
                     type="button"
-                    style={{ ...DesktopDenseTile, border: 'none', minHeight: 132, height: '100%', padding: 10, textAlign: 'left', display: 'grid', gap: 6, alignItems: 'start', cursor: 'pointer', gridTemplateRows: 'auto auto 1fr', justifyItems: 'start' }}
+                    style={{ ...DesktopDenseTile, border: 'none', minHeight: compactSectionTileHeight, height: '100%', padding: 10, textAlign: 'left', display: 'grid', gap: 6, alignItems: 'start', cursor: 'pointer', gridTemplateRows: 'auto auto 1fr', justifyItems: 'start' }}
                   >
                     <img src={profileImageOf(expert)} alt={expert?.name || ''} loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: 50, height: 50, borderRadius: 15, objectFit: 'cover', background: 'rgba(255,255,255,0.14)' }} />
                     <div style={{ minWidth: 0 }}>
@@ -2037,33 +2058,32 @@ function V2SecondScreenDesktop({
                 </div>
               ) : null}
               <div>
-                <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                    <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                   <div style={{ color: V2.text, fontWeight: 850, fontSize: 23 }}>Рядом</div>
                   <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Открыть карту</button>
                 </div>
-                  <div style={{ ...DesktopTile, padding: 8 }}>
+                  <div style={{ ...DesktopDenseTile, padding: 8 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactNearbyColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
                     {nearbyObjects.length === 0 ? (
                       <div style={{ color: V2.textMuted, fontSize: 12 }}>Сейчас поблизости нет новых объектов.</div>
                     ) : nearbyObjects.map((item) => (
-                      <button
+                    <button
                         key={item.key}
                         type="button"
                         onClick={item.action}
                         style={{
+                          ...DesktopDenseTile,
                           border: 'none',
-                          borderRadius: 14,
-                          background: 'rgba(255,255,255,0.08)',
                           color: V2.text,
-                          padding: 8,
+                          minHeight: compactSectionTileHeight,
+                          height: '100%',
+                          padding: 10,
                           textAlign: 'left',
                           cursor: 'pointer',
                           display: 'grid',
                           gridTemplateRows: '44px auto auto',
                           gap: 6,
                           alignItems: 'start',
-                          minHeight: 132,
-                          height: '100%',
                         }}
                       >
                         <div style={{ width: '100%', height: 50, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
@@ -2081,13 +2101,13 @@ function V2SecondScreenDesktop({
               </div>
             </section>
 
-            <section style={{ ...desktopSectionShell, height: desktopLayout.quickBarHeight, padding: '9px 12px 10px', marginTop: -8 }}>
+            <section style={{ ...desktopSectionShell, gridColumn: '1 / -1', padding: '9px 12px 10px', marginTop: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'center' }}>
                 <div>
                   <div style={{ color: V2.text, fontWeight: 850, fontSize: 18, lineHeight: '22px' }}>Быстрый доступ</div>
                   <div style={{ color: V2.textMuted, fontSize: 11.5, lineHeight: '15px', marginTop: 3 }}>Основные пользовательские разделы АПГ.</div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
                   {quickAccessItems.map((item) => (
                     <button key={item.label} type="button" onClick={item.onClick} style={{ border: 'none', borderRadius: 13, background: 'rgba(255,255,255,0.08)', color: V2.text, minHeight: 38, padding: '6px 8px', cursor: item.onClick ? 'pointer' : 'default', display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', gap: 8, textAlign: 'left' }}>
                       <span style={{ width: 24, height: 24, borderRadius: 8, background: item.tone, display: 'flex', alignItems: 'center', justifyContent: 'center', color: V2.gold, fontSize: 12, fontWeight: 880 }}>{item.icon}</span>
