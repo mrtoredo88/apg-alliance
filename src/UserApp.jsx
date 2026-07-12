@@ -2970,8 +2970,13 @@ export function UserApp() {
     onOpenHealth: () => goPanel('health'),
     onOpenMap: () => goPanel('map'),
     onOpenNearby: () => goPanel('nearby'),
+    onOpenOffers: () => goPanel('offers'),
+    onOpenProfile: () => goPanel('profile'),
     onOpenReference: () => goPanel('reference'),
     onOpenLoki: () => goPanel('loki'),
+    desktopWorkspaceAvailable,
+    onSwitchAppMode: setAppModePersisted,
+    desktopWorkspaceMode: resolvedAppMode,
   };
 
   return (
