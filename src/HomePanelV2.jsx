@@ -213,44 +213,6 @@ const GlassPanel = {
   ...GlassSection,
 };
 
-function IntelligenceSignalCard({ homeExperience, onOpenLoki, compact = false }) {
-  const main = homeExperience?.smartContext?.mainRecommendation;
-  const insight = homeExperience?.insights?.[0] || homeExperience?.smartContext?.lokiAdvice || '';
-  if (!main && !insight) return null;
-  const title = main?.title || insight;
-  const reasons = main?.explanation || main?.explain || [];
-  return (
-    <button
-      type="button"
-      onClick={onOpenLoki}
-      {...pressMotion}
-      style={{
-        ...GlassCard,
-        width: '100%',
-        border: '1px solid rgba(244,217,140,0.28)',
-        borderRadius: compact ? 24 : 30,
-        padding: compact ? 12 : 15,
-        textAlign: 'left',
-        cursor: onOpenLoki ? 'pointer' : 'default',
-        display: 'grid',
-        gap: compact ? 6 : 8,
-        background: 'radial-gradient(circle at 12% 0%, rgba(244,217,140,0.22), transparent 38%), rgba(var(--apg2-glass-a,255,255,255),0.08)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <span style={{ ...GlassBadge, color: V2.gold, fontSize: compact ? 9.5 : 11 }}>Локи заметил</span>
-        <span style={{ color: V2.textMuted, fontSize: compact ? 10 : 11, fontWeight: 780 }}>→</span>
-      </div>
-      <div style={{ color: V2.text, fontSize: compact ? 13.2 : 16, lineHeight: compact ? '16px' : '20px', fontWeight: 880, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</div>
-      {reasons.length ? (
-        <div style={{ color: V2.textSoft, fontSize: compact ? 10.4 : 12, lineHeight: compact ? '13px' : '16px', display: '-webkit-box', WebkitLineClamp: compact ? 1 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          Потому что {reasons.slice(0, compact ? 1 : 2).join(', ')}
-        </div>
-      ) : null}
-    </button>
-  );
-}
-
 const GlassHero = {
   ...V2.glowGlass,
   borderRadius: 42,
@@ -1389,12 +1351,8 @@ function V2SecondScreenMobile({
           Что интересного сегодня
         </div>
         <div style={{ color: V2.textMuted, fontSize: 14, lineHeight: '22px', fontWeight: 420 }}>
-          {homeExperience?.insights?.[0] || 'Подборка поводов выйти в город и открыть новые места'}
+          Подборка поводов выйти в город и открыть новые места
         </div>
-      </div>
-
-      <div style={{ padding: desktopMode ? '0 0 18px' : '0 22px 22px' }}>
-        <IntelligenceSignalCard homeExperience={homeExperience} onOpenLoki={onOpenLoki} />
       </div>
 
       <div data-apg-horizontal-scroll={!desktopMode ? 'true' : undefined} onTouchStart={e => e.stopPropagation()}>

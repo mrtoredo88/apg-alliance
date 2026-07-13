@@ -6,6 +6,7 @@ import { LokiExperience } from './LokiExperience.jsx';
 import { LokiIdentity } from './LokiIdentity.jsx';
 import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { getLokiPosition } from './lokiPosition.js';
+import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
 
 function getMotionName(emotion) {
   if (emotion === 'happy') return 'lokiHappy';
@@ -231,7 +232,7 @@ export function LokiAssistant({ desktopMode = false }) {
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
         {menuOpen && (
           <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 190, borderRadius: 24, padding: 9, display: 'grid', gap: 7, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
-            <button type="button" onClick={() => { loki.openExperience(); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
+            <button type="button" onClick={() => { loki.executeAction(createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI)); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
             <button type="button" onClick={() => { setBrainOpen(v => !v); setHistoryOpen(false); setMenuOpen(false); }} style={menuButtonStyle}>Спросить Локи</button>
             <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
             <button type="button" onClick={() => { loki.handleCharacterTap(); setMenuOpen(false); }} style={menuButtonStyle}>Поздороваться</button>

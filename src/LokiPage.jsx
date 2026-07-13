@@ -45,12 +45,29 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
   const loki = useLoki();
   const [input, setInput] = useState('');
   const [answer, setAnswer] = useState(null);
+  const [hiddenRecommendationIds, setHiddenRecommendationIds] = useState(() => new Set());
   const dashboard = loki.dashboard ?? {};
 
   const recommendations = useMemo(() => {
     const rows = dashboard.todayRecommendations?.length ? dashboard.todayRecommendations : loki.recommendationFeed ?? [];
     return rows.slice(0, 3);
   }, [dashboard.todayRecommendations, loki.recommendationFeed]);
+  const personalSummary = Array.isArray(dashboard.personalSummary) ? dashboard.personalSummary : [];
+  const continueItems = Array.isArray(dashboard.continueItems) ? dashboard.continueItems : [];
+  const changes = Array.isArray(dashboard.changes) ? dashboard.changes : [];
+  const todayBlocks = Array.isArray(dashboard.todayBlocks) ? dashboard.todayBlocks : [];
+  const recommendationSections = dashboard.recommendationSections || {};
+  const recommendationCards = [
+    ...(recommendationSections.events || []),
+    ...(recommendationSections.partners || []),
+    ...(recommendationSections.news || []),
+    ...(recommendationSections.experts || []),
+    ...recommendations,
+  ].filter(Boolean);
+  const uniqueRecommendationCards = recommendationCards
+    .filter((card, index, list) => list.findIndex(row => `${row.type}-${row.id}` === `${card.type}-${card.id}`) === index)
+    .filter(card => !hiddenRecommendationIds.has(`${card.type}-${card.id}`))
+    .slice(0, 5);
 
   useEffect(() => {
     recommendations.forEach(card => {
@@ -121,10 +138,24 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
         </div>
         <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 920 }}>{safeText(card.title, 'Рекомендация АПГ')}</div>
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>{shortText(card.reason || card.text || 'Открою детали и помогу выбрать действие.', 126)}</div>
+        {!!card.explanation?.length && (
+          <div style={{ display: 'grid', gap: 3, marginTop: 8 }}>
+            {card.explanation.slice(0, 2).map((reason, idx) => (
+              <div key={`${card.id}-reason-${idx}`} style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px' }}>• {reason}</div>
+            ))}
+          </div>
+        )}
         {!!card.actions?.length && (
           <div style={{ display: 'flex', gap: 7, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 11, paddingBottom: 2 }} onClick={e => e.stopPropagation()}>
             {card.actions.slice(0, 3).map((act, idx) => (
-              <GlassButton key={`${card.id}-action-${idx}`} tone={idx === 0 ? 'gold' : 'default'} onClick={() => act.href ? openHref(act.href) : runCardAction(act.action)} style={{ minHeight: 34, borderRadius: 999, padding: '7px 10px', fontSize: 12, flex: '0 0 auto', color: idx === 0 ? '#17120a' : undefined }}>{act.label}</GlassButton>
+              <GlassButton key={`${card.id}-action-${idx}`} tone={idx === 0 ? 'gold' : 'default'} onClick={() => {
+                if (act.localAction === 'hideRecommendation') {
+                  setHiddenRecommendationIds(prev => new Set([...prev, `${card.type}-${card.id}`]));
+                  return;
+                }
+                if (act.href) openHref(act.href);
+                else runCardAction(act.action);
+              }} style={{ minHeight: 34, borderRadius: 999, padding: '7px 10px', fontSize: 12, flex: '0 0 auto', color: idx === 0 ? '#17120a' : undefined }}>{act.label}</GlassButton>
             ))}
           </div>
         )}
@@ -134,6 +165,34 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
 
   const progress = dashboard.progress ?? {};
   const mainNews = dashboard.mainNews ?? null;
+  const renderSectionTitle = (title, meta = '') => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+      <div style={{ color: APG2_PROFILE.text, fontSize: 19, lineHeight: '24px', fontWeight: 920 }}>{title}</div>
+      {meta ? <GlassBadge>{meta}</GlassBadge> : null}
+    </div>
+  );
+  const renderInsightList = (items = []) => (
+    <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 8 }}>
+      {items.map((item, idx) => (
+        <div key={`${item}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '24px 1fr', gap: 9, alignItems: 'start' }}>
+          <span style={{ width: 24, height: 24, borderRadius: 12, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900 }}>{idx + 1}</span>
+          <span style={{ color: APG2_PROFILE.textSoft, fontSize: 13.2, lineHeight: '18px' }}>{item}</span>
+        </div>
+      ))}
+    </GlassCard>
+  );
+  const renderContinueItem = (item) => (
+    <button
+      key={`${item.type}-${item.id}`}
+      type="button"
+      onClick={() => runCardAction(item.action)}
+      style={{ border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: APG2_PROFILE.text, borderRadius: 20, padding: 12, textAlign: 'left', display: 'grid', gap: 4 }}
+    >
+      <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 840, textTransform: 'uppercase' }}>{item.label || cardTypeLabel(item.type)}</span>
+      <span style={{ fontSize: 14, lineHeight: '18px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.text}</span>
+    </button>
+  );
 
   return (
     <GlassPanel>
@@ -141,8 +200,8 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
         <GlassButton onClick={onBack} style={{ width: 44, minHeight: 44, borderRadius: 18, padding: 0 }}>‹</GlassButton>
         <div style={{ minWidth: 0, flex: 1 }}>
           <GlassBadge tone="gold" style={{ marginBottom: 7 }}>{isVK() ? 'Loki Home в VK' : 'Loki Home'}</GlassBadge>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 28, lineHeight: '32px', fontWeight: 940 }}>AI Dashboard</div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px', marginTop: 4 }}>Персональная главная страница АПГ.</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 28, lineHeight: '32px', fontWeight: 940 }}>Личный секретарь</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px', marginTop: 4 }}>Единый центр персональных рекомендаций АПГ.</div>
         </div>
       </div>
 
@@ -158,12 +217,31 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </GlassCard>
 
       <section style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 19, lineHeight: '24px', fontWeight: 920 }}>Сегодня для тебя</div>
-          <GlassBadge>{recommendations.length || 0} варианта</GlassBadge>
+        {renderSectionTitle('Сегодня для вас', `${personalSummary.length || 0} фактов`)}
+        {personalSummary.length ? renderInsightList(personalSummary) : (
+          <GlassCard style={{ borderRadius: 28, padding: 15 }}>
+            <div style={{ color: APG2_PROFILE.text, fontWeight: 880 }}>Локи собирает контекст</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Чем больше вы пользуетесь АПГ, тем точнее будет ежедневная сводка.</div>
+          </GlassCard>
+        )}
+      </section>
+
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Продолжить', continueItems.length ? `${continueItems.length}` : '')}
+        <div style={{ display: 'grid', gridTemplateColumns: continueItems.length > 1 ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 9 }}>
+          {continueItems.length ? continueItems.slice(0, 4).map(renderContinueItem) : (
+            <GlassCard style={{ borderRadius: 26, padding: 15 }}>
+              <div style={{ color: APG2_PROFILE.text, fontWeight: 880 }}>Нет незавершённых действий</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Когда вы начнёте читать новости, смотреть партнёров или мероприятия, Локи запомнит путь.</div>
+            </GlassCard>
+          )}
         </div>
+      </section>
+
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Локи рекомендует', `${uniqueRecommendationCards.length || 0}`)}
         <div style={{ display: 'grid', gap: 9 }}>
-          {recommendations.length ? recommendations.map(card => renderLokiCard(card, 'today')) : (
+          {uniqueRecommendationCards.length ? uniqueRecommendationCards.map(card => renderLokiCard(card, 'recommend')) : (
             <GlassCard style={{ borderRadius: 26, padding: 16 }}>
               <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 880 }}>Локи готов собрать подборку</div>
               <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Спроси, что интересно сегодня, и я выберу лучший вариант из данных АПГ.</div>
@@ -173,37 +251,26 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </section>
 
       <section style={{ marginBottom: 14 }}>
-        <div style={{ color: APG2_PROFILE.text, fontSize: 19, lineHeight: '24px', fontWeight: 920, marginBottom: 10 }}>Быстрые сценарии</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
-          {QUICK_ACTIONS.map(item => (
-            <GlassCard key={item.id} onClick={() => ask(item.prompt)} style={{ borderRadius: 26, padding: 14, minHeight: 124, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 26, lineHeight: '30px' }}>{item.icon}</div>
-              <div>
-                <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '19px', fontWeight: 900 }}>{item.title}</div>
-                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', marginTop: 4 }}>{item.text}</div>
-              </div>
-            </GlassCard>
-          ))}
-        </div>
+        {renderSectionTitle('Что изменилось', changes.length ? 'с последнего периода' : '')}
+        {changes.length ? renderInsightList(changes) : (
+          <GlassCard style={{ borderRadius: 28, padding: 15 }}>
+            <div style={{ color: APG2_PROFILE.text, fontWeight: 880 }}>Пока без заметных изменений</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Локи покажет новые события, новости, партнёров и начисления, когда они появятся.</div>
+          </GlassCard>
+        )}
       </section>
 
-      <GlassCard style={{ borderRadius: 30, padding: 16, marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <GlassBadge tone="gold">План дня</GlassBadge>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5 }}>лучший маршрут от Локи</div>
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Сегодня', todayBlocks.length ? 'план дня' : '')}
+        <div style={{ display: 'grid', gap: 9 }}>
+          {todayBlocks.length ? todayBlocks.slice(0, 3).map(card => renderLokiCard(card, 'today-block')) : (
+            <GlassCard style={{ borderRadius: 28, padding: 15 }}>
+              <div style={{ color: APG2_PROFILE.text, fontWeight: 880 }}>Сегодня без срочных задач</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Позже здесь появятся мероприятие дня, акция, новость, напоминания и погодный контекст.</div>
+            </GlassCard>
+          )}
         </div>
-        <div style={{ display: 'grid', gap: 10 }}>
-          {(dashboard.dayPlan ?? []).slice(0, 4).map((step, idx) => (
-            <div key={`${step.title}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '34px 1fr', gap: 10, alignItems: 'start' }}>
-              <div style={{ width: 34, height: 34, borderRadius: 15, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 920 }}>{idx + 1}</div>
-              <div>
-                <div style={{ color: APG2_PROFILE.text, fontSize: 14.5, lineHeight: '19px', fontWeight: 860 }}>{step.title}</div>
-                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 2 }}>{step.text}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
+      </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 14 }}>
         <GlassCard style={{ borderRadius: 26, padding: 14 }}>
@@ -228,8 +295,13 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
 
       <GlassCard style={{ borderRadius: 32, padding: 14, marginBottom: 14 }}>
         <form onSubmit={(e) => { e.preventDefault(); ask(input); }} style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 930 }}>Чем я могу помочь сегодня?</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '25px', fontWeight: 930 }}>Спросите Локи</div>
           <GlassButton onClick={() => ask('Объясни этот экран')} tone="gold" style={{ width: '100%', minHeight: 46, borderRadius: 20, color: '#17120a' }}>Объяснить этот экран</GlassButton>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+            {QUICK_ACTIONS.slice(0, 4).map(item => (
+              <GlassButton key={item.id} onClick={() => ask(item.prompt)} style={{ minHeight: 42, borderRadius: 18, padding: '8px 9px', fontSize: 12 }}>{item.title}</GlassButton>
+            ))}
+          </div>
           <GlassInput value={input} onChange={e => setInput(e.target.value)} placeholder="Напиши задачу, а не команду" aria-label="Вопрос Локи" style={{ minHeight: 56, borderRadius: 24 }} />
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
             {EXAMPLE_PROMPTS.map(prompt => <GlassButton key={prompt} onClick={() => ask(prompt)} style={{ minHeight: 38, borderRadius: 999, padding: '8px 11px', flex: '0 0 auto', fontSize: 12 }}>{prompt}</GlassButton>)}

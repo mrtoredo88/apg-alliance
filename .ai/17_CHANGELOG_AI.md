@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: move Intelligence UI into Loki
+**Коммит:** `pending`
+**Файлы:** `src/HomePanelV2.jsx`, `src/LokiPage.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`
+**Тип:** feat
+**Что изменено:**
+- С главной страницы удалены видимые Intelligence-рекомендации, включая `Локи заметил`; Home снова остаётся городской навигацией и тематической витриной.
+- Loki Home стал единым интерфейсом Intelligence Platform: добавлены блоки `Сегодня для вас`, `Продолжить`, `Локи рекомендует`, `Что изменилось`, `Сегодня` и `Спросите Локи`.
+- Dashboard Локи формируется из уже существующих `homeExperience`, `recommendations`, `continueExperience`, `dailySummary`, `aiMemory` и `activityTimeline` без новых источников данных.
+**Почему:** интеллект АПГ должен иметь одно понятное место — Локи как личный цифровой помощник пользователя, а не быть размазанным по карточкам Home.
+
+---
+
 ## [2026-07-13] fix: restore Nearby card semantics on Home
 **Коммит:** `pending`
 **Файлы:** `src/HomePanelV2.jsx`

@@ -229,6 +229,48 @@ function freshRows(items = []) {
     .sort((a, b) => b.ms - a.ms);
 }
 
+function recommendationAction(type, item = {}) {
+  if (type === 'event') return createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: item.id });
+  if (type === 'partner') return createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: item.id });
+  if (type === 'news') return createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: item.id });
+  if (type === 'expert') return createLokiAction(LOKI_APP_ACTIONS.OPEN_EXPERTS, { expertId: item.id });
+  if (type === 'task') return createLokiAction(LOKI_APP_ACTIONS.OPEN_TASKS, { taskId: item.id });
+  return createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI);
+}
+
+function normalizeDashboardCard(row = {}, fallbackType = 'recommendation') {
+  const item = row.item || row;
+  const type = row.type || fallbackType;
+  const action = row.action || recommendationAction(type, item);
+  const explanation = row.explanation || row.explain || row.reasons || [row.reason].filter(Boolean);
+  return {
+    id: String(row.id || item?.id || `${type}-${titleOf(item, 'item')}`),
+    type,
+    title: titleOf(row, '') || titleOf(item, 'Рекомендация АПГ'),
+    text: truncateText(row.text || row.reason || item?.summary || item?.description || item?.address || item?.specialization || item?.offer || 'Открою детали и помогу выбрать действие.', 180),
+    reason: truncateText(row.reason || explanation?.[0] || 'Рекомендация собрана из вашего контекста АПГ.', 180),
+    explanation: Array.isArray(explanation) ? explanation.filter(Boolean).slice(0, 3) : [String(explanation || '').trim()].filter(Boolean),
+    image: row.image || item?.coverPhoto || item?.imageUrl || item?.photo || item?.logoUrl || '',
+    label: row.label || (type === 'news' ? 'Читать' : type === 'event' ? 'Записаться' : 'Открыть'),
+    action,
+    actions: [
+      { label: type === 'news' ? 'Читать' : type === 'event' ? 'Записаться' : 'Открыть', action },
+      item?.address ? { label: 'Маршрут', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_MAP) } : null,
+      { label: 'Подробнее', action },
+      { label: 'Скрыть', localAction: 'hideRecommendation' },
+    ].filter(Boolean).slice(0, 4),
+  };
+}
+
+function continueActionFor(row = {}) {
+  if (row.action) return row.action;
+  if (row.type === 'news') return createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: row.id || row.item?.id });
+  if (row.type === 'event') return createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: row.id || row.item?.id });
+  if (row.type === 'partner') return createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: row.id || row.item?.id });
+  if (row.type === 'expert') return createLokiAction(LOKI_APP_ACTIONS.OPEN_EXPERTS, { expertId: row.id || row.item?.id });
+  return createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI);
+}
+
 function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] } = {}) {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -236,8 +278,16 @@ function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] }
   const news = Array.isArray(appState.news) ? appState.news : [];
   const tasks = Array.isArray(appState.customTasks) ? appState.customTasks : [];
   const partners = Array.isArray(appState.partners) ? appState.partners : [];
+  const experts = Array.isArray(appState.experts) ? appState.experts : [];
+  const homeExperience = appState.homeExperience || {};
+  const continueExperience = appState.continueExperience || {};
+  const dailySummary = appState.dailySummary || {};
+  const aiMemory = appState.aiMemory || {};
+  const activityTimeline = Array.isArray(appState.activityTimeline) ? appState.activityTimeline : [];
   const todayEvents = events.filter(item => isToday(item?.date ?? item?.startAt ?? item?.startsAt ?? item?.eventDate));
   const freshNews = freshRows(news).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 3).map(row => row.item);
+  const freshEvents = freshRows(events).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 7).map(row => row.item);
+  const freshPartners = freshRows(partners).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 10).map(row => row.item);
   const offerPartners = partners.filter(hasOffer);
   const activeTasks = tasks.filter(item => !appState.completedTasks?.includes?.(item.id));
   const keyOpportunity = Math.min(5, Math.max(1, activeTasks.length || offerPartners.length || todayEvents.length));
@@ -266,10 +316,56 @@ function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] }
     if (fallback) dayPlan.push(fallback);
     else break;
   }
+  const smartContext = homeExperience.smartContext || {};
+  const personalSummary = [
+    todayEvents.length ? `Сегодня рядом проходят ${todayEvents.length} мероприятия.` : 'Сегодня рядом нет срочных мероприятий.',
+    offerPartners[0] ? `У ${titleOf(offerPartners[0], 'партнёра')} есть актуальная акция.` : null,
+    smartContext.nextAchievement ? `До следующего достижения осталось ${smartContext.nextAchievement.missingKeys ?? smartContext.nextAchievement.keysLeft ?? keyOpportunity} ключей.` : `Можно заработать ещё ${keyOpportunity} ключей.`,
+    freshNews[0] ? `Главная новость: ${titleOf(freshNews[0], 'новость АПГ')}.` : null,
+    experts[0] ? `Есть эксперт по теме: ${titleOf(experts[0], 'эксперт АПГ')}.` : null,
+  ].filter(Boolean).slice(0, 5);
+  const continueItems = [
+    ...(Array.isArray(continueExperience.items) ? continueExperience.items : []),
+    ...(Array.isArray(aiMemory.lastViewedNews) ? aiMemory.lastViewedNews.map(item => ({ ...item, type: 'news', label: 'Дочитать статью' })) : []),
+    ...(Array.isArray(aiMemory.lastViewedEvents) ? aiMemory.lastViewedEvents.map(item => ({ ...item, type: 'event', label: 'Вернуться к мероприятию' })) : []),
+    ...(Array.isArray(aiMemory.lastViewedPartners) ? aiMemory.lastViewedPartners.map(item => ({ ...item, type: 'partner', label: 'Вернуться к партнёру' })) : []),
+    ...(Array.isArray(aiMemory.lastViewedExperts) ? aiMemory.lastViewedExperts.map(item => ({ ...item, type: 'expert', label: 'Посмотреть эксперта' })) : []),
+  ].filter(Boolean).slice(0, 4).map((row, index) => ({
+    id: String(row.id || row.item?.id || `${row.type || 'continue'}-${index}`),
+    type: row.type || row.entityType || 'continue',
+    label: row.label || row.title || 'Продолжить',
+    title: titleOf(row, '') || titleOf(row.item, 'Продолжить'),
+    text: truncateText(row.text || row.reason || row.subtitle || row.item?.summary || row.item?.description || 'Можно вернуться к этому месту.', 120),
+    action: continueActionFor(row),
+  }));
+  const recommendationSections = {
+    partners: (appState.recommendations?.partners || homeExperience.recommendations?.partners || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'partner')),
+    events: (appState.recommendations?.events || homeExperience.recommendations?.events || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'event')),
+    news: (appState.recommendations?.news || homeExperience.recommendations?.news || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'news')),
+    experts: (appState.recommendations?.experts || homeExperience.recommendations?.experts || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'expert')),
+  };
+  const changedRecentActions = activityTimeline.filter(item => toMillis(item.timestamp || item.createdAt || item.time) > Date.now() - 1000 * 60 * 60 * 24);
+  const changes = [
+    freshNews.length ? `Опубликовано ${freshNews.length} новости.` : null,
+    freshEvents[0] ? `Появилось новое мероприятие: ${titleOf(freshEvents[0], 'мероприятие')}.` : null,
+    freshPartners[0] ? `Добавился партнёр: ${titleOf(freshPartners[0], 'партнёр')}.` : null,
+    Number(dailySummary.keys || appState.userKeys || 0) ? `На балансе ${Number(dailySummary.keys || appState.userKeys || 0)} ключей.` : null,
+    changedRecentActions.length ? `Зафиксировано ${changedRecentActions.length} действий в вашей активности.` : null,
+  ].filter(Boolean).slice(0, 5);
+  const todayBlocks = [
+    todayEvents[0] ? normalizeDashboardCard({ item: todayEvents[0], type: 'event', reason: 'Ближайшее мероприятие сегодня.' }, 'event') : null,
+    offerPartners[0] ? normalizeDashboardCard({ item: offerPartners[0], type: 'partner', reason: 'У партнёра есть актуальное предложение.' }, 'partner') : null,
+    freshNews[0] ? normalizeDashboardCard({ item: freshNews[0], type: 'news', reason: 'Свежая новость в АПГ.' }, 'news') : null,
+  ].filter(Boolean);
   return {
     greeting,
     userName: safeString(user?.first_name || user?.name || appState.user?.first_name || appState.user?.name),
     summary: `Сегодня для тебя есть ${todayEvents.length} ${todayEvents.length === 1 ? 'мероприятие' : 'мероприятия'}, ${freshNews.length} ${freshNews.length === 1 ? 'новость' : 'новости'} и возможность заработать ещё ${keyOpportunity} ключей.`,
+    personalSummary,
+    continueItems,
+    recommendationSections,
+    changes,
+    todayBlocks,
     todayRecommendations,
     dayPlan,
     mainNews,
