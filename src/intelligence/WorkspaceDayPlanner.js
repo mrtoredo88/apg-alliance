@@ -131,7 +131,7 @@ function buildOpportunities({ tasks, appState, analytics }) {
     { title: 'Опубликовать новость', target: 'content', action: 'Опубликовать', enabled: tasks.some(item => item.target === 'content') || !(appState.news || []).length },
     { title: 'Создать мероприятие', target: 'events', action: 'Создать', enabled: tasks.some(item => item.target === 'events') || !(appState.events || []).length },
     { title: 'Запустить акцию', target: 'offers', action: 'Запустить', enabled: tasks.some(item => item.target === 'offers') || !(appState.partners || []).some(item => item.offer) },
-    { title: 'Разобрать клиентов', target: 'clients', action: 'Открыть', enabled: totalCount(analytics.clicks) > 0 || totalCount(analytics.views) > 0 },
+    { title: 'Проверить встречи', target: 'booking', action: 'Открыть', enabled: totalCount(analytics.clicks) > 0 || totalCount(analytics.views) > 0 },
     { title: 'Проверить QR', target: 'growth', action: 'Проверить', enabled: true },
   ];
   return opportunities.filter(item => item.enabled).slice(0, 4);

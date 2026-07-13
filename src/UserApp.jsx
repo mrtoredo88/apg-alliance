@@ -3607,6 +3607,7 @@ export function UserApp() {
                 workspaceDayPlan={workspaceDayPlan}
                 onModeChange={setAppModePersisted}
                 onOpenPanel={(panel) => { setAppModePersisted('user'); goPanel(panel); }}
+                onOpenDialog={(dialogId) => { setAppModePersisted('user'); openContextDialogById(dialogId); }}
                 onOpenAdmin={() => { window.location.assign('/admin-app'); }}
                 onOpenScan={() => openScanner('workspace')}
               />

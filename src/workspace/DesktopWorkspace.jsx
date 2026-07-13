@@ -8,6 +8,15 @@ import { PartnerCard } from '../HomePanelV2.jsx';
 import { ExpertCardV2 } from '../ExpertsPage.jsx';
 import { CAPABILITIES, hasCapability } from '../roleEngine.js';
 import { motionTransition } from '../motion.js';
+import { userAction } from '../userApi.js';
+import {
+  BOOKING_STATUSES,
+  buildBookingCalendar,
+  buildBookingProfile,
+  formatBookingDateKey,
+  groupBookingsForProfile,
+  normalizeBooking,
+} from '../../server-shared/booking.js';
 
 const WS = {
   page: '#F8F1E4',
@@ -30,11 +39,11 @@ const WS = {
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Рабочий стол', icon: '🏠', description: 'Что сделать сегодня' },
   { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
+  { id: 'booking', label: 'Встречи', icon: '📅', description: 'Календарь и записи' },
   { id: 'dialogs', label: 'Диалоги', icon: '💬', description: 'Вопросы по объектам', badge: data => data.dialogUnreadCount || 0 },
   { id: 'content', label: 'Новости', icon: '📰', description: 'Публикации и черновики' },
   { id: 'growth', label: 'Партнёры', icon: '📢', description: 'QR, ссылки, промо' },
   { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
-  { id: 'clients', label: 'Эксперты и клиенты', icon: '👥', description: 'CRM-контур' },
   { id: 'reviews', label: 'Отзывы', icon: '⭐', description: 'Рейтинг и ответы' },
   { id: 'analytics', label: 'Аналитика', icon: '📊', description: 'Метрики и изменения' },
   { id: 'finance', label: 'Финансы', icon: '💰', description: 'Тарифы и документы' },
@@ -131,6 +140,61 @@ function formatShortDate(value) {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
+function bookingDateRange(mode, anchor = new Date()) {
+  const start = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  if (mode === 'week') start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  if (mode === 'month') start.setDate(1);
+  const end = new Date(start);
+  end.setDate(start.getDate() + (mode === 'month' ? 35 : mode === 'week' ? 7 : 1));
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function bookingTimeText(item) {
+  const date = toDate(item?.startAt);
+  if (!date) return item?.dateLabel || 'Дата не указана';
+  const day = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  const time = item?.time || date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return `${day} · ${time}`;
+}
+
+function bookingDayText(item) {
+  const date = toDate(item?.startAt);
+  if (!date) return item?.dateLabel || 'дата не указана';
+  return date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function bookingStartMinute(item) {
+  const date = toDate(item?.startAt);
+  if (!date) return 0;
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function bookingStatusTone(status) {
+  if ([BOOKING_STATUSES.pending, BOOKING_STATUSES.new, BOOKING_STATUSES.rescheduleRequested].includes(status)) return WS.gold;
+  if ([BOOKING_STATUSES.cancelled, BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider, BOOKING_STATUSES.noShow].includes(status)) return WS.red;
+  if (status === BOOKING_STATUSES.completed) return WS.green;
+  return WS.blue;
+}
+
+function bookingSearchText(item) {
+  return [
+    item?.userName,
+    item?.userPhone,
+    item?.serviceTitle,
+    item?.specialistName,
+    item?.providerName,
+    item?.dateLabel,
+    item?.time,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function isSameBookingDay(item, date) {
+  const itemDate = toDate(item?.startAt);
+  if (!itemDate) return false;
+  return formatBookingDateKey(itemDate) === formatBookingDateKey(date);
+}
+
 function getDayGreeting() {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return 'Доброе утро';
@@ -166,6 +230,7 @@ function buildWorkspaceContext(activeSection) {
     growth: { label: 'Привлечение клиентов', prompt: 'Как сегодня привести новых клиентов?', next: 'запустить QR, ссылку или промоматериал' },
     content: { label: 'Контент', prompt: 'Что стоит опубликовать?', next: 'проверить новости, статьи и черновики' },
     events: { label: 'Мероприятия', prompt: 'Какие мероприятия требуют внимания?', next: 'проверить календарь и регистрации' },
+    booking: { label: 'Встречи', prompt: 'Кого нужно принять сегодня?', next: 'проверить записи, подтверждения и свободные интервалы' },
     dialogs: { label: 'Диалоги', prompt: 'Какие обращения ждут ответа?', next: 'разобрать вопросы по объектам' },
     offers: { label: 'Акции и предложения', prompt: 'Какие акции сейчас важнее?', next: 'обновить предложения и бонусы' },
     clients: { label: 'Клиенты', prompt: 'С кем нужно поработать сегодня?', next: 'разобрать новых и вернувшихся клиентов' },
@@ -488,6 +553,7 @@ function getWorkspaceAction(actions, target) {
     growth: actions.openPartners,
     content: actions.openNews,
     events: actions.openEvents,
+    booking: actions.openBooking,
     dialogs: actions.openDialogs,
     offers: actions.openOffers,
     clients: actions.openExperts,
@@ -708,6 +774,283 @@ function DataSection({ type, title, subtitle, items = [], emptyText, onOpen }) {
   );
 }
 
+function BookingStatusBadge({ item }) {
+  const tone = bookingStatusTone(item.status);
+  return (
+    <span style={{ borderRadius: 999, background: `${tone}16`, color: tone, padding: '6px 9px', fontSize: 11.5, lineHeight: '13px', fontWeight: 900, whiteSpace: 'nowrap' }}>
+      {item.statusLabel || 'Статус'}
+    </span>
+  );
+}
+
+function MeetingMiniRow({ item, onClick, compact = false }) {
+  const tone = bookingStatusTone(item.status);
+  const time = item.time || toDate(item.startAt)?.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) || '—';
+  return (
+    <button type="button" onClick={onClick} style={{ border: 0, borderBottom: `1px solid ${WS.line}`, background: 'transparent', padding: compact ? '8px 0' : '10px 0', display: 'grid', gridTemplateColumns: compact ? '50px minmax(0,1fr)' : '60px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <span style={{ minHeight: 36, borderRadius: 14, background: `${tone}14`, color: tone, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: 950 }}>{time}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', color: WS.text, fontSize: compact ? 13 : 14.2, lineHeight: compact ? '17px' : '18px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.userName || 'Клиент'} · {item.serviceTitle || 'Услуга'}</span>
+        <span style={{ display: 'block', color: WS.soft, fontSize: compact ? 11.8 : 12.3, lineHeight: '16px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.specialistName || 'Специалист'} · {bookingDayText(item)}</span>
+      </span>
+      {!compact && <BookingStatusBadge item={item} />}
+    </button>
+  );
+}
+
+function MeetingSheet({ item, onClose, onAction, onOpenDialog }) {
+  if (!item) return null;
+  const canConfirm = [BOOKING_STATUSES.pending, BOOKING_STATUSES.new].includes(item.status);
+  const canComplete = [BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(item.status);
+  const canCancel = item.isActive;
+  return (
+    <section data-workspace-meeting-sheet style={cardStyle({ padding: 18, borderRadius: 26, background: 'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,250,239,0.88))', display: 'grid', gap: 14 })}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'start' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Карточка встречи</div>
+          <h2 style={{ margin: '7px 0 0', color: WS.text, fontSize: 24, lineHeight: '29px', fontWeight: 950, letterSpacing: -0.35 }}>{item.userName || 'Клиент'}</h2>
+          <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px', marginTop: 6 }}>{item.serviceTitle || 'Услуга'} · {bookingTimeText(item)} · {item.durationMinutes || 60} мин</div>
+        </div>
+        <button type="button" onClick={onClose} style={buttonStyle({ width: 38, minHeight: 38, padding: 0, borderRadius: 14, background: 'rgba(88,67,37,0.06)' })}>×</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 9 }}>
+        {[
+          ['Статус', item.statusLabel || '—'],
+          ['Специалист', item.specialistName || '—'],
+          ['Телефон', item.userPhone || '—'],
+          ['Диалог', item.dialogId ? 'есть' : 'нет'],
+        ].map(([label, value]) => (
+          <div key={label} style={{ borderRadius: 16, background: 'rgba(255,255,255,0.72)', border: `1px solid ${WS.line}`, padding: 10, minWidth: 0 }}>
+            <div style={{ color: WS.muted, fontSize: 11.5, lineHeight: '14px', fontWeight: 800 }}>{label}</div>
+            <div style={{ color: WS.text, fontSize: 13.5, lineHeight: '17px', fontWeight: 900, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+      {item.comment && <div style={{ borderRadius: 18, background: 'rgba(88,67,37,0.05)', color: WS.soft, fontSize: 13.2, lineHeight: '19px', padding: 12 }}>{item.comment}</div>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {canConfirm && <WorkspaceButton onClick={() => onAction('booking:confirm', item)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' }}>Подтвердить</WorkspaceButton>}
+        {item.status === BOOKING_STATUSES.rescheduleRequested && <WorkspaceButton onClick={() => onAction('booking:respondReschedule', item, { decision: 'accept' })} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' }}>Принять перенос</WorkspaceButton>}
+        {item.status === BOOKING_STATUSES.rescheduleRequested && <WorkspaceButton onClick={() => onAction('booking:respondReschedule', item, { decision: 'reject', reason: 'Отклонено в Workspace' })} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px' }}>Отклонить</WorkspaceButton>}
+        {canComplete && <WorkspaceButton onClick={() => onAction('booking:complete', item)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px' }}>Завершить</WorkspaceButton>}
+        {canComplete && <WorkspaceButton onClick={() => onAction('booking:noShow', item, { reason: 'Клиент не пришел' })} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px' }}>Неявка</WorkspaceButton>}
+        {canCancel && <WorkspaceButton onClick={() => {
+          const reason = prompt('Причина отмены') || '';
+          if (reason.trim()) onAction('booking:cancel', item, { reason: reason.trim() });
+        }} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px' }}>Отменить</WorkspaceButton>}
+        <WorkspaceButton onClick={() => onOpenDialog(item)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px' }}>Открыть диалог</WorkspaceButton>
+      </div>
+    </section>
+  );
+}
+
+function WorkspaceMeetings({ role, profile, actions, onOpenDialog }) {
+  const providerType = role?.id === 'expert' ? 'expert' : 'partner';
+  const bookingProfile = useMemo(() => buildBookingProfile(profile || {}, providerType), [profile, providerType]);
+  const [calendarMode, setCalendarMode] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1180 ? 'week' : 'day');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [specialistFilter, setSpecialistFilter] = useState('');
+  const [query, setQuery] = useState('');
+  const [bookings, setBookings] = useState([]);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadBookings = async () => {
+    if (!profile?.id || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      const range = bookingDateRange(calendarMode);
+      const result = await userAction('booking:calendar', {
+        providerType,
+        providerId: profile.id,
+        from: range.from,
+        to: range.to,
+        specialistId: specialistFilter,
+        status: '',
+      });
+      setBookings(Array.isArray(result.bookings) ? result.bookings.map(normalizeBooking) : []);
+    } catch (err) {
+      setError(err?.message || 'Не удалось загрузить встречи');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBookings();
+  }, [profile?.id, providerType, calendarMode, specialistFilter]);
+
+  const today = useMemo(() => new Date(), []);
+  const tomorrow = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date;
+  }, []);
+  const groups = useMemo(() => groupBookingsForProfile(bookings), [bookings]);
+  const stats = useMemo(() => ({
+    today: bookings.filter(item => isSameBookingDay(item, today)).length,
+    pending: groups.pending.length + groups.actionRequired.length,
+    confirmed: bookings.filter(item => [BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(item.status)).length,
+    cancelled: groups.cancelled.length,
+    completed: groups.completed.filter(item => item.status === BOOKING_STATUSES.completed).length,
+    noShow: groups.completed.filter(item => item.status === BOOKING_STATUSES.noShow).length,
+  }), [bookings, groups, today]);
+  const filteredBookings = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return bookings
+      .filter(item => {
+        if (statusFilter === 'today') return isSameBookingDay(item, today);
+        if (statusFilter === 'tomorrow') return isSameBookingDay(item, tomorrow);
+        if (statusFilter === 'pending') return [BOOKING_STATUSES.pending, BOOKING_STATUSES.new, BOOKING_STATUSES.rescheduleRequested].includes(item.status);
+        if (statusFilter === 'confirmed') return [BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(item.status);
+        if (statusFilter === 'cancelled') return groups.cancelled.some(row => row.id === item.id);
+        if (statusFilter === 'completed') return [BOOKING_STATUSES.completed, BOOKING_STATUSES.noShow].includes(item.status);
+        return true;
+      })
+      .filter(item => !text || bookingSearchText(item).includes(text));
+  }, [bookings, groups.cancelled, query, statusFilter, today, tomorrow]);
+  const calendarItems = useMemo(() => buildBookingCalendar({ bookings: filteredBookings, ...bookingDateRange(calendarMode), specialistId: specialistFilter, status: '' }), [filteredBookings, calendarMode, specialistFilter]);
+  const todayItems = useMemo(() => bookings.filter(item => isSameBookingDay(item, today)).sort((a, b) => bookingStartMinute(a) - bookingStartMinute(b)), [bookings, today]);
+  const tomorrowItems = useMemo(() => bookings.filter(item => isSameBookingDay(item, tomorrow)).sort((a, b) => bookingStartMinute(a) - bookingStartMinute(b)), [bookings, tomorrow]);
+  const upcomingItems = useMemo(() => groups.upcoming.slice(0, 8), [groups.upcoming]);
+  const slotTimes = useMemo(() => {
+    const configured = Array.isArray(profile?.bookingSlotTimes) && profile.bookingSlotTimes.length ? profile.bookingSlotTimes : ['10:00', '11:30', '13:00', '15:00', '16:30', '18:00'];
+    return configured.slice(0, 10);
+  }, [profile]);
+
+  const runLifecycle = async (action, item, payload = {}) => {
+    try {
+      const result = await userAction(action, { bookingId: item.id || item.bookingId, ...payload });
+      if (result?.booking) {
+        const next = normalizeBooking(result.booking);
+        setBookings(prev => prev.map(row => String(row.id || row.bookingId) === String(next.id || next.bookingId) ? next : row));
+        setSelectedBooking(next);
+      } else {
+        await loadBookings();
+      }
+    } catch (err) {
+      setError(err?.message || 'Не удалось обновить встречу');
+    }
+  };
+
+  const openDialog = item => {
+    if (item?.dialogId) {
+      onOpenDialog?.(item.dialogId);
+      return;
+    }
+    actions.openDialogs();
+  };
+
+  if (!profile?.id || !['partner', 'expert'].includes(role?.id)) {
+    return <PlaceholderSection title="Встречи" text="Раздел доступен партнёрам и экспертам после выбора рабочего профиля." actions={[{ label: 'Открыть кабинет', onClick: actions.openCabinet, tone: 'gold' }]} />;
+  }
+
+  const filterButtons = [
+    ['all', 'Все'],
+    ['today', 'Сегодня'],
+    ['tomorrow', 'Завтра'],
+    ['pending', 'Ожидают'],
+    ['confirmed', 'Подтверждённые'],
+    ['cancelled', 'Отменённые'],
+    ['completed', 'Завершённые'],
+  ];
+
+  return (
+    <div data-workspace-meetings style={{ display: 'grid', gap: 14 }}>
+      <section style={cardStyle({ padding: 18, borderRadius: 28, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))' })}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'start' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Встречи</div>
+            <h1 style={{ margin: '7px 0 0', color: WS.text, fontSize: 28, lineHeight: '34px', fontWeight: 950, letterSpacing: -0.55 }}>Календарь ежедневной работы</h1>
+            <div style={{ color: WS.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 7 }}>{bookingProfile.title}: кто записан сегодня, кого подтвердить и где есть свободное время.</div>
+          </div>
+          <WorkspaceButton onClick={loadBookings} style={{ minHeight: 40, borderRadius: 16, padding: '8px 13px', background: loading ? 'rgba(88,67,37,0.06)' : 'linear-gradient(135deg,#F6D891,#D0A14C)', color: loading ? WS.soft : '#24190B' }}>{loading ? 'Обновляем...' : 'Обновить'}</WorkspaceButton>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 10, marginTop: 16 }}>
+          {[
+            ['Сегодня', stats.today, WS.blue],
+            ['Ожидают', stats.pending, WS.gold],
+            ['Подтверждены', stats.confirmed, WS.green],
+            ['Отменены', stats.cancelled, WS.red],
+            ['Завершены', stats.completed, WS.green],
+            ['Неявка', stats.noShow, WS.red],
+          ].map(([label, value, tone]) => (
+            <div key={label} style={{ borderRadius: 18, background: 'rgba(255,255,255,0.74)', border: `1px solid ${WS.line}`, padding: 12 }}>
+              <div style={{ color: tone, fontSize: 22, lineHeight: '25px', fontWeight: 950 }}>{value}</div>
+              <div style={{ color: WS.soft, fontSize: 12.4, lineHeight: '16px', marginTop: 4, fontWeight: 760 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {error && <div style={cardStyle({ padding: 12, borderRadius: 18, background: 'rgba(217,93,84,0.10)', color: WS.red, boxShadow: 'none', fontSize: 13.5, fontWeight: 820 })}>{error}</div>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 360px', gap: 14, alignItems: 'start' }}>
+        <Panel title="Календарь" action={<div style={{ display: 'flex', gap: 6 }}>{['day', 'week', 'month'].map(mode => <button key={mode} type="button" onClick={() => setCalendarMode(mode)} style={buttonStyle({ minHeight: 32, borderRadius: 13, padding: '6px 10px', background: calendarMode === mode ? 'linear-gradient(135deg,#F6D891,#D0A14C)' : 'rgba(255,255,255,0.68)', color: calendarMode === mode ? '#24190B' : WS.text })}>{mode === 'day' ? 'День' : mode === 'week' ? 'Неделя' : 'Месяц'}</button>)}</div>}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 220px', gap: 10, marginBottom: 12 }}>
+            <label style={{ minHeight: 42, borderRadius: 16, background: 'rgba(255,255,255,0.72)', border: `1px solid ${WS.line}`, display: 'flex', alignItems: 'center', gap: 9, padding: '0 12px' }}>
+              <span style={{ color: WS.muted, fontSize: 17 }}>⌕</span>
+              <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Клиент, телефон, услуга, дата" style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: WS.text, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 680 }} />
+            </label>
+            <select value={specialistFilter} onChange={event => setSpecialistFilter(event.target.value)} style={{ minHeight: 42, borderRadius: 16, border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.72)', color: WS.text, padding: '0 10px', fontFamily: 'inherit', fontWeight: 780 }}>
+              <option value="">Все специалисты</option>
+              {bookingProfile.specialists.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+            {filterButtons.map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setStatusFilter(id)} style={buttonStyle({ minHeight: 32, borderRadius: 999, padding: '6px 10px', background: statusFilter === id ? 'rgba(201,155,60,0.18)' : 'rgba(255,255,255,0.66)', color: statusFilter === id ? '#8A6422' : WS.soft, boxShadow: `inset 0 0 0 1px ${statusFilter === id ? 'rgba(201,155,60,0.18)' : 'rgba(88,67,37,0.06)'}` })}>{label}</button>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {!calendarItems.length ? <EmptyWidget text="Встреч на выбранный период нет. Свободные интервалы остаются доступными в карточке партнёра или эксперта." /> : calendarItems.map(item => {
+              const time = item.time || toDate(item.startAt)?.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) || '—';
+              return (
+                <button key={item.id || item.bookingId} type="button" onClick={() => setSelectedBooking(item)} style={{ border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.70)', borderRadius: 18, padding: 12, display: 'grid', gridTemplateColumns: '86px minmax(0,1fr) auto', gap: 12, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <span style={{ minHeight: 52, borderRadius: 16, background: `${bookingStatusTone(item.status)}14`, color: bookingStatusTone(item.status), display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 950 }}>{time}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', color: WS.text, fontSize: 15, lineHeight: '19px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bookingDayText(item)} · {item.userName || 'Клиент'}</span>
+                    <span style={{ display: 'block', color: WS.soft, fontSize: 12.8, lineHeight: '17px', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.serviceTitle || 'Услуга'} · {item.specialistName || 'Специалист'} · {item.durationMinutes || 60} мин</span>
+                  </span>
+                  <BookingStatusBadge item={item} />
+                </button>
+              );
+            })}
+          </div>
+          {selectedBooking && <div style={{ marginTop: 14 }}><MeetingSheet item={selectedBooking} onClose={() => setSelectedBooking(null)} onAction={runLifecycle} onOpenDialog={openDialog} /></div>}
+        </Panel>
+
+        <div style={{ display: 'grid', gap: 14 }}>
+          <Panel title="Ближайшие встречи">
+            <div style={{ display: 'grid' }}>
+              {upcomingItems.length ? upcomingItems.map(item => <MeetingMiniRow key={item.id || item.bookingId} item={item} onClick={() => setSelectedBooking(item)} />) : <EmptyWidget text="Ближайших подтверждённых встреч пока нет." />}
+            </div>
+          </Panel>
+          <Panel title="Сегодня">
+            <div style={{ display: 'grid' }}>
+              {todayItems.length ? todayItems.slice(0, 5).map(item => <MeetingMiniRow key={item.id || item.bookingId} item={item} onClick={() => setSelectedBooking(item)} compact />) : <EmptyWidget text="Сегодня свободный день." />}
+            </div>
+          </Panel>
+          <Panel title="Завтра">
+            <div style={{ display: 'grid' }}>
+              {tomorrowItems.length ? tomorrowItems.slice(0, 5).map(item => <MeetingMiniRow key={item.id || item.bookingId} item={item} onClick={() => setSelectedBooking(item)} compact />) : <EmptyWidget text="На завтра записей пока нет." />}
+            </div>
+          </Panel>
+          <Panel title="Свободные интервалы">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 7 }}>
+              {slotTimes.map(time => {
+                const occupied = todayItems.some(item => (item.time || toDate(item.startAt)?.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })) === time);
+                return <span key={time} style={{ borderRadius: 13, background: occupied ? 'rgba(217,93,84,0.10)' : 'rgba(46,179,107,0.12)', color: occupied ? WS.red : WS.green, padding: '8px 9px', fontSize: 12.5, fontWeight: 900, textAlign: 'center' }}>{time}</span>;
+              })}
+            </div>
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getAnalyticsCount(analytics, key, fallback = 0) {
   const value = analytics?.[key];
   if (typeof value === 'number') return value;
@@ -880,6 +1223,21 @@ function buildCenterConfig({ id, data, actions, intelligence, businessHubAvailab
       ],
       future: [...baseFuture, 'экспорт участников', 'повторяющиеся события', 'модерация событий'],
     },
+    booking: {
+      subtitle: 'Рабочий календарь встреч: сегодня, завтра, подтверждения, отмены, завершения и свободные интервалы.',
+      metrics: [['Сегодня', 'Календарь', 'день'], ['Ожидают', 'Проверить', 'статус'], ['Диалоги', data.dialogUnreadCount || 0, 'связь'], ['Напоминания', 'on', 'push']],
+      tasks: [
+        { icon: '📅', title: 'Проверить сегодняшние встречи', text: 'Кто придёт, кто ждёт подтверждения и где свободное окно', priority: 'Сегодня', tone: WS.gold, onClick: actions.openBooking },
+        { icon: '✓', title: 'Подтвердить новые записи', text: 'Заявки не должны висеть без ответа', priority: 'Важно', tone: WS.red, onClick: actions.openBooking },
+        { icon: '💬', title: 'Ответить в контекстных диалогах', text: 'Каждая запись связана с диалогом встречи', priority: 'Связь', tone: WS.blue, onClick: actions.openDialogs },
+      ],
+      modules: [
+        { meta: 'Календарь', title: 'День, неделя, месяц', text: 'Свободные и занятые интервалы без перехода в Cabinet.', action: 'Открыть встречи', onClick: actions.openBooking },
+        { meta: 'Статусы', title: 'Подтверждение и завершение', text: 'Подтвердить, перенести, отменить, завершить или отметить неявку.' },
+        { meta: 'Диалог', title: 'Контекст встречи', text: 'Открытие связанной переписки прямо из карточки встречи.' },
+      ],
+      future: [...baseFuture, 'рабочие часы', 'исключения', 'недельное планирование', 'несколько филиалов'],
+    },
     dialogs: {
       subtitle: 'Центр контекстных коммуникаций: вопросы по партнёрам, экспертам, мероприятиям, акциям и будущим записям.',
       metrics: [['Непрочитано', data.dialogUnreadCount || 0, 'сообщения'], ['Входящие', data.dialogNotifications.length || 0, 'диалоги'], ['Контексты', 4, 'типа'], ['Push', 'on', 'доставка']],
@@ -1034,6 +1392,7 @@ export function DesktopWorkspace({
   onOpenPanel,
   onOpenAdmin,
   onOpenScan,
+  onOpenDialog,
 }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [query, setQuery] = useState('');
@@ -1060,6 +1419,7 @@ export function DesktopWorkspace({
     openBusinessHub: () => setActiveSection('settings'),
     openNews: () => setActiveSection('content'),
     openEvents: () => setActiveSection('events'),
+    openBooking: () => setActiveSection('booking'),
     openPartners: () => setActiveSection('growth'),
     openExperts: () => setActiveSection('clients'),
     openReviews: () => setActiveSection('reviews'),
@@ -1129,6 +1489,7 @@ export function DesktopWorkspace({
         <DataSection type="events" title="Список мероприятий" subtitle="Ближайшие мероприятия и календарный контекст" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />
       </div>
     );
+    if (activeSection === 'booking') return <WorkspaceMeetings role={activeRole} profile={activeProfile} actions={actions} onOpenDialog={onOpenDialog} />;
     if (activeSection === 'offers') return (
       <div style={{ display: 'grid', gap: 14 }}>
         <WorkspaceCenter center={buildCenterConfig({ id: 'offers', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />

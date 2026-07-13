@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Workspace Meetings center
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `src/intelligence/WorkspaceDayPlanner.js`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- В левом меню Desktop Workspace раздел `Эксперты и клиенты` заменён на `Встречи`; новый пункт расположен третьим после `Рабочий стол` и `Мероприятия`.
+- Добавлен рабочий экран `Встречи` поверх существующего booking-модуля: KPI по статусам, календарь день/неделя/месяц, фильтры, поиск, ближайшие встречи, блоки сегодня/завтра и карточка встречи с действиями подтверждения, переноса, отмены, завершения, неявки и открытия диалога.
+- Workspace Intelligence больше не ведёт в скрытый CRM-раздел `clients`: возможность `Проверить встречи` открывает новый рабочий центр `booking`.
+**Почему:** встречи стали ежедневным рабочим инструментом партнёра/эксперта и должны быть доступны прямо из Workspace без перехода в Cabinet.
+
 ## [2026-07-13] feat: Meetings V1.1 lifecycle
 **Коммит:** `pending`
 **Файлы:** `server-shared/booking.js`, `server/src/routes/user-actions.js`, `src/ProfilePanel.jsx`, `src/cabinet/CabinetCorePage.jsx`, `src/contextDialogs/ContextDialogsPage.jsx`, `scripts/booking-test.mjs`, `.ai/04_API.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
