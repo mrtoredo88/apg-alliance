@@ -11,7 +11,11 @@ import {
   CONTEXT_DIALOG_TYPES,
   buildContextDialogId,
   buildDialogContext,
+  buildDialogDeepLink,
+  buildDialogNotificationBody,
+  buildDialogNotificationTitle,
   normalizeDialogType,
+  safeDialogIdPart,
 } from '../../../server-shared/context-dialogs.js';
 
 const MAX_TEXT = 4000;
@@ -1241,13 +1245,123 @@ function normalizeDialogSubscription(input) {
   return { endpoint, expirationTime: input.expirationTime || null, keys: { p256dh, auth } };
 }
 
+function boolNotificationPref(prefs, key) {
+  if (prefs?.onlyCritical) return false;
+  if (!key) return true;
+  if (!prefs || prefs[key] === undefined) return true;
+  return prefs[key] !== false;
+}
+
+function isArchivedUser(user = {}) {
+  return user.archived === true || user.deleted === true || ['archived', 'deleted', 'blocked', 'banned'].includes(String(user.status || user.accountStatus || '').toLowerCase());
+}
+
+function hasBlockedDialog(user = {}, senderId = '') {
+  const blocked = [
+    ...(Array.isArray(user.blockedUserIds) ? user.blockedUserIds : []),
+    ...(Array.isArray(user.blockedUsers) ? user.blockedUsers : []),
+  ].map(item => String(item || ''));
+  return senderId && blocked.includes(String(senderId));
+}
+
+function isDialogActiveForUser(user = {}, dialogId = '') {
+  if (String(user.activeContextDialogId || '') !== String(dialogId || '')) return false;
+  const value = user.activeContextDialogSeenAt;
+  const ms = value?.toMillis ? value.toMillis() : value?.toDate ? value.toDate().getTime() : new Date(value || 0).getTime();
+  return Number.isFinite(ms) && Date.now() - ms < 45000;
+}
+
+async function getDialogRecipientState(db, userId, dialogId, senderId) {
+  const snap = await db.collection('users').doc(String(userId)).get().catch(() => null);
+  if (!snap?.exists) return { userId, user: null, canCreateNotification: false, canPush: false, active: false, reason: 'user_not_found' };
+  const user = snap.data() || {};
+  const active = isDialogActiveForUser(user, dialogId);
+  const blocked = hasBlockedDialog(user, senderId);
+  const archived = isArchivedUser(user);
+  const pushConsent = user.notificationsEnabled === true || user.notificationConsent === true;
+  const providerOk = !user.notificationProvider || user.notificationProvider === 'webpush' || user.notificationProvider === 'vk';
+  const prefOk = boolNotificationPref(user.notificationPreferences || {}, 'messages');
+  return {
+    userId,
+    user,
+    active,
+    canCreateNotification: !active && !blocked && !archived,
+    canPush: !active && !blocked && !archived && pushConsent && providerOk && prefOk,
+    reason: active ? 'dialog_active' : blocked ? 'blocked_sender' : archived ? 'archived_user' : !pushConsent ? 'notifications_disabled' : !prefOk ? 'messages_disabled' : !providerOk ? 'provider_unsupported' : '',
+  };
+}
+
+async function findRecentDialogNotification(db, userId, dialogId) {
+  const id = `dialog_${safeDialogIdPart(userId)}_${safeDialogIdPart(dialogId)}`.slice(0, 900);
+  const ref = db.collection('notifications').doc(id);
+  const doc = await ref.get().catch(() => null);
+  if (!doc?.exists) return { ref, id, data: null, recentUnread: false };
+  const data = doc.data() || {};
+  if (data.isRead === true) return { ref, id, data, recentUnread: false };
+  const ms = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt?.toDate ? data.createdAt.toDate().getTime() : new Date(data.createdAt || 0).getTime();
+  return { ref, id, data, recentUnread: Number.isFinite(ms) && Date.now() - ms <= 10 * 60000 };
+}
+
+async function prepareDialogNotification(db, target, dialog, message, preview) {
+  if (!target.canCreateNotification) return null;
+  const recent = await findRecentDialogNotification(db, target.userId, dialog.id);
+  const messageCount = recent?.recentUnread ? Number(recent?.data?.messageCount || 0) + 1 : 1;
+  const title = buildDialogNotificationTitle(dialog.context || {});
+  const body = buildDialogNotificationBody(dialog.context || {}, { senderRole: message.senderRole, senderName: message.senderName, messageCount });
+  const notificationRef = recent?.ref || db.collection('notifications').doc();
+  const recentPushMs = recent?.data?.pushSentAt?.toMillis
+    ? recent.data.pushSentAt.toMillis()
+    : recent?.data?.pushSentAt?.toDate
+      ? recent.data.pushSentAt.toDate().getTime()
+      : 0;
+  return {
+    ref: notificationRef,
+    id: notificationRef.id,
+    userId: target.userId,
+    title,
+    body,
+    shouldPush: target.canPush && (!recent?.recentUnread || Date.now() - recentPushMs > 45000),
+    data: {
+      userId: target.userId,
+      targetUserId: target.userId,
+      category: 'messages',
+      type: 'contextDialogMessage',
+      title,
+      body,
+      text: body,
+      preview,
+      dialogId: dialog.id,
+      objectType: dialog.type,
+      dialogType: dialog.type,
+      objectId: dialog.objectId,
+      senderId: message.senderId,
+      senderName: message.senderName,
+      senderRole: message.senderRole,
+      deepLink: buildDialogDeepLink(dialog.id),
+      url: buildDialogDeepLink(dialog.id),
+      actionUrl: buildDialogDeepLink(dialog.id),
+      isRead: false,
+      messageCount,
+      priority: 'normal',
+      pushStatus: target.canPush && (!recent?.recentUnread || Date.now() - recentPushMs > 45000) ? 'pending' : 'skipped',
+      pushSkipReason: target.canPush ? (recent?.recentUnread ? 'aggregated_recent_push' : '') : target.reason,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: recent?.recentUnread ? recent.data.createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
+    },
+  };
+}
+
 async function sendDialogPush(db, userId, notificationId, title, body, dialogId) {
   const snap = await db.collection('users').doc(userId).get().catch(() => null);
   if (!snap?.exists) return { sent: 0, failed: 0, skipped: true, reason: 'user_not_found' };
   const user = snap.data() || {};
+  if (isArchivedUser(user)) return { sent: 0, failed: 0, skipped: true, reason: 'archived_user' };
+  if (isDialogActiveForUser(user, dialogId)) return { sent: 0, failed: 0, skipped: true, reason: 'dialog_active' };
+  if (user.notificationsEnabled !== true && user.notificationConsent !== true) return { sent: 0, failed: 0, skipped: true, reason: 'notifications_disabled' };
+  if (!boolNotificationPref(user.notificationPreferences || {}, 'messages')) return { sent: 0, failed: 0, skipped: true, reason: 'messages_disabled' };
   const fcmTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.map(token => safeString(token, 600)).filter(Boolean) : [];
   const webSubscriptions = Array.isArray(user.webPushSubscriptions) ? user.webPushSubscriptions.map(normalizeDialogSubscription).filter(Boolean) : [];
-  const url = `${APP_URL}/#dialogs`;
+  const url = `${APP_URL}${buildDialogDeepLink(dialogId)}`;
   let sent = 0;
   let failed = 0;
   const errors = [];
@@ -1259,7 +1373,7 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
         notification: { title, body },
         data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
         webpush: {
-          notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}` },
+          notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}`, renotify: true },
           fcmOptions: { link: url },
         },
       });
@@ -1276,7 +1390,7 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
     await Promise.all(webSubscriptions.map(async subscription => {
       try {
         await webpush.sendNotification(subscription, JSON.stringify({
-          notification: { title, body, icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}` },
+          notification: { title, body, icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}`, renotify: true },
           data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
         }), { TTL: 21600, urgency: 'normal' });
         sent += 1;
@@ -1363,6 +1477,7 @@ async function actionDialogMessage(db, req, actor) {
   if (!text && !attachments.length) throw Object.assign(new Error('Сообщение пустое.'), { statusCode: 400 });
   const { ref, dialog, participantIds } = await getDialogForActor(db, dialogId, actor);
   const senderRole = req.body?.senderRole === 'loki' ? 'loki' : (dialog.ownerUserIds || []).includes(actor.userId) ? 'owner' : 'user';
+  const senderId = senderRole === 'loki' ? 'loki' : actor.userId;
   const messageRef = ref.collection('messages').doc();
   const message = {
     id: messageRef.id,
@@ -1372,51 +1487,43 @@ async function actionDialogMessage(db, req, actor) {
     context: dialog.context,
     text,
     attachments,
-    senderId: actor.userId,
+    senderId,
+    actorUserId: actor.userId,
     senderName: actorName(actor),
     senderRole,
     status: 'delivered',
-    readBy: { [actor.userId]: true },
+    readBy: senderRole === 'loki' ? { loki: true } : { [actor.userId]: true },
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
   const unreadBy = { ...(dialog.unreadBy || {}) };
-  participantIds.forEach(id => { unreadBy[id] = id === actor.userId ? 0 : Number(unreadBy[id] || 0) + 1; });
-  const lastMessage = { id: message.id, text, senderId: actor.userId, senderName: message.senderName, senderRole, createdAt: FieldValue.serverTimestamp() };
+  const notificationRecipientIds = senderRole === 'loki'
+    ? uniqueSafeIds([dialog.userId, actor.userId]).filter(id => participantIds.includes(id))
+    : participantIds.filter(id => id !== actor.userId);
+  participantIds.forEach(id => {
+    if (senderRole !== 'loki' && id === actor.userId) unreadBy[id] = 0;
+    else if (notificationRecipientIds.includes(id)) unreadBy[id] = Number(unreadBy[id] || 0) + 1;
+  });
+  const lastMessage = { id: message.id, text, senderId, senderName: message.senderName, senderRole, createdAt: FieldValue.serverTimestamp() };
   const typing = { ...(dialog.typing || {}), [actor.userId]: false };
+  const preview = text || (attachments.length ? 'Новое вложение' : 'Новое сообщение');
+  const targets = await Promise.all(notificationRecipientIds.map(id => getDialogRecipientState(db, id, dialogId, actor.userId)));
+  const preparedNotifications = (await Promise.all(targets.map(target => prepareDialogNotification(db, target, { ...dialog, id: dialogId }, message, preview)))).filter(Boolean);
   const batch = db.batch();
-  const pushTargets = [];
   batch.set(messageRef, message, { merge: true });
   batch.set(ref, { participantIds, lastMessage, lastMessageAt: FieldValue.serverTimestamp(), unreadBy, typing, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   participantIds.forEach(participantId => {
     batch.set(db.collection('users').doc(participantId).collection('contextDialogMessages').doc(message.id), message, { merge: true });
     batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialogId), dialogMirrorPayload({ ...dialog, id: dialogId, participantIds, unreadBy, lastMessage, lastMessageAt: FieldValue.serverTimestamp(), typing }, participantId), { merge: true });
   });
-  participantIds.filter(id => id !== actor.userId).forEach(participantId => {
-    const notificationRef = db.collection('notifications').doc();
-    pushTargets.push({ userId: participantId, notificationId: notificationRef.id });
-    batch.set(notificationRef, {
-      userId: participantId,
-      targetUserId: participantId,
-      type: 'contextDialogMessage',
-      category: 'messages',
-      title: dialog.context?.title || 'Новое сообщение',
-      text: text || 'Новое вложение',
-      dialogId,
-      dialogType: dialog.type,
-      objectId: dialog.objectId,
-      isRead: false,
-      pushStatus: 'pending',
-      createdAt: FieldValue.serverTimestamp(),
-    });
-  });
+  preparedNotifications.forEach(item => batch.set(item.ref, item.data, { merge: true }));
   await batch.commit();
-  await Promise.all(pushTargets.map(target => sendDialogPush(
+  await Promise.all(preparedNotifications.filter(item => item.shouldPush).map(target => sendDialogPush(
     db,
     target.userId,
-    target.notificationId,
-    dialog.context?.title || 'Новое сообщение',
-    text || 'Новое вложение',
+    target.id,
+    target.title,
+    target.body,
     dialogId,
   ).catch(() => {})));
   await audit(db, req, actor, 'dialog:message', 'contextDialog', dialogId, 'success', { senderRole, type: dialog.type, objectId: dialog.objectId });
@@ -1427,7 +1534,17 @@ async function actionDialogRead(db, req, actor) {
   const dialogId = safeString(req.body?.dialogId, 260);
   const { ref, dialog, participantIds } = await getDialogForActor(db, dialogId, actor);
   const unreadBy = { ...(dialog.unreadBy || {}), [actor.userId]: 0 };
-  await ref.set({ unreadBy, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  const notificationId = `dialog_${safeDialogIdPart(actor.userId)}_${safeDialogIdPart(dialogId)}`.slice(0, 900);
+  const notificationRef = db.collection('notifications').doc(notificationId);
+  const notificationSnap = await notificationRef.get().catch(() => null);
+  const batch = db.batch();
+  batch.set(ref, { unreadBy, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  batch.set(db.collection('users').doc(actor.userId), {
+    activeContextDialogId: dialogId,
+    activeContextDialogSeenAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  if (notificationSnap?.exists) batch.set(notificationRef, { isRead: true, readAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await batch.commit();
   await mirrorDialog(db, { ...dialog, id: dialogId, participantIds, unreadBy });
   return { ok: true, dialogId };
 }

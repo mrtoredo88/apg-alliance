@@ -4,6 +4,9 @@ import {
   buildContextDialogId,
   buildDialogAutoAnswer,
   buildDialogContext,
+  buildDialogDeepLink,
+  buildDialogNotificationBody,
+  buildDialogNotificationTitle,
   normalizeDialogType,
 } from '../server-shared/context-dialogs.js';
 
@@ -31,6 +34,10 @@ assert.equal(partnerContext.type, 'partner');
 assert.equal(partnerContext.objectId, 'p1');
 assert.equal(partnerContext.partnerId, 'p1');
 assert.deepEqual(partnerContext.ownerUserIds, ['owner1']);
+assert.equal(buildDialogDeepLink('user_1__partner__p1'), '/dialogs?dialogId=user_1__partner__p1');
+assert.equal(buildDialogNotificationTitle(partnerContext), '💬 Coffee Time');
+assert.equal(buildDialogNotificationBody(partnerContext, { senderRole: 'owner' }), 'Ответил на ваше сообщение.');
+assert.equal(buildDialogNotificationBody(partnerContext, { messageCount: 4 }), 'У вас 4 новых сообщения');
 
 const promoContext = buildDialogContext('promotion', {
   id: 'p1',

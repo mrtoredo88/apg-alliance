@@ -16,6 +16,7 @@ const NOTIFICATION_CATEGORIES = [
   ['prizes', 'Призы'],
   ['offers', 'Акции'],
   ['reminders', 'Напоминания'],
+  ['messages', 'Сообщения'],
   ['loki', 'Ответы Локи'],
   ['achievements', 'Достижения'],
   ['keys', 'Ключи'],
@@ -54,7 +55,7 @@ function matchesTarget(notif, userKeys, lastScanDate) {
   return true;
 }
 
-export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled, onEnableNotifications, notificationPreferences, onNotificationPreferencesChange, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null }) {
+export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled, onEnableNotifications, notificationPreferences, onNotificationPreferencesChange, lastSeenTs, notifications: propNotifications, userKeys = 0, lastScanDate = null, onOpenDialog }) {
   const [allNotifications, setAllNotifications] = useState(propNotifications ?? []);
   const [loading, setLoading] = useState(!propNotifications);
   const [loadError, setLoadError] = useState(false);
@@ -87,6 +88,8 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
   };
 
   const isUnread = (notif) => {
+    if (notif.isRead === true || notif.read === true || notif.seen === true) return false;
+    if (notif.category === 'messages' || notif.type === 'contextDialogMessage') return true;
     if (!notif.createdAt) return true;
     const seenDate = readAllAt ? new Date(readAllAt) : lastSeenTs?.toDate ? lastSeenTs.toDate() : lastSeenTs ? new Date(lastSeenTs) : null;
     if (!seenDate) return true;
@@ -117,6 +120,10 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
   };
 
   const openNotification = (notif) => {
+    if (notif?.type === 'contextDialogMessage' && notif.dialogId) {
+      onOpenDialog?.(notif.dialogId);
+      return;
+    }
     const url = notif.deepLink || notif.url || notif.actionUrl;
     if (!url) return;
     window.location.href = url;
@@ -204,7 +211,7 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
                   key={n.id ?? i}
                   icon={n.emoji ?? '🔔'}
                   title={n.title ?? 'Уведомление АПГ'}
-                  subtitle={n.body ?? timeAgo(n.createdAt)}
+                  subtitle={n.body ?? n.text ?? n.preview ?? timeAgo(n.createdAt)}
                   meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : timeAgo(n.createdAt)}
                   accent={unread ? APG2_PROFILE.gold : undefined}
                   onClick={() => openNotification(n)}
@@ -297,7 +304,7 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
                       <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, lineHeight: '18px' }}>{n.title}</div>
                       {unread && <div style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: T.gold, marginTop: 5 }} />}
                     </div>
-                    {n.body && <div style={{ fontSize: 12, color: T.textSec, lineHeight: '17px', marginBottom: 6 }}>{n.body}</div>}
+                    {(n.body || n.text || n.preview) && <div style={{ fontSize: 12, color: T.textSec, lineHeight: '17px', marginBottom: 6 }}>{n.body || n.text || n.preview}</div>}
                     <div style={{ fontSize: 11, color: T.textSec, opacity: 0.7 }}>{timeAgo(n.createdAt)}</div>
                   </div>
                 </div>

@@ -147,6 +147,38 @@ export function getDialogObjectLabel(context = {}) {
   return CONTEXT_DIALOG_TYPES[type]?.label || 'Объект';
 }
 
+export function buildDialogDeepLink(dialogId) {
+  const id = safeDialogIdPart(dialogId);
+  return id ? `/dialogs?dialogId=${encodeURIComponent(id)}` : '/dialogs';
+}
+
+export function buildDialogNotificationTitle(context = {}) {
+  const type = normalizeDialogType(context.type);
+  const title = firstText(context.title, context.parentTitle, CONTEXT_DIALOG_TYPES[type]?.titleFallback, 'Новое сообщение');
+  if (type === 'event') return `🎫 ${title}`;
+  if (type === 'expert') return `✦ ${title}`;
+  if (type === 'promotion') return `🎁 ${firstText(context.parentTitle, title)}`;
+  if (type === 'partner') return `💬 ${title}`;
+  return `💬 ${title}`;
+}
+
+export function buildDialogNotificationBody(context = {}, { senderRole = '', messageCount = 1, senderName = '' } = {}) {
+  const type = normalizeDialogType(context.type);
+  const count = Math.max(Number(messageCount || 1), 1);
+  if (count > 1) {
+    const title = firstText(context.parentTitle, context.title, senderName, 'АПГ');
+    const more = count - 1;
+    const moreWord = more === 1 ? 'сообщение' : 'сообщения';
+    return count >= 4 ? `У вас ${count} новых сообщения` : `${title} отправил еще ${more} ${moreWord}`;
+  }
+  if (senderRole === 'loki') return 'Локи ответил в диалоге.';
+  if (type === 'event') return senderRole === 'owner' ? 'Организатор отправил сообщение.' : 'Новое сообщение по мероприятию.';
+  if (type === 'expert') return senderRole === 'owner' ? 'Ответил на ваш вопрос.' : 'Новый вопрос эксперту.';
+  if (type === 'promotion') return 'Новое сообщение по акции.';
+  if (type === 'partner') return senderRole === 'owner' ? 'Ответил на ваше сообщение.' : 'Новый вопрос партнеру.';
+  return 'Новое сообщение в диалоге.';
+}
+
 export function buildDialogAutoAnswer(context = {}, text = '') {
   const query = String(text || '').toLowerCase();
   if (!query.trim()) return null;

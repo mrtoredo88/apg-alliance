@@ -127,6 +127,8 @@ function safeStringList(value) {
 function readAppDeepLink() {
   if (typeof window === 'undefined') return { type: '', id: '' };
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const hashQuery = window.location.hash.includes('?') ? window.location.hash.slice(window.location.hash.indexOf('?') + 1) : '';
+  const params = new URLSearchParams(window.location.search || hashQuery ? `${window.location.search.replace(/^\?/, '')}${window.location.search && hashQuery ? '&' : ''}${hashQuery}` : '');
   const hashPath = window.location.hash.startsWith('#/')
     ? window.location.hash.slice(1).split('?')[0]
     : window.location.hash.startsWith('#')
@@ -146,6 +148,7 @@ function readAppDeepLink() {
   if (section === 'partnership') return { type: 'partnership', id: '' };
   if (section === 'expert' && id) return { type: 'expert', id };
   if (section === 'experts') return { type: 'experts', id: '' };
+  if (section === 'dialogs') return { type: 'dialogs', id: params.get('dialogId') || id || '' };
   return { type: '', id: '' };
 }
 
@@ -155,6 +158,7 @@ function getInitialPanelFromDeepLink(deepLink) {
   if (deepLink.type === 'event' || deepLink.type === 'events') return 'events';
   if (deepLink.type === 'partnership') return 'partnership';
   if (deepLink.type === 'expert' || deepLink.type === 'experts') return 'experts';
+  if (deepLink.type === 'dialogs') return 'dialogs';
   return 'home';
 }
 
@@ -657,6 +661,7 @@ export function UserApp() {
   const [activePartner, setActivePartner]       = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
+  const [initialDialogId, setInitialDialogId] = useState(() => initialDeepLink.type === 'dialogs' ? initialDeepLink.id : '');
   const [pendingDialogRequest, setPendingDialogRequest] = useState(null);
   const [partnershipEntry, setPartnershipEntry] = useState({ type: initialDeepLink.type === 'partnership' ? 'partner' : '', nonce: 0 });
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
@@ -850,6 +855,13 @@ export function UserApp() {
   const openContextDialog = useCallback((type, item, source = 'ui') => {
     if (!type || !item) return;
     setPendingDialogRequest({ type, item, source, nonce: Date.now() });
+    navigatePanel('dialogs');
+  }, [navigatePanel]);
+
+  const openContextDialogById = useCallback((dialogId) => {
+    const id = String(dialogId || '').trim();
+    if (!id) return;
+    setInitialDialogId(id);
     navigatePanel('dialogs');
   }, [navigatePanel]);
 
@@ -1209,7 +1221,13 @@ export function UserApp() {
         const sd = statsSnap.data();
         setPlatformStats({ userCount: sd.userCount ?? 0, totalScans: sd.totalScans ?? 0 });
       }
-      const notifList = notifSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const currentUserId = String(userData?.id || '');
+      const notifList = notifSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => {
+          const target = String(item.targetUserId || item.userId || '');
+          return !target || !currentUserId || target === currentUserId;
+        });
       setNotifications(notifList);
       writeCachedArray('apg_notif_cache', notifList);
 
@@ -1220,6 +1238,8 @@ export function UserApp() {
       const lastSeen = localStorage.getItem('apg_notif_seen');
       const lastSeenDate = lastSeen ? new Date(Number(lastSeen)) : null;
       const unread = notifList.filter(d => {
+        if (d.isRead === true || d.read === true || d.seen === true) return false;
+        if (d.category === 'messages' || d.type === 'contextDialogMessage') return true;
         if (!lastSeenDate) return true;
         const ts = d.createdAt;
         if (!ts) return false;
@@ -2605,6 +2625,15 @@ export function UserApp() {
     return v ? { toDate: () => new Date(Number(v)) } : null;
   })();
 
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+    if (unreadCount > 0 && typeof navigator.setAppBadge === 'function') {
+      navigator.setAppBadge(unreadCount).catch(() => {});
+    } else if (unreadCount <= 0 && typeof navigator.clearAppBadge === 'function') {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }, [unreadCount]);
+
   // ─── TabBar ─────────────────────────────────────────────────────────────────
 
   const tabIconStyle = (active) => ({
@@ -3473,6 +3502,7 @@ export function UserApp() {
                   <ContextDialogsPage
                     user={user}
                     initialRequest={pendingDialogRequest}
+                    initialDialogId={initialDialogId}
                     onBack={goBackPanel}
                     onOpenObject={openDialogObject}
                   />
@@ -3739,6 +3769,7 @@ export function UserApp() {
                     lastSeenTs={lastSeenTs}
                     userKeys={userKeys}
                     lastScanDate={lastScanDate}
+                    onOpenDialog={openContextDialogById}
                     onBack={goBackPanel}
                   />
                 </Suspense>

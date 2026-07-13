@@ -113,7 +113,7 @@ function OwnerAssist({ enabled, onToggle, context, lastQuestion, onUse }) {
   );
 }
 
-export function ContextDialogsPage({ user, initialRequest, onBack, onOpenObject }) {
+export function ContextDialogsPage({ user, initialRequest, initialDialogId = '', onBack, onOpenObject }) {
   const uid = userIdOf(user);
   const [dialogs, setDialogs] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -156,7 +156,17 @@ export function ContextDialogsPage({ user, initialRequest, onBack, onOpenObject 
   useEffect(() => {
     if (!activeDialogId) return;
     userAction('dialog:read', { dialogId: activeDialogId }).catch(() => {});
+    const timer = setInterval(() => {
+      userAction('dialog:read', { dialogId: activeDialogId }).catch(() => {});
+    }, 25000);
+    return () => clearInterval(timer);
   }, [activeDialogId]);
+
+  useEffect(() => {
+    const targetId = String(initialDialogId || '').trim();
+    if (!targetId || activeDialogId === targetId) return;
+    if (dialogs.some(dialog => dialog.id === targetId || dialog.dialogId === targetId)) setActiveDialogId(targetId);
+  }, [initialDialogId, dialogs, activeDialogId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
