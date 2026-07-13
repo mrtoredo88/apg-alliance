@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-13] fix: Telegram-авторизация — переход с webhook на getUpdates-поллинг
+**Коммит:** `pending`
+**Файлы:** `server/src/lib/telegramUpdates.js` (новый), `server/src/routes/telegram-webhook.js`, `server/src/routes/telegram-auth-check.js`, `server/src/routes/system-status.js`, `server/deploy.sh`, `server/deploy-cron.sh`, `.ai/13_DEPLOYMENT.md`
+**Тип:** fix
+**Что изменено:**
+- Первопричина отказа авторизации: Telegram не мог установить TCP-соединение с Yandex-контейнером (getWebhookInfo «Connection timed out»); апдейты доставлялись ретраями через 30–70 минут, когда 5-минутная auth-сессия уже истекла. Последняя успешная авторизация — 10.07; доставка деградировала неделями (07.07: 2 успеха из 33 сессий). Код цепочки был исправен (подтверждено сквозным тестом).
+- Бот переведён на исходящий getUpdates-поллинг: (1) цикл telegram-auth-check поллит каждую ~1 с, пока клиент ждёт авторизацию; (2) timer-триггер apg-telegram-poll раз в минуту → /api/telegram-poll (CRON_SECRET) для органических команд. Webhook у Telegram удалён (иначе 409-конфликт), обработчик апдейтов вынесен в server/src/lib/telegramUpdates.js (общий для webhook-роута и поллера), offset+lock в config/telegramPolling.
+- Наблюдаемость: /api/system-status → блок telegramAuth (lastPollAt, pollAgeSec, lastError) — деградация поллинга видна в админ-Диагностике, а не через жалобы пользователей.
+- CRON_SECRET сгенерирован (был пуст) и проброшен в контейнер через deploy.sh; в deploy-cron.sh убран несуществующий флаг --force.
+**Почему:** production-блокер — новые пользователи не могли войти через Telegram; сетевой путь Telegram→Yandex вне нашего контроля, поллинг убирает зависимость от него.
+
+---
+
 ## [2026-07-13] feat: add Workspace Intelligence day planner
 **Коммит:** `pending`
 **Файлы:** `src/intelligence/WorkspaceDayPlanner.js`, `src/intelligence/IntelligenceService.js`, `src/intelligence/index.js`, `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `scripts/workspace-core-test.mjs`

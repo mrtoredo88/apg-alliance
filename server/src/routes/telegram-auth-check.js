@@ -1,4 +1,5 @@
 import { getDb, getDbAuth } from '../lib/firebase.js';
+import { pollTelegramUpdates } from '../lib/telegramUpdates.js';
 
 export default async function telegramAuthCheckRoutes(fastify) {
   fastify.get('/api/telegram-auth-check', async (request, reply) => {
@@ -13,6 +14,10 @@ export default async function telegramAuthCheckRoutes(fastify) {
     const deadline = Date.now() + 25_000;
 
     while (Date.now() < deadline) {
+      // Push-доставка Telegram → Yandex ненадёжна: пока клиент ждёт авторизацию,
+      // сами забираем апдейты бота — /start auth_* обрабатывается за ~1-2 секунды
+      await pollTelegramUpdates(db, fastify.log).catch(() => {});
+
       const snap = await ref.get();
 
       if (!snap.exists) return { status: 'not_found' };

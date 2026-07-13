@@ -17,7 +17,7 @@ ensure_timer() {
   local payload="$4"
 
   if yc serverless trigger get --name "$name" >/dev/null 2>&1; then
-    yc serverless trigger delete --name "$name" --force >/dev/null
+    yc serverless trigger delete --name "$name" >/dev/null
   fi
 
   yc serverless trigger create timer "$name" \
@@ -35,5 +35,6 @@ ensure_timer() {
 ensure_timer "apg-raffle-draw" "0 10 * * ? *" "/api/raffle-draw" "{\"secret\":\"$(get_env RAFFLE_SECRET)\",\"source\":\"yandex-cron\"}"
 ensure_timer "apg-activity-index" "0 3 * * ? *" "/api/activity-index" "{\"secret\":\"$(get_env ACTIVITY_SECRET)\",\"source\":\"yandex-cron\"}"
 ensure_timer "apg-expert-rotation" "0 0 ? * MON *" "/api/expert-rotation" "{\"source\":\"yandex-cron\"}"
+ensure_timer "apg-telegram-poll" "* * * * ? *" "/api/telegram-poll" "{\"secret\":\"$(get_env CRON_SECRET)\",\"source\":\"yandex-cron\"}"
 
 yc serverless trigger list

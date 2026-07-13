@@ -18,7 +18,7 @@ export default async function systemStatusRoutes(fastify) {
       const startedAt = Date.now();
       const pingRef = db.collection('config').doc('systemStatus');
       const ping = await pingRef.get();
-      const [news, comments, users, errors, adminActivity, vkSync, backups] = await Promise.all([
+      const [news, comments, users, errors, adminActivity, vkSync, backups, tgPolling] = await Promise.all([
         countSafe(db, 'news'),
         countSafe(db, 'newsComments'),
         countSafe(db, 'users'),
@@ -26,6 +26,7 @@ export default async function systemStatusRoutes(fastify) {
         countSafe(db, 'adminActivity', 300),
         db.collection('config').doc('vkNewsSync').get().catch(error => ({ error })),
         db.collection('backups').orderBy('createdAt', 'desc').limit(1).get().catch(error => ({ error, docs: [] })),
+        db.collection('config').doc('telegramPolling').get().catch(error => ({ error })),
       ]);
 
       const lastBackup = backups?.docs?.[0]?.data?.() || null;
@@ -38,6 +39,22 @@ export default async function systemStatusRoutes(fastify) {
         api: { ok: true, runtime: 'yandex-fastify', version: process.env.APP_VERSION || '' },
         firestore: { ok: Boolean(ping || pingRef), collections: { news, comments, users, errors, adminActivity } },
         queues: { ok: true, pending: 0, note: 'Очередь задач пока не вынесена в отдельный сервис.' },
+        telegramAuth: (() => {
+          const tg = tgPolling?.exists ? tgPolling.data() : null;
+          const lastPollAt = tg?.lastPollAt?.toDate ? tg.lastPollAt.toDate() : null;
+          const pollAgeSec = lastPollAt ? Math.round((Date.now() - lastPollAt.getTime()) / 1000) : null;
+          return {
+            // поллинг живой, если крутился за последние 5 минут (cron — раз в минуту)
+            ok: pollAgeSec !== null && pollAgeSec < 300 && !tg?.lastError,
+            mode: 'getUpdates-polling',
+            lastPollAt: lastPollAt ? lastPollAt.toISOString() : null,
+            pollAgeSec,
+            lastUpdateAt: tg?.lastUpdateAt?.toDate ? tg.lastUpdateAt.toDate().toISOString() : null,
+            processedTotal: tg?.processedTotal || 0,
+            lastError: tg?.lastError || null,
+            note: pollAgeSec === null ? 'Поллинг ещё не запускался.' : tg?.lastError ? `Ошибка поллинга: ${tg.lastError}` : 'Апдейты Telegram забираются поллингом.',
+          };
+        })(),
         vkNews: {
           ok: Boolean(vkData),
           lastSyncAt: vkData?.updatedAt?.toDate ? vkData.updatedAt.toDate().toISOString() : vkData?.updatedAt || null,

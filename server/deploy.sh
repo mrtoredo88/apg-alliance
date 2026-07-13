@@ -17,6 +17,7 @@ yc serverless container revision deploy \
   --environment YC_ACCESS_KEY="$(get_env YC_ACCESS_KEY)" \
   --environment YC_SECRET_KEY="$(get_env YC_SECRET_KEY)" \
   --environment PUSH_SECRET="$(get_env PUSH_SECRET)" \
+  --environment CRON_SECRET="$(get_env CRON_SECRET)" \
   --environment RAFFLE_SECRET="$(get_env RAFFLE_SECRET)" \
   --environment ACTIVITY_SECRET="$(get_env ACTIVITY_SECRET)" \
   --environment TELEGRAM_BOT_TOKEN="$(get_env TELEGRAM_BOT_TOKEN)" \
