@@ -14,6 +14,7 @@ import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
 import { DigitalShowcaseBuilder } from './DigitalShowcaseBuilder.jsx';
+import { buildBookingProfile } from '../../server-shared/booking.js';
 
 const MODULES = [
   ['showcase-builder', 'Витрина'],
@@ -379,6 +380,68 @@ function RoleSpecificModule({ id, snapshot, onOpenModule }) {
   return null;
 }
 
+function BookingModule({ role, profile, onSaved, onToast }) {
+  const bookingProfile = useMemo(() => buildBookingProfile(profile, role.id === 'expert' ? 'expert' : 'partner'), [profile, role.id]);
+  const [enabled, setEnabled] = useState(bookingProfile.enabled);
+  const [slotTimes, setSlotTimes] = useState(() => Array.isArray(profile.bookingSlotTimes) && profile.bookingSlotTimes.length ? profile.bookingSlotTimes.join(', ') : '10:00, 11:30, 13:00, 15:00, 16:30, 18:00');
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const patch = {
+        bookingEnabled: enabled,
+        onlineBookingEnabled: enabled,
+        bookingMode: enabled ? 'apg' : 'external',
+        bookingSlotTimes: slotTimes.split(',').map(item => item.trim()).filter(Boolean).slice(0, 12),
+      };
+      await userAction(role.updateAction, { id: profile.id, patch });
+      onSaved?.({ ...profile, ...patch });
+      onToast?.('✅ Онлайн-запись обновлена', 'success');
+    } catch {
+      onToast?.('Не удалось сохранить онлайн-запись', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <GlassSection title="Онлайн-запись">
+      <div style={{ display: 'grid', gap: 12 }}>
+        <GlassCard style={{ borderRadius: 30, display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+            <div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 900 }}>Запись через АПГ</div>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Кнопка появится в карточке, а после подтверждения создастся контекстный диалог записи.</div>
+            </div>
+            <GlassButton tone={enabled ? 'gold' : 'glass'} onClick={() => setEnabled(value => !value)} style={{ minHeight: 40, borderRadius: 18, padding: '8px 12px', color: enabled ? '#17120a' : APG2_PROFILE.text }}>{enabled ? 'Включена' : 'Выключена'}</GlassButton>
+          </div>
+          <label style={{ display: 'grid', gap: 7 }}>
+            <span style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 780 }}>Свободные интервалы</span>
+            <GlassInput value={slotTimes} onChange={e => setSlotTimes(e.target.value)} placeholder="10:00, 11:30, 13:00" style={{ minHeight: 46, borderRadius: 18, fontSize: 14 }} />
+          </label>
+          <GlassButton tone="gold" onClick={save} disabled={saving} style={{ color: '#17120a', opacity: saving ? 0.62 : 1 }}>{saving ? 'Сохраняем...' : 'Сохранить'}</GlassButton>
+        </GlassCard>
+        <ContentGrid min={120} gap={8}>
+          <StatPill label="Услуги" value={bookingProfile.services.length} />
+          <StatPill label="Специалисты" value={bookingProfile.specialists.length} />
+          <StatPill label="Статус" value={enabled ? 'Активна' : 'Пауза'} />
+        </ContentGrid>
+        <GlassCard style={{ borderRadius: 28 }}>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 9 }}>Услуги для записи</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {bookingProfile.services.slice(0, 6).map(item => (
+              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', color: APG2_PROFILE.text }}>
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13.5, fontWeight: 820 }}>{item.title}</span>
+                <span style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>{item.durationMinutes} мин{item.price ? ` · ${item.price}` : ''}</span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      </div>
+    </GlassSection>
+  );
+}
+
 export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', events = [], onBack, onProfileUpdate, onEventCreated, onToast, onOpenDialogs }) {
   const roleState = useMemo(() => getCabinetRoles({ user, partner, expert, preferredRole }), [user, partner, expert, preferredRole]);
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || preferredRole);
@@ -455,6 +518,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
     if (activeModule === 'content') return <ContentModule snapshot={snapshot} events={events} onEventCreated={onEventCreated} onToast={onToast} />;
     if (activeModule === 'reviews') return <ReviewsModule snapshot={snapshot} />;
     if (activeModule === 'dialogs') return <GlassSection title="Контекстные диалоги"><SectionCard title="Вопросы по объектам" text="Здесь собираются обращения по партнёру, акциям, мероприятиям и экспертному профилю. Каждый диалог привязан к конкретной карточке." action={<GlassButton onClick={onOpenDialogs} style={{ marginTop: 10 }}>Открыть диалоги</GlassButton>} /></GlassSection>;
+    if (activeModule === 'booking' && ['partner', 'expert'].includes(activeRole.id)) return <BookingModule role={activeRole} profile={currentProfile} onSaved={handleSaved} onToast={onToast} />;
     if (activeModule === 'notifications') return <NotificationsModule snapshot={snapshot} />;
     if (activeModule === 'loki') return <LokiModule snapshot={snapshot} onOpenModule={setActiveModule} />;
     if (activeModule === 'subscription') return <SubscriptionModule role={activeRole} snapshot={snapshot} />;
@@ -487,6 +551,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
             ['showcase-builder', 'Витрина', '◇'],
             ['dashboard', 'Дашборд', '▦'],
             ['dialogs', 'Диалоги', '💬'],
+            ['booking', 'Запись', '📅'],
             ['tasks', 'Задачи', '✓'],
             ['contacts', 'Контакты', '☎'],
             ['media', 'Медиа', '▣'],

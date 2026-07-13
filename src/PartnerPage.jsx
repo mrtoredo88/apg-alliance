@@ -21,6 +21,7 @@ import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
+import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, reviewPrompt, onReviewPromptHandled }) {
+export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, reviewPrompt, onReviewPromptHandled }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -378,6 +379,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   ].filter(Boolean);
 
   const ratingLabel = avg => avg >= 4.7 ? 'Отлично' : avg >= 4.0 ? 'Хорошо' : avg >= 3.0 ? 'Неплохо' : avg >= 2.0 ? 'Так себе' : 'Плохо';
+  const canUseApgBooking = canOpenBookingFlow(partner, 'partner') && typeof onBook === 'function';
 
   if (variant === 'v2') {
     const heroImage = getProfileImage(partner);
@@ -391,7 +393,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     const cta = [
       partner.phone && { label: phoneCopied ? 'Номер скопирован' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', onClick: handlePhone, tone: 'gold' },
       partner.address && { label: 'Маршрут', icon: '📍', onClick: handleMap },
-      !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
+      canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(partner), tone: 'gold' },
+      !canUseApgBooking && !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
       !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
       partner.vkGroupUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
       onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(partner), tone: 'gold' },

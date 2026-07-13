@@ -40,6 +40,7 @@ import { getRoleDiagnostics } from './roleEngine.js';
 import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
 import { buildAIContext } from './intelligence/AIContextService.js';
 import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
+import { BookingFlow } from './booking/BookingFlow.jsx';
 import {
   APG_EVENT_TYPES,
   getAIMemorySnapshot,
@@ -657,6 +658,8 @@ export function UserApp() {
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [initialDialogId, setInitialDialogId] = useState(() => initialDeepLink.type === 'dialogs' ? initialDeepLink.id : '');
   const [pendingDialogRequest, setPendingDialogRequest] = useState(null);
+  const [bookingRequest, setBookingRequest] = useState(null);
+  const [userBookings, setUserBookings] = useState([]);
   const [partnershipEntry, setPartnershipEntry] = useState({ type: initialDeepLink.type === 'partnership' ? 'partner' : '', nonce: 0 });
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
@@ -859,6 +862,33 @@ export function UserApp() {
     navigatePanel('dialogs');
   }, [navigatePanel]);
 
+  const openBookingFlow = useCallback((providerType, provider) => {
+    if (!provider) return;
+    setBookingRequest({ providerType: providerType === 'expert' ? 'expert' : 'partner', provider, nonce: Date.now() });
+    trackAppEvent('booking:open', {
+      type: APG_EVENT_TYPES.APP_ACTION,
+      user,
+      entityType: 'booking',
+      entityId: provider?.id,
+      payload: { providerType, providerId: provider?.id, title: provider?.name },
+      source: platformSource,
+    });
+  }, [platformSource, user]);
+
+  const handleBookingCreated = useCallback((booking) => {
+    if (!booking?.id) return;
+    setUserBookings(prev => [booking, ...prev.filter(item => item.id !== booking.id)].slice(0, 30));
+    showToast('✅ Запись создана', 'success');
+    trackAppEvent('booking:create', {
+      type: APG_EVENT_TYPES.APP_ACTION,
+      user,
+      entityType: 'booking',
+      entityId: booking.id,
+      payload: { providerType: booking.providerType, providerId: booking.providerId, serviceTitle: booking.serviceTitle },
+      source: platformSource,
+    });
+  }, [platformSource, user]);
+
 
   const openScanner = useCallback((source = 'app') => {
     trackAppEvent('qr:scanner_open', {
@@ -887,6 +917,22 @@ export function UserApp() {
       }, 120);
     });
   }, []);
+
+  useEffect(() => {
+    const uid = user?.id ? String(user.id) : '';
+    if (!uid || uid === 'guest' || uid.startsWith('guest_')) {
+      setUserBookings([]);
+      return;
+    }
+    let alive = true;
+    getDocs(query(collection(db, 'users', uid, 'bookings'), orderBy('startAt', 'desc'), limit(30)))
+      .then(snap => {
+        if (!alive) return;
+        setUserBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      })
+      .catch(e => logError(e, 'UserApp.loadUserBookings'));
+    return () => { alive = false; };
+  }, [user?.id]);
 
   // Offline/online detection
   useEffect(() => {
@@ -2930,8 +2976,8 @@ export function UserApp() {
 
   const adaptiveInterestProfile = useMemo(() => buildInterestProfile({
     profile: interestProfile,
-    appState: { partners: enrichedPartners, experts, events, news, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
-  }), [enrichedPartners, events, experts, favorites, interestProfile, news, readLaterNews, registeredEventIds, savedNews, userKeys]);
+    appState: { partners: enrichedPartners, experts, events, news, bookings: userBookings, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
+  }), [enrichedPartners, events, experts, favorites, interestProfile, news, readLaterNews, registeredEventIds, savedNews, userBookings, userKeys]);
 
   const aiContext = useMemo(() => buildAIContext({
     aiMemory: getAIMemorySnapshot(),
@@ -2941,6 +2987,7 @@ export function UserApp() {
     partners: enrichedPartners,
     experts,
     events,
+    bookings: userBookings,
     news,
     favorites,
     notifications,
@@ -2959,7 +3006,7 @@ export function UserApp() {
     scanCount: Number(Object.keys(scannedPartnerIds || {}).length || 0),
     location: user?.location || null,
     source: platformSource,
-  }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, joinedGroup, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userKeys, adaptiveInterestProfile]);
+  }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, joinedGroup, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userBookings, userKeys, adaptiveInterestProfile]);
 
   const intelligenceInput = useMemo(() => ({
     user,
@@ -2976,6 +3023,7 @@ export function UserApp() {
       source: platformSource,
       favorites,
       registeredEventIds,
+      bookings: userBookings,
       savedNews,
       readLaterNews,
       referralCount,
@@ -2988,6 +3036,7 @@ export function UserApp() {
       partners: enrichedPartners,
       experts,
       events,
+      bookings: userBookings,
       news,
       notifications,
       unreadCount,
@@ -2995,7 +3044,7 @@ export function UserApp() {
       source: platformSource,
       location: user?.location || null,
     },
-  }), [activePanel, aiContext, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, unreadCount, user, userKeys]);
+  }), [activePanel, aiContext, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, unreadCount, user, userBookings, userKeys]);
 
   const intelligenceService = useMemo(() => createIntelligenceService(intelligenceInput), [intelligenceInput]);
   const homeExperience = useMemo(() => intelligenceService.getHomeExperience(), [intelligenceService]);
@@ -3014,6 +3063,7 @@ export function UserApp() {
       source: platformSource,
       favorites,
       registeredEventIds,
+      bookings: userBookings,
       savedNews,
       readLaterNews,
       referralCount,
@@ -3024,6 +3074,7 @@ export function UserApp() {
       partners: enrichedPartners,
       experts,
       events,
+      bookings: userBookings,
       news,
       notifications,
       source: platformSource,
@@ -3032,7 +3083,7 @@ export function UserApp() {
       analytics: getAnalyticsSnapshot(),
       interestModel: interestModelSnapshot,
     },
-  }), [completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, interestModelSnapshot, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
+  }), [completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, interestModelSnapshot, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userBookings, userKeys]);
 
   const lokiAppState = useMemo(() => ({
     activePanel,
@@ -3049,6 +3100,7 @@ export function UserApp() {
     analytics: getAnalyticsSnapshot(),
     partners: enrichedPartners,
     events,
+    bookings: userBookings,
     news,
     notifications,
     customTasks,
@@ -3065,7 +3117,7 @@ export function UserApp() {
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
     workspace: { mode: workspaceMode },
-  }), [activePanel, adaptiveInterestProfile, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userKeys, workspaceMode]);
+  }), [activePanel, adaptiveInterestProfile, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -3442,6 +3494,7 @@ export function UserApp() {
                     onPartnerUpdate={handlePartnerUpdate}
                     onScan={() => openScanner('partner')}
                     onAskQuestion={(partner) => openContextDialog('partner', partner, 'partner-card')}
+                    onBook={(partner) => openBookingFlow('partner', partner)}
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
                     onReviewPromptHandled={() => setReviewPromptPartnerId(null)}
                   />
@@ -3487,6 +3540,7 @@ export function UserApp() {
                     variant="v2"
                     user={user} userKeys={userKeys} favorites={favorites}
                     partners={enrichedPartners} events={events}
+                    bookings={userBookings}
                     news={news}
                     savedNews={savedNews}
                     readLaterNews={readLaterNews}
@@ -3521,6 +3575,7 @@ export function UserApp() {
                     onRestartLearning={restartLearning}
                     onOpenNews={() => goPanel('news')}
                     onOpenHealth={() => goPanel('health')}
+                    onOpenDialog={openContextDialogById}
                   />
                 </Suspense>
               </Panel>
@@ -3701,6 +3756,7 @@ export function UserApp() {
                       });
                     }}
                     onAskQuestion={(expert) => openContextDialog('expert', expert, 'expert-card')}
+                    onBook={(expert) => openBookingFlow('expert', expert)}
                     onScan={() => openScanner('expert')}
                   />
                 </Suspense>
@@ -3803,6 +3859,16 @@ export function UserApp() {
               setReviewPromptPartnerId(partner.id);
               openPartner(partner);
             }}
+          />
+
+          <BookingFlow
+            open={!!bookingRequest}
+            provider={bookingRequest?.provider}
+            providerType={bookingRequest?.providerType}
+            user={user}
+            onClose={() => setBookingRequest(null)}
+            onCreated={handleBookingCreated}
+            onOpenDialog={openContextDialogById}
           />
 
           {showOnboarding && (

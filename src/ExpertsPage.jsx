@@ -24,6 +24,7 @@ import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
+import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { motionTransition } from './motion.js';
 import { getExpertCategory, normalizeExpertRecord } from '../server-shared/expert-directory.js';
@@ -169,7 +170,7 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   );
 }
 
-function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan, onAskQuestion }) {
+function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan, onAskQuestion, onBook }) {
   expert = normalizeExpertRecord(expert);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
@@ -336,6 +337,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
   const hasScanned = scannedExperts?.[expert.id];
   const canBook = expert.bookingUrl || expert.vkUrl || expert.phone;
+  const canUseApgBooking = canOpenBookingFlow(expert, 'expert') && typeof onBook === 'function';
   const category = getExpertCategory(expert.category);
 
   if (variant === 'v2') {
@@ -348,7 +350,8 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
     ].filter(Boolean);
     const cta = [
       expert.telHref && { label: 'Позвонить', icon: '📞', onClick: callExpert, tone: 'gold' },
-      expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openExpertContact(expert.bookingUrl, 'booking'), tone: 'gold' },
+      canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(expert), tone: 'gold' },
+      !canUseApgBooking && expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openExpertContact(expert.bookingUrl, 'booking'), tone: 'gold' },
       expert.whatsappUrl && { label: 'WhatsApp', icon: '🟢', onClick: () => openExpertContact(expert.whatsappUrl, 'whatsapp', { platform: 'whatsapp' }) },
       expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openExpertContact(expert.websiteUrl, 'website') },
       expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openExpertContact(expert.vkUrl, 'vk', { platform: 'vk' }) },
@@ -855,7 +858,7 @@ const FILTERS = [
   { id: 'group',   label: 'Группа', emoji: '👥' },
 ];
 
-export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen, onAskQuestion }) {
+export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen, onAskQuestion, onBook }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -999,6 +1002,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             variant={variant}
             onScan={onScan}
             onAskQuestion={onAskQuestion}
+            onBook={onBook}
           />
         )}
       </>
@@ -1098,6 +1102,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           variant={variant}
           onScan={onScan}
           onAskQuestion={onAskQuestion}
+          onBook={onBook}
         />
       )}
     </>

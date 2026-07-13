@@ -59,6 +59,7 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
   const experts = rawExperts.map(item => ({ ...item, aiProfile: getAiProfile(item, 'expert', { partners, experts: rawExperts }) }));
   const events = cleanList(appState.events).filter(isActive);
   const news = cleanList(appState.news).filter(isActive);
+  const bookings = cleanList(appState.bookings);
   const archive = {
     partners: cleanList(appState.partners).filter(item => isLifecycleArchived(item) && !isLifecycleDeleted(item)),
     experts: cleanList(appState.experts).filter(item => isLifecycleArchived(item) && !isLifecycleDeleted(item)),
@@ -125,6 +126,14 @@ export function buildLokiContext({ appState = {}, user = null, activePanel = 'ho
       balance: Number(appState.userKeys ?? 0),
       lastScanDate: appState.lastScanDate ?? null,
       registeredEventIds: cleanList(appState.registeredEventIds).map(String),
+    },
+    bookings: {
+      all: bookings,
+      future: bookings.filter(item => {
+        const ms = new Date(item?.startAt || 0).getTime();
+        return item?.status !== 'cancelled' && (!ms || ms >= Date.now());
+      }),
+      recent: bookings.slice(0, 6),
     },
     eventsToday,
     recommendedEvents,

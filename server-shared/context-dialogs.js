@@ -158,6 +158,7 @@ export function buildDialogNotificationTitle(context = {}) {
   if (type === 'event') return `🎫 ${title}`;
   if (type === 'expert') return `✦ ${title}`;
   if (type === 'promotion') return `🎁 ${firstText(context.parentTitle, title)}`;
+  if (type === 'booking') return `📅 ${title}`;
   if (type === 'partner') return `💬 ${title}`;
   return `💬 ${title}`;
 }
@@ -175,6 +176,7 @@ export function buildDialogNotificationBody(context = {}, { senderRole = '', mes
   if (type === 'event') return senderRole === 'owner' ? 'Организатор отправил сообщение.' : 'Новое сообщение по мероприятию.';
   if (type === 'expert') return senderRole === 'owner' ? 'Ответил на ваш вопрос.' : 'Новый вопрос эксперту.';
   if (type === 'promotion') return 'Новое сообщение по акции.';
+  if (type === 'booking') return senderRole === 'owner' ? 'Новое сообщение по записи.' : 'Новая запись ожидает подтверждения.';
   if (type === 'partner') return senderRole === 'owner' ? 'Ответил на ваше сообщение.' : 'Новый вопрос партнеру.';
   return 'Новое сообщение в диалоге.';
 }

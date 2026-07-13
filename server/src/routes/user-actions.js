@@ -17,6 +17,13 @@ import {
   normalizeDialogType,
   safeDialogIdPart,
 } from '../../../server-shared/context-dialogs.js';
+import {
+  BOOKING_STATUSES,
+  buildBookingDialogContext,
+  buildBookingProfile,
+  formatBookingDateKey,
+  isOnlineBookingEnabled,
+} from '../../../server-shared/booking.js';
 
 const MAX_TEXT = 4000;
 const MAX_DIALOG_TEXT = 1800;
@@ -1117,8 +1124,8 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   const data = snap.data() || {};
   if (!actorOwnsProfile(data, actor)) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
   const allowedFields = type === 'expert'
-    ? new Set(['name', 'lastName', 'firstName', 'middleName', 'category', 'categoryLabel', 'primaryCategory', 'secondaryCategories', 'specialization', 'shortDescription', 'description', 'slogan', 'workFormats', 'formats', 'offer', 'tariff', 'contactName', 'phone', 'whatsappUrl', 'email', 'inn', 'city', 'district', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'tiktokUrl', 'dzenUrl', 'yandexMapsUrl', 'twoGisUrl', 'socialLinks', 'comment', 'photo', 'logoUrl', 'coverPhoto', 'gallery', 'videos', 'services', 'serviceDescription', 'serviceCost', 'directions', 'advantages', 'prices', 'paymentMethods', 'parking', 'delivery', 'booking', 'features', 'faq', 'customerNotes', 'education', 'experience', 'certificates', 'consultationPrice', 'workFormat', 'servicesDraftReady', 'aiProfile'])
-    : new Set(['name', 'category', 'categoryLabel', 'shortDescription', 'description', 'slogan', 'offer', 'phone', 'whatsappUrl', 'email', 'city', 'district', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'tiktokUrl', 'dzenUrl', 'yandexMapsUrl', 'twoGisUrl', 'socialLinks', 'socialUrl', 'logoUrl', 'photo', 'coverPhoto', 'gallery', 'photos', 'videos', 'services', 'serviceDescription', 'directions', 'advantages', 'prices', 'paymentMethods', 'parking', 'delivery', 'booking', 'features', 'faq', 'customerNotes', 'aiProfile']);
+    ? new Set(['name', 'lastName', 'firstName', 'middleName', 'category', 'categoryLabel', 'primaryCategory', 'secondaryCategories', 'specialization', 'shortDescription', 'description', 'slogan', 'workFormats', 'formats', 'offer', 'tariff', 'contactName', 'phone', 'whatsappUrl', 'email', 'inn', 'city', 'district', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'bookingEnabled', 'onlineBookingEnabled', 'bookingMode', 'bookingServices', 'bookingSpecialists', 'bookingSchedule', 'bookingSlotTimes', 'bookingSettings', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'tiktokUrl', 'dzenUrl', 'yandexMapsUrl', 'twoGisUrl', 'socialLinks', 'comment', 'photo', 'logoUrl', 'coverPhoto', 'gallery', 'videos', 'services', 'serviceDescription', 'serviceCost', 'directions', 'advantages', 'prices', 'paymentMethods', 'parking', 'delivery', 'booking', 'features', 'faq', 'customerNotes', 'education', 'experience', 'certificates', 'consultationPrice', 'workFormat', 'servicesDraftReady', 'aiProfile'])
+    : new Set(['name', 'category', 'categoryLabel', 'shortDescription', 'description', 'slogan', 'offer', 'phone', 'whatsappUrl', 'email', 'city', 'district', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'bookingEnabled', 'onlineBookingEnabled', 'bookingMode', 'bookingServices', 'bookingSpecialists', 'bookingSchedule', 'bookingSlotTimes', 'bookingSettings', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'tiktokUrl', 'dzenUrl', 'yandexMapsUrl', 'twoGisUrl', 'socialLinks', 'socialUrl', 'logoUrl', 'photo', 'coverPhoto', 'gallery', 'photos', 'videos', 'services', 'serviceDescription', 'directions', 'advantages', 'prices', 'paymentMethods', 'parking', 'delivery', 'booking', 'features', 'faq', 'customerNotes', 'aiProfile']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (!allowedFields.has(key)) return;
@@ -1161,6 +1168,133 @@ async function actionLokiAnalytics(db, req, actor) {
     createdAt: FieldValue.serverTimestamp(),
   });
   return { ok: true };
+}
+
+async function actionBookingCreate(db, req, actor) {
+  const providerType = safeString(req.body?.providerType, 40) === 'expert' ? 'expert' : 'partner';
+  const providerId = safeString(req.body?.providerId, 160);
+  if (!providerId) throw Object.assign(new Error('Не указан профиль для записи.'), { statusCode: 400, code: 'BOOKING_BAD_PROVIDER' });
+  const providerCollection = providerType === 'expert' ? 'experts' : 'partners';
+  const providerRef = db.collection(providerCollection).doc(providerId);
+  const providerSnap = await providerRef.get();
+  if (!providerSnap.exists) throw Object.assign(new Error('Профиль для записи не найден.'), { statusCode: 404, code: 'BOOKING_PROVIDER_NOT_FOUND' });
+  const provider = { id: providerSnap.id, ...(providerSnap.data() || {}) };
+  if (!isOnlineBookingEnabled(provider)) throw Object.assign(new Error('Онлайн-запись у этого профиля пока не включена.'), { statusCode: 400, code: 'BOOKING_DISABLED' });
+
+  const bookingProfile = buildBookingProfile(provider, providerType);
+  const servicePayload = req.body?.service && typeof req.body.service === 'object' ? req.body.service : {};
+  const specialistPayload = req.body?.specialist && typeof req.body.specialist === 'object' ? req.body.specialist : {};
+  const slotPayload = req.body?.slot && typeof req.body.slot === 'object' ? req.body.slot : {};
+  const serviceId = safeString(servicePayload.id, 80);
+  const service = bookingProfile.services.find(item => item.id === serviceId) || bookingProfile.services[0];
+  if (!service) throw Object.assign(new Error('Не выбрана услуга.'), { statusCode: 400, code: 'BOOKING_BAD_SERVICE' });
+  const specialistId = safeString(specialistPayload.id || 'default', 80);
+  const specialist = bookingProfile.specialists.find(item => item.id === specialistId) || bookingProfile.specialists[0];
+  const startAt = safeString(slotPayload.startAt, 80);
+  const endAt = safeString(slotPayload.endAt, 80);
+  const startDate = new Date(startAt);
+  const endDate = new Date(endAt);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate.getTime() <= Date.now() + 10 * 60 * 1000 || endDate <= startDate) {
+    throw Object.assign(new Error('Выбранное время записи недоступно.'), { statusCode: 400, code: 'BOOKING_BAD_SLOT' });
+  }
+  const dateKey = formatBookingDateKey(startDate);
+  const slotKey = `${providerType}_${providerId}_${specialist?.id || 'default'}_${startDate.getTime()}`.replace(/[^a-zA-Z0-9а-яА-ЯёЁ:_-]+/g, '_').slice(0, 420);
+  const bookingRef = db.collection('bookings').doc(slotKey);
+  const dialogId = buildContextDialogId(actor.userId, 'booking', bookingRef.id);
+  const ownerUserIds = uniqueSafeIds([provider.ownerUserIds, provider.ownerIds, provider.ownerId, provider.ownerUserId, provider.userId, provider.managerUserId, provider.createdByUserId].flat());
+  let booking = null;
+
+  await db.runTransaction(async tx => {
+    const existing = await tx.get(bookingRef);
+    if (existing.exists && ![BOOKING_STATUSES.cancelled, BOOKING_STATUSES.noShow].includes(existing.data()?.status)) {
+      throw Object.assign(new Error('Это время уже занято. Выберите другое окно.'), { statusCode: 409, code: 'BOOKING_SLOT_TAKEN' });
+    }
+    booking = {
+      id: bookingRef.id,
+      bookingId: bookingRef.id,
+      dialogId,
+      providerType,
+      providerId,
+      providerName: bookingProfile.title,
+      providerPhone: bookingProfile.phone || null,
+      address: bookingProfile.address || null,
+      serviceId: service.id,
+      serviceTitle: service.title,
+      serviceDescription: service.description || null,
+      durationMinutes: Number(service.durationMinutes || 60),
+      price: service.price || null,
+      specialistId: specialist?.id || 'default',
+      specialistName: specialist?.name || bookingProfile.title,
+      userId: actor.userId,
+      userName: actorName(actor),
+      userPhoto: safeString(actor.user?.photo || actor.user?.photo_200, 1000) || null,
+      ownerUserIds,
+      status: BOOKING_STATUSES.new,
+      dateKey,
+      dateLabel: startDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' }),
+      time: safeString(slotPayload.time || startDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), 20),
+      startAt: startDate.toISOString(),
+      endAt: endDate.toISOString(),
+      comment: safeString(req.body?.comment, 800),
+      source: safeString(req.body?.source || 'booking-flow', 80),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    tx.set(bookingRef, booking, { merge: true });
+    tx.set(db.collection('users').doc(actor.userId).collection('bookings').doc(bookingRef.id), booking, { merge: true });
+    ownerUserIds.forEach(ownerId => {
+      tx.set(db.collection('users').doc(ownerId).collection('bookings').doc(bookingRef.id), { ...booking, ownerView: true }, { merge: true });
+    });
+  });
+
+  const context = buildBookingDialogContext(booking);
+  const participantIds = dialogParticipants(actor, context, ownerUserIds);
+  const dialog = {
+    id: dialogId,
+    type: 'booking',
+    objectId: booking.id,
+    userId: actor.userId,
+    context,
+    participantIds,
+    ownerUserIds,
+    unreadBy: Object.fromEntries(participantIds.filter(id => id !== actor.userId).map(id => [id, 1])),
+    typing: {},
+    lastMessage: { id: `booking_${booking.id}`, text: `Создана запись: ${booking.serviceTitle}, ${booking.dateLabel} ${booking.time}`, senderId: 'system', senderName: 'АПГ', senderRole: 'system', createdAt: FieldValue.serverTimestamp() },
+    lastMessageAt: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const batch = db.batch();
+  batch.set(db.collection('contextDialogs').doc(dialogId), dialog, { merge: true });
+  participantIds.forEach(participantId => {
+    batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialogId), dialogMirrorPayload(dialog, participantId), { merge: true });
+  });
+  ownerUserIds.forEach(ownerId => {
+    const notificationId = `booking_${safeDialogIdPart(ownerId)}_${safeDialogIdPart(booking.id)}`.slice(0, 900);
+    batch.set(db.collection('notifications').doc(notificationId), {
+      id: notificationId,
+      userId: ownerId,
+      category: 'messages',
+      type: 'bookingCreated',
+      title: `📅 ${booking.providerName}`,
+      body: `${booking.userName} записался: ${booking.serviceTitle}, ${booking.dateLabel} ${booking.time}`,
+      text: `${booking.userName} записался: ${booking.serviceTitle}`,
+      dialogId,
+      bookingId: booking.id,
+      objectType: 'booking',
+      objectId: booking.id,
+      deepLink: buildDialogDeepLink(dialogId),
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+  await batch.commit();
+  await Promise.all(ownerUserIds.map(ownerId => sendDialogPush(db, ownerId, `booking_${safeDialogIdPart(ownerId)}_${safeDialogIdPart(booking.id)}`.slice(0, 900), `📅 ${booking.providerName}`, `Новая запись: ${booking.serviceTitle}, ${booking.dateLabel} ${booking.time}`, dialogId).catch(error => {
+    req.log?.warn?.({ bookingPush: { bookingId: booking.id, ownerId, message: safeString(error?.message, 200) } }, 'booking push failed');
+  })));
+  await audit(db, req, actor, 'booking:create', 'bookings', booking.id, 'success', { providerType, providerId, serviceId: service.id, dialogId });
+  return { ok: true, booking, dialogId };
 }
 
 async function actionLogCreate(db, req, actor, collection, source) {
@@ -1790,6 +1924,7 @@ async function routeAction(db, req, actor) {
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');
   if (action === 'expert:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'expert');
+  if (action === 'booking:create') return actionBookingCreate(db, req, actor);
   if (action === 'loki:settings') return actionLokiSettings(db, req, actor);
   if (action === 'loki:analytics') return actionLokiAnalytics(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);

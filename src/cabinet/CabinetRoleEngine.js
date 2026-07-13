@@ -8,8 +8,8 @@ export const CABINET_ROLE_DEFINITIONS = {
     updateAction: 'partner:profileUpdate',
     profileIdField: 'partnerId',
     profileType: 'partner',
-    modules: ['promotions', 'events', 'products'],
-    taskKeys: ['offer', 'event', 'news', 'photos', 'hours'],
+    modules: ['booking', 'promotions', 'events', 'products'],
+    taskKeys: ['offer', 'event', 'news', 'photos', 'hours', 'booking'],
   },
   expert: {
     id: 'expert',
