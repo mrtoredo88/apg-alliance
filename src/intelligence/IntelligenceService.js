@@ -5,6 +5,7 @@ import { buildAIContext } from './AIContextService.js';
 import { buildContinueExperience } from './ContinueExperience.js';
 import { buildHomeExperience } from './HomeExperienceService.js';
 import { getInterestModelSnapshot } from './InterestModel.js';
+import { buildWorkspaceDayPlan } from './WorkspaceDayPlanner.js';
 import {
   recommendEvents,
   recommendExperts,
@@ -118,6 +119,27 @@ export function getDailySummary(input = {}) {
   });
 }
 
+export function getWorkspaceDayPlan(input = {}) {
+  return withBase(input, ({ user, appState = {}, userState = {}, aiContext, aiMemory, activityTimeline, analytics }) => {
+    const recommendations = input.recommendations || getRecommendations({ ...input, aiContext, aiMemory, activityTimeline, analytics });
+    const dailySummary = input.dailySummary || getDailySummary({ ...input, aiContext, aiMemory, activityTimeline, analytics });
+    return buildWorkspaceDayPlan({
+      user,
+      aiContext,
+      aiMemory,
+      activityTimeline,
+      analytics,
+      recommendations,
+      dailySummary,
+      appState: {
+        ...appState,
+        unreadCount: appState.unreadCount ?? userState.unreadCount ?? 0,
+      },
+      userState,
+    });
+  });
+}
+
 export function createIntelligenceService(input = {}) {
   return {
     getHomeExperience: (override = {}) => getHomeExperience({ ...input, ...override }),
@@ -126,6 +148,6 @@ export function createIntelligenceService(input = {}) {
     getContinueExperience: (override = {}) => getContinueExperience({ ...input, ...override }),
     getInterestModel: (override = {}) => getInterestModel({ ...input, ...override }),
     getDailySummary: (override = {}) => getDailySummary({ ...input, ...override }),
+    getWorkspaceDayPlan: (override = {}) => getWorkspaceDayPlan({ ...input, ...override }),
   };
 }
-

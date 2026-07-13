@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: add Workspace Intelligence day planner
+**Коммит:** `pending`
+**Файлы:** `src/intelligence/WorkspaceDayPlanner.js`, `src/intelligence/IntelligenceService.js`, `src/intelligence/index.js`, `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `scripts/workspace-core-test.mjs`
+**Тип:** feat
+**Что изменено:**
+- Добавлен `WorkspaceDayPlanner`, который формирует рабочий день партнёра/эксперта: задачи, приоритеты, изменения, проблемные зоны, возможности, мини-аналитику и совет Локи.
+- `IntelligenceService` получил метод `getWorkspaceDayPlan()`, а Workspace Dashboard показывает новый верхний блок `Workspace Intelligence` над существующими рабочими центрами.
+- План дня использует уже существующие `AI Context`, `AI Memory`, `Activity Timeline`, `Analytics Collector`, `Recommendation Engine` и app state без новых подписок и без изменения рабочих сценариев.
+**Почему:** Workspace должен быть не просто кабинетом, а интеллектуальным координатором рабочего дня: что произошло, что сделать сейчас и куда перейти одним действием.
+
+---
+
 ## [2026-07-13] feat: turn Workspace into work centers
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`

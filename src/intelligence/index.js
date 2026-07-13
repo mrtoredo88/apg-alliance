@@ -10,3 +10,4 @@ export * from './ContinueExperience.js';
 export * from './HomeExperienceService.js';
 export * from './IntelligenceService.js';
 export * from './InterestModel.js';
+export * from './WorkspaceDayPlanner.js';

@@ -471,7 +471,131 @@ function MessageRow({ item, index, onClick }) {
   );
 }
 
-function WorkspaceDashboard({ data, actions, workspaceView, intelligence }) {
+function getPriorityTone(priority) {
+  if (priority === 'critical') return WS.red;
+  if (priority === 'important') return WS.gold;
+  return WS.green;
+}
+
+function getWorkspaceAction(actions, target) {
+  const map = {
+    dashboard: actions.openDashboard,
+    growth: actions.openPartners,
+    content: actions.openNews,
+    events: actions.openEvents,
+    offers: actions.openOffers,
+    clients: actions.openExperts,
+    reviews: actions.openReviews,
+    analytics: actions.openAnalytics,
+    finance: actions.openFinance,
+    notifications: actions.openMessages,
+    settings: actions.openCabinet,
+    loki: actions.openLoki,
+  };
+  return map[target] || actions.openDashboard;
+}
+
+function IntelligenceTaskRow({ item, actions }) {
+  const tone = getPriorityTone(item.priority);
+  const onClick = getWorkspaceAction(actions, item.target);
+  return (
+    <button type="button" onClick={onClick} title={item.reason} style={{ border: 0, background: 'transparent', padding: '9px 0', borderBottom: `1px solid ${WS.line}`, display: 'grid', gridTemplateColumns: '30px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <span style={{ width: 30, height: 30, borderRadius: 12, background: `${tone}17`, color: tone, display: 'grid', placeItems: 'center', fontSize: 13 }}>{item.priorityIcon || '●'}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', color: WS.text, fontSize: 14, lineHeight: '18px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+        <span style={{ display: 'block', color: WS.soft, fontSize: 12, lineHeight: '16px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</span>
+      </span>
+      <span style={{ borderRadius: 999, background: `${tone}16`, color: tone, padding: '6px 9px', fontSize: 11.5, lineHeight: '13px', fontWeight: 890 }}>{item.action || item.priorityLabel}</span>
+    </button>
+  );
+}
+
+function WorkspaceIntelligenceDashboard({ plan, actions }) {
+  if (!plan) return null;
+  const counts = [
+    ['🟢', plan.summary?.quickTasks || 0, 'быстрые'],
+    ['🟡', plan.summary?.importantTasks || 0, 'важные'],
+    ['🔴', plan.summary?.criticalProblems || 0, 'критичные'],
+  ];
+  const expected = [
+    `${plan.summary?.expectedEvents || 0} мероприятия`,
+    `${plan.summary?.forecastClients || 0} клиента прогноз`,
+    plan.summary?.topNews || 'новая публикация',
+  ];
+  return (
+    <section data-workspace-intelligence-dashboard style={cardStyle({ padding: 18, borderRadius: 26, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))', boxShadow: '0 18px 54px rgba(82,60,30,0.10)' })}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(390px,0.95fr)', gap: 16, alignItems: 'start' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Workspace Intelligence</div>
+          <h1 style={{ margin: '7px 0 0', color: WS.text, fontSize: 29, lineHeight: '34px', fontWeight: 950, letterSpacing: -0.55 }}>{plan.greeting}</h1>
+          <div style={{ color: WS.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 8 }}>Сегодня Workspace ведёт вас по рабочему дню: что произошло, где проблема и какое действие принесёт пользу.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10, marginTop: 14 }}>
+            {counts.map(([icon, value, label]) => (
+              <div key={label} style={{ borderRadius: 18, background: 'rgba(255,255,255,0.72)', border: `1px solid ${WS.line}`, padding: 12 }}>
+                <div style={{ color: WS.text, fontSize: 22, lineHeight: '24px', fontWeight: 950 }}>{icon} {value}</div>
+                <div style={{ color: WS.soft, fontSize: 12.5, lineHeight: '16px', marginTop: 5 }}>{label} задачи</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 13, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {expected.map(item => <span key={item} style={{ borderRadius: 999, padding: '7px 10px', background: 'rgba(201,155,60,0.12)', color: '#8A6422', fontSize: 12.5, fontWeight: 850 }}>{item}</span>)}
+          </div>
+        </div>
+        <Panel title="План на сегодня" style={{ padding: 16, boxShadow: 'none', background: 'rgba(255,255,255,0.72)' }}>
+          <div style={{ display: 'grid' }}>
+            {(plan.tasks || []).slice(0, 5).map(item => <IntelligenceTaskRow key={item.id} item={item} actions={actions} />)}
+          </div>
+        </Panel>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.95fr) minmax(0,1.05fr) minmax(320px,0.72fr)', gap: 14, marginTop: 14 }}>
+        <Panel title="Что изменилось" style={{ padding: 16, boxShadow: 'none' }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {(plan.changes || []).slice(0, 4).map(item => <div key={item} style={{ color: WS.soft, fontSize: 13.2, lineHeight: '18px' }}>• {item}</div>)}
+          </div>
+        </Panel>
+        <Panel title="Требует внимания" style={{ padding: 16, boxShadow: 'none' }}>
+          <div style={{ display: 'grid', gap: 9 }}>
+            {(plan.attention || []).slice(0, 3).map(item => {
+              const tone = getPriorityTone(item.priority);
+              return (
+                <button key={item.title} type="button" onClick={getWorkspaceAction(actions, item.target)} title={`Мы рекомендуем это, потому что: ${item.reason}`} style={{ border: `1px solid ${tone}20`, background: `${tone}08`, borderRadius: 15, padding: 10, display: 'grid', gridTemplateColumns: '24px 1fr auto', gap: 8, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <span>{item.priorityIcon}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', color: WS.text, fontSize: 13.2, lineHeight: '17px', fontWeight: 890, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                    <span style={{ display: 'block', color: WS.soft, fontSize: 11.7, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.reason}</span>
+                  </span>
+                  <span style={{ color: tone, fontSize: 11.5, fontWeight: 900 }}>{item.action}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+        <Panel title="Мини-аналитика" style={{ padding: 16, boxShadow: 'none' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 6 }}>
+            {(plan.miniAnalytics || []).slice(0, 5).map(item => (
+              <div key={item.label} style={{ borderRadius: 13, background: 'rgba(88,67,37,0.05)', padding: '8px 6px', textAlign: 'center' }}>
+                <div style={{ color: WS.text, fontSize: 15, lineHeight: '18px', fontWeight: 950 }}>{item.value}</div>
+                <div style={{ color: WS.soft, fontSize: 10.5, lineHeight: '13px', marginTop: 3 }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 11, borderTop: `1px solid ${WS.line}`, paddingTop: 10 }}>
+            <div style={{ color: WS.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 900 }}>💡 Совет Локи</div>
+            <div style={{ color: WS.soft, fontSize: 12.3, lineHeight: '17px', marginTop: 4 }}>{plan.lokiAdvice?.text}</div>
+            <button type="button" onClick={getWorkspaceAction(actions, plan.lokiAdvice?.target || 'loki')} style={buttonStyle({ minHeight: 32, borderRadius: 14, padding: '7px 11px', marginTop: 9, background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' })}>{plan.lokiAdvice?.action || 'Открыть'}</button>
+          </div>
+        </Panel>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 13 }}>
+        {(plan.opportunities || []).slice(0, 4).map(item => (
+          <button key={item.title} type="button" onClick={getWorkspaceAction(actions, item.target)} style={buttonStyle({ minHeight: 34, borderRadius: 999, padding: '7px 11px', background: 'rgba(255,255,255,0.72)', color: WS.text, boxShadow: 'inset 0 0 0 1px rgba(88,67,37,0.08)' })}>{item.title}</button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WorkspaceDashboard({ data, actions, workspaceView, intelligence, dayPlan }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const tasks = getRoleSpecificTasks({ view: workspaceView, data, profileStatus, actions });
   const fallbackEvents = [
@@ -489,6 +613,7 @@ function WorkspaceDashboard({ data, actions, workspaceView, intelligence }) {
 
   return (
     <div data-workspace-v2-dashboard data-workspace-role-view={workspaceView.id} style={{ display: 'grid', gap: 14 }}>
+      <WorkspaceIntelligenceDashboard plan={dayPlan} actions={actions} />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.12fr) minmax(390px,0.88fr)', gap: 14 }}>
         <DashboardHero data={data} profileStatus={profileStatus} workspaceView={workspaceView} actions={actions} />
         <MetricsPanel data={data} />
@@ -883,6 +1008,7 @@ export function DesktopWorkspace({
   recommendations = null,
   dailySummary = null,
   homeExperience = null,
+  workspaceDayPlan = null,
   onModeChange,
   onOpenPanel,
   onOpenAdmin,
@@ -913,7 +1039,9 @@ export function DesktopWorkspace({
     openEvents: () => setActiveSection('events'),
     openPartners: () => setActiveSection('growth'),
     openExperts: () => setActiveSection('clients'),
+    openReviews: () => setActiveSection('reviews'),
     openOffers: () => setActiveSection('offers'),
+    openFinance: () => setActiveSection('finance'),
     openMessages: () => setActiveSection('notifications'),
     openAnalytics: () => setActiveSection('analytics'),
     openLoki: () => onOpenPanel?.('loki'),
@@ -964,7 +1092,7 @@ export function DesktopWorkspace({
   };
 
   const renderContent = () => {
-    if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} intelligence={workspaceIntelligence} />;
+    if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} intelligence={workspaceIntelligence} dayPlan={workspaceDayPlan} />;
     if (activeSection === 'content') return (
       <div style={{ display: 'grid', gap: 14 }}>
         <WorkspaceCenter center={buildCenterConfig({ id: 'content', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />

@@ -2960,6 +2960,7 @@ export function UserApp() {
       referralCount,
       streak,
       userKeys,
+      unreadCount,
     },
     appState: {
       activePanel,
@@ -2968,11 +2969,12 @@ export function UserApp() {
       events,
       news,
       notifications,
+      unreadCount,
       customTasks,
       source: platformSource,
       location: user?.location || null,
     },
-  }), [activePanel, aiContext, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
+  }), [activePanel, aiContext, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, unreadCount, user, userKeys]);
 
   const intelligenceService = useMemo(() => createIntelligenceService(intelligenceInput), [intelligenceInput]);
   const homeExperience = useMemo(() => intelligenceService.getHomeExperience(), [intelligenceService]);
@@ -2980,6 +2982,7 @@ export function UserApp() {
   const continueExperience = useMemo(() => intelligenceService.getContinueExperience(), [intelligenceService]);
   const interestModelSnapshot = useMemo(() => intelligenceService.getInterestModel(), [intelligenceService]);
   const dailySummary = useMemo(() => intelligenceService.getDailySummary(), [intelligenceService]);
+  const workspaceDayPlan = useMemo(() => intelligenceService.getWorkspaceDayPlan({ recommendations, dailySummary }), [dailySummary, intelligenceService, recommendations]);
 
   const personalHomeContext = useMemo(() => buildPersonalHomeContext({
     user,
@@ -3305,6 +3308,7 @@ export function UserApp() {
                 recommendations={recommendations}
                 dailySummary={dailySummary}
                 homeExperience={homeExperience}
+                workspaceDayPlan={workspaceDayPlan}
                 onModeChange={setAppModePersisted}
                 onOpenPanel={(panel) => { setAppModePersisted('user'); goPanel(panel); }}
                 onOpenAdmin={() => { window.location.assign('/admin-app'); }}
