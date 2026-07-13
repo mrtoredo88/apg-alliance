@@ -103,6 +103,11 @@ function BookingContextCard({ context, isOwner, onOpenObject, onAction }) {
           if (reason) onAction('booking:cancel', { reason });
         }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Отменить</GlassButton>}
       </div>
+      {context.journeySummary && (
+        <div style={{ borderRadius: 18, padding: '9px 11px', background: 'rgba(215,184,106,0.10)', border: '1px solid rgba(215,184,106,0.22)', color: APG2_PROFILE.gold, fontSize: 12, lineHeight: '17px', fontWeight: 760 }}>
+          {context.journeySummary}
+        </div>
+      )}
       {!bookingId && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>Карточка встречи откроется после синхронизации контекста.</div>}
     </GlassCard>
   );

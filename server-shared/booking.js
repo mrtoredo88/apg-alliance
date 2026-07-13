@@ -206,6 +206,7 @@ export function normalizeBooking(booking = {}) {
   const status = normalizeBookingStatus(booking.status);
   const startMs = timeMs(booking.startAt);
   const endMs = timeMs(booking.endAt);
+  const journey = normalizeBookingJourney(booking.journey || booking);
   return {
     ...booking,
     id: text(booking.id || booking.bookingId, 180),
@@ -216,9 +217,48 @@ export function normalizeBooking(booking = {}) {
     statusHistory: Array.isArray(booking.statusHistory) ? booking.statusHistory : [],
     startMs,
     endMs,
+    journey,
     isActive: BOOKING_ACTIVE_STATUSES.includes(status),
     isFinal: BOOKING_HISTORY_STATUSES.includes(status),
   };
+}
+
+export function normalizeBookingJourney(source = {}) {
+  const stampProgress = source.stampProgress && typeof source.stampProgress === 'object' ? source.stampProgress : {};
+  const nextSteps = Array.isArray(source.nextSteps) ? source.nextSteps : [];
+  return {
+    visitCompletedAt: text(source.visitCompletedAt || ''),
+    rewardedAt: text(source.rewardedAt || ''),
+    reviewPromptAvailable: Boolean(source.reviewPromptAvailable),
+    reviewPublishedAt: text(source.reviewPublishedAt || ''),
+    keysAwarded: Math.max(0, Number(source.keysAwarded || 0)),
+    reputationAwarded: Math.max(0, Number(source.reputationAwarded || 0)),
+    stampAwarded: Boolean(source.stampAwarded),
+    stampProgress: {
+      providerId: text(stampProgress.providerId || source.providerId || '', 160),
+      current: Math.max(0, Number(stampProgress.current || 0)),
+      target: Math.max(0, Number(stampProgress.target || 0)),
+      completed: Boolean(stampProgress.completed),
+    },
+    nextSteps: nextSteps.map(item => ({
+      id: text(item?.id || '', 80),
+      label: text(item?.label || '', 160),
+      action: text(item?.action || '', 80),
+    })).filter(item => item.id && item.label),
+  };
+}
+
+export function buildBookingJourneySummary(booking = {}) {
+  const normalized = normalizeBooking(booking);
+  const journey = normalized.journey || {};
+  const parts = [];
+  if (journey.keysAwarded > 0) parts.push(`+${journey.keysAwarded} ключа`);
+  if (journey.stampAwarded) {
+    const progress = journey.stampProgress || {};
+    parts.push(progress.target > 0 ? `штамп ${progress.current}/${progress.target}` : 'штамп начислен');
+  }
+  if (journey.reviewPromptAvailable && !journey.reviewPublishedAt) parts.push('можно оставить отзыв');
+  return parts.join(' · ');
 }
 
 export function groupBookingsForProfile(bookings = [], now = Date.now()) {
@@ -347,6 +387,7 @@ export function buildBookingProfile(profile = {}, type = 'partner') {
 
 export function buildBookingDialogContext(booking = {}) {
   const normalized = normalizeBooking(booking);
+  const journey = normalizeBookingJourney(normalized.journey || {});
   return {
     type: 'booking',
     objectId: text(booking.id || booking.bookingId, 180),
@@ -365,6 +406,11 @@ export function buildBookingDialogContext(booking = {}) {
     specialistName: text(booking.specialistName || ''),
     status: normalized.status,
     statusLabel: normalized.statusLabel,
+    journey,
+    journeySummary: buildBookingJourneySummary(normalized),
+    reviewPromptAvailable: journey.reviewPromptAvailable,
+    keysAwarded: journey.keysAwarded,
+    stampProgress: journey.stampProgress,
     startAt: text(booking.startAt || ''),
     endAt: text(booking.endAt || ''),
     partnerId: booking.providerType === 'partner' ? text(booking.providerId) : '',

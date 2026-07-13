@@ -1070,6 +1070,12 @@ async function actionReviewPartner(db, req, actor) {
   const list = snap.docs.map(d => d.data() || {});
   const avgRating = list.length ? Math.round(list.reduce((sum, r) => sum + Number(r.stars || 0), 0) / list.length * 10) / 10 : 0;
   await partnerRef.set({ avgRating, reviewCount: list.length }, { merge: true });
+  await markBookingReviewPublished(db, {
+    bookingId: req.body?.bookingId,
+    userId,
+    providerType: 'partner',
+    providerId: partnerId,
+  });
   await audit(db, req, actor, 'review:partner', 'partners', partnerId, 'success', { stars });
   return { ok: true, avgRating, reviewCount: list.length, review: { ...reviewData, id: userId, createdAt: new Date().toISOString() } };
 }
@@ -1119,6 +1125,12 @@ async function actionReviewExpert(db, req, actor) {
   const list = snap.docs.map(d => d.data() || {});
   const avgRating = list.length ? Math.round(list.reduce((sum, r) => sum + Number(r.rating || 0), 0) / list.length * 10) / 10 : 0;
   await db.collection('experts').doc(expertId).set({ avgRating, reviewCount: list.length }, { merge: true });
+  await markBookingReviewPublished(db, {
+    bookingId: req.body?.bookingId,
+    userId,
+    providerType: 'expert',
+    providerId: expertId,
+  });
   await audit(db, req, actor, 'review:expert', 'experts', expertId, 'success', { rating });
   return { ok: true, avgRating, reviewCount: list.length, review: { ...reviewData, id: reviewId, createdAt: new Date().toISOString() } };
 }
@@ -1468,6 +1480,189 @@ async function persistBookingMirrors(db, booking) {
   await batch.commit();
 }
 
+function bookingProviderCollection(providerType) {
+  return providerType === 'expert' ? 'experts' : 'partners';
+}
+
+function bookingVisitRewardAction(providerType) {
+  return providerType === 'expert' ? 'expert_visit' : 'partner_visit';
+}
+
+function bookingJourneyNextSteps(booking, journey) {
+  const steps = [];
+  if (journey.reviewPromptAvailable && !journey.reviewPublishedAt) {
+    steps.push({ id: 'review', label: 'Оставить отзыв', action: 'openReview' });
+  }
+  if (booking.providerId) {
+    steps.push({ id: 'bookAgain', label: 'Записаться снова', action: 'openProvider' });
+  }
+  if (booking.dialogId) {
+    steps.push({ id: 'dialog', label: 'Открыть диалог', action: 'openDialog' });
+  }
+  return steps;
+}
+
+async function applyBookingCompletionJourney(db, booking) {
+  if (booking.status !== BOOKING_STATUSES.completed) return { booking, events: [] };
+  const bookingId = safeString(booking.id || booking.bookingId, 180);
+  const providerId = safeString(booking.providerId, 180);
+  const userId = safeUserId(booking.userId);
+  if (!bookingId || !providerId || !userId) return { booking, events: [] };
+
+  const bookingRef = db.collection('bookings').doc(bookingId);
+  const userRef = db.collection('users').doc(userId);
+  const providerRef = db.collection(bookingProviderCollection(booking.providerType)).doc(providerId);
+  const globalRef = db.collection('stats').doc('global');
+  const nowIso = new Date().toISOString();
+  let nextBooking = booking;
+  let journey = null;
+
+  await db.runTransaction(async tx => {
+    const [bookingSnap, userSnap, providerSnap] = await Promise.all([
+      tx.get(bookingRef),
+      tx.get(userRef),
+      tx.get(providerRef),
+    ]);
+    if (!bookingSnap.exists) return;
+    const current = normalizeBooking({ id: bookingSnap.id, ...(bookingSnap.data() || {}) });
+    const currentJourney = current.journey || {};
+    if (currentJourney.rewardedAt) {
+      nextBooking = current;
+      journey = currentJourney;
+      return;
+    }
+
+    const user = userSnap.exists ? userSnap.data() || {} : {};
+    const provider = providerSnap.exists ? providerSnap.data() || {} : {};
+    const previousVisitCounts = user.visitCounts && typeof user.visitCounts === 'object' ? user.visitCounts : {};
+    const scannedPartners = user.scannedPartners && typeof user.scannedPartners === 'object' ? user.scannedPartners : {};
+    const scannedExperts = user.scannedExperts && typeof user.scannedExperts === 'object' ? user.scannedExperts : {};
+    const prevCount = Number(current.providerType === 'expert' ? scannedExperts[providerId] : previousVisitCounts[providerId]) || 0;
+    const alreadyAwarded = current.providerType === 'expert' ? prevCount > 0 : Boolean(scannedPartners[providerId]);
+    const reward = getEconomyReward(bookingVisitRewardAction(current.providerType));
+    const boost = Math.max(1, Math.min(5, Number(provider.keyMultiplier || provider.keysMultiplier || (provider.featured || provider.partnerOfMonth ? 2 : 1)) || 1));
+    const configuredKeys = Number(provider.keys || provider.visitKeys || 0);
+    const keysAwarded = alreadyAwarded ? 0 : Math.max(0, configuredKeys || Math.round(reward.keys * boost));
+    const reputationAwarded = alreadyAwarded ? 0 : Math.max(0, Number(reward.reputation || 0));
+    const nextVisitCount = prevCount + 1;
+    const stampTarget = Math.max(0, Number(provider.stampTarget || provider.loyaltyStampTarget || 0));
+    const stampAwarded = stampTarget > 0 || current.providerType === 'partner';
+
+    journey = {
+      ...(currentJourney || {}),
+      visitCompletedAt: nowIso,
+      rewardedAt: nowIso,
+      reviewPromptAvailable: true,
+      keysAwarded,
+      reputationAwarded,
+      stampAwarded,
+      rewardSource: 'booking_complete',
+      stampProgress: {
+        providerId,
+        current: nextVisitCount,
+        target: stampTarget,
+        completed: stampTarget > 0 && nextVisitCount >= stampTarget,
+      },
+    };
+    journey.nextSteps = bookingJourneyNextSteps(current, journey);
+
+    const userPatch = {
+      [`visitCounts.${providerId}`]: FieldValue.increment(1),
+      economyVersion: ECONOMY_VERSION,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (current.providerType === 'expert') {
+      userPatch[`scannedExperts.${providerId}`] = FieldValue.increment(1);
+    } else if (!alreadyAwarded) {
+      userPatch[`scannedPartners.${providerId}`] = true;
+    }
+    if (keysAwarded > 0) userPatch.keys = FieldValue.increment(keysAwarded);
+    if (reputationAwarded > 0) userPatch.reputation = FieldValue.increment(reputationAwarded);
+
+    tx.set(userRef, userPatch, { merge: true });
+    tx.set(userRef.collection('activity').doc(), {
+      type: 'booking_visit',
+      icon: keysAwarded > 0 ? '🔑' : '📅',
+      text: keysAwarded > 0
+        ? `Встреча завершена: ${current.providerName || provider.name || 'АПГ'} · +${keysAwarded} ключа`
+        : `Встреча завершена: ${current.providerName || provider.name || 'АПГ'}`,
+      keys: keysAwarded,
+      reputation: reputationAwarded,
+      partnerId: current.providerType === 'partner' ? providerId : '',
+      expertId: current.providerType === 'expert' ? providerId : '',
+      bookingId,
+      economyVersion: ECONOMY_VERSION,
+      meta: { source: 'booking_complete', providerType: current.providerType, providerId },
+      ts: FieldValue.serverTimestamp(),
+    });
+    tx.set(providerRef, {
+      totalVisits: FieldValue.increment(1),
+      'bookingStats.completedVisits': FieldValue.increment(1),
+      'bookingStats.keysAwarded': FieldValue.increment(keysAwarded),
+      'bookingStats.stampsAwarded': FieldValue.increment(stampAwarded ? 1 : 0),
+      'bookingStats.reviewsRequested': FieldValue.increment(1),
+      bookingStatsUpdatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(globalRef, {
+      totalBookingVisits: FieldValue.increment(1),
+      bookingKeysAwarded: FieldValue.increment(keysAwarded),
+    }, { merge: true });
+    tx.set(bookingRef, {
+      journey,
+      reviewPromptAvailable: true,
+      keysAwarded,
+      reputationAwarded,
+      stampAwarded,
+      completedVisitAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    nextBooking = normalizeBooking({ ...current, journey, reviewPromptAvailable: true, keysAwarded, reputationAwarded, stampAwarded });
+  });
+
+  const events = [];
+  if (journey?.stampAwarded) {
+    const progress = journey.stampProgress || {};
+    events.push(progress.target > 0 ? `Штамп начислен: ${progress.current}/${progress.target}.` : 'Визит добавлен в историю посещений.');
+  }
+  if (journey?.keysAwarded > 0) events.push(`Начислено ${journey.keysAwarded} ключа за подтвержденный визит.`);
+  if (journey?.reviewPromptAvailable && !journey?.reviewPublishedAt) events.push('Теперь можно оставить отзыв о встрече.');
+  return { booking: nextBooking, events };
+}
+
+async function markBookingReviewPublished(db, { bookingId, userId, providerType, providerId }) {
+  const cleanBookingId = safeString(bookingId, 180);
+  const cleanUserId = safeUserId(userId);
+  const cleanProviderId = safeString(providerId, 180);
+  const cleanProviderType = providerType === 'expert' ? 'expert' : 'partner';
+  if (!cleanBookingId || !cleanUserId || !cleanProviderId) return null;
+
+  const ref = db.collection('bookings').doc(cleanBookingId);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const booking = normalizeBooking({ id: snap.id, ...(snap.data() || {}) });
+  if (booking.userId !== cleanUserId || booking.providerType !== cleanProviderType || booking.providerId !== cleanProviderId) return null;
+  const journey = {
+    ...(booking.journey || {}),
+    reviewPromptAvailable: false,
+    reviewPublishedAt: new Date().toISOString(),
+  };
+  journey.nextSteps = bookingJourneyNextSteps(booking, journey);
+  const nextBooking = normalizeBooking({ ...booking, journey, reviewPromptAvailable: false });
+  await ref.set({
+    journey,
+    reviewPromptAvailable: false,
+    reviewPublishedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await persistBookingMirrors(db, nextBooking);
+  await appendBookingSystemEvent(db, nextBooking, 'Отзыв опубликован и связан с этой встречей.', { userId: cleanUserId });
+  await db.collection(bookingProviderCollection(cleanProviderType)).doc(cleanProviderId).set({
+    'bookingStats.reviewsPublished': FieldValue.increment(1),
+    bookingStatsUpdatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return nextBooking;
+}
+
 async function actionBookingLifecycle(db, req, actor, kind) {
   const bookingId = safeString(req.body?.bookingId || req.body?.id, 260);
   if (!bookingId) throw Object.assign(new Error('Не указана встреча.'), { statusCode: 400, code: 'BOOKING_BAD_ID' });
@@ -1579,9 +1774,18 @@ async function actionBookingLifecycle(db, req, actor, kind) {
     tx.set(ref, booking, { merge: true });
   });
 
+  let journeyResult = { booking, events: [] };
+  if (kind === 'complete') {
+    journeyResult = await applyBookingCompletionJourney(db, booking);
+    booking = journeyResult.booking || booking;
+  }
+
   await persistBookingMirrors(db, booking);
   const text = bookingEventText(kind, before, booking, reason);
   await appendBookingSystemEvent(db, booking, text, actor);
+  for (const eventText of journeyResult.events || []) {
+    await appendBookingSystemEvent(db, booking, eventText, actor);
+  }
   await Promise.all(bookingRecipientIds(booking, actor).map(userId => writeBookingNotification(db, booking, userId, `📅 ${booking.providerName || 'Встреча АПГ'}`, text, notificationType).catch(() => {})));
   await audit(db, req, actor, `booking:${kind}`, 'bookings', booking.id, 'success', { fromStatus: before.status, toStatus: booking.status, dialogId: booking.dialogId || '' });
   return { ok: true, booking, dialogId: booking.dialogId || '' };

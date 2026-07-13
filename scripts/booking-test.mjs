@@ -4,6 +4,7 @@ import {
   bookingBlocksSlot,
   buildBookingDialogContext,
   buildBookingHistoryEntry,
+  buildBookingJourneySummary,
   canTransitionBookingStatus,
   buildBookingProfile,
   buildBookingReminders,
@@ -13,6 +14,7 @@ import {
   getUpcomingBookingDates,
   isOnlineBookingEnabled,
   normalizeBooking,
+  normalizeBookingJourney,
   rangesOverlap,
 } from '../server-shared/booking.js';
 
@@ -59,6 +61,29 @@ assert.equal(context.bookingId, 'booking-1');
 assert.equal(context.partnerId, 'coffee-time');
 assert.equal(context.ownerUserIds[0], 'owner-1');
 assert.equal(context.label, 'Встреча');
+
+const journey = normalizeBookingJourney({
+  reviewPromptAvailable: true,
+  keysAwarded: 2,
+  stampAwarded: true,
+  stampProgress: { providerId: 'coffee-time', current: 3, target: 6 },
+  nextSteps: [{ id: 'review', label: 'Оставить отзыв', action: 'openReview' }],
+});
+assert.equal(journey.keysAwarded, 2);
+assert.equal(journey.stampProgress.current, 3);
+assert.equal(journey.nextSteps[0].action, 'openReview');
+
+const completedContext = buildBookingDialogContext({
+  id: 'booking-done',
+  providerType: 'partner',
+  providerId: 'coffee-time',
+  providerName: 'Coffee Time',
+  status: BOOKING_STATUSES.completed,
+  journey,
+});
+assert.equal(completedContext.reviewPromptAvailable, true);
+assert.equal(completedContext.keysAwarded, 2);
+assert.equal(buildBookingJourneySummary(completedContext), '+2 ключа · штамп 3/6 · можно оставить отзыв');
 
 assert.equal(normalizeBooking({ id: 'b1', status: 'new' }).status, BOOKING_STATUSES.pending);
 assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.pending, BOOKING_STATUSES.confirmed), true);

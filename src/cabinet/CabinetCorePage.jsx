@@ -434,6 +434,14 @@ function BookingModule({ role, profile, onSaved, onToast }) {
 
   const groups = useMemo(() => groupBookingsForProfile(bookings), [bookings]);
   const calendarItems = useMemo(() => buildBookingCalendar({ bookings, ...bookingDateRange(calendarMode), specialistId: specialistFilter, status: statusFilter }), [bookings, calendarMode, specialistFilter, statusFilter]);
+  const journeyStats = useMemo(() => bookings.reduce((acc, item) => {
+    const journey = item.journey || {};
+    acc.completed += item.status === BOOKING_STATUSES.completed ? 1 : 0;
+    acc.keys += Number(journey.keysAwarded || item.keysAwarded || 0);
+    acc.stamps += journey.stampAwarded || item.stampAwarded ? 1 : 0;
+    acc.reviews += journey.reviewPublishedAt ? 1 : 0;
+    return acc;
+  }, { completed: 0, keys: 0, stamps: 0, reviews: 0 }), [bookings]);
 
   const runLifecycle = async (action, item, payload = {}) => {
     try {
@@ -555,6 +563,10 @@ function BookingModule({ role, profile, onSaved, onToast }) {
           <StatPill label="Услуги" value={bookingProfile.services.length} />
           <StatPill label="Специалисты" value={bookingProfile.specialists.length} />
           <StatPill label="Статус" value={enabled ? 'Активна' : 'Пауза'} />
+          <StatPill label="Завершено" value={journeyStats.completed} tone="gold" />
+          <StatPill label="Ключей" value={journeyStats.keys} />
+          <StatPill label="Штампы" value={journeyStats.stamps} />
+          <StatPill label="Отзывы" value={journeyStats.reviews} />
         </ContentGrid>
         <GlassCard style={{ borderRadius: 28 }}>
           <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 9 }}>Услуги для записи</div>

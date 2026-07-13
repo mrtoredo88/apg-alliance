@@ -152,7 +152,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, reviewPrompt, onReviewPromptHandled }) {
+export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, reviewPrompt, reviewPromptBookingId = '', onReviewPromptHandled }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -234,6 +234,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         userId,
         partnerId: partner.id,
         partnerName: partner.name,
+        bookingId: reviewPromptBookingId || '',
         ...reviewData,
       });
 
@@ -261,7 +262,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
     } catch (e) { logError(e, 'PartnerPage.submitReview'); setReviewError('Ошибка отправки. Проверьте соединение.'); }
     if (mountedRef.current) setSubmitting(false);
-  }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate]);
+  }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate, reviewPromptBookingId]);
 
   if (!partner) return null;
 

@@ -643,6 +643,7 @@ export function UserApp() {
   const [toast, setToast]                       = useState(null);
   const [scanSuccess, setScanSuccess]           = useState(null);
   const [reviewPromptPartnerId, setReviewPromptPartnerId] = useState(null);
+  const [reviewPromptBookingId, setReviewPromptBookingId] = useState('');
   const [scanDates, setScanDates]               = useState([]);
 
   const [activePanel, setActivePanel]           = useState(initialPanel);
@@ -888,7 +889,6 @@ export function UserApp() {
       source: platformSource,
     });
   }, [platformSource, user]);
-
 
   const openScanner = useCallback((source = 'app') => {
     trackAppEvent('qr:scanner_open', {
@@ -2010,6 +2010,19 @@ export function UserApp() {
     showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { id: partner?.id, partnerName: partner?.name });
     navigatePanel('partner');
   }, [markLearningAction, navigatePanel, platformSource, recordInterest, user]);
+
+  const openBookingReview = useCallback((booking) => {
+    if (!booking) return;
+    const providerId = String(booking.providerId || '').trim();
+    if (booking.providerType !== 'partner' || !providerId) {
+      if (booking.dialogId) openContextDialogById(booking.dialogId);
+      return;
+    }
+    const partner = enrichedPartners.find(item => String(item.id) === providerId) || { id: providerId, name: booking.providerName || 'Партнёр АПГ' };
+    setReviewPromptPartnerId(providerId);
+    setReviewPromptBookingId(String(booking.id || booking.bookingId || ''));
+    openPartner(partner);
+  }, [enrichedPartners, openContextDialogById, openPartner]);
 
   const openDialogObject = useCallback((context) => {
     if (!context?.type) return;
@@ -3496,7 +3509,8 @@ export function UserApp() {
                     onAskQuestion={(partner) => openContextDialog('partner', partner, 'partner-card')}
                     onBook={(partner) => openBookingFlow('partner', partner)}
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
-                    onReviewPromptHandled={() => setReviewPromptPartnerId(null)}
+                    reviewPromptBookingId={reviewPromptBookingId}
+                    onReviewPromptHandled={() => { setReviewPromptPartnerId(null); setReviewPromptBookingId(''); }}
                   />
                 </Suspense>
               </Panel>
@@ -3576,6 +3590,7 @@ export function UserApp() {
                     onOpenNews={() => goPanel('news')}
                     onOpenHealth={() => goPanel('health')}
                     onOpenDialog={openContextDialogById}
+                    onOpenBookingReview={openBookingReview}
                   />
                 </Suspense>
               </Panel>
@@ -3857,6 +3872,7 @@ export function UserApp() {
               setScanSuccess(null);
               if (!partner) return;
               setReviewPromptPartnerId(partner.id);
+              setReviewPromptBookingId('');
               openPartner(partner);
             }}
           />

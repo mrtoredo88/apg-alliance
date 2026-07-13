@@ -201,6 +201,21 @@ function AccountMethodRow({ icon, title, subtitle, status, accent = APG2.gold })
   );
 }
 
+function bookingJourneySummary(item = {}) {
+  const journey = item.journey || {};
+  const parts = [];
+  const keysAwarded = Number(journey.keysAwarded || item.keysAwarded || 0);
+  const stamp = journey.stampProgress || {};
+  if (keysAwarded > 0) parts.push(`+${keysAwarded} ключа`);
+  if (journey.stampAwarded || item.stampAwarded) {
+    parts.push(stamp.target > 0 ? `штамп ${stamp.current || 0}/${stamp.target}` : 'визит отмечен');
+  }
+  if ((journey.reviewPromptAvailable || item.reviewPromptAvailable) && !journey.reviewPublishedAt) {
+    parts.push('можно оставить отзыв');
+  }
+  return parts.join(' · ');
+}
+
 const FAQ_ITEMS = [
   {
     q: 'Что такое АПГ?',
@@ -391,7 +406,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingReview }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -1118,6 +1133,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                         <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.providerName || 'Запись АПГ'}</span>
                         <span style={{ display: 'block', color: APG2.textMuted, fontSize: 12, lineHeight: '16px', marginTop: 3 }}>{item.serviceTitle || 'Услуга'} · {item.dateLabel || ''} {item.time || ''}</span>
+                        {bookingJourneySummary(item) && <span style={{ display: 'block', color: APG2.gold, fontSize: 11.5, lineHeight: '16px', marginTop: 4, fontWeight: 760 }}>{bookingJourneySummary(item)}</span>}
                       </span>
                         <span style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>{item.statusLabel || 'Запись'}</span>
                       </button>
@@ -1137,6 +1153,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                             const reason = prompt('Причина отмены, если хотите указать') || '';
                             runBookingAction('booking:cancel', item, { reason });
                           }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Отменить</GlassButton>
+                        </div>
+                      )}
+                      {item.status === 'completed' && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {(item.journey?.reviewPromptAvailable || item.reviewPromptAvailable) && !item.journey?.reviewPublishedAt && <GlassButton tone="gold" onClick={() => onOpenBookingReview?.(item)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12, color: '#17120a' }}>Оставить отзыв</GlassButton>}
+                          {item.dialogId && <GlassButton onClick={() => onOpenDialog?.(item.dialogId)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Диалог встречи</GlassButton>}
                         </div>
                       )}
                     </div>
