@@ -1,5 +1,8 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
+import { APP_URL } from '../lib/config.js';
+import { getDbMessaging } from '../lib/firebase.js';
+import webpush from 'web-push';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
 import { buildIdentityDiagnostics, resolveFirebaseIdentity } from '../lib/identityCore.js';
@@ -1222,6 +1225,77 @@ function dialogMirrorPayload(dialog, participantId) {
   };
 }
 
+function initDialogWebPush() {
+  const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) return false;
+  webpush.setVapidDetails(process.env.WEB_PUSH_VAPID_SUBJECT || `mailto:support@${new URL(APP_URL).hostname}`, publicKey, privateKey);
+  return true;
+}
+
+function normalizeDialogSubscription(input) {
+  const endpoint = safeString(input?.endpoint, 2000);
+  const p256dh = safeString(input?.keys?.p256dh, 500);
+  const auth = safeString(input?.keys?.auth, 300);
+  if (!endpoint || !p256dh || !auth) return null;
+  return { endpoint, expirationTime: input.expirationTime || null, keys: { p256dh, auth } };
+}
+
+async function sendDialogPush(db, userId, notificationId, title, body, dialogId) {
+  const snap = await db.collection('users').doc(userId).get().catch(() => null);
+  if (!snap?.exists) return { sent: 0, failed: 0, skipped: true, reason: 'user_not_found' };
+  const user = snap.data() || {};
+  const fcmTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.map(token => safeString(token, 600)).filter(Boolean) : [];
+  const webSubscriptions = Array.isArray(user.webPushSubscriptions) ? user.webPushSubscriptions.map(normalizeDialogSubscription).filter(Boolean) : [];
+  const url = `${APP_URL}/#dialogs`;
+  let sent = 0;
+  let failed = 0;
+  const errors = [];
+
+  if (fcmTokens.length) {
+    try {
+      const result = await getDbMessaging().sendEachForMulticast({
+        tokens: fcmTokens,
+        notification: { title, body },
+        data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
+        webpush: {
+          notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}` },
+          fcmOptions: { link: url },
+        },
+      });
+      sent += result.successCount;
+      failed += result.failureCount;
+      result.responses.filter(r => !r.success).slice(0, 6).forEach(r => errors.push({ code: r.error?.code || 'fcm/error', message: safeString(r.error?.message, 240) }));
+    } catch (e) {
+      failed += fcmTokens.length;
+      errors.push({ code: 'fcm/error', message: safeString(e?.message, 240) });
+    }
+  }
+
+  if (webSubscriptions.length && initDialogWebPush()) {
+    await Promise.all(webSubscriptions.map(async subscription => {
+      try {
+        await webpush.sendNotification(subscription, JSON.stringify({
+          notification: { title, body, icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}` },
+          data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
+        }), { TTL: 21600, urgency: 'normal' });
+        sent += 1;
+      } catch (e) {
+        failed += 1;
+        errors.push({ code: e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error', message: safeString(e?.body || e?.message, 240) });
+      }
+    }));
+  }
+
+  const stats = { sent, failed, subscribers: fcmTokens.length + webSubscriptions.length, errors: errors.slice(0, 10) };
+  await db.collection('notifications').doc(notificationId).set({
+    pushStatus: stats.subscribers ? (failed ? 'partial' : 'sent') : 'skipped',
+    pushStats: stats,
+    pushSentAt: FieldValue.serverTimestamp(),
+  }, { merge: true }).catch(() => {});
+  return stats;
+}
+
 async function mirrorDialog(db, dialog) {
   const batch = db.batch();
   for (const participantId of dialog.participantIds || []) {
@@ -1311,6 +1385,7 @@ async function actionDialogMessage(db, req, actor) {
   const lastMessage = { id: message.id, text, senderId: actor.userId, senderName: message.senderName, senderRole, createdAt: FieldValue.serverTimestamp() };
   const typing = { ...(dialog.typing || {}), [actor.userId]: false };
   const batch = db.batch();
+  const pushTargets = [];
   batch.set(messageRef, message, { merge: true });
   batch.set(ref, { participantIds, lastMessage, lastMessageAt: FieldValue.serverTimestamp(), unreadBy, typing, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   participantIds.forEach(participantId => {
@@ -1318,7 +1393,9 @@ async function actionDialogMessage(db, req, actor) {
     batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialogId), dialogMirrorPayload({ ...dialog, id: dialogId, participantIds, unreadBy, lastMessage, lastMessageAt: FieldValue.serverTimestamp(), typing }, participantId), { merge: true });
   });
   participantIds.filter(id => id !== actor.userId).forEach(participantId => {
-    batch.set(db.collection('notifications').doc(), {
+    const notificationRef = db.collection('notifications').doc();
+    pushTargets.push({ userId: participantId, notificationId: notificationRef.id });
+    batch.set(notificationRef, {
       userId: participantId,
       targetUserId: participantId,
       type: 'contextDialogMessage',
@@ -1334,6 +1411,14 @@ async function actionDialogMessage(db, req, actor) {
     });
   });
   await batch.commit();
+  await Promise.all(pushTargets.map(target => sendDialogPush(
+    db,
+    target.userId,
+    target.notificationId,
+    dialog.context?.title || 'Новое сообщение',
+    text || 'Новое вложение',
+    dialogId,
+  ).catch(() => {})));
   await audit(db, req, actor, 'dialog:message', 'contextDialog', dialogId, 'success', { senderRole, type: dialog.type, objectId: dialog.objectId });
   return { ok: true, dialogId, messageId: message.id, senderRole };
 }
