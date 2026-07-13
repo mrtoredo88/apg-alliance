@@ -1437,6 +1437,15 @@ function bookingEventText(action, before, after, reason = '') {
   return `Статус встречи изменен: ${getBookingStatusLabel(after.status)}.`;
 }
 
+function bookingMomentNotificationText(booking) {
+  const journey = booking?.journey || {};
+  const bonuses = [];
+  if (Number(journey.keysAwarded || 0) > 0) bonuses.push(`+${journey.keysAwarded} ключа`);
+  if (journey.stampAwarded) bonuses.push('новый штамп');
+  const suffix = bonuses.length ? ` Вас ждут бонусы: ${bonuses.join(' и ')}.` : ' Вас ждёт экран благодарности.';
+  return `Спасибо за посещение ${booking.providerName || 'партнёра АПГ'}!${suffix}`;
+}
+
 function normalizeSlotFromBody(body = {}, current = {}) {
   const slot = body.slot && typeof body.slot === 'object' ? body.slot : {};
   const startAt = safeString(slot.startAt || body.startAt, 80);
@@ -1786,7 +1795,8 @@ async function actionBookingLifecycle(db, req, actor, kind) {
   for (const eventText of journeyResult.events || []) {
     await appendBookingSystemEvent(db, booking, eventText, actor);
   }
-  await Promise.all(bookingRecipientIds(booking, actor).map(userId => writeBookingNotification(db, booking, userId, `📅 ${booking.providerName || 'Встреча АПГ'}`, text, notificationType).catch(() => {})));
+  const notificationText = kind === 'complete' ? bookingMomentNotificationText(booking) : text;
+  await Promise.all(bookingRecipientIds(booking, actor).map(userId => writeBookingNotification(db, booking, userId, `📅 ${booking.providerName || 'Встреча АПГ'}`, notificationText, notificationType).catch(() => {})));
   await audit(db, req, actor, `booking:${kind}`, 'bookings', booking.id, 'success', { fromStatus: before.status, toStatus: booking.status, dialogId: booking.dialogId || '' });
   return { ok: true, booking, dialogId: booking.dialogId || '' };
 }
@@ -1816,6 +1826,44 @@ async function actionBookingList(db, req, actor, calendar = false) {
     .filter(item => rangesOverlap(item.startAt, item.endAt, from, to) || (item.startMs >= new Date(from).getTime() && item.startMs < new Date(to).getTime()))
     .sort((a, b) => (a.startMs || 0) - (b.startMs || 0));
   return { ok: true, bookings: items, calendar: { from, to, specialistId, status, items } };
+}
+
+async function actionBookingMoment(db, req, actor) {
+  const bookingId = safeString(req.body?.bookingId || req.body?.id, 180);
+  const event = safeString(req.body?.event || req.body?.type, 80);
+  const allowed = new Set(['opened', 'review_started', 'review_submitted', 'dialog_clicked', 'rebook_clicked', 'dismissed']);
+  if (!bookingId || !allowed.has(event)) throw Object.assign(new Error('Некорректное событие момента после визита.'), { statusCode: 400, code: 'BOOKING_MOMENT_BAD_EVENT' });
+  const ref = db.collection('bookings').doc(bookingId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Встреча не найдена.'), { statusCode: 404, code: 'BOOKING_NOT_FOUND' });
+  const booking = normalizeBooking({ id: snap.id, ...(snap.data() || {}) });
+  await assertBookingAccess(db, booking, actor);
+
+  const momentPatch = {
+    [`moment.${event}At`]: FieldValue.serverTimestamp(),
+    [`moment.${event}Count`]: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const providerRef = db.collection(bookingProviderCollection(booking.providerType)).doc(booking.providerId);
+  await Promise.all([
+    ref.set(momentPatch, { merge: true }),
+    db.collection('bookingMomentAnalytics').add({
+      bookingId,
+      event,
+      userId: actor.userId,
+      providerType: booking.providerType,
+      providerId: booking.providerId,
+      source: safeString(req.body?.source || 'post_visit_moment', 80),
+      rating: req.body?.rating == null ? null : Math.max(1, Math.min(5, Number(req.body.rating || 0))),
+      createdAt: FieldValue.serverTimestamp(),
+    }),
+    providerRef.set({
+      [`bookingMomentStats.${event}`]: FieldValue.increment(1),
+      bookingMomentStatsUpdatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => {}),
+  ]);
+  await audit(db, req, actor, 'booking:moment', 'bookings', bookingId, 'success', { event });
+  return { ok: true };
 }
 
 async function actionLogCreate(db, req, actor, collection, source) {
@@ -2454,6 +2502,7 @@ async function routeAction(db, req, actor) {
   if (action === 'booking:noShow') return actionBookingLifecycle(db, req, actor, 'noShow');
   if (action === 'booking:list') return actionBookingList(db, req, actor, false);
   if (action === 'booking:calendar') return actionBookingList(db, req, actor, true);
+  if (action === 'booking:moment') return actionBookingMoment(db, req, actor);
   if (action === 'loki:settings') return actionLokiSettings(db, req, actor);
   if (action === 'loki:analytics') return actionLokiAnalytics(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);

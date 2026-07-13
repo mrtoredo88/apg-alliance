@@ -261,6 +261,50 @@ export function buildBookingJourneySummary(booking = {}) {
   return parts.join(' · ');
 }
 
+export function buildPostVisitMomentState(booking = {}, { provider = {}, userKeys = 0 } = {}) {
+  const normalized = normalizeBooking(booking);
+  const journey = normalized.journey || {};
+  const progress = journey.stampProgress || {};
+  const providerName = text(normalized.providerName || provider.name || normalized.title || 'Партнёр АПГ', 180);
+  const keysAwarded = Math.max(0, Number(journey.keysAwarded || normalized.keysAwarded || 0));
+  const stampTarget = Math.max(0, Number(progress.target || provider.stampTarget || provider.loyaltyStampTarget || 0));
+  const stampCurrent = Math.max(0, Number(progress.current || 0));
+  const hasStampCard = stampTarget > 0;
+  const stampsLeft = hasStampCard ? Math.max(0, stampTarget - stampCurrent) : 0;
+  const serviceTitle = text(normalized.serviceTitle || '', 160);
+  const regularWords = ['массаж', 'маникюр', 'педикюр', 'стриж', 'салон', 'стомат', 'психолог', 'трен', 'йога', 'фитнес', 'космет', 'консультац'];
+  const regularText = `${serviceTitle} ${provider.categoryLabel || ''} ${provider.specialization || ''}`.toLowerCase();
+  const canRepeat = regularWords.some(word => regularText.includes(word)) || Boolean(normalized.providerId);
+  const achievement = stampCurrent > 0 && (stampCurrent === 1 || stampCurrent === 5 || (hasStampCard && stampCurrent >= stampTarget))
+    ? {
+        id: hasStampCard && stampCurrent >= stampTarget ? 'stamp_card_complete' : stampCurrent >= 5 ? 'fifth_visit' : 'first_meeting_visit',
+        title: hasStampCard && stampCurrent >= stampTarget ? 'Штамп-карта заполнена' : stampCurrent >= 5 ? 'Пятое посещение' : 'Первый визит после записи',
+      }
+    : null;
+
+  return {
+    visible: normalized.status === BOOKING_STATUSES.completed && Boolean(journey.rewardedAt),
+    bookingId: normalized.id || normalized.bookingId,
+    providerType: normalized.providerType === 'expert' ? 'expert' : 'partner',
+    providerId: text(normalized.providerId || '', 180),
+    providerName,
+    serviceTitle,
+    dateText: [normalized.dateLabel, normalized.time].filter(Boolean).join(' '),
+    keysAwarded,
+    balance: Math.max(0, Number(userKeys || 0)),
+    hasStampCard,
+    stampCurrent,
+    stampTarget,
+    stampsLeft,
+    stampCompleted: hasStampCard && stampCurrent >= stampTarget,
+    achievement,
+    canReview: Boolean(journey.reviewPromptAvailable && !journey.reviewPublishedAt),
+    canRepeat,
+    dialogId: text(normalized.dialogId || '', 260),
+    lokiText: 'Спасибо! Надеюсь, вам понравилось. Если возникли вопросы, я помогу связаться с партнёром.',
+  };
+}
+
 export function groupBookingsForProfile(bookings = [], now = Date.now()) {
   const normalized = (Array.isArray(bookings) ? bookings : []).map(normalizeBooking).sort((a, b) => (a.startMs || 0) - (b.startMs || 0));
   return {

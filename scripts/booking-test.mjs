@@ -5,6 +5,7 @@ import {
   buildBookingDialogContext,
   buildBookingHistoryEntry,
   buildBookingJourneySummary,
+  buildPostVisitMomentState,
   canTransitionBookingStatus,
   buildBookingProfile,
   buildBookingReminders,
@@ -84,6 +85,26 @@ const completedContext = buildBookingDialogContext({
 assert.equal(completedContext.reviewPromptAvailable, true);
 assert.equal(completedContext.keysAwarded, 2);
 assert.equal(buildBookingJourneySummary(completedContext), '+2 ключа · штамп 3/6 · можно оставить отзыв');
+
+const postVisit = buildPostVisitMomentState({
+  id: 'booking-done',
+  providerType: 'partner',
+  providerId: 'coffee-time',
+  providerName: 'Coffee Time',
+  serviceTitle: 'Маникюр',
+  status: BOOKING_STATUSES.completed,
+  dateLabel: '14 июля',
+  time: '18:30',
+  journey: {
+    ...journey,
+    rewardedAt: '2026-07-14T18:40:00.000Z',
+  },
+}, { provider: { stampTarget: 6 }, userKeys: 138 });
+assert.equal(postVisit.visible, true);
+assert.equal(postVisit.hasStampCard, true);
+assert.equal(postVisit.stampsLeft, 3);
+assert.equal(postVisit.canRepeat, true);
+assert.equal(postVisit.balance, 138);
 
 assert.equal(normalizeBooking({ id: 'b1', status: 'new' }).status, BOOKING_STATUSES.pending);
 assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.pending, BOOKING_STATUSES.confirmed), true);

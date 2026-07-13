@@ -41,6 +41,7 @@ import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManage
 import { buildAIContext } from './intelligence/AIContextService.js';
 import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
 import { BookingFlow } from './booking/BookingFlow.jsx';
+import { buildPostVisitMomentState } from '../server-shared/booking.js';
 import {
   APG_EVENT_TYPES,
   getAIMemorySnapshot,
@@ -223,6 +224,132 @@ function ScanSuccessModal({ result, onClose, onReview }) {
             <GlassButton onClick={onReview} tone="gold" style={{ minHeight: 48, borderRadius: 20, color: '#17120a' }}>⭐ Оставить отзыв</GlassButton>
           )}
           <GlassButton onClick={onClose} style={{ minHeight: 46, borderRadius: 20 }}>Готово</GlassButton>
+        </div>
+      </GlassCard>
+    </div>,
+    document.body,
+  );
+}
+
+function PostVisitMoment({ booking, provider, user, userKeys, onClose, onSubmitReview, onOpenDialog, onRepeatBooking, onTrack }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [showComment, setShowComment] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const moment = useMemo(() => buildPostVisitMomentState(booking, { provider, userKeys }), [booking, provider, userKeys]);
+
+  useEffect(() => {
+    if (!moment.visible) return;
+    onTrack?.('opened');
+    showLokiMessage(LOKI_EVENTS.KEY_RECEIVED, { partnerName: moment.providerName, keys: moment.keysAwarded });
+  }, [moment.visible, moment.bookingId]);
+
+  if (!booking || !moment.visible) return null;
+
+  const submit = async () => {
+    if (!rating || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmitReview?.({ booking, rating, comment });
+      setDone(true);
+      onTrack?.('review_submitted', { rating });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const close = (event = 'dismissed') => {
+    onTrack?.(event, { rating: rating || undefined });
+    onClose?.();
+  };
+
+  const stampSlots = moment.hasStampCard ? Array.from({ length: Math.min(moment.stampTarget, 8) }) : [];
+  const lowRating = rating > 0 && rating <= 3;
+  const highRating = rating >= 4;
+
+  return createPortal(
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 13200, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'calc(18px + var(--safe-top, 0px)) 14px calc(24px + env(safe-area-inset-bottom, 0px))', background: 'rgba(7,7,9,0.62)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+      onClick={e => { if (e.target === e.currentTarget) close('dismissed'); }}
+    >
+      <div style={{ position: 'absolute', left: '50%', top: '18%', width: 280, height: 280, borderRadius: '50%', transform: 'translateX(-50%)', background: 'radial-gradient(circle, rgba(215,184,106,0.30), rgba(126,103,182,0.14) 48%, transparent 72%)', filter: 'blur(2px)', pointerEvents: 'none' }} />
+      <GlassCard style={{ width: '100%', maxWidth: 430, borderRadius: 34, padding: 18, display: 'grid', gap: 12, border: '1px solid rgba(215,184,106,0.34)', animation: 'fadeInUp 360ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
+        <div style={{ textAlign: 'center', padding: '8px 8px 4px' }}>
+          <div style={{ width: 76, height: 76, margin: '0 auto 13px', borderRadius: 28, display: 'grid', placeItems: 'center', fontSize: 36, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, boxShadow: '0 20px 48px rgba(215,184,106,0.20), inset 0 1px 0 rgba(255,255,255,0.30)' }}>🎉</div>
+          <GlassBadge tone="gold">Спасибо за визит</GlassBadge>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 25, lineHeight: '30px', fontWeight: 940, marginTop: 10 }}>Вы посетили<br />{moment.providerName}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 7 }}>{moment.serviceTitle ? `${moment.serviceTitle} · ` : ''}{moment.dateText || 'Сегодня'}</div>
+        </div>
+
+        {moment.hasStampCard && (
+          <GlassCard style={{ borderRadius: 24, padding: 13, display: 'grid', gap: 9 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 880 }}>☕ Новый штамп получен</div>
+              <GlassBadge>{moment.stampCurrent}/{moment.stampTarget}</GlassBadge>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stampSlots.length}, minmax(0, 1fr))`, gap: 6 }}>
+              {stampSlots.map((_, index) => {
+                const filled = index < moment.stampCurrent;
+                return <div key={index} style={{ height: 28, borderRadius: 10, display: 'grid', placeItems: 'center', background: filled ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: filled ? '1px solid rgba(255,240,184,0.42)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', color: filled ? '#17120a' : APG2_PROFILE.textMuted, fontSize: 13, fontWeight: 900, animation: filled ? `fadeInUp ${240 + index * 40}ms ease both` : undefined }}>★</div>;
+              })}
+            </div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px' }}>
+              {moment.stampCompleted ? 'Карта заполнена. Можно получить награду у партнёра.' : `Осталось ещё ${moment.stampsLeft} до бонуса.`}
+            </div>
+          </GlassCard>
+        )}
+
+        {moment.keysAwarded > 0 && (
+          <GlassCard style={{ borderRadius: 24, padding: 13, display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}>
+            <div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>🗝 Получено</div>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 28, lineHeight: '32px', fontWeight: 940 }}>+{moment.keysAwarded} ключа</div>
+            </div>
+            <GlassBadge>Баланс: {moment.balance}</GlassBadge>
+          </GlassCard>
+        )}
+
+        {moment.achievement && (
+          <GlassCard style={{ borderRadius: 24, padding: 13, display: 'flex', gap: 12, alignItems: 'center', border: '1px solid rgba(215,184,106,0.30)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 17, background: APG2_PROFILE.goldSoft, display: 'grid', placeItems: 'center', fontSize: 23 }}>🏆</div>
+            <div>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.8 }}>Новое достижение</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '19px', fontWeight: 880 }}>{moment.achievement.title}</div>
+            </div>
+          </GlassCard>
+        )}
+
+        <GlassCard style={{ borderRadius: 24, padding: 13, display: 'grid', gap: 10 }}>
+          <div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 900 }}>⭐ Как всё прошло?</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>Ваш отзыв поможет другим жителям.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 7 }}>
+            {[1, 2, 3, 4, 5].map(star => <button key={star} type="button" onClick={() => { setRating(star); setShowComment(true); onTrack?.('review_started', { rating: star }); }} style={{ height: 42, borderRadius: 15, border: star <= rating ? '1px solid rgba(255,232,165,0.58)' : APG2_PROFILE.glass.border, background: star <= rating ? APG2_PROFILE.goldGradient : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: star <= rating ? '#17120a' : APG2_PROFILE.textMuted, fontSize: 19, fontFamily: 'inherit', cursor: 'pointer' }}>★</button>)}
+          </div>
+          {showComment && (
+            <div style={{ display: 'grid', gap: 9 }}>
+              <div style={{ color: lowRating ? '#F5A3A3' : highRating ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px' }}>
+                {lowRating ? 'Если что-то пошло не так, можно сначала написать партнёру и решить вопрос.' : 'Спасибо! Можно добавить пару слов о впечатлении.'}
+              </div>
+              <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Комментарий к отзыву" style={{ ...APG2_PROFILE.glass, minHeight: 86, borderRadius: 20, padding: 12, color: APG2_PROFILE.text, fontSize: 14, lineHeight: '20px', fontFamily: 'inherit', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
+              {lowRating && (
+                <GlassButton onClick={() => { onTrack?.('dialog_clicked', { rating }); onOpenDialog?.(booking); }} style={{ minHeight: 42, borderRadius: 18 }}>Написать партнёру</GlassButton>
+              )}
+              <GlassButton tone="gold" disabled={!rating || submitting || done} onClick={submit} style={{ minHeight: 44, borderRadius: 18, color: '#17120a' }}>{done ? 'Отзыв отправлен' : submitting ? 'Отправляем...' : lowRating ? 'Оставить отзыв' : 'Опубликовать отзыв'}</GlassButton>
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard style={{ borderRadius: 24, padding: 13, display: 'flex', gap: 11, alignItems: 'center' }}>
+          <div style={{ width: 42, height: 42, borderRadius: 16, background: APG2_PROFILE.goldSoft, display: 'grid', placeItems: 'center', fontSize: 21 }}>◈</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', flex: 1 }}>{lowRating ? 'Локи: давайте попробуем разобраться. Я помогу связаться с партнёром.' : moment.lokiText}</div>
+        </GlassCard>
+
+        <div style={{ display: 'grid', gridTemplateColumns: moment.canRepeat ? '1fr 1fr' : '1fr', gap: 9 }}>
+          {moment.canRepeat && <GlassButton onClick={() => { onTrack?.('rebook_clicked'); onRepeatBooking?.(booking); }} tone="gold" style={{ minHeight: 46, borderRadius: 20, color: '#17120a' }}>📅 Повторить запись</GlassButton>}
+          <GlassButton onClick={() => close(done ? 'review_submitted' : 'dismissed')} style={{ minHeight: 46, borderRadius: 20 }}>{done ? 'Готово' : 'Закрыть'}</GlassButton>
         </div>
       </GlassCard>
     </div>,
@@ -661,6 +788,7 @@ export function UserApp() {
   const [pendingDialogRequest, setPendingDialogRequest] = useState(null);
   const [bookingRequest, setBookingRequest] = useState(null);
   const [userBookings, setUserBookings] = useState([]);
+  const [postVisitMoment, setPostVisitMoment] = useState(null);
   const [partnershipEntry, setPartnershipEntry] = useState({ type: initialDeepLink.type === 'partnership' ? 'partner' : '', nonce: 0 });
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
@@ -933,6 +1061,21 @@ export function UserApp() {
       .catch(e => logError(e, 'UserApp.loadUserBookings'));
     return () => { alive = false; };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (loading || postVisitMoment || !userBookings.length) return;
+    const seenKey = `apg_post_visit_seen_${user?.id || 'guest'}`;
+    const seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]'));
+    const booking = userBookings.find(item => {
+      const id = String(item.id || item.bookingId || '');
+      const journey = item.journey || {};
+      return id && !seen.has(id) && item.status === 'completed' && journey.rewardedAt && journey.reviewPromptAvailable && !journey.reviewPublishedAt;
+    });
+    if (!booking) return;
+    seen.add(String(booking.id || booking.bookingId));
+    localStorage.setItem(seenKey, JSON.stringify([...seen].slice(-80)));
+    setPostVisitMoment(booking);
+  }, [loading, postVisitMoment, user?.id, userBookings]);
 
   // Offline/online detection
   useEffect(() => {
@@ -2023,6 +2166,73 @@ export function UserApp() {
     setReviewPromptBookingId(String(booking.id || booking.bookingId || ''));
     openPartner(partner);
   }, [enrichedPartners, openContextDialogById, openPartner]);
+
+  const trackPostVisitMoment = useCallback((booking, event, extra = {}) => {
+    const bookingId = String(booking?.id || booking?.bookingId || '').trim();
+    if (!bookingId || !event) return;
+    userAction('booking:moment', { bookingId, event, source: 'post_visit_moment', ...extra }).catch(e => logError(e, 'UserApp.bookingMoment'));
+    trackAppEvent('booking:post_visit_moment', {
+      type: APG_EVENT_TYPES.APP_ACTION,
+      user,
+      entityType: 'booking',
+      entityId: bookingId,
+      payload: { event, providerType: booking?.providerType, providerId: booking?.providerId, ...extra },
+      source: platformSource,
+    });
+  }, [platformSource, user]);
+
+  const providerForBooking = useCallback((booking) => {
+    if (!booking?.providerId) return null;
+    const list = booking.providerType === 'expert' ? experts : enrichedPartners;
+    return list.find(item => String(item.id) === String(booking.providerId)) || { id: booking.providerId, name: booking.providerName || 'АПГ' };
+  }, [enrichedPartners, experts]);
+
+  const submitPostVisitReview = useCallback(async ({ booking, rating, comment }) => {
+    const provider = providerForBooking(booking);
+    const userName = user?.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : 'Участник АПГ';
+    if (booking.providerType === 'expert') {
+      await userAction('review:expert', {
+        userId: user.id,
+        expertId: booking.providerId,
+        bookingId: booking.id || booking.bookingId,
+        rating,
+        text: comment,
+        userName,
+        userPhoto: user?.photo_200 ?? null,
+      });
+    } else {
+      await userAction('review:partner', {
+        userId: user.id,
+        partnerId: booking.providerId,
+        partnerName: provider?.name || booking.providerName,
+        bookingId: booking.id || booking.bookingId,
+        stars: rating,
+        text: comment,
+        userName,
+        userPhoto: user?.photo_200 ?? null,
+      });
+    }
+    setUserBookings(prev => prev.map(item => String(item.id || item.bookingId) === String(booking.id || booking.bookingId)
+      ? { ...item, reviewPromptAvailable: false, journey: { ...(item.journey || {}), reviewPromptAvailable: false, reviewPublishedAt: new Date().toISOString() } }
+      : item));
+  }, [providerForBooking, user]);
+
+  const openPostVisitDialog = useCallback((booking) => {
+    if (booking?.dialogId) {
+      openContextDialogById(booking.dialogId);
+      setPostVisitMoment(null);
+      return;
+    }
+    const provider = providerForBooking(booking);
+    if (provider) openContextDialog(booking.providerType === 'expert' ? 'expert' : 'partner', provider, 'post-visit-moment');
+    setPostVisitMoment(null);
+  }, [openContextDialog, openContextDialogById, providerForBooking]);
+
+  const repeatPostVisitBooking = useCallback((booking) => {
+    const provider = providerForBooking(booking);
+    setPostVisitMoment(null);
+    if (provider) openBookingFlow(booking.providerType, provider);
+  }, [openBookingFlow, providerForBooking]);
 
   const openDialogObject = useCallback((context) => {
     if (!context?.type) return;
@@ -3885,6 +4095,18 @@ export function UserApp() {
             onClose={() => setBookingRequest(null)}
             onCreated={handleBookingCreated}
             onOpenDialog={openContextDialogById}
+          />
+
+          <PostVisitMoment
+            booking={postVisitMoment}
+            provider={providerForBooking(postVisitMoment)}
+            user={user}
+            userKeys={userKeys}
+            onClose={() => setPostVisitMoment(null)}
+            onSubmitReview={submitPostVisitReview}
+            onOpenDialog={openPostVisitDialog}
+            onRepeatBooking={repeatPostVisitBooking}
+            onTrack={(event, extra) => trackPostVisitMoment(postVisitMoment, event, extra)}
           />
 
           {showOnboarding && (
