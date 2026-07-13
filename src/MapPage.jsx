@@ -18,7 +18,7 @@ const CATEGORIES = [
   { id: 'fashion',       label: 'Одежда',        emoji: '👗' },
   { id: 'auto',          label: 'Авто',          emoji: '🚗' },
   { id: 'services',      label: 'Услуги',        emoji: '💼' },
-  { id: 'shopping',      label: 'Шоппинг',       emoji: '🛍️' },
+  { id: 'shopping',      label: 'Магазины',      emoji: '🛍️' },
   { id: 'other',         label: 'Другое',        emoji: '📦' },
 ];
 

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-13] fix: rename shopping category label
+**Коммит:** `pending`
+**Файлы:** `src/HomePanelV2.jsx`, `src/NearbyPage.jsx`, `src/MapPage.jsx`, `src/AdminPanel.jsx`, `src/tariffConfig.js`, `src/components/EntityPreviewCard.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Отображаемое название категории `shopping` заменено с “Шоппинг/Шопинг” на “Магазины” в каталогах, фильтрах, карте, Nearby, админке, тарифных справочниках и preview-карточках.
+- Внутренний идентификатор `shopping` не менялся, чтобы не нарушить фильтрацию, поиск, аналитику и существующие связи.
+- В Firestore выполнена точечная миграция legacy `categoryLabel=Шоппинг` у партнёра `t3JbrL0GJwp2zTqhu9CJ` на `Магазины`; после проверки legacy labels не осталось.
+**Почему:** пользовательское название категории должно быть понятным и единым во всём приложении.
+
 ## [2026-07-13] feat: Workspace digital showcase builder
 **Коммит:** `pending`
 **Файлы:** `src/cabinet/CabinetCorePage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `server/src/routes/user-actions.js`, `scripts/showcase-builder-test.mjs`, `package.json`

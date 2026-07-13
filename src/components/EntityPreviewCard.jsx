@@ -11,7 +11,7 @@ const CATEGORY_LABELS = {
   health: ['Здоровье', '🏥'],
   home: ['Дом', '🏠'],
   services: ['Услуги', '💼'],
-  shopping: ['Шопинг', '🛍️'],
+  shopping: ['Магазины', '🛍️'],
   business: ['Бизнес', '💼'],
   law: ['Право', '⚖️'],
   psychology: ['Психология', '🧠'],

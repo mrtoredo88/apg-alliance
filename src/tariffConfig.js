@@ -21,7 +21,7 @@ export const PARTNER_CATEGORIES = [
   { id: 'fashion', label: 'Одежда' },
   { id: 'auto', label: 'Авто' },
   { id: 'services', label: 'Услуги' },
-  { id: 'shopping', label: 'Шоппинг' },
+  { id: 'shopping', label: 'Магазины' },
   { id: 'other', label: 'Другое' },
 ];
 
