@@ -32,6 +32,7 @@ import { normalizeExpertRecord, registerCustomExpertCategories } from '../server
 import { profileOwnedByUser } from './utils/profileOwnership.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
+import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { getRoleDiagnostics } from './roleEngine.js';
@@ -2334,11 +2335,12 @@ export function UserApp() {
   }, [user, handleLogout]);
 
   const handleShare = useCallback(() => {
+    const link = buildReferralLink(user);
     vkBridge.send('VKWebAppShare', {
-      link: 'https://vk.com/app54601851',
-      text: 'Присоединяйся к АПГ — Альянсу Партнёров Зеленограда! 🔑',
+      link,
+      text: buildReferralInviteText(link),
     }).catch(() => {});
-  }, []);
+  }, [user]);
 
   // ─── Свайп-навигация между основными табами ─────────────────────────────────
 

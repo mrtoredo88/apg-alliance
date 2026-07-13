@@ -28,6 +28,18 @@
 
 ---
 
+## [2026-07-13] fix: simplify referral invite text
+**Коммит:** `pending`
+**Файлы:** `src/referralInvite.js`, `src/UserApp.jsx`, `src/ReferralPage.jsx`, `src/ProfilePanel.jsx`, `src/constants.js`, `scripts/referral-invite-test.mjs`, `package.json`
+**Тип:** fix
+**Что изменено:**
+- Добавлен единый шаблон реферального приглашения: `Присоединяйся к Альянсу Партнёров Зеленограда 👇` + текущая ссылка.
+- Telegram/VK/Web Share/clipboard сценарии реферального приглашения больше не отправляют имя, ключи, уровень, стрик или посещённых партнёров.
+- Реферальные ссылки с `?ref=` сохраняются полностью; добавлен regression-тест шаблона.
+**Почему:** приглашение должно быть коротким и понятным человеку, который ещё не знаком с АПГ, без отвлекающей персональной статистики.
+
+---
+
 ## [2026-07-13] feat: add Workspace Intelligence day planner
 **Коммит:** `pending`
 **Файлы:** `src/intelligence/WorkspaceDayPlanner.js`, `src/intelligence/IntelligenceService.js`, `src/intelligence/index.js`, `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `scripts/workspace-core-test.mjs`

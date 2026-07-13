@@ -14,6 +14,7 @@ import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, Gla
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 import { CAPABILITIES, hasCapability } from './roleEngine.js';
+import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -1645,7 +1646,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
               <div style={{ background: '#fff', borderRadius: 16, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                 <QRCodeSVG
-                  value={`${APP_URL}/?ref=${user.id}`}
+                  value={buildReferralLink(user)}
                   size={160}
                   bgColor="#ffffff"
                   fgColor="#0F0F1A"
@@ -2147,14 +2148,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           level={level}
           onClose={() => setShowShareModal(false)}
           onShareVK={async () => {
-            const name = user ? user.first_name : 'Я';
-            const levelLabel = level.label;
-            const msg = `${name} — участник АПГ!\n\n🗝️ ${userKeys} ключей · ${levelLabel}\n🔥 Стрик: ${streak} дней\n🏪 Партнёров посещено: ${scannedCount}\n\nПрисоединяйся к Альянсу Партнёров Зеленограда 👇`;
+            const link = buildReferralLink(user);
+            const msg = buildReferralInviteText(link);
             setShowShareModal(false);
             if (navigator.share) {
-              try { await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: msg, url: APP_URL }); return; } catch (err) { if (err.name === 'AbortError') return; }
+              try { await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; }
             }
-            vkBridge.send('VKWebAppShare', { link: APP_URL, text: msg }).catch(() => {});
+            vkBridge.send('VKWebAppShare', { link, text: msg }).catch(() => {});
           }}
         />,
         document.body

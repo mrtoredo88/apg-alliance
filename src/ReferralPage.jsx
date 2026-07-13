@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 import { T, GLASS } from './design.js';
 import vkBridge from './vk.js';
-import { APP_URL } from './constants.js';
+import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const MILESTONES = [
@@ -23,15 +23,15 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
   const copyTimerRef = useRef(null);
   useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
-  const refLink = user?.id ? `${APP_URL}/?ref=${user.id}` : APP_URL;
-  const inviteText = `Привет! Присоединяйся к АПГ — Альянсу Партнёров Города. Открывай классные места Зеленограда и получай награды за визиты 🔑`;
+  const refLink = buildReferralLink(user);
+  const inviteText = buildReferralInviteText(refLink);
 
   const handleCopy = async () => {
     let ok = false;
-    try { await navigator.clipboard.writeText(refLink); ok = true; } catch {}
+    try { await navigator.clipboard.writeText(inviteText); ok = true; } catch {}
     if (!ok) {
       try {
-        await vkBridge.send('VKWebAppCopyText', { text: refLink });
+        await vkBridge.send('VKWebAppCopyText', { text: inviteText });
         ok = true;
       } catch {}
     }
@@ -44,13 +44,13 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: inviteText, url: refLink });
+        await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: inviteText });
         return;
       } catch (err) {
         if (err.name === 'AbortError') return;
       }
     }
-    vkBridge.send('VKWebAppShare', { link: refLink }).catch(() => {});
+    vkBridge.send('VKWebAppShare', { link: refLink, text: inviteText }).catch(() => {});
   };
 
   const milestoneKeys = MILESTONES
