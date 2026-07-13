@@ -72,7 +72,7 @@ export function buildAIContext({
       favorites,
       notifications,
       rewards,
-      tasks: normalized(customTasks),
+      tasks: normalizeList(customTasks),
       completedTasks,
       userKeys,
       referralCount,

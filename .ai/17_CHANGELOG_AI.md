@@ -15,6 +15,17 @@
 
 ---
 
+## [2026-07-13] fix: repair AI Context task normalization
+**Коммит:** `pending`
+**Файлы:** `src/intelligence/AIContextService.js`
+**Тип:** fix
+**Что изменено:**
+- Исправлен вызов нормализации `customTasks` при сборке AI Context: используется существующий `normalizeList`.
+- Устранён production runtime crash `ReferenceError: normalized is not defined`, найденный smoke-проверкой после выкладки Intelligence Experience.
+**Почему:** AI Context должен строиться прозрачно для Home и Loki без падения приложения в production.
+
+---
+
 ## [2026-07-13] feat: launch APG Intelligence Experience
 **Коммит:** `pending`
 **Файлы:** `src/intelligence/IntelligenceService.js`, `src/intelligence/HomeExperienceService.js`, `src/intelligence/ContinueExperience.js`, `src/intelligence/InterestModel.js`, `src/intelligence/recommendationEngine.js`, `src/intelligence/PersonalHomeContext.js`, `src/intelligence/index.js`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/NewsPage.jsx`
