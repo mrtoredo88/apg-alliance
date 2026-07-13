@@ -262,18 +262,20 @@ export function buildBookingJourneySummary(booking = {}) {
 }
 
 export function buildPostVisitMomentState(booking = {}, { provider = {}, userKeys = 0 } = {}) {
-  const normalized = normalizeBooking(booking);
+  const sourceBooking = booking && typeof booking === 'object' ? booking : {};
+  const sourceProvider = provider && typeof provider === 'object' ? provider : {};
+  const normalized = normalizeBooking(sourceBooking);
   const journey = normalized.journey || {};
   const progress = journey.stampProgress || {};
-  const providerName = text(normalized.providerName || provider.name || normalized.title || 'Партнёр АПГ', 180);
+  const providerName = text(normalized.providerName || sourceProvider.name || normalized.title || 'Партнёр АПГ', 180);
   const keysAwarded = Math.max(0, Number(journey.keysAwarded || normalized.keysAwarded || 0));
-  const stampTarget = Math.max(0, Number(progress.target || provider.stampTarget || provider.loyaltyStampTarget || 0));
+  const stampTarget = Math.max(0, Number(progress.target || sourceProvider.stampTarget || sourceProvider.loyaltyStampTarget || 0));
   const stampCurrent = Math.max(0, Number(progress.current || 0));
   const hasStampCard = stampTarget > 0;
   const stampsLeft = hasStampCard ? Math.max(0, stampTarget - stampCurrent) : 0;
   const serviceTitle = text(normalized.serviceTitle || '', 160);
   const regularWords = ['массаж', 'маникюр', 'педикюр', 'стриж', 'салон', 'стомат', 'психолог', 'трен', 'йога', 'фитнес', 'космет', 'консультац'];
-  const regularText = `${serviceTitle} ${provider.categoryLabel || ''} ${provider.specialization || ''}`.toLowerCase();
+  const regularText = `${serviceTitle} ${sourceProvider.categoryLabel || ''} ${sourceProvider.specialization || ''}`.toLowerCase();
   const canRepeat = regularWords.some(word => regularText.includes(word)) || Boolean(normalized.providerId);
   const achievement = stampCurrent > 0 && (stampCurrent === 1 || stampCurrent === 5 || (hasStampCard && stampCurrent >= stampTarget))
     ? {
