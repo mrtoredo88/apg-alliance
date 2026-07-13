@@ -36,6 +36,8 @@ import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './wor
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { getRoleDiagnostics } from './roleEngine.js';
 import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
+import { buildAIContext } from './intelligence/AIContextService.js';
+import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -2753,9 +2755,64 @@ export function UserApp() {
     appState: { partners: enrichedPartners, experts, events, news, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
   }), [enrichedPartners, events, experts, favorites, interestProfile, news, readLaterNews, registeredEventIds, savedNews, userKeys]);
 
+  const platformSource = useMemo(() => (isVK() ? 'vk-miniapp' : 'web-app'), []);
+
+  const aiContext = useMemo(() => buildAIContext({
+    user,
+    activePanel,
+    partners: enrichedPartners,
+    experts,
+    events,
+    news,
+    favorites,
+    notifications,
+    rewards: [],
+    customTasks,
+    completedTasks,
+    userKeys,
+    interestProfile: adaptiveInterestProfile,
+    recentActions: [],
+    registeredEventIds,
+    savedNews,
+    readLaterNews,
+    joinedGroup,
+    referralCount,
+    streak,
+    scanCount: Number(Object.keys(scannedPartnerIds || {}).length || 0),
+    location: user?.location || null,
+    source: platformSource,
+  }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, joinedGroup, notifications, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userKeys, adaptiveInterestProfile]);
+
+  const personalHomeContext = useMemo(() => buildPersonalHomeContext({
+    user,
+    userState: {
+      rewards: [],
+      completedTaskIds: completedTasks,
+      customTasks,
+      source: platformSource,
+      favorites,
+      registeredEventIds,
+      savedNews,
+      readLaterNews,
+      referralCount,
+      streak,
+      userKeys,
+    },
+    appState: {
+      partners: enrichedPartners,
+      experts,
+      events,
+      news,
+      notifications,
+      source: platformSource,
+    },
+  }), [completedTasks, customTasks, enrichedPartners, events, favorites, news, notifications, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
+
   const lokiAppState = useMemo(() => ({
     activePanel,
     user,
+    aiContext,
+    personalHomeContext,
     partners: enrichedPartners,
     events,
     news,
