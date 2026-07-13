@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel } from './components/Apg2ProfileGlass.jsx';
 import { useLoki } from './loki/LokiProvider.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { isVK } from './vk.js';
+import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 
 const QUICK_ACTIONS = [
   { id: 'food', icon: '🍽️', title: 'Где поесть', text: 'Подберу лучшее место сейчас', prompt: 'Где поесть сегодня?' },
@@ -51,9 +52,28 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
     return rows.slice(0, 3);
   }, [dashboard.todayRecommendations, loki.recommendationFeed]);
 
+  useEffect(() => {
+    recommendations.forEach(card => {
+      trackAppEvent('loki:recommendation_view', {
+        type: APG_EVENT_TYPES.RECOMMENDATION_VIEWED,
+        user: loki.lokiContext?.user,
+        entityType: card.type || 'recommendation',
+        entityId: card.id,
+        payload: { title: card.title, recommendationType: card.type, source: 'loki_page' },
+      });
+    });
+  }, [loki.lokiContext?.user, recommendations]);
+
   const runCardAction = async (action) => {
     if (!action) return;
     await loki.executeAction(action);
+    trackAppEvent('loki:action_completed', {
+      type: APG_EVENT_TYPES.LOKI_ACTION_COMPLETED,
+      user: loki.lokiContext?.user,
+      entityType: 'loki',
+      entityId: action?.type || action?.id || 'action',
+      payload: { action },
+    });
   };
 
   const openHref = (href) => {
@@ -64,6 +84,13 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
   const ask = async (text) => {
     const question = String(text || '').trim();
     if (!question || loki.brainThinking) return;
+    trackAppEvent('loki:question', {
+      type: APG_EVENT_TYPES.LOKI_QUESTION_ASKED,
+      user: loki.lokiContext?.user,
+      entityType: 'loki',
+      entityId: 'question',
+      payload: { question },
+    });
     setInput('');
     setAnswer({ question, loading: true, text: 'Локи собирает лучшее решение...', cards: [] });
     const result = await loki.askExperience(question);
@@ -76,7 +103,16 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
   };
 
   const renderLokiCard = (card, keyPrefix = 'card') => (
-    <GlassCard key={`${keyPrefix}-${card.id}`} onClick={() => runCardAction(card.action)} style={{ borderRadius: 26, padding: 0, overflow: 'hidden' }}>
+    <GlassCard key={`${keyPrefix}-${card.id}`} onClick={() => {
+      trackAppEvent('loki:recommendation_interaction', {
+        type: APG_EVENT_TYPES.RECOMMENDATION_INTERACTED,
+        user: loki.lokiContext?.user,
+        entityType: card.type || 'recommendation',
+        entityId: card.id,
+        payload: { title: card.title, recommendationType: card.type, source: keyPrefix },
+      });
+      runCardAction(card.action);
+    }} style={{ borderRadius: 26, padding: 0, overflow: 'hidden' }}>
       {card.image && <div style={{ height: 104, backgroundImage: `url(${card.image})`, backgroundSize: 'cover', backgroundPosition: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }} />}
       <div style={{ padding: 13 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>

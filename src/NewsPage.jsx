@@ -9,6 +9,7 @@ import { logError } from './errorLogger.js';
 import { auth } from './firebase.js';
 import { shareLink } from './utils/shareLink.js';
 import { useLoki } from './loki/LokiProvider.jsx';
+import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import {
   NEWS_CATEGORIES,
   areNewsCommentsEnabled,
@@ -704,6 +705,13 @@ function CommentsPanel({ item, user, onToast }) {
           body: JSON.stringify({ action: 'update', commentId: editing.id, text: value, user: apiUser }),
         });
         setComments(prev => prev.map(comment => comment.id === editing.id ? data.comment : comment));
+        trackAppEvent('news:comment_update', {
+          type: APG_EVENT_TYPES.NEWS_COMMENTED,
+          user,
+          entityType: 'news',
+          entityId: newsId,
+          payload: { newsId, commentId: editing.id, title: getNewsTitle(item) },
+        });
         setEditing(null);
         onToast?.('Комментарий обновлён.', 'success');
       } else {
@@ -712,6 +720,13 @@ function CommentsPanel({ item, user, onToast }) {
           body: JSON.stringify({ action: 'create', newsId, parentId: replyTo?.id || null, text: value, user: apiUser }),
         });
         setComments(prev => [data.comment, ...prev]);
+        trackAppEvent(replyTo ? 'news:comment_reply' : 'news:comment_create', {
+          type: APG_EVENT_TYPES.NEWS_COMMENTED,
+          user,
+          entityType: 'news',
+          entityId: newsId,
+          payload: { newsId, commentId: data.comment?.id || '', parentId: replyTo?.id || null, title: getNewsTitle(item) },
+        });
         onToast?.(replyTo ? 'Ответ опубликован.' : 'Комментарий опубликован.', 'success');
       }
       setText('');
@@ -740,6 +755,13 @@ function CommentsPanel({ item, user, onToast }) {
         body: JSON.stringify({ action: 'like', commentId: comment.id, user: apiUser }),
       });
       setComments(prev => prev.map(v => v.id === comment.id ? { ...v, likes: Number(data.likes ?? v.likes ?? 0), likedBy: data.likedBy || v.likedBy } : v));
+      trackAppEvent('news:comment_like', {
+        type: APG_EVENT_TYPES.COMMENT_LIKED,
+        user,
+        entityType: 'comment',
+        entityId: comment.id,
+        payload: { newsId, commentId: comment.id, title: getNewsTitle(item) },
+      });
     } catch (e) {
       logError(e, 'NewsPage.comments.like');
       onToast?.(e?.message || 'Не удалось поставить реакцию.', 'error');
@@ -995,6 +1017,13 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
     maxProgressRef.current = 0;
     completedSentRef.current = false;
     setFeedback(null);
+    trackAppEvent('news:open', {
+      type: APG_EVENT_TYPES.NEWS_OPENED,
+      user,
+      entityType: 'news',
+      entityId: id,
+      payload: { newsId: id, title, category: getNewsCategory(item), source: item?.source || 'apg' },
+    });
     sendEngagement('view', { source: item?.source || 'apg' });
     return () => {
       const readTimeMs = Date.now() - readStartRef.current;
@@ -1361,6 +1390,17 @@ export function NewsPage({
     pageRef.current?.scrollTo({ top: 210, behavior: 'smooth' });
   };
   const handleShare = (item) => shareNewsItem(item, onToast);
+  const openNewsItem = (item, source = 'feed') => {
+    const id = getCanonicalNewsId(item);
+    trackAppEvent('news:open', {
+      type: APG_EVENT_TYPES.NEWS_OPENED,
+      user,
+      entityType: 'news',
+      entityId: id,
+      payload: { newsId: id, title: getNewsTitle(item), category: getNewsCategory(item), source },
+    });
+    setSelected(item);
+  };
 
   return (
     <div ref={pageRef} data-apg-scroll-root="news-feed" onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(108px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
@@ -1380,7 +1420,7 @@ export function NewsPage({
           </div>
 
           {hero && (
-            <button type="button" onClick={() => setSelected(hero)} style={{ border: 'none', background: 'transparent', padding: 0, textAlign: 'left', color: APG2_PROFILE.text, cursor: 'pointer' }}>
+            <button type="button" onClick={() => openNewsItem(hero, 'hero')} style={{ border: 'none', background: 'transparent', padding: 0, textAlign: 'left', color: APG2_PROFILE.text, cursor: 'pointer' }}>
               <NewsImage item={hero} height={340} radius={36} mode="hero">
                 <div style={{ position: 'absolute', left: 18, right: 18, bottom: 18, display: 'grid', gap: 10 }}>
                   <span style={{ justifySelf: 'start', padding: '8px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.48)', border: '1px solid rgba(215,184,106,0.30)', color: APG2_PROFILE.gold, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', fontSize: 12, fontWeight: 900 }}>{(hero.priority ?? 0) >= 9 ? '🔥 Важно' : 'Главная новость'}</span>
@@ -1420,7 +1460,7 @@ export function NewsPage({
             </div>
             <div data-apg-horizontal-scroll="true" style={{ ...horizontalSnapTrack, gap: 10, scrollPaddingLeft: 2 }}>
               {popular.map(item => (
-                <button key={item.id || getNewsTitle(item)} type="button" onClick={() => setSelected(item)} style={{ flex: '0 0 220px', minHeight: 96, borderRadius: 22, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 12, textAlign: 'left', ...horizontalSnapItem }}>
+                <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'popular')} style={{ flex: '0 0 220px', minHeight: 96, borderRadius: 22, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 12, textAlign: 'left', ...horizontalSnapItem }}>
                   <span style={{ display: 'block', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 820, marginBottom: 6 }}>{getNewsViews(item)} просмотров</span>
                   <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 13, lineHeight: '18px', fontWeight: 830 }}>{getNewsTitle(item)}</span>
                 </button>
@@ -1444,7 +1484,7 @@ export function NewsPage({
                 key={item.id || `${getNewsTitle(item)}-${index}`}
                 item={item}
                 index={index}
-                onOpen={setSelected}
+                onOpen={(item) => openNewsItem(item, 'card')}
                 onShare={handleShare}
                 saved={savedSet.has(getCanonicalNewsId(item))}
                 later={laterSet.has(getCanonicalNewsId(item))}
@@ -1473,8 +1513,8 @@ export function NewsPage({
           related={related}
           previousItem={previousItem}
           nextItem={nextItem}
-          onClose={(next) => setSelected(next?.id ? next : null)}
-          onNavigate={setSelected}
+          onClose={(next) => next?.id ? openNewsItem(next, 'article_close_next') : setSelected(null)}
+          onNavigate={(item) => openNewsItem(item, 'article_nav')}
           onReact={onReact}
           onSave={onSave}
           onReadLater={onReadLater}

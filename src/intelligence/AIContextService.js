@@ -1,4 +1,6 @@
 import { buildInterestProfile } from '../interestEngine.js';
+import { getAIMemorySnapshot } from './AIMemory.js';
+import { getActivityTimeline } from './ActivityTimeline.js';
 
 function safeDate(value) {
   if (!value) return null;
@@ -52,6 +54,8 @@ export function buildAIContext({
   scanCount = 0,
   source = 'web-app',
   location = null,
+  aiMemory = null,
+  activityTimeline = null,
 } = {}) {
   const normalizedPartners = normalizeList(partners);
   const normalizedExperts = normalizeList(experts);
@@ -79,9 +83,37 @@ export function buildAIContext({
   if (user?.role) ownedRoles.push(String(user.role));
   if (toStringValue(user?.roleGroup)) ownedRoles.push(String(user.roleGroup));
 
-  const lastActions = Array.isArray(recentActions)
+  const memory = aiMemory || getAIMemorySnapshot();
+  const timeline = Array.isArray(activityTimeline) ? activityTimeline : getActivityTimeline(40);
+  const lastActions = Array.isArray(recentActions) && recentActions.length
     ? recentActions.map(item => normalizeRecent(item, 'Действие')).filter(Boolean)
-    : [];
+    : memory.lastActions?.map(item => normalizeRecent({ id: item.id, name: item.action, type: item.entityType }, 'Действие')).filter(Boolean)
+      || [];
+
+  const favoritePartnerIds = Array.from(new Set([
+    ...(Array.isArray(favorites) ? favorites.map(String) : []),
+    ...(memory.favoritePartners || []).map(item => String(item.id || '')).filter(Boolean),
+  ]));
+
+  const frequentActions = Object.entries(memory.frequentActions || {})
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, 8)
+    .map(([action, count]) => ({ action, count }));
+
+  const recentCategories = [
+    ...(memory.lastViewedPartners || []),
+    ...(memory.lastViewedExperts || []),
+    ...(memory.lastViewedEvents || []),
+    ...(memory.lastViewedNews || []),
+  ].map(item => item.category).filter(Boolean);
+  const categoryCounts = recentCategories.reduce((acc, category) => {
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {});
+  const favoriteCategories = Object.entries(categoryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([category]) => category)
+    .slice(0, 8);
 
   return {
     version: 1,
@@ -106,6 +138,7 @@ export function buildAIContext({
       favoritesCount: Number(Array.isArray(favorites) ? favorites.length : 0),
       readLaterCount: Number(Array.isArray(readLaterNews) ? readLaterNews.length : 0),
       savedNewsCount: Number(Array.isArray(savedNews) ? savedNews.length : 0),
+      frequentActions,
     },
     platform: {
       source,
@@ -129,6 +162,21 @@ export function buildAIContext({
       lastNotification: normalizeRecent(notifications?.[0], 'Уведомление'),
       latestTask: normalizeRecent(completedTasks?.[0], 'Задача'),
       latestReward: normalizeRecent(rewards?.[0], 'Награда'),
+      timeline: timeline.slice(0, 20),
+      lastViewedNews: memory.lastViewedNews || [],
+      lastViewedEvents: memory.lastViewedEvents || [],
+      lastViewedPartners: memory.lastViewedPartners || [],
+      lastViewedExperts: memory.lastViewedExperts || [],
+      latestAchievements: memory.latestAchievements || [],
+      lastLokiQuestions: memory.lastLokiQuestions || [],
+      lastRecommendations: memory.lastRecommendations || [],
+    },
+    preferenceSignals: {
+      favoritePartnerIds,
+      favoriteExpertIds: (memory.favoriteExperts || []).map(item => String(item.id || '')).filter(Boolean),
+      favoriteCategories,
+      repeatedOpenings: frequentActions.filter(item => /open|view/i.test(item.action)),
+      timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'day' : 'evening',
     },
   };
 }

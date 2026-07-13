@@ -38,6 +38,17 @@ import { getRoleDiagnostics } from './roleEngine.js';
 import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
 import { buildAIContext } from './intelligence/AIContextService.js';
 import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
+import {
+  APG_EVENT_TYPES,
+  getAIMemorySnapshot,
+  getActivityTimeline,
+  getAnalyticsSnapshot,
+  subscribeToEvents,
+  trackAppEvent,
+  wireAIMemory,
+  wireActivityTimeline,
+  wireAnalyticsCollector,
+} from './intelligence/index.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
 const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
@@ -631,6 +642,8 @@ export function UserApp() {
   const [scanDates, setScanDates]               = useState([]);
 
   const [activePanel, setActivePanel]           = useState(initialPanel);
+  const [intelligenceTick, setIntelligenceTick] = useState(0);
+  const platformSource                          = useMemo(() => (isVK() ? 'vk-miniapp' : 'web-app'), []);
   const panelHistoryRef                         = useRef([initialPanel]);
   const [panelTransition, setPanelTransition]   = useState('forward');
   const [tabIndicator, setTabIndicator]         = useState({ center: 0, width: 0, ready: false });
@@ -781,7 +794,15 @@ export function UserApp() {
       if (history.length > 24) history.shift();
     }
     setActivePanel(id);
-  }, []);
+    trackAppEvent(`screen:${id}:open`, {
+      type: id === 'home' ? APG_EVENT_TYPES.SCREEN_OPENED : id === 'loki' ? APG_EVENT_TYPES.LOKI_OPENED : APG_EVENT_TYPES.SCREEN_OPENED,
+      user,
+      entityType: id === 'loki' ? 'loki' : 'screen',
+      entityId: id,
+      payload: { panel: id, direction, replace },
+      source: platformSource,
+    });
+  }, [platformSource, user]);
 
   const getFallbackBackPanel = useCallback((panel) => {
     if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet' || panel === 'partnership') return 'profile';
@@ -819,6 +840,32 @@ export function UserApp() {
     if (id === 'loki') showLokiMessage(LOKI_EVENTS.VK_ENTRY, { source: isVK() ? 'vk_miniapp' : 'web_app' });
     if (id === 'map' || id === 'nearby') showLokiMessage(LOKI_EVENTS.MAP_OPENED, { source: id });
   }, [navigatePanel]);
+
+  const openScanner = useCallback((source = 'app') => {
+    trackAppEvent('qr:scanner_open', {
+      type: APG_EVENT_TYPES.QR_SCAN_STARTED,
+      user,
+      entityType: 'qrcode',
+      entityId: 'scanner',
+      payload: { source },
+      source: platformSource,
+    });
+    setIsScannerOpen(true);
+  }, [platformSource, user]);
+
+  useEffect(() => {
+    wireActivityTimeline();
+    wireAIMemory();
+    wireAnalyticsCollector();
+    let timer = null;
+    return subscribeToEvents('*', () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        setIntelligenceTick(tick => (tick + 1) % 100000);
+      }, 120);
+    });
+  }, []);
 
   // Offline/online detection
   useEffect(() => {
@@ -1559,7 +1606,17 @@ export function UserApp() {
   useEffect(() => {
     if (activePanel === 'loki') markLearningAction('lokiOpened');
     if (activePanel === 'profile') markLearningAction('profileOpened');
-  }, [activePanel, markLearningAction]);
+    if (activePanel === 'home') {
+      trackAppEvent('home:open', {
+        type: APG_EVENT_TYPES.SCREEN_OPENED,
+        user,
+        entityType: 'screen',
+        entityId: 'home',
+        payload: { panel: 'home' },
+        source: platformSource,
+      });
+    }
+  }, [activePanel, markLearningAction, platformSource, user]);
 
   const activeLearningHint = useMemo(() => {
     if (!learningHintsEnabled) return null;
@@ -1581,8 +1638,16 @@ export function UserApp() {
     setFavorites(next);
     const partner = enrichedPartners.find(p => p.id === partnerId);
     if (partner) recordInterest({ type: isAdding ? 'favorite_add' : 'favorite_remove', itemType: 'partner', item: partner });
+    trackAppEvent(isAdding ? 'partner:favorite_add' : 'partner:favorite_remove', {
+      type: APG_EVENT_TYPES.RECOMMENDATION_INTERACTED,
+      user,
+      entityType: 'partner',
+      entityId: partnerId,
+      payload: { partnerId, title: partner?.name || '', isAdding },
+      source: platformSource,
+    });
     try {
-      const result = await userAction('favorites:toggle', { userId: String(user.id), partnerId });
+      const result = await userAction('favorites:toggle', { userId: String(user.id), partnerId, isAdding });
       if (Array.isArray(result.favorites)) setFavorites(result.favorites);
     } catch (e) {
       setFavorites(prev);
@@ -1590,7 +1655,7 @@ export function UserApp() {
       logError(e, 'UserApp.toggleFavorite');
       showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось обновить избранное.', 'error');
     }
-  }, [user, favorites, showToast, enrichedPartners, recordInterest]);
+  }, [user, favorites, showToast, enrichedPartners, recordInterest, platformSource]);
 
   const canWriteUserNewsState = useCallback(() => {
     if (!user || String(user.id).startsWith('guest_')) {
@@ -1607,6 +1672,14 @@ export function UserApp() {
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
     setSavedNews(next);
     recordInterest({ type: 'saved_news', itemType: 'news', item });
+    trackAppEvent('news:save', {
+      type: APG_EVENT_TYPES.NEWS_SAVED,
+      user,
+      entityType: 'news',
+      entityId: id,
+      payload: { newsId: id, title: item?.title || item?.text || '', saved: next.includes(id) },
+      source: platformSource,
+    });
     try {
       await userAction('news:saved', { userId: String(user.id), values: next });
       showToast(next.includes(id) ? 'Новость сохранена.' : 'Новость убрана из сохранённых.', 'success');
@@ -1615,7 +1688,7 @@ export function UserApp() {
       logError(e, 'UserApp.toggleSavedNews');
       showToast('Не удалось сохранить новость. Попробуйте ещё раз.', 'error');
     }
-  }, [canWriteUserNewsState, savedNews, showToast, user, recordInterest]);
+  }, [canWriteUserNewsState, savedNews, showToast, user, recordInterest, platformSource]);
 
   const toggleReadLaterNews = useCallback(async (item) => {
     const id = getCanonicalNewsId(item);
@@ -1623,6 +1696,14 @@ export function UserApp() {
     const prev = readLaterNews;
     const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id];
     setReadLaterNews(next);
+    trackAppEvent('news:read_later', {
+      type: APG_EVENT_TYPES.NEWS_SAVED,
+      user,
+      entityType: 'news',
+      entityId: id,
+      payload: { newsId: id, title: item?.title || item?.text || '', readLater: next.includes(id) },
+      source: platformSource,
+    });
     try {
       await userAction('news:readLater', { userId: String(user.id), values: next });
       showToast(next.includes(id) ? 'Добавлено в список на потом.' : 'Убрано из списка на потом.', 'success');
@@ -1631,7 +1712,7 @@ export function UserApp() {
       logError(e, 'UserApp.toggleReadLaterNews');
       showToast('Не удалось обновить список. Попробуйте ещё раз.', 'error');
     }
-  }, [canWriteUserNewsState, readLaterNews, showToast, user]);
+  }, [canWriteUserNewsState, readLaterNews, showToast, user, platformSource]);
 
   const reactToNews = useCallback(async (item, reaction) => {
     const id = getCanonicalNewsId(item);
@@ -1644,6 +1725,14 @@ export function UserApp() {
     }
     const next = { ...prev, [id]: reaction };
     setNewsReactions(next);
+    trackAppEvent('news:like', {
+      type: APG_EVENT_TYPES.NEWS_LIKED,
+      user,
+      entityType: 'news',
+      entityId: id,
+      payload: { newsId: id, reaction, previousReaction, title: item?.title || item?.text || '' },
+      source: platformSource,
+    });
     try {
       await userAction('news:reaction', { userId: String(user.id), newsId: id, reaction, previousReaction });
       showToast('Реакция сохранена.', 'success');
@@ -1652,7 +1741,7 @@ export function UserApp() {
       logError(e, 'UserApp.reactToNews');
       showToast('Не удалось сохранить реакцию. Попробуйте ещё раз.', 'error');
     }
-  }, [canWriteUserNewsState, newsReactions, showToast, user]);
+  }, [canWriteUserNewsState, newsReactions, showToast, user, platformSource]);
 
   const toggleNewsSubscription = useCallback(async ({ type, targetId, label }) => {
     const id = targetId ? String(targetId) : '';
@@ -1695,7 +1784,22 @@ export function UserApp() {
 
   const handleConfirmScan = useCallback(async (placeIdentifier) => {
     if (!user || isScanningRef.current) return;
+    trackAppEvent('qr:scan_start', {
+      type: APG_EVENT_TYPES.QR_SCAN_STARTED,
+      user,
+      entityType: 'qrcode',
+      entityId: '',
+      payload: { source: 'scanner' },
+      source: platformSource,
+    });
     if (!navigator.onLine) {
+      trackAppEvent('qr:scan_error', {
+        type: APG_EVENT_TYPES.QR_SCAN_FAILED,
+        user,
+        entityType: 'qrcode',
+        payload: { reason: 'offline' },
+        source: platformSource,
+      });
       showToast('Нет интернета. Проверьте соединение и попробуйте ещё раз.');
       return;
     }
@@ -1767,6 +1871,14 @@ export function UserApp() {
         const partner = result.subjectType === 'partner'
           ? enrichedPartners.find(p => p.id === result.subjectId)
           : null;
+        trackAppEvent('qr:scan_success', {
+          type: APG_EVENT_TYPES.QR_SCANNED,
+          user,
+          entityType: result.subjectType || 'qrcode',
+          entityId: result.subjectId || qrValue,
+          payload: { qrValue, awardedKeys, visitCount: result.visitCount, subjectType: result.subjectType, subjectId: result.subjectId },
+          source: platformSource,
+        });
         setScanSuccess({ ...result, partner });
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToast(null);
@@ -1774,16 +1886,32 @@ export function UserApp() {
         const days = Number(result.streak ?? streak) || 1;
         const label = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
         showToast(result.alreadyAwarded ? `Ключ уже был начислен. Визит отмечен, серия — ${days} ${label}.` : result.message, 'success');
+        trackAppEvent('qr:scan_success', {
+          type: APG_EVENT_TYPES.QR_SCANNED,
+          user,
+          entityType: result.subjectType || 'qrcode',
+          entityId: result.subjectId || qrValue,
+          payload: { qrValue, awardedKeys, alreadyAwarded: result.alreadyAwarded, subjectType: result.subjectType, subjectId: result.subjectId },
+          source: platformSource,
+        });
       }
     } catch (e) {
       logError(e, 'UserApp.handleConfirmScan.reward');
+      trackAppEvent('qr:scan_error', {
+        type: APG_EVENT_TYPES.QR_SCAN_FAILED,
+        user,
+        entityType: 'qrcode',
+        entityId: qrValue,
+        payload: { qrValue, error: String(e?.message || e || 'scan_error') },
+        source: platformSource,
+      });
       showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'qr_scan' });
       showToast(getQrErrorMessage(e), 'error');
     } finally {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, experts, streak, showToast]);
+  }, [user, enrichedPartners, experts, streak, showToast, platformSource]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -1796,9 +1924,17 @@ export function UserApp() {
     setActivePartner(partner);
     markLearningAction('partnerOpened');
     recordInterest({ type: 'partner_open', itemType: 'partner', item: partner });
+    trackAppEvent('partner:open', {
+      type: APG_EVENT_TYPES.PARTNER_OPENED,
+      user,
+      entityType: 'partner',
+      entityId: partner?.id,
+      payload: { partnerId: partner?.id, title: partner?.name, category: partner?.category || partner?.categoryLabel },
+      source: platformSource,
+    });
     showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { id: partner?.id, partnerName: partner?.name });
     navigatePanel('partner');
-  }, [markLearningAction, navigatePanel, recordInterest]);
+  }, [markLearningAction, navigatePanel, platformSource, recordInterest, user]);
 
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
@@ -1954,6 +2090,14 @@ export function UserApp() {
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: Math.max(0, (e.registeredCount ?? 1) - 1) } : e));
       try {
         const result = await userAction('event:toggle', { userId, event, register: false });
+        trackAppEvent('event:unregister', {
+          type: APG_EVENT_TYPES.EVENT_UNREGISTERED,
+          user,
+          entityType: 'event',
+          entityId: eventId,
+          payload: { eventId, title: event.title },
+          source: platformSource,
+        });
         if (Array.isArray(result.registeredEvents)) setRegisteredEventIds(result.registeredEvents);
       } catch (e) {
         logError(e, 'UserApp.handleEventUnregister');
@@ -1973,6 +2117,14 @@ export function UserApp() {
       const next = [...registeredEventIds, eventId];
       setRegisteredEventIds(next);
       recordInterest({ type: 'event_registration', itemType: 'event', item: event });
+      trackAppEvent('event:register', {
+        type: APG_EVENT_TYPES.EVENT_REGISTERED,
+        user,
+        entityType: 'event',
+        entityId: eventId,
+        payload: { eventId, title: event.title, category: event.category },
+        source: platformSource,
+      });
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, registeredCount: (e.registeredCount ?? 0) + 1 } : e));
       try {
         const result = await userAction('event:toggle', {
@@ -1991,7 +2143,7 @@ export function UserApp() {
         showToast(e?.isAuthError ? 'Требуется повторный вход. Перезапустите приложение.' : 'Не удалось записаться. Попробуйте ещё раз.', 'error');
       }
     }
-  }, [user, userKeys, registeredEventIds, setEvents, showToast, recordInterest]);
+  }, [user, userKeys, registeredEventIds, setEvents, showToast, recordInterest, platformSource]);
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
@@ -2710,7 +2862,7 @@ export function UserApp() {
       )}
       {TABS.map((tab, i) => {
         if (i === 2) return (
-          <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { setIsScannerOpen(true); }}
+          <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { openScanner('tabbar'); }}
             style={{ flex: 1, background: isScannerOpen ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isScannerOpen ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isScannerOpen ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 0, position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
               width: 42, height: 42, marginTop: 0, borderRadius: 18,
@@ -2755,9 +2907,9 @@ export function UserApp() {
     appState: { partners: enrichedPartners, experts, events, news, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
   }), [enrichedPartners, events, experts, favorites, interestProfile, news, readLaterNews, registeredEventIds, savedNews, userKeys]);
 
-  const platformSource = useMemo(() => (isVK() ? 'vk-miniapp' : 'web-app'), []);
-
   const aiContext = useMemo(() => buildAIContext({
+    aiMemory: getAIMemorySnapshot(),
+    activityTimeline: getActivityTimeline(40),
     user,
     activePanel,
     partners: enrichedPartners,
@@ -2781,7 +2933,7 @@ export function UserApp() {
     scanCount: Number(Object.keys(scannedPartnerIds || {}).length || 0),
     location: user?.location || null,
     source: platformSource,
-  }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, joinedGroup, notifications, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userKeys, adaptiveInterestProfile]);
+  }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, joinedGroup, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userKeys, adaptiveInterestProfile]);
 
   const personalHomeContext = useMemo(() => buildPersonalHomeContext({
     user,
@@ -2805,14 +2957,20 @@ export function UserApp() {
       news,
       notifications,
       source: platformSource,
+      aiMemory: getAIMemorySnapshot(),
+      activityTimeline: getActivityTimeline(40),
+      analytics: getAnalyticsSnapshot(),
     },
-  }), [completedTasks, customTasks, enrichedPartners, events, favorites, news, notifications, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
+  }), [completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
 
   const lokiAppState = useMemo(() => ({
     activePanel,
     user,
     aiContext,
     personalHomeContext,
+    aiMemory: getAIMemorySnapshot(),
+    activityTimeline: getActivityTimeline(40),
+    analytics: getAnalyticsSnapshot(),
     partners: enrichedPartners,
     events,
     news,
@@ -2831,7 +2989,7 @@ export function UserApp() {
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
     workspace: { mode: workspaceMode },
-  }), [activePanel, adaptiveInterestProfile, completedTasks, customTasks, enrichedPartners, events, experts, favorites, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, registeredEventIds, savedNews, unreadCount, user, userKeys, workspaceMode]);
+  }), [activePanel, adaptiveInterestProfile, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, registeredEventIds, savedNews, unreadCount, user, userKeys, workspaceMode]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -2862,7 +3020,7 @@ export function UserApp() {
     [LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS]: () => goPanel('tasks'),
     [LOKI_APP_ACTIONS.SHOW_FAVORITES]: () => goPanel('profile'),
     [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),
-    [LOKI_APP_ACTIONS.START_QR_SCANNER]: () => setIsScannerOpen(true),
+    [LOKI_APP_ACTIONS.START_QR_SCANNER]: () => openScanner('loki_action'),
     [LOKI_APP_ACTIONS.OPEN_SETTINGS]: () => goPanel('profile'),
     [LOKI_APP_ACTIONS.OPEN_REFERENCE]: () => goPanel('reference'),
     [LOKI_APP_ACTIONS.OPEN_LOKI]: () => goPanel('loki'),
@@ -2878,7 +3036,7 @@ export function UserApp() {
       if (targetId) setPendingLokiEventTarget({ id: targetId, nonce: Date.now(), action: 'register' });
       goPanel('events');
     },
-  }), [enrichedPartners, favorites, goPanel, openNotifications, openPartner, toggleFavorite]);
+  }), [enrichedPartners, favorites, goPanel, openNotifications, openPartner, openScanner, toggleFavorite]);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
@@ -2995,11 +3153,19 @@ export function UserApp() {
     onEventRegister: handleEventRegister,
     onOpenPartner: openPartner,
     onToggleFavorite: toggleFavorite,
-    onScan: () => setIsScannerOpen(true),
+    onScan: () => openScanner('home'),
     onRetry: () => loadData(mountedRef),
     onRefresh: handleRefresh,
     onOpenEvents: (target) => {
       if (target?.id) setPendingLokiEventTarget({ id: String(target.id), nonce: Date.now() });
+      trackAppEvent('home:recommendation_interaction', {
+        type: APG_EVENT_TYPES.RECOMMENDATION_INTERACTED,
+        user,
+        entityType: target?.id ? 'event' : 'screen',
+        entityId: target?.id || 'events',
+        payload: { source: 'home', target: 'events', title: target?.title || '' },
+        source: platformSource,
+      });
       goPanel('events');
     },
     onOpenExperts: () => goPanel('experts'),
@@ -3009,7 +3175,17 @@ export function UserApp() {
     onOpenNotifications: openNotifications,
     onOpenNews: (itemOrId) => {
       const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
-      if (typeof itemOrId === 'object') recordInterest({ type: 'news_open', itemType: 'news', item: itemOrId });
+      if (typeof itemOrId === 'object') {
+        recordInterest({ type: 'news_open', itemType: 'news', item: itemOrId });
+        trackAppEvent('home:news_open', {
+          type: APG_EVENT_TYPES.NEWS_OPENED,
+          user,
+          entityType: 'news',
+          entityId: targetId,
+          payload: { source: 'home', newsId: targetId, title: itemOrId?.title || itemOrId?.text || '' },
+          source: platformSource,
+        });
+      }
       if (targetId && targetId !== 'undefined' && targetId !== 'null') {
         setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
       }
@@ -3017,7 +3193,17 @@ export function UserApp() {
     },
     onOpenNewsItem: (itemOrId) => {
       const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
-      if (typeof itemOrId === 'object') recordInterest({ type: 'news_open', itemType: 'news', item: itemOrId });
+      if (typeof itemOrId === 'object') {
+        recordInterest({ type: 'news_open', itemType: 'news', item: itemOrId });
+        trackAppEvent('home:news_card_view', {
+          type: APG_EVENT_TYPES.RECOMMENDATION_INTERACTED,
+          user,
+          entityType: 'news',
+          entityId: targetId,
+          payload: { source: 'home', newsId: targetId, title: itemOrId?.title || itemOrId?.text || '' },
+          source: platformSource,
+        });
+      }
       if (targetId && targetId !== 'undefined' && targetId !== 'null') {
         setPendingLokiNewsTarget({ id: targetId, nonce: Date.now() });
       }
@@ -3037,6 +3223,7 @@ export function UserApp() {
     desktopWorkspaceAvailable,
     onSwitchAppMode: setAppModePersisted,
     desktopWorkspaceMode: resolvedAppMode,
+    personalHomeContext,
   };
 
   return (
@@ -3059,7 +3246,7 @@ export function UserApp() {
                 onModeChange={setAppModePersisted}
                 onOpenPanel={(panel) => { setAppModePersisted('user'); goPanel(panel); }}
                 onOpenAdmin={() => { window.location.assign('/admin-app'); }}
-                onOpenScan={() => setIsScannerOpen(true)}
+                onOpenScan={() => openScanner('workspace')}
               />
             </Suspense>
           ) : (
@@ -3166,7 +3353,7 @@ export function UserApp() {
                     scannedPartnerIds={scannedPartnerIds}
                     visitCounts={visitCounts}
                     onPartnerUpdate={handlePartnerUpdate}
-                    onScan={() => setIsScannerOpen(true)}
+                    onScan={() => openScanner('partner')}
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
                     onReviewPromptHandled={() => setReviewPromptPartnerId(null)}
                   />
@@ -3253,6 +3440,14 @@ export function UserApp() {
                     onEventOpen={(event) => {
                       markLearningAction('eventOpened');
                       recordInterest({ type: 'event_open', itemType: 'event', item: event });
+                      trackAppEvent('event:open', {
+                        type: APG_EVENT_TYPES.EVENT_OPENED,
+                        user,
+                        entityType: 'event',
+                        entityId: event?.id,
+                        payload: { eventId: event?.id, title: event?.title, category: event?.category },
+                        source: platformSource,
+                      });
                     }}
                   />
                 </Suspense>
@@ -3391,8 +3586,18 @@ export function UserApp() {
                     onBack={goBackPanel}
                     isActive={activePanel === 'experts'}
                     initialExpertId={pendingExpertId}
-                    onExpertOpen={(expert) => recordInterest({ type: 'expert_open', itemType: 'expert', item: expert })}
-                    onScan={() => setIsScannerOpen(true)}
+                    onExpertOpen={(expert) => {
+                      recordInterest({ type: 'expert_open', itemType: 'expert', item: expert });
+                      trackAppEvent('expert:open', {
+                        type: APG_EVENT_TYPES.EXPERT_OPENED,
+                        user,
+                        entityType: 'expert',
+                        entityId: expert?.id,
+                        payload: { expertId: expert?.id, title: expert?.name, category: expert?.category || expert?.categoryLabel },
+                        source: platformSource,
+                      });
+                    }}
+                    onScan={() => openScanner('expert')}
                   />
                 </Suspense>
               </Panel>

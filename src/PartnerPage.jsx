@@ -16,6 +16,7 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
+import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
 import { RichText } from './components/RichText.jsx';
@@ -270,10 +271,24 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const reviewCount = partner.reviewCount ?? reviews.length;
 
   const openVkGroup = () => {
+    trackAppEvent('partner:site_open', {
+      type: APG_EVENT_TYPES.PARTNER_SITE_OPENED,
+      user,
+      entityType: 'partner',
+      entityId: partner.id,
+      payload: { partnerId: partner.id, title: partner.name, target: 'vk' },
+    });
     openNormalizedUrl(openUrl, partner.vkGroupUrl, { platform: 'vk' });
   };
   const handlePhone = () => {
     if (!partner.phone) return;
+    trackAppEvent('partner:call', {
+      type: APG_EVENT_TYPES.PARTNER_CALLED,
+      user,
+      entityType: 'partner',
+      entityId: partner.id,
+      payload: { partnerId: partner.id, title: partner.name },
+    });
     // Копируем номер в буфер — VK WebView блокирует tel: схему
     vkBridge.send('VKWebAppCopyText', { text: partner.phone }).catch(() => {
       navigator.clipboard?.writeText(partner.phone).catch(() => {});
@@ -284,7 +299,37 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     // Попытка открыть диалер (может сработать в браузере)
     openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
   };
-  const handleMap   = () => partner.address && openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
+  const handleMap   = () => {
+    if (!partner.address) return;
+    trackAppEvent('partner:route', {
+      type: APG_EVENT_TYPES.PARTNER_ROUTE_BUILT,
+      user,
+      entityType: 'partner',
+      entityId: partner.id,
+      payload: { partnerId: partner.id, title: partner.name, address: partner.address },
+    });
+    openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
+  };
+  const openPartnerUrl = (url, target = 'site', options = undefined) => {
+    trackAppEvent('partner:site_open', {
+      type: APG_EVENT_TYPES.PARTNER_SITE_OPENED,
+      user,
+      entityType: 'partner',
+      entityId: partner.id,
+      payload: { partnerId: partner.id, title: partner.name, target },
+    });
+    openNormalizedUrl(openUrl, url, options);
+  };
+  const startPartnerScan = () => {
+    trackAppEvent('partner:qr_scan_start', {
+      type: APG_EVENT_TYPES.QR_SCAN_STARTED,
+      user,
+      entityType: 'partner',
+      entityId: partner.id,
+      payload: { partnerId: partner.id, title: partner.name, source: 'partner_card' },
+    });
+    onScan?.();
+  };
   const showShareToast = (msg) => {
     setShareToast(msg);
     clearTimeout(shareToastRef.current);
@@ -346,8 +391,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     const cta = [
       partner.phone && { label: phoneCopied ? 'Номер скопирован' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', onClick: handlePhone, tone: 'gold' },
       partner.address && { label: 'Маршрут', icon: '📍', onClick: handleMap },
-      !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openNormalizedUrl(openUrl, partner.bookingUrl), tone: 'gold' },
-      !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openNormalizedUrl(openUrl, partner.websiteUrl) },
+      !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
+      !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
       partner.vkGroupUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
@@ -403,7 +448,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                     </div>
                   </div>
                 </div>
-                <GlassButton onClick={onScan} tone="gold" style={{ width: '100%', minHeight: 50, borderRadius: 21, fontSize: 15, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>
+                <GlassButton onClick={startPartnerScan} tone="gold" style={{ width: '100%', minHeight: 50, borderRadius: 21, fontSize: 15, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>
                   📷 Сканировать QR
                 </GlassButton>
               </div>
@@ -795,7 +840,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             </div>
           )}
           {!isVK() && partner.bookingUrl && (
-            <button onClick={() => openNormalizedUrl(openUrl, partner.bookingUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:`0 4px 16px rgba(201,168,76,0.35)` }}>
+            <button onClick={() => openPartnerUrl(partner.bookingUrl, 'booking')} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:`0 4px 16px rgba(201,168,76,0.35)` }}>
               📅 Записаться онлайн
             </button>
           )}
@@ -803,8 +848,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
           {!isVK() && partner.websiteUrl && partner.websiteUrl !== partner.vkGroupUrl && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.websiteUrl);
             return isVkLink
-              ? <button onClick={() => openNormalizedUrl(openUrl, partner.websiteUrl, { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
-              : <button onClick={() => openNormalizedUrl(openUrl, partner.websiteUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
+              ? <button onClick={() => openPartnerUrl(partner.websiteUrl, 'vk', { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
+              : <button onClick={() => openPartnerUrl(partner.websiteUrl, 'website')} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
           })()}
           {partner.vkGroupUrl && (
             <button onClick={openVkGroup} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
@@ -812,18 +857,18 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             </button>
           )}
           {!isVK() && partner.telegramCommunityUrl && (
-            <button onClick={() => openNormalizedUrl(openUrl, partner.telegramCommunityUrl, { platform: 'telegram' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={() => openPartnerUrl(partner.telegramCommunityUrl, 'telegram', { platform: 'telegram' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               ✈️ Telegram
             </button>
           )}
           {!isVK() && partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && partner.socialUrl !== partner.websiteUrl && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.socialUrl);
             return isVkLink
-              ? <button onClick={() => openNormalizedUrl(openUrl, partner.socialUrl, { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
-              : <button onClick={() => openNormalizedUrl(openUrl, partner.socialUrl)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
+              ? <button onClick={() => openPartnerUrl(partner.socialUrl, 'vk', { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
+              : <button onClick={() => openPartnerUrl(partner.socialUrl, 'social')} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
           })()}
           {!isVK() && partner.maxCommunityUrl && (
-            <button onClick={() => openNormalizedUrl(openUrl, partner.maxCommunityUrl, { platform: 'max' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={() => openPartnerUrl(partner.maxCommunityUrl, 'max', { platform: 'max' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               💬 Max
             </button>
           )}

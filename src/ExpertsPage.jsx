@@ -7,6 +7,7 @@ import {
   collection, getDocs, query, where,
 } from 'firebase/firestore';
 import { userAction } from './userApi.js';
+import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 
 function getISOWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -178,6 +179,13 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
   const shareToastRef = useRef(null);
 
   useEffect(() => {
+    trackAppEvent('expert:view', {
+      type: APG_EVENT_TYPES.EXPERT_OPENED,
+      user,
+      entityType: 'expert',
+      entityId: expert.id,
+      payload: { expertId: expert.id, title: expert.name, category: expert.category || expert.categoryLabel },
+    });
     userAction('publicQr:view', { type: 'expert', id: expert.id, metric: 'view' }).catch(() => {});
   }, []);
 
@@ -219,6 +227,48 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
         .then(() => showToast('📋 Скопировано'))
         .catch(() => showToast('❌ Ошибка'));
     }
+  };
+  const openExpertContact = (url, target = 'contact', options = undefined) => {
+    trackAppEvent(target === 'booking' ? 'expert:book' : 'expert:contact_open', {
+      type: target === 'booking' ? APG_EVENT_TYPES.EXPERT_BOOKED : APG_EVENT_TYPES.EXPERT_CONTACT_OPENED,
+      user,
+      entityType: 'expert',
+      entityId: expert.id,
+      payload: { expertId: expert.id, title: expert.name, target },
+    });
+    if (options) openNormalizedUrl(openUrl, url, options);
+    else openNormalizedUrl(openUrl, url);
+  };
+  const callExpert = () => {
+    trackAppEvent('expert:contact_open', {
+      type: APG_EVENT_TYPES.EXPERT_CONTACT_OPENED,
+      user,
+      entityType: 'expert',
+      entityId: expert.id,
+      payload: { expertId: expert.id, title: expert.name, target: 'phone' },
+    });
+    openUrl(expert.telHref);
+  };
+  const openExpertMap = () => {
+    trackAppEvent('expert:contact_open', {
+      type: APG_EVENT_TYPES.EXPERT_CONTACT_OPENED,
+      user,
+      entityType: 'expert',
+      entityId: expert.id,
+      payload: { expertId: expert.id, title: expert.name, target: 'map' },
+    });
+    openUrl(expert.latitude && expert.longitude ? `https://yandex.ru/maps/?pt=${expert.longitude},${expert.latitude}&z=16&l=map` : `https://yandex.ru/maps/?text=${encodeURIComponent(expert.address)}`);
+  };
+  const startExpertScan = () => {
+    trackAppEvent('expert:qr_scan_start', {
+      type: APG_EVENT_TYPES.QR_SCAN_STARTED,
+      user,
+      entityType: 'expert',
+      entityId: expert.id,
+      payload: { expertId: expert.id, title: expert.name, source: 'expert_card' },
+    });
+    onClose();
+    onScan?.();
   };
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -297,13 +347,13 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       (expert.avgRating ?? 0) > 0 ? `★ ${expert.avgRating.toFixed(1)} · ${expert.reviewCount ?? reviews.length}` : null,
     ].filter(Boolean);
     const cta = [
-      expert.telHref && { label: 'Позвонить', icon: '📞', onClick: () => openUrl(expert.telHref), tone: 'gold' },
-      expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openNormalizedUrl(openUrl, expert.bookingUrl), tone: 'gold' },
-      expert.whatsappUrl && { label: 'WhatsApp', icon: '🟢', onClick: () => openNormalizedUrl(openUrl, expert.whatsappUrl, { platform: 'whatsapp' }) },
-      expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openNormalizedUrl(openUrl, expert.websiteUrl) },
-      expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' }) },
-      expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' }) },
-      expert.maxUrl && { label: 'MAX', icon: '💬', onClick: () => openNormalizedUrl(openUrl, expert.maxUrl, { platform: 'max' }) },
+      expert.telHref && { label: 'Позвонить', icon: '📞', onClick: callExpert, tone: 'gold' },
+      expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openExpertContact(expert.bookingUrl, 'booking'), tone: 'gold' },
+      expert.whatsappUrl && { label: 'WhatsApp', icon: '🟢', onClick: () => openExpertContact(expert.whatsappUrl, 'whatsapp', { platform: 'whatsapp' }) },
+      expert.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openExpertContact(expert.websiteUrl, 'website') },
+      expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openExpertContact(expert.vkUrl, 'vk', { platform: 'vk' }) },
+      expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openExpertContact(expert.telegramUrl, 'telegram', { platform: 'telegram' }) },
+      expert.maxUrl && { label: 'MAX', icon: '💬', onClick: () => openExpertContact(expert.maxUrl, 'max', { platform: 'max' }) },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
 
@@ -394,7 +444,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                 <div style={{ ...APG2.glass, borderRadius: 34, padding: 18, display: 'grid', gap: 10, color: APG2.textSoft, fontSize: 14, lineHeight: '20px' }}>
                   {expert.address && <div>📍 {expert.address}</div>}
                   {expert.hours && <div>🕒 {expert.hours}</div>}
-                  {(expert.latitude && expert.longitude || expert.address) && <GlassButton onClick={() => openUrl(expert.latitude && expert.longitude ? `https://yandex.ru/maps/?pt=${expert.longitude},${expert.latitude}&z=16&l=map` : `https://yandex.ru/maps/?text=${encodeURIComponent(expert.address)}`)}>Открыть на карте</GlassButton>}
+                  {(expert.latitude && expert.longitude || expert.address) && <GlassButton onClick={openExpertMap}>Открыть на карте</GlassButton>}
                 </div>
               </GlassSection>
             )}
@@ -422,7 +472,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                     </div>
                   </div>
                 </div>
-                <GlassButton onClick={() => { onClose(); onScan?.(); }} tone="gold" style={{ width: '100%', minHeight: 50, borderRadius: 21, fontSize: 15, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>
+                <GlassButton onClick={startExpertScan} tone="gold" style={{ width: '100%', minHeight: 50, borderRadius: 21, fontSize: 15, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>
                   📷 Сканировать QR
                 </GlassButton>
               </div>
@@ -619,35 +669,35 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
         {(canBook || expert.websiteUrl || expert.telegramUrl || expert.vkUrl || expert.maxUrl || expert.whatsappUrl) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
             {expert.telHref && (
-              <button onClick={() => openUrl(expert.telHref)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.green},#3a9a3a)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={callExpert} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.green},#3a9a3a)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 📞 Позвонить
               </button>
             )}
             {expert.bookingUrl && (
-              <button onClick={() => openNormalizedUrl(openUrl, expert.bookingUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 16px rgba(201,168,76,0.35)' }}>
+              <button onClick={() => openExpertContact(expert.bookingUrl, 'booking')} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#0F0F1A', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 16px rgba(201,168,76,0.35)' }}>
                 📅 Записаться онлайн
               </button>
             )}
             {expert.whatsappUrl && (
-              <button onClick={() => openNormalizedUrl(openUrl, expert.whatsappUrl, { platform: 'whatsapp' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#25D366,#149F4A)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>🟢 WhatsApp</button>
+              <button onClick={() => openExpertContact(expert.whatsappUrl, 'whatsapp', { platform: 'whatsapp' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#25D366,#149F4A)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>🟢 WhatsApp</button>
             )}
             {expert.websiteUrl && (
-              <button onClick={() => openNormalizedUrl(openUrl, expert.websiteUrl)} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openExpertContact(expert.websiteUrl, 'website')} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: T.textPri, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🌐 Сайт
               </button>
             )}
             {expert.vkUrl && (
-              <button onClick={() => openNormalizedUrl(openUrl, expert.vkUrl, { platform: 'vk' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,#4A76A8,#2D5F8A)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openExpertContact(expert.vkUrl, 'vk', { platform: 'vk' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,#4A76A8,#2D5F8A)`, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 🔵 ВКонтакте
               </button>
             )}
             {expert.telegramUrl && (
-              <button onClick={() => openNormalizedUrl(openUrl, expert.telegramUrl, { platform: 'telegram' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openExpertContact(expert.telegramUrl, 'telegram', { platform: 'telegram' })} style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#2AABEE,#1D8EC4)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 ✈️ Telegram
               </button>
             )}
             {expert.maxUrl && (
-              <button onClick={() => openNormalizedUrl(openUrl, expert.maxUrl, { platform: 'max' })} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openExpertContact(expert.maxUrl, 'max', { platform: 'max' })} style={{ width: '100%', padding: '15px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7B5EA7,#5B3F87)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
                 💬 Max
               </button>
             )}
@@ -662,7 +712,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
               <div style={{ fontSize: 12, color: hasScanned ? '#4BB34B' : T.textSec, lineHeight: '17px' }}>{hasScanned ? 'Повторный скан не создаёт дубль.' : 'Попросите эксперта показать QR-код АПГ и отсканируйте его.'}</div>
             </div>
           </div>
-          <button onClick={() => { onClose(); onScan?.(); }} style={{ width: '100%', padding: '13px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#17120a', fontSize: 14, fontWeight: 850, cursor: 'pointer', opacity: onScan ? 1 : 0.55 }}>
+          <button onClick={startExpertScan} style={{ width: '100%', padding: '13px 0', borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${T.gold},${T.goldL})`, color: '#17120a', fontSize: 14, fontWeight: 850, cursor: 'pointer', opacity: onScan ? 1 : 0.55 }}>
             📷 Сканировать QR
           </button>
         </div>

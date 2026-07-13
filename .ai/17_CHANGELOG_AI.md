@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: connect Intelligence Platform to user scenarios
+**Коммит:** `pending`
+**Файлы:** `src/intelligence/EventBus.js`, `src/intelligence/ActivityTimeline.js`, `src/intelligence/AIMemory.js`, `src/intelligence/AnalyticsCollector.js`, `src/intelligence/AIContextService.js`, `src/intelligence/recommendationEngine.js`, `src/intelligence/PersonalHomeContext.js`, `src/intelligence/index.js`, `src/UserApp.jsx`, `src/NewsPage.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/LokiPage.jsx`
+**Тип:** feat
+**Что изменено:**
+- Event Bus получил пользовательские события для экранов, новостей, мероприятий, партнёров, экспертов, QR, Локи и рекомендаций; основные сценарии начали публиковать non-blocking события.
+- Добавлены локальные `ActivityTimeline`, `AIMemory` и `AnalyticsCollector`, которые автоматически подписываются на Event Bus и собирают журнал активности, AI-память и счётчики без сервера.
+- AI Context, Recommendation Engine и Personal Home Context начали учитывать последние действия, просмотры, избранное, частые действия, время суток и скрытые home-инсайты.
+**Почему:** первый этап создал инфраструктуру Intelligence Platform; второй этап подключает к ней реальные пользовательские сценарии без изменения UI и привычных flows.
+
+---
+
 ## [2026-07-13] feat: finalize Workspace 2.2 single-screen role dashboard
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`

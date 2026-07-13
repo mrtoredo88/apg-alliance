@@ -22,6 +22,12 @@ function clampText(value, max) {
   return `${text.slice(0, Math.max(0, max - 1)).trim()}…`;
 }
 
+function eventDateMs(event) {
+  const value = event?.startAt || event?.startsAt || event?.eventDate || event?.date || event?.deadline;
+  const ms = value?.toDate ? value.toDate().getTime() : new Date(value || 0).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 export function buildPersonalHomeContext({
   user = null,
   userState = {},
@@ -42,6 +48,17 @@ export function buildPersonalHomeContext({
   const eventRecommendations = recommendEvents({ events: appState.events || [] }, aiContext);
   const rewardRecommendations = recommendRewards({ rewards: userState.rewards || appState.rewards || [] });
   const taskRecommendations = recommendTasks({ tasks: appState.customTasks || [], completedTaskIds: appState.completedTaskIds || [] });
+
+  const nowMs = now.getTime();
+  const nearbyTodayEvents = (appState.events || []).filter(event => {
+    const ms = eventDateMs(event);
+    return ms && ms >= nowMs - 2 * 3600000 && ms <= nowMs + 24 * 3600000;
+  });
+  const favoritePartnerNews = (appState.news || []).filter(item => {
+    const partnerId = String(item?.partnerId || '');
+    return partnerId && aiContext.preferenceSignals.favoritePartnerIds.includes(partnerId);
+  });
+  const nextAchievementGap = Math.max(0, 10 - (Number(userState.userKeys || 0) % 10));
 
   return {
     version: 1,
@@ -78,5 +95,12 @@ export function buildPersonalHomeContext({
       newsCount: Number(Array.isArray(appState.news) ? appState.news.length : 0),
     },
     statusLine: clampText(`У вас ${aiContext.activity.favoritesCount} избранных, ${aiContext.activity.scanCount} сканов, ${aiContext.activity.referralCount} приглашений.`, 180),
+    hiddenInsights: {
+      welcome: 'Добро пожаловать',
+      eventsNearbyToday: nearbyTodayEvents.length,
+      favoritePartnerNews: favoritePartnerNews.length,
+      keysToNextAchievement: nextAchievementGap,
+      lokiPreparedRecommendations: eventRecommendations.length + partnerRecommendations.length + expertRecommendations.length + newsRecommendations.length,
+    },
   };
 }

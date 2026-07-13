@@ -32,6 +32,29 @@ export const APG_EVENT_TYPES = {
   TASK_CLAIMED: 'TaskClaimed',
   TASK_COMPLETED: 'TaskCompleted',
   APP_ACTION: 'AppAction',
+  SCREEN_OPENED: 'ScreenOpened',
+  CARD_VIEWED: 'CardViewed',
+  NEWS_OPENED: 'NewsOpened',
+  NEWS_LIKED: 'NewsLiked',
+  NEWS_SAVED: 'NewsSaved',
+  NEWS_COMMENTED: 'NewsCommented',
+  EVENT_OPENED: 'EventOpened',
+  EVENT_REGISTERED: 'EventRegistered',
+  EVENT_UNREGISTERED: 'EventUnregistered',
+  PARTNER_OPENED: 'PartnerOpened',
+  PARTNER_ROUTE_BUILT: 'PartnerRouteBuilt',
+  PARTNER_SITE_OPENED: 'PartnerSiteOpened',
+  PARTNER_CALLED: 'PartnerCalled',
+  EXPERT_OPENED: 'ExpertOpened',
+  EXPERT_BOOKED: 'ExpertBooked',
+  EXPERT_CONTACT_OPENED: 'ExpertContactOpened',
+  QR_SCAN_STARTED: 'QRScanStarted',
+  QR_SCAN_FAILED: 'QRScanFailed',
+  LOKI_OPENED: 'LokiOpened',
+  LOKI_QUESTION_ASKED: 'LokiQuestionAsked',
+  LOKI_ACTION_COMPLETED: 'LokiActionCompleted',
+  RECOMMENDATION_VIEWED: 'RecommendationViewed',
+  RECOMMENDATION_INTERACTED: 'RecommendationInteracted',
 };
 
 function resolveEventId() {
@@ -57,6 +80,10 @@ function normalizeEntityType(type) {
   if (['task', 'tasks'].includes(normalized)) return 'task';
   if (['prize', 'reward', 'rewards'].includes(normalized)) return 'reward';
   if (['comment', 'comments'].includes(normalized)) return 'comment';
+  if (['qrcode', 'qr', 'scan', 'scanner'].includes(normalized)) return 'qrcode';
+  if (['screen', 'panel', 'home'].includes(normalized)) return 'screen';
+  if (['loki', 'assistant'].includes(normalized)) return 'loki';
+  if (['recommendation', 'recommendations'].includes(normalized)) return 'recommendation';
   return normalized;
 }
 
@@ -133,6 +160,39 @@ export function emitAppActionEvent({ type = APG_EVENT_TYPES.APP_ACTION, actor = 
     entityType,
     entityId,
     payload,
+    source,
+    platform,
+    version,
+  });
+}
+
+export function trackAppEvent(action, {
+  type = APG_EVENT_TYPES.APP_ACTION,
+  actor = null,
+  user = null,
+  entityType = null,
+  entityId = null,
+  payload = {},
+  source = 'web-app',
+  platform = 'web-app',
+  version = '1',
+} = {}) {
+  const actorId = actor?.id || user?.id || user?.uid || payload?.userId || null;
+  const normalizedActor = actor || (actorId ? {
+    id: String(actorId),
+    name: user?.name || user?.first_name || user?.email || '',
+    source,
+    platform,
+  } : null);
+  return emitAppActionEvent({
+    type,
+    actor: normalizedActor,
+    entityType,
+    entityId,
+    payload: {
+      action: String(action || type),
+      ...payload,
+    },
     source,
     platform,
     version,
