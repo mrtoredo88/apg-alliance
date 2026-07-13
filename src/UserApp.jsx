@@ -3298,6 +3298,13 @@ export function UserApp() {
                 news={news}
                 notifications={notifications}
                 unreadCount={unreadCount}
+                userKeys={userKeys}
+                userCount={platformStats.userCount}
+                analytics={getAnalyticsSnapshot()}
+                activityTimeline={getActivityTimeline(80)}
+                recommendations={recommendations}
+                dailySummary={dailySummary}
+                homeExperience={homeExperience}
                 onModeChange={setAppModePersisted}
                 onOpenPanel={(panel) => { setAppModePersisted('user'); goPanel(panel); }}
                 onOpenAdmin={() => { window.location.assign('/admin-app'); }}

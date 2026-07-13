@@ -28,16 +28,17 @@ const WS = {
 };
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Сводка', icon: '⌂' },
-  { id: 'analytics', label: 'Статистика', icon: '▥' },
-  { id: 'messages', label: 'Сообщения', icon: '✉', badge: data => data.unreadCount || 0 },
-  { id: 'keys', label: 'Заявки и отклики', icon: '▣', badge: data => Math.max(data.unreadCount || 0, 0) + 9 },
-  { id: 'events', label: 'Мероприятия', icon: '□' },
-  { id: 'offers', label: 'Акции и предложения', icon: '✧' },
-  { id: 'news', label: 'Публикации', icon: '✎' },
-  { id: 'partners', label: 'Партнёры', icon: '☷' },
-  { id: 'management', label: 'Финансы', icon: '▤' },
-  { id: 'management', label: 'Настройки', icon: '⚙' },
+  { id: 'dashboard', label: 'Рабочий стол', icon: '🏠', description: 'Что сделать сегодня' },
+  { id: 'growth', label: 'Привлечение клиентов', icon: '📢', description: 'QR, ссылки, промо' },
+  { id: 'content', label: 'Контент', icon: '📰', description: 'Публикации и черновики' },
+  { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
+  { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
+  { id: 'clients', label: 'Клиенты', icon: '👥', description: 'CRM-контур', badge: data => data.unreadCount || 0 },
+  { id: 'reviews', label: 'Отзывы', icon: '⭐', description: 'Рейтинг и ответы' },
+  { id: 'analytics', label: 'Аналитика', icon: '📊', description: 'Метрики и изменения' },
+  { id: 'finance', label: 'Финансы', icon: '💰', description: 'Тарифы и документы' },
+  { id: 'notifications', label: 'Центр уведомлений', icon: '🔔', description: 'События и заявки', badge: data => data.unreadCount || 0 },
+  { id: 'settings', label: 'Настройки', icon: '⚙️', description: 'Кабинет и команда' },
 ];
 
 const WORKSPACE_ROLE_VIEWS = {
@@ -160,16 +161,17 @@ function getProfileCompletion(profile) {
 
 function buildWorkspaceContext(activeSection) {
   const map = {
-    dashboard: { label: 'Сводка', prompt: 'Что мне важно сделать сегодня?', next: 'начать с рабочих задач' },
-    events: { label: 'События', prompt: 'Какие мероприятия требуют внимания?', next: 'проверить ближайшие события' },
-    news: { label: 'Публикации', prompt: 'Какие новости стоит проверить?', next: 'открыть редакционный список' },
-    partners: { label: 'Партнёры', prompt: 'Каких партнёров стоит проверить?', next: 'посмотреть карточки партнёров' },
-    experts: { label: 'Эксперты', prompt: 'Каких экспертов стоит проверить?', next: 'проверить категории экспертов' },
-    offers: { label: 'Акции', prompt: 'Какие акции сейчас важнее?', next: 'проверить предложения' },
-    messages: { label: 'Сообщения', prompt: 'Какие сообщения требуют ответа?', next: 'разобрать уведомления' },
-    analytics: { label: 'Статистика', prompt: 'Какие показатели изменились?', next: 'посмотреть ключевые метрики' },
-    management: { label: 'Управление', prompt: 'Что проверить в управлении?', next: 'открыть кабинет' },
-    keys: { label: 'Заявки и отклики', prompt: 'Что требует ответа?', next: 'проверить входящие сигналы' },
+    dashboard: { label: 'Рабочий стол', prompt: 'Что мне важно сделать сегодня?', next: 'начать с рабочих задач' },
+    growth: { label: 'Привлечение клиентов', prompt: 'Как сегодня привести новых клиентов?', next: 'запустить QR, ссылку или промоматериал' },
+    content: { label: 'Контент', prompt: 'Что стоит опубликовать?', next: 'проверить новости, статьи и черновики' },
+    events: { label: 'Мероприятия', prompt: 'Какие мероприятия требуют внимания?', next: 'проверить календарь и регистрации' },
+    offers: { label: 'Акции и предложения', prompt: 'Какие акции сейчас важнее?', next: 'обновить предложения и бонусы' },
+    clients: { label: 'Клиенты', prompt: 'С кем нужно поработать сегодня?', next: 'разобрать новых и вернувшихся клиентов' },
+    reviews: { label: 'Отзывы', prompt: 'На какие отзывы нужно ответить?', next: 'проверить рейтинг и ответы' },
+    analytics: { label: 'Аналитика', prompt: 'Какие показатели изменились?', next: 'посмотреть метрики и источники клиентов' },
+    finance: { label: 'Финансы', prompt: 'Что проверить по оплатам?', next: 'сверить тариф, счета и документы' },
+    notifications: { label: 'Центр уведомлений', prompt: 'Какие события требуют реакции?', next: 'разобрать заявки, комментарии и рекомендации' },
+    settings: { label: 'Настройки', prompt: 'Что настроить в кабинете?', next: 'проверить профиль, команду и доступы' },
   };
   return map[activeSection] || map.dashboard;
 }
@@ -268,8 +270,8 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
 }
 
 function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeChange, availableViews, activeViewId, onViewChange }) {
-  const main = items.slice(0, 8);
-  const settings = items.slice(8);
+  const main = items.filter(item => !['finance', 'notifications', 'settings'].includes(item.id));
+  const settings = items.filter(item => ['finance', 'notifications', 'settings'].includes(item.id));
   const initial = String(user?.firstName || user?.name || user?.displayName || 'A').slice(0, 1).toUpperCase();
   return (
     <aside data-workspace-v2-sidebar style={cardStyle({ height: 'calc(100dvh - 102px)', minHeight: 0, position: 'sticky', top: 84, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' })}>
@@ -296,9 +298,12 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
               const active = activeSection === item.id;
               const badge = typeof item.badge === 'function' ? item.badge(data) : item.badge;
               return (
-                <button key={`${item.id}-${item.label}`} type="button" onClick={() => onSelect(item)} style={{ border: 0, minHeight: 40, padding: '0 20px', background: active ? 'linear-gradient(90deg, rgba(241,206,128,0.42), rgba(241,206,128,0.08))' : 'transparent', color: active ? '#8A6422' : WS.text, display: 'grid', gridTemplateColumns: '25px minmax(0,1fr) auto', alignItems: 'center', gap: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', boxShadow: active ? 'inset 4px 0 0 #D0A14C' : 'none' }}>
+                <button key={`${item.id}-${item.label}`} type="button" onClick={() => onSelect(item)} style={{ border: 0, minHeight: 47, padding: '0 18px', background: active ? 'linear-gradient(90deg, rgba(241,206,128,0.42), rgba(241,206,128,0.08))' : 'transparent', color: active ? '#8A6422' : WS.text, display: 'grid', gridTemplateColumns: '29px minmax(0,1fr) auto', alignItems: 'center', gap: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', boxShadow: active ? 'inset 4px 0 0 #D0A14C' : 'none' }}>
                   <span style={{ color: active ? '#B68126' : 'rgba(31,26,20,0.58)', fontSize: 18, textAlign: 'center' }}>{item.icon}</span>
-                  <span style={{ fontSize: 13.8, lineHeight: '17px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13.3, lineHeight: '16px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    <span style={{ display: 'block', color: active ? 'rgba(138,100,34,0.72)' : WS.muted, fontSize: 10.8, lineHeight: '13px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
+                  </span>
                   {!!badge && <span style={{ minWidth: 24, height: 24, borderRadius: 999, background: 'rgba(209,161,76,0.18)', color: '#A8741F', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 920 }}>{badge}</span>}
                 </button>
               );
@@ -466,7 +471,7 @@ function MessageRow({ item, index, onClick }) {
   );
 }
 
-function WorkspaceDashboard({ data, actions, workspaceView }) {
+function WorkspaceDashboard({ data, actions, workspaceView, intelligence }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const tasks = getRoleSpecificTasks({ view: workspaceView, data, profileStatus, actions });
   const fallbackEvents = [
@@ -477,6 +482,10 @@ function WorkspaceDashboard({ data, actions, workspaceView }) {
   const visibleTasks = tasks.slice(0, 3);
   const visibleEvents = data.events.length ? data.events.slice(0, 2) : fallbackEvents.slice(0, 2);
   const visibleMessages = data.notifications.length ? data.notifications.slice(0, 3) : [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }];
+  const dashboardSignals = intelligence?.signals?.length ? intelligence.signals.slice(0, 3) : [
+    'Локи начнёт подсказывать приоритеты после накопления активности.',
+    'Workspace уже собирает события через Intelligence Platform.',
+  ];
 
   return (
     <div data-workspace-v2-dashboard data-workspace-role-view={workspaceView.id} style={{ display: 'grid', gap: 14 }}>
@@ -498,6 +507,32 @@ function WorkspaceDashboard({ data, actions, workspaceView }) {
         <Panel title="Новые сообщения" action={<button type="button" onClick={actions.openMessages} style={buttonStyle({ minHeight: 32, padding: '6px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Все сообщения⌄</button>} style={{ padding: 18 }}>
           <div style={{ display: 'grid' }}>
             {visibleMessages.map((item, index) => <MessageRow key={item.id || index} item={item} index={index} onClick={actions.openMessages} />)}
+          </div>
+        </Panel>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(330px,0.55fr)', gap: 14, alignItems: 'stretch' }}>
+        <Panel title="Рекомендации Локи" action={<button type="button" onClick={actions.openLoki} style={buttonStyle({ minHeight: 32, padding: '6px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Открыть Локи⌄</button>} style={{ padding: 18 }}>
+          <div style={{ display: 'grid', gap: 9 }}>
+            {dashboardSignals.map((signal, index) => (
+              <button key={`${signal}-${index}`} type="button" onClick={actions.openLoki} style={{ border: 0, borderBottom: index < dashboardSignals.length - 1 ? `1px solid ${WS.line}` : 0, background: 'transparent', padding: '8px 0', display: 'grid', gridTemplateColumns: '32px 1fr', gap: 10, alignItems: 'start', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <span style={{ width: 32, height: 32, borderRadius: 13, background: 'rgba(201,155,60,0.14)', color: '#A8741F', display: 'grid', placeItems: 'center', fontWeight: 930 }}>✦</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', color: WS.text, fontSize: 14.5, lineHeight: '19px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{signal}</span>
+                  <span style={{ display: 'block', color: WS.soft, fontSize: 12.5, lineHeight: '17px', marginTop: 3 }}>Из AI Context, Activity Timeline и рекомендаций</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Быстрые действия" style={{ padding: 18 }}>
+          <div style={{ display: 'grid', gap: 9 }}>
+            {[
+              { label: 'Привлечь клиентов', onClick: actions.openPartners },
+              { label: 'Создать контент', onClick: actions.openNews },
+              { label: 'Проверить аналитику', onClick: actions.openAnalytics },
+            ].map(item => (
+              <button key={item.label} type="button" onClick={item.onClick} style={{ border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.68)', borderRadius: 15, padding: '10px 12px', color: WS.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 860, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>{item.label}</button>
+            ))}
           </div>
         </Panel>
       </div>
@@ -542,6 +577,295 @@ function DataSection({ type, title, subtitle, items = [], emptyText, onOpen }) {
   );
 }
 
+function getAnalyticsCount(analytics, key, fallback = 0) {
+  const value = analytics?.[key];
+  if (typeof value === 'number') return value;
+  if (value && typeof value === 'object') return Object.values(value).reduce((sum, item) => sum + (Number(item) || 0), 0);
+  return fallback;
+}
+
+function normalizeRecommendationRows(recommendations = {}) {
+  return [
+    ...(recommendations.events || []),
+    ...(recommendations.partners || []),
+    ...(recommendations.news || []),
+    ...(recommendations.experts || []),
+    ...(recommendations.tasks || []),
+    ...(recommendations.feed || []),
+  ]
+    .filter(Boolean)
+    .filter((item, index, list) => list.findIndex(row => String(row.id || row.item?.id || row.title) === String(item.id || item.item?.id || item.title)) === index)
+    .slice(0, 6);
+}
+
+function buildWorkspaceIntelligence({ data, analytics, activityTimeline, recommendations, dailySummary }) {
+  const recRows = normalizeRecommendationRows(recommendations);
+  const recentEvents = Array.isArray(activityTimeline) ? activityTimeline.slice(0, 8) : [];
+  return {
+    metrics: {
+      screens: getAnalyticsCount(analytics, 'screenOpenings', dailySummary?.activeSections || 0),
+      views: getAnalyticsCount(analytics, 'views', data.news.length + data.events.length),
+      clicks: getAnalyticsCount(analytics, 'clicks', data.unreadCount || 0),
+      registrations: getAnalyticsCount(analytics, 'registrations', data.events.length),
+      qr: analytics?.qrScans?.started || analytics?.qrScans?.success || 0,
+      comments: getAnalyticsCount(analytics, 'comments', 0),
+    },
+    signals: [
+      recRows[0] ? `Локи рекомендует: ${safeTitle(recRows[0].item || recRows[0], 'рабочее действие')}` : null,
+      dailySummary?.topRecommendation ? `Главный сигнал дня: ${safeTitle(dailySummary.topRecommendation.item || dailySummary.topRecommendation, 'рекомендация')}` : null,
+      recentEvents[0] ? `Последнее событие: ${recentEvents[0].type || recentEvents[0].action || 'активность'}` : null,
+      data.unreadCount ? `${data.unreadCount} входящих сигналов требуют реакции` : null,
+    ].filter(Boolean).slice(0, 4),
+    recommendations: recRows,
+    timeline: recentEvents,
+  };
+}
+
+function WorkspaceCenterHeader({ center, context }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 18, alignItems: 'start', marginBottom: 14 }}>
+      <div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 11px', borderRadius: 999, background: 'rgba(201,155,60,0.13)', color: '#8A6422', fontSize: 12, fontWeight: 900, marginBottom: 10 }}>
+          <span>{center.icon}</span>
+          <span>{context.prompt}</span>
+        </div>
+        <h1 style={{ margin: 0, color: WS.text, fontSize: 31, lineHeight: '36px', fontWeight: 950, letterSpacing: -0.62 }}>{center.label}</h1>
+        <div style={{ color: WS.soft, fontSize: 15, lineHeight: '22px', marginTop: 7, maxWidth: 780 }}>{center.subtitle}</div>
+      </div>
+      <div style={cardStyle({ padding: '11px 14px', borderRadius: 18, boxShadow: 'none', minWidth: 210 })}>
+        <div style={{ color: WS.muted, fontSize: 11.5, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.5 }}>Следующий шаг</div>
+        <div style={{ color: WS.text, fontSize: 14, lineHeight: '19px', fontWeight: 880, marginTop: 5 }}>{context.next}</div>
+      </div>
+    </div>
+  );
+}
+
+function WorkModuleCard({ title, text, meta, action, tone = WS.gold, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{ ...cardStyle({ padding: 15, borderRadius: 20, boxShadow: 'none', textAlign: 'left', cursor: onClick ? 'pointer' : 'default' }), border: `1px solid ${tone}22` }}>
+      <div style={{ color: tone, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.4 }}>{meta}</div>
+      <div style={{ color: WS.text, fontSize: 16, lineHeight: '20px', fontWeight: 920, marginTop: 7 }}>{title}</div>
+      <div style={{ color: WS.soft, fontSize: 13, lineHeight: '19px', marginTop: 6 }}>{text}</div>
+      {action && <div style={{ color: tone, fontSize: 12.5, lineHeight: '16px', fontWeight: 880, marginTop: 10 }}>{action} →</div>}
+    </button>
+  );
+}
+
+function IntelligencePanel({ intelligence, onOpenLoki }) {
+  return (
+    <Panel title="Интеллект Workspace" action={<WorkspaceButton onClick={onOpenLoki} style={{ minHeight: 36, borderRadius: 16, padding: '8px 12px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' }}>Открыть Локи</WorkspaceButton>}>
+      <div style={{ display: 'grid', gap: 9 }}>
+        {(intelligence.signals.length ? intelligence.signals : ['Локи будет подсказывать рабочие приоритеты после накопления активности.']).map((signal, index) => (
+          <div key={`${signal}-${index}`} style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 9, alignItems: 'start', padding: '8px 0', borderBottom: index < intelligence.signals.length - 1 ? `1px solid ${WS.line}` : 0 }}>
+            <span style={{ width: 28, height: 28, borderRadius: 12, background: 'rgba(201,155,60,0.14)', color: '#A8741F', display: 'grid', placeItems: 'center', fontWeight: 930 }}>{index + 1}</span>
+            <span style={{ color: WS.soft, fontSize: 13.5, lineHeight: '19px' }}>{signal}</span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function WorkspaceCenter({ center, data, actions, intelligence }) {
+  const context = buildWorkspaceContext(center.id);
+  return (
+    <div data-workspace-center={center.id} style={{ display: 'grid', gap: 14 }}>
+      <WorkspaceCenterHeader center={center} context={context} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10 }}>
+        {center.metrics.map(metric => (
+          <MetricTile key={metric.label} label={metric.label} value={metric.value} delta={metric.delta} />
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) minmax(320px,0.65fr)', gap: 14, alignItems: 'start' }}>
+        <Panel title="Что сделать сейчас" action={center.primaryAction ? <WorkspaceButton onClick={center.primaryAction.onClick} style={{ minHeight: 36, borderRadius: 16, padding: '8px 12px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' }}>{center.primaryAction.label}</WorkspaceButton> : null}>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {center.tasks.map(task => <TaskRow key={task.title} {...task} />)}
+          </div>
+        </Panel>
+        <IntelligencePanel intelligence={intelligence} onOpenLoki={actions.openLoki} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
+        {center.modules.map(module => <WorkModuleCard key={module.title} {...module} />)}
+      </div>
+      <Panel title="Архитектура на будущее" style={{ padding: 18 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {center.future.map(item => (
+            <span key={item} style={{ borderRadius: 999, padding: '8px 11px', background: 'rgba(88,67,37,0.06)', color: WS.soft, fontSize: 12.5, fontWeight: 820 }}>{item}</span>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function buildCenterConfig({ id, data, actions, intelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan }) {
+  const offers = data.partners.filter(item => item.offer);
+  const reviewsCount = data.partners.reduce((sum, item) => sum + Number(item.reviewCount || item.reviewsCount || 0), 0);
+  const baseFuture = ['несколько филиалов', 'несколько сотрудников', 'командные роли', 'история изменений'];
+  const openBusiness = () => businessHubAvailable ? actions.openBusinessHub() : actions.openCabinet();
+  const configs = {
+    growth: {
+      subtitle: 'Рабочий центр для привлечения новых клиентов: QR, ссылки, промокоды, соцсети и материалы продвижения.',
+      metrics: [['QR', intelligence.metrics.qr || 0, 'сегодня'], ['Переходы', intelligence.metrics.clicks || 0, 'из событий'], ['Клиенты', Math.max(data.unreadCount || 0, 24), 'поток'], ['Промо', offers.length, 'активно']],
+      tasks: [
+        { icon: '◎', title: 'Проверить QR-точки', text: 'Убедиться, что сотрудники знают сценарий выдачи ключей', priority: 'Сегодня', tone: WS.gold, onClick: onOpenScan },
+        { icon: '↗', title: 'Поделиться ссылкой-приглашением', text: 'Запустить быстрый поток из соцсетей и мессенджеров', priority: 'Рост', tone: WS.blue, onClick: () => onOpenPanel?.('referral') },
+        { icon: '✧', title: 'Обновить промо-материалы', text: 'Подготовить пост, купон или рекламную карточку', priority: 'Маркетинг', tone: WS.green, onClick: () => onOpenPanel?.('offers') },
+      ],
+      modules: [
+        { meta: 'QR', title: 'Коды и точки входа', text: 'Сценарии сканирования, выдачи ключей и визитов.', action: 'Открыть сканер', onClick: onOpenScan },
+        { meta: 'Рефералы', title: 'Ссылки-приглашения', text: 'Готовая база для партнёрских ссылок и промокодов.', action: 'Открыть рефералы', onClick: () => onOpenPanel?.('referral') },
+        { meta: 'Соцсети', title: 'Материалы продвижения', text: 'Посты, баннеры, истории и будущие рекламные наборы.' },
+      ],
+      future: [...baseFuture, 'промокоды', 'UTM-источники', 'рекламные кампании'],
+    },
+    content: {
+      subtitle: 'Единый центр публикаций: новости, статьи, черновики, медиа, ИИ-редактор и история публикаций.',
+      metrics: [['Материалов', data.news.length, 'в базе'], ['Черновики', Math.max(1, Math.round(data.news.length / 8)), 'готовятся'], ['Просмотры', intelligence.metrics.views || data.news.length, 'контент'], ['Рекомендации', intelligence.recommendations.filter(item => item.type === 'news').length, 'Локи']],
+      tasks: [
+        { icon: '✎', title: 'Подготовить публикацию', text: data.news[0] ? safeTitle(data.news[0], 'Последняя новость') : 'Лента ждёт первый материал', priority: 'Контент', tone: WS.blue, onClick: () => onOpenPanel?.('news') },
+        { icon: '▧', title: 'Проверить черновики', text: 'Не оставлять незавершённые публикации без даты', priority: 'Редакция', tone: WS.gold },
+        { icon: '✦', title: 'Спросить Локи о теме', text: 'Получить идею публикации на основе активности', priority: 'AI', tone: WS.green, onClick: actions.openLoki },
+      ],
+      modules: [
+        { meta: 'Новости', title: 'Новости и статьи', text: 'Публикации, категории и история материалов.', action: 'Открыть новости', onClick: () => onOpenPanel?.('news') },
+        { meta: 'Медиа', title: 'Фотографии и видео', text: 'Подготовка визуалов для карточек и публикаций.' },
+        { meta: 'ИИ-редактор', title: 'Редактор АПГ', text: 'Основа для генерации и согласования публикаций.', action: 'Спросить Локи', onClick: actions.openLoki },
+      ],
+      future: [...baseFuture, 'согласование публикаций', 'отложенный постинг', 'совместное редактирование'],
+    },
+    events: {
+      subtitle: 'Центр управления мероприятиями: календарь, регистрации, участники, посещаемость и статистика.',
+      metrics: [['Событий', data.events.length, 'активно'], ['Регистрации', intelligence.metrics.registrations || data.events.length, 'сигнал'], ['Участники', data.events.reduce((sum, item) => sum + Number(item.participants || 0), 0), 'всего'], ['Прогноз', data.events.length ? 'Средний' : 'Нет', 'Локи']],
+      tasks: [
+        { icon: '□', title: 'Проверить ближайшее событие', text: data.events[0] ? safeTitle(data.events[0], 'Мероприятие') : 'Создайте первое мероприятие', priority: 'Календарь', tone: WS.red, onClick: () => onOpenPanel?.('events') },
+        { icon: '▣', title: 'Проверить регистрации', text: 'Участники, лимиты мест и подтверждения', priority: 'Важно', tone: WS.gold, onClick: () => onOpenPanel?.('events') },
+        { icon: '✎', title: 'Подготовить анонс', text: 'Связать событие с новостью и push-сценарием', priority: 'Контент', tone: WS.blue, onClick: () => onOpenPanel?.('news') },
+      ],
+      modules: [
+        { meta: 'Календарь', title: 'Расписание', text: 'Список, календарь, черновики и конфликты времени.', action: 'Открыть афишу', onClick: () => onOpenPanel?.('events') },
+        { meta: 'Участники', title: 'Регистрации', text: 'Будущий список гостей, посещаемость и экспорт.' },
+        { meta: 'Статистика', title: 'Эффективность событий', text: 'Просмотры, заявки, визиты и повторные участия.' },
+      ],
+      future: [...baseFuture, 'экспорт участников', 'повторяющиеся события', 'модерация событий'],
+    },
+    offers: {
+      subtitle: 'Маркетинговый центр для акций, специальных предложений, подарков, купонов и бонусных программ.',
+      metrics: [['Акций', offers.length, 'активно'], ['Ключи', data.userKeys || 0, 'баланс'], ['Подарки', Math.max(1, offers.length), 'механики'], ['Отклики', intelligence.metrics.clicks || 0, 'сигнал']],
+      tasks: [
+        { icon: '✧', title: 'Проверить активные акции', text: offers[0] ? safeTitle(offers[0], 'Акция партнёра') : 'Добавьте первое предложение', priority: 'Маркетинг', tone: WS.gold, onClick: () => onOpenPanel?.('offers') },
+        { icon: '🎁', title: 'Подготовить подарок или купон', text: 'Сформировать причину вернуться', priority: 'Удержание', tone: WS.green },
+        { icon: '◎', title: 'Связать акцию с QR', text: 'Ключи и визиты должны вести в одну механику', priority: 'Рост', tone: WS.blue, onClick: onOpenScan },
+      ],
+      modules: [
+        { meta: 'Акции', title: 'Спецпредложения', text: 'Карточки, сроки, условия и аудитория.', action: 'Открыть акции', onClick: () => onOpenPanel?.('offers') },
+        { meta: 'Бонусы', title: 'Ключи и купоны', text: 'Будущая бонусная программа партнёра.' },
+        { meta: 'Розыгрыши', title: 'Подарки и призы', text: 'Связь с призами и городскими механиками.', action: 'Открыть подарки', onClick: () => onOpenPanel?.('rewards') },
+      ],
+      future: [...baseFuture, 'купоны', 'сегменты клиентов', 'A/B-акции'],
+    },
+    clients: {
+      subtitle: 'Лёгкий CRM-контур: новые, постоянные, активные и давно не возвращавшиеся клиенты.',
+      metrics: [['Новые', Math.max(data.unreadCount || 0, 8), 'сигнал'], ['Постоянные', Math.max(12, data.userCount || 0), 'аудитория'], ['Повторные', Math.max(4, offers.length), 'визиты'], ['Риск', 3, 'вернуть']],
+      tasks: [
+        { icon: '👥', title: 'Разобрать новых клиентов', text: 'Входящие заявки, QR-визиты и обращения', priority: 'Сегодня', tone: WS.gold, onClick: () => onOpenPanel?.('notifications') },
+        { icon: '↺', title: 'Вернуть тех, кто давно не приходил', text: 'Основа для будущей retention-кампании', priority: 'Удержание', tone: WS.blue },
+        { icon: '✦', title: 'Попросить Локи выбрать сегмент', text: 'Рекомендации по удержанию из активности', priority: 'AI', tone: WS.green, onClick: actions.openLoki },
+      ],
+      modules: [
+        { meta: 'Сегменты', title: 'Новые и постоянные', text: 'Готовая архитектура CRM-сегментов.' },
+        { meta: 'История', title: 'Взаимодействия', text: 'QR, заявки, комментарии, визиты и ответы.' },
+        { meta: 'Удержание', title: 'Рекомендации', text: 'Кого вернуть и каким предложением.' },
+      ],
+      future: [...baseFuture, 'история клиента', 'избранные клиенты', 'retention-кампании'],
+    },
+    reviews: {
+      subtitle: 'Центр отзывов: рейтинг, ответы, жалобы, полезные ответы и аналитика обратной связи.',
+      metrics: [['Отзывы', reviewsCount || 8, 'всего'], ['Рейтинг', data.activeProfile?.rating || data.activeProfile?.avgRating || '4.9', 'средний'], ['Ответы', Math.max(2, Math.round((reviewsCount || 8) / 3)), 'нужны'], ['Жалобы', 0, 'открыто']],
+      tasks: [
+        { icon: '⭐', title: 'Ответить на новые отзывы', text: 'Скорость ответа влияет на доверие', priority: 'Репутация', tone: WS.gold },
+        { icon: '▣', title: 'Проверить рейтинг', text: 'Найти темы, которые повторяются в обратной связи', priority: 'Аналитика', tone: WS.blue },
+        { icon: '✦', title: 'Подготовить полезный ответ', text: 'Локи может предложить тон ответа', priority: 'AI', tone: WS.green, onClick: actions.openLoki },
+      ],
+      modules: [
+        { meta: 'Отзывы', title: 'Все отзывы', text: 'Список, ответы и история диалогов.' },
+        { meta: 'Рейтинг', title: 'Репутация', text: 'Динамика оценки и причины изменений.' },
+        { meta: 'Жалобы', title: 'Сложные обращения', text: 'Отдельный контур эскалации.' },
+      ],
+      future: [...baseFuture, 'шаблоны ответов', 'тональность отзывов', 'жалобы и модерация'],
+    },
+    analytics: {
+      subtitle: 'Единый аналитический центр: просмотры, переходы, QR, конверсия, клиенты, мероприятия и акции.',
+      metrics: [['Просмотры', intelligence.metrics.views, 'события'], ['Переходы', intelligence.metrics.clicks, 'клики'], ['QR', intelligence.metrics.qr, 'сканы'], ['Разделы', intelligence.metrics.screens, 'открытия']],
+      tasks: [
+        { icon: '▥', title: 'Посмотреть важные изменения', text: intelligence.signals[0] || 'Локи покажет изменения по мере накопления событий', priority: 'Insight', tone: WS.gold, onClick: actions.openLoki },
+        { icon: '◎', title: 'Проверить QR-конверсию', text: 'Сравнить сканы, визиты и начисления ключей', priority: 'Воронка', tone: WS.blue },
+        { icon: '🎉', title: 'Оценить эффективность событий', text: 'Просмотры, регистрации и посещаемость', priority: 'События', tone: WS.green, onClick: () => onOpenPanel?.('events') },
+      ],
+      modules: [
+        { meta: 'Воронка', title: 'Просмотры → действия', text: 'Переходы, клики, QR и регистрации.' },
+        { meta: 'Контент', title: 'Популярные публикации', text: 'Какие новости приводят интерес.' },
+        { meta: 'Источники', title: 'Каналы клиентов', text: 'Готовая точка для UTM и рефералов.' },
+      ],
+      future: [...baseFuture, 'источники клиентов', 'эффективность акций', 'прогноз посещаемости'],
+    },
+    finance: {
+      subtitle: 'Финансовая архитектура кабинета: тариф, оплаты, счета, документы, выплаты, баланс и подписка.',
+      metrics: [['Тариф', businessHubAvailable ? 'Активен' : 'Базовый', 'статус'], ['Счета', 0, 'к оплате'], ['Баланс', data.userKeys || 0, 'ключи'], ['Документы', 0, 'новые']],
+      tasks: [
+        { icon: '💰', title: 'Проверить тариф', text: 'Статус подписки и доступные возможности Workspace', priority: 'Финансы', tone: WS.gold, onClick: openBusiness },
+        { icon: '▤', title: 'Подготовить документы', text: 'Счета, акты и будущий документооборот', priority: 'Документы', tone: WS.blue },
+        { icon: '⚙', title: 'Проверить реквизиты', text: 'Данные организации и доступы сотрудников', priority: 'Настройки', tone: WS.green, onClick: openBusiness },
+      ],
+      modules: [
+        { meta: 'Тариф', title: 'Подписка Workspace', text: 'Уровень доступа, лимиты и возможности.', action: businessHubAvailable ? 'Открыть Business Hub' : 'Открыть кабинет', onClick: openBusiness },
+        { meta: 'Оплаты', title: 'История счетов', text: 'Готовый контур оплат и документов.' },
+        { meta: 'Баланс', title: 'Выплаты и ключи', text: 'Финансовые показатели будущих программ.' },
+      ],
+      future: [...baseFuture, 'счета', 'акты', 'выплаты', 'мультифилиальность'],
+    },
+    notifications: {
+      subtitle: 'Единый центр событий: сообщения, заявки, комментарии, регистрации, модерация, система и рекомендации Локи.',
+      metrics: [['Входящие', data.unreadCount || 0, 'новые'], ['События', intelligence.timeline.length, 'timeline'], ['Комментарии', intelligence.metrics.comments, 'новые'], ['Регистрации', intelligence.metrics.registrations, 'сигнал']],
+      tasks: [
+        { icon: '🔔', title: 'Разобрать входящие события', text: data.unreadCount ? `${data.unreadCount} уведомлений ждут реакции` : 'Критичных входящих нет', priority: data.unreadCount ? 'Важно' : 'Спокойно', tone: data.unreadCount ? WS.red : WS.green, onClick: () => onOpenPanel?.('notifications') },
+        { icon: '▣', title: 'Проверить регистрации и комментарии', text: 'События приходят из Event Bus через Activity Timeline', priority: 'Event Bus', tone: WS.gold },
+        { icon: '✦', title: 'Открыть рекомендации Локи', text: 'Локи объяснит, что важнее разобрать первым', priority: 'AI', tone: WS.blue, onClick: actions.openLoki },
+      ],
+      modules: [
+        { meta: 'Event Bus', title: 'Activity Timeline', text: 'Экран готов принимать события из платформы.' },
+        { meta: 'Модерация', title: 'Заявки и комментарии', text: 'Будущая очередь согласований.' },
+        { meta: 'Система', title: 'Сервисные уведомления', text: 'Ошибки, статусы и рекомендации.' },
+      ],
+      future: [...baseFuture, 'очереди модерации', 'SLA ответов', 'командные назначения'],
+    },
+    settings: {
+      subtitle: 'Реальные настройки рабочего кабинета: профиль, роли, команда, филиалы, доступы и интеграции.',
+      metrics: [['Профиль', `${getProfileCompletion(data.activeProfile).value}%`, 'готов'], ['Роли', 1, 'активно'], ['Филиалы', 1, 'готово'], ['Доступы', businessHubAvailable ? 'Hub' : 'Base', 'режим']],
+      tasks: [
+        { icon: '⚙', title: 'Проверить профиль', text: getProfileCompletion(data.activeProfile).missing.slice(0, 2).join(', ') || 'Профиль готов', priority: 'Профиль', tone: WS.gold, onClick: openBusiness },
+        { icon: '👥', title: 'Подготовить команду', text: 'Будущие сотрудники и уровни доступа', priority: 'Команда', tone: WS.blue },
+        { icon: '☷', title: 'Настроить филиалы', text: 'Основа для нескольких точек бизнеса', priority: 'Филиалы', tone: WS.green },
+      ],
+      modules: [
+        { meta: 'Профиль', title: 'Карточка организации', text: 'Название, описание, контакты и визуалы.', action: 'Открыть кабинет', onClick: openBusiness },
+        { meta: 'Команда', title: 'Сотрудники и роли', text: 'Права, согласования и совместная работа.' },
+        { meta: 'Интеграции', title: 'Сервисы и уведомления', text: 'Будущие подключения и каналы.' },
+      ],
+      future: [...baseFuture, 'несколько ролей', 'согласование публикаций', 'внутренние задачи'],
+    },
+  };
+  const selected = configs[id] || configs.growth;
+  return {
+    id,
+    icon: NAV_ITEMS.find(item => item.id === id)?.icon || '▧',
+    label: buildWorkspaceContext(id).label,
+    primaryAction: selected.tasks?.[0] ? { label: 'Начать работу', onClick: selected.tasks[0].onClick } : null,
+    ...selected,
+    metrics: selected.metrics.map(([label, value, delta]) => ({ label, value, delta })),
+  };
+}
+
 export function DesktopWorkspace({
   user,
   ownedPartner,
@@ -554,9 +878,15 @@ export function DesktopWorkspace({
   unreadCount = 0,
   userKeys = 0,
   userCount = 0,
+  analytics = null,
+  activityTimeline = [],
+  recommendations = null,
+  dailySummary = null,
+  homeExperience = null,
   onModeChange,
   onOpenPanel,
   onOpenAdmin,
+  onOpenScan,
 }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [query, setQuery] = useState('');
@@ -569,20 +899,22 @@ export function DesktopWorkspace({
   const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: ownedPartner, expert: ownedExpert, flag: businessHubFlag }), [user, ownedPartner, ownedExpert, businessHubFlag]);
   const activeProfile = activeRole?.id === 'expert' ? ownedExpert : activeRole?.id === 'partner' ? ownedPartner : user;
   const userName = user?.firstName || user?.name || user?.displayName || 'Mr. TOREDO';
-  const workspaceData = { userName, activeProfile, partners, experts, events, news, notifications, unreadCount, userKeys, userCount };
+  const workspaceData = useMemo(() => ({ userName, activeProfile, partners, experts, events, news, notifications, unreadCount, userKeys, userCount, homeExperience }), [userName, activeProfile, partners, experts, events, news, notifications, unreadCount, userKeys, userCount, homeExperience]);
+  const workspaceIntelligence = useMemo(() => buildWorkspaceIntelligence({ data: workspaceData, analytics, activityTimeline, recommendations, dailySummary }), [workspaceData, analytics, activityTimeline, recommendations, dailySummary]);
   const availableWorkspaceViews = useMemo(() => getWorkspaceRoleViews({ roles: roleState.roles, activeRole, ownedPartner, ownedExpert, isAdminRole }), [roleState.roles, activeRole, ownedPartner, ownedExpert, isAdminRole]);
   const workspaceView = availableWorkspaceViews.find(view => view.id === activeWorkspaceViewId) || availableWorkspaceViews[0] || WORKSPACE_ROLE_VIEWS.partner;
-  const navItems = NAV_ITEMS.filter(item => item.id !== 'management' || businessHubAvailable || isAdminRole);
+  const navItems = NAV_ITEMS.filter(item => item.id !== 'finance' || businessHubAvailable || isAdminRole || activeRole?.id === 'partner' || activeRole?.id === 'expert');
 
   const actions = {
     openDashboard: () => setActiveSection('dashboard'),
-    openCabinet: () => businessHubAvailable ? setActiveSection('management') : onOpenPanel?.(activeRole?.id === 'expert' ? 'expert-cabinet' : 'partner-cabinet'),
-    openNews: () => setActiveSection('news'),
+    openCabinet: () => businessHubAvailable ? setActiveSection('settings') : onOpenPanel?.(activeRole?.id === 'expert' ? 'expert-cabinet' : 'partner-cabinet'),
+    openBusinessHub: () => setActiveSection('settings'),
+    openNews: () => setActiveSection('content'),
     openEvents: () => setActiveSection('events'),
-    openPartners: () => setActiveSection('partners'),
-    openExperts: () => setActiveSection('experts'),
+    openPartners: () => setActiveSection('growth'),
+    openExperts: () => setActiveSection('clients'),
     openOffers: () => setActiveSection('offers'),
-    openMessages: () => setActiveSection('messages'),
+    openMessages: () => setActiveSection('notifications'),
     openAnalytics: () => setActiveSection('analytics'),
     openLoki: () => onOpenPanel?.('loki'),
   };
@@ -608,7 +940,7 @@ export function DesktopWorkspace({
       }
       if ((event.metaKey || event.ctrlKey) && key === '2') {
         event.preventDefault();
-        setActiveSection('management');
+        setActiveSection('growth');
       }
       if ((event.metaKey || event.ctrlKey) && key === 'l') {
         event.preventDefault();
@@ -620,34 +952,49 @@ export function DesktopWorkspace({
   }, [businessHubAvailable, activeRole?.id]);
 
   const handleSelectNav = item => {
-    if (item.id === 'management') {
+    if (item.id === 'settings') {
       if (isAdminRole && !businessHubAvailable) {
-        onOpenAdmin?.();
+        setActiveSection('settings');
         return;
       }
-      setActiveSection('management');
+      setActiveSection('settings');
       return;
     }
     setActiveSection(item.id);
   };
 
   const renderContent = () => {
-    if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} />;
-    if (activeSection === 'news') return <DataSection type="news" title="Публикации" subtitle={query ? `Поиск: ${query}` : 'Рабочий список публикаций'} items={news} emptyText="Новостей пока нет." onOpen={() => onOpenPanel?.('news')} />;
-    if (activeSection === 'events') return <DataSection type="events" title="Мероприятия" subtitle="Ближайшие мероприятия и календарный контекст" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />;
-    if (activeSection === 'partners') return <DataSection type="partners" title="Партнёры" subtitle="Каталог партнёров для рабочей проверки" items={partners} emptyText="Партнёров пока нет." onOpen={() => onOpenPanel?.('offers')} />;
-    if (activeSection === 'experts') return <DataSection type="experts" title="Эксперты" subtitle="Профили экспертов и категории" items={experts} emptyText="Экспертов пока нет." onOpen={() => onOpenPanel?.('experts')} />;
-    if (activeSection === 'offers') return <DataSection type="partners" title="Акции и предложения" subtitle="Партнёры с актуальными предложениями" items={partners.filter(item => item.offer)} emptyText="Акций пока нет." onOpen={() => onOpenPanel?.('offers')} />;
-    if (activeSection === 'messages') return <PlaceholderSection title="Сообщения" text="Входящие сигналы, уведомления и будущие диалоги." actions={[{ id: 'notifications', label: 'Открыть уведомления', onClick: () => onOpenPanel?.('notifications'), tone: 'gold' }]} />;
-    if (activeSection === 'keys') return <PlaceholderSection title="Заявки и отклики" text="Рабочая очередь заявок, ключей и QR-сценариев." actions={[{ id: 'scan', label: 'Открыть сканер', onClick: () => onOpenPanel?.('scan'), tone: 'gold' }]} />;
-    if (activeSection === 'analytics') return <PlaceholderSection title="Статистика" text="Ключевые показатели уже собраны в сводке; расширенная аналитика подключается без второй архитектуры." actions={[{ id: 'loki', label: 'Спросить Локи о метриках', onClick: actions.openLoki }]} />;
-    if (activeSection === 'management') {
-      if (businessHubAvailable) {
-        return <BusinessHub user={user} ownedPartner={ownedPartner} ownedExpert={ownedExpert} partners={partners} experts={experts} events={events} news={news} notifications={notifications} activeRoleId={activeRole?.id} onOpenPanel={onOpenPanel} />;
-      }
-      return <PlaceholderSection title="Управление" text="Кабинет, админка и настройки Workspace." actions={[isAdminRole && { id: 'admin', label: 'Админка', onClick: onOpenAdmin, tone: 'gold' }, { id: 'profile', label: 'Профиль', onClick: () => onOpenPanel?.('profile') }].filter(Boolean)} />;
+    if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} intelligence={workspaceIntelligence} />;
+    if (activeSection === 'content') return (
+      <div style={{ display: 'grid', gap: 14 }}>
+        <WorkspaceCenter center={buildCenterConfig({ id: 'content', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
+        <DataSection type="news" title="Рабочий список публикаций" subtitle={query ? `Поиск: ${query}` : 'Новости, статьи, черновики, медиа и ИИ-редактор'} items={news} emptyText="Публикаций пока нет." onOpen={() => onOpenPanel?.('news')} />
+      </div>
+    );
+    if (activeSection === 'events') return (
+      <div style={{ display: 'grid', gap: 14 }}>
+        <WorkspaceCenter center={buildCenterConfig({ id: 'events', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
+        <DataSection type="events" title="Список мероприятий" subtitle="Ближайшие мероприятия и календарный контекст" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />
+      </div>
+    );
+    if (activeSection === 'offers') return (
+      <div style={{ display: 'grid', gap: 14 }}>
+        <WorkspaceCenter center={buildCenterConfig({ id: 'offers', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
+        <DataSection type="partners" title="Акции и предложения" subtitle="Партнёры с актуальными предложениями" items={partners.filter(item => item.offer)} emptyText="Акций пока нет." onOpen={() => onOpenPanel?.('offers')} />
+      </div>
+    );
+    if (activeSection === 'settings' && businessHubAvailable) {
+      return (
+        <div style={{ display: 'grid', gap: 14 }}>
+          <WorkspaceCenter center={buildCenterConfig({ id: 'settings', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
+          <BusinessHub user={user} ownedPartner={ownedPartner} ownedExpert={ownedExpert} partners={partners} experts={experts} events={events} news={news} notifications={notifications} activeRoleId={activeRole?.id} onOpenPanel={onOpenPanel} />
+        </div>
+      );
     }
-    return <PlaceholderSection title={buildWorkspaceContext(activeSection).label} text={buildWorkspaceContext(activeSection).next} />;
+    if (activeSection === 'settings' && !businessHubAvailable) {
+      return <WorkspaceCenter center={buildCenterConfig({ id: 'settings', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />;
+    }
+    return <WorkspaceCenter center={buildCenterConfig({ id: activeSection, data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />;
   };
 
   return (
@@ -671,7 +1018,7 @@ export function DesktopWorkspace({
         '--apg2-glass-border': WS.line,
       }}
     >
-      <WorkspaceHeader query={query} onQueryChange={setQuery} unreadCount={unreadCount} onModeChange={onModeChange} onOpenNotifications={() => setActiveSection('messages')} />
+      <WorkspaceHeader query={query} onQueryChange={setQuery} unreadCount={unreadCount} onModeChange={onModeChange} onOpenNotifications={() => setActiveSection('notifications')} />
       <div style={{ maxWidth: 1760, margin: '0 auto', padding: '18px 24px 22px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
         <WorkspaceSidebar items={navItems} activeSection={activeSection} onSelect={handleSelectNav} user={user} data={workspaceData} onModeChange={onModeChange} availableViews={availableWorkspaceViews} activeViewId={workspaceView.id} onViewChange={setActiveWorkspaceViewId} />
         <main data-workspace-region="content" style={{ minWidth: 0 }}>

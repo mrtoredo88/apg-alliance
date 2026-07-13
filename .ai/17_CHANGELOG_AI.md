@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: turn Workspace into work centers
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`
+**Тип:** feat
+**Что изменено:**
+- Workspace перестроен из меню разделов в рабочую среду с центрами `Рабочий стол`, `Привлечение клиентов`, `Контент`, `Мероприятия`, `Акции и предложения`, `Клиенты`, `Отзывы`, `Аналитика`, `Финансы`, `Центр уведомлений`, `Настройки`.
+- Каждый центр получил собственный контекст, метрики, список действий на сегодня, рабочие модули и задел под филиалы, роли, сотрудников, историю изменений и согласования.
+- Workspace начал использовать данные Intelligence Platform: analytics snapshot, Activity Timeline, Recommendation Engine, Daily Summary и Home Experience; на рабочем столе появились компактные рекомендации Локи и быстрые действия.
+**Почему:** Workspace должен отвечать на вопрос “что мне нужно сделать сегодня?” и стать ежедневной рабочей средой партнёра/эксперта, а не набором равнозначных ссылок.
+
+---
+
 ## [2026-07-13] feat: move Intelligence UI into Loki
 **Коммит:** `pending`
 **Файлы:** `src/HomePanelV2.jsx`, `src/LokiPage.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiAssistant.jsx`
