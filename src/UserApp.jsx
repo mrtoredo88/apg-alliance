@@ -6,6 +6,7 @@ import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
 import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js';
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
+import { registerCurrentPushDevice } from './pushDiagnostics.js';
 import { confirmQrScan } from './rewardApi.js';
 import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
@@ -160,13 +161,6 @@ function getInitialPanelFromDeepLink(deepLink) {
   if (deepLink.type === 'expert' || deepLink.type === 'experts') return 'experts';
   if (deepLink.type === 'dialogs') return 'dialogs';
   return 'home';
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
 function getQrErrorMessage(error) {
@@ -2492,49 +2486,16 @@ export function UserApp() {
       return;
     }
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        if (!silent) showToast('🔔 Включите уведомления в настройках браузера', 'info');
-        return;
-      }
-      const swReg = await (window.__swRegPromise ?? navigator.serviceWorker.ready);
-      let subscription = await swReg.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await swReg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(WEB_PUSH_VAPID_PUBLIC_KEY),
-        });
-      }
-
-      if (subscription && user?.id) {
-        await userAction('profile:update', {
-          userId: String(user.id),
-          patch: {
-            webPushSubscriptions: [subscription.toJSON()],
-            notificationProvider: 'webpush',
-            notificationsEnabled: true,
-            notificationConsent: true,
-            webPushUpdatedAt: new Date().toISOString(),
-            notificationPreferences: user?.notificationPreferences || {
-              news: true,
-              events: true,
-              partners: true,
-              experts: true,
-              raffles: true,
-              prizes: true,
-              offers: true,
-              reminders: true,
-              loki: true,
-              achievements: true,
-              keys: true,
-              invites: true,
-              updates: true,
-              important: true,
-              onlyCritical: false,
-            },
-          },
-        });
-      }
+      if (!user?.id) return;
+      const { result } = await registerCurrentPushDevice(user, { requestPermission: !silent || Notification.permission !== 'granted' });
+      setUser(prev => prev ? ({
+        ...prev,
+        notificationsEnabled: true,
+        notificationConsent: true,
+        notificationProvider: 'webpush',
+        notificationPreferences: { ...(prev.notificationPreferences || {}), messages: true },
+        pushDevices: { ...(prev.pushDevices || {}), [result.deviceId]: result.device },
+      }) : prev);
       localStorage.setItem('apg_notif_enabled', '1');
       setNotifEnabled(true);
       if (!silent) showToast('🔔 Уведомления включены!', 'success');
@@ -3802,6 +3763,7 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <ApgHealthPage
                     nav="health"
+                    user={user}
                     partners={partners}
                     experts={experts}
                     events={events}

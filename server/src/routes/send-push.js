@@ -9,6 +9,7 @@ const DEFAULT_CATEGORIES = {
   events: true,
   partners: true,
   experts: true,
+  messages: true,
   raffles: true,
   prizes: true,
   offers: true,

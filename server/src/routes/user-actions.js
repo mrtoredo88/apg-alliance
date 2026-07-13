@@ -135,6 +135,37 @@ function sanitizeWebPushSubscription(input = {}) {
   };
 }
 
+function pushEndpointInfo(subscription = {}) {
+  const endpoint = safeString(subscription.endpoint, 2000);
+  if (!endpoint) return { host: '', length: 0 };
+  try {
+    return { host: new URL(endpoint).host, length: endpoint.length };
+  } catch {
+    return { host: endpoint.slice(0, 24), length: endpoint.length };
+  }
+}
+
+function safePushDiagnostics(input = {}) {
+  const allowed = [
+    'deviceId', 'platform', 'device', 'os', 'browser', 'appVersion',
+    'notificationPermission', 'notificationSupported', 'serviceWorkerSupported',
+    'serviceWorkerReady', 'serviceWorkerController', 'pushManagerSupported',
+    'subscriptionExists', 'subscriptionActiveInProfile', 'subscriptionEndpointHost',
+    'subscriptionEndpointLength', 'fcmTokenCount', 'registeredDeviceCount',
+    'profileSubscriptionCount', 'lastRegistration', 'lastSuccessfulPush', 'lastPushStatus',
+  ];
+  return Object.fromEntries(allowed.map(key => [key, input[key]]).filter(([, value]) => value !== undefined));
+}
+
+function mergePushSubscriptions(existing = [], current = null) {
+  const byEndpoint = new Map();
+  [...(Array.isArray(existing) ? existing : []), current].filter(Boolean).forEach(item => {
+    const sanitized = sanitizeWebPushSubscription(item);
+    if (sanitized?.endpoint) byEndpoint.set(sanitized.endpoint, sanitized);
+  });
+  return [...byEndpoint.values()].slice(-5);
+}
+
 async function resolveActor(db, decoded) {
   const identity = await resolveFirebaseIdentity(db, decoded.uid).catch(() => null);
   if (identity?.userId) return identity;
@@ -1599,6 +1630,136 @@ async function actionDialogAiAssist(db, req, actor) {
   return { ok: true, enabled };
 }
 
+async function actionPushRegister(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const deviceId = safeString(req.body?.deviceId, 120);
+  const subscription = sanitizeWebPushSubscription(req.body?.subscription || {});
+  if (!deviceId || !subscription) throw Object.assign(new Error('Не удалось зарегистрировать push-устройство.'), { statusCode: 400, code: 'BAD_PUSH_DEVICE' });
+  const userRef = db.collection('users').doc(userId);
+  const snap = await userRef.get();
+  const user = snap.exists ? snap.data() || {} : {};
+  const subscriptions = mergePushSubscriptions(user.webPushSubscriptions || [], subscription);
+  const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
+  const endpoint = pushEndpointInfo(subscription);
+  const device = {
+    ...(devices[deviceId] || {}),
+    ...safePushDiagnostics(req.body?.diagnostics || {}),
+    deviceId,
+    subscriptionEndpointHost: endpoint.host,
+    subscriptionEndpointLength: endpoint.length,
+    subscriptionActive: true,
+    lastRegistrationAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const pushDevices = { ...devices, [deviceId]: device };
+  const sortedDeviceIds = Object.keys(pushDevices).sort((a, b) => String(pushDevices[b]?.updatedAt || '').localeCompare(String(pushDevices[a]?.updatedAt || ''))).slice(0, 10);
+  const trimmedDevices = Object.fromEntries(sortedDeviceIds.map(id => [id, pushDevices[id]]));
+  const notificationPreferences = {
+    ...(user.notificationPreferences || {}),
+    messages: user.notificationPreferences?.messages !== false,
+  };
+  await userRef.set({
+    webPushSubscriptions: subscriptions,
+    pushDevices: trimmedDevices,
+    lastPushRegistration: { deviceId, at: FieldValue.serverTimestamp(), endpointHost: endpoint.host },
+    notificationProvider: 'webpush',
+    notificationsEnabled: true,
+    notificationConsent: true,
+    notificationPreferences,
+    webPushUpdatedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await audit(db, req, actor, 'push:register', 'users', userId, 'success', { deviceId, endpointHost: endpoint.host, subscriptionCount: subscriptions.length });
+  return { ok: true, userId, deviceId, device, subscriptionCount: subscriptions.length, webPushSubscriptions: subscriptions.map(item => pushEndpointInfo(item)) };
+}
+
+async function actionPushCleanupSubscriptions(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const deviceId = safeString(req.body?.deviceId, 120);
+  const subscription = sanitizeWebPushSubscription(req.body?.subscription || {});
+  const userRef = db.collection('users').doc(userId);
+  const snap = await userRef.get();
+  const user = snap.exists ? snap.data() || {} : {};
+  const before = Array.isArray(user.webPushSubscriptions) ? user.webPushSubscriptions.length : 0;
+  const subscriptions = subscription ? [subscription] : [];
+  const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
+  const nextDevices = deviceId && devices[deviceId]
+    ? { [deviceId]: { ...devices[deviceId], subscriptionActive: Boolean(subscription), cleanupAt: new Date().toISOString(), updatedAt: new Date().toISOString() } }
+    : {};
+  await userRef.set({
+    webPushSubscriptions: subscriptions,
+    pushDevices: nextDevices,
+    webPushUpdatedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await audit(db, req, actor, 'push:cleanupSubscriptions', 'users', userId, 'success', { deviceId, before, after: subscriptions.length });
+  return { ok: true, userId, deviceId, keptSubscriptions: subscriptions.length, removedSubscriptions: Math.max(before - subscriptions.length, 0) };
+}
+
+async function actionPushTestDevice(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const deviceId = safeString(req.body?.deviceId, 120);
+  const subscription = sanitizeWebPushSubscription(req.body?.subscription || {});
+  if (!deviceId || !subscription) throw Object.assign(new Error('На этом устройстве нет Web Push подписки.'), { statusCode: 400, code: 'NO_DEVICE_SUBSCRIPTION' });
+  const userRef = db.collection('users').doc(userId);
+  const snap = await userRef.get();
+  const user = snap.exists ? snap.data() || {} : {};
+  const isRegistered = (user.webPushSubscriptions || []).some(item => item?.endpoint === subscription.endpoint);
+  if (!isRegistered) throw Object.assign(new Error('Текущая подписка не сохранена в профиле. Сначала перерегистрируйте устройство.'), { statusCode: 400, code: 'SUBSCRIPTION_NOT_REGISTERED' });
+  let sent = 0;
+  let failed = 0;
+  let reason = '';
+  let errorCode = '';
+  if (!initDialogWebPush()) {
+    reason = 'WEB_PUSH_VAPID_ENV_MISSING';
+    failed = 1;
+  } else {
+    try {
+      await withDialogPushTimeout(webpush.sendNotification(subscription, JSON.stringify({
+        notification: {
+          title: '🧪 APG Push Diagnostics',
+          body: 'Тестовый push на это устройство.',
+          icon: `${APP_URL}/192.png`,
+          badge: `${APP_URL}/32.png`,
+          tag: `push-diagnostics-${deviceId}`,
+          renotify: true,
+        },
+        data: {
+          title: 'APG Push Diagnostics',
+          body: 'Тестовый push на это устройство.',
+          url: `${APP_URL}/health`,
+          tag: `push-diagnostics-${deviceId}`,
+          category: 'messages',
+          type: 'pushDiagnostics',
+          priority: 'normal',
+        },
+      }), { TTL: 300, urgency: 'high' }));
+      sent = 1;
+    } catch (e) {
+      failed = 1;
+      errorCode = e.code === 'push/timeout' ? 'webpush/timeout' : e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error';
+      reason = safeString(e?.body || e?.message || errorCode, 240);
+    }
+  }
+  const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
+  const current = devices[deviceId] || { deviceId };
+  await userRef.set({
+    pushDevices: {
+      ...devices,
+      [deviceId]: {
+        ...current,
+        lastPushStatus: sent ? 'sent' : 'failed',
+        lastSuccessfulPushAt: sent ? new Date().toISOString() : current.lastSuccessfulPushAt || null,
+        lastPushError: failed ? { code: errorCode || reason, at: new Date().toISOString() } : null,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await audit(db, req, actor, 'push:testDevice', 'users', userId, sent ? 'success' : 'error', { deviceId, sent, failed, errorCode });
+  return { ok: sent === 1, userId, deviceId, sent, failed, reason, errorCode };
+}
+
 async function routeAction(db, req, actor) {
   const action = safeString(req.body?.action, 80);
   if (action === 'auth:linkUser') return actionAuthLink(db, req, actor);
@@ -1609,6 +1770,9 @@ async function routeAction(db, req, actor) {
   if (action === 'profile:consentStatus') return actionProfileConsentStatus(db, req, actor);
   if (action === 'profile:forceAcceptConsent') return actionProfileForceAcceptConsent(db, req, actor);
   if (action === 'profile:delete') return actionProfileDelete(db, req, actor);
+  if (action === 'push:register') return actionPushRegister(db, req, actor);
+  if (action === 'push:cleanupSubscriptions') return actionPushCleanupSubscriptions(db, req, actor);
+  if (action === 'push:testDevice') return actionPushTestDevice(db, req, actor);
   if (action === 'favorites:toggle') return actionFavoritesToggle(db, req, actor);
   if (action === 'news:saved') return actionUserListSet(db, req, actor, 'savedNews', action);
   if (action === 'news:readLater') return actionUserListSet(db, req, actor, 'readLaterNews', action);

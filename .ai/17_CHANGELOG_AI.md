@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-13] feat: device-aware Push Diagnostics для iPhone PWA
+**Коммит:** `pending`
+**Файлы:** `src/pushDiagnostics.js`, `src/ApgHealthPage.jsx`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `server/src/routes/send-push.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Push-регистрация стала device-aware: PWA создаёт локальный `deviceId`, проверяет Notification/Service Worker/PushManager/subscription и сохраняет безопасную мета-информацию устройства в профиле без endpoint/ключей.
+- В APG Health добавлена вкладка `Push`: permission, SW, PushManager, subscription, FCM, deviceId, platform, last registration, last successful push, active subscription и количество устройств.
+- Добавлены actions `push:register`, `push:cleanupSubscriptions`, `push:testDevice`: перерегистрация текущего устройства, очистка старых подписок с сохранением текущей и тестовый push строго на этот endpoint.
+- Регистрация при запуске PWA теперь автоматически восстанавливает отсутствующую subscription при `Notification.permission=granted`; stage-логи `push register start/permission/service worker ready/subscription exists/subscription created/subscription saved/subscription failed` хранятся локально и видны в диагностике.
+**Почему:** без device-id невозможно доказать, что сохранённая Apple Web Push подписка относится именно к текущему iPhone PWA, а не к старой установке или другому профилю.
+
+---
+
 ## [2026-07-13] fix: push контекстных диалогов — таймауты web-push и этапная диагностика
 **Коммит:** `pending`
 **Файлы:** `server/src/routes/send-push.js`, `server/src/routes/user-actions.js`, `.ai/17_CHANGELOG_AI.md`

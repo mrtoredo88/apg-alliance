@@ -3,6 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
+import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';
 import { APG2_PROFILE, EmptyStateV2, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
 
 function StatusDot({ ok, pending }) {
@@ -34,12 +35,25 @@ function CountCard({ icon, label, value }) {
   );
 }
 
-export function ApgHealthPage({ nav = 'health', partners = [], experts = [], events = [], news = [], customTasks = [], userCount = 0, totalScans = 0, onBack, onGoAdmin }) {
+function DiagnosticLine({ label, value, tone = 'default' }) {
+  const color = tone === 'ok' ? '#4ade80' : tone === 'bad' ? '#f87171' : APG2_PROFILE.text;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 760 }}>{label}</span>
+      <span style={{ color, fontSize: 12, fontWeight: 850, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%' }}>{value ?? '—'}</span>
+    </div>
+  );
+}
+
+export function ApgHealthPage({ nav = 'health', user = null, partners = [], experts = [], events = [], news = [], customTasks = [], userCount = 0, totalScans = 0, onBack, onGoAdmin }) {
   const [checks, setChecks]           = useState(null);
   const [checking, setChecking]       = useState(true);
   const [errorLogs, setErrorLogs]     = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [activeTab, setActiveTab]     = useState('overview');
+  const [pushDiagnostics, setPushDiagnostics] = useState(null);
+  const [pushBusy, setPushBusy] = useState('');
+  const [pushResult, setPushResult] = useState(null);
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -52,13 +66,38 @@ export function ApgHealthPage({ nav = 'health', partners = [], experts = [], eve
     setChecking(false);
   }, []);
 
+  const refreshPushDiagnostics = useCallback(async () => {
+    const result = await collectPushDiagnostics(user || {}).catch(error => ({ error: error?.message || 'push diagnostics failed', localLog: getPushRegistrationLog() }));
+    setPushDiagnostics(result);
+    return result;
+  }, [user]);
+
   useEffect(() => {
     runChecks();
+    refreshPushDiagnostics();
     getDocs(query(collection(db, 'errorLogs'), orderBy('createdAt', 'desc'), limit(20)))
       .then(snap => setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
       .catch(() => {})
       .finally(() => setLoadingLogs(false));
-  }, []);
+  }, [refreshPushDiagnostics, runChecks]);
+
+  const runPushAction = async (action) => {
+    setPushBusy(action);
+    setPushResult(null);
+    try {
+      const result = action === 'register'
+        ? await registerCurrentPushDevice(user || {})
+        : action === 'cleanup'
+          ? await cleanupCurrentPushSubscriptions(user || {})
+          : await sendCurrentDeviceTestPush(user || {});
+      setPushResult({ ok: result?.ok !== false, action, result });
+      await refreshPushDiagnostics();
+    } catch (e) {
+      setPushResult({ ok: false, action, error: e?.message || 'Ошибка push диагностики' });
+      await refreshPushDiagnostics();
+    }
+    setPushBusy('');
+  };
 
   const devInfo = getDeviceInfo();
   const online  = navigator.onLine;
@@ -91,8 +130,8 @@ export function ApgHealthPage({ nav = 'health', partners = [], experts = [], eve
       <GlassPanel>
         <ScreenHeader title="APG Health" subtitle="Диагностика системы" kicker="OWNER" onBack={onBack} />
 
-        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 0 }}>
-          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность']].map(([id, label]) => (
+        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginTop: 0 }}>
+          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push']].map(([id, label]) => (
             <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
@@ -245,6 +284,60 @@ export function ApgHealthPage({ nav = 'health', partners = [], experts = [], eve
                   ))}
                 </div>
               )}
+            </GlassSection>
+          </>
+        )}
+
+        {activeTab === 'push' && (
+          <>
+            <GlassSection title="Push Diagnostics">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="UID" value={user?.id || 'нет пользователя'} />
+                <DiagnosticLine label="Способ входа" value={user?.email ? 'Email' : user?.telegramId || user?.tgId ? 'Telegram' : user?.vkId ? 'VK' : 'Firebase / linked profile'} />
+                <DiagnosticLine label="Email / Telegram / VK" value={user?.email || user?.linkedEmail || user?.telegramUsername || user?.telegramId || user?.vkId || '—'} />
+                <DiagnosticLine label="Device ID" value={pushDiagnostics?.deviceId} />
+                <DiagnosticLine label="Platform" value={`${pushDiagnostics?.platform || '—'} · ${pushDiagnostics?.device || ''} · ${pushDiagnostics?.os || ''}`} />
+                <DiagnosticLine label="Notification permission" value={pushDiagnostics?.notificationPermission} tone={pushDiagnostics?.notificationPermission === 'granted' ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Service Worker" value={pushDiagnostics?.serviceWorkerReady ? 'READY' : 'NOT READY'} tone={pushDiagnostics?.serviceWorkerReady ? 'ok' : 'bad'} />
+                <DiagnosticLine label="PushManager" value={pushDiagnostics?.pushManagerSupported ? 'SUPPORTED' : 'UNSUPPORTED'} tone={pushDiagnostics?.pushManagerSupported ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Web Push subscription" value={pushDiagnostics?.subscriptionExists ? 'ACTIVE' : 'MISSING'} tone={pushDiagnostics?.subscriptionExists ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Active subscription in profile" value={pushDiagnostics?.subscriptionActiveInProfile ? 'YES' : 'NO'} tone={pushDiagnostics?.subscriptionActiveInProfile ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Endpoint host" value={pushDiagnostics?.subscriptionEndpointHost || '—'} />
+                <DiagnosticLine label="FCM" value={`${pushDiagnostics?.fcmTokenCount ?? 0} tokens`} />
+                <DiagnosticLine label="Last registration" value={pushDiagnostics?.lastRegistration || '—'} />
+                <DiagnosticLine label="Last successful push" value={pushDiagnostics?.lastSuccessfulPush || '—'} />
+                <DiagnosticLine label="Last push status" value={pushDiagnostics?.lastPushStatus || '—'} />
+                <DiagnosticLine label="Registered devices" value={pushDiagnostics?.registeredDeviceCount ?? 0} />
+                <DiagnosticLine label="Profile subscriptions" value={pushDiagnostics?.profileSubscriptionCount ?? 0} />
+              </GlassCard>
+            </GlassSection>
+
+            <GlassSection title="Действия">
+              <div style={{ display: 'grid', gap: 8 }}>
+                <GlassButton onClick={() => runPushAction('register')} disabled={!!pushBusy} tone="gold" style={{ minHeight: 48, color: '#17120a' }}>{pushBusy === 'register' ? 'Регистрируем...' : '🔄 Перерегистрировать устройство'}</GlassButton>
+                <GlassButton onClick={() => runPushAction('cleanup')} disabled={!!pushBusy} style={{ minHeight: 48 }}>{pushBusy === 'cleanup' ? 'Очищаем...' : '🧹 Очистить старые подписки'}</GlassButton>
+                <GlassButton onClick={() => runPushAction('test')} disabled={!!pushBusy} style={{ minHeight: 48 }}>{pushBusy === 'test' ? 'Отправляем...' : '🧪 Отправить тестовый push на это устройство'}</GlassButton>
+                <GlassButton onClick={refreshPushDiagnostics} disabled={!!pushBusy} style={{ minHeight: 48 }}>↻ Обновить диагностику</GlassButton>
+              </div>
+              {pushResult && (
+                <GlassCard style={{ borderRadius: 22, padding: 12, marginTop: 10, border: `1px solid ${pushResult.ok ? 'rgba(74,222,128,0.34)' : 'rgba(248,113,113,0.34)'}` }}>
+                  <div style={{ color: pushResult.ok ? '#4ade80' : '#f87171', fontSize: 13, fontWeight: 850 }}>{pushResult.ok ? 'Готово' : 'Ошибка'}</div>
+                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>{pushResult.error || JSON.stringify(pushResult.result)}</div>
+                </GlassCard>
+              )}
+            </GlassSection>
+
+            <GlassSection title="Лог регистрации">
+              <div style={{ display: 'grid', gap: 8 }}>
+                {(pushDiagnostics?.localLog || []).length === 0 ? (
+                  <EmptyStateV2 icon="🔎" title="Лог пуст" text="После перерегистрации здесь появятся этапы push register." />
+                ) : pushDiagnostics.localLog.map((item, index) => (
+                  <GlassCard key={`${item.at}_${index}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850 }}>{item.stage}</div>
+                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, marginTop: 3 }}>{item.at}</div>
+                  </GlassCard>
+                ))}
+              </div>
             </GlassSection>
           </>
         )}
