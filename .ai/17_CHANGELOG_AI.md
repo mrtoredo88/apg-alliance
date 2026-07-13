@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-13] feat: Workspace digital showcase builder
+**Коммит:** `pending`
+**Файлы:** `src/cabinet/CabinetCorePage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `server/src/routes/user-actions.js`, `scripts/showcase-builder-test.mjs`, `package.json`
+**Тип:** feat
+**Что изменено:**
+- Единый кабинет партнёра/эксперта теперь открывается с конструктора цифровой витрины: вкладки “Витрина”, “Фото и видео”, “Контакты и соцсети”, “О бизнесе/эксперте”, “Контент”, “Аналитика”, “Как видят клиенты”, “Локи”.
+- Витрина использует те же данные, что публичная карточка: live preview через `EntityPreviewCard`, загрузка фото через существующие `PhotoUpload/GalleryUpload`, автосохранение через существующий `userAction(...:profileUpdate)`.
+- Добавлены заполненность профиля, чек-лист, подсказки Локи с кнопкой “Исправить”, компактная аналитика и core regression для модели витрины.
+**Почему:** кабинет должен восприниматься как мобильный конструктор публичной страницы бизнеса, а не как длинная административная анкета.
+
 ## [2026-07-13] fix: Telegram-авторизация — переход с webhook на getUpdates-поллинг
 **Коммит:** `pending`
 **Файлы:** `server/src/lib/telegramUpdates.js` (новый), `server/src/routes/telegram-webhook.js`, `server/src/routes/telegram-auth-check.js`, `server/src/routes/system-status.js`, `server/deploy.sh`, `server/deploy-cron.sh`, `.ai/13_DEPLOYMENT.md`

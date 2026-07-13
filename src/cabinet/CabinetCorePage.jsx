@@ -13,8 +13,10 @@ import { ContentGrid } from '../workspace/WorkspaceComponents.jsx';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
+import { DigitalShowcaseBuilder } from './DigitalShowcaseBuilder.jsx';
 
 const MODULES = [
+  ['showcase-builder', 'Витрина'],
   ['dashboard', 'Дашборд'],
   ['tasks', 'Задачи'],
   ['analytics', 'Аналитика'],
@@ -382,9 +384,9 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
   const [profile, setProfile] = useState(activeRole?.profile || null);
   const [reviews, setReviews] = useState([]);
-  const [activeModule, setActiveModule] = useState('dashboard');
+  const [activeModule, setActiveModule] = useState('showcase-builder');
   const [loading, setLoading] = useState(false);
-  const moduleIds = useMemo(() => getRoleModuleIds(roleState.roles).filter(id => id === 'dashboard' || id === 'tasks' || id === 'analytics' || id === 'media' || id === 'contacts' || id === 'content' || id === 'reviews' || id === 'notifications' || id === 'loki' || id === 'subscription' || id === 'settings' || id === 'history' || (activeRole?.modules || []).includes(id)), [roleState.roles, activeRole?.id]);
+  const moduleIds = useMemo(() => ['showcase-builder', ...getRoleModuleIds(roleState.roles)].filter(id => id === 'showcase-builder' || id === 'dashboard' || id === 'tasks' || id === 'analytics' || id === 'media' || id === 'contacts' || id === 'content' || id === 'reviews' || id === 'notifications' || id === 'loki' || id === 'subscription' || id === 'settings' || id === 'history' || (activeRole?.modules || []).includes(id)), [roleState.roles, activeRole?.id]);
 
   useEffect(() => {
     setActiveRoleId(roleState.activeRole?.id || preferredRole);
@@ -440,6 +442,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
   };
   const renderModule = () => {
     if (activeModule === 'dashboard') return <DashboardModule snapshot={snapshot} onOpenModule={setActiveModule} />;
+    if (activeModule === 'showcase-builder') return <DigitalShowcaseBuilder role={activeRole} profile={currentProfile} relatedEvents={snapshot.relatedEvents} onSaved={handleSaved} onOpenModule={setActiveModule} onEventCreated={onEventCreated} onToast={onToast} publicUrl={publicUrl} />;
     if (activeModule === 'tasks') return <TasksModule snapshot={snapshot} onOpenModule={setActiveModule} />;
     if (activeModule === 'analytics') return <AnalyticsModule snapshot={snapshot} />;
     if (activeModule === 'media') return <MediaModule snapshot={snapshot} />;
@@ -461,7 +464,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
         <ScreenHeader title="Личный кабинет 2.0" subtitle={currentProfile.name} kicker={activeRole.label} onBack={onBack} />
         {roleState.hasMultipleRoles && (
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: `repeat(${roleState.roles.length}, minmax(0,1fr))`, gap: 6, marginBottom: 12 }}>
-            {roleState.roles.map(role => <GlassButton key={role.id} tone={role.id === activeRole.id ? 'gold' : 'glass'} onClick={() => { setActiveRoleId(role.id); setActiveModule('dashboard'); }} style={{ color: role.id === activeRole.id ? '#17120a' : APG2_PROFILE.text }}>{role.label}</GlassButton>)}
+            {roleState.roles.map(role => <GlassButton key={role.id} tone={role.id === activeRole.id ? 'gold' : 'glass'} onClick={() => { setActiveRoleId(role.id); setActiveModule('showcase-builder'); }} style={{ color: role.id === activeRole.id ? '#17120a' : APG2_PROFILE.text }}>{role.label}</GlassButton>)}
           </GlassCard>
         )}
         <ProfileHero
@@ -475,6 +478,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
         />
         <ContentGrid min={72} gap={7} style={{ marginTop: 12 }}>
           {[
+            ['showcase-builder', 'Витрина', '◇'],
             ['dashboard', 'Дашборд', '▦'],
             ['tasks', 'Задачи', '✓'],
             ['contacts', 'Контакты', '☎'],
