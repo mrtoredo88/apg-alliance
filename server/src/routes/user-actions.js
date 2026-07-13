@@ -1351,6 +1351,16 @@ async function prepareDialogNotification(db, target, dialog, message, preview) {
   };
 }
 
+// зависший push-endpoint не должен ронять запрос dialog:message по 30с лимиту контейнера
+const DIALOG_PUSH_TIMEOUT_MS = 10000;
+
+function withDialogPushTimeout(promise, ms = DIALOG_PUSH_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('push endpoint timed out'), { statusCode: 0, code: 'push/timeout' })), ms)),
+  ]);
+}
+
 async function sendDialogPush(db, userId, notificationId, title, body, dialogId) {
   const snap = await db.collection('users').doc(userId).get().catch(() => null);
   if (!snap?.exists) return { sent: 0, failed: 0, skipped: true, reason: 'user_not_found' };
@@ -1368,7 +1378,7 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
 
   if (fcmTokens.length) {
     try {
-      const result = await getDbMessaging().sendEachForMulticast({
+      const result = await withDialogPushTimeout(getDbMessaging().sendEachForMulticast({
         tokens: fcmTokens,
         notification: { title, body },
         data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
@@ -1376,7 +1386,7 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
           notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}`, renotify: true },
           fcmOptions: { link: url },
         },
-      });
+      }));
       sent += result.successCount;
       failed += result.failureCount;
       result.responses.filter(r => !r.success).slice(0, 6).forEach(r => errors.push({ code: r.error?.code || 'fcm/error', message: safeString(r.error?.message, 240) }));
@@ -1389,14 +1399,14 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
   if (webSubscriptions.length && initDialogWebPush()) {
     await Promise.all(webSubscriptions.map(async subscription => {
       try {
-        await webpush.sendNotification(subscription, JSON.stringify({
+        await withDialogPushTimeout(webpush.sendNotification(subscription, JSON.stringify({
           notification: { title, body, icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}`, renotify: true },
           data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
-        }), { TTL: 21600, urgency: 'normal' });
+        }), { TTL: 21600, urgency: 'normal' }));
         sent += 1;
       } catch (e) {
         failed += 1;
-        errors.push({ code: e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error', message: safeString(e?.body || e?.message, 240) });
+        errors.push({ code: e.code === 'push/timeout' ? 'webpush/timeout' : e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error', message: safeString(e?.body || e?.message, 240) });
       }
     }));
   }
@@ -1518,14 +1528,38 @@ async function actionDialogMessage(db, req, actor) {
   });
   preparedNotifications.forEach(item => batch.set(item.ref, item.data, { merge: true }));
   await batch.commit();
-  await Promise.all(preparedNotifications.filter(item => item.shouldPush).map(target => sendDialogPush(
-    db,
-    target.userId,
-    target.id,
-    target.title,
-    target.body,
+  const pushTargets = preparedNotifications.filter(item => item.shouldPush);
+  req.log?.info?.({ dialogPush: {
+    stage: 'prepared',
     dialogId,
-  ).catch(() => {})));
+    recipients: notificationRecipientIds.length,
+    notificationsCreated: preparedNotifications.length,
+    pushTargets: pushTargets.length,
+    skipReasons: targets.filter(t => t.reason).map(t => t.reason),
+  } }, 'dialog message notifications prepared');
+  await Promise.all(pushTargets.map(async target => {
+    try {
+      const stats = await sendDialogPush(db, target.userId, target.id, target.title, target.body, dialogId);
+      req.log?.info?.({ dialogPush: {
+        stage: 'push_result',
+        dialogId,
+        notificationId: target.id,
+        sent: stats.sent ?? 0,
+        failed: stats.failed ?? 0,
+        subscribers: stats.subscribers ?? 0,
+        skipped: stats.skipped === true,
+        reason: stats.reason || null,
+        errorCodes: (stats.errors || []).map(e => e.code),
+      } }, 'dialog push result');
+    } catch (error) {
+      req.log?.warn?.({ dialogPush: { stage: 'push_error', dialogId, notificationId: target.id, message: safeString(error?.message, 200) } }, 'dialog push failed');
+      await db.collection('notifications').doc(target.id).set({
+        pushStatus: 'error',
+        pushError: safeString(error?.message, 200),
+        pushSentAt: FieldValue.serverTimestamp(),
+      }, { merge: true }).catch(() => {});
+    }
+  }));
   await audit(db, req, actor, 'dialog:message', 'contextDialog', dialogId, 'success', { senderRole, type: dialog.type, objectId: dialog.objectId });
   return { ok: true, dialogId, messageId: message.id, senderRole };
 }

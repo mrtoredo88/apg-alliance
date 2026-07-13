@@ -58,6 +58,16 @@ function initWebPush() {
   return { ok: true };
 }
 
+// у web-push нет таймаута: зависший push-endpoint блокирует запрос до 30с лимита контейнера
+export const WEB_PUSH_SEND_TIMEOUT_MS = 10000;
+
+export function withPushTimeout(promise, ms = WEB_PUSH_SEND_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('push endpoint timed out'), { statusCode: 0, code: 'push/timeout' })), ms)),
+  ]);
+}
+
 async function sendToFcmTokens(tokens, userIds, title, body, url, tag, options = {}) {
   if (!tokens.length) return { sent: 0, failed: 0, cleaned: 0 };
 
@@ -90,7 +100,12 @@ async function sendToFcmTokens(tokens, userIds, title, body, url, tag, options =
     },
   };
 
-  const result = await getDbMessaging().sendEachForMulticast(message);
+  let result;
+  try {
+    result = await withPushTimeout(getDbMessaging().sendEachForMulticast(message), 15000);
+  } catch (e) {
+    return { sent: 0, failed: tokens.length, cleaned: 0, errors: [{ code: e.code === 'push/timeout' ? 'fcm/timeout' : 'fcm/error', message: String(e.message || '').slice(0, 300) }] };
+  }
 
   const DEAD_CODES = new Set([
     'messaging/invalid-registration-token',
@@ -174,14 +189,14 @@ async function sendToWebPushSubscriptions(subscriptions, userIds, title, body, u
 
   await Promise.all(pairs.map(async ({ subscription, userId }) => {
     try {
-      await webpush.sendNotification(subscription, payload, {
+      await withPushTimeout(webpush.sendNotification(subscription, payload, {
         TTL: options.priority === 'critical' ? 86400 : 21600,
         urgency: options.priority === 'critical' ? 'high' : 'normal',
-      });
+      }));
       sent += 1;
     } catch (e) {
       failed += 1;
-      const code = e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error';
+      const code = e.code === 'push/timeout' ? 'webpush/timeout' : e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error';
       errors.push({ code, message: String(e.body || e.message || '').slice(0, 300) });
       if (e.statusCode === 404 || e.statusCode === 410) {
         deadByUser[userId] ??= [];

@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-13] fix: push контекстных диалогов — таймауты web-push и этапная диагностика
+**Коммит:** `pending`
+**Файлы:** `server/src/routes/send-push.js`, `server/src/routes/user-actions.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Первопричина «push не приходит» в диалогах: у web-push НЕТ таймаута, а одна мёртвая Apple-подписка (web.push.apple.com; локально отдаёт 400) вызывала вечное зависание TLS-коннекта из Yandex-контейнера. dialog:message висел до 30-секундного лимита контейнера: сообщение записывалось (batch.commit до push), а отправка push погибала — уведомления оставались с pushStatus: pending.
+- Все webpush.sendNotification и FCM sendEachForMulticast обёрнуты в таймаут (10–15 с) в send-push.js и в диалоговом пути user-actions.js; код ошибки webpush/timeout виден в pushStats.
+- actionDialogMessage: этапное production-safe логирование (prepared: получатели/уведомления/причины пропуска; push_result: sent/failed/subscribers/errorCodes) и честный pushStatus: error вместо вечного pending при падении отправки.
+- Мёртвая подписка удалена из профиля владельца; контрольный push после фикса: sent 1/1 за 1.1 с (было 30 с таймаут).
+- Диагностика также показала: у второго тестового аккаунта три несвязанных профиля (VK без согласия / email с живой подпиской / tg со старым FCM-токеном) — пуши уходили на неактивные устройства. Это identity-фрагментация, не баг push-кода.
+**Почему:** production-блокер обмена сообщениями; одна битая подписка любого получателя вешала всю отправку.
+
+---
+
 ## [2026-07-13] fix: rename shopping category label
 **Коммит:** `pending`
 **Файлы:** `src/HomePanelV2.jsx`, `src/NearbyPage.jsx`, `src/MapPage.jsx`, `src/AdminPanel.jsx`, `src/tariffConfig.js`, `src/components/EntityPreviewCard.jsx`, `.ai/17_CHANGELOG_AI.md`
