@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-13] fix: partner/expert Desktop Workspace access
+**Коммит:** `pending`
+**Файлы:** `server-shared/role-engine.js`, `src/workspace/WorkspaceFeatureFlags.js`, `scripts/role-engine-test.mjs`, `scripts/desktop-workspace-test.mjs`
+**Тип:** fix
+**Что изменено:**
+- Роли `partner` и `expert` теперь получают permission `workspace.open` и capability `canUseWorkspace`, а не только доступ к Business Hub.
+- Desktop Workspace rollout по умолчанию переведён с `owner` на `expert`, чтобы партнёры и эксперты видели кнопку Workspace без ручного localStorage-флага.
+- Контрактные тесты закрепляют доступ Workspace для партнёров/экспертов и отсутствие доступа у обычного пользователя.
+**Почему:** пользователь `daria_samarina@mail.ru` был корректно распознан как владелец партнёра через `ownerEmail`, но кнопка Workspace скрывалась, потому что условие показа требовало `canUseWorkspace`, которого у роли `partner` не было.
+
 ## [2026-07-13] feat: device-aware Push Diagnostics для iPhone PWA
 **Коммит:** `pending`
 **Файлы:** `src/pushDiagnostics.js`, `src/ApgHealthPage.jsx`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `server/src/routes/send-push.js`, `.ai/17_CHANGELOG_AI.md`

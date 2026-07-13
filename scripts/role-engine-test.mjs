@@ -30,10 +30,12 @@ const partnerIdentity = { role: 'user', partnerId: 'partner-1' };
 assert.deepEqual(getUserRoles(partnerIdentity).sort(), [ROLES.partner, ROLES.user]);
 assert.equal(hasRole(partnerIdentity, ROLES.partner), true);
 assert.equal(hasCapability(partnerIdentity, CAPABILITIES.canUseBusinessHub), true);
-assert.equal(hasCapability(partnerIdentity, CAPABILITIES.canUseWorkspace), false);
+assert.equal(hasCapability(partnerIdentity, CAPABILITIES.canUseWorkspace), true);
 assert.equal(hasPermission(partnerIdentity, PERMISSIONS.businessProfileManage), true);
+assert.equal(hasPermission(partnerIdentity, PERMISSIONS.workspaceOpen), true);
 
 const expertIdentity = { roles: ['expert'], expertCabinetEnabled: true };
+assert.equal(hasCapability(expertIdentity, CAPABILITIES.canUseWorkspace), true);
 assert.equal(hasCapability(expertIdentity, CAPABILITIES.canManageOwnExpertProfile), true);
 assert.equal(hasPermission(expertIdentity, PERMISSIONS.contentCreate), true);
 

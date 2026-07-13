@@ -11,7 +11,7 @@ import { buildWorkspaceLayout, WORKSPACE_MODES, WORKSPACE_REGIONS } from '../src
 import { getWorkspaceWidgetLayout, moveWorkspaceWidget, WORKSPACE_WIDGETS } from '../src/workspace/WorkspaceWidgets.js';
 
 assert.equal(normalizeWorkspaceFlag('OWNER'), DESKTOP_WORKSPACE_FLAG.owner);
-assert.equal(normalizeWorkspaceFlag('unknown'), DESKTOP_WORKSPACE_FLAG.owner);
+assert.equal(normalizeWorkspaceFlag('unknown'), DESKTOP_WORKSPACE_FLAG.expert);
 assert.equal(canUseDesktopWorkspace({ user: { role: 'user' }, flag: DESKTOP_WORKSPACE_FLAG.off }), false);
 assert.equal(canUseDesktopWorkspace({ user: { isOwner: true }, flag: DESKTOP_WORKSPACE_FLAG.owner }), true);
 assert.equal(canUseDesktopWorkspace({ user: { role: 'super_admin' }, flag: DESKTOP_WORKSPACE_FLAG.owner }), true);
@@ -21,6 +21,9 @@ assert.equal(canUseDesktopWorkspace({ user: { role: 'admin' }, flag: DESKTOP_WOR
 assert.equal(canUseDesktopWorkspace({ user: { role: 'admin' }, flag: DESKTOP_WORKSPACE_FLAG.owner }), false);
 assert.equal(canUseDesktopWorkspace({ user: { role: 'user' }, partner: { id: 'p1' }, flag: DESKTOP_WORKSPACE_FLAG.partner }), true);
 assert.equal(canUseDesktopWorkspace({ user: { role: 'user' }, expert: { id: 'e1' }, flag: DESKTOP_WORKSPACE_FLAG.expert }), true);
+assert.equal(canUseDesktopWorkspace({ user: { role: 'user' }, partner: { id: 'p1' } }), true);
+assert.equal(canUseDesktopWorkspace({ user: { role: 'user' }, expert: { id: 'e1' } }), true);
+assert.equal(canUseDesktopWorkspace({ user: { role: 'user' } }), false);
 assert.deepEqual(getWorkspaceUserRoles({ user: { role: 'super_admin' }, partner: { id: 'p1' } }).sort(), ['partner', 'super_admin']);
 
 assert.equal(isDesktopWorkspaceDevice({ width: 1440, platform: 'MacIntel' }), true);

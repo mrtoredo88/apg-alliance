@@ -69,14 +69,14 @@ export const ROLE_REGISTRY = Object.freeze({
   [ROLES.expert]: {
     rank: 20,
     label: 'Эксперт',
-    permissions: [...BASE_USER_PERMISSIONS, PERMISSIONS.businessHubOpen, PERMISSIONS.businessProfileManage, PERMISSIONS.contentCreate],
-    capabilities: [...BASE_USER_CAPABILITIES, CAPABILITIES.canUseBusinessHub, CAPABILITIES.canManageOwnExpertProfile],
+    permissions: [...BASE_USER_PERMISSIONS, PERMISSIONS.workspaceOpen, PERMISSIONS.businessHubOpen, PERMISSIONS.businessProfileManage, PERMISSIONS.contentCreate],
+    capabilities: [...BASE_USER_CAPABILITIES, CAPABILITIES.canUseWorkspace, CAPABILITIES.canUseBusinessHub, CAPABILITIES.canManageOwnExpertProfile],
   },
   [ROLES.partner]: {
     rank: 30,
     label: 'Партнёр',
-    permissions: [...BASE_USER_PERMISSIONS, PERMISSIONS.businessHubOpen, PERMISSIONS.businessProfileManage, PERMISSIONS.contentCreate],
-    capabilities: [...BASE_USER_CAPABILITIES, CAPABILITIES.canUseBusinessHub, CAPABILITIES.canManageOwnPartnerProfile],
+    permissions: [...BASE_USER_PERMISSIONS, PERMISSIONS.workspaceOpen, PERMISSIONS.businessHubOpen, PERMISSIONS.businessProfileManage, PERMISSIONS.contentCreate],
+    capabilities: [...BASE_USER_CAPABILITIES, CAPABILITIES.canUseWorkspace, CAPABILITIES.canUseBusinessHub, CAPABILITIES.canManageOwnPartnerProfile],
   },
   [ROLES.analyst]: {
     rank: 40,

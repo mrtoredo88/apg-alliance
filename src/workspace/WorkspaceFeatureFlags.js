@@ -18,16 +18,16 @@ const FLAG_ORDER = [
   DESKTOP_WORKSPACE_FLAG.all,
 ];
 
-export function normalizeWorkspaceFlag(value, fallback = DESKTOP_WORKSPACE_FLAG.owner) {
+export function normalizeWorkspaceFlag(value, fallback = DESKTOP_WORKSPACE_FLAG.expert) {
   const normalized = String(value || '').trim().toLowerCase();
   return FLAG_ORDER.includes(normalized) ? normalized : fallback;
 }
 
 export function getDesktopWorkspaceFlag(storage = globalThis.localStorage) {
   try {
-    return normalizeWorkspaceFlag(storage?.getItem?.('apg_desktop_workspace_flag'), DESKTOP_WORKSPACE_FLAG.owner);
+    return normalizeWorkspaceFlag(storage?.getItem?.('apg_desktop_workspace_flag'), DESKTOP_WORKSPACE_FLAG.expert);
   } catch {
-    return DESKTOP_WORKSPACE_FLAG.owner;
+    return DESKTOP_WORKSPACE_FLAG.expert;
   }
 }
 
@@ -48,7 +48,7 @@ export function isWorkspaceOwner({ user, partner, expert } = {}) {
 }
 
 export function canUseDesktopWorkspace({ user, partner, expert, flag } = {}) {
-  const resolvedFlag = normalizeWorkspaceFlag(flag, DESKTOP_WORKSPACE_FLAG.owner);
+  const resolvedFlag = normalizeWorkspaceFlag(flag, DESKTOP_WORKSPACE_FLAG.expert);
   const identity = {
     ...(user || {}),
     partnerId: user?.partnerId || partner?.id,
