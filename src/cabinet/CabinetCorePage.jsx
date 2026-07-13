@@ -18,13 +18,13 @@ import { DigitalShowcaseBuilder } from './DigitalShowcaseBuilder.jsx';
 const MODULES = [
   ['showcase-builder', 'Витрина'],
   ['dashboard', 'Дашборд'],
+  ['dialogs', 'Диалоги'],
   ['tasks', 'Задачи'],
   ['analytics', 'Аналитика'],
   ['media', 'Галерея'],
   ['contacts', 'Контакты'],
   ['content', 'Контент'],
   ['reviews', 'Отзывы'],
-  ['dialogs', 'Диалоги'],
   ['notifications', 'Уведомления'],
   ['loki', 'Локи'],
   ['subscription', 'Подписка'],
@@ -387,7 +387,11 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
   const [reviews, setReviews] = useState([]);
   const [activeModule, setActiveModule] = useState('showcase-builder');
   const [loading, setLoading] = useState(false);
-  const moduleIds = useMemo(() => ['showcase-builder', ...getRoleModuleIds(roleState.roles), 'dialogs'].filter(id => id === 'showcase-builder' || id === 'dashboard' || id === 'tasks' || id === 'analytics' || id === 'media' || id === 'contacts' || id === 'content' || id === 'reviews' || id === 'dialogs' || id === 'notifications' || id === 'loki' || id === 'subscription' || id === 'settings' || id === 'history' || (activeRole?.modules || []).includes(id)), [roleState.roles, activeRole?.id]);
+  const moduleIds = useMemo(() => {
+    const allowed = new Set(['showcase-builder', 'dashboard', 'dialogs', 'tasks', 'analytics', 'media', 'contacts', 'content', 'reviews', 'notifications', 'loki', 'subscription', 'settings', 'history']);
+    const ordered = ['showcase-builder', 'dashboard', 'dialogs', 'tasks', ...getRoleModuleIds(roleState.roles)];
+    return [...new Set(ordered)].filter(id => allowed.has(id) || (activeRole?.modules || []).includes(id));
+  }, [roleState.roles, activeRole?.id]);
 
   useEffect(() => {
     setActiveRoleId(roleState.activeRole?.id || preferredRole);
@@ -482,6 +486,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
           {[
             ['showcase-builder', 'Витрина', '◇'],
             ['dashboard', 'Дашборд', '▦'],
+            ['dialogs', 'Диалоги', '💬'],
             ['tasks', 'Задачи', '✓'],
             ['contacts', 'Контакты', '☎'],
             ['media', 'Медиа', '▣'],

@@ -29,11 +29,12 @@ const WS = {
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Рабочий стол', icon: '🏠', description: 'Что сделать сегодня' },
-  { id: 'growth', label: 'Привлечение клиентов', icon: '📢', description: 'QR, ссылки, промо' },
-  { id: 'content', label: 'Контент', icon: '📰', description: 'Публикации и черновики' },
   { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
+  { id: 'dialogs', label: 'Диалоги', icon: '💬', description: 'Вопросы по объектам', badge: data => data.dialogUnreadCount || 0 },
+  { id: 'content', label: 'Новости', icon: '📰', description: 'Публикации и черновики' },
+  { id: 'growth', label: 'Партнёры', icon: '📢', description: 'QR, ссылки, промо' },
   { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
-  { id: 'clients', label: 'Клиенты', icon: '👥', description: 'CRM-контур', badge: data => data.unreadCount || 0 },
+  { id: 'clients', label: 'Эксперты и клиенты', icon: '👥', description: 'CRM-контур' },
   { id: 'reviews', label: 'Отзывы', icon: '⭐', description: 'Рейтинг и ответы' },
   { id: 'analytics', label: 'Аналитика', icon: '📊', description: 'Метрики и изменения' },
   { id: 'finance', label: 'Финансы', icon: '💰', description: 'Тарифы и документы' },
@@ -165,6 +166,7 @@ function buildWorkspaceContext(activeSection) {
     growth: { label: 'Привлечение клиентов', prompt: 'Как сегодня привести новых клиентов?', next: 'запустить QR, ссылку или промоматериал' },
     content: { label: 'Контент', prompt: 'Что стоит опубликовать?', next: 'проверить новости, статьи и черновики' },
     events: { label: 'Мероприятия', prompt: 'Какие мероприятия требуют внимания?', next: 'проверить календарь и регистрации' },
+    dialogs: { label: 'Диалоги', prompt: 'Какие обращения ждут ответа?', next: 'разобрать вопросы по объектам' },
     offers: { label: 'Акции и предложения', prompt: 'Какие акции сейчас важнее?', next: 'обновить предложения и бонусы' },
     clients: { label: 'Клиенты', prompt: 'С кем нужно поработать сегодня?', next: 'разобрать новых и вернувшихся клиентов' },
     reviews: { label: 'Отзывы', prompt: 'На какие отзывы нужно ответить?', next: 'проверить рейтинг и ответы' },
@@ -274,7 +276,8 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
   const settings = items.filter(item => ['finance', 'notifications', 'settings'].includes(item.id));
   const initial = String(user?.firstName || user?.name || user?.displayName || 'A').slice(0, 1).toUpperCase();
   return (
-    <aside data-workspace-v2-sidebar style={cardStyle({ height: 'calc(100dvh - 102px)', minHeight: 0, position: 'sticky', top: 84, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' })}>
+    <aside data-workspace-v2-sidebar style={cardStyle({ height: 'calc(100dvh - 94px - env(safe-area-inset-bottom, 0px))', minHeight: 0, position: 'sticky', top: 80, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' })}>
+      <style>{`@keyframes workspaceDialogBadgePulse{0%,100%{transform:scale(1);box-shadow:0 0 0 rgba(185,65,53,0)}45%{transform:scale(1.08);box-shadow:0 0 0 6px rgba(185,65,53,0.12)}}`}</style>
       <div style={{ padding: '15px 20px 12px' }}>
         <div style={{ color: WS.text, fontSize: 15, lineHeight: '18px', fontWeight: 930, textTransform: 'uppercase', letterSpacing: 0.7 }}>Workspace</div>
         <div style={{ color: WS.soft, fontSize: 13, lineHeight: '17px', marginTop: 5 }}>Ролевой рабочий кабинет</div>
@@ -291,6 +294,7 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
           </div>
         )}
       </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 0 8px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
       <div style={{ display: 'grid', gap: 1 }}>
         {[main, settings].map((group, groupIndex) => (
           <div key={groupIndex} style={{ display: 'grid', gap: 1 }}>
@@ -304,13 +308,14 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
                     <span style={{ display: 'block', fontSize: 13.3, lineHeight: '16px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
                     <span style={{ display: 'block', color: active ? 'rgba(138,100,34,0.72)' : WS.muted, fontSize: 10.8, lineHeight: '13px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
                   </span>
-                  {!!badge && <span style={{ minWidth: 24, height: 24, borderRadius: 999, background: 'rgba(209,161,76,0.18)', color: '#A8741F', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 920 }}>{badge}</span>}
+                  {!!badge && <span style={{ minWidth: 24, height: 24, borderRadius: 999, background: item.id === 'dialogs' ? '#B94135' : 'rgba(209,161,76,0.18)', color: item.id === 'dialogs' ? '#fff' : '#A8741F', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 920, animation: item.id === 'dialogs' ? 'workspaceDialogBadgePulse 1.8s ease-in-out infinite' : 'none' }}>{badge}</span>}
                 </button>
               );
             })}
             {groupIndex === 0 && <div style={{ height: 4 }} />}
           </div>
         ))}
+      </div>
       </div>
       <div style={{ marginTop: 'auto', padding: 14, display: 'grid', gap: 8 }}>
         <div style={cardStyle({ padding: 10, borderRadius: 16, background: 'rgba(255,252,245,0.86)', boxShadow: 'none' })}>
@@ -483,6 +488,7 @@ function getWorkspaceAction(actions, target) {
     growth: actions.openPartners,
     content: actions.openNews,
     events: actions.openEvents,
+    dialogs: actions.openDialogs,
     offers: actions.openOffers,
     clients: actions.openExperts,
     reviews: actions.openReviews,
@@ -874,6 +880,21 @@ function buildCenterConfig({ id, data, actions, intelligence, businessHubAvailab
       ],
       future: [...baseFuture, 'экспорт участников', 'повторяющиеся события', 'модерация событий'],
     },
+    dialogs: {
+      subtitle: 'Центр контекстных коммуникаций: вопросы по партнёрам, экспертам, мероприятиям, акциям и будущим записям.',
+      metrics: [['Непрочитано', data.dialogUnreadCount || 0, 'сообщения'], ['Входящие', data.dialogNotifications.length || 0, 'диалоги'], ['Контексты', 4, 'типа'], ['Push', 'on', 'доставка']],
+      tasks: [
+        { icon: '💬', title: 'Ответить на новые вопросы', text: data.dialogUnreadCount ? `${data.dialogUnreadCount} сообщений ждут реакции` : 'Новых вопросов пока нет', priority: data.dialogUnreadCount ? 'Важно' : 'Спокойно', tone: data.dialogUnreadCount ? WS.red : WS.green, onClick: () => onOpenPanel?.('dialogs') },
+        { icon: '▣', title: 'Проверить обращения по объектам', text: 'Каждый диалог привязан к партнёру, эксперту, мероприятию или акции', priority: 'Контекст', tone: WS.gold, onClick: () => onOpenPanel?.('dialogs') },
+        { icon: '✦', title: 'Подготовить ответ с Локи', text: 'Локи видит карточку объекта и помогает отвечать точнее', priority: 'AI', tone: WS.blue, onClick: actions.openLoki },
+      ],
+      modules: [
+        { meta: 'Диалоги', title: 'Контекстные обращения', text: 'Один объект — один диалог, без обычного свободного мессенджера.', action: 'Открыть диалоги', onClick: () => onOpenPanel?.('dialogs') },
+        { meta: 'Локи', title: 'Помощь с ответом', text: 'Готовые ответы по данным карточки и истории обращения.', action: 'Открыть Локи', onClick: actions.openLoki },
+        { meta: 'Push', title: 'Уведомления о сообщениях', text: 'Новые сообщения отправляются получателю через существующий push-канал.' },
+      ],
+      future: [...baseFuture, 'SLA ответов', 'назначение сотрудника', 'документы и голосовые сообщения'],
+    },
     offers: {
       subtitle: 'Маркетинговый центр для акций, специальных предложений, подарков, купонов и бонусных программ.',
       metrics: [['Акций', offers.length, 'активно'], ['Ключи', data.userKeys || 0, 'баланс'], ['Подарки', Math.max(1, offers.length), 'механики'], ['Отклики', intelligence.metrics.clicks || 0, 'сигнал']],
@@ -1025,7 +1046,9 @@ export function DesktopWorkspace({
   const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: ownedPartner, expert: ownedExpert, flag: businessHubFlag }), [user, ownedPartner, ownedExpert, businessHubFlag]);
   const activeProfile = activeRole?.id === 'expert' ? ownedExpert : activeRole?.id === 'partner' ? ownedPartner : user;
   const userName = user?.firstName || user?.name || user?.displayName || 'Mr. TOREDO';
-  const workspaceData = useMemo(() => ({ userName, activeProfile, partners, experts, events, news, notifications, unreadCount, userKeys, userCount, homeExperience }), [userName, activeProfile, partners, experts, events, news, notifications, unreadCount, userKeys, userCount, homeExperience]);
+  const dialogNotifications = useMemo(() => notifications.filter(item => (item?.category === 'messages' || item?.type === 'contextDialogMessage') && item?.isRead !== true), [notifications]);
+  const dialogUnreadCount = dialogNotifications.length || 0;
+  const workspaceData = useMemo(() => ({ userName, activeProfile, partners, experts, events, news, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience }), [userName, activeProfile, partners, experts, events, news, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience]);
   const workspaceIntelligence = useMemo(() => buildWorkspaceIntelligence({ data: workspaceData, analytics, activityTimeline, recommendations, dailySummary }), [workspaceData, analytics, activityTimeline, recommendations, dailySummary]);
   const availableWorkspaceViews = useMemo(() => getWorkspaceRoleViews({ roles: roleState.roles, activeRole, ownedPartner, ownedExpert, isAdminRole }), [roleState.roles, activeRole, ownedPartner, ownedExpert, isAdminRole]);
   const workspaceView = availableWorkspaceViews.find(view => view.id === activeWorkspaceViewId) || availableWorkspaceViews[0] || WORKSPACE_ROLE_VIEWS.partner;
@@ -1042,6 +1065,7 @@ export function DesktopWorkspace({
     openReviews: () => setActiveSection('reviews'),
     openOffers: () => setActiveSection('offers'),
     openFinance: () => setActiveSection('finance'),
+    openDialogs: () => setActiveSection('dialogs'),
     openMessages: () => setActiveSection('notifications'),
     openAnalytics: () => setActiveSection('analytics'),
     openLoki: () => onOpenPanel?.('loki'),
