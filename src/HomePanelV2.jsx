@@ -149,6 +149,44 @@ const GlassPanel = {
   ...GlassSection,
 };
 
+function IntelligenceSignalCard({ homeExperience, onOpenLoki, compact = false }) {
+  const main = homeExperience?.smartContext?.mainRecommendation;
+  const insight = homeExperience?.insights?.[0] || homeExperience?.smartContext?.lokiAdvice || '';
+  if (!main && !insight) return null;
+  const title = main?.title || insight;
+  const reasons = main?.explanation || main?.explain || [];
+  return (
+    <button
+      type="button"
+      onClick={onOpenLoki}
+      {...pressMotion}
+      style={{
+        ...GlassCard,
+        width: '100%',
+        border: '1px solid rgba(244,217,140,0.28)',
+        borderRadius: compact ? 24 : 30,
+        padding: compact ? 12 : 15,
+        textAlign: 'left',
+        cursor: onOpenLoki ? 'pointer' : 'default',
+        display: 'grid',
+        gap: compact ? 6 : 8,
+        background: 'radial-gradient(circle at 12% 0%, rgba(244,217,140,0.22), transparent 38%), rgba(var(--apg2-glass-a,255,255,255),0.08)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ ...GlassBadge, color: V2.gold, fontSize: compact ? 9.5 : 11 }}>Локи заметил</span>
+        <span style={{ color: V2.textMuted, fontSize: compact ? 10 : 11, fontWeight: 780 }}>→</span>
+      </div>
+      <div style={{ color: V2.text, fontSize: compact ? 13.2 : 16, lineHeight: compact ? '16px' : '20px', fontWeight: 880, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</div>
+      {reasons.length ? (
+        <div style={{ color: V2.textSoft, fontSize: compact ? 10.4 : 12, lineHeight: compact ? '13px' : '16px', display: '-webkit-box', WebkitLineClamp: compact ? 1 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          Потому что {reasons.slice(0, compact ? 1 : 2).join(', ')}
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
 const GlassHero = {
   ...V2.glowGlass,
   borderRadius: 42,
@@ -1108,6 +1146,9 @@ function V2SecondScreen({
   interestProfile,
   isOffline = false,
   desktopMode = false,
+  homeExperience = null,
+  continueExperience = null,
+  recommendations = null,
 }) {
   if (desktopMode) {
     return (
@@ -1131,6 +1172,9 @@ function V2SecondScreen({
         onOpenNearby={onOpenNearby}
         loading={loading}
         isOffline={isOffline}
+        homeExperience={homeExperience}
+        continueExperience={continueExperience}
+        recommendations={recommendations}
       />
     );
   }
@@ -1149,9 +1193,13 @@ function V2SecondScreen({
       onOpenRewards={onOpenRewards}
       onOpenNews={onOpenNews}
       onOpenNewsItem={onOpenNewsItem}
+      onOpenLoki={onOpenLoki}
       isOffline={isOffline}
       interestProfile={interestProfile}
       desktopMode={desktopMode}
+      homeExperience={homeExperience}
+      continueExperience={continueExperience}
+      recommendations={recommendations}
     />
   );
 }
@@ -1171,9 +1219,11 @@ function V2SecondScreenMobile({
   onOpenTasks,
   onOpenNews,
   onOpenNewsItem,
+  onOpenLoki,
   interestProfile,
   isOffline = false,
   desktopMode = false,
+  homeExperience = null,
 }) {
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
@@ -1273,8 +1323,12 @@ function V2SecondScreenMobile({
           Что интересного сегодня
         </div>
         <div style={{ color: V2.textMuted, fontSize: 14, lineHeight: '22px', fontWeight: 420 }}>
-          Подборка поводов выйти в город и открыть новые места
+          {homeExperience?.insights?.[0] || 'Подборка поводов выйти в город и открыть новые места'}
         </div>
+      </div>
+
+      <div style={{ padding: desktopMode ? '0 0 18px' : '0 22px 22px' }}>
+        <IntelligenceSignalCard homeExperience={homeExperience} onOpenLoki={onOpenLoki} />
       </div>
 
       <div data-apg-horizontal-scroll={!desktopMode ? 'true' : undefined} onTouchStart={e => e.stopPropagation()}>
@@ -1428,6 +1482,8 @@ function V2SecondScreenDesktop({
   onOpenLoki,
   loading = false,
   isOffline = false,
+  homeExperience = null,
+  continueExperience = null,
 }) {
   const desktopWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
@@ -1691,12 +1747,17 @@ function V2SecondScreenDesktop({
       return [];
     }
   }, []);
-  const hasContinueSection = recentActions.length > 0;
+  const intelligenceContinueItems = Array.isArray(continueExperience?.items) ? continueExperience.items : [];
+  const hasContinueSection = intelligenceContinueItems.length > 0 || recentActions.length > 0;
 
   const getRecentActionAction = (row) => {
     if (!row?.type) return undefined;
     if (row.type === 'news') {
       return () => {
+        if (row.item) {
+          onOpenNewsItem?.(row.item);
+          return;
+        }
         if (newsForYou?.[0] && row.id === newsForYou[0].id) {
           onOpenNewsItem?.(newsForYou[0]);
           return;
@@ -1710,9 +1771,9 @@ function V2SecondScreenDesktop({
         }
       };
     }
-    if (row.type === 'event') return () => onOpenEvents?.();
+    if (row.type === 'event') return () => onOpenEvents?.(row.item || undefined);
     if (row.type === 'expert') return () => onOpenExperts?.();
-    if (row.type === 'partner' || row.type === 'offer') return () => onOpenOffers?.();
+    if (row.type === 'partner' || row.type === 'offer') return row.item ? () => onOpenPartner?.(row.item) : () => onOpenOffers?.();
     return undefined;
   };
   const desktopLayout = getDesktopLayout(typeof window === 'undefined' ? 1280 : window.innerWidth);
@@ -2052,16 +2113,19 @@ function V2SecondScreenDesktop({
                   <div>
                     <div style={{ color: V2.text, fontWeight: 850, fontSize: 18, marginBottom: 8 }}>Продолжить</div>
                     <div style={{ display: 'grid', gap: 7 }}>
-                    {recentActions.slice(0, 2).map((row) => (
+                    {(intelligenceContinueItems.length ? intelligenceContinueItems : recentActions).slice(0, 2).map((row) => (
                       <button key={`${row.type}-${row.id}`} type="button" onClick={getRecentActionAction(row)} style={{ ...DesktopDenseTile, border: '1px solid rgba(255,255,255,0.16)', padding: 10, color: V2.text, textAlign: 'left', width: '100%', cursor: getRecentActionAction(row) ? 'pointer' : 'default' }}>
                         <span style={{ color: V2.textMuted, fontSize: 11, textTransform: 'uppercase' }}>{row.type}</span>
-                        <div style={{ marginTop: 4, fontSize: 13, fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</div>
+                        <div style={{ marginTop: 4, fontSize: 13, fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label || row.title || row.item?.title || row.item?.name}</div>
                       </button>
                     ))}
                   </div>
                 </div>
               ) : null}
               <div>
+                <div style={{ marginBottom: 10 }}>
+                  <IntelligenceSignalCard homeExperience={homeExperience} onOpenLoki={onOpenLoki} compact />
+                </div>
                     <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                   <div style={{ color: V2.text, fontWeight: 850, fontSize: 23 }}>Рядом</div>
                   <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Открыть карту</button>
@@ -2836,6 +2900,9 @@ export function HomePanelV2({
   desktopWorkspaceAvailable = false,
   onSwitchAppMode,
   desktopWorkspaceMode = 'user',
+  homeExperience = null,
+  continueExperience = null,
+  recommendations = null,
 }) {
   // Главная показывает только актуальные события: не удалённые/архивные и не завершившиеся, ближайшие первыми
   const events = useMemo(() => selectActualEvents(rawEvents), [rawEvents]);
@@ -2983,6 +3050,7 @@ export function HomePanelV2({
         onSwitchAppMode={onSwitchAppMode}
         desktopWorkspaceMode={desktopWorkspaceMode}
         desktopMode={desktopMode}
+        homeExperience={homeExperience}
       />
 
       {/* Pull-to-refresh indicator */}
@@ -3066,6 +3134,9 @@ export function HomePanelV2({
               loading={loading}
               isOffline={isOffline}
               desktopMode={desktopMode}
+              homeExperience={homeExperience}
+              continueExperience={continueExperience}
+              recommendations={recommendations}
             />
 
           </>

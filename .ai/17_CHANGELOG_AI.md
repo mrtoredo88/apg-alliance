@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-13] feat: launch APG Intelligence Experience
+**Коммит:** `pending`
+**Файлы:** `src/intelligence/IntelligenceService.js`, `src/intelligence/HomeExperienceService.js`, `src/intelligence/ContinueExperience.js`, `src/intelligence/InterestModel.js`, `src/intelligence/recommendationEngine.js`, `src/intelligence/PersonalHomeContext.js`, `src/intelligence/index.js`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/NewsPage.jsx`
+**Тип:** feat
+**Что изменено:**
+- Добавлен единый `IntelligenceService` с методами `getHomeExperience`, `getRecommendations`, `getPersonalInsights`, `getContinueExperience`, `getInterestModel`, `getDailySummary`.
+- Home Experience теперь рассчитывает динамические приоритеты секций, Smart Home Context, Continue Experience, объяснимые рекомендации и Loki advice поверх AI Context/Memory/Timeline.
+- На главной аккуратно показана первая персональная подсказка `Локи заметил`, если есть безопасная рекомендация; существующий UI и сценарии не переписаны.
+**Почему:** после инфраструктурного этапа пользователь должен впервые почувствовать, что АПГ стало персональным и “живым”, без риска для текущих разделов.
+
+---
+
 ## [2026-07-13] feat: connect Intelligence Platform to user scenarios
 **Коммит:** `pending`
 **Файлы:** `src/intelligence/EventBus.js`, `src/intelligence/ActivityTimeline.js`, `src/intelligence/AIMemory.js`, `src/intelligence/AnalyticsCollector.js`, `src/intelligence/AIContextService.js`, `src/intelligence/recommendationEngine.js`, `src/intelligence/PersonalHomeContext.js`, `src/intelligence/index.js`, `src/UserApp.jsx`, `src/NewsPage.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/LokiPage.jsx`

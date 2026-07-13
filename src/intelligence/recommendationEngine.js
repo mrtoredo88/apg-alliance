@@ -8,6 +8,31 @@ function scoreNews(item, weights = {}) {
   return (ageScore * 2) + (Math.log2(popularity + 1) / 3) + (keyword || 0) + signals;
 }
 
+function explainRecommendation(type, item = {}, userContext = {}) {
+  const reasons = [];
+  const category = String(item?.category || item?.categoryLabel || item?.type || '').trim();
+  const id = String(item?.id || '');
+  const recent = userContext.recentActivity || {};
+  const favorites = userContext.preferenceSignals?.favoritePartnerIds || [];
+  if (category && userContext.preferenceSignals?.favoriteCategories?.includes(category)) reasons.push('вы часто взаимодействуете с этой категорией');
+  if (type === 'partner' && favorites.includes(id)) reasons.push('партнёр уже есть в избранном');
+  if (type === 'partner' && item?.offer) reasons.push('у партнёра есть актуальное предложение');
+  if (type === 'event' && userContext.preferenceSignals?.timeOfDay === 'evening') reasons.push('вечером события получают больший приоритет');
+  if ((type === 'event' || type === 'partner') && getDistanceBoost(item) > 0) reasons.push('это находится рядом');
+  if (type === 'event' && isWeekendSoon(new Date(item?.startAt || item?.startsAt || item?.eventDate || item?.date || 0).getTime())) reasons.push('подходит для выходного дня');
+  if (type === 'news' && (item?.priority || item?.pinned)) reasons.push('материал отмечен как важный');
+  if (type === 'expert' && (item?.avgRating || item?.rating)) reasons.push('у эксперта есть рейтинг и отзывы');
+  const recentMap = {
+    news: recent.lastViewedNews,
+    event: recent.lastViewedEvents,
+    partner: recent.lastViewedPartners,
+    expert: recent.lastViewedExperts,
+  };
+  if ((recentMap[type] || []).some(row => String(row?.id || '') === id)) reasons.push('вы уже открывали эту карточку');
+  if (!reasons.length) reasons.push('учитываются свежесть, популярность и ваша недавняя активность');
+  return reasons.slice(0, 4);
+}
+
 function scorePartner(item, userContext = {}) {
   const favorites = new Set([
     ...(Array.isArray(userContext.favorites) ? userContext.favorites : []),
@@ -16,7 +41,7 @@ function scorePartner(item, userContext = {}) {
   const isFavorite = favorites.has(String(item?.id));
   const withPromo = Boolean(item?.offer || item?.promo || item?.discount || item?.specialOffer || item?.actionText);
   const views = Number(item?.views || item?.viewCount || 0);
-  return Number(item?.rating || 0) * 0.4 + (withPromo ? 2 : 0) + (isFavorite ? 1.8 : 0) + Math.log2(views + 1) + getSignals(userContext, 'partner', item);
+  return Number(item?.rating || 0) * 0.4 + (withPromo ? 2 : 0) + (isFavorite ? 1.8 : 0) + Math.log2(views + 1) + getDistanceBoost(item) + getSignals(userContext, 'partner', item);
 }
 
 function scoreExpert(item, userContext = {}) {
@@ -35,7 +60,25 @@ function scoreEvent(item, userContext = {}, now = Date.now()) {
   const limit = Number(item?.maxParticipants || 0);
   const capacityScore = limit > 0 ? Math.max(0, 1 - registrations / limit) * 2 : 1;
   const eveningBoost = userContext.preferenceSignals?.timeOfDay === 'evening' && days <= 2 ? 0.4 : 0;
-  return timeScore + capacityScore + Number(item?.popularity || 0) * 0.2 + eveningBoost + getSignals(userContext, 'event', item);
+  const dayBoost = isWeekendSoon(whenMs) ? 0.35 : 0;
+  return timeScore + capacityScore + Number(item?.popularity || 0) * 0.2 + eveningBoost + dayBoost + getDistanceBoost(item) + getSignals(userContext, 'event', item);
+}
+
+function getDistanceBoost(item = {}) {
+  const raw = item.distanceKm ?? item.distance_km ?? item.distance;
+  const distance = typeof raw === 'string' ? Number(raw.replace(',', '.').replace(/[^\d.]/g, '')) : Number(raw);
+  if (!Number.isFinite(distance) || distance <= 0) return 0;
+  if (distance <= 0.5) return 0.9;
+  if (distance <= 1.5) return 0.6;
+  if (distance <= 3) return 0.35;
+  return 0;
+}
+
+function isWeekendSoon(ms) {
+  if (!Number.isFinite(ms)) return false;
+  const date = new Date(ms);
+  const day = date.getDay();
+  return day === 0 || day === 6;
 }
 
 function getSignals(userContext = {}, type, item = {}) {
@@ -72,6 +115,7 @@ export function recommendNews({ news = [] }, userContext = {}) {
     type: 'news',
     item,
     score: Number(scoreNews(item, userContext).toFixed(3)),
+    explanation: explainRecommendation('news', item, userContext),
   }));
 }
 
@@ -85,6 +129,7 @@ export function recommendPartners({ partners = [] }, userContext = {}) {
     type: 'partner',
     item,
     score: Number(scorePartner(item, userContext).toFixed(3)),
+    explanation: explainRecommendation('partner', item, userContext),
   }));
 }
 
@@ -98,6 +143,7 @@ export function recommendExperts({ experts = [] }, userContext = {}) {
     type: 'expert',
     item,
     score: Number(scoreExpert(item, userContext).toFixed(3)),
+    explanation: explainRecommendation('expert', item, userContext),
   }));
 }
 
@@ -111,6 +157,7 @@ export function recommendEvents({ events = [] }, userContext = {}) {
     type: 'event',
     item,
     score: Number(scoreEvent(item, userContext).toFixed(3)),
+    explanation: explainRecommendation('event', item, userContext),
   }));
 }
 
@@ -124,6 +171,7 @@ export function recommendRewards({ rewards = [] }) {
     type: 'reward',
     item,
     score: Number((item?.keys || 0) || 0),
+    explanation: ['подходит под ваш прогресс по ключам'],
   }));
 }
 
@@ -138,6 +186,7 @@ export function recommendTasks({ tasks = [], completedTaskIds = [] }) {
     type: 'task',
     item,
     score: Number(item?.reward || 0),
+    explanation: ['поможет быстрее продвинуться к следующему достижению'],
   }));
 }
 

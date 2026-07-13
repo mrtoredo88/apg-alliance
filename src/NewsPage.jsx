@@ -1374,6 +1374,21 @@ export function NewsPage({
   }, [news]);
 
   useEffect(() => {
+    const value = query.trim();
+    if (value.length < 3) return undefined;
+    const timer = setTimeout(() => {
+      trackAppEvent('news:search', {
+        type: APG_EVENT_TYPES.APP_ACTION,
+        user,
+        entityType: 'news',
+        entityId: 'search',
+        payload: { query: value, results: prepared.length },
+      });
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [prepared.length, query, user]);
+
+  useEffect(() => {
     const targetId = initialNewsTarget?.id ? String(initialNewsTarget.id) : '';
     if (!targetId) return;
     const target = news.find(item => getNewsLegacyIds(item).includes(targetId));

@@ -7,6 +7,7 @@ import {
   recommendRewards,
   recommendTasks,
 } from './recommendationEngine.js';
+import { buildHomeExperience } from './HomeExperienceService.js';
 
 function timeWindowLabel() {
   const hour = new Date().getHours();
@@ -59,6 +60,16 @@ export function buildPersonalHomeContext({
     return partnerId && aiContext.preferenceSignals.favoritePartnerIds.includes(partnerId);
   });
   const nextAchievementGap = Math.max(0, 10 - (Number(userState.userKeys || 0) % 10));
+  const homeExperience = buildHomeExperience({
+    user,
+    userState,
+    appState,
+    aiContext,
+    aiMemory: appState.aiMemory || {},
+    activityTimeline: appState.activityTimeline || [],
+    interestModel: appState.interestModel || null,
+    now,
+  });
 
   return {
     version: 1,
@@ -95,6 +106,9 @@ export function buildPersonalHomeContext({
       newsCount: Number(Array.isArray(appState.news) ? appState.news.length : 0),
     },
     statusLine: clampText(`У вас ${aiContext.activity.favoritesCount} избранных, ${aiContext.activity.scanCount} сканов, ${aiContext.activity.referralCount} приглашений.`, 180),
+    smartHomeContext: homeExperience.smartContext,
+    dynamicSections: homeExperience.dynamicSections,
+    continueExperience: homeExperience.continueExperience,
     hiddenInsights: {
       welcome: 'Добро пожаловать',
       eventsNearbyToday: nearbyTodayEvents.length,

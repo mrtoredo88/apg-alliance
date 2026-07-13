@@ -6,3 +6,7 @@ export * from './PersonalHomeContext.js';
 export * from './ActivityTimeline.js';
 export * from './AIMemory.js';
 export * from './AnalyticsCollector.js';
+export * from './ContinueExperience.js';
+export * from './HomeExperienceService.js';
+export * from './IntelligenceService.js';
+export * from './InterestModel.js';

@@ -43,11 +43,14 @@ import {
   getAIMemorySnapshot,
   getActivityTimeline,
   getAnalyticsSnapshot,
+  createIntelligenceService,
   subscribeToEvents,
   trackAppEvent,
+  wireContinueExperience,
   wireAIMemory,
   wireActivityTimeline,
   wireAnalyticsCollector,
+  wireInterestModel,
 } from './intelligence/index.js';
 
 const ProfilePanel      = lazy(() => import('./ProfilePanel.jsx').then(m => ({ default: m.ProfilePanel })));
@@ -857,6 +860,8 @@ export function UserApp() {
     wireActivityTimeline();
     wireAIMemory();
     wireAnalyticsCollector();
+    wireContinueExperience();
+    wireInterestModel();
     let timer = null;
     return subscribeToEvents('*', () => {
       if (timer) return;
@@ -2935,6 +2940,47 @@ export function UserApp() {
     source: platformSource,
   }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, joinedGroup, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userKeys, adaptiveInterestProfile]);
 
+  const intelligenceInput = useMemo(() => ({
+    user,
+    activePanel,
+    aiContext,
+    aiMemory: getAIMemorySnapshot(),
+    activityTimeline: getActivityTimeline(80),
+    analytics: getAnalyticsSnapshot(),
+    source: platformSource,
+    userState: {
+      rewards: [],
+      completedTaskIds: completedTasks,
+      customTasks,
+      source: platformSource,
+      favorites,
+      registeredEventIds,
+      savedNews,
+      readLaterNews,
+      referralCount,
+      streak,
+      userKeys,
+    },
+    appState: {
+      activePanel,
+      partners: enrichedPartners,
+      experts,
+      events,
+      news,
+      notifications,
+      customTasks,
+      source: platformSource,
+      location: user?.location || null,
+    },
+  }), [activePanel, aiContext, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
+
+  const intelligenceService = useMemo(() => createIntelligenceService(intelligenceInput), [intelligenceInput]);
+  const homeExperience = useMemo(() => intelligenceService.getHomeExperience(), [intelligenceService]);
+  const recommendations = useMemo(() => intelligenceService.getRecommendations(), [intelligenceService]);
+  const continueExperience = useMemo(() => intelligenceService.getContinueExperience(), [intelligenceService]);
+  const interestModelSnapshot = useMemo(() => intelligenceService.getInterestModel(), [intelligenceService]);
+  const dailySummary = useMemo(() => intelligenceService.getDailySummary(), [intelligenceService]);
+
   const personalHomeContext = useMemo(() => buildPersonalHomeContext({
     user,
     userState: {
@@ -2960,14 +3006,20 @@ export function UserApp() {
       aiMemory: getAIMemorySnapshot(),
       activityTimeline: getActivityTimeline(40),
       analytics: getAnalyticsSnapshot(),
+      interestModel: interestModelSnapshot,
     },
-  }), [completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
+  }), [completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, interestModelSnapshot, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userKeys]);
 
   const lokiAppState = useMemo(() => ({
     activePanel,
     user,
     aiContext,
     personalHomeContext,
+    homeExperience,
+    recommendations,
+    continueExperience,
+    interestModel: interestModelSnapshot,
+    dailySummary,
     aiMemory: getAIMemorySnapshot(),
     activityTimeline: getActivityTimeline(40),
     analytics: getAnalyticsSnapshot(),
@@ -2989,7 +3041,7 @@ export function UserApp() {
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
     workspace: { mode: workspaceMode },
-  }), [activePanel, adaptiveInterestProfile, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, registeredEventIds, savedNews, unreadCount, user, userKeys, workspaceMode]);
+  }), [activePanel, adaptiveInterestProfile, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userKeys, workspaceMode]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -3224,6 +3276,9 @@ export function UserApp() {
     onSwitchAppMode: setAppModePersisted,
     desktopWorkspaceMode: resolvedAppMode,
     personalHomeContext,
+    homeExperience,
+    continueExperience,
+    recommendations,
   };
 
   return (
