@@ -13,6 +13,7 @@ import { buildAdaptiveHomeData } from './interestEngine.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { selectActualEvents } from './eventSchedule.js';
+import { haversine, formatDistance } from './utils/geo.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -58,6 +59,69 @@ const getEntityKey = (item) => String(item?.id ?? `${item?.title ?? ''}-${item?.
 const pickPrimaryEvent = (events = []) => {
   const normalized = Array.isArray(events) ? events : [];
   return normalized.find(event => contentImageOf(event)) ?? normalized[0] ?? null;
+};
+
+const toFiniteNumber = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const getEntityCoords = (item = {}) => {
+  if (!item || typeof item !== 'object') return null;
+  const lat = toFiniteNumber(item.latitude ?? item.lat ?? item.coords?.lat ?? item.location?.lat);
+  const lon = toFiniteNumber(item.longitude ?? item.lon ?? item.lng ?? item.long ?? item.coords?.lon ?? item.coords?.lng ?? item.location?.lon ?? item.location?.lng);
+  if (lat == null || lon == null) return null;
+  return { lat, lon };
+};
+
+const getUserCoords = (user = {}) => getEntityCoords(user?.location || user);
+
+const parseDistanceKm = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const text = String(value || '').replace(',', '.').trim();
+  const match = text.match(/([\d.]+)/);
+  if (!match) return null;
+  const num = Number(match[1]);
+  if (!Number.isFinite(num)) return null;
+  return /м\b/i.test(text) && !/км/i.test(text) ? num / 1000 : num;
+};
+
+const getEntityDistanceKm = (item, userCoords) => {
+  const coords = getEntityCoords(item);
+  if (coords && userCoords) return haversine(userCoords.lat, userCoords.lon, coords.lat, coords.lon);
+  return parseDistanceKm(item?.distance ?? item?._dist);
+};
+
+const formatNearbyDistance = (distanceKm) => {
+  if (!Number.isFinite(Number(distanceKm))) return 'город';
+  return formatDistance(Number(distanceKm));
+};
+
+const isTodayEntity = (item = {}) => {
+  const raw = item.eventDate || item.date || item.startDate || item.datetime || item.createdAt;
+  const date = raw?.toDate ? raw.toDate() : raw ? new Date(raw) : null;
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    const today = new Date();
+    const day = String(today.getDate());
+    const month = today.toLocaleDateString('ru-RU', { month: 'long' });
+    return String(raw || '').toLowerCase().includes(day) && String(raw || '').toLowerCase().includes(month);
+  }
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+};
+
+const isEntityOpenNow = (item = {}) => Boolean(item.openNow || item.isOpenNow || item.status === 'open' || item.workStatus === 'open');
+
+const getPopularityScore = (item = {}) => Number(item.views || item.viewCount || item.visits || item.scanCount || item.rating || item.avgRating || item.participants || 0) || 0;
+
+const openRouteForEntity = (item = {}) => {
+  const coords = getEntityCoords(item);
+  if (coords) {
+    openUrl(`https://yandex.ru/maps/?pt=${coords.lon},${coords.lat}&z=16&l=map`);
+    return;
+  }
+  const address = item.address || item.place || item.locationText;
+  if (address) openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(`${address}, Зеленоград`)}`);
 };
 
 const V2 = {
@@ -1127,6 +1191,7 @@ function V2FirstScreenDesktop({
 function V2SecondScreen({
   user,
   partners,
+  favorites = [],
   experts = [],
   events,
   news,
@@ -1155,6 +1220,7 @@ function V2SecondScreen({
       <V2SecondScreenDesktop
         user={user}
         partners={partners}
+        favorites={favorites}
         experts={experts}
         events={events}
         news={news}
@@ -1466,6 +1532,7 @@ function V2SecondScreenMobile({
 function V2SecondScreenDesktop({
   user,
   partners = [],
+  favorites = [],
   experts = [],
   events = [],
   news = [],
@@ -1484,6 +1551,7 @@ function V2SecondScreenDesktop({
   isOffline = false,
   homeExperience = null,
   continueExperience = null,
+  recommendations = null,
 }) {
   const desktopWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
@@ -1530,7 +1598,6 @@ function V2SecondScreenDesktop({
   const afishaTileHeight = afishaColumns === 1 ? 172 : afishaColumns === 2 ? 154 : 136;
   const compactPartnerColumns = desktopWidth >= 1728 ? 4 : desktopWidth >= 1280 ? 3 : 2;
   const compactExpertsColumns = compactPartnerColumns;
-  const compactNearbyColumns = compactPartnerColumns;
   const mainNews = newsForYou[0] || null;
   const dayOffer = offers[0] || null;
   const partnerOfDay = featuredPartner || nearbyPartners[0] || null;
@@ -1693,49 +1760,85 @@ function V2SecondScreenDesktop({
     });
     return cards;
   }, [dayOffer, getNewsCategoryLabel, getNewsImage, mainNews, onOpenEvents, onOpenExperts, onOpenOffers, onOpenPartner, primaryEvent, sideNews, topExperts]);
+  const userCoords = useMemo(() => getUserCoords(user), [user]);
   const nearbyObjects = useMemo(() => {
-    const list = [];
-    if (nearbyPartners[0]) {
-      const partner = nearbyPartners[0];
-      list.push({
-        type: 'partner',
-        key: `nearby-partner-${partner?.id || 0}`,
-        title: partner.name || 'Партнёр',
-        subtitle: partner.categoryLabel || (CATEGORIES.find(c => c.id === partner?.category)?.label) || 'Городской партнёр',
-        image: profileImageOf(partner),
-        meta: partner.offer || 'Откройте карту',
-        action: () => onOpenPartner?.(partner),
-      });
-    }
-    const extraEvent = eventsWithoutHero.find((event) => getEntityKey(event) !== getEntityKey(primaryEvent || {}));
-    if (extraEvent) {
-      list.push({
-        type: 'event',
-        key: `nearby-event-${extraEvent.id || 0}`,
-        title: extraEvent.title || 'Мероприятие',
-        subtitle: 'Мероприятие',
-        detail: `${eventDayParts(extraEvent).time} · ${eventDayParts(extraEvent).place}`,
-        image: contentImageOf(extraEvent),
-        meta: `${eventDayParts(extraEvent).place} · ${formatEventPrice(extraEvent) || 'Бесплатно'}`,
-        action: () => onOpenEvents?.(),
-      });
-    }
-    const nearbyExpert = topExperts[0] || null;
-    if (nearbyExpert) {
-      const expert = nearbyExpert;
-      list.push({
-        type: 'expert',
-        key: `nearby-expert-${expert?.id || 0}`,
-        title: expert.name || 'Эксперт',
-        subtitle: expert.specialization || expert.category || 'Профессиональная помощь',
-        detail: expert.rating ? `${expert.rating.toFixed(1)} ★` : 'Записаться',
-        image: profileImageOf(expert),
-        meta: expert.rating ? `${expert.rating.toFixed(1)} ★` : 'Записаться',
-        action: () => onOpenExperts?.(),
-      });
-    }
-    return list.slice(0, 4);
-  }, [allEvents, onOpenEvents, onOpenExperts, onOpenPartner, primaryEvent, nearbyPartners, topExperts]);
+    const favoriteIds = new Set((Array.isArray(favorites) ? favorites : []).map(String));
+    const recommendationIds = new Set([
+      ...(recommendations?.partners || []),
+      ...(recommendations?.events || []),
+      ...(recommendations?.experts || []),
+      ...(homeExperience?.recommendations?.partners || []),
+      ...(homeExperience?.recommendations?.events || []),
+      ...(homeExperience?.recommendations?.experts || []),
+    ].map(row => String(row?.id || row?.item?.id || '')).filter(Boolean));
+
+    const enrich = (item, type, index) => {
+      const id = String(item?.id || getEntityKey(item) || `${type}-${index}`);
+      const distanceKm = getEntityDistanceKm(item, userCoords);
+      const hasCoords = Boolean(getEntityCoords(item));
+      const isFavorite = favoriteIds.has(id);
+      const hasOffer = Boolean(item?.offer || item?.discount || item?.promo);
+      const today = type === 'event' && isTodayEntity(item);
+      const openNow = isEntityOpenNow(item);
+      const recommendationBoost = recommendationIds.has(id) ? 0.2 : 0;
+      const popularity = getPopularityScore(item);
+      const score = (Number.isFinite(distanceKm) ? distanceKm : 999)
+        - (openNow ? 0.28 : 0)
+        - (today ? 0.24 : 0)
+        - (isFavorite ? 0.18 : 0)
+        - (hasOffer ? 0.12 : 0)
+        - recommendationBoost
+        - Math.min(popularity / 10000, 0.08);
+      return {
+        item,
+        type,
+        id,
+        key: `nearby-${type}-${id}`,
+        title: titleOf(item, type === 'event' ? 'Мероприятие' : type === 'expert' ? 'Эксперт' : 'Партнёр'),
+        subtitle: type === 'event'
+          ? `${eventDayParts(item).time} · ${eventDayParts(item).place}`
+          : type === 'expert'
+            ? (item.specialization || item.category || 'Эксперт поблизости')
+            : (item.categoryLabel || (CATEGORIES.find(c => c.id === item?.category)?.label) || 'Партнёр поблизости'),
+        meta: Number.isFinite(distanceKm) ? formatNearbyDistance(distanceKm) : (item.address || item.offer || 'город'),
+        badge: type === 'event' ? (today ? 'Сегодня' : 'Событие') : type === 'expert' ? 'Эксперт' : hasOffer ? 'Акция' : 'Место',
+        distanceKm,
+        hasCoords,
+        hasOffer,
+        today,
+        openNow,
+        isFavorite,
+        score,
+        popularity,
+      };
+    };
+
+    return [
+      ...(Array.isArray(partners) ? partners : []).filter(Boolean).map((item, index) => enrich(item, 'partner', index)),
+      ...(Array.isArray(allEvents) ? allEvents : []).filter(Boolean).map((item, index) => enrich(item, 'event', index)),
+      ...(Array.isArray(experts) ? experts : []).filter(Boolean).map((item, index) => enrich(item, 'expert', index)),
+    ]
+      .sort((a, b) => a.score - b.score || Number(b.openNow) - Number(a.openNow) || Number(b.today) - Number(a.today) || Number(b.isFavorite) - Number(a.isFavorite) || Number(b.hasOffer) - Number(a.hasOffer) || b.popularity - a.popularity)
+      .slice(0, 4);
+  }, [allEvents, eventDayParts, experts, favorites, homeExperience, partners, recommendations, titleOf, userCoords]);
+  const nearbySummary = useMemo(() => ({
+    partners: nearbyObjects.filter(item => item.type === 'partner').length || (Array.isArray(partners) ? partners.length : 0),
+    eventsToday: (Array.isArray(allEvents) ? allEvents : []).filter(isTodayEntity).length,
+    experts: nearbyObjects.filter(item => item.type === 'expert').length || (Array.isArray(experts) ? experts.length : 0),
+    offers: (Array.isArray(partners) ? partners : []).filter(partner => partner?.offer || partner?.discount || partner?.promo).length,
+    hasCoords: nearbyObjects.some(item => item.hasCoords),
+  }), [allEvents, experts, nearbyObjects, partners]);
+  const handleNearbyPrimaryAction = useCallback((entry) => {
+    if (!entry) return;
+    addRecentAction(entry.item, entry.type);
+    if (entry.type === 'partner') onOpenPartner?.(entry.item);
+    else if (entry.type === 'event') onOpenEvents?.(entry.item);
+    else onOpenExperts?.();
+  }, [addRecentAction, onOpenEvents, onOpenExperts, onOpenPartner]);
+  const handleNearbyRoute = useCallback((entry) => {
+    if (!entry) return;
+    openRouteForEntity(entry.item);
+  }, []);
   const recentActions = useMemo(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -2123,46 +2226,123 @@ function V2SecondScreenDesktop({
                 </div>
               ) : null}
               <div>
-                <div style={{ marginBottom: 10 }}>
-                  <IntelligenceSignalCard homeExperience={homeExperience} onOpenLoki={onOpenLoki} compact />
-                </div>
-                    <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                   <div style={{ color: V2.text, fontWeight: 850, fontSize: 23 }}>Рядом</div>
                   <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Открыть карту</button>
                 </div>
-                  <div style={{ ...DesktopDenseTile, padding: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactNearbyColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
-                    {nearbyObjects.length === 0 ? (
-                      <div style={{ color: V2.textMuted, fontSize: 12 }}>Сейчас поблизости нет новых объектов.</div>
-                    ) : nearbyObjects.map((item) => (
+                <div style={{ ...DesktopDenseTile, padding: 10, display: 'grid', gap: 8 }}>
+                  {nearbySummary.hasCoords ? (
                     <button
-                        key={item.key}
-                        type="button"
-                        onClick={item.action}
+                      type="button"
+                      onClick={onOpenNearby}
+                      style={{
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: 15,
+                        minHeight: 32,
+                        padding: '5px 8px',
+                        background: 'radial-gradient(circle at 16% 50%, rgba(244,217,140,0.24), transparent 18%), linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05))',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        alignItems: 'center',
+                        gap: 8,
+                        cursor: 'pointer',
+                        color: V2.text,
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                        {nearbyObjects.filter(item => item.hasCoords).slice(0, 4).map((item, index) => (
+                          <span key={`${item.key}-dot`} style={{ width: 7 + index, height: 7 + index, borderRadius: 99, background: index === 0 ? V2.gold : 'rgba(255,255,255,0.48)', boxShadow: index === 0 ? '0 0 14px rgba(244,217,140,0.62)' : 'none' }} />
+                        ))}
+                        <span style={{ color: V2.textSoft, fontSize: 10.4, lineHeight: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {nearbyObjects[0]?.meta ? `Ближайшее: ${nearbyObjects[0].meta}` : 'Объекты на карте'}
+                        </span>
+                      </span>
+                      <span style={{ color: V2.gold, fontSize: 10.5, fontWeight: 820 }}>Карта</span>
+                    </button>
+                  ) : null}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+                    {[
+                      ['📍', nearbySummary.partners, 'партнёров'],
+                      ['🎉', nearbySummary.eventsToday, 'сегодня'],
+                      ['👨‍💼', nearbySummary.experts, 'экспертов'],
+                      ['🎁', nearbySummary.offers, 'акций'],
+                    ].map(([icon, value, label]) => (
+                      <div key={label} style={{ borderRadius: 12, padding: '6px 5px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', minWidth: 0 }}>
+                        <div style={{ color: V2.text, fontSize: 12, fontWeight: 860, lineHeight: '13px', whiteSpace: 'nowrap' }}>{icon} {value}</div>
+                        <div style={{ color: V2.textMuted, fontSize: 8.8, lineHeight: '10px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {nearbyObjects.length === 0 ? (
+                      <button type="button" onClick={onOpenNearby} style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, background: 'rgba(255,255,255,0.07)', padding: 11, color: V2.text, textAlign: 'left', cursor: 'pointer' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 850, lineHeight: '16px' }}>Сегодня рядом новых событий нет.</div>
+                        <div style={{ color: V2.textSoft, fontSize: 11, lineHeight: '14px', marginTop: 4 }}>Посмотрите популярные места в городе.</div>
+                      </button>
+                    ) : nearbyObjects.slice(0, nearbySummary.hasCoords ? 3 : 4).map((entry) => (
+                    <div
+                        key={entry.key}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleNearbyPrimaryAction(entry)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') handleNearbyPrimaryAction(entry);
+                        }}
                         style={{
-                          ...DesktopDenseTile,
-                          border: 'none',
+                          border: '1px solid rgba(255,255,255,0.11)',
+                          background: 'rgba(255,255,255,0.07)',
+                          borderRadius: 14,
                           color: V2.text,
-                          minHeight: compactSectionTileHeight,
-                          height: '100%',
-                          padding: 10,
+                          minHeight: 42,
+                          padding: '7px 8px',
                           textAlign: 'left',
                           cursor: 'pointer',
                           display: 'grid',
-                          gridTemplateRows: '44px auto auto',
-                          gap: 6,
-                          alignItems: 'start',
+                          gridTemplateColumns: '1fr auto',
+                          gap: 8,
+                          alignItems: 'center',
+                          minWidth: 0,
                         }}
                       >
-                        <div style={{ width: '100%', height: 50, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.12)' }}>
-                          {item.image ? <img src={item.image} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+                        <div style={{ minWidth: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 7, alignItems: 'center' }}>
+                          <span style={{ width: 28, height: 28, borderRadius: 10, display: 'grid', placeItems: 'center', background: entry.type === 'event' ? 'rgba(244,217,140,0.16)' : entry.type === 'expert' ? 'rgba(101,163,255,0.16)' : 'rgba(106,224,174,0.13)', border: '1px solid rgba(255,255,255,0.13)', fontSize: 14 }}>
+                            {entry.type === 'event' ? '🎉' : entry.type === 'expert' ? '👨‍💼' : '📍'}
+                          </span>
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                              <span style={{ color: V2.text, fontSize: 12.2, fontWeight: 850, lineHeight: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.title}</span>
+                              <span style={{ color: entry.today || entry.hasOffer ? V2.gold : V2.textMuted, fontSize: 9.1, fontWeight: 820, whiteSpace: 'nowrap' }}>{entry.badge}</span>
+                            </span>
+                            <span style={{ display: 'block', color: V2.textSoft, fontSize: 9.8, lineHeight: '12px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.subtitle}</span>
+                          </span>
                         </div>
-                        <div style={{ minWidth: 0 }}>
-                        <div style={{ color: V2.text, fontSize: 11.7, fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '15px' }}>{item.title}</div>
-                        <div style={{ color: V2.textSoft, fontSize: 10.3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '12px' }}>{item.subtitle}</div>
-                        <div style={{ color: V2.textMuted, fontSize: 9.9, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '12px' }}>{item.meta}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'end', minWidth: 0 }}>
+                          <span style={{ color: V2.gold, fontSize: 10.3, fontWeight: 850, whiteSpace: 'nowrap' }}>{entry.meta}</span>
+                          {(entry.hasCoords || entry.item?.address || entry.item?.place) ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleNearbyRoute(entry);
+                              }}
+                              style={{ ...GlassButton, minHeight: 25, padding: '0 7px', fontSize: 9.5, borderRadius: 10 }}
+                            >
+                              Маршрут
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleNearbyPrimaryAction(entry);
+                            }}
+                            style={{ ...GlassButton, minHeight: 25, padding: '0 7px', fontSize: 9.5, borderRadius: 10, color: entry.type === 'event' ? '#17120a' : V2.text, background: entry.type === 'event' ? V2.goldMetal : GlassButton.background }}
+                          >
+                            {entry.type === 'event' ? 'Записаться' : 'Открыть'}
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -3115,6 +3295,7 @@ export function HomePanelV2({
           <>
             <V2SecondScreen
               user={user}
+              favorites={favorites}
               partners={adaptiveHome.partners}
               experts={adaptiveHome.experts}
               events={adaptiveHome.events}
