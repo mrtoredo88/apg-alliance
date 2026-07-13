@@ -29,6 +29,7 @@ function toActionEntityType(action = '') {
     .replace('task', 'task')
     .replace('prize', 'reward')
     .replace('loki', 'system')
+    .replace('dialog', 'dialog')
     .replace('raffle', 'reward')
     .replace('economy', 'user')
     .replace('guest', 'user')
@@ -96,6 +97,8 @@ function normalizeEventFromAction(action, payload = {}, result = {}) {
     }
   } else if (namespace === 'publicQr' || namespace === 'qr') {
     type = APG_EVENT_TYPES.QR_SCANNED;
+  } else if (namespace === 'dialog') {
+    type = APG_EVENT_TYPES.APP_ACTION;
   } else if (normalized === 'reward:claim') {
     type = APG_EVENT_TYPES.REWARD_CLAIMED;
   } else if (normalized === 'raffle:enter') {

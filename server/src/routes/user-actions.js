@@ -4,8 +4,15 @@ import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrat
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
 import { buildIdentityDiagnostics, resolveFirebaseIdentity } from '../lib/identityCore.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
+import {
+  CONTEXT_DIALOG_TYPES,
+  buildContextDialogId,
+  buildDialogContext,
+  normalizeDialogType,
+} from '../../../server-shared/context-dialogs.js';
 
 const MAX_TEXT = 4000;
+const MAX_DIALOG_TEXT = 1800;
 
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
@@ -1154,6 +1161,208 @@ async function actionGuestSession(db, req, actor) {
   return { ok: true };
 }
 
+function uniqueSafeIds(values = []) {
+  return [...new Set(values.map(safeUserId).filter(Boolean))];
+}
+
+function actorName(actor = {}) {
+  return safeString(
+    actor.user?.displayName
+    || [actor.user?.firstName || actor.user?.first_name, actor.user?.lastName || actor.user?.last_name].filter(Boolean).join(' ')
+    || actor.user?.name
+    || actor.user?.email
+    || 'Участник АПГ',
+    160,
+  );
+}
+
+function serverDialogContextFromDoc(type, objectId, data, payloadContext = {}) {
+  const { ownerUserIds, ownerIds, ownerId, ownerUserId, userId, managerUserId, createdByUserId, ...clientContext } = payloadContext || {};
+  const context = buildDialogContext(type, { id: objectId, ...clientContext, ...(data || {}) }, { objectId, source: 'user-action' });
+  if (!context) return null;
+  return { ...context, ownerUserIds: uniqueSafeIds(context.ownerUserIds || []) };
+}
+
+async function resolveDialogContext(db, req) {
+  const type = normalizeDialogType(req.body?.type || req.body?.context?.type);
+  const meta = CONTEXT_DIALOG_TYPES[type];
+  const objectId = safeString(req.body?.objectId || req.body?.context?.objectId || req.body?.context?.[meta?.idField], 220);
+  if (!type || !objectId || !meta) {
+    throw Object.assign(new Error('Для диалога нужен корректный тип и объект.'), { statusCode: 400, code: 'BAD_DIALOG_CONTEXT' });
+  }
+  let data = null;
+  if (meta.collection && !['bookings', 'reviews', 'orders', 'support'].includes(meta.collection)) {
+    const snap = await db.collection(meta.collection).doc(objectId).get().catch(() => null);
+    data = snap?.exists ? snap.data() : null;
+  }
+  const context = serverDialogContextFromDoc(type, objectId, data || {}, req.body?.context || {});
+  if (!context) throw Object.assign(new Error('Не удалось сформировать контекст диалога.'), { statusCode: 400, code: 'BAD_DIALOG_CONTEXT' });
+  return context;
+}
+
+function dialogParticipants(actor, context = {}, existing = []) {
+  return uniqueSafeIds([actor.userId, actor.uid, ...(context.ownerUserIds || []), ...(existing || [])]);
+}
+
+function dialogMirrorPayload(dialog, participantId) {
+  return {
+    dialogId: dialog.id,
+    type: dialog.type,
+    objectId: dialog.objectId,
+    context: dialog.context,
+    participantIds: dialog.participantIds,
+    userId: dialog.userId,
+    ownerUserIds: dialog.ownerUserIds || [],
+    lastMessage: dialog.lastMessage || null,
+    lastMessageAt: dialog.lastMessageAt || null,
+    unreadCount: Number(dialog.unreadBy?.[participantId] || 0),
+    typing: dialog.typing || {},
+    createdAt: dialog.createdAt || FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+async function mirrorDialog(db, dialog) {
+  const batch = db.batch();
+  for (const participantId of dialog.participantIds || []) {
+    batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialog.id), dialogMirrorPayload(dialog, participantId), { merge: true });
+  }
+  await batch.commit();
+}
+
+async function actionDialogOpen(db, req, actor) {
+  const context = await resolveDialogContext(db, req);
+  const dialogId = buildContextDialogId(actor.userId, context.type, context.objectId);
+  if (!dialogId) throw Object.assign(new Error('Не удалось создать ID диалога.'), { statusCode: 400, code: 'BAD_DIALOG_ID' });
+  const ref = db.collection('contextDialogs').doc(dialogId);
+  let dialog = null;
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const before = snap.exists ? snap.data() || {} : {};
+    const participantIds = dialogParticipants(actor, context, before.participantIds || []);
+    dialog = {
+      id: dialogId,
+      type: context.type,
+      objectId: context.objectId,
+      userId: before.userId || actor.userId,
+      context,
+      participantIds,
+      ownerUserIds: uniqueSafeIds(context.ownerUserIds || []),
+      unreadBy: before.unreadBy || {},
+      typing: before.typing || {},
+      lastMessage: before.lastMessage || null,
+      lastMessageAt: before.lastMessageAt || null,
+      createdAt: before.createdAt || FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    tx.set(ref, dialog, { merge: true });
+  });
+  await mirrorDialog(db, dialog);
+  await audit(db, req, actor, 'dialog:open', 'contextDialog', dialogId, 'success', { type: context.type, objectId: context.objectId });
+  return { ok: true, dialogId, type: context.type, objectId: context.objectId };
+}
+
+async function getDialogForActor(db, dialogId, actor) {
+  const ref = db.collection('contextDialogs').doc(dialogId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Диалог не найден.'), { statusCode: 404, code: 'DIALOG_NOT_FOUND' });
+  const dialog = { id: snap.id, ...(snap.data() || {}) };
+  const storedParticipants = uniqueSafeIds(dialog.participantIds || []);
+  const ownerIds = uniqueSafeIds(dialog.ownerUserIds || dialog.context?.ownerUserIds || []);
+  const allowed = storedParticipants.includes(actor.userId) || storedParticipants.includes(actor.uid) || ownerIds.includes(actor.userId);
+  if (!allowed) {
+    throw Object.assign(new Error('Нет доступа к диалогу.'), { statusCode: 403, code: 'DIALOG_FORBIDDEN' });
+  }
+  const participantIds = dialogParticipants(actor, dialog.context || {}, storedParticipants);
+  return { ref, dialog, participantIds };
+}
+
+async function actionDialogMessage(db, req, actor) {
+  const dialogId = safeString(req.body?.dialogId, 260);
+  const text = safeString(req.body?.text, MAX_DIALOG_TEXT);
+  const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments.slice(0, 8).map(item => ({
+    type: safeString(item?.type || 'image', 40),
+    url: safeString(item?.url, 1200),
+    name: safeString(item?.name, 180),
+  })).filter(item => item.url) : [];
+  if (!dialogId) throw Object.assign(new Error('Не указан диалог.'), { statusCode: 400 });
+  if (!text && !attachments.length) throw Object.assign(new Error('Сообщение пустое.'), { statusCode: 400 });
+  const { ref, dialog, participantIds } = await getDialogForActor(db, dialogId, actor);
+  const senderRole = req.body?.senderRole === 'loki' ? 'loki' : (dialog.ownerUserIds || []).includes(actor.userId) ? 'owner' : 'user';
+  const messageRef = ref.collection('messages').doc();
+  const message = {
+    id: messageRef.id,
+    dialogId,
+    type: dialog.type,
+    objectId: dialog.objectId,
+    context: dialog.context,
+    text,
+    attachments,
+    senderId: actor.userId,
+    senderName: actorName(actor),
+    senderRole,
+    status: 'delivered',
+    readBy: { [actor.userId]: true },
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const unreadBy = { ...(dialog.unreadBy || {}) };
+  participantIds.forEach(id => { unreadBy[id] = id === actor.userId ? 0 : Number(unreadBy[id] || 0) + 1; });
+  const lastMessage = { id: message.id, text, senderId: actor.userId, senderName: message.senderName, senderRole, createdAt: FieldValue.serverTimestamp() };
+  const typing = { ...(dialog.typing || {}), [actor.userId]: false };
+  const batch = db.batch();
+  batch.set(messageRef, message, { merge: true });
+  batch.set(ref, { participantIds, lastMessage, lastMessageAt: FieldValue.serverTimestamp(), unreadBy, typing, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  participantIds.forEach(participantId => {
+    batch.set(db.collection('users').doc(participantId).collection('contextDialogMessages').doc(message.id), message, { merge: true });
+    batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialogId), dialogMirrorPayload({ ...dialog, id: dialogId, participantIds, unreadBy, lastMessage, lastMessageAt: FieldValue.serverTimestamp(), typing }, participantId), { merge: true });
+  });
+  participantIds.filter(id => id !== actor.userId).forEach(participantId => {
+    batch.set(db.collection('notifications').doc(), {
+      userId: participantId,
+      targetUserId: participantId,
+      type: 'contextDialogMessage',
+      category: 'messages',
+      title: dialog.context?.title || 'Новое сообщение',
+      text: text || 'Новое вложение',
+      dialogId,
+      dialogType: dialog.type,
+      objectId: dialog.objectId,
+      isRead: false,
+      pushStatus: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  await audit(db, req, actor, 'dialog:message', 'contextDialog', dialogId, 'success', { senderRole, type: dialog.type, objectId: dialog.objectId });
+  return { ok: true, dialogId, messageId: message.id, senderRole };
+}
+
+async function actionDialogRead(db, req, actor) {
+  const dialogId = safeString(req.body?.dialogId, 260);
+  const { ref, dialog, participantIds } = await getDialogForActor(db, dialogId, actor);
+  const unreadBy = { ...(dialog.unreadBy || {}), [actor.userId]: 0 };
+  await ref.set({ unreadBy, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await mirrorDialog(db, { ...dialog, id: dialogId, participantIds, unreadBy });
+  return { ok: true, dialogId };
+}
+
+async function actionDialogTyping(db, req, actor) {
+  const dialogId = safeString(req.body?.dialogId, 260);
+  const typing = req.body?.typing === true;
+  const { ref, dialog, participantIds } = await getDialogForActor(db, dialogId, actor);
+  const nextTyping = { ...(dialog.typing || {}), [actor.userId]: typing };
+  await ref.set({ typing: nextTyping, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await mirrorDialog(db, { ...dialog, id: dialogId, participantIds, typing: nextTyping });
+  return { ok: true, dialogId, typing };
+}
+
+async function actionDialogAiAssist(db, req, actor) {
+  const enabled = req.body?.enabled === true;
+  await db.collection('users').doc(actor.userId).set({ contextDialogAiAssist: enabled, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  return { ok: true, enabled };
+}
+
 async function routeAction(db, req, actor) {
   const action = safeString(req.body?.action, 80);
   if (action === 'auth:linkUser') return actionAuthLink(db, req, actor);
@@ -1183,6 +1392,11 @@ async function routeAction(db, req, actor) {
   if (action === 'expert:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'expert');
   if (action === 'loki:settings') return actionLokiSettings(db, req, actor);
   if (action === 'loki:analytics') return actionLokiAnalytics(db, req, actor);
+  if (action === 'dialog:open') return actionDialogOpen(db, req, actor);
+  if (action === 'dialog:message') return actionDialogMessage(db, req, actor);
+  if (action === 'dialog:read') return actionDialogRead(db, req, actor);
+  if (action === 'dialog:typing') return actionDialogTyping(db, req, actor);
+  if (action === 'dialog:aiAssist') return actionDialogAiAssist(db, req, actor);
   if (action === 'log:error') return actionLogCreate(db, req, actor, 'errorLogs', 'api.user-actions');
   if (action === 'log:diagnostic') return actionLogCreate(db, req, actor, 'diagnostics', 'api.user-actions');
   if (action === 'guest:session') return actionGuestSession(db, req, actor);

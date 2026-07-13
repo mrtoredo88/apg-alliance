@@ -169,7 +169,7 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   );
 }
 
-function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan }) {
+function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan, onAskQuestion }) {
   expert = normalizeExpertRecord(expert);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
@@ -354,6 +354,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       expert.vkUrl && { label: 'VK', icon: '🔵', onClick: () => openExpertContact(expert.vkUrl, 'vk', { platform: 'vk' }) },
       expert.telegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openExpertContact(expert.telegramUrl, 'telegram', { platform: 'telegram' }) },
       expert.maxUrl && { label: 'MAX', icon: '💬', onClick: () => openExpertContact(expert.maxUrl, 'max', { platform: 'max' }) },
+      onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(expert), tone: 'gold' },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
 
@@ -854,7 +855,7 @@ const FILTERS = [
   { id: 'group',   label: 'Группа', emoji: '👥' },
 ];
 
-export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen }) {
+export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen, onAskQuestion }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -997,6 +998,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             onClose={() => setSelected(null)}
             variant={variant}
             onScan={onScan}
+            onAskQuestion={onAskQuestion}
           />
         )}
       </>
@@ -1095,6 +1097,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           onClose={() => setSelected(null)}
           variant={variant}
           onScan={onScan}
+          onAskQuestion={onAskQuestion}
         />
       )}
     </>

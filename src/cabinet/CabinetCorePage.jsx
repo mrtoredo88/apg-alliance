@@ -24,6 +24,7 @@ const MODULES = [
   ['contacts', 'Контакты'],
   ['content', 'Контент'],
   ['reviews', 'Отзывы'],
+  ['dialogs', 'Диалоги'],
   ['notifications', 'Уведомления'],
   ['loki', 'Локи'],
   ['subscription', 'Подписка'],
@@ -378,7 +379,7 @@ function RoleSpecificModule({ id, snapshot, onOpenModule }) {
   return null;
 }
 
-export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', events = [], onBack, onProfileUpdate, onEventCreated, onToast }) {
+export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', events = [], onBack, onProfileUpdate, onEventCreated, onToast, onOpenDialogs }) {
   const roleState = useMemo(() => getCabinetRoles({ user, partner, expert, preferredRole }), [user, partner, expert, preferredRole]);
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || preferredRole);
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
@@ -386,7 +387,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
   const [reviews, setReviews] = useState([]);
   const [activeModule, setActiveModule] = useState('showcase-builder');
   const [loading, setLoading] = useState(false);
-  const moduleIds = useMemo(() => ['showcase-builder', ...getRoleModuleIds(roleState.roles)].filter(id => id === 'showcase-builder' || id === 'dashboard' || id === 'tasks' || id === 'analytics' || id === 'media' || id === 'contacts' || id === 'content' || id === 'reviews' || id === 'notifications' || id === 'loki' || id === 'subscription' || id === 'settings' || id === 'history' || (activeRole?.modules || []).includes(id)), [roleState.roles, activeRole?.id]);
+  const moduleIds = useMemo(() => ['showcase-builder', ...getRoleModuleIds(roleState.roles), 'dialogs'].filter(id => id === 'showcase-builder' || id === 'dashboard' || id === 'tasks' || id === 'analytics' || id === 'media' || id === 'contacts' || id === 'content' || id === 'reviews' || id === 'dialogs' || id === 'notifications' || id === 'loki' || id === 'subscription' || id === 'settings' || id === 'history' || (activeRole?.modules || []).includes(id)), [roleState.roles, activeRole?.id]);
 
   useEffect(() => {
     setActiveRoleId(roleState.activeRole?.id || preferredRole);
@@ -449,6 +450,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
     if (activeModule === 'contacts') return <ContactsModule role={activeRole} profile={currentProfile} onSaved={handleSaved} onToast={onToast} />;
     if (activeModule === 'content') return <ContentModule snapshot={snapshot} events={events} onEventCreated={onEventCreated} onToast={onToast} />;
     if (activeModule === 'reviews') return <ReviewsModule snapshot={snapshot} />;
+    if (activeModule === 'dialogs') return <GlassSection title="Контекстные диалоги"><SectionCard title="Вопросы по объектам" text="Здесь собираются обращения по партнёру, акциям, мероприятиям и экспертному профилю. Каждый диалог привязан к конкретной карточке." action={<GlassButton onClick={onOpenDialogs} style={{ marginTop: 10 }}>Открыть диалоги</GlassButton>} /></GlassSection>;
     if (activeModule === 'notifications') return <NotificationsModule snapshot={snapshot} />;
     if (activeModule === 'loki') return <LokiModule snapshot={snapshot} onOpenModule={setActiveModule} />;
     if (activeModule === 'subscription') return <SubscriptionModule role={activeRole} snapshot={snapshot} />;

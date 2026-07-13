@@ -59,6 +59,7 @@ const ScannerComponent  = lazy(() => import('./Scanner.jsx'));
 const PartnerPage       = lazy(() => import('./PartnerPage.jsx').then(m => ({ default: m.PartnerPage })));
 const Onboarding        = lazy(() => import('./Onboarding.jsx').then(m => ({ default: m.Onboarding })));
 const NotificationsPage = lazy(() => import('./NotificationsPage.jsx').then(m => ({ default: m.NotificationsPage })));
+const ContextDialogsPage = lazy(() => import('./contextDialogs/ContextDialogsPage.jsx').then(m => ({ default: m.ContextDialogsPage })));
 
 // Lazy-loaded pages (рендерят <Panel> внутри себя)
 const EventsPage      = lazy(() => import('./EventsPage.jsx').then(m => ({ default: m.EventsPage })));
@@ -656,6 +657,7 @@ export function UserApp() {
   const [activePartner, setActivePartner]       = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
+  const [pendingDialogRequest, setPendingDialogRequest] = useState(null);
   const [partnershipEntry, setPartnershipEntry] = useState({ type: initialDeepLink.type === 'partnership' ? 'partner' : '', nonce: 0 });
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
@@ -809,7 +811,7 @@ export function UserApp() {
   }, [platformSource, user]);
 
   const getFallbackBackPanel = useCallback((panel) => {
-    if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet' || panel === 'partnership') return 'profile';
+    if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet' || panel === 'partnership' || panel === 'dialogs') return 'profile';
     return 'home';
   }, []);
 
@@ -844,6 +846,13 @@ export function UserApp() {
     if (id === 'loki') showLokiMessage(LOKI_EVENTS.VK_ENTRY, { source: isVK() ? 'vk_miniapp' : 'web_app' });
     if (id === 'map' || id === 'nearby') showLokiMessage(LOKI_EVENTS.MAP_OPENED, { source: id });
   }, [navigatePanel]);
+
+  const openContextDialog = useCallback((type, item, source = 'ui') => {
+    if (!type || !item) return;
+    setPendingDialogRequest({ type, item, source, nonce: Date.now() });
+    navigatePanel('dialogs');
+  }, [navigatePanel]);
+
 
   const openScanner = useCallback((source = 'app') => {
     trackAppEvent('qr:scanner_open', {
@@ -1941,6 +1950,26 @@ export function UserApp() {
     showLokiMessage(LOKI_EVENTS.PARTNER_OPENED, { id: partner?.id, partnerName: partner?.name });
     navigatePanel('partner');
   }, [markLearningAction, navigatePanel, platformSource, recordInterest, user]);
+
+  const openDialogObject = useCallback((context) => {
+    if (!context?.type) return;
+    if (context.type === 'partner' || context.type === 'promotion') {
+      const partner = enrichedPartners.find(item => String(item.id) === String(context.partnerId || context.objectId));
+      if (partner) openPartner(partner);
+      else navigatePanel('offers');
+      return;
+    }
+    if (context.type === 'event') {
+      setPendingLokiEventTarget({ id: context.eventId || context.objectId, nonce: Date.now() });
+      navigatePanel('events');
+      return;
+    }
+    if (context.type === 'expert') {
+      navigatePanel('experts');
+      return;
+    }
+    navigatePanel('home');
+  }, [enrichedPartners, navigatePanel, openPartner]);
 
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
@@ -3422,6 +3451,7 @@ export function UserApp() {
                     visitCounts={visitCounts}
                     onPartnerUpdate={handlePartnerUpdate}
                     onScan={() => openScanner('partner')}
+                    onAskQuestion={(partner) => openContextDialog('partner', partner, 'partner-card')}
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
                     onReviewPromptHandled={() => setReviewPromptPartnerId(null)}
                   />
@@ -3434,6 +3464,17 @@ export function UserApp() {
                     onBack={goBackPanel}
                     onOpenReference={() => goPanel('reference')}
                     onOpenPanel={goPanel}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="dialogs">
+                <Suspense fallback={<LazyFallback />}>
+                  <ContextDialogsPage
+                    user={user}
+                    initialRequest={pendingDialogRequest}
+                    onBack={goBackPanel}
+                    onOpenObject={openDialogObject}
                   />
                 </Suspense>
               </Panel>
@@ -3517,6 +3558,7 @@ export function UserApp() {
                         source: platformSource,
                       });
                     }}
+                    onAskQuestion={(event) => openContextDialog('event', event, 'event-card')}
                   />
                 </Suspense>
               </Panel>
@@ -3551,7 +3593,7 @@ export function UserApp() {
 
               <Panel id="offers">
                 <Suspense fallback={<LazyFallback />}>
-                  <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onBack={goBackPanel} />
+                  <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onAskQuestion={(partner) => openContextDialog('promotion', partner, 'promotion-card')} onBack={goBackPanel} />
                 </Suspense>
               </Panel>
 
@@ -3583,6 +3625,7 @@ export function UserApp() {
                     expert={ownedExpert}
                     events={events}
                     onBack={goBackPanel}
+                    onOpenDialogs={() => navigatePanel('dialogs')}
                     onToast={showToast}
                     onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
                     onProfileUpdate={(role, updated) => {
@@ -3609,6 +3652,7 @@ export function UserApp() {
                     expert={ownedExpert}
                     events={events}
                     onBack={goBackPanel}
+                    onOpenDialogs={() => navigatePanel('dialogs')}
                     onToast={showToast}
                     onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
                     onProfileUpdate={(role, updated) => {
@@ -3665,6 +3709,7 @@ export function UserApp() {
                         source: platformSource,
                       });
                     }}
+                    onAskQuestion={(expert) => openContextDialog('expert', expert, 'expert-card')}
                     onScan={() => openScanner('expert')}
                   />
                 </Suspense>

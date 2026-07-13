@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
-function OfferCard({ partner, onOpenPartner, index }) {
+function OfferCard({ partner, onOpenPartner, onAskQuestion, index }) {
   return (
     <div style={{
       ...GLASS,
@@ -47,13 +47,23 @@ function OfferCard({ partner, onOpenPartner, index }) {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: onAskQuestion ? '1fr 1fr' : '1fr', gap: 8 }}>
       <button onClick={() => onOpenPartner(partner)} style={{
         width: '100%', padding: '12px 0', borderRadius: 14, border: 'none',
         background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
         color: '#0F0F1A', fontSize: 14, fontWeight: 700, cursor: 'pointer',
       }}>
-        Подробнее о партнёре →
+        Подробнее
       </button>
+      {onAskQuestion && (
+        <button onClick={() => onAskQuestion(partner)} style={{
+          width: '100%', padding: '12px 0', borderRadius: 14, border: `1px solid ${T.gold}55`,
+          background: 'rgba(201,168,76,0.12)', color: T.gold, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+        }}>
+          Задать вопрос
+        </button>
+      )}
+      </div>
     </div>
   );
 }
@@ -114,7 +124,7 @@ const CATEGORY_LABELS = {
   other:         '📦 Другое',
 };
 
-function OfferCardV2({ partner, onOpenPartner, index }) {
+function OfferCardV2({ partner, onOpenPartner, onAskQuestion, index }) {
   const featuredTone = partner.featured;
   return (
     <GlassCard onClick={() => onOpenPartner(partner)} style={{ borderRadius: 28, padding: 0, overflow: 'hidden', animation: `fadeInUp 0.34s ease ${index * 0.04}s both`, border: featuredTone ? '1px solid rgba(215,184,106,0.28)' : APG2_PROFILE.glass.border }}>
@@ -136,12 +146,20 @@ function OfferCardV2({ partner, onOpenPartner, index }) {
         <div style={{ position: 'relative', marginTop: 10, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {partner.offer}
         </div>
+        {onAskQuestion && (
+          <GlassButton
+            onClick={(event) => { event.stopPropagation(); onAskQuestion(partner); }}
+            style={{ position: 'relative', marginTop: 12, minHeight: 38, borderRadius: 18 }}
+          >
+            💬 Задать вопрос
+          </GlassButton>
+        )}
       </div>
     </GlassCard>
   );
 }
 
-export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner }) {
+export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner, onAskQuestion }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch]                 = useState('');
   const inputRef                            = useRef(null);
@@ -219,7 +237,7 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
         ) : filtered.length === 0 ? (
           <EmptyStateV2 icon="🔍" title="В категории пока пусто" text="Можно вернуться ко всем предложениям." action={<GlassButton onClick={() => setActiveCategory('all')} tone="gold" style={{ color: '#17120a' }}>Показать все</GlassButton>} />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{filtered.map((p, i) => <OfferCardV2 key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />)}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{filtered.map((p, i) => <OfferCardV2 key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} onAskQuestion={onAskQuestion} />)}</div>
         )}
       </GlassPanel>
     );
@@ -377,7 +395,7 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
             </div>
           ) : (
             filtered.map((p, i) => (
-              <OfferCard key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} />
+              <OfferCard key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} onAskQuestion={onAskQuestion} />
             ))
           )
         )}

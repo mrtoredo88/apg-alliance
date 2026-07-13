@@ -465,7 +465,7 @@ function downloadIcs(event) {
   }, 120);
 }
 
-function UserActionsSection({ event, isRegistered, onRegister, onClose }) {
+function UserActionsSection({ event, isRegistered, onRegister, onClose, onAskQuestion }) {
   const [reminder, setReminder] = useState(() => {
     try { return localStorage.getItem(`apg_event_reminder_${event?.id}`) || ''; } catch { return ''; }
   });
@@ -497,6 +497,7 @@ function UserActionsSection({ event, isRegistered, onRegister, onClose }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <button onClick={() => downloadIcs(event)} style={{ ...BUTTON, background: 'rgba(255,255,255,0.08)', color: A.text, border: `1px solid ${A.border}` }}>В календарь</button>
           <button onClick={share} style={{ ...BUTTON, background: 'rgba(255,255,255,0.08)', color: A.text, border: `1px solid ${A.border}` }}>Поделиться</button>
+          {onAskQuestion && <button onClick={() => onAskQuestion(event)} style={{ ...BUTTON, background: 'rgba(215,184,106,0.15)', color: A.gold, border: `1px solid ${A.goldBrd}` }}>Задать вопрос</button>}
           <button disabled={!canRoute} onClick={() => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(event?.address || event?.location || '')}`, '_blank')} style={{ ...BUTTON, background: 'rgba(255,255,255,0.08)', color: canRoute ? A.text : A.textSec, border: `1px solid ${A.border}`, cursor: canRoute ? 'pointer' : 'not-allowed' }}>Маршрут</button>
           <button onClick={onClose} style={{ ...BUTTON, background: 'rgba(255,255,255,0.08)', color: A.text, border: `1px solid ${A.border}` }}>Закрыть</button>
         </div>
@@ -948,6 +949,7 @@ export function EventDetailSheet({
   onCreateSeries = () => {},
   registeredEventIds = [],
   onRegister = null,
+  onAskQuestion = null,
   onApprove = () => {},
   onRequestChanges = () => {},
   onReject = () => {},
@@ -1137,6 +1139,7 @@ export function EventDetailSheet({
               isRegistered={isRegistered}
               onRegister={onRegister}
               onClose={handleClose}
+              onAskQuestion={onAskQuestion}
             />
           )}
       {isAdminRole && (

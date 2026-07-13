@@ -515,7 +515,7 @@ function EventsCalendarView({ events, selectedDay, onSelectDay, onOpenEvent }) {
   );
 }
 
-export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen }) {
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen, onAskQuestion }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
@@ -697,6 +697,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
           role="user"
           registeredEventIds={registeredEventIds}
           onRegister={onEventRegister}
+          onAskQuestion={onAskQuestion}
           onClose={() => setSelectedEvent(null)}
         />
       </GlassPanel>
