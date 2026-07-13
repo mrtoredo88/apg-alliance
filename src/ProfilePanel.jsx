@@ -10,12 +10,13 @@ import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from 
 import { APP_URL, API_BASE_URL } from './constants.js';
 import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
+import { userAction } from './userApi.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 import { CAPABILITIES, hasCapability } from './roleEngine.js';
 import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
-import { BOOKING_STATUS_LABELS, BOOKING_STATUSES } from '../server-shared/booking.js';
+import { groupBookingsForProfile, normalizeBooking } from '../server-shared/booking.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -759,6 +760,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   useEffect(() => () => clearTimeout(dismissTimerRef.current), []);
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const favoritePartners = useMemo(() => partners.filter(p => favorites.includes(p.id)), [partners, favorites]);
+  const [localBookings, setLocalBookings] = useState(() => Array.isArray(bookings) ? bookings.map(normalizeBooking) : []);
+  useEffect(() => {
+    setLocalBookings(Array.isArray(bookings) ? bookings.map(normalizeBooking) : []);
+  }, [bookings]);
   const savedNewsItems = useMemo(() => {
     const saved = new Set((savedNews || []).map(String));
     const later = new Set((readLaterNews || []).map(String));
@@ -767,17 +772,34 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       .slice(0, 5);
   }, [news, readLaterNews, savedNews]);
   const bookingGroups = useMemo(() => {
-    const now = Date.now();
-    const normalized = (Array.isArray(bookings) ? bookings : [])
-      .filter(Boolean)
-      .map(item => ({ ...item, ms: new Date(item.startAt || item.createdAt || 0).getTime() || 0 }))
-      .sort((a, b) => (a.ms || 0) - (b.ms || 0));
+    const groups = groupBookingsForProfile(localBookings);
     return {
-      future: normalized.filter(item => item.status !== BOOKING_STATUSES.cancelled && (!item.ms || item.ms >= now)).slice(0, 4),
-      past: normalized.filter(item => item.status !== BOOKING_STATUSES.cancelled && item.ms && item.ms < now).slice(-4).reverse(),
-      cancelled: normalized.filter(item => item.status === BOOKING_STATUSES.cancelled).slice(0, 4),
+      pending: groups.pending.slice(0, 4),
+      actionRequired: groups.actionRequired.slice(0, 4),
+      upcoming: groups.upcoming.slice(0, 4),
+      past: groups.past.slice(-4).reverse(),
+      cancelled: groups.cancelled.slice(0, 4),
+      completed: groups.completed.slice(-4).reverse(),
     };
-  }, [bookings]);
+  }, [localBookings]);
+
+  const runBookingAction = async (action, item, payload = {}) => {
+    if (!item?.id && !item?.bookingId) return;
+    try {
+      const result = await userAction(action, { bookingId: item.id || item.bookingId, ...payload });
+      if (result?.booking) {
+        setLocalBookings(prev => {
+          const next = normalizeBooking(result.booking);
+          const key = String(next.id || next.bookingId);
+          const exists = prev.some(row => String(row.id || row.bookingId) === key);
+          return (exists ? prev.map(row => String(row.id || row.bookingId) === key ? next : row) : [next, ...prev]);
+        });
+      }
+    } catch (error) {
+      logError(error, `ProfilePanel.${action}`);
+      alert(error?.message || 'Не удалось обновить встречу.');
+    }
+  };
 
   const stats = [
     { label: 'Ключей',    value: userKeys,          emoji: '🗝️' },
@@ -1066,7 +1088,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         </GlassSection>
 
         <GlassSection title="Мои записи">
-          {bookingGroups.future.length === 0 && bookingGroups.past.length === 0 && bookingGroups.cancelled.length === 0 ? (
+          {bookingGroups.pending.length === 0 && bookingGroups.actionRequired.length === 0 && bookingGroups.upcoming.length === 0 && bookingGroups.past.length === 0 && bookingGroups.cancelled.length === 0 && bookingGroups.completed.length === 0 ? (
             <GlassCard style={{ padding: 22, textAlign: 'center' }}>
               <div style={{ color: APG2.text, fontSize: 17, fontWeight: 830, marginBottom: 6 }}>Записей пока нет</div>
               <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Когда вы запишетесь к партнёру или эксперту, карточка появится здесь.</div>
@@ -1074,25 +1096,50 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {[
-                ['Будущие', bookingGroups.future],
+                ['Ожидают подтверждения', bookingGroups.pending],
+                ['Требуют действия', bookingGroups.actionRequired],
+                ['Предстоящие', bookingGroups.upcoming],
                 ['Прошедшие', bookingGroups.past],
                 ['Отмененные', bookingGroups.cancelled],
+                ['История', bookingGroups.completed],
               ].filter(([, list]) => list.length).map(([title, list]) => (
                 <GlassCard key={title} style={{ borderRadius: 28, display: 'grid', gap: 8 }}>
                   <div style={{ color: APG2.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.8 }}>{title}</div>
                   {list.map(item => (
-                    <button
+                    <div
                       key={item.id || item.bookingId}
-                      type="button"
-                      onClick={() => item.dialogId ? onOpenDialog?.(item.dialogId) : null}
-                      style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', borderRadius: 20, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', padding: '10px 11px', color: APG2.text, textAlign: 'left', fontFamily: 'inherit', cursor: item.dialogId ? 'pointer' : 'default', display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}
+                      style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', borderRadius: 20, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', padding: '10px 11px', color: APG2.text, display: 'grid', gap: 9 }}
                     >
-                      <span style={{ minWidth: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => item.dialogId ? onOpenDialog?.(item.dialogId) : null}
+                        style={{ border: 0, background: 'transparent', padding: 0, color: APG2.text, textAlign: 'left', fontFamily: 'inherit', cursor: item.dialogId ? 'pointer' : 'default', display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}
+                      >
+                        <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.providerName || 'Запись АПГ'}</span>
                         <span style={{ display: 'block', color: APG2.textMuted, fontSize: 12, lineHeight: '16px', marginTop: 3 }}>{item.serviceTitle || 'Услуга'} · {item.dateLabel || ''} {item.time || ''}</span>
                       </span>
-                      <span style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>{BOOKING_STATUS_LABELS[item.status] || 'Запись'}</span>
-                    </button>
+                        <span style={{ color: APG2.gold, fontSize: 12, fontWeight: 820 }}>{item.statusLabel || 'Запись'}</span>
+                      </button>
+                      {item.isActive && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {item.dialogId && <GlassButton onClick={() => onOpenDialog?.(item.dialogId)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Диалог</GlassButton>}
+                          <GlassButton onClick={() => {
+                            const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
+                            if (!startAt) return;
+                            const start = new Date(String(startAt).trim().replace(' ', 'T'));
+                            if (Number.isNaN(start.getTime())) return alert('Не удалось распознать дату.');
+                            const duration = Number(item.durationMinutes || 60);
+                            runBookingAction('booking:requestReschedule', item, { slot: { startAt: start.toISOString(), endAt: new Date(start.getTime() + duration * 60000).toISOString() }, reason: 'Запрос пользователя' });
+                          }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Перенести</GlassButton>
+                          <GlassButton onClick={() => {
+                            if (!confirm('Отменить запись?')) return;
+                            const reason = prompt('Причина отмены, если хотите указать') || '';
+                            runBookingAction('booking:cancel', item, { reason });
+                          }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Отменить</GlassButton>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </GlassCard>
               ))}

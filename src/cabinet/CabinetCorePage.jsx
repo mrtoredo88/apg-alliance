@@ -14,7 +14,7 @@ import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
 import { DigitalShowcaseBuilder } from './DigitalShowcaseBuilder.jsx';
-import { buildBookingProfile } from '../../server-shared/booking.js';
+import { BOOKING_STATUSES, buildBookingCalendar, buildBookingProfile, groupBookingsForProfile, normalizeBooking } from '../../server-shared/booking.js';
 
 const MODULES = [
   ['showcase-builder', 'Витрина'],
@@ -380,11 +380,74 @@ function RoleSpecificModule({ id, snapshot, onOpenModule }) {
   return null;
 }
 
+function bookingDateRange(mode, anchor = new Date()) {
+  const start = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  if (mode === 'week') start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  if (mode === 'month') start.setDate(1);
+  const end = new Date(start);
+  end.setDate(start.getDate() + (mode === 'month' ? 35 : mode === 'week' ? 7 : 1));
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function bookingTimeText(item) {
+  const date = new Date(item.startAt || 0);
+  if (Number.isNaN(date.getTime())) return item.dateLabel || 'Дата не указана';
+  return `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} · ${item.time || date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 function BookingModule({ role, profile, onSaved, onToast }) {
   const bookingProfile = useMemo(() => buildBookingProfile(profile, role.id === 'expert' ? 'expert' : 'partner'), [profile, role.id]);
   const [enabled, setEnabled] = useState(bookingProfile.enabled);
   const [slotTimes, setSlotTimes] = useState(() => Array.isArray(profile.bookingSlotTimes) && profile.bookingSlotTimes.length ? profile.bookingSlotTimes.join(', ') : '10:00, 11:30, 13:00, 15:00, 16:30, 18:00');
+  const [calendarMode, setCalendarMode] = useState(() => window.innerWidth >= 900 ? 'week' : 'day');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [specialistFilter, setSpecialistFilter] = useState('');
+  const [bookings, setBookings] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
+  const loadBookings = async () => {
+    if (!profile?.id || loadingBookings) return;
+    setLoadingBookings(true);
+    try {
+      const range = bookingDateRange(calendarMode);
+      const result = await userAction('booking:calendar', {
+        providerType: role.id === 'expert' ? 'expert' : 'partner',
+        providerId: profile.id,
+        from: range.from,
+        to: range.to,
+        specialistId: specialistFilter,
+        status: statusFilter,
+      });
+      setBookings(Array.isArray(result.bookings) ? result.bookings.map(normalizeBooking) : []);
+    } catch (error) {
+      onToast?.(error?.message || 'Не удалось загрузить календарь', 'error');
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBookings();
+  }, [profile?.id, calendarMode, statusFilter, specialistFilter]);
+
+  const groups = useMemo(() => groupBookingsForProfile(bookings), [bookings]);
+  const calendarItems = useMemo(() => buildBookingCalendar({ bookings, ...bookingDateRange(calendarMode), specialistId: specialistFilter, status: statusFilter }), [bookings, calendarMode, specialistFilter, statusFilter]);
+
+  const runLifecycle = async (action, item, payload = {}) => {
+    try {
+      const result = await userAction(action, { bookingId: item.id || item.bookingId, ...payload });
+      if (result?.booking) {
+        const next = normalizeBooking(result.booking);
+        setBookings(prev => prev.map(row => String(row.id || row.bookingId) === String(next.id || next.bookingId) ? next : row));
+      }
+      onToast?.('✅ Встреча обновлена', 'success');
+    } catch (error) {
+      onToast?.(error?.message || 'Не удалось обновить встречу', 'error');
+    }
+  };
+
   const save = async () => {
     if (saving) return;
     setSaving(true);
@@ -405,13 +468,13 @@ function BookingModule({ role, profile, onSaved, onToast }) {
     }
   };
   return (
-    <GlassSection title="Онлайн-запись">
+    <GlassSection title="Встречи">
       <div style={{ display: 'grid', gap: 12 }}>
         <GlassCard style={{ borderRadius: 30, display: 'grid', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
             <div>
-              <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 900 }}>Запись через АПГ</div>
-              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Кнопка появится в карточке, а после подтверждения создастся контекстный диалог записи.</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 900 }}>Встречи через АПГ</div>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>Кнопка появится в карточке, а заявка создаст контекстный диалог встречи.</div>
             </div>
             <GlassButton tone={enabled ? 'gold' : 'glass'} onClick={() => setEnabled(value => !value)} style={{ minHeight: 40, borderRadius: 18, padding: '8px 12px', color: enabled ? '#17120a' : APG2_PROFILE.text }}>{enabled ? 'Включена' : 'Выключена'}</GlassButton>
           </div>
@@ -420,6 +483,73 @@ function BookingModule({ role, profile, onSaved, onToast }) {
             <GlassInput value={slotTimes} onChange={e => setSlotTimes(e.target.value)} placeholder="10:00, 11:30, 13:00" style={{ minHeight: 46, borderRadius: 18, fontSize: 14 }} />
           </label>
           <GlassButton tone="gold" onClick={save} disabled={saving} style={{ color: '#17120a', opacity: saving ? 0.62 : 1 }}>{saving ? 'Сохраняем...' : 'Сохранить'}</GlassButton>
+        </GlassCard>
+        <GlassCard style={{ borderRadius: 30, display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 900 }}>Календарь встреч</div>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>День, неделя или месяц без отдельного экрана.</div>
+            </div>
+            <GlassButton onClick={loadBookings} disabled={loadingBookings} style={{ minHeight: 38, borderRadius: 17 }}>{loadingBookings ? 'Обновляем...' : 'Обновить'}</GlassButton>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            {['day', 'week', 'month'].map(mode => <GlassButton key={mode} tone={calendarMode === mode ? 'gold' : 'glass'} onClick={() => setCalendarMode(mode)} style={{ minHeight: 38, borderRadius: 16, color: calendarMode === mode ? '#17120a' : APG2_PROFILE.text }}>{mode === 'day' ? 'День' : mode === 'week' ? 'Неделя' : 'Месяц'}</GlassButton>)}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
+            <select value={specialistFilter} onChange={e => setSpecialistFilter(e.target.value)} style={{ minHeight: 42, borderRadius: 17, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, padding: '0 10px', fontFamily: 'inherit' }}>
+              <option value="">Все специалисты</option>
+              {bookingProfile.specialists.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ minHeight: 42, borderRadius: 17, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, padding: '0 10px', fontFamily: 'inherit' }}>
+              <option value="">Все статусы</option>
+              <option value={BOOKING_STATUSES.pending}>Ожидают</option>
+              <option value={BOOKING_STATUSES.confirmed}>Подтверждены</option>
+              <option value={BOOKING_STATUSES.rescheduleRequested}>Перенос</option>
+              <option value={BOOKING_STATUSES.cancelledByUser}>Отменены</option>
+              <option value={BOOKING_STATUSES.completed}>Завершены</option>
+            </select>
+          </div>
+          {groups.pending.length > 0 && (
+            <GlassCard style={{ borderRadius: 22, padding: 12, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.34)' }}>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.8 }}>Ожидают подтверждения</div>
+              {groups.pending.slice(0, 4).map(item => (
+                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 13.5, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.userName || 'Клиент'} · {item.serviceTitle}</div>
+                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 2 }}>{bookingTimeText(item)} · {item.specialistName}</div>
+                  </div>
+                  <GlassButton tone="gold" onClick={() => runLifecycle('booking:confirm', item)} style={{ minHeight: 34, borderRadius: 15, color: '#17120a', padding: '7px 10px' }}>Подтвердить</GlassButton>
+                </div>
+              ))}
+            </GlassCard>
+          )}
+          <div style={{ display: 'grid', gap: 8 }}>
+            {calendarItems.length ? calendarItems.slice(0, calendarMode === 'month' ? 18 : 12).map(item => (
+              <GlassCard key={item.id} style={{ borderRadius: 22, padding: 12, display: 'grid', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '18px', fontWeight: 870, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bookingTimeText(item)} · {item.userName || 'Клиент'}</div>
+                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3 }}>{item.serviceTitle || 'Услуга'} · {item.specialistName || 'Специалист'} · {item.durationMinutes || 60} мин</div>
+                  </div>
+                  <GlassBadge tone={item.status === BOOKING_STATUSES.confirmed || item.status === BOOKING_STATUSES.rescheduled ? 'gold' : 'glass'}>{item.statusLabel}</GlassBadge>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[BOOKING_STATUSES.pending, BOOKING_STATUSES.new].includes(item.status) && <GlassButton tone="gold" onClick={() => runLifecycle('booking:confirm', item)} style={{ minHeight: 34, borderRadius: 15, color: '#17120a', padding: '7px 10px' }}>Подтвердить</GlassButton>}
+                  {item.status === BOOKING_STATUSES.rescheduleRequested && <GlassButton tone="gold" onClick={() => runLifecycle('booking:respondReschedule', item, { decision: 'accept' })} style={{ minHeight: 34, borderRadius: 15, color: '#17120a', padding: '7px 10px' }}>Принять перенос</GlassButton>}
+                  {item.status === BOOKING_STATUSES.rescheduleRequested && <GlassButton onClick={() => runLifecycle('booking:respondReschedule', item, { decision: 'reject', reason: 'Отклонено партнером' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px' }}>Отклонить</GlassButton>}
+                  {[BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(item.status) && <GlassButton onClick={() => runLifecycle('booking:complete', item)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px' }}>Завершить</GlassButton>}
+                  {[BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(item.status) && <GlassButton onClick={() => runLifecycle('booking:noShow', item, { reason: 'Клиент не пришел' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px' }}>Неявка</GlassButton>}
+                  {item.isActive && <GlassButton onClick={() => {
+                    const reason = prompt('Причина отмены') || '';
+                    if (!reason) return;
+                    runLifecycle('booking:cancel', item, { reason });
+                  }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px' }}>Отменить</GlassButton>}
+                </div>
+              </GlassCard>
+            )) : (
+              <EmptyStateV2 icon="📅" title="Встреч на период нет" text="Свободные интервалы остаются доступными для пользователей в карточке." />
+            )}
+          </div>
         </GlassCard>
         <ContentGrid min={120} gap={8}>
           <StatPill label="Услуги" value={bookingProfile.services.length} />

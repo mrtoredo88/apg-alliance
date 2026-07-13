@@ -4,6 +4,7 @@ import { db } from '../firebase.js';
 import { userAction } from '../userApi.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader } from '../components/Apg2ProfileGlass.jsx';
 import { buildDialogAutoAnswer, buildDialogContext, getDialogObjectLabel } from '../../server-shared/context-dialogs.js';
+import { BOOKING_STATUSES } from '../../server-shared/booking.js';
 
 function tsMs(value) {
   if (!value) return 0;
@@ -75,8 +76,50 @@ function ContextHeader({ context, onOpenObject }) {
   );
 }
 
+function BookingContextCard({ context, isOwner, onOpenObject, onAction }) {
+  if (context?.type !== 'booking') return null;
+  const bookingId = context.bookingId || context.objectId;
+  return (
+    <GlassCard style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 7, borderRadius: 26, padding: 14, display: 'grid', gap: 10, border: '1px solid rgba(215,184,106,0.34)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
+        <div style={{ minWidth: 0 }}>
+          <GlassBadge tone="gold">📅 Встреча</GlassBadge>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 900, marginTop: 8 }}>{context.parentTitle || context.title || 'Встреча АПГ'}</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 5 }}>
+            {[context.serviceTitle, context.specialistName, context.date, context.durationMinutes ? `${context.durationMinutes} мин` : '', context.price].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+        <GlassBadge>{context.statusLabel || context.status || 'Статус'}</GlassBadge>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <GlassButton onClick={() => onOpenObject?.(context)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Открыть карточку</GlassButton>
+        {!isOwner && context.address && <GlassButton onClick={() => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(context.address)}`, '_blank', 'noopener,noreferrer')} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Маршрут</GlassButton>}
+        {!isOwner && ![BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider, BOOKING_STATUSES.completed, BOOKING_STATUSES.noShow].includes(context.status) && <GlassButton onClick={() => onAction('booking:cancel', { reason: prompt('Причина отмены, если хотите указать') || '' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Отменить</GlassButton>}
+        {isOwner && [BOOKING_STATUSES.pending, BOOKING_STATUSES.new].includes(context.status) && <GlassButton tone="gold" onClick={() => onAction('booking:confirm')} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', color: '#17120a', fontSize: 12 }}>Подтвердить</GlassButton>}
+        {isOwner && context.status === BOOKING_STATUSES.rescheduleRequested && <GlassButton tone="gold" onClick={() => onAction('booking:respondReschedule', { decision: 'accept' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', color: '#17120a', fontSize: 12 }}>Принять перенос</GlassButton>}
+        {isOwner && [BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(context.status) && <GlassButton onClick={() => onAction('booking:complete')} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Завершить</GlassButton>}
+        {isOwner && ![BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider, BOOKING_STATUSES.completed, BOOKING_STATUSES.noShow].includes(context.status) && <GlassButton onClick={() => {
+          const reason = prompt('Причина отмены');
+          if (reason) onAction('booking:cancel', { reason });
+        }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Отменить</GlassButton>}
+      </div>
+      {!bookingId && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>Карточка встречи откроется после синхронизации контекста.</div>}
+    </GlassCard>
+  );
+}
+
 function MessageBubble({ message, own }) {
   const loki = message.senderRole === 'loki';
+  if (message.isSystem || message.senderRole === 'system') {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ maxWidth: '88%', borderRadius: 18, padding: '9px 12px', background: 'rgba(215,184,106,0.12)', border: '1px solid rgba(215,184,106,0.24)', color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', textAlign: 'center', whiteSpace: 'pre-wrap' }}>
+          {message.text}
+          <div style={{ marginTop: 4, color: APG2_PROFILE.textMuted, fontSize: 10.5 }}>{timeText(message.createdAt)}</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', justifyContent: own ? 'flex-end' : 'flex-start' }}>
       <div style={{ maxWidth: '82%', borderRadius: own ? '22px 22px 6px 22px' : '22px 22px 22px 6px', padding: 12, background: loki ? APG2_PROFILE.goldSoft : own ? 'rgba(215,184,106,0.18)' : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: loki ? '1px solid rgba(215,184,106,0.36)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', color: APG2_PROFILE.text }}>
@@ -201,6 +244,20 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     }
   };
 
+  const runBookingAction = async (action, payload = {}) => {
+    const bookingId = activeContext?.bookingId || activeContext?.objectId;
+    if (!bookingId || pending) return;
+    setPending(true);
+    setError('');
+    try {
+      await userAction(action, { bookingId, ...payload });
+    } catch (err) {
+      setError(err?.message || 'Не удалось обновить встречу.');
+    } finally {
+      setPending(false);
+    }
+  };
+
   const toggleAiAssist = async (enabled) => {
     setAiAssist(enabled);
     await userAction('dialog:aiAssist', { enabled }).catch(() => {});
@@ -235,7 +292,9 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
               {dialogs.slice(0, 8).map(dialog => <DialogListItem key={dialog.id} dialog={dialog} active={dialog.id === activeDialog.id} onClick={() => setActiveDialogId(dialog.id)} />)}
             </div>
           )}
-          <ContextHeader context={activeContext} onOpenObject={onOpenObject} />
+          {activeContext?.type === 'booking'
+            ? <BookingContextCard context={activeContext} isOwner={isOwner} onOpenObject={onOpenObject} onAction={runBookingAction} />
+            : <ContextHeader context={activeContext} onOpenObject={onOpenObject} />}
           {isOwner && <OwnerAssist enabled={aiAssist} onToggle={toggleAiAssist} context={activeContext} lastQuestion={lastQuestion} onUse={value => setText(value)} />}
           <div style={{ display: 'grid', gap: 9, minHeight: 220 }}>
             {activeMessages.length ? activeMessages.map(message => <MessageBubble key={message.id} message={message} own={message.senderId === uid && message.senderRole !== 'loki'} />) : (

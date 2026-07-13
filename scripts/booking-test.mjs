@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import {
+  BOOKING_STATUSES,
+  bookingBlocksSlot,
   buildBookingDialogContext,
+  buildBookingHistoryEntry,
+  canTransitionBookingStatus,
   buildBookingProfile,
   buildBookingSlots,
   formatBookingDateKey,
+  groupBookingsForProfile,
   getUpcomingBookingDates,
   isOnlineBookingEnabled,
+  normalizeBooking,
+  rangesOverlap,
 } from '../server-shared/booking.js';
 
 const partner = {
@@ -50,5 +57,37 @@ assert.equal(context.type, 'booking');
 assert.equal(context.bookingId, 'booking-1');
 assert.equal(context.partnerId, 'coffee-time');
 assert.equal(context.ownerUserIds[0], 'owner-1');
+assert.equal(context.label, 'Встреча');
 
-console.log('Booking V1 contract test passed');
+assert.equal(normalizeBooking({ id: 'b1', status: 'new' }).status, BOOKING_STATUSES.pending);
+assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.pending, BOOKING_STATUSES.confirmed), true);
+assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.completed, BOOKING_STATUSES.confirmed), false);
+assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.confirmed, BOOKING_STATUSES.cancelledByProvider), true);
+assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.rescheduleRequested, BOOKING_STATUSES.rescheduled), true);
+
+const history = buildBookingHistoryEntry({
+  fromStatus: BOOKING_STATUSES.pending,
+  toStatus: BOOKING_STATUSES.confirmed,
+  actorId: 'owner-1',
+  actorRole: 'provider',
+  reason: 'Подтверждено',
+});
+assert.equal(history.fromStatus, BOOKING_STATUSES.pending);
+assert.equal(history.toStatus, BOOKING_STATUSES.confirmed);
+assert.equal(history.actorRole, 'provider');
+
+assert.equal(rangesOverlap('2026-07-14T10:00:00+03:00', '2026-07-14T11:00:00+03:00', '2026-07-14T10:30:00+03:00', '2026-07-14T11:30:00+03:00'), true);
+assert.equal(rangesOverlap('2026-07-14T10:00:00+03:00', '2026-07-14T11:00:00+03:00', '2026-07-14T11:00:00+03:00', '2026-07-14T12:00:00+03:00'), false);
+assert.equal(bookingBlocksSlot({ id: 'b1', providerType: 'partner', providerId: 'p1', specialistId: 's1', status: BOOKING_STATUSES.confirmed, startAt: '2026-07-14T10:00:00+03:00', endAt: '2026-07-14T11:00:00+03:00' }, { providerType: 'partner', providerId: 'p1', specialistId: 's1', startAt: '2026-07-14T10:30:00+03:00', endAt: '2026-07-14T11:30:00+03:00' }), true);
+assert.equal(bookingBlocksSlot({ id: 'b1', providerType: 'partner', providerId: 'p1', specialistId: 's1', status: BOOKING_STATUSES.cancelledByUser, startAt: '2026-07-14T10:00:00+03:00', endAt: '2026-07-14T11:00:00+03:00' }, { providerType: 'partner', providerId: 'p1', specialistId: 's1', startAt: '2026-07-14T10:30:00+03:00', endAt: '2026-07-14T11:30:00+03:00' }), false);
+
+const grouped = groupBookingsForProfile([
+  { id: 'p', status: BOOKING_STATUSES.pending, startAt: '2026-07-14T10:00:00+03:00', endAt: '2026-07-14T11:00:00+03:00' },
+  { id: 'r', status: BOOKING_STATUSES.rescheduleRequested, startAt: '2026-07-15T10:00:00+03:00', endAt: '2026-07-15T11:00:00+03:00' },
+  { id: 'c', status: BOOKING_STATUSES.cancelledByProvider, startAt: '2026-07-16T10:00:00+03:00', endAt: '2026-07-16T11:00:00+03:00' },
+], new Date('2026-07-13T10:00:00+03:00').getTime());
+assert.equal(grouped.pending.length, 1);
+assert.equal(grouped.actionRequired.length, 1);
+assert.equal(grouped.cancelled.length, 1);
+
+console.log('Booking/Meetings V1.1 contract test passed');

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-13] feat: Meetings V1.1 lifecycle
+**Коммит:** `pending`
+**Файлы:** `server-shared/booking.js`, `server/src/routes/user-actions.js`, `src/ProfilePanel.jsx`, `src/cabinet/CabinetCorePage.jsx`, `src/contextDialogs/ContextDialogsPage.jsx`, `scripts/booking-test.mjs`, `.ai/04_API.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Online Booking V1 расширен до Meetings V1.1: статусы `pending/confirmed/reschedule_requested/rescheduled/cancelled_by_user/cancelled_by_provider/completed/no_show`, история переходов, backend actions жизненного цикла и overlap-защита активных слотов.
+- В профиле пользователя блок `Мои записи` получил группировку и действия отмены/запроса переноса; в Cabinet модуль записи получил календарь день/неделя/месяц, фильтры, ожидающие подтверждения и действия партнёра/эксперта.
+- Booking-диалоги получили закреплённую карточку встречи и системные события статуса, а контрактные тесты покрывают переходы, историю, блокировку и освобождение слотов.
+**Почему:** базовая онлайн-запись должна стать завершённым рабочим циклом встречи без создания отдельного продукта и без редизайна Workspace.
+
 ## [2026-07-13] fix: partner/expert Desktop Workspace access
 **Коммит:** `pending`
 **Файлы:** `server-shared/role-engine.js`, `src/workspace/WorkspaceFeatureFlags.js`, `scripts/role-engine-test.mjs`, `scripts/desktop-workspace-test.mjs`
