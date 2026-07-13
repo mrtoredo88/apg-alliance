@@ -1,20 +1,107 @@
 export const BOOKING_STATUSES = {
+  pending: 'pending',
   new: 'new',
   confirmed: 'confirmed',
+  rescheduleRequested: 'reschedule_requested',
   rescheduled: 'rescheduled',
   cancelled: 'cancelled',
+  cancelledByUser: 'cancelled_by_user',
+  cancelledByProvider: 'cancelled_by_provider',
   completed: 'completed',
   noShow: 'no_show',
 };
 
 export const BOOKING_STATUS_LABELS = {
+  [BOOKING_STATUSES.pending]: 'Ожидает подтверждения',
   [BOOKING_STATUSES.new]: 'Новая',
   [BOOKING_STATUSES.confirmed]: 'Подтверждена',
+  [BOOKING_STATUSES.rescheduleRequested]: 'Запрошен перенос',
   [BOOKING_STATUSES.rescheduled]: 'Перенесена',
   [BOOKING_STATUSES.cancelled]: 'Отменена',
+  [BOOKING_STATUSES.cancelledByUser]: 'Отменена пользователем',
+  [BOOKING_STATUSES.cancelledByProvider]: 'Отменена партнером',
   [BOOKING_STATUSES.completed]: 'Завершена',
   [BOOKING_STATUSES.noShow]: 'Не пришел',
 };
+
+export const BOOKING_STATUS_TONES = {
+  [BOOKING_STATUSES.pending]: 'pending',
+  [BOOKING_STATUSES.new]: 'pending',
+  [BOOKING_STATUSES.confirmed]: 'confirmed',
+  [BOOKING_STATUSES.rescheduleRequested]: 'reschedule',
+  [BOOKING_STATUSES.rescheduled]: 'confirmed',
+  [BOOKING_STATUSES.cancelled]: 'cancelled',
+  [BOOKING_STATUSES.cancelledByUser]: 'cancelled',
+  [BOOKING_STATUSES.cancelledByProvider]: 'cancelled',
+  [BOOKING_STATUSES.completed]: 'completed',
+  [BOOKING_STATUSES.noShow]: 'cancelled',
+};
+
+export const BOOKING_TRANSITIONS = Object.freeze({
+  [BOOKING_STATUSES.pending]: [
+    BOOKING_STATUSES.confirmed,
+    BOOKING_STATUSES.rescheduleRequested,
+    BOOKING_STATUSES.cancelledByUser,
+    BOOKING_STATUSES.cancelledByProvider,
+  ],
+  [BOOKING_STATUSES.new]: [
+    BOOKING_STATUSES.confirmed,
+    BOOKING_STATUSES.rescheduleRequested,
+    BOOKING_STATUSES.cancelledByUser,
+    BOOKING_STATUSES.cancelledByProvider,
+  ],
+  [BOOKING_STATUSES.confirmed]: [
+    BOOKING_STATUSES.rescheduleRequested,
+    BOOKING_STATUSES.rescheduled,
+    BOOKING_STATUSES.cancelledByUser,
+    BOOKING_STATUSES.cancelledByProvider,
+    BOOKING_STATUSES.completed,
+    BOOKING_STATUSES.noShow,
+  ],
+  [BOOKING_STATUSES.rescheduleRequested]: [
+    BOOKING_STATUSES.confirmed,
+    BOOKING_STATUSES.rescheduled,
+    BOOKING_STATUSES.cancelledByUser,
+    BOOKING_STATUSES.cancelledByProvider,
+  ],
+  [BOOKING_STATUSES.rescheduled]: [
+    BOOKING_STATUSES.confirmed,
+    BOOKING_STATUSES.rescheduleRequested,
+    BOOKING_STATUSES.cancelledByUser,
+    BOOKING_STATUSES.cancelledByProvider,
+    BOOKING_STATUSES.completed,
+    BOOKING_STATUSES.noShow,
+  ],
+  [BOOKING_STATUSES.cancelled]: [],
+  [BOOKING_STATUSES.cancelledByUser]: [],
+  [BOOKING_STATUSES.cancelledByProvider]: [],
+  [BOOKING_STATUSES.completed]: [],
+  [BOOKING_STATUSES.noShow]: [],
+});
+
+export const BOOKING_BLOCKING_STATUSES = [
+  BOOKING_STATUSES.pending,
+  BOOKING_STATUSES.new,
+  BOOKING_STATUSES.confirmed,
+  BOOKING_STATUSES.rescheduleRequested,
+  BOOKING_STATUSES.rescheduled,
+];
+
+export const BOOKING_ACTIVE_STATUSES = [
+  BOOKING_STATUSES.pending,
+  BOOKING_STATUSES.new,
+  BOOKING_STATUSES.confirmed,
+  BOOKING_STATUSES.rescheduleRequested,
+  BOOKING_STATUSES.rescheduled,
+];
+
+export const BOOKING_HISTORY_STATUSES = [
+  BOOKING_STATUSES.cancelled,
+  BOOKING_STATUSES.cancelledByUser,
+  BOOKING_STATUSES.cancelledByProvider,
+  BOOKING_STATUSES.completed,
+  BOOKING_STATUSES.noShow,
+];
 
 const DEFAULT_SLOT_TIMES = ['10:00', '11:30', '13:00', '15:00', '16:30', '18:00'];
 const DEFAULT_SERVICE_DURATION = 60;
@@ -34,6 +121,130 @@ function asList(value) {
 function numberOr(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function timeMs(value) {
+  if (!value) return 0;
+  if (value?.toMillis) return value.toMillis();
+  if (value?.toDate) return value.toDate().getTime();
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+export function normalizeBookingStatus(status) {
+  const value = text(status, 80);
+  if (value === BOOKING_STATUSES.new) return BOOKING_STATUSES.pending;
+  if (value === BOOKING_STATUSES.cancelled) return BOOKING_STATUSES.cancelledByUser;
+  return Object.values(BOOKING_STATUSES).includes(value) ? value : BOOKING_STATUSES.pending;
+}
+
+export function getBookingStatusLabel(status) {
+  return BOOKING_STATUS_LABELS[normalizeBookingStatus(status)] || BOOKING_STATUS_LABELS[BOOKING_STATUSES.pending];
+}
+
+export function getBookingStatusTone(status) {
+  return BOOKING_STATUS_TONES[normalizeBookingStatus(status)] || 'pending';
+}
+
+export function canTransitionBookingStatus(fromStatus, toStatus) {
+  const from = normalizeBookingStatus(fromStatus);
+  const to = normalizeBookingStatus(toStatus);
+  return from === to || (BOOKING_TRANSITIONS[from] || []).includes(to);
+}
+
+export function isBookingSlotBlocking(status) {
+  return BOOKING_BLOCKING_STATUSES.includes(normalizeBookingStatus(status));
+}
+
+export function isBookingFinalStatus(status) {
+  return BOOKING_HISTORY_STATUSES.includes(normalizeBookingStatus(status));
+}
+
+export function rangesOverlap(startA, endA, startB, endB) {
+  const a1 = timeMs(startA);
+  const a2 = timeMs(endA);
+  const b1 = timeMs(startB);
+  const b2 = timeMs(endB);
+  if (!a1 || !a2 || !b1 || !b2) return false;
+  return a1 < b2 && b1 < a2;
+}
+
+export function bookingBlocksSlot(booking = {}, slot = {}, options = {}) {
+  if (!booking || options.ignoreBookingId && String(booking.id || booking.bookingId || '') === String(options.ignoreBookingId)) return false;
+  if (!isBookingSlotBlocking(booking.status)) return false;
+  const sameProvider = !slot.providerType || !slot.providerId || (booking.providerType === slot.providerType && String(booking.providerId || '') === String(slot.providerId || ''));
+  if (!sameProvider) return false;
+  const bookingSpecialist = String(booking.specialistId || 'default');
+  const slotSpecialist = String(slot.specialistId || 'default');
+  const sameSpecialist = bookingSpecialist === slotSpecialist || bookingSpecialist === 'any' || slotSpecialist === 'any';
+  if (!sameSpecialist) return false;
+  return rangesOverlap(booking.startAt, booking.endAt, slot.startAt, slot.endAt);
+}
+
+export function buildBookingHistoryEntry({ fromStatus = '', toStatus = '', actorId = '', actorRole = '', reason = '', changes = {}, at = null } = {}) {
+  return {
+    fromStatus: fromStatus ? normalizeBookingStatus(fromStatus) : '',
+    toStatus: toStatus ? normalizeBookingStatus(toStatus) : '',
+    actorId: text(actorId, 180),
+    actorRole: text(actorRole, 40),
+    reason: text(reason, 800),
+    changes: changes && typeof changes === 'object' ? changes : {},
+    at: at || new Date().toISOString(),
+  };
+}
+
+export function buildBookingReminders(startAt) {
+  const startMs = timeMs(startAt);
+  if (!startMs) return [];
+  return [
+    { type: '24h', label: 'За сутки', scheduledAt: new Date(startMs - 24 * 60 * 60 * 1000).toISOString(), status: 'scheduled' },
+    { type: '2h', label: 'За два часа', scheduledAt: new Date(startMs - 2 * 60 * 60 * 1000).toISOString(), status: 'scheduled' },
+  ].filter(item => new Date(item.scheduledAt).getTime() > Date.now());
+}
+
+export function normalizeBooking(booking = {}) {
+  const status = normalizeBookingStatus(booking.status);
+  const startMs = timeMs(booking.startAt);
+  const endMs = timeMs(booking.endAt);
+  return {
+    ...booking,
+    id: text(booking.id || booking.bookingId, 180),
+    bookingId: text(booking.bookingId || booking.id, 180),
+    status,
+    statusLabel: getBookingStatusLabel(status),
+    statusTone: getBookingStatusTone(status),
+    statusHistory: Array.isArray(booking.statusHistory) ? booking.statusHistory : [],
+    startMs,
+    endMs,
+    isActive: BOOKING_ACTIVE_STATUSES.includes(status),
+    isFinal: BOOKING_HISTORY_STATUSES.includes(status),
+  };
+}
+
+export function groupBookingsForProfile(bookings = [], now = Date.now()) {
+  const normalized = (Array.isArray(bookings) ? bookings : []).map(normalizeBooking).sort((a, b) => (a.startMs || 0) - (b.startMs || 0));
+  return {
+    pending: normalized.filter(item => item.status === BOOKING_STATUSES.pending || item.status === BOOKING_STATUSES.new),
+    actionRequired: normalized.filter(item => item.status === BOOKING_STATUSES.rescheduleRequested),
+    upcoming: normalized.filter(item => item.isActive && item.status !== BOOKING_STATUSES.pending && item.startMs >= now),
+    past: normalized.filter(item => !item.isFinal && item.startMs && item.startMs < now),
+    cancelled: normalized.filter(item => [BOOKING_STATUSES.cancelled, BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider].includes(item.status)),
+    completed: normalized.filter(item => item.status === BOOKING_STATUSES.completed || item.status === BOOKING_STATUSES.noShow),
+    all: normalized,
+  };
+}
+
+export function buildBookingCalendar({ bookings = [], from, to, specialistId = '', status = '' } = {}) {
+  const fromMs = timeMs(from) || 0;
+  const toMs = timeMs(to) || Number.MAX_SAFE_INTEGER;
+  const wantedSpecialist = text(specialistId, 80);
+  const wantedStatus = text(status, 80);
+  return (Array.isArray(bookings) ? bookings : [])
+    .map(normalizeBooking)
+    .filter(item => item.startMs >= fromMs && item.startMs < toMs)
+    .filter(item => !wantedSpecialist || String(item.specialistId || '') === wantedSpecialist)
+    .filter(item => !wantedStatus || item.status === normalizeBookingStatus(wantedStatus))
+    .sort((a, b) => (a.startMs || 0) - (b.startMs || 0));
 }
 
 export function isOnlineBookingEnabled(profile = {}) {
@@ -135,18 +346,27 @@ export function buildBookingProfile(profile = {}, type = 'partner') {
 }
 
 export function buildBookingDialogContext(booking = {}) {
+  const normalized = normalizeBooking(booking);
   return {
     type: 'booking',
     objectId: text(booking.id || booking.bookingId, 180),
     bookingId: text(booking.id || booking.bookingId, 180),
-    title: text(booking.providerName || booking.title || 'Запись'),
+    title: text(booking.providerName || booking.title || 'Встреча'),
     subtitle: [booking.serviceTitle, booking.dateLabel, booking.time].filter(Boolean).join(' · '),
     parentTitle: text(booking.providerName || ''),
-    label: 'Запись',
+    label: 'Встреча',
     description: text(booking.comment || booking.serviceDescription || ''),
     address: text(booking.address || ''),
     phone: text(booking.providerPhone || ''),
     date: [booking.dateLabel, booking.time].filter(Boolean).join(' '),
+    durationMinutes: Number(booking.durationMinutes || 0) || '',
+    price: text(booking.price || ''),
+    serviceTitle: text(booking.serviceTitle || ''),
+    specialistName: text(booking.specialistName || ''),
+    status: normalized.status,
+    statusLabel: normalized.statusLabel,
+    startAt: text(booking.startAt || ''),
+    endAt: text(booking.endAt || ''),
     partnerId: booking.providerType === 'partner' ? text(booking.providerId) : '',
     expertId: booking.providerType === 'expert' ? text(booking.providerId) : '',
     ownerUserIds: Array.isArray(booking.ownerUserIds) ? booking.ownerUserIds.map(id => text(id, 180)).filter(Boolean) : [],

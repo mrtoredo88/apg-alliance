@@ -18,11 +18,20 @@ import {
   safeDialogIdPart,
 } from '../../../server-shared/context-dialogs.js';
 import {
+  BOOKING_ACTIVE_STATUSES,
   BOOKING_STATUSES,
+  bookingBlocksSlot,
+  buildBookingHistoryEntry,
   buildBookingDialogContext,
   buildBookingProfile,
+  buildBookingReminders,
+  canTransitionBookingStatus,
   formatBookingDateKey,
+  getBookingStatusLabel,
   isOnlineBookingEnabled,
+  normalizeBooking,
+  normalizeBookingStatus,
+  rangesOverlap,
 } from '../../../server-shared/booking.js';
 
 const MAX_TEXT = 4000;
@@ -1206,8 +1215,20 @@ async function actionBookingCreate(db, req, actor) {
 
   await db.runTransaction(async tx => {
     const existing = await tx.get(bookingRef);
-    if (existing.exists && ![BOOKING_STATUSES.cancelled, BOOKING_STATUSES.noShow].includes(existing.data()?.status)) {
+    if (existing.exists && ![BOOKING_STATUSES.cancelled, BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider, BOOKING_STATUSES.noShow].includes(normalizeBookingStatus(existing.data()?.status))) {
+      const existingBooking = normalizeBooking({ id: existing.id, ...(existing.data() || {}) });
+      if (existingBooking.userId === actor.userId && existingBooking.serviceId === service.id) {
+        booking = existingBooking;
+        return;
+      }
       throw Object.assign(new Error('Это время уже занято. Выберите другое окно.'), { statusCode: 409, code: 'BOOKING_SLOT_TAKEN' });
+    }
+    const providerBookings = await tx.get(db.collection('bookings').where('providerId', '==', providerId));
+    const conflict = providerBookings.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .find(item => bookingBlocksSlot(item, { providerType, providerId, specialistId: specialist?.id || 'default', startAt, endAt }));
+    if (conflict) {
+      throw Object.assign(new Error('Это время уже занято. Выберите другой свободный интервал.'), { statusCode: 409, code: 'BOOKING_SLOT_TAKEN' });
     }
     booking = {
       id: bookingRef.id,
@@ -1229,12 +1250,15 @@ async function actionBookingCreate(db, req, actor) {
       userName: actorName(actor),
       userPhoto: safeString(actor.user?.photo || actor.user?.photo_200, 1000) || null,
       ownerUserIds,
-      status: BOOKING_STATUSES.new,
+      status: BOOKING_STATUSES.pending,
+      statusLabel: getBookingStatusLabel(BOOKING_STATUSES.pending),
+      statusHistory: [buildBookingHistoryEntry({ fromStatus: '', toStatus: BOOKING_STATUSES.pending, actorId: actor.userId, actorRole: 'user', reason: 'Создана встреча' })],
       dateKey,
       dateLabel: startDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' }),
       time: safeString(slotPayload.time || startDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), 20),
       startAt: startDate.toISOString(),
       endAt: endDate.toISOString(),
+      reminders: buildBookingReminders(startDate.toISOString()),
       comment: safeString(req.body?.comment, 800),
       source: safeString(req.body?.source || 'booking-flow', 80),
       createdAt: FieldValue.serverTimestamp(),
@@ -1295,6 +1319,299 @@ async function actionBookingCreate(db, req, actor) {
   })));
   await audit(db, req, actor, 'booking:create', 'bookings', booking.id, 'success', { providerType, providerId, serviceId: service.id, dialogId });
   return { ok: true, booking, dialogId };
+}
+
+function bookingActorRole(booking = {}, actor = {}) {
+  if (String(booking.userId || '') === String(actor.userId || '')) return 'user';
+  if (uniqueSafeIds(booking.ownerUserIds || []).includes(actor.userId) || hasRole(actor.user || {}, ROLES.owner) || hasRole(actor.user || {}, ROLES.admin)) return 'provider';
+  return '';
+}
+
+async function assertBookingAccess(db, booking, actor, required = 'any') {
+  const role = bookingActorRole(booking, actor);
+  if (role) return role;
+  const collectionName = booking.providerType === 'expert' ? 'experts' : 'partners';
+  const providerSnap = booking.providerId ? await db.collection(collectionName).doc(String(booking.providerId)).get().catch(() => null) : null;
+  if (providerSnap?.exists && actorOwnsProfile(providerSnap.data() || {}, actor)) return 'provider';
+  if (required === 'user' || required === 'provider') {
+    throw Object.assign(new Error('Нет доступа к этой встрече.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+  }
+  return '';
+}
+
+function bookingRecipientIds(booking = {}, actor = {}) {
+  const ownerIds = uniqueSafeIds(booking.ownerUserIds || []);
+  if (String(actor.userId) === String(booking.userId)) return ownerIds;
+  return uniqueSafeIds([booking.userId]);
+}
+
+async function writeBookingNotification(db, booking, targetUserId, title, body, type = 'bookingUpdated') {
+  const notificationId = `booking_${type}_${safeDialogIdPart(targetUserId)}_${safeDialogIdPart(booking.id || booking.bookingId)}`.slice(0, 900);
+  await db.collection('notifications').doc(notificationId).set({
+    id: notificationId,
+    userId: targetUserId,
+    targetUserId,
+    category: 'messages',
+    type,
+    title,
+    body,
+    text: body,
+    dialogId: booking.dialogId || null,
+    bookingId: booking.id || booking.bookingId,
+    objectType: 'booking',
+    objectId: booking.id || booking.bookingId,
+    deepLink: booking.dialogId ? buildDialogDeepLink(booking.dialogId) : '/profile',
+    isRead: false,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  if (booking.dialogId) {
+    await sendDialogPush(db, targetUserId, notificationId, title, body, booking.dialogId).catch(() => {});
+  }
+}
+
+async function appendBookingSystemEvent(db, booking, text, actor) {
+  if (!booking.dialogId) return;
+  const dialogRef = db.collection('contextDialogs').doc(booking.dialogId);
+  const messageRef = dialogRef.collection('messages').doc();
+  const message = {
+    id: messageRef.id,
+    dialogId: booking.dialogId,
+    type: 'booking',
+    objectId: booking.id || booking.bookingId,
+    context: buildBookingDialogContext(booking),
+    text,
+    senderId: 'system',
+    senderName: 'АПГ',
+    senderRole: 'system',
+    status: 'delivered',
+    isSystem: true,
+    unreadSilent: true,
+    createdAt: FieldValue.serverTimestamp(),
+  };
+  const dialogSnap = await dialogRef.get().catch(() => null);
+  const dialog = dialogSnap?.exists ? { id: dialogSnap.id, ...(dialogSnap.data() || {}) } : null;
+  const participantIds = uniqueSafeIds(dialog?.participantIds || [booking.userId, ...(booking.ownerUserIds || [])]);
+  const batch = db.batch();
+  batch.set(messageRef, message, { merge: true });
+  participantIds.forEach(participantId => {
+    batch.set(db.collection('users').doc(participantId).collection('contextDialogMessages').doc(messageRef.id), message, { merge: true });
+  });
+  if (dialog) {
+    const nextDialog = {
+      ...dialog,
+      context: buildBookingDialogContext(booking),
+      lastMessage: message,
+      lastMessageAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    batch.set(dialogRef, nextDialog, { merge: true });
+    participantIds.forEach(participantId => {
+      batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(booking.dialogId), dialogMirrorPayload(nextDialog, participantId), { merge: true });
+    });
+  }
+  await batch.commit();
+}
+
+function bookingEventText(action, before, after, reason = '') {
+  const when = `${after.dateLabel || ''} ${after.time || ''}`.trim();
+  if (action === 'confirm') return 'Встреча подтверждена партнером.';
+  if (action === 'cancel') return `${after.status === BOOKING_STATUSES.cancelledByProvider ? 'Встреча отменена партнером.' : 'Встреча отменена пользователем.'}${reason ? `\nПричина: ${reason}` : ''}`;
+  if (action === 'requestReschedule') return `Запрошен перенос встречи на ${after.pendingReschedule?.dateLabel || when}.`;
+  if (action === 'respondReschedule' && after.status === BOOKING_STATUSES.rescheduled) return `Встреча перенесена с ${before.dateLabel || ''} ${before.time || ''} на ${when}.`;
+  if (action === 'respondReschedule') return 'Запрос на перенос отклонен.';
+  if (action === 'complete') return 'Встреча завершена.';
+  if (action === 'noShow') return `Клиент не пришел.${reason ? `\nКомментарий: ${reason}` : ''}`;
+  return `Статус встречи изменен: ${getBookingStatusLabel(after.status)}.`;
+}
+
+function normalizeSlotFromBody(body = {}, current = {}) {
+  const slot = body.slot && typeof body.slot === 'object' ? body.slot : {};
+  const startAt = safeString(slot.startAt || body.startAt, 80);
+  const endAt = safeString(slot.endAt || body.endAt, 80);
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (!startAt || !endAt || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
+  return {
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    dateKey: formatBookingDateKey(start),
+    dateLabel: start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' }),
+    time: safeString(slot.time || start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), 20),
+    specialistId: safeString(body.specialistId || slot.specialistId || current.specialistId || 'default', 80),
+    specialistName: safeString(body.specialistName || slot.specialistName || current.specialistName || '', 160),
+  };
+}
+
+async function assertBookingSlotFree(tx, db, booking, slot, ignoreBookingId = '') {
+  const providerBookings = await tx.get(db.collection('bookings').where('providerId', '==', booking.providerId));
+  const conflict = providerBookings.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .find(item => bookingBlocksSlot(item, {
+      providerType: booking.providerType,
+      providerId: booking.providerId,
+      specialistId: slot.specialistId || booking.specialistId || 'default',
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+    }, { ignoreBookingId }));
+  if (conflict) {
+    throw Object.assign(new Error('Это время уже занято. Выберите другой свободный интервал.'), { statusCode: 409, code: 'BOOKING_SLOT_TAKEN' });
+  }
+}
+
+async function persistBookingMirrors(db, booking) {
+  const batch = db.batch();
+  batch.set(db.collection('users').doc(booking.userId).collection('bookings').doc(booking.id), booking, { merge: true });
+  uniqueSafeIds(booking.ownerUserIds || []).forEach(ownerId => {
+    batch.set(db.collection('users').doc(ownerId).collection('bookings').doc(booking.id), { ...booking, ownerView: true }, { merge: true });
+  });
+  await batch.commit();
+}
+
+async function actionBookingLifecycle(db, req, actor, kind) {
+  const bookingId = safeString(req.body?.bookingId || req.body?.id, 260);
+  if (!bookingId) throw Object.assign(new Error('Не указана встреча.'), { statusCode: 400, code: 'BOOKING_BAD_ID' });
+  const reason = safeString(req.body?.reason || req.body?.comment, 800);
+  const ref = db.collection('bookings').doc(bookingId);
+  let before = null;
+  let booking = null;
+  let role = '';
+  let notificationType = 'bookingUpdated';
+  const preSnap = await ref.get();
+  if (!preSnap.exists) throw Object.assign(new Error('Встреча не найдена.'), { statusCode: 404, code: 'BOOKING_NOT_FOUND' });
+  const preBooking = normalizeBooking({ id: preSnap.id, ...(preSnap.data() || {}) });
+  const preRole = await assertBookingAccess(db, preBooking, actor);
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw Object.assign(new Error('Встреча не найдена.'), { statusCode: 404, code: 'BOOKING_NOT_FOUND' });
+    before = normalizeBooking({ id: snap.id, ...(snap.data() || {}) });
+    role = preRole || bookingActorRole(before, actor);
+
+    let nextStatus = before.status;
+    const changes = {};
+    const patch = {};
+
+    if (kind === 'confirm') {
+      if (role !== 'provider') throw Object.assign(new Error('Подтвердить встречу может только партнер или эксперт.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+      nextStatus = BOOKING_STATUSES.confirmed;
+      notificationType = 'bookingConfirmed';
+    } else if (kind === 'cancel') {
+      if (role === 'provider' && !reason) throw Object.assign(new Error('Укажите причину отмены.'), { statusCode: 400, code: 'BOOKING_REASON_REQUIRED' });
+      nextStatus = role === 'provider' ? BOOKING_STATUSES.cancelledByProvider : BOOKING_STATUSES.cancelledByUser;
+      notificationType = 'bookingCancelled';
+    } else if (kind === 'requestReschedule') {
+      const slot = normalizeSlotFromBody(req.body, before);
+      if (!slot || new Date(slot.startAt).getTime() <= Date.now() + 10 * 60 * 1000) throw Object.assign(new Error('Выберите доступный будущий интервал.'), { statusCode: 400, code: 'BOOKING_BAD_SLOT' });
+      await assertBookingSlotFree(tx, db, before, slot, before.id);
+      nextStatus = BOOKING_STATUSES.rescheduleRequested;
+      patch.pendingReschedule = {
+        ...slot,
+        requestedBy: actor.userId,
+        requestedByRole: role || 'user',
+        reason,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      };
+      changes.pendingReschedule = patch.pendingReschedule;
+      notificationType = 'bookingRescheduleRequested';
+    } else if (kind === 'respondReschedule') {
+      if (role !== 'provider') throw Object.assign(new Error('Ответить на перенос может только партнер или эксперт.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+      const decision = safeString(req.body?.decision || req.body?.response, 40);
+      const proposedSlot = normalizeSlotFromBody(req.body, before);
+      if (decision === 'reject') {
+        nextStatus = BOOKING_STATUSES.confirmed;
+        patch.pendingReschedule = null;
+        notificationType = 'bookingRescheduleRejected';
+      } else {
+        const slot = proposedSlot || before.pendingReschedule;
+        if (!slot?.startAt || !slot?.endAt) throw Object.assign(new Error('Нет нового интервала для переноса.'), { statusCode: 400, code: 'BOOKING_BAD_SLOT' });
+        await assertBookingSlotFree(tx, db, before, slot, before.id);
+        nextStatus = BOOKING_STATUSES.rescheduled;
+        Object.assign(patch, {
+          startAt: slot.startAt,
+          endAt: slot.endAt,
+          dateKey: slot.dateKey || formatBookingDateKey(slot.startAt),
+          dateLabel: slot.dateLabel,
+          time: slot.time,
+          specialistId: slot.specialistId || before.specialistId,
+          specialistName: slot.specialistName || before.specialistName,
+          reminders: buildBookingReminders(slot.startAt),
+          pendingReschedule: null,
+        });
+        changes.from = { startAt: before.startAt, endAt: before.endAt, specialistId: before.specialistId };
+        changes.to = { startAt: patch.startAt, endAt: patch.endAt, specialistId: patch.specialistId };
+        notificationType = 'bookingRescheduled';
+      }
+    } else if (kind === 'complete') {
+      if (role !== 'provider') throw Object.assign(new Error('Завершить встречу может только партнер или эксперт.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+      if (![BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(before.status)) throw Object.assign(new Error('Завершить можно только подтвержденную встречу.'), { statusCode: 400, code: 'BOOKING_BAD_TRANSITION' });
+      if (new Date(before.startAt).getTime() > Date.now() + 5 * 60 * 1000) throw Object.assign(new Error('Встречу можно завершить после ее начала.'), { statusCode: 400, code: 'BOOKING_TOO_EARLY' });
+      nextStatus = BOOKING_STATUSES.completed;
+      patch.reviewPromptAvailable = true;
+      notificationType = 'bookingCompleted';
+    } else if (kind === 'noShow') {
+      if (role !== 'provider') throw Object.assign(new Error('Отметить неявку может только партнер или эксперт.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+      nextStatus = BOOKING_STATUSES.noShow;
+      notificationType = 'bookingNoShow';
+    }
+
+    if (!canTransitionBookingStatus(before.status, nextStatus)) {
+      throw Object.assign(new Error('Недопустимый переход статуса встречи.'), { statusCode: 400, code: 'BOOKING_BAD_TRANSITION' });
+    }
+
+    const historyEntry = buildBookingHistoryEntry({
+      fromStatus: before.status,
+      toStatus: nextStatus,
+      actorId: actor.userId,
+      actorRole: role || 'user',
+      reason,
+      changes,
+    });
+    booking = normalizeBooking({
+      ...before,
+      ...patch,
+      status: nextStatus,
+      statusLabel: getBookingStatusLabel(nextStatus),
+      statusHistory: [...(Array.isArray(before.statusHistory) ? before.statusHistory : []), historyEntry],
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(ref, booking, { merge: true });
+  });
+
+  await persistBookingMirrors(db, booking);
+  const text = bookingEventText(kind, before, booking, reason);
+  await appendBookingSystemEvent(db, booking, text, actor);
+  await Promise.all(bookingRecipientIds(booking, actor).map(userId => writeBookingNotification(db, booking, userId, `📅 ${booking.providerName || 'Встреча АПГ'}`, text, notificationType).catch(() => {})));
+  await audit(db, req, actor, `booking:${kind}`, 'bookings', booking.id, 'success', { fromStatus: before.status, toStatus: booking.status, dialogId: booking.dialogId || '' });
+  return { ok: true, booking, dialogId: booking.dialogId || '' };
+}
+
+async function actionBookingList(db, req, actor, calendar = false) {
+  const providerType = safeString(req.body?.providerType, 40);
+  const providerId = safeString(req.body?.providerId, 160);
+  let rows = [];
+  if (providerId) {
+    const snap = await db.collection(providerType === 'expert' ? 'experts' : 'partners').doc(providerId).get();
+    const adminAccess = hasRole(actor.user || {}, ROLES.owner) || hasRole(actor.user || {}, ROLES.admin);
+    if (!snap.exists || (!adminAccess && !actorOwnsProfile(snap.data() || {}, actor))) throw Object.assign(new Error('Нет доступа к календарю.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+    const bookingsSnap = await db.collection('bookings').where('providerId', '==', providerId).get();
+    rows = bookingsSnap.docs.map(doc => normalizeBooking({ id: doc.id, ...(doc.data() || {}) }));
+  } else {
+    const bookingsSnap = await db.collection('users').doc(actor.userId).collection('bookings').get();
+    rows = bookingsSnap.docs.map(doc => normalizeBooking({ id: doc.id, ...(doc.data() || {}) }));
+  }
+  if (!calendar) return { ok: true, bookings: rows };
+  const from = req.body?.from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const to = req.body?.to || new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString();
+  const specialistId = safeString(req.body?.specialistId, 80);
+  const status = safeString(req.body?.status, 80);
+  const items = rows
+    .filter(item => !specialistId || String(item.specialistId || '') === specialistId)
+    .filter(item => !status || item.status === normalizeBookingStatus(status))
+    .filter(item => rangesOverlap(item.startAt, item.endAt, from, to) || (item.startMs >= new Date(from).getTime() && item.startMs < new Date(to).getTime()))
+    .sort((a, b) => (a.startMs || 0) - (b.startMs || 0));
+  return { ok: true, bookings: items, calendar: { from, to, specialistId, status, items } };
 }
 
 async function actionLogCreate(db, req, actor, collection, source) {
@@ -1925,6 +2242,14 @@ async function routeAction(db, req, actor) {
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');
   if (action === 'expert:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'expert');
   if (action === 'booking:create') return actionBookingCreate(db, req, actor);
+  if (action === 'booking:confirm') return actionBookingLifecycle(db, req, actor, 'confirm');
+  if (action === 'booking:cancel') return actionBookingLifecycle(db, req, actor, 'cancel');
+  if (action === 'booking:requestReschedule') return actionBookingLifecycle(db, req, actor, 'requestReschedule');
+  if (action === 'booking:respondReschedule') return actionBookingLifecycle(db, req, actor, 'respondReschedule');
+  if (action === 'booking:complete') return actionBookingLifecycle(db, req, actor, 'complete');
+  if (action === 'booking:noShow') return actionBookingLifecycle(db, req, actor, 'noShow');
+  if (action === 'booking:list') return actionBookingList(db, req, actor, false);
+  if (action === 'booking:calendar') return actionBookingList(db, req, actor, true);
   if (action === 'loki:settings') return actionLokiSettings(db, req, actor);
   if (action === 'loki:analytics') return actionLokiAnalytics(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);
