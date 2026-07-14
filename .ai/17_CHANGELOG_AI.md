@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Workspace Dialogs CRM
+**Коммит:** `pending`
+**Файлы:** `src/workspace/WorkspaceDialogsCRM.jsx`, `src/workspace/DesktopWorkspace.jsx`, `server-shared/workspace-dialogs.js`, `server/src/routes/user-actions.js`, `scripts/context-dialogs-test.mjs`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Раздел `Диалоги` в Desktop Workspace стал коммуникационным CRM-центром: левая колонка с поиском, фильтрами, непрочитанными/архивом/закреплёнными; центральный чат; правая CRM-панель клиента.
+- Экран использует существующие `contextDialogs`, `contextDialogMessages`, `dialog:*` actions, realtime-зеркала, booking-связи, уведомления и history без создания второго мессенджера.
+- Добавлены приватные рабочие поля диалога `pinned`, `archived`, `notes`, `status` через `dialog:workspaceUpdate`; заметки сохраняются только в mirror владельца/сотрудника и не показываются пользователю.
+**Почему:** партнёр или эксперт должен сопровождать клиента из Workspace: видеть контекст, переписку, встречи, историю, заметки и быстрые действия в одном рабочем экране.
+
 ## [2026-07-14] feat: Workspace profile editor entry
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`

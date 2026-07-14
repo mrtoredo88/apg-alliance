@@ -75,6 +75,7 @@ assert.ok(desktopWorkspaceSource.includes("if (activeSection === 'profile')"));
 assert.ok(desktopWorkspaceSource.includes('<DigitalShowcaseBuilder'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceEventsManager'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceMeetingsCRM'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspaceDialogsCRM'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
 const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };

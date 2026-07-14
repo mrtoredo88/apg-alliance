@@ -37,6 +37,7 @@ import {
   buildBookingChangeEntry,
   sanitizeBookingInternalNotes,
 } from '../../../server-shared/workspace-bookings.js';
+import { sanitizeDialogWorkspaceNotes } from '../../../server-shared/workspace-dialogs.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import {
   buildWorkspaceEventBase,
@@ -2648,7 +2649,7 @@ async function getDialogForActor(db, dialogId, actor) {
   const dialog = { id: snap.id, ...(snap.data() || {}) };
   const storedParticipants = uniqueSafeIds(dialog.participantIds || []);
   const ownerIds = uniqueSafeIds(dialog.ownerUserIds || dialog.context?.ownerUserIds || []);
-  const allowed = storedParticipants.includes(actor.userId) || storedParticipants.includes(actor.uid) || ownerIds.includes(actor.userId);
+  const allowed = storedParticipants.includes(actor.userId) || storedParticipants.includes(actor.uid) || ownerIds.includes(actor.userId) || hasRole(actor.user || {}, ROLES.owner) || hasRole(actor.user || {}, ROLES.admin);
   if (!allowed) {
     throw Object.assign(new Error('Нет доступа к диалогу.'), { statusCode: 403, code: 'DIALOG_FORBIDDEN' });
   }
@@ -2778,6 +2779,46 @@ async function actionDialogAiAssist(db, req, actor) {
   const enabled = req.body?.enabled === true;
   await db.collection('users').doc(actor.userId).set({ contextDialogAiAssist: enabled, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   return { ok: true, enabled };
+}
+
+async function actionDialogWorkspaceUpdate(db, req, actor) {
+  const dialogId = safeString(req.body?.dialogId, 260);
+  const { dialog } = await getDialogForActor(db, dialogId, actor);
+  const ownerIds = uniqueSafeIds(dialog.ownerUserIds || dialog.context?.ownerUserIds || []);
+  const isWorkspaceOwner = ownerIds.includes(actor.userId) || hasRole(actor.user || {}, ROLES.owner) || hasRole(actor.user || {}, ROLES.admin);
+  if (!isWorkspaceOwner) {
+    throw Object.assign(new Error('Нет доступа к рабочим заметкам диалога.'), { statusCode: 403, code: 'DIALOG_WORKSPACE_FORBIDDEN' });
+  }
+  const patch = req.body?.patch && typeof req.body.patch === 'object' ? req.body.patch : {};
+  const privatePatch = {
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: actor.userId,
+  };
+  const responsePatch = { updatedBy: actor.userId };
+  if (Object.hasOwn(patch, 'notes')) privatePatch.notes = sanitizeDialogWorkspaceNotes(patch.notes);
+  if (Object.hasOwn(patch, 'pinned')) privatePatch.pinned = patch.pinned === true;
+  if (Object.hasOwn(patch, 'archived')) privatePatch.archived = patch.archived === true;
+  if (Object.hasOwn(patch, 'status')) privatePatch.status = safeString(patch.status, 80);
+  if (Object.hasOwn(patch, 'notes')) responsePatch.notes = privatePatch.notes;
+  if (Object.hasOwn(patch, 'pinned')) responsePatch.pinned = privatePatch.pinned;
+  if (Object.hasOwn(patch, 'archived')) responsePatch.archived = privatePatch.archived;
+  if (Object.hasOwn(patch, 'status')) responsePatch.status = privatePatch.status;
+  const mirrorRef = db.collection('users').doc(actor.userId).collection('contextDialogs').doc(dialogId);
+  await mirrorRef.set({
+    ...dialogMirrorPayload(dialog, actor.userId),
+    workspacePrivate: privatePatch,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await audit(db, req, actor, 'dialog:workspaceUpdate', 'contextDialog', dialogId, 'success', {
+    pinned: privatePatch.pinned === true,
+    archived: privatePatch.archived === true,
+    hasNotes: Boolean(privatePatch.notes),
+  });
+  return {
+    ok: true,
+    dialogId,
+    workspacePrivate: responsePatch,
+  };
 }
 
 async function actionPushRegister(db, req, actor) {
@@ -2966,6 +3007,7 @@ async function routeAction(db, req, actor) {
   if (action === 'dialog:read') return actionDialogRead(db, req, actor);
   if (action === 'dialog:typing') return actionDialogTyping(db, req, actor);
   if (action === 'dialog:aiAssist') return actionDialogAiAssist(db, req, actor);
+  if (action === 'dialog:workspaceUpdate') return actionDialogWorkspaceUpdate(db, req, actor);
   if (action === 'log:error') return actionLogCreate(db, req, actor, 'errorLogs', 'api.user-actions');
   if (action === 'log:diagnostic') return actionLogCreate(db, req, actor, 'diagnostics', 'api.user-actions');
   if (action === 'guest:session') return actionGuestSession(db, req, actor);
