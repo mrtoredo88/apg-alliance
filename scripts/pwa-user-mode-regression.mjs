@@ -25,6 +25,6 @@ const userAppSource = readFileSync(new URL('../src/UserApp.jsx', import.meta.url
 assert.match(userAppSource, /readCachedArray\('apg_news_cache'\)\.filter\(item => isNotArchived\(item\) && isPublicContent\(item\)\)/);
 assert.match(userAppSource, /readCachedArray\('apg_events_cache'\)[\s\S]*isPublicContent\(item\) \|\| normalizeContentStatus\(item\) === 'completed'/);
 assert.match(userAppSource, /UserApp Branch/);
-assert.match(userAppSource, /Service Worker/);
+assert.match(userAppSource, /'serviceWorker' in navigator/);
 
 console.log('PWA User Mode regression passed');

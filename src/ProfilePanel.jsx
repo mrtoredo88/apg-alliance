@@ -201,6 +201,212 @@ function AccountMethodRow({ icon, title, subtitle, status, accent = APG2.gold })
   );
 }
 
+const DP = {
+  bg: 'linear-gradient(180deg,#f8f4ec 0%,#f4eee4 100%)',
+  card: 'rgba(255,255,255,0.78)',
+  strong: 'rgba(255,255,255,0.94)',
+  border: 'rgba(112,84,42,0.13)',
+  text: '#1F1A14',
+  soft: 'rgba(31,26,20,0.64)',
+  muted: 'rgba(31,26,20,0.44)',
+  gold: '#C89B3C',
+  goldSoft: 'rgba(200,155,60,0.13)',
+  red: '#D95D54',
+  green: '#2EB36B',
+  blue: '#4A90D9',
+  shadow: '0 22px 62px rgba(86,62,30,0.09)',
+};
+
+function dpCard(extra = {}) {
+  return {
+    background: DP.card,
+    border: `1px solid ${DP.border}`,
+    borderRadius: 8,
+    boxShadow: DP.shadow,
+    backdropFilter: 'blur(22px) saturate(1.25)',
+    WebkitBackdropFilter: 'blur(22px) saturate(1.25)',
+    ...extra,
+  };
+}
+
+function dpButton(tone = 'light', extra = {}) {
+  const primary = tone === 'primary';
+  const danger = tone === 'danger';
+  return {
+    minHeight: 38,
+    borderRadius: 8,
+    border: `1px solid ${primary ? 'rgba(200,155,60,0.48)' : danger ? 'rgba(217,93,84,0.32)' : DP.border}`,
+    background: primary ? 'linear-gradient(135deg,#F2D58A,#C89B3C)' : danger ? 'rgba(217,93,84,0.09)' : 'rgba(255,255,255,0.62)',
+    color: primary ? '#241807' : danger ? DP.red : DP.text,
+    padding: '8px 12px',
+    fontSize: 13,
+    lineHeight: '17px',
+    fontWeight: 820,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    textDecoration: 'none',
+    ...extra,
+  };
+}
+
+function dpText(value, fallback = '') {
+  return String(value ?? '').trim() || fallback;
+}
+
+function profileDateText(value) {
+  if (!value) return '';
+  const ms = typeof value.toMillis === 'function'
+    ? value.toMillis()
+    : typeof value.toDate === 'function'
+      ? value.toDate().getTime()
+      : new Date(value).getTime();
+  if (!ms || Number.isNaN(ms)) return '';
+  return new Date(ms).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+}
+
+function DesktopSection({ title, icon, action, children, style }) {
+  return (
+    <section style={dpCard({ padding: 18, display: 'grid', gap: 14, ...style })}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+          <span style={{ color: DP.gold, fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
+          <h2 style={{ margin: 0, color: DP.text, fontSize: 17, lineHeight: '22px', fontWeight: 930 }}>{title}</h2>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function DesktopEmpty({ title, text }) {
+  return (
+    <div style={{ borderRadius: 8, border: `1px dashed ${DP.border}`, background: 'rgba(255,255,255,0.42)', padding: 16, textAlign: 'center' }}>
+      <div style={{ color: DP.text, fontSize: 14, fontWeight: 860 }}>{title}</div>
+      {text && <div style={{ color: DP.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{text}</div>}
+    </div>
+  );
+}
+
+function DesktopKpi({ icon, label, value, sub }) {
+  return (
+    <div style={dpCard({ padding: 13, minHeight: 82, boxShadow: '0 12px 30px rgba(86,62,30,0.055)', display: 'grid', alignContent: 'center', justifyItems: 'center', textAlign: 'center' })}>
+      <div style={{ color: DP.gold, fontSize: 20, lineHeight: '22px' }}>{icon}</div>
+      <div style={{ color: DP.text, fontSize: 22, lineHeight: '27px', fontWeight: 940, marginTop: 4 }}>{value}</div>
+      <div style={{ color: DP.soft, fontSize: 12, lineHeight: '15px', marginTop: 1 }}>{label}</div>
+      {sub && <div style={{ color: DP.muted, fontSize: 10.5, lineHeight: '14px', marginTop: 5 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function DesktopProgress({ value, color = DP.gold }) {
+  return (
+    <div style={{ height: 8, borderRadius: 999, background: 'rgba(88,67,37,0.13)', overflow: 'hidden' }}>
+      <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, Number(value) || 0))}%`, borderRadius: 999, background: `linear-gradient(90deg, ${color}, #E8C97A)`, transition: 'width 0.4s ease' }} />
+    </div>
+  );
+}
+
+function DesktopBookingRow({ item, onDialog, onReschedule, onCancel, onReview }) {
+  const active = item?.isActive;
+  const completed = item?.status === 'completed';
+  return (
+    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.52)', padding: 11, display: 'grid', gap: 9 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, alignItems: 'start' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: DP.text, fontSize: 14, lineHeight: '18px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item?.providerName || 'Запись АПГ'}</div>
+          <div style={{ color: DP.soft, fontSize: 12.5, lineHeight: '17px', marginTop: 2 }}>{item?.serviceTitle || 'Услуга'} · {[item?.dateLabel, item?.time].filter(Boolean).join(' ') || 'время уточняется'}</div>
+          {bookingJourneySummary(item) && <div style={{ color: DP.gold, fontSize: 11.5, lineHeight: '16px', marginTop: 4, fontWeight: 780 }}>{bookingJourneySummary(item)}</div>}
+        </div>
+        <span style={{ borderRadius: 999, background: active ? 'rgba(46,179,107,0.12)' : completed ? 'rgba(200,155,60,0.13)' : 'rgba(31,26,20,0.06)', color: active ? DP.green : completed ? DP.gold : DP.soft, border: `1px solid ${active ? 'rgba(46,179,107,0.28)' : completed ? 'rgba(200,155,60,0.24)' : DP.border}`, padding: '4px 8px', fontSize: 11, lineHeight: '14px', fontWeight: 850, whiteSpace: 'nowrap' }}>{item?.statusLabel || 'Запись'}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+        {item?.dialogId && <button onClick={() => onDialog?.(item.dialogId)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Диалог</button>}
+        {active && <button onClick={() => onReschedule?.(item)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Перенести</button>}
+        {active && <button onClick={() => onCancel?.(item)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12, color: DP.red })}>Отменить</button>}
+        {completed && (item?.journey?.reviewPromptAvailable || item?.reviewPromptAvailable) && !item?.journey?.reviewPublishedAt && <button onClick={() => onReview?.(item)} style={dpButton('primary', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Отзыв</button>}
+      </div>
+    </div>
+  );
+}
+
+function DesktopFavoriteRow({ item, onOpen }) {
+  return (
+    <button onClick={() => onOpen?.(item)} style={{ border: 0, background: 'transparent', padding: 0, display: 'grid', gridTemplateColumns: '42px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+      {item?.logoUrl ? <img src={item.logoUrl} alt="" loading="lazy" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover' }} /> : <div style={{ width: 42, height: 42, borderRadius: 8, background: DP.goldSoft, color: DP.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{item?.emoji || '◆'}</div>}
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', color: DP.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item?.name || 'Партнёр АПГ'}</span>
+        <span style={{ display: 'block', color: DP.soft, fontSize: 12, lineHeight: '16px', marginTop: 1 }}>{item?.categoryLabel || item?.category || 'Избранное'}</span>
+      </span>
+      <span style={{ color: DP.gold, fontSize: 18 }}>›</span>
+    </button>
+  );
+}
+
+function DesktopNewsRow({ item, onOpen }) {
+  return (
+    <button onClick={() => onOpen?.(item)} style={{ border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.46)', borderRadius: 8, padding: '9px 10px', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+      <span style={{ display: 'block', color: DP.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getNewsTitle(item)}</span>
+      <span style={{ display: 'block', color: DP.soft, fontSize: 11.5, lineHeight: '15px', marginTop: 3 }}>{formatNewsDate(item)}</span>
+    </button>
+  );
+}
+
+function DesktopProfileEditor({ user, onClose, onSaved }) {
+  const [form, setForm] = useState(() => ({
+    displayName: dpText(user?.displayName || [user?.first_name, user?.last_name].filter(Boolean).join(' ')),
+    about: dpText(user?.about || user?.bio || user?.description),
+    phone: dpText(user?.phone),
+    telegram: dpText(user?.telegram || user?.telegramUsername),
+    vk: dpText(user?.vk || user?.vkUrl),
+  }));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const save = async () => {
+    if (!user?.id || saving) return;
+    setSaving(true);
+    setError('');
+    const patch = {
+      displayName: form.displayName.trim(),
+      about: form.about.trim(),
+      phone: form.phone.trim(),
+      telegram: form.telegram.trim(),
+      vk: form.vk.trim(),
+    };
+    try {
+      await userAction('profile:update', { userId: String(user.id), patch });
+      onSaved?.(patch);
+      onClose?.();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить профиль.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  const inputStyle = { width: '100%', minHeight: 42, borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.72)', color: DP.text, outline: 'none', padding: '0 11px', fontFamily: 'inherit', fontSize: 13.5, boxSizing: 'border-box' };
+  return (
+    <ApgModal title="Редактировать профиль" subtitle="Личные данные обычного профиля АПГ." onClose={onClose} maxWidth={520}>
+      <div style={{ display: 'grid', gap: 11 }}>
+        <input value={form.displayName} onChange={event => update('displayName', event.target.value)} placeholder="Имя" style={inputStyle} />
+        <textarea value={form.about} onChange={event => update('about', event.target.value)} placeholder="Кратко о себе" style={{ ...inputStyle, minHeight: 96, resize: 'vertical', padding: 11, lineHeight: '19px' }} />
+        <input value={form.phone} onChange={event => update('phone', event.target.value)} placeholder="Телефон" style={inputStyle} />
+        <input value={form.telegram} onChange={event => update('telegram', event.target.value)} placeholder="Telegram" style={inputStyle} />
+        <input value={form.vk} onChange={event => update('vk', event.target.value)} placeholder="VK" style={inputStyle} />
+        {error && <div style={{ color: DP.red, fontSize: 12.5, lineHeight: '18px' }}>{error}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 9 }}>
+          <button onClick={onClose} style={dpButton('light', { width: '100%' })}>Отмена</button>
+          <button onClick={save} disabled={saving || !form.displayName.trim()} style={dpButton('primary', { width: '100%', opacity: saving || !form.displayName.trim() ? 0.58 : 1 })}>{saving ? 'Сохраняем...' : 'Сохранить'}</button>
+        </div>
+      </div>
+    </ApgModal>
+  );
+}
+
 function bookingJourneySummary(item = {}) {
   const journey = item.journey || {};
   const parts = [];
@@ -406,7 +612,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingReview }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingReview, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -659,6 +865,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIosHint, setShowIosHint] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -853,6 +1060,277 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       ownedPartner && { label: 'Кабинет партнера', icon: '◆', onClick: onOpenPartnerCabinet },
       ownedExpert && { label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
     ].filter(Boolean);
+
+    if (desktopMode) {
+      const roleLabels = [
+        ownedPartner ? 'Партнёр' : '',
+        ownedExpert ? 'Эксперт' : '',
+      ].filter(Boolean);
+      const roleLabel = roleLabels.length ? roleLabels.join(' · ') : 'Участник';
+      const profileAbout = dpText(user?.about || user?.bio || user?.description);
+      const joinedText = profileDateText(user?.createdAt || user?.joinedAt || user?.registeredAt || user?.firstSeenAt);
+      const activeBookings = [
+        ...bookingGroups.pending,
+        ...bookingGroups.actionRequired,
+        ...bookingGroups.upcoming,
+      ].slice(0, 4);
+      const nextAchievement = achievements.find(item => !item.unlocked);
+      const unlockedPreview = achievements.filter(item => item.unlocked).slice(0, 4);
+      const contactRows = [
+        userEmail && { id: 'email', label: 'Email', value: userEmail, href: `mailto:${userEmail}`, icon: '✉' },
+        (user?.phone) && { id: 'phone', label: 'Телефон', value: user.phone, href: `tel:${String(user.phone).replace(/[^\d+]/g, '')}`, icon: '☎' },
+        (user?.telegram || user?.telegramUsername || user?.linkedTelegram?.username) && { id: 'telegram', label: 'Telegram', value: user.telegram || user.telegramUsername || `@${user.linkedTelegram.username}`, href: `https://telegram.me/${String(user.telegram || user.telegramUsername || user.linkedTelegram.username).replace(/^@+/, '')}`, icon: '↗' },
+        (user?.vk || user?.vkUrl) && { id: 'vk', label: 'VK', value: user.vk || user.vkUrl, href: String(user.vk || user.vkUrl).startsWith('http') ? user.vk || user.vkUrl : `https://vk.com/${user.vk || user.vkUrl}`, icon: '↗' },
+      ].filter(Boolean);
+      const quickActions = [
+        { id: 'activity', label: 'Активность', icon: '◷', onClick: onOpenActivity },
+        { id: 'referral', label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+        { id: 'notifications', label: notificationsEnabled ? 'Уведомления вкл' : 'Уведомления', icon: notificationsEnabled ? '✓' : '🔔', onClick: onEnableNotifications },
+        { id: 'theme', label: isDark ? 'Светлая тема' : 'Тёмная тема', icon: isDark ? '☀' : '☾', onClick: onToggleTheme },
+        ownedPartner && { id: 'partner', label: 'Кабинет партнёра', icon: '◆', onClick: onOpenPartnerCabinet },
+        ownedExpert && { id: 'expert', label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
+      ].filter(Boolean);
+      const handleDesktopReschedule = item => {
+        const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
+        if (!startAt) return;
+        const start = new Date(String(startAt).trim().replace(' ', 'T'));
+        if (Number.isNaN(start.getTime())) return alert('Не удалось распознать дату.');
+        const duration = Number(item.durationMinutes || 60);
+        runBookingAction('booking:requestReschedule', item, { slot: { startAt: start.toISOString(), endAt: new Date(start.getTime() + duration * 60000).toISOString() }, reason: 'Запрос пользователя' });
+      };
+      const handleDesktopCancel = item => {
+        if (!confirm('Отменить запись?')) return;
+        const reason = prompt('Причина отмены, если хотите указать') || '';
+        runBookingAction('booking:cancel', item, { reason });
+      };
+      const desktopModals = (
+        <>
+          {showProfileEditor && createPortal(
+            <DesktopProfileEditor
+              user={user}
+              onClose={() => setShowProfileEditor(false)}
+              onSaved={(patch) => onUserUpdate?.(patch)}
+            />,
+            document.body
+          )}
+          {showEmailAuth && createPortal(
+            <ApgModal
+              title="Войти по почте"
+              subtitle="Введите email, чтобы сохранить ключи, избранное и прогресс."
+              onClose={() => setShowEmailAuth(false)}
+            >
+              <EmailAuth onCancel={() => setShowEmailAuth(false)} onSuccess={handleEmailAuthSuccess} />
+            </ApgModal>,
+            document.body
+          )}
+          {showShareModal && createPortal(
+            <ShareModal
+              user={user}
+              userKeys={userKeys}
+              streak={streak}
+              scannedCount={scannedCount}
+              completedTasks={completedTasks}
+              unlockedAchievements={achievements.filter(a => a.unlocked).length}
+              level={level}
+              onClose={() => setShowShareModal(false)}
+              onShareVK={async () => {
+                const link = buildReferralLink(user);
+                const msg = buildReferralInviteText(link);
+                setShowShareModal(false);
+                if (navigator.share) {
+                  try { await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; }
+                }
+                vkBridge.send('VKWebAppShare', { link, text: msg }).catch(() => {});
+              }}
+            />,
+            document.body
+          )}
+        </>
+      );
+
+      return (
+        <div data-desktop-user-profile style={{ minHeight: '100svh', background: DP.bg, color: DP.text, padding: '18px clamp(20px, 3vw, 44px) 44px', boxSizing: 'border-box', overflowX: 'clip' }}>
+          {achievementToast && (
+            <div style={{ position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 700, ...dpCard({ width: 'min(520px, calc(100vw - 32px))', padding: 14, display: 'flex', gap: 12, alignItems: 'center', animation: toastExiting ? 'achievementOut 0.3s ease both' : 'achievementPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both' }) }}>
+              <div style={{ width: 44, height: 44, borderRadius: 8, background: achievementToast.color + '24', display: 'grid', placeItems: 'center', fontSize: 22 }}>{achievementToast.emoji}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: DP.gold, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0 }}>Новое достижение</div>
+                <div style={{ color: DP.text, fontSize: 15, fontWeight: 880 }}>{achievementToast.title}</div>
+              </div>
+              <button type="button" onClick={dismissToast} style={dpButton('light', { width: 36, height: 36, minHeight: 36, padding: 0 })}>×</button>
+            </div>
+          )}
+
+          <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gap: 16 }}>
+            <header style={dpCard({ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.72)' })}>
+              <button type="button" onClick={() => onBack?.()} style={{ ...dpButton('light', { minHeight: 36, background: 'transparent', borderColor: 'transparent' }) }}>← Назад в приложение</button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: DP.text, fontSize: 18, lineHeight: '23px', fontWeight: 940 }}>Мой профиль</div>
+                <div style={{ color: DP.soft, fontSize: 12, lineHeight: '16px' }}>Ключи, записи, избранное и настройки участника</div>
+              </div>
+              <button type="button" onClick={() => setShowProfileEditor(true)} style={dpButton('primary')}>✎ Редактировать профиль</button>
+              <button type="button" onClick={onOpenReference} style={dpButton('light', { width: 38, height: 38, minHeight: 38, padding: 0 })}>•••</button>
+            </header>
+
+            <section style={dpCard({ padding: 22, background: DP.strong, display: 'grid', gridTemplateColumns: 'minmax(360px, 1fr) minmax(420px, 0.95fr)', gap: 24, alignItems: 'center' })}>
+              <div style={{ display: 'grid', gridTemplateColumns: '124px minmax(0,1fr)', gap: 20, alignItems: 'center' }}>
+                <div style={{ position: 'relative', width: 124, height: 124 }}>
+                  {safeUser.photo_200
+                    ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(200,155,60,0.32)', boxShadow: '0 18px 42px rgba(31,26,20,0.16)' }} />
+                    : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'linear-gradient(135deg,rgba(200,155,60,0.22),rgba(255,255,255,0.72))', border: '3px solid rgba(200,155,60,0.24)', display: 'grid', placeItems: 'center', color: DP.gold, fontSize: 42, fontWeight: 950 }}>{displayName[0] || 'А'}</div>
+                  }
+                  <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Изменить профиль" style={{ position: 'absolute', right: -2, bottom: 5, width: 38, height: 38, borderRadius: '50%', border: `1px solid ${DP.border}`, background: '#fff', color: DP.text, boxShadow: '0 10px 24px rgba(31,26,20,0.12)', cursor: 'pointer', fontSize: 15 }}>✎</button>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <h1 style={{ margin: 0, color: DP.text, fontSize: 30, lineHeight: '36px', fontWeight: 960, overflowWrap: 'anywhere' }}>{displayName}</h1>
+                    <span style={{ color: DP.blue, fontSize: 18 }}>●</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 8 }}>
+                    <span style={{ borderRadius: 999, background: DP.goldSoft, color: DP.gold, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 850 }}>{roleLabel}</span>
+                    <span style={{ borderRadius: 999, background: 'rgba(31,26,20,0.05)', color: DP.soft, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 760 }}>{level.emoji} {level.label}</span>
+                  </div>
+                  <div style={{ color: DP.soft, fontSize: 14, lineHeight: '20px', marginTop: 10 }}>{profileAbout || 'Краткое описание пока не заполнено.'}</div>
+                  <div style={{ display: 'grid', gap: 5, marginTop: 12, color: DP.muted, fontSize: 12.5, lineHeight: '17px' }}>
+                    {ownedPartner?.name && <div>Партнёр: {ownedPartner.name}</div>}
+                    {ownedExpert?.name && <div>Эксперт: {ownedExpert.name}</div>}
+                    {joinedText && <div>В АПГ с {joinedText}</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 10 }}>
+                <DesktopKpi icon="🗝" label="Ключей" value={userKeys} sub={nextLevel ? `До ${nextLevel.label}: ${toNext}` : 'Максимум'} />
+                <DesktopKpi icon="★" label="Уровень" value={level.label} sub={`${pct}% прогресс`} />
+                <DesktopKpi icon="🏆" label="Достижения" value={`${unlockedCount}/${achievements.length}`} sub="Получено" />
+                <DesktopKpi icon="♡" label="Избранное" value={favorites.length} sub="Партнёры" />
+                <DesktopKpi icon="📅" label="Записи" value={activeBookings.length} sub="Ближайшие" />
+              </div>
+            </section>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(360px, 0.75fr)', gap: 16, alignItems: 'start' }}>
+              <div style={{ display: 'grid', gap: 16 }}>
+                <DesktopSection
+                  title="Мои записи"
+                  icon="📅"
+                  action={<button type="button" onClick={onOpenActivity} style={dpButton('light', { minHeight: 32, padding: '6px 10px', fontSize: 12 })}>Все записи →</button>}
+                >
+                  {!activeBookings.length ? (
+                    <DesktopEmpty title="Записей пока нет" text="Когда вы запишетесь к партнёру или эксперту, ближайшие встречи появятся здесь." />
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10 }}>
+                      {activeBookings.map(item => <DesktopBookingRow key={item.id || item.bookingId} item={item} onDialog={onOpenDialog} onReschedule={handleDesktopReschedule} onCancel={handleDesktopCancel} onReview={onOpenBookingReview} />)}
+                    </div>
+                  )}
+                </DesktopSection>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,0.88fr)', gap: 16 }}>
+                  <DesktopSection
+                    title="Избранное"
+                    icon="★"
+                    action={favoritePartners.length > 0 ? <span style={{ color: DP.muted, fontSize: 12 }}>{favoritePartners.length}</span> : null}
+                  >
+                    {!favoritePartners.length ? (
+                      <DesktopEmpty title="Пока пусто" text="Добавляйте места сердцем, чтобы быстро возвращаться к ним." />
+                    ) : (
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        {favoritePartners.slice(0, 4).map(item => <DesktopFavoriteRow key={item.id} item={item} onOpen={onOpenPartner} />)}
+                      </div>
+                    )}
+                  </DesktopSection>
+
+                  <DesktopSection
+                    title="Сохранённые материалы"
+                    icon="📰"
+                    action={<button type="button" onClick={() => onOpenNews?.()} style={dpButton('light', { minHeight: 32, padding: '6px 10px', fontSize: 12 })}>Открыть →</button>}
+                  >
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: DP.soft, fontSize: 12 }}>
+                      <span>{savedNews.length} сохранено</span>
+                      <span>·</span>
+                      <span>{readLaterNews.length} на потом</span>
+                    </div>
+                    {!savedNewsItems.length ? (
+                      <DesktopEmpty title="Материалов нет" text="Сохраняйте новости, чтобы вернуться к ним позже." />
+                    ) : (
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {savedNewsItems.slice(0, 2).map(item => <DesktopNewsRow key={item.id} item={item} onOpen={onOpenNews} />)}
+                      </div>
+                    )}
+                  </DesktopSection>
+                </div>
+
+                <DesktopSection title="Контакты" icon="☎">
+                  {!contactRows.length ? (
+                    <DesktopEmpty title="Контакты не заполнены" text="Добавьте контакты через редактирование профиля." />
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
+                      {contactRows.map(row => (
+                        <a key={row.id} href={row.href} target={row.id === 'email' || row.id === 'phone' ? undefined : '_blank'} rel="noreferrer" style={{ ...dpButton('light', { justifyContent: 'space-between', minHeight: 48, padding: '8px 10px' }) }}>
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: 'block', color: DP.text, fontSize: 12.5, fontWeight: 850 }}>{row.label}</span>
+                            <span style={{ display: 'block', color: DP.soft, fontSize: 12, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.value}</span>
+                          </span>
+                          <span>{row.icon}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </DesktopSection>
+              </div>
+
+              <aside style={{ display: 'grid', gap: 16 }}>
+                <DesktopSection title="Ключи и достижения" icon="🗝">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.48)', padding: 12 }}>
+                      <div style={{ color: DP.soft, fontSize: 12, fontWeight: 820 }}>Ключи</div>
+                      <div style={{ color: DP.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, marginTop: 6 }}>{userKeys}</div>
+                      <DesktopProgress value={pct} color={level.color || DP.gold} />
+                      <div style={{ color: DP.muted, fontSize: 11.5, lineHeight: '16px', marginTop: 6 }}>{nextLevel ? `До следующего уровня: ${toNext} ключей` : 'Максимальный уровень'}</div>
+                    </div>
+                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.48)', padding: 12 }}>
+                      <div style={{ color: DP.soft, fontSize: 12, fontWeight: 820 }}>Достижения</div>
+                      <div style={{ color: DP.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, marginTop: 6 }}>{unlockedCount}/{achievements.length}</div>
+                      <DesktopProgress value={achievements.length ? unlockedCount / achievements.length * 100 : 0} />
+                      <div style={{ color: DP.muted, fontSize: 11.5, lineHeight: '16px', marginTop: 6 }}>{nextAchievement ? `Ближайшее: ${nextAchievement.title}` : 'Все открыты'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    {(unlockedPreview.length ? unlockedPreview : achievements.slice(0, 3)).map(item => (
+                      <div key={item.id} style={{ width: 70, display: 'grid', gap: 6, justifyItems: 'center', opacity: item.unlocked ? 1 : 0.42, filter: item.unlocked ? 'none' : 'grayscale(1)' }}>
+                        <div style={{ width: 48, height: 48, borderRadius: 8, background: item.unlocked ? `${item.color}22` : 'rgba(31,26,20,0.06)', border: `1px solid ${item.unlocked ? `${item.color}55` : DP.border}`, display: 'grid', placeItems: 'center', fontSize: 21 }}>{item.emoji}</div>
+                        <div style={{ color: item.unlocked ? DP.text : DP.muted, fontSize: 11, lineHeight: '14px', textAlign: 'center', fontWeight: 760 }}>{item.title}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={onOpenReference} style={dpButton('light', { width: 'fit-content', minHeight: 34, padding: '7px 11px', fontSize: 12 })}>Подробнее о ключах →</button>
+                </DesktopSection>
+
+                <DesktopSection title="Быстрые действия" icon="⚡">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9 }}>
+                    {quickActions.map(action => (
+                      <button key={action.id} type="button" onClick={action.onClick} style={dpButton('light', { minHeight: 58, flexDirection: 'column', gap: 5, padding: 8, fontSize: 12 })}>
+                        <span style={{ color: DP.gold, fontSize: 18 }}>{action.icon}</span>
+                        <span>{action.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </DesktopSection>
+
+                <DesktopSection title="Аккаунт" icon="☰">
+                  <div style={{ display: 'grid', gap: 9 }}>
+                    <button type="button" onClick={() => setShowShareModal(true)} style={dpButton('light', { justifyContent: 'space-between' })}>Поделиться АПГ <span>↗</span></button>
+                    <button type="button" onClick={handleWriteAdmin} style={dpButton('light', { justifyContent: 'space-between' })}>Написать в поддержку <span>↗</span></button>
+                    {!isGuest && <button type="button" onClick={onLogout} style={dpButton('danger', { justifyContent: 'space-between' })}>Выйти <span>→</span></button>}
+                    {isGuest && <button type="button" onClick={() => setShowEmailAuth(true)} style={dpButton('primary')}>Войти по email</button>}
+                  </div>
+                </DesktopSection>
+              </aside>
+            </div>
+          </div>
+          {desktopModals}
+        </div>
+      );
+    }
 
     return (
       <GlassPanel>

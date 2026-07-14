@@ -3809,6 +3809,8 @@ export function UserApp() {
                     onOpenHealth={() => goPanel('health')}
                     onOpenDialog={openContextDialogById}
                     onOpenBookingReview={openBookingReview}
+                    desktopMode={desktopDevice}
+                    onBack={() => goPanel('home')}
                   />
                 </Suspense>
               </Panel>
