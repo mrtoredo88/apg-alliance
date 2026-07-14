@@ -2793,3 +2793,13 @@
 - Экран `WorkspaceAnalyticsCenter` использует только существующие источники: `news.stats`, `events`, `bookings`, `contextDialogs`, `newsComments`, `notifications`, `scans` и поля статистики профиля.
 - Добавлены экспорт CSV, XLS-compatible `.xls`, PDF через печать браузера и кнопка `Проанализировать результаты`, которая передаёт snapshot Локи через `sessionStorage`.
 - `scripts/workspace-core-test.mjs` расширен проверками периода, ownership-фильтрации, KPI, воронки, рекомендаций, admin snapshot и CSV.
+
+# 2026-07-14 — Workspace Promotions Center
+
+- Раздел `Акции и предложения` в Desktop Workspace заменён на полноценный Promotions Center: KPI, поиск, статусы, категории, периоды, режимы карточки/таблица/календарь и редактор текущей акции профиля.
+- Добавлен shared-layer `server-shared/workspace-promotions.js`: типы акций, санитайзинг полей, статусная модель, KPI, фильтрация и сериализация существующих profile-based `offer/promo/discount/specialOffer` в рабочий промо-объект.
+- Новые серверные действия `workspacePromotion:list`, `workspacePromotion:save`, `workspacePromotion:submit`, `workspacePromotion:archive` используют существующие коллекции `partners`/`experts`, ownership через `assertOwnedProfile` и audit trail.
+- Для опубликованных акций правки из Workspace сохраняются в `promotionPendingPatch` и отправляются на модерацию, не меняя публичный `offer` до админского решения.
+- Редактор поддерживает заголовок, описание, тип, категорию, период, лимиты, цену, условия, ограничения, CTA, связи с мероприятием/новостью, обложку через `PhotoUpload`, галерею, теги, SEO, autosave, локальный draft, Cmd/Ctrl+S и beforeunload-защиту.
+- Локи встроен как ассистент редактора: предлагает название, описание, CTA и условия только после явного клика пользователя.
+- `scripts/workspace-core-test.mjs` расширен проверками promotion shared-layer, статусов, KPI, фильтров, санитайзинга и подключения нового Workspace-компонента.

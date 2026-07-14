@@ -37,6 +37,14 @@ import {
   filterWorkspaceAnalyticsSources,
   workspaceAnalyticsRowsToCsv,
 } from '../server-shared/workspace-analytics.js';
+import {
+  buildWorkspacePromotionFromProfile,
+  buildWorkspacePromotionKpis,
+  filterWorkspacePromotions,
+  sanitizeWorkspacePromotionPatch,
+  workspacePromotionStatus,
+  workspacePromotionStatusLabel,
+} from '../server-shared/workspace-promotions.js';
 
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.mobile), WORKSPACE_MODES.mobile);
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.tablet), WORKSPACE_MODES.tablet);
@@ -92,6 +100,7 @@ assert.ok(desktopWorkspaceSource.includes('<WorkspaceEventsManager'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceMeetingsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceDialogsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceNewsCenter'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspacePromotionsCenter'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceAnalyticsCenter'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
@@ -147,6 +156,34 @@ const newsFromEvent = buildWorkspaceNewsFromEvent(workspaceEvents[0], partnerPro
 assert.equal(newsFromEvent.partnerId, 'partner-1');
 assert.equal(newsFromEvent.eventId, 'own-draft');
 assert.equal(newsFromEvent.category, 'events');
+
+const promotionProfiles = [
+  { id: 'partner-1', name: 'Coffee House', offer: 'Кофе + десерт', category: 'Еда', promotionStats: { views: 100, claimed: 12, used: 8 }, offerUntil: '2026-07-31T00:00:00.000Z' },
+  { id: 'partner-2', name: 'Studio', promotionDraft: { title: 'Маникюр -20%', description: 'Будни до 16:00', category: 'Красота', promotionType: 'discount' }, promotionStatus: 'draft', promotionStats: { views: 5 } },
+  { id: 'expert-1', name: 'Анна', promotionPendingPatch: { title: 'Консультация', description: 'Первая встреча' }, promotionStatus: 'moderation' },
+];
+const workspacePromotions = [
+  buildWorkspacePromotionFromProfile(promotionProfiles[0], 'partner'),
+  buildWorkspacePromotionFromProfile(promotionProfiles[1], 'partner'),
+  buildWorkspacePromotionFromProfile(promotionProfiles[2], 'expert'),
+];
+assert.equal(workspacePromotions[0].status, 'published');
+assert.equal(workspacePromotions[0].offer, 'Кофе + десерт');
+assert.equal(workspacePromotions[1].status, 'draft');
+assert.equal(workspacePromotions[2].profileType, 'expert');
+assert.equal(workspacePromotionStatus(workspacePromotions[2]), 'moderation');
+assert.equal(workspacePromotionStatusLabel(workspacePromotions[0]), 'Опубликовано');
+const promotionKpis = buildWorkspacePromotionKpis(workspacePromotions);
+assert.equal(promotionKpis.total, 3);
+assert.equal(promotionKpis.published, 1);
+assert.equal(promotionKpis.draft, 1);
+assert.equal(promotionKpis.moderation, 1);
+assert.equal(promotionKpis.views, 105);
+assert.equal(promotionKpis.claimed, 12);
+assert.equal(promotionKpis.used, 8);
+assert.deepEqual(filterWorkspacePromotions(workspacePromotions, { query: 'кофе' }).map(item => item.profileId), ['partner-1']);
+assert.deepEqual(filterWorkspacePromotions(workspacePromotions, { status: 'draft' }).map(item => item.profileId), ['partner-2']);
+assert.deepEqual(sanitizeWorkspacePromotionPatch({ title: ' Скидка ', unknown: 'x', discountPercent: 250, tags: ['vip'] }), { title: 'Скидка', discountPercent: 100, tags: ['vip'], offer: 'Скидка' });
 
 const analyticsRange = buildWorkspaceAnalyticsRange({ period: '30d', now: '2026-07-14T12:00:00.000Z' });
 assert.equal(analyticsRange.period, '30d');

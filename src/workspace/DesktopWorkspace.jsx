@@ -15,6 +15,7 @@ import { WorkspaceEventsManager } from './WorkspaceEventsManager.jsx';
 import { WorkspaceMeetingsCRM } from './WorkspaceMeetingsCRM.jsx';
 import { WorkspaceDialogsCRM } from './WorkspaceDialogsCRM.jsx';
 import { WorkspaceNewsCenter } from './WorkspaceNewsCenter.jsx';
+import { WorkspacePromotionsCenter } from './WorkspacePromotionsCenter.jsx';
 import { WorkspaceAnalyticsCenter } from './WorkspaceAnalyticsCenter.jsx';
 import {
   BOOKING_STATUSES,
@@ -1572,12 +1573,7 @@ export function DesktopWorkspace({
     if (activeSection === 'booking') return <WorkspaceMeetingsCRM role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenDialog={onOpenDialog} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'dialogs') return <WorkspaceDialogsCRM user={user} role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'analytics') return <WorkspaceAnalyticsCenter role={activeRole} profile={activeProfile} onOpenPanel={onOpenPanel} onToast={onToast} />;
-    if (activeSection === 'offers') return (
-      <div style={{ display: 'grid', gap: 14 }}>
-        <WorkspaceCenter center={buildCenterConfig({ id: 'offers', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
-        <DataSection type="partners" title="Акции и предложения" subtitle="Партнёры с актуальными предложениями" items={partners.filter(item => item.offer)} emptyText="Акций пока нет." onOpen={() => onOpenPanel?.('offers')} />
-      </div>
-    );
+    if (activeSection === 'offers') return <WorkspacePromotionsCenter role={activeRole} profile={activeProfile} events={events} news={news} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'settings' && businessHubAvailable) {
       return (
         <div style={{ display: 'grid', gap: 14 }}>

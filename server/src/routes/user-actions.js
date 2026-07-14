@@ -44,6 +44,11 @@ import {
   workspaceNewsBelongsToProfile,
 } from '../../../server-shared/workspace-news.js';
 import {
+  buildPromotionOfferText,
+  buildWorkspacePromotionFromProfile,
+  sanitizeWorkspacePromotionPatch,
+} from '../../../server-shared/workspace-promotions.js';
+import {
   buildWorkspaceAnalyticsRange,
   buildWorkspaceAnalyticsSnapshot,
   workspaceAnalyticsRowsToCsv,
@@ -1559,6 +1564,115 @@ async function actionWorkspaceNewsFromEvent(db, req, actor) {
   const ref = await db.collection('news').add(draft);
   await audit(db, req, actor, 'workspaceNews:fromEvent', 'news', ref.id, 'success', { eventId, profileId: profile.id });
   return { ok: true, id: ref.id, news: { ...draft, id: ref.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
+}
+
+function workspacePromotionCollection(role = 'partner') {
+  return role === 'expert' ? 'experts' : 'partners';
+}
+
+function workspacePromotionProfilePayload(profile = {}, role = 'partner') {
+  const type = role === 'expert' ? 'expert' : 'partner';
+  return {
+    profileId: safeString(profile.id, 180),
+    ownerProfileId: safeString(profile.id, 180),
+    ownerProfileType: type,
+    profileType: type,
+    profileName: safeString(profile.name || profile.title || profile.displayName || '', 220),
+  };
+}
+
+async function actionWorkspacePromotionList(db, req, actor) {
+  const requestedRole = safeString(req.body?.role, 40).toLowerCase();
+  const adminAccess = hasRole(actor.user || {}, ROLES.admin) || hasRole(actor.user || {}, ROLES.owner);
+  const role = requestedRole === 'admin' && adminAccess ? 'admin' : requestedRole === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const profiles = [];
+  if (role === 'admin') {
+    const [partnersSnap, expertsSnap] = await Promise.all([
+      db.collection('partners').limit(500).get(),
+      db.collection('experts').limit(500).get(),
+    ]);
+    profiles.push(...partnersSnap.docs.map(doc => ({ role: 'partner', data: { id: doc.id, ...(doc.data() || {}) } })));
+    profiles.push(...expertsSnap.docs.map(doc => ({ role: 'expert', data: { id: doc.id, ...(doc.data() || {}) } })));
+  } else {
+    const profile = await assertOwnedProfile(db, actor, role, profileId);
+    profiles.push({ role, data: profile });
+  }
+  const promotions = profiles.map(item => buildWorkspacePromotionFromProfile(item.data, item.role));
+  await audit(db, req, actor, 'workspacePromotion:list', role === 'admin' ? 'profiles' : workspacePromotionCollection(role), profileId || 'all', 'success', { role, count: promotions.length });
+  return { ok: true, promotions, profile: role === 'admin' ? { id: 'all', name: 'Вся система' } : { id: profiles[0]?.data?.id || '', name: profiles[0]?.data?.name || profiles[0]?.data?.title || '' } };
+}
+
+async function actionWorkspacePromotionSave(db, req, actor) {
+  const role = safeString(req.body?.role, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = await assertOwnedProfile(db, actor, role, profileId);
+  const patch = sanitizeWorkspacePromotionPatch(req.body?.patch || {});
+  if (!patch.title && !patch.offer && !patch.description) {
+    throw Object.assign(new Error('Для акции нужен заголовок, описание или предложение.'), { statusCode: 400, code: 'PROMOTION_EMPTY' });
+  }
+  const current = buildWorkspacePromotionFromProfile(profile, role);
+  const collection = workspacePromotionCollection(role);
+  const ref = db.collection(collection).doc(profile.id);
+  const submit = req.body?.submit === true;
+  const publicAlreadyVisible = current.status === 'published' && Boolean(profile.offer || profile.promo || profile.specialOffer || profile.discount);
+  const nowIso = new Date().toISOString();
+  const clean = {
+    ...workspacePromotionProfilePayload(profile, role),
+    ...patch,
+    offer: buildPromotionOfferText(patch),
+    updatedByUserId: actor.userId,
+    updatedAt: nowIso,
+  };
+  const data = publicAlreadyVisible || submit
+    ? {
+        promotionPendingPatch: clean,
+        promotionStatus: 'moderation',
+        promotionLifecycleStatus: 'moderation',
+        promotionContentStatus: 'moderation',
+        ...(submit ? { promotionSubmittedAt: FieldValue.serverTimestamp() } : {}),
+        promotionUpdatedAt: FieldValue.serverTimestamp(),
+        promotionUpdatedByUserId: actor.userId,
+      }
+    : {
+        promotionDraft: clean,
+        promotionStatus: 'draft',
+        promotionLifecycleStatus: 'draft',
+        promotionContentStatus: 'draft',
+        promotionUpdatedAt: FieldValue.serverTimestamp(),
+        promotionUpdatedByUserId: actor.userId,
+      };
+  await ref.set(data, { merge: true });
+  const updatedProfile = { ...profile, ...data, promotionUpdatedAt: nowIso };
+  await audit(db, req, actor, submit ? 'workspacePromotion:submit' : 'workspacePromotion:save', collection, profile.id, 'success', { role, fields: Object.keys(patch), publicAlreadyVisible });
+  return { ok: true, id: current.id, promotion: buildWorkspacePromotionFromProfile(updatedProfile, role), patch: clean };
+}
+
+async function actionWorkspacePromotionSubmit(db, req, actor) {
+  return actionWorkspacePromotionSave(db, { ...req, body: { ...(req.body || {}), submit: true, patch: req.body?.patch || req.body?.promotion || {} } }, actor);
+}
+
+async function actionWorkspacePromotionArchive(db, req, actor) {
+  const role = safeString(req.body?.role, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = await assertOwnedProfile(db, actor, role, profileId);
+  const collection = workspacePromotionCollection(role);
+  const ref = db.collection(collection).doc(profile.id);
+  const patch = {
+    offer: '',
+    promo: '',
+    specialOffer: '',
+    discount: '',
+    promotionStatus: 'archived',
+    promotionLifecycleStatus: 'archived',
+    promotionContentStatus: 'archived',
+    promotionArchivedAt: FieldValue.serverTimestamp(),
+    promotionUpdatedAt: FieldValue.serverTimestamp(),
+    promotionUpdatedByUserId: actor.userId,
+  };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspacePromotion:archive', collection, profile.id, 'success', { role });
+  return { ok: true, id: `${role}:${profile.id}:main`, promotion: buildWorkspacePromotionFromProfile({ ...profile, ...patch, promotionUpdatedAt: new Date().toISOString() }, role) };
 }
 
 async function getWorkspaceAnalyticsComments(db, newsIds = []) {
@@ -3184,6 +3298,10 @@ async function routeAction(db, req, actor) {
   if (action === 'workspaceNews:submit') return actionWorkspaceNewsSubmit(db, req, actor);
   if (action === 'workspaceNews:archive') return actionWorkspaceNewsArchive(db, req, actor);
   if (action === 'workspaceNews:fromEvent') return actionWorkspaceNewsFromEvent(db, req, actor);
+  if (action === 'workspacePromotion:list') return actionWorkspacePromotionList(db, req, actor);
+  if (action === 'workspacePromotion:save') return actionWorkspacePromotionSave(db, req, actor);
+  if (action === 'workspacePromotion:submit') return actionWorkspacePromotionSubmit(db, req, actor);
+  if (action === 'workspacePromotion:archive') return actionWorkspacePromotionArchive(db, req, actor);
   if (action === 'workspaceAnalytics:snapshot') return actionWorkspaceAnalyticsSnapshot(db, req, actor);
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
