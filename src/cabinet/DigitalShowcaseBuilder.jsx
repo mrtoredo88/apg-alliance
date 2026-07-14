@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassInput, GlassSection } from '../components/Apg2ProfileGlass.jsx';
 import { EntityPreviewCard } from '../components/EntityPreviewCard.jsx';
 import { GalleryUpload, PhotoUpload } from '../PhotoUpload.jsx';
@@ -101,8 +101,8 @@ function CompletionCard({ completion, onOpenTab }) {
 }
 
 function SaveState({ state }) {
-  const label = state === 'saving' ? 'Сохраняем...' : state === 'error' ? 'Не сохранено' : state === 'saved' ? 'Изменения сохранены' : 'Автосохранение';
-  return <GlassBadge tone={state === 'saved' ? 'gold' : 'glass'}>{state === 'saved' ? '✓ ' : ''}{label}</GlassBadge>;
+  const label = state === 'saving' ? 'Сохраняем...' : state === 'dirty' ? 'Есть несохранённые изменения' : state === 'error' ? 'Не сохранено' : state === 'saved' ? 'Изменения сохранены' : 'Автосохранение';
+  return <GlassBadge tone={state === 'saved' ? 'gold' : 'glass'}>{state === 'saved' ? '✓ ' : state === 'dirty' ? '• ' : ''}{label}</GlassBadge>;
 }
 
 function ShowcaseTab({ draft, update, roleId, publicUrl }) {
@@ -360,35 +360,86 @@ function LokiTab({ tips, onOpenTab }) {
 
 export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSaved, onOpenModule, onEventCreated, onToast, publicUrl }) {
   const roleId = role?.id || 'partner';
+  const draftKey = profile?.id ? `apg_showcase_draft_${roleId}_${profile.id}` : '';
   const [activeTab, setActiveTab] = useState('showcase');
-  const [draft, setDraft] = useState(() => buildShowcaseDraft(profile, roleId));
+  const [draft, setDraft] = useState(() => {
+    const base = buildShowcaseDraft(profile, roleId);
+    if (!profile?.id || typeof localStorage === 'undefined') return base;
+    try {
+      const saved = JSON.parse(localStorage.getItem(`apg_showcase_draft_${roleId}_${profile.id}`) || 'null');
+      return saved?.draft ? { ...base, ...saved.draft } : base;
+    } catch {
+      return base;
+    }
+  });
   const [saveState, setSaveState] = useState('idle');
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setDraft(buildShowcaseDraft(profile, roleId));
-    setDirty(false);
+    const base = buildShowcaseDraft(profile, roleId);
+    let restored = null;
+    if (profile?.id && typeof localStorage !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`apg_showcase_draft_${roleId}_${profile.id}`) || 'null');
+        restored = saved?.draft ? { ...base, ...saved.draft } : null;
+      } catch {}
+    }
+    setDraft(restored || base);
+    setDirty(Boolean(restored));
     setSaveState('idle');
   }, [profile?.id, roleId]);
 
+  const saveDraft = useCallback(async () => {
+    if (!role?.updateAction || !profile?.id) return;
+    setSaveState('saving');
+    try {
+      const patch = buildShowcasePatch(draft, roleId);
+      await userAction(role.updateAction, { id: profile.id, patch });
+      const updated = { ...profile, ...patch };
+      onSaved?.(updated);
+      if (draftKey && typeof localStorage !== 'undefined') localStorage.removeItem(draftKey);
+      setDirty(false);
+      setSaveState('saved');
+    } catch (error) {
+      setSaveState('error');
+      onToast?.(error.message || 'Не удалось сохранить витрину.', 'error');
+    }
+  }, [draft, draftKey, onSaved, onToast, profile, role?.updateAction, roleId]);
+
   useEffect(() => {
     if (!dirty || !role?.updateAction || !profile?.id) return undefined;
-    setSaveState('saving');
-    const timer = setTimeout(async () => {
-      try {
-        const patch = buildShowcasePatch(draft, roleId);
-        await userAction(role.updateAction, { id: profile.id, patch });
-        const updated = { ...profile, ...patch };
-        onSaved?.(updated);
-        setDirty(false);
-        setSaveState('saved');
-      } catch (error) {
-        setSaveState('error');
-        onToast?.(error.message || 'Не удалось сохранить витрину.', 'error');
-      }
-    }, 900);
+    setSaveState('dirty');
+    const timer = setTimeout(saveDraft, 900);
     return () => clearTimeout(timer);
   }, [dirty, draft, role?.updateAction, profile?.id, roleId]);
+
+  useEffect(() => {
+    if (!dirty || !draftKey || typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ draft, updatedAt: Date.now() }));
+    } catch {}
+  }, [dirty, draft, draftKey]);
+
+  useEffect(() => {
+    const onBeforeUnload = event => {
+      if (!dirty) return undefined;
+      event.preventDefault();
+      event.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (!(event.metaKey || event.ctrlKey) || event.key?.toLowerCase() !== 's') return;
+      event.preventDefault();
+      saveDraft();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [saveDraft]);
 
   const update = (patch) => {
     setDraft(prev => ({ ...prev, ...patch }));

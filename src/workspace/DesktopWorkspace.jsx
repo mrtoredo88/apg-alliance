@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
+import { buildCabinetSnapshot, getCabinetPublicUrl } from '../cabinet/CabinetModules.js';
+import { DigitalShowcaseBuilder } from '../cabinet/DigitalShowcaseBuilder.jsx';
 import { NewsCard } from '../NewsPage.jsx';
 import { EventPosterCard } from '../EventsPage.jsx';
 import { PartnerCard } from '../HomePanelV2.jsx';
@@ -38,6 +40,7 @@ const WS = {
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Рабочий стол', icon: '🏠', description: 'Что сделать сегодня' },
+  { id: 'profile', label: 'Мой профиль', icon: '👤', description: 'Карточка и витрина' },
   { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
   { id: 'booking', label: 'Встречи', icon: '📅', description: 'Календарь и записи' },
   { id: 'dialogs', label: 'Диалоги', icon: '💬', description: 'Вопросы по объектам', badge: data => data.dialogUnreadCount || 0 },
@@ -101,7 +104,7 @@ function getRoleSpecificTasks({ view, data, profileStatus, actions }) {
     text: profileStatus.value < 100 ? `Не хватает: ${profileStatus.missing.slice(0, 2).join(', ')}` : 'Можно переходить к публикациям',
     priority: profileStatus.value < 100 ? 'Средний' : 'Готово',
     tone: profileStatus.value < 100 ? '#E39A35' : WS.green,
-    onClick: actions.openCabinet,
+    onClick: actions.openProfile,
   };
 
   if (view.id === 'expert') {
@@ -227,6 +230,7 @@ function getProfileCompletion(profile) {
 function buildWorkspaceContext(activeSection) {
   const map = {
     dashboard: { label: 'Рабочий стол', prompt: 'Что мне важно сделать сегодня?', next: 'начать с рабочих задач' },
+    profile: { label: 'Мой профиль', prompt: 'Что улучшить в моей карточке?', next: 'обновить витрину и контакты' },
     growth: { label: 'Привлечение клиентов', prompt: 'Как сегодня привести новых клиентов?', next: 'запустить QR, ссылку или промоматериал' },
     content: { label: 'Контент', prompt: 'Что стоит опубликовать?', next: 'проверить новости, статьи и черновики' },
     events: { label: 'Мероприятия', prompt: 'Какие мероприятия требуют внимания?', next: 'проверить календарь и регистрации' },
@@ -550,6 +554,7 @@ function getPriorityTone(priority) {
 function getWorkspaceAction(actions, target) {
   const map = {
     dashboard: actions.openDashboard,
+    profile: actions.openProfile,
     growth: actions.openPartners,
     content: actions.openNews,
     events: actions.openEvents,
@@ -565,6 +570,70 @@ function getWorkspaceAction(actions, target) {
     loki: actions.openLoki,
   };
   return map[target] || actions.openDashboard;
+}
+
+function profileEvents(events = [], profile = {}, roleId = '') {
+  if (!profile?.id) return [];
+  return events.filter(event => {
+    if (roleId === 'expert') return event.expertId === profile.id || event.submittedProfileId === profile.id || event.proposalAuthorType === 'expert' && event.submittedProfileName === profile.name;
+    if (roleId === 'partner') return event.partnerId === profile.id || event.submittedProfileId === profile.id || event.proposalAuthorType === 'partner' && event.submittedProfileName === profile.name;
+    return false;
+  });
+}
+
+function WorkspaceProfileSection({ role, profile, events = [], roleState, onRoleChange, onSaved, onOpenPanel, onToast }) {
+  if (!role || !['partner', 'expert'].includes(role.id) || !profile?.id) {
+    return (
+      <PlaceholderSection
+        title="Мой профиль"
+        text="Для редактирования карточки нужен привязанный профиль партнёра или эксперта. Администраторские системные разделы остаются в админке."
+        actions={[
+          { label: 'Открыть админку', tone: 'gold', onClick: () => onOpenPanel?.('admin') },
+        ]}
+      />
+    );
+  }
+
+  const snapshot = buildCabinetSnapshot({ role, profile, events, reviews: [] });
+  const publicUrl = getCabinetPublicUrl(snapshot);
+  const relatedEvents = profileEvents(events, profile, role.id);
+  const statusText = profile.moderationStatus === 'pending_review' || profile.profileModerationStatus === 'pending_review'
+    ? 'Изменения ожидают проверки.'
+    : 'Изменения публикуются сразу в вашу карточку.';
+
+  return (
+    <div data-workspace-profile-editor style={{ display: 'grid', gap: 14 }}>
+      <Panel title="Мой профиль" style={{ padding: 18, background: 'rgba(255,255,255,0.82)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: roleState?.hasMultipleRoles ? 'minmax(0,1fr) auto' : 'minmax(0,1fr)', gap: 14, alignItems: 'center' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>{role.id === 'expert' ? 'Профиль эксперта' : 'Профиль партнёра'}</div>
+            <div style={{ color: WS.text, fontSize: 24, lineHeight: '29px', fontWeight: 950, marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name || 'Карточка АПГ'}</div>
+            <div style={{ color: WS.soft, fontSize: 13.5, lineHeight: '20px', marginTop: 6 }}>{statusText}</div>
+          </div>
+          {roleState?.hasMultipleRoles && (
+            <div style={{ display: 'flex', gap: 6, padding: 5, borderRadius: 18, background: 'rgba(88,67,37,0.06)' }}>
+              {roleState.roles.filter(item => ['partner', 'expert'].includes(item.id)).map(item => (
+                <button key={item.id} type="button" onClick={() => onRoleChange?.(item.id)} style={buttonStyle({ minHeight: 38, borderRadius: 15, padding: '8px 12px', background: item.id === role.id ? 'linear-gradient(135deg,#F6D891,#D0A14C)' : 'rgba(255,255,255,0.62)', color: item.id === role.id ? '#24190B' : WS.text })}>
+                  {item.id === 'expert' ? 'Профиль эксперта' : 'Профиль партнёра'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Panel>
+      <DigitalShowcaseBuilder
+        role={role}
+        profile={profile}
+        relatedEvents={relatedEvents}
+        onSaved={updated => onSaved?.(role.id, updated)}
+        onOpenModule={module => {
+          if (module === 'events') onOpenPanel?.('events');
+        }}
+        onToast={onToast}
+        publicUrl={publicUrl}
+      />
+    </div>
+  );
 }
 
 function IntelligenceTaskRow({ item, actions }) {
@@ -1397,25 +1466,29 @@ export function DesktopWorkspace({
   const [activeSection, setActiveSection] = useState('dashboard');
   const [query, setQuery] = useState('');
   const [activeWorkspaceViewId, setActiveWorkspaceViewId] = useState(null);
-  const roleState = useMemo(() => getCabinetRoles({ user, partner: ownedPartner, expert: ownedExpert }), [user, ownedPartner, ownedExpert]);
-  const activeRole = roleState.activeRole;
+  const [profileOverrides, setProfileOverrides] = useState({});
+  const workspacePartner = profileOverrides.partner || ownedPartner;
+  const workspaceExpert = profileOverrides.expert || ownedExpert;
+  const roleState = useMemo(() => getCabinetRoles({ user, partner: workspacePartner, expert: workspaceExpert, preferredRole: activeWorkspaceViewId || undefined }), [user, workspacePartner, workspaceExpert, activeWorkspaceViewId]);
+  const activeRole = roleState.roles.find(role => role.id === activeWorkspaceViewId) || roleState.activeRole;
   const activeRoleIdentity = useMemo(() => ({ ...(user || {}), role: activeRole?.id || user?.role || 'user' }), [activeRole?.id, user]);
   const isAdminRole = hasCapability(activeRoleIdentity, CAPABILITIES.canOpenAdminPanel);
   const businessHubFlag = useMemo(() => getBusinessHubFlag(), []);
-  const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: ownedPartner, expert: ownedExpert, flag: businessHubFlag }), [user, ownedPartner, ownedExpert, businessHubFlag]);
-  const activeProfile = activeRole?.id === 'expert' ? ownedExpert : activeRole?.id === 'partner' ? ownedPartner : user;
+  const businessHubAvailable = useMemo(() => canUseBusinessHub({ user, partner: workspacePartner, expert: workspaceExpert, flag: businessHubFlag }), [user, workspacePartner, workspaceExpert, businessHubFlag]);
+  const activeProfile = activeRole?.id === 'expert' ? workspaceExpert : activeRole?.id === 'partner' ? workspacePartner : user;
   const userName = user?.firstName || user?.name || user?.displayName || 'Mr. TOREDO';
   const dialogNotifications = useMemo(() => notifications.filter(item => (item?.category === 'messages' || item?.type === 'contextDialogMessage') && item?.isRead !== true), [notifications]);
   const dialogUnreadCount = dialogNotifications.length || 0;
   const workspaceData = useMemo(() => ({ userName, activeProfile, partners, experts, events, news, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience }), [userName, activeProfile, partners, experts, events, news, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience]);
   const workspaceIntelligence = useMemo(() => buildWorkspaceIntelligence({ data: workspaceData, analytics, activityTimeline, recommendations, dailySummary }), [workspaceData, analytics, activityTimeline, recommendations, dailySummary]);
-  const availableWorkspaceViews = useMemo(() => getWorkspaceRoleViews({ roles: roleState.roles, activeRole, ownedPartner, ownedExpert, isAdminRole }), [roleState.roles, activeRole, ownedPartner, ownedExpert, isAdminRole]);
+  const availableWorkspaceViews = useMemo(() => getWorkspaceRoleViews({ roles: roleState.roles, activeRole, ownedPartner: workspacePartner, ownedExpert: workspaceExpert, isAdminRole }), [roleState.roles, activeRole, workspacePartner, workspaceExpert, isAdminRole]);
   const workspaceView = availableWorkspaceViews.find(view => view.id === activeWorkspaceViewId) || availableWorkspaceViews[0] || WORKSPACE_ROLE_VIEWS.partner;
   const navItems = NAV_ITEMS.filter(item => item.id !== 'finance' || businessHubAvailable || isAdminRole || activeRole?.id === 'partner' || activeRole?.id === 'expert');
 
   const actions = {
     openDashboard: () => setActiveSection('dashboard'),
-    openCabinet: () => businessHubAvailable ? setActiveSection('settings') : onOpenPanel?.(activeRole?.id === 'expert' ? 'expert-cabinet' : 'partner-cabinet'),
+    openProfile: () => setActiveSection('profile'),
+    openCabinet: () => setActiveSection('profile'),
     openBusinessHub: () => setActiveSection('settings'),
     openNews: () => setActiveSection('content'),
     openEvents: () => setActiveSection('events'),
@@ -1452,6 +1525,10 @@ export function DesktopWorkspace({
       }
       if ((event.metaKey || event.ctrlKey) && key === '2') {
         event.preventDefault();
+        setActiveSection('profile');
+      }
+      if ((event.metaKey || event.ctrlKey) && key === '3') {
+        event.preventDefault();
         setActiveSection('growth');
       }
       if ((event.metaKey || event.ctrlKey) && key === 'l') {
@@ -1475,8 +1552,14 @@ export function DesktopWorkspace({
     setActiveSection(item.id);
   };
 
+  const handleProfileSaved = (roleId, updatedProfile) => {
+    if (!roleId || !updatedProfile?.id) return;
+    setProfileOverrides(prev => ({ ...prev, [roleId]: updatedProfile }));
+  };
+
   const renderContent = () => {
     if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} intelligence={workspaceIntelligence} dayPlan={workspaceDayPlan} />;
+    if (activeSection === 'profile') return <WorkspaceProfileSection role={activeRole} profile={activeProfile} events={events} roleState={roleState} onRoleChange={setActiveWorkspaceViewId} onSaved={handleProfileSaved} onOpenPanel={onOpenPanel} />;
     if (activeSection === 'content') return (
       <div style={{ display: 'grid', gap: 14 }}>
         <WorkspaceCenter center={buildCenterConfig({ id: 'content', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
@@ -1500,7 +1583,7 @@ export function DesktopWorkspace({
       return (
         <div style={{ display: 'grid', gap: 14 }}>
           <WorkspaceCenter center={buildCenterConfig({ id: 'settings', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
-          <BusinessHub user={user} ownedPartner={ownedPartner} ownedExpert={ownedExpert} partners={partners} experts={experts} events={events} news={news} notifications={notifications} activeRoleId={activeRole?.id} onOpenPanel={onOpenPanel} />
+          <BusinessHub user={user} ownedPartner={workspacePartner} ownedExpert={workspaceExpert} partners={partners} experts={experts} events={events} news={news} notifications={notifications} activeRoleId={activeRole?.id} onOpenPanel={onOpenPanel} />
         </div>
       );
     }

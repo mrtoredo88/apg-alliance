@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   buildWorkspaceLayout,
   createWorkspaceCache,
@@ -56,6 +57,13 @@ assert.ok(desktopPartnerNav.primary.some(item => item.id === 'business-hub'));
 
 const navIds = WORKSPACE_NAV_ITEMS.map(item => item.id);
 assert.equal(navIds.length, new Set(navIds).size);
+
+const desktopWorkspaceSource = readFileSync(new URL('../src/workspace/DesktopWorkspace.jsx', import.meta.url), 'utf8');
+const navBlock = desktopWorkspaceSource.match(/const NAV_ITEMS = \[([\s\S]*?)\];/)?.[1] || '';
+const desktopWorkspaceNavIds = [...navBlock.matchAll(/id: '([^']+)'/g)].map(match => match[1]);
+assert.deepEqual(desktopWorkspaceNavIds.slice(0, 5), ['dashboard', 'profile', 'events', 'booking', 'dialogs']);
+assert.ok(desktopWorkspaceSource.includes("if (activeSection === 'profile')"));
+assert.ok(desktopWorkspaceSource.includes('<DigitalShowcaseBuilder'));
 
 const cache = createWorkspaceCache({ ttl: 1000, max: 1 });
 cache.set('a', 1);

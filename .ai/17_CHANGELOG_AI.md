@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Workspace profile editor entry
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- В Desktop Workspace добавлен раздел `Мой профиль` вторым пунктом меню после `Рабочий стол`; профиль партнёра/эксперта открывается прямо в рабочей области Workspace.
+- Раздел использует общий `DigitalShowcaseBuilder`/`ShowcaseBuilderCore` без копирования форм: те же данные карточки, автосохранение, локальный черновик, статус сохранения, Ctrl/Cmd+S и beforeunload-защита.
+- Переключатель двойной роли теперь меняет не только визуальный режим Workspace, но и активный профиль/редактор партнёра или эксперта.
+**Почему:** Workspace должен управлять собственным бизнес-профилем, а не отправлять партнёра/эксперта искать редактирование в кабинетах или админке.
+
 ## [2026-07-14] fix: normalize Telegram input before saving
 **Коммит:** `pending`
 **Файлы:** `server-shared/telegram.js`, `src/utils/externalUrls.js`, `src/AdminPanel.jsx`, `src/cabinet/CabinetCorePage.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `server/src/routes/public-submit.js`, `server/src/routes/user-actions.js`, `scripts/telegram-url-test.mjs`, `.ai/17_CHANGELOG_AI.md`
