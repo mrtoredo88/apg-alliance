@@ -34,6 +34,15 @@ import {
   rangesOverlap,
 } from '../../../server-shared/booking.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
+import {
+  buildWorkspaceEventBase,
+  buildWorkspaceEventDuplicate,
+  filterWorkspaceEvents,
+  findWorkspaceEventConflicts,
+  sanitizeWorkspaceEventPatch,
+  workspaceEventBelongsToProfile,
+  workspaceEventStatus,
+} from '../../../server-shared/workspace-events.js';
 
 const MAX_TEXT = 4000;
 const MAX_DIALOG_TEXT = 1800;
@@ -716,6 +725,19 @@ function actorOwnsProfile(data, actor) {
     ));
 }
 
+async function assertOwnedProfile(db, actor, type = 'partner', id = '') {
+  const collection = type === 'expert' ? 'experts' : 'partners';
+  const profileId = safeString(id, 180);
+  if (!profileId) throw Object.assign(new Error('Не указан рабочий профиль.'), { statusCode: 400, code: 'PROFILE_BAD_ID' });
+  const snap = await db.collection(collection).doc(profileId).get();
+  if (!snap.exists) throw Object.assign(new Error('Профиль не найден.'), { statusCode: 404, code: 'PROFILE_NOT_FOUND' });
+  const profile = { id: snap.id, ...(snap.data() || {}) };
+  if (!actorOwnsProfile(profile, actor) && !hasRole(actor.user || {}, ROLES.admin) && !hasRole(actor.user || {}, ROLES.owner)) {
+    throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403, code: 'PROFILE_FORBIDDEN' });
+  }
+  return profile;
+}
+
 async function actionFavoritesToggle(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
@@ -973,6 +995,173 @@ async function actionEventToggle(db, req, actor) {
   });
   await audit(db, req, actor, register ? 'event:register' : 'event:unregister', 'events', eventId);
   return { ok: true, registeredEvents };
+}
+
+function workspaceEventProfileType(req) {
+  return safeString(req.body?.profileType || req.body?.type, 40) === 'expert' ? 'expert' : 'partner';
+}
+
+function workspaceEventNormalizePatch(input = {}) {
+  const patch = sanitizeWorkspaceEventPatch(input);
+  if (Object.hasOwn(patch, 'socialUrl')) patch.socialUrl = normalizeProfileUrl(patch.socialUrl, '');
+  if (Object.hasOwn(patch, 'linkUrl')) patch.linkUrl = normalizeProfileUrl(patch.linkUrl, '');
+  if (Object.hasOwn(patch, 'startAt') && patch.startAt) {
+    const start = new Date(patch.startAt);
+    if (Number.isNaN(start.getTime())) throw Object.assign(new Error('Некорректное время начала мероприятия.'), { statusCode: 400, code: 'EVENT_BAD_START' });
+    patch.startAt = start.toISOString();
+  }
+  if (Object.hasOwn(patch, 'endAt') && patch.endAt) {
+    const end = new Date(patch.endAt);
+    if (Number.isNaN(end.getTime())) throw Object.assign(new Error('Некорректное время окончания мероприятия.'), { statusCode: 400, code: 'EVENT_BAD_END' });
+    patch.endAt = end.toISOString();
+  }
+  if (patch.startAt && patch.endAt && new Date(patch.endAt).getTime() <= new Date(patch.startAt).getTime()) {
+    throw Object.assign(new Error('Конец мероприятия должен быть позже начала.'), { statusCode: 400, code: 'EVENT_BAD_INTERVAL' });
+  }
+  return patch;
+}
+
+async function assertWorkspaceEventAccess(db, actor, eventId, profileType, profileId) {
+  const profile = await assertOwnedProfile(db, actor, profileType, profileId);
+  const ref = db.collection('events').doc(eventId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Мероприятие не найдено.'), { statusCode: 404, code: 'EVENT_NOT_FOUND' });
+  const event = { id: snap.id, ...(snap.data() || {}) };
+  if (!workspaceEventBelongsToProfile(event, profile, profileType)) {
+    throw Object.assign(new Error('Нет доступа к этому мероприятию.'), { statusCode: 403, code: 'EVENT_FORBIDDEN' });
+  }
+  return { profile, ref, event };
+}
+
+async function workspaceEventConflictsForProfile(db, profile, profileType, event, ignoreId = '') {
+  const profileField = profileType === 'expert' ? 'expertId' : 'partnerId';
+  const snap = await db.collection('events').where(profileField, '==', profile.id).limit(120).get();
+  const events = filterWorkspaceEvents(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })), profile, profileType, { includeDeleted: true });
+  return findWorkspaceEventConflicts(events, event, ignoreId).map(item => ({ id: item.id, title: safeString(item.title || 'Мероприятие', 200), startAt: item.startAt || item.eventDate || item.date || '', endAt: item.endAt || '' })).slice(0, 10);
+}
+
+async function actionWorkspaceEventCreate(db, req, actor) {
+  const profileType = workspaceEventProfileType(req);
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = await assertOwnedProfile(db, actor, profileType, profileId);
+  const idempotencyKey = safeString(req.body?.idempotencyKey, 220).replace(/[^a-z0-9:_-]/gi, '_');
+  const ref = idempotencyKey
+    ? db.collection('events').doc(`workspace_${safeString(actor.userId, 80).replace(/[^a-z0-9:_-]/gi, '_')}_${idempotencyKey}`.slice(0, 900))
+    : db.collection('events').doc();
+  const existing = await ref.get();
+  if (existing.exists) return { ok: true, event: { id: ref.id, ...(existing.data() || {}) }, deduped: true };
+  const patch = workspaceEventNormalizePatch(req.body?.patch || {});
+  const event = {
+    ...buildWorkspaceEventBase({ profile, type: profileType, actor }),
+    ...patch,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    draftSavedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(event, { merge: true });
+  await audit(db, req, actor, 'workspace:eventCreate', 'events', ref.id, 'success', { profileType, profileId: profile.id });
+  const now = new Date().toISOString();
+  return { ok: true, event: { ...event, id: ref.id, createdAt: now, updatedAt: now, draftSavedAt: now } };
+}
+
+async function actionWorkspaceEventUpdate(db, req, actor) {
+  const eventId = safeString(req.body?.eventId || req.body?.id, 220);
+  const profileType = workspaceEventProfileType(req);
+  if (!eventId) throw Object.assign(new Error('Не указано мероприятие.'), { statusCode: 400, code: 'EVENT_BAD_ID' });
+  const { profile, ref, event } = await assertWorkspaceEventAccess(db, actor, eventId, profileType, req.body?.profileId);
+  const patch = workspaceEventNormalizePatch(req.body?.patch || {});
+  const status = workspaceEventStatus(event);
+  const publicEvent = ['published', 'approved'].includes(status) || event.active === true;
+  const next = publicEvent
+    ? { pendingWorkspacePatch: patch, moderationStatus: 'pending_review', submissionStatus: 'pending_review', workspacePendingAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }
+    : { ...patch, updatedAt: FieldValue.serverTimestamp(), draftSavedAt: FieldValue.serverTimestamp() };
+  const conflicts = await workspaceEventConflictsForProfile(db, profile, profileType, { ...event, ...patch }, eventId);
+  await ref.set(next, { merge: true });
+  await audit(db, req, actor, 'workspace:eventUpdate', 'events', eventId, 'success', { profileType, fields: Object.keys(patch), conflicts: conflicts.length, publicEvent });
+  const now = new Date().toISOString();
+  return { ok: true, event: { ...event, ...patch, id: eventId, updatedAt: now, draftSavedAt: publicEvent ? event.draftSavedAt || null : now, pendingWorkspacePatch: publicEvent ? patch : event.pendingWorkspacePatch || null, moderationStatus: publicEvent ? 'pending_review' : event.moderationStatus || 'draft', submissionStatus: publicEvent ? 'pending_review' : event.submissionStatus || 'draft' }, conflicts, pendingModeration: publicEvent };
+}
+
+async function actionWorkspaceEventSubmit(db, req, actor) {
+  const eventId = safeString(req.body?.eventId || req.body?.id, 220);
+  const profileType = workspaceEventProfileType(req);
+  if (!eventId) throw Object.assign(new Error('Не указано мероприятие.'), { statusCode: 400, code: 'EVENT_BAD_ID' });
+  const { profile, ref, event } = await assertWorkspaceEventAccess(db, actor, eventId, profileType, req.body?.profileId);
+  const candidate = { ...event, ...(event.pendingWorkspacePatch || {}) };
+  if (!safeString(candidate.title, 220)) throw Object.assign(new Error('Укажите название мероприятия перед модерацией.'), { statusCode: 400, code: 'EVENT_TITLE_REQUIRED' });
+  const conflicts = await workspaceEventConflictsForProfile(db, profile, profileType, candidate, eventId);
+  const patch = {
+    status: 'pending_review',
+    lifecycleStatus: 'moderation',
+    contentStatus: 'moderation',
+    moderationStatus: 'pending_review',
+    submissionStatus: 'pending_review',
+    active: false,
+    published: false,
+    submittedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspace:eventSubmit', 'events', eventId, 'success', { profileType, conflicts: conflicts.length });
+  return { ok: true, event: { ...event, id: eventId, status: 'pending_review', lifecycleStatus: 'moderation', contentStatus: 'moderation', moderationStatus: 'pending_review', submissionStatus: 'pending_review', active: false, published: false, submittedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, conflicts };
+}
+
+async function actionWorkspaceEventLifecycle(db, req, actor, kind) {
+  const eventId = safeString(req.body?.eventId || req.body?.id, 220);
+  const profileType = workspaceEventProfileType(req);
+  if (!eventId) throw Object.assign(new Error('Не указано мероприятие.'), { statusCode: 400, code: 'EVENT_BAD_ID' });
+  const { ref, event } = await assertWorkspaceEventAccess(db, actor, eventId, profileType, req.body?.profileId);
+  const nowPatch = { updatedAt: FieldValue.serverTimestamp() };
+  const patch = kind === 'archive'
+    ? { ...nowPatch, status: 'archived', lifecycleStatus: 'archived', contentStatus: 'archived', archived: true, active: false, archivedAt: FieldValue.serverTimestamp(), archivedBy: actor.userId }
+    : { ...nowPatch, status: 'deleted', lifecycleStatus: 'deleted', contentStatus: 'deleted', deleted: true, archived: true, active: false, deletedAt: FieldValue.serverTimestamp(), deletedBy: actor.userId };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, `workspace:event${kind === 'archive' ? 'Archive' : 'Delete'}`, 'events', eventId, 'success', { profileType });
+  const now = new Date().toISOString();
+  const deleted = kind !== 'archive';
+  return { ok: true, event: { ...event, id: eventId, status: deleted ? 'deleted' : 'archived', lifecycleStatus: deleted ? 'deleted' : 'archived', contentStatus: deleted ? 'deleted' : 'archived', archived: true, deleted, active: false, updatedAt: now } };
+}
+
+async function actionWorkspaceEventDuplicate(db, req, actor) {
+  const eventId = safeString(req.body?.eventId || req.body?.id, 220);
+  const profileType = workspaceEventProfileType(req);
+  if (!eventId) throw Object.assign(new Error('Не указано мероприятие.'), { statusCode: 400, code: 'EVENT_BAD_ID' });
+  const { profile, event } = await assertWorkspaceEventAccess(db, actor, eventId, profileType, req.body?.profileId);
+  const duplicate = {
+    ...buildWorkspaceEventDuplicate(event, profile, profileType, actor),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    draftSavedAt: FieldValue.serverTimestamp(),
+    duplicatedFromEventId: eventId,
+  };
+  const ref = await db.collection('events').add(duplicate);
+  await audit(db, req, actor, 'workspace:eventDuplicate', 'events', ref.id, 'success', { profileType, sourceEventId: eventId });
+  const now = new Date().toISOString();
+  return { ok: true, event: { ...duplicate, id: ref.id, createdAt: now, updatedAt: now, draftSavedAt: now } };
+}
+
+async function actionEventPropose(db, req, actor) {
+  const authorType = workspaceEventProfileType({ body: { profileType: req.body?.authorType || req.body?.type } });
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = await assertOwnedProfile(db, actor, authorType, profileId);
+  const patch = workspaceEventNormalizePatch(req.body?.event || req.body?.patch || {});
+  if (!safeString(patch.title, 220)) throw Object.assign(new Error('Укажите название мероприятия.'), { statusCode: 400, code: 'EVENT_TITLE_REQUIRED' });
+  const event = {
+    ...buildWorkspaceEventBase({ profile, type: authorType, actor }),
+    ...patch,
+    status: 'pending_review',
+    lifecycleStatus: 'moderation',
+    contentStatus: 'moderation',
+    moderationStatus: 'pending_review',
+    submissionStatus: 'pending_review',
+    submittedAt: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const ref = await db.collection('events').add(event);
+  await audit(db, req, actor, 'event:propose', 'events', ref.id, 'success', { authorType, profileId: profile.id });
+  const now = new Date().toISOString();
+  return { ok: true, id: ref.id, event: { ...event, id: ref.id, submittedAt: now, createdAt: now, updatedAt: now } };
 }
 
 function inferPartnerAiDraft(message = {}, profile = {}) {
@@ -2556,6 +2745,12 @@ async function routeAction(db, req, actor) {
   if (action === 'economy:exchangeTickets') return actionEconomyExchangeTickets(db, req, actor);
   if (action === 'event:toggle') return actionEventToggle(db, req, actor);
   if (action === 'event:propose') return actionEventPropose(db, req, actor);
+  if (action === 'workspace:eventCreate') return actionWorkspaceEventCreate(db, req, actor);
+  if (action === 'workspace:eventUpdate') return actionWorkspaceEventUpdate(db, req, actor);
+  if (action === 'workspace:eventSubmit') return actionWorkspaceEventSubmit(db, req, actor);
+  if (action === 'workspace:eventArchive') return actionWorkspaceEventLifecycle(db, req, actor, 'archive');
+  if (action === 'workspace:eventDelete') return actionWorkspaceEventLifecycle(db, req, actor, 'delete');
+  if (action === 'workspace:eventDuplicate') return actionWorkspaceEventDuplicate(db, req, actor);
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);

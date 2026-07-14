@@ -11,6 +11,7 @@ import { ExpertCardV2 } from '../ExpertsPage.jsx';
 import { CAPABILITIES, hasCapability } from '../roleEngine.js';
 import { motionTransition } from '../motion.js';
 import { userAction } from '../userApi.js';
+import { WorkspaceEventsManager } from './WorkspaceEventsManager.jsx';
 import {
   BOOKING_STATUSES,
   buildBookingCalendar,
@@ -1462,6 +1463,8 @@ export function DesktopWorkspace({
   onOpenAdmin,
   onOpenScan,
   onOpenDialog,
+  onEventChanged,
+  onToast,
 }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [query, setQuery] = useState('');
@@ -1566,12 +1569,7 @@ export function DesktopWorkspace({
         <DataSection type="news" title="Рабочий список публикаций" subtitle={query ? `Поиск: ${query}` : 'Новости, статьи, черновики, медиа и ИИ-редактор'} items={news} emptyText="Публикаций пока нет." onOpen={() => onOpenPanel?.('news')} />
       </div>
     );
-    if (activeSection === 'events') return (
-      <div style={{ display: 'grid', gap: 14 }}>
-        <WorkspaceCenter center={buildCenterConfig({ id: 'events', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />
-        <DataSection type="events" title="Список мероприятий" subtitle="Ближайшие мероприятия и календарный контекст" items={events} emptyText="Мероприятий пока нет." onOpen={() => onOpenPanel?.('events')} />
-      </div>
-    );
+    if (activeSection === 'events') return <WorkspaceEventsManager role={activeRole} profile={activeProfile} roleViews={availableWorkspaceViews} activeViewId={workspaceView.id} onRoleChange={setActiveWorkspaceViewId} events={events} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventChanged} onToast={onToast} />;
     if (activeSection === 'booking') return <WorkspaceMeetings role={activeRole} profile={activeProfile} actions={actions} onOpenDialog={onOpenDialog} />;
     if (activeSection === 'offers') return (
       <div style={{ display: 'grid', gap: 14 }}>

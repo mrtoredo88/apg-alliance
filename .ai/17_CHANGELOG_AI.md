@@ -2744,3 +2744,13 @@
 - Единый push после `booking:complete` теперь говорит “Спасибо за посещение …” и не создаёт серию отдельных уведомлений по ключам/штампам.
 - Добавлено серверное действие `booking:moment` и коллекция `bookingMomentAnalytics` для событий `opened`, `review_started`, `review_submitted`, `dialog_clicked`, `rebook_clicked`, `dismissed`.
 - Shared-helper `buildPostVisitMomentState` добавлен в `server-shared/booking.js` и покрыт `scripts/booking-test.mjs`.
+
+# 2026-07-14 — Workspace Events Center
+
+- Раздел `Мероприятия` в Desktop Workspace заменён на полноценный рабочий центр профиля: KPI, поиск, фильтры статусов/дат, список, календарь месяц/неделя/день и правая панель ближайших событий.
+- Добавлен shared-layer `server-shared/workspace-events.js`: единые статусы, фильтрация своих событий, проверка конфликтов интервалов, дублирование без служебных полей и статистики.
+- Добавлены owner-safe серверные действия `workspace:eventCreate`, `workspace:eventUpdate`, `workspace:eventSubmit`, `workspace:eventArchive`, `workspace:eventDelete`, `workspace:eventDuplicate`; все проверяют владение `partnerId/expertId` на сервере.
+- Для опубликованных событий правки из Workspace сохраняются как `pendingWorkspacePatch` и отправляются на модерацию, не меняя публичную карточку до админского решения.
+- Редактор мероприятий поддерживает обложку через существующий `PhotoUpload`, markdown-описание, autosave, локальный draft в `localStorage`, Cmd/Ctrl+S, предупреждения о прошедшей дате и пересечениях.
+- Старое действие `event:propose` оставлено совместимым с новым workspace-layer, чтобы кабинет партнёра/эксперта продолжал отправлять предложения на модерацию.
+- `scripts/workspace-core-test.mjs` расширен проверками партнёр/эксперт ownership, статусов, архивов, прошедших событий, конфликтов и безопасного дублирования.

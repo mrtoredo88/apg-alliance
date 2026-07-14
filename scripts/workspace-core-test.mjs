@@ -13,6 +13,15 @@ import {
   WORKSPACE_REGIONS,
 } from '../src/workspace/WorkspaceCore.js';
 import { buildWorkspaceDayPlan } from '../src/intelligence/WorkspaceDayPlanner.js';
+import {
+  buildWorkspaceEventDuplicate,
+  filterWorkspaceEvents,
+  findWorkspaceEventConflicts,
+  isWorkspaceEventPast,
+  workspaceEventBelongsToProfile,
+  workspaceEventStatus,
+  workspaceEventStatusLabel,
+} from '../server-shared/workspace-events.js';
 
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.mobile), WORKSPACE_MODES.mobile);
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.tablet), WORKSPACE_MODES.tablet);
@@ -64,6 +73,35 @@ const desktopWorkspaceNavIds = [...navBlock.matchAll(/id: '([^']+)'/g)].map(matc
 assert.deepEqual(desktopWorkspaceNavIds.slice(0, 5), ['dashboard', 'profile', 'events', 'booking', 'dialogs']);
 assert.ok(desktopWorkspaceSource.includes("if (activeSection === 'profile')"));
 assert.ok(desktopWorkspaceSource.includes('<DigitalShowcaseBuilder'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspaceEventsManager'));
+
+const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
+const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };
+const workspaceEvents = [
+  { id: 'own-draft', partnerId: 'partner-1', title: 'Черновик', status: 'draft', startAt: '2026-07-20T10:00:00.000Z', endAt: '2026-07-20T11:00:00.000Z', registeredCount: 4, views: 12 },
+  { id: 'own-conflict', partnerId: 'partner-1', title: 'Конфликт', status: 'published', startAt: '2026-07-20T10:30:00.000Z', endAt: '2026-07-20T12:00:00.000Z' },
+  { id: 'own-archived', partnerId: 'partner-1', title: 'Архив', status: 'archived', archived: true },
+  { id: 'expert-event', expertId: 'expert-1', submittedProfileId: 'expert-1', proposalAuthorType: 'expert', title: 'Лекция', moderationStatus: 'pending_review', startAt: '2026-07-21T10:00:00.000Z' },
+  { id: 'foreign', partnerId: 'partner-2', title: 'Чужое', status: 'published' },
+];
+const partnerEvents = filterWorkspaceEvents(workspaceEvents, partnerProfile, 'partner');
+assert.deepEqual(partnerEvents.map(item => item.id), ['own-draft', 'own-conflict']);
+const partnerEventsWithArchive = filterWorkspaceEvents(workspaceEvents, partnerProfile, 'partner', { includeDeleted: true });
+assert.deepEqual(partnerEventsWithArchive.map(item => item.id), ['own-draft', 'own-conflict', 'own-archived']);
+const expertEvents = filterWorkspaceEvents(workspaceEvents, expertProfile, 'expert');
+assert.deepEqual(expertEvents.map(item => item.id), ['expert-event']);
+assert.equal(workspaceEventBelongsToProfile(workspaceEvents[4], partnerProfile, 'partner'), false);
+assert.equal(workspaceEventStatus(workspaceEvents[3]), 'pending_review');
+assert.equal(workspaceEventStatusLabel(workspaceEvents[3]), 'На модерации');
+assert.equal(isWorkspaceEventPast({ startAt: '2026-07-01T10:00:00.000Z', endAt: '2026-07-01T11:00:00.000Z' }, Date.parse('2026-07-14T10:00:00.000Z')), true);
+assert.equal(findWorkspaceEventConflicts(partnerEventsWithArchive, workspaceEvents[0], 'own-draft').map(item => item.id).join(','), 'own-conflict');
+const duplicate = buildWorkspaceEventDuplicate(workspaceEvents[0], partnerProfile, 'partner', { userId: 'owner-1' });
+assert.equal(duplicate.status, 'draft');
+assert.equal(duplicate.partnerId, 'partner-1');
+assert.equal(duplicate.registeredCount, 0);
+assert.equal(duplicate.views, 0);
+assert.equal(duplicate.startAt, '');
+assert.equal(Object.hasOwn(duplicate, 'id'), false);
 
 const cache = createWorkspaceCache({ ttl: 1000, max: 1 });
 cache.set('a', 1);

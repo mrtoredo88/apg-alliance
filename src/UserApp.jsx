@@ -3610,6 +3610,13 @@ export function UserApp() {
                 onOpenDialog={(dialogId) => { setAppModePersisted('user'); openContextDialogById(dialogId); }}
                 onOpenAdmin={() => { window.location.assign('/admin-app'); }}
                 onOpenScan={() => openScanner('workspace')}
+                onEventChanged={(event) => setEvents(prev => {
+                  if (!event?.id) return prev;
+                  return prev.some(item => item.id === event.id)
+                    ? prev.map(item => item.id === event.id ? { ...item, ...event } : item)
+                    : [{ ...event }, ...prev];
+                })}
+                onToast={showToast}
               />
             </Suspense>
           ) : (
