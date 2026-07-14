@@ -49,6 +49,11 @@ import {
   sanitizeWorkspacePromotionPatch,
 } from '../../../server-shared/workspace-promotions.js';
 import {
+  buildWorkspaceGift,
+  sanitizeWorkspaceGiftPatch,
+  workspaceGiftBelongsToProfile,
+} from '../../../server-shared/workspace-gifts.js';
+import {
   buildWorkspaceAnalyticsRange,
   buildWorkspaceAnalyticsSnapshot,
   workspaceAnalyticsRowsToCsv,
@@ -1673,6 +1678,159 @@ async function actionWorkspacePromotionArchive(db, req, actor) {
   await ref.set(patch, { merge: true });
   await audit(db, req, actor, 'workspacePromotion:archive', collection, profile.id, 'success', { role });
   return { ok: true, id: `${role}:${profile.id}:main`, promotion: buildWorkspacePromotionFromProfile({ ...profile, ...patch, promotionUpdatedAt: new Date().toISOString() }, role) };
+}
+
+function workspaceGiftRole(req, actor) {
+  const requested = safeString(req.body?.role, 40).toLowerCase();
+  const adminAccess = hasRole(actor.user || {}, ROLES.admin) || hasRole(actor.user || {}, ROLES.owner);
+  if (requested === 'admin' && adminAccess) return 'admin';
+  return requested === 'expert' ? 'expert' : 'partner';
+}
+
+async function workspaceGiftSources(db, role, profile = {}) {
+  const [claimsSnap, entriesSnap, partnersSnap, expertsSnap] = await Promise.all([
+    db.collection('prizeClaims').orderBy('claimedAt', 'desc').limit(500).get().catch(() => ({ docs: [] })),
+    db.collection('raffleEntries').limit(500).get().catch(() => ({ docs: [] })),
+    db.collection('partners').limit(role === 'admin' ? 500 : 100).get().catch(() => ({ docs: [] })),
+    db.collection('experts').limit(role === 'admin' ? 500 : 100).get().catch(() => ({ docs: [] })),
+  ]);
+  const claims = claimsSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const entries = entriesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const partners = partnersSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const experts = expertsSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  if (role === 'admin') return { claims, entries, partners, experts };
+  const profileField = role === 'expert' ? 'expertId' : 'partnerId';
+  const allowedPrizeIds = new Set();
+  return {
+    claims,
+    entries,
+    partners,
+    experts,
+    profileField,
+    allowedPrizeIds,
+    profileId: profile.id,
+  };
+}
+
+async function actionWorkspaceGiftList(db, req, actor) {
+  const role = workspaceGiftRole(req, actor);
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = role === 'admin' ? { id: 'all', name: 'Вся система' } : await assertOwnedProfile(db, actor, role, profileId);
+  const profileField = role === 'expert' ? 'expertId' : 'partnerId';
+  const prizesSnap = role === 'admin'
+    ? await db.collection('prizes').limit(500).get()
+    : await db.collection('prizes').where(profileField, '==', profile.id).limit(500).get();
+  const prizes = prizesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const sources = await workspaceGiftSources(db, role, profile);
+  const prizeIds = new Set(prizes.map(item => item.id));
+  const claims = role === 'admin' ? sources.claims : sources.claims.filter(item => prizeIds.has(item.prizeId));
+  const entries = role === 'admin' ? sources.entries : sources.entries.filter(item => prizeIds.has(item.prizeId));
+  const gifts = prizes.map(item => buildWorkspaceGift(item, { ...sources, claims, entries }));
+  await audit(db, req, actor, 'workspaceGift:list', 'prizes', profile.id, 'success', { role, count: gifts.length, claims: claims.length, entries: entries.length });
+  return { ok: true, gifts, claims, entries, profile: { id: profile.id, name: profile.name || profile.title || 'Workspace' } };
+}
+
+async function assertWorkspaceGiftAccess(db, req, actor) {
+  const role = workspaceGiftRole(req, actor);
+  const adminAccess = role === 'admin';
+  const id = safeString(req.body?.id || req.body?.giftId || req.body?.prizeId, 220);
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = adminAccess ? { id: 'all', name: 'Вся система' } : await assertOwnedProfile(db, actor, role, profileId);
+  if (!id) return { ref: null, gift: null, role, profile, adminAccess };
+  const ref = db.collection('prizes').doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Подарок не найден.'), { statusCode: 404, code: 'GIFT_NOT_FOUND' });
+  const gift = { id: snap.id, ...(snap.data() || {}) };
+  if (!adminAccess && !workspaceGiftBelongsToProfile(gift, profile, role)) {
+    throw Object.assign(new Error('Нет доступа к этому подарку.'), { statusCode: 403, code: 'GIFT_FORBIDDEN' });
+  }
+  return { ref, gift, role, profile, adminAccess };
+}
+
+function workspaceGiftOwnerPayload(profile = {}, role = 'partner') {
+  const type = role === 'expert' ? 'expert' : 'partner';
+  return {
+    ownerProfileType: type,
+    ownerProfileId: safeString(profile.id, 180),
+    profileId: safeString(profile.id, 180),
+    donorName: safeString(profile.name || profile.title || profile.displayName || '', 220),
+    ...(type === 'expert' ? { expertId: safeString(profile.id, 180), partnerId: null } : { partnerId: safeString(profile.id, 180), expertId: null }),
+  };
+}
+
+async function actionWorkspaceGiftSave(db, req, actor) {
+  const { ref, gift, role, profile, adminAccess } = await assertWorkspaceGiftAccess(db, req, actor);
+  const patch = sanitizeWorkspaceGiftPatch(req.body?.patch || {});
+  if (!patch.name && !patch.title) throw Object.assign(new Error('Укажите название подарка.'), { statusCode: 400, code: 'GIFT_EMPTY' });
+  const submit = req.body?.submit === true;
+  const isPublished = gift && normalizeContentStatus(gift) === 'published' && gift.active !== false;
+  const clean = {
+    ...patch,
+    updatedByUserId: actor.userId,
+    updatedAt: new Date().toISOString(),
+  };
+  if (!adminAccess) Object.assign(clean, workspaceGiftOwnerPayload(profile, role));
+  const data = gift && (isPublished || submit)
+    ? {
+        pendingWorkspacePatch: clean,
+        ...buildLifecyclePatch({ item: gift, resource: 'prizes', nextStatus: 'moderation', actorId: actor.userId, reason: submit ? 'Подарок отправлен на модерацию из Workspace' : 'Редактирование опубликованного подарка из Workspace' }),
+        updatedByUserId: actor.userId,
+        updatedAt: FieldValue.serverTimestamp(),
+      }
+    : {
+        ...clean,
+        ...buildLifecyclePatch({ item: gift || {}, resource: 'prizes', nextStatus: submit ? 'moderation' : (patch.status || 'draft'), actorId: actor.userId, reason: submit ? 'Подарок отправлен на модерацию из Workspace' : 'Черновик подарка из Workspace' }),
+        active: submit ? false : clean.active === true && patch.status === 'published',
+        createdByUserId: gift?.createdByUserId || actor.userId,
+        updatedByUserId: actor.userId,
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(gift ? {} : { createdAt: FieldValue.serverTimestamp() }),
+      };
+  const writeRef = ref || db.collection('prizes').doc();
+  await writeRef.set(data, { merge: true });
+  const sources = await workspaceGiftSources(db, role, profile);
+  const resultGift = buildWorkspaceGift({ ...(gift || {}), ...clean, ...data, id: writeRef.id, updatedAt: new Date().toISOString() }, sources);
+  await audit(db, req, actor, gift ? 'workspaceGift:update' : 'workspaceGift:create', 'prizes', writeRef.id, 'success', { role, fields: Object.keys(patch), safePendingPatch: Boolean(gift && (isPublished || submit)) });
+  return { ok: true, id: writeRef.id, gift: resultGift };
+}
+
+async function actionWorkspaceGiftSubmit(db, req, actor) {
+  return actionWorkspaceGiftSave(db, { ...req, body: { ...(req.body || {}), submit: true } }, actor);
+}
+
+async function actionWorkspaceGiftArchive(db, req, actor) {
+  const { ref, gift, role, profile } = await assertWorkspaceGiftAccess(db, req, actor);
+  if (!ref || !gift) throw Object.assign(new Error('Подарок не найден.'), { statusCode: 404, code: 'GIFT_NOT_FOUND' });
+  const patch = {
+    ...buildLifecyclePatch({ item: gift, resource: 'prizes', nextStatus: 'archived', actorId: actor.userId, reason: 'Архив из Workspace' }),
+    active: false,
+    archived: true,
+    updatedByUserId: actor.userId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspaceGift:archive', 'prizes', ref.id, 'success', { role, profileId: profile.id });
+  return { ok: true, id: ref.id, gift: buildWorkspaceGift({ ...gift, ...patch, id: ref.id, updatedAt: new Date().toISOString() }) };
+}
+
+async function actionWorkspaceGiftClaimStatus(db, req, actor) {
+  const claimId = safeString(req.body?.claimId, 220);
+  const status = safeString(req.body?.status || 'given', 40);
+  if (!claimId) throw Object.assign(new Error('Не указана выдача.'), { statusCode: 400, code: 'CLAIM_BAD_ID' });
+  const claimRef = db.collection('prizeClaims').doc(claimId);
+  const claimSnap = await claimRef.get();
+  if (!claimSnap.exists) throw Object.assign(new Error('Выдача не найдена.'), { statusCode: 404, code: 'CLAIM_NOT_FOUND' });
+  const claim = { id: claimSnap.id, ...(claimSnap.data() || {}) };
+  await assertWorkspaceGiftAccess(db, { ...req, body: { ...(req.body || {}), id: claim.prizeId } }, actor);
+  const patch = {
+    status,
+    issuedAt: status === 'given' || status === 'issued' ? FieldValue.serverTimestamp() : claim.issuedAt || null,
+    issuedByUserId: actor.userId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await claimRef.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspaceGift:claimStatus', 'prizeClaims', claimId, 'success', { prizeId: claim.prizeId, status });
+  return { ok: true, claim: { ...claim, status, issuedByUserId: actor.userId, issuedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
 }
 
 async function getWorkspaceAnalyticsComments(db, newsIds = []) {
@@ -3302,6 +3460,11 @@ async function routeAction(db, req, actor) {
   if (action === 'workspacePromotion:save') return actionWorkspacePromotionSave(db, req, actor);
   if (action === 'workspacePromotion:submit') return actionWorkspacePromotionSubmit(db, req, actor);
   if (action === 'workspacePromotion:archive') return actionWorkspacePromotionArchive(db, req, actor);
+  if (action === 'workspaceGift:list') return actionWorkspaceGiftList(db, req, actor);
+  if (action === 'workspaceGift:save') return actionWorkspaceGiftSave(db, req, actor);
+  if (action === 'workspaceGift:submit') return actionWorkspaceGiftSubmit(db, req, actor);
+  if (action === 'workspaceGift:archive') return actionWorkspaceGiftArchive(db, req, actor);
+  if (action === 'workspaceGift:claimStatus') return actionWorkspaceGiftClaimStatus(db, req, actor);
   if (action === 'workspaceAnalytics:snapshot') return actionWorkspaceAnalyticsSnapshot(db, req, actor);
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);

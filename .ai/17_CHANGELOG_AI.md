@@ -2803,3 +2803,13 @@
 - Редактор поддерживает заголовок, описание, тип, категорию, период, лимиты, цену, условия, ограничения, CTA, связи с мероприятием/новостью, обложку через `PhotoUpload`, галерею, теги, SEO, autosave, локальный draft, Cmd/Ctrl+S и beforeunload-защиту.
 - Локи встроен как ассистент редактора: предлагает название, описание, CTA и условия только после явного клика пользователя.
 - `scripts/workspace-core-test.mjs` расширен проверками promotion shared-layer, статусов, KPI, фильтров, санитайзинга и подключения нового Workspace-компонента.
+
+# 2026-07-14 — Workspace Gifts Center
+
+- В Desktop Workspace добавлен основной раздел `Подарки`: центр управления призами, бонусами, розыгрышами и выдачами партнёра/эксперта.
+- Добавлен shared-layer `server-shared/workspace-gifts.js`: типы подарков, санитайзинг, ownership helper, статусная модель, KPI, фильтрация, статистика выдач и сборка рабочего gift-объекта из существующих `prizes`, `prizeClaims`, `raffleEntries`.
+- Backend actions `workspaceGift:list`, `workspaceGift:save`, `workspaceGift:submit`, `workspaceGift:archive`, `workspaceGift:claimStatus` используют существующие коллекции и проверяют ownership по `partnerId` / `expertId`; admin видит все подарки.
+- Для опубликованных подарков правки из Workspace сохраняются как `pendingWorkspacePatch` и переводят подарок на модерацию, не меняя публичную карточку до админского решения.
+- Экран поддерживает KPI, поиск, фильтры статусов/типов/периода, режимы карточки/таблица/календарь окончания, редактор с autosave/local draft/Cmd+S/beforeunload, `PhotoUpload`, `GalleryUpload`, предпросмотр и подсказки Локи по явному клику.
+- В правой панели показывается история выдачи из `prizeClaims`, быстрый перевод заявки в `given`, а для розыгрышей — участники и количество билетов из `raffleEntries`.
+- `scripts/workspace-core-test.mjs` расширен проверками gift shared-layer: ownership, статусы, KPI, выдачи, розыгрыши, фильтры, санитайзинг и подключение нового Workspace-компонента.

@@ -45,6 +45,15 @@ import {
   workspacePromotionStatus,
   workspacePromotionStatusLabel,
 } from '../server-shared/workspace-promotions.js';
+import {
+  buildWorkspaceGift,
+  buildWorkspaceGiftKpis,
+  filterWorkspaceGifts,
+  sanitizeWorkspaceGiftPatch,
+  workspaceGiftBelongsToProfile,
+  workspaceGiftStatus,
+  workspaceGiftStatusLabel,
+} from '../server-shared/workspace-gifts.js';
 
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.mobile), WORKSPACE_MODES.mobile);
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.tablet), WORKSPACE_MODES.tablet);
@@ -101,6 +110,7 @@ assert.ok(desktopWorkspaceSource.includes('<WorkspaceMeetingsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceDialogsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceNewsCenter'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspacePromotionsCenter'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspaceGiftsCenter'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceAnalyticsCenter'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
@@ -184,6 +194,38 @@ assert.equal(promotionKpis.used, 8);
 assert.deepEqual(filterWorkspacePromotions(workspacePromotions, { query: 'кофе' }).map(item => item.profileId), ['partner-1']);
 assert.deepEqual(filterWorkspacePromotions(workspacePromotions, { status: 'draft' }).map(item => item.profileId), ['partner-2']);
 assert.deepEqual(sanitizeWorkspacePromotionPatch({ title: ' Скидка ', unknown: 'x', discountPercent: 250, tags: ['vip'] }), { title: 'Скидка', discountPercent: 100, tags: ['vip'], offer: 'Скидка' });
+
+const workspaceGiftClaims = [
+  { id: 'c1', prizeId: 'gift-1', userId: 'u1', userName: 'Иван', status: 'pending', claimedAt: '2026-07-14T10:00:00.000Z' },
+  { id: 'c2', prizeId: 'gift-1', userId: 'u2', userName: 'Мария', status: 'given', claimedAt: '2026-07-14T11:00:00.000Z' },
+  { id: 'c3', prizeId: 'gift-2', userId: 'u3', userName: 'Анна', status: 'given' },
+];
+const workspaceGiftEntries = [
+  { id: 'r1', prizeId: 'gift-2', userId: 'u1', ticketsCount: 2 },
+  { id: 'r2', prizeId: 'gift-2', userId: 'u2', ticketsCount: 3 },
+];
+const workspaceGifts = [
+  buildWorkspaceGift({ id: 'gift-1', partnerId: 'partner-1', name: 'Кофе', type: 'purchase', cost: 5, stock: 4, status: 'published', active: true, stats: { views: 20 } }, { claims: workspaceGiftClaims, entries: workspaceGiftEntries, partners: [{ id: 'partner-1', name: 'Coffee House' }] }),
+  buildWorkspaceGift({ id: 'gift-2', expertId: 'expert-1', name: 'Консультация', type: 'raffle', ticketCost: 1, stock: 1, lifecycleStatus: 'moderation', raffleDate: '2026-07-31T10:00:00.000Z', stats: { views: 10 } }, { claims: workspaceGiftClaims, entries: workspaceGiftEntries, experts: [{ id: 'expert-1', name: 'Анна Эксперт' }] }),
+];
+assert.equal(workspaceGiftBelongsToProfile(workspaceGifts[0], partnerProfile, 'partner'), true);
+assert.equal(workspaceGiftBelongsToProfile(workspaceGifts[1], partnerProfile, 'partner'), false);
+assert.equal(workspaceGiftBelongsToProfile(workspaceGifts[1], expertProfile, 'expert'), true);
+assert.equal(workspaceGiftStatus(workspaceGifts[1]), 'moderation');
+assert.equal(workspaceGiftStatusLabel(workspaceGifts[0]), 'Опубликовано');
+assert.equal(workspaceGifts[0].received, 2);
+assert.equal(workspaceGifts[0].issued, 1);
+assert.equal(workspaceGifts[1].stats.tickets, 5);
+const giftKpis = buildWorkspaceGiftKpis(workspaceGifts);
+assert.equal(giftKpis.total, 2);
+assert.equal(giftKpis.published, 1);
+assert.equal(giftKpis.moderation, 1);
+assert.equal(giftKpis.received, 3);
+assert.equal(giftKpis.issued, 2);
+assert.equal(giftKpis.remaining, 5);
+assert.deepEqual(filterWorkspaceGifts(workspaceGifts, { query: 'кофе' }).map(item => item.id), ['gift-1']);
+assert.deepEqual(filterWorkspaceGifts(workspaceGifts, { type: 'raffle' }).map(item => item.id), ['gift-2']);
+assert.deepEqual(sanitizeWorkspaceGiftPatch({ name: ' Подарок ', type: 'raffle', cost: -5, tags: ['vip'], unknown: 'x' }), { name: 'Подарок', cost: 0, tags: ['vip'], type: 'raffle', opportunityType: 'raffle', title: 'Подарок' });
 
 const analyticsRange = buildWorkspaceAnalyticsRange({ period: '30d', now: '2026-07-14T12:00:00.000Z' });
 assert.equal(analyticsRange.period, '30d');

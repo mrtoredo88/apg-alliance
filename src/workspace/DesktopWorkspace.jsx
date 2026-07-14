@@ -16,6 +16,7 @@ import { WorkspaceMeetingsCRM } from './WorkspaceMeetingsCRM.jsx';
 import { WorkspaceDialogsCRM } from './WorkspaceDialogsCRM.jsx';
 import { WorkspaceNewsCenter } from './WorkspaceNewsCenter.jsx';
 import { WorkspacePromotionsCenter } from './WorkspacePromotionsCenter.jsx';
+import { WorkspaceGiftsCenter } from './WorkspaceGiftsCenter.jsx';
 import { WorkspaceAnalyticsCenter } from './WorkspaceAnalyticsCenter.jsx';
 import {
   BOOKING_STATUSES,
@@ -53,6 +54,7 @@ const NAV_ITEMS = [
   { id: 'content', label: 'Новости', icon: '📰', description: 'Публикации и черновики' },
   { id: 'growth', label: 'Партнёры', icon: '📢', description: 'QR, ссылки, промо' },
   { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
+  { id: 'rewards', label: 'Подарки', icon: '🏆', description: 'Призы, бонусы, выдачи' },
   { id: 'reviews', label: 'Отзывы', icon: '⭐', description: 'Рейтинг и ответы' },
   { id: 'analytics', label: 'Аналитика', icon: '📊', description: 'Метрики и изменения' },
   { id: 'finance', label: 'Финансы', icon: '💰', description: 'Тарифы и документы' },
@@ -1574,6 +1576,7 @@ export function DesktopWorkspace({
     if (activeSection === 'dialogs') return <WorkspaceDialogsCRM user={user} role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'analytics') return <WorkspaceAnalyticsCenter role={activeRole} profile={activeProfile} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'offers') return <WorkspacePromotionsCenter role={activeRole} profile={activeProfile} events={events} news={news} onOpenPanel={onOpenPanel} onToast={onToast} />;
+    if (activeSection === 'rewards') return <WorkspaceGiftsCenter role={activeRole} profile={activeProfile} events={events} news={news} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'settings' && businessHubAvailable) {
       return (
         <div style={{ display: 'grid', gap: 14 }}>
