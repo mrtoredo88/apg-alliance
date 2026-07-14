@@ -899,6 +899,8 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
           registeredEventIds={registeredEventIds}
           onRegister={onEventRegister}
           onAskQuestion={onAskQuestion}
+          onOpenEvent={openEventSheet}
+          desktopMode={desktopMode}
           onClose={() => setSelectedEvent(null)}
         />
       </DesktopSectionShell>
@@ -982,6 +984,8 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
           registeredEventIds={registeredEventIds}
           onRegister={onEventRegister}
           onAskQuestion={onAskQuestion}
+          onOpenEvent={openEventSheet}
+          desktopMode={desktopMode}
           onClose={() => setSelectedEvent(null)}
         />
       </GlassPanel>

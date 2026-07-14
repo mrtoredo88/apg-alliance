@@ -3,6 +3,19 @@ import { createPortal } from 'react-dom';
 import { motionTransition } from './motion.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { shareLink } from './utils/shareLink.js';
+import {
+  DesktopDetailShell,
+  DesktopHero,
+  DesktopHeroActions,
+  DesktopInfoGrid,
+  DesktopMeta,
+  DesktopGallery,
+  DesktopRelated,
+  DesktopSection,
+  DesktopSidebarCard,
+  DesktopStickyActions,
+  DesktopDetailTabs,
+} from './components/DesktopUI.jsx';
 import { formatEventPrice } from './eventPrice.js';
 
 const A = {
@@ -22,6 +35,86 @@ const BUTTON = {
   fontWeight: 700,
   cursor: 'pointer',
 };
+
+function EventPhotoLightbox({ photos = [], initial = 0, onClose }) {
+  const [idx, setIdx] = useState(initial);
+  const [zoom, setZoom] = useState(false);
+  const safePhotos = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+
+  if (!safePhotos.length) return null;
+
+  const lastIdx = safePhotos.length - 1;
+  const safeIdx = Math.min(Math.max(Number(idx) || 0, 0), Math.max(0, lastIdx));
+  const go = (direction) => {
+    setZoom(false);
+    setIdx(current => {
+      const next = (current + direction + safePhotos.length) % safePhotos.length;
+      return next;
+    });
+  };
+
+  return (
+    <div
+      data-apg-pull-disabled="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 15000,
+        background: 'rgba(3,3,5,0.94)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr auto',
+        padding: 'calc(var(--safe-top, 0px) + 12px) 14px calc(18px + env(safe-area-inset-bottom, 0px))',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
+        <span style={{ fontSize: 13, fontWeight: 800 }}>{safeIdx + 1} / {safePhotos.length}</span>
+        <button type="button" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22 }}>×</button>
+      </div>
+      <div
+        data-apg-gesture-ignore="true"
+        onDoubleClick={() => setZoom(v => !v)}
+        onTouchStart={e => {
+          startXRef.current = e.touches?.[0]?.clientX ?? 0;
+          startYRef.current = e.touches?.[0]?.clientY ?? 0;
+        }}
+        onTouchEnd={e => {
+          const dx = (e.changedTouches?.[0]?.clientX ?? 0) - startXRef.current;
+          const dy = (e.changedTouches?.[0]?.clientY ?? 0) - startYRef.current;
+          if (dy > 86 && Math.abs(dx) < 70) {
+            onClose?.();
+            return;
+          }
+          if (Math.abs(dx) > 52) go(dx > 0 ? -1 : 1);
+        }}
+        style={{ minHeight: 0, overflow: zoom ? 'auto' : 'hidden', display: 'grid', placeItems: 'center', touchAction: zoom ? 'pan-x pan-y' : 'pan-y' }}
+      >
+        <img
+          src={safePhotos[safeIdx]}
+          alt=""
+          style={{
+            maxWidth: zoom ? 'none' : '100%',
+            maxHeight: zoom ? 'none' : '100%',
+            width: zoom ? '165%' : 'auto',
+            height: 'auto',
+            objectFit: 'contain',
+            borderRadius: zoom ? 0 : 20,
+            transition: 'width 220ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))',
+          }}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+        {safePhotos.length > 1 && <button type="button" onClick={() => go(-1)} style={{ width: 54, height: 46, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 24 }}>‹</button>}
+        <button type="button" onClick={() => setZoom(v => !v)} style={{ minWidth: 118, height: 46, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, fontWeight: 820 }}>{zoom ? 'Уместить' : 'Увеличить'}</button>
+        {safePhotos.length > 1 && <button type="button" onClick={() => go(1)} style={{ width: 54, height: 46, borderRadius: 18, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 24 }}>›</button>}
+      </div>
+    </div>
+  );
+}
 
 const SECTION = {
   ...APG2_PROFILE.glass,
@@ -950,6 +1043,8 @@ export function EventDetailSheet({
   registeredEventIds = [],
   onRegister = null,
   onAskQuestion = null,
+  desktopMode = false,
+  onOpenEvent = () => {},
   onApprove = () => {},
   onRequestChanges = () => {},
   onReject = () => {},
@@ -959,6 +1054,8 @@ export function EventDetailSheet({
   const [isClosing, setIsClosing] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
   const [pointerStartY, setPointerStartY] = useState(null);
+  const [desktopTab, setDesktopTab] = useState('overview');
+  const [desktopLightboxIndex, setDesktopLightboxIndex] = useState(null);
   const contentRef = useRef(null);
   const detailEvent = useMemo(() => normalizeDetailEvent(event, partners, experts), [event, partners, experts]);
   const participants = useMemo(() => buildParticipants(users, event?.id), [users, event?.id]);
@@ -1020,6 +1117,16 @@ export function EventDetailSheet({
     onClose();
   };
 
+  const handleDesktopShare = async () => {
+    const text = `${detailEvent?.title || 'Событие АПГ'}${eventStartDate(detailEvent) ? ` · ${formatDate(eventStartDate(detailEvent))}` : ''}`;
+    const url = shareLink('event', detailEvent?.id || '');
+    if (navigator?.share) {
+      await navigator.share({ title: detailEvent?.title || 'Событие АПГ', text, url }).catch(() => {});
+      return;
+    }
+    await navigator?.clipboard?.writeText(`${text}\n${url}`).catch(() => {});
+  };
+
   const handleEdit = () => {
     onEdit(detailEvent);
   };
@@ -1051,6 +1158,171 @@ export function EventDetailSheet({
       handleClose();
     }
   };
+
+  const desktopPhotoItems = eventGallery(detailEvent);
+  const desktopTabs = [
+    { id: 'overview', label: 'Обзор' },
+    isAdminRole ? { id: 'participants', label: `Участники ${participants.length}` } : null,
+    { id: 'details', label: 'Подробно' },
+    isAdminRole ? { id: 'admin', label: 'Управление' } : null,
+  ].filter(Boolean);
+  const activeDesktopTab = desktopTabs.some(item => item.id === desktopTab) ? desktopTab : (desktopTabs[0]?.id || 'overview');
+  const desktopHeroBadges = [
+    { id: 'status', label: status, tone: 'info' },
+    capacity > 0 ? { id: 'capacity', label: `${capacity} мест` } : null,
+    onRegister ? { id: 'reg', label: isRegistered ? 'Вы записаны' : 'Открыта запись' } : null,
+  ].filter(Boolean);
+  const desktopMetaRows = [
+    { id: 'date', label: 'Дата', value: formatDate(eventStartDate(detailEvent)), icon: '📅' },
+    { id: 'time', label: 'Время', value: `${formatTime(eventStartDate(detailEvent))}${detailEvent?.endAt ? ` — ${formatTime(detailEvent.endAt)}` : ''}`, icon: '⏱' },
+    { id: 'mode', label: 'Формат', value: EVENT_MODE_META[modeKey]?.label || 'Офлайн', icon: EVENT_MODE_META[modeKey]?.emoji || '📍' },
+    { id: 'partner', label: 'Партнёр', value: partnerName || 'Не указан', icon: '🏪' },
+    { id: 'expert', label: 'Эксперт', value: expertName || 'Не указан', icon: '👤' },
+    { id: 'price', label: 'Стоимость', value: detailEvent?.price || 'По запросу', icon: '💳' },
+    { id: 'address', label: 'Локация', value: detailEvent?.address || detailEvent?.location || '—', icon: '📍' },
+    { id: 'registered', label: 'Записи', value: `${registered}/${capacity > 0 ? capacity : '∞'}`, icon: '👥' },
+  ].filter(item => item.value);
+  const desktopAsideItems = [
+    { id: 'status', label: 'Статус', value: status, icon: '📌', onClick: null },
+    { id: 'deadline', label: 'Дедлайн', value: detailEvent?.deadline ? toDateValue(detailEvent.deadline)?.toLocaleDateString('ru-RU') : 'без ограничений', icon: '🕒', onClick: null },
+    { id: 'distance', label: 'Открыто', value: detailEvent?.isOpen ? 'Да' : 'Нет', icon: '🔔', onClick: null },
+  ].filter(item => item.value);
+  const handleOpenDesktopRelated = (item) => {
+    const nextEvent = allEvents.find(eventItem => eventItem?.id === item?.id);
+    if (!nextEvent) return;
+    handleClose();
+    onOpenEvent(nextEvent);
+  };
+  if (desktopMode) {
+    const desktopActions = [
+      { id: 'close', icon: '✕', label: 'Закрыть', tone: 'gold', onClick: handleClose },
+      isRegistered ? { id: 'unregister', icon: '🗑', label: 'Отписаться', onClick: isRegistered && onRegister ? () => onRegister(detailEvent) : null, disabled: !onRegister } : { id: 'register', icon: '✅', label: 'Записаться', onClick: onRegister ? () => onRegister(detailEvent) : null, disabled: !onRegister },
+      onAskQuestion ? { id: 'question', icon: '💬', label: 'Задать вопрос', onClick: () => onAskQuestion(detailEvent) } : null,
+      { id: 'approve', icon: '✔', label: 'Подтвердить', onClick: () => onApprove(detailEvent), disabled: !isAdminRole },
+    ].filter(Boolean);
+
+    return createPortal(
+      <>
+        <DesktopDetailShell
+          title={detailEvent?.title || 'Мероприятие'}
+          onBack={handleClose}
+          stickyActions={<DesktopStickyActions actions={desktopActions} />}
+          aside={
+            <>
+              <DesktopSidebarCard title="Ключевые параметры" subtitle="Сводка мероприятия">
+                <DesktopMeta items={desktopAsideItems} />
+              </DesktopSidebarCard>
+              {desktopPhotoItems.length > 0 && (
+                <DesktopSidebarCard title="Галерея" subtitle="Фото с мероприятия">
+                  <DesktopGallery items={desktopPhotoItems} onOpen={desktopPhotoItems.length ? setDesktopLightboxIndex : null} />
+                </DesktopSidebarCard>
+              )}
+              <DesktopSidebarCard title="Связанные мероприятия" subtitle="Этот день и этот партнёр">
+                {allEvents?.length ? (
+                  <DesktopRelated
+                    items={allEvents
+                      .filter(eventItem => eventItem && eventItem.id !== detailEvent.id)
+                      .slice(0, 6)
+                      .map(eventItem => ({
+                        id: eventItem.id,
+                        title: eventItem.title || eventItem.name || 'Мероприятие',
+                        subtitle: eventItem.date || eventItem.category || 'Мероприятие',
+                        kicker: 'Мероприятие',
+                      }))}
+                    onOpen={handleOpenDesktopRelated}
+                  />
+                ) : (
+                  <div style={{ color: A.textMuted, fontSize: 13 }}>Связанных мероприятий нет.</div>
+                )}
+              </DesktopSidebarCard>
+            </>
+          }
+        >
+          <DesktopHero
+            image={eventImage(detailEvent)}
+            avatar={eventImage(detailEvent) ? null : <span role="img" aria-label="Мероприятие">🎉</span>}
+            status={status}
+            title={detailEvent?.title || 'Мероприятие'}
+            subtitle={detailEvent?.category || detailEvent?.description || 'Мероприятие АПГ'}
+            badges={desktopHeroBadges}
+            description={detailEvent?.description || 'Описание мероприятия скоро будет добавлено.'}
+            meta={<DesktopInfoGrid items={desktopMetaRows} columns="repeat(2, minmax(0, 1fr))" />}
+            actions={
+              <DesktopHeroActions
+                actions={[
+                  ...desktopActions.filter(action => action.id === 'question' || action.id === 'register' || action.id === 'unregister'),
+                  { id: 'share', label: 'Поделиться', icon: '↗', onClick: handleDesktopShare },
+                ]}
+              />
+            }
+          />
+
+          <DesktopDetailTabs items={desktopTabs} activeId={activeDesktopTab} onChange={setDesktopTab} />
+
+          {activeDesktopTab === 'overview' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {isAdminRole && (
+                <DesktopSection title="Аналитика качества" subtitle="Подготовка и статус публикации">
+                  <QualitySection event={detailEvent} partnerName={partnerName} expertName={expertName} />
+                  <PreparationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />
+                  <ConflictSection event={detailEvent} allEvents={allEvents} />
+                </DesktopSection>
+              )}
+              <DesktopSection title="Дата и время" subtitle="Ключевые параметры">
+                <DateSection event={detailEvent} status={status} />
+              </DesktopSection>
+              <DesktopSection title="Локация" subtitle="Партнёр и эксперт">
+                <LocationSection event={detailEvent} partnerName={partnerName} expertName={expertName} />
+              </DesktopSection>
+              <DesktopSection title="Описание" subtitle="Подробности мероприятия">
+                <DescriptionSection event={detailEvent} />
+              </DesktopSection>
+            </div>
+          )}
+
+          {activeDesktopTab === 'participants' && isAdminRole && (
+            <DesktopSection title="Участники" subtitle="Список и поиск">
+              <ParticipantsSection participants={participants} search={search} setSearch={setSearch} canManage={isAdminRole} />
+              <div style={{ marginTop: 10 }}>
+                <button onClick={handleExport} disabled={!participants.length} style={{ ...BUTTON, width: 154, background: participants.length ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.08)', color: participants.length ? A.gold : 'rgba(240,240,240,0.5)', border: participants.length ? `1px solid ${A.goldBrd}` : `1px solid ${A.border}`, padding: '8px 12px', fontSize: 12, cursor: participants.length ? 'pointer' : 'not-allowed' }}>Экспорт CSV</button>
+              </div>
+            </DesktopSection>
+          )}
+
+          {activeDesktopTab === 'admin' && isAdminRole && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <DesktopSection title="Управление публикацией">
+                <ModerationSection event={detailEvent} canManage={isAdminRole} />
+              </DesktopSection>
+              <DesktopSection title="Маркетинг и план" subtitle="Инструменты продвижения">
+                <PromotionPlanSection event={detailEvent} canManage={isAdminRole} onPatch={onPatch} />
+                <SeriesSection event={detailEvent} canManage={isAdminRole} onCreateSeries={onCreateSeries} />
+              </DesktopSection>
+            </div>
+          )}
+
+          {activeDesktopTab === 'details' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <DesktopSection title="Регистрация" subtitle="Статистика и состояния">
+                <RegistrationSection event={detailEvent} />
+              </DesktopSection>
+              <DesktopSection title="Участники" subtitle="Уведомления и ответы">
+                <FooterActions isAdminRole={isAdminRole} event={detailEvent} onEdit={handleEdit} onClose={handleClose} onDuplicate={onDuplicate} onApprove={onApprove} onRequestChanges={onRequestChanges} onReject={onReject} />
+              </DesktopSection>
+            </div>
+          )}
+        </DesktopDetailShell>
+        {desktopPhotoItems.length > 0 && desktopLightboxIndex !== null && (
+          <EventPhotoLightbox
+            photos={desktopPhotoItems}
+            initial={desktopLightboxIndex}
+            onClose={() => setDesktopLightboxIndex(null)}
+          />
+        )}
+      </>,
+      document.body
+    );
+  }
 
   const sheet = (
     <div

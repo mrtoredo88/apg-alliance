@@ -8,9 +8,19 @@ import {
   DesktopEmptyState,
   DesktopHeader,
   DesktopKpiStrip,
+  DesktopDetailShell,
+  DesktopGallery,
+  DesktopHero,
+  DesktopHeroActions,
+  DesktopInfoGrid,
+  DesktopMeta,
   DesktopSectionShell,
   DesktopSectionTitle,
   DesktopSidebarCard,
+  DesktopStickyActions,
+  DesktopSection,
+  DesktopRelated,
+  DesktopDetailTabs,
   DesktopSkeleton,
   DesktopTopOverview,
   DesktopToolbar,
@@ -991,13 +1001,33 @@ export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {
   );
 }
 
-function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigate, onReact, onSave, onReadLater, onSubscribe, saved, later, reaction, subscriptions, user, onToast, onOpenLoki }) {
+function ArticleView({
+  item,
+  related,
+  previousItem,
+  nextItem,
+  onClose,
+  onNavigate,
+  onReact,
+  onSave,
+  onReadLater,
+  onSubscribe,
+  saved,
+  later,
+  reaction,
+  subscriptions,
+  user,
+  onToast,
+  onOpenLoki,
+  desktopMode = false,
+}) {
   const loki = useLoki();
   const [progress, setProgress] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showArticleTop, setShowArticleTop] = useState(false);
   const [headerHidden, setHeaderHidden] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [desktopTab, setDesktopTab] = useState('content');
   const scrollRef = useRef(null);
   const lastScrollRef = useRef(0);
   const readStartRef = useRef(Date.now());
@@ -1125,6 +1155,177 @@ function ArticleView({ item, related, previousItem, nextItem, onClose, onNavigat
         onToast?.('Не удалось сохранить оценку. Попробуйте ещё раз.', 'error');
       });
   };
+
+  if (desktopMode) {
+    const heroImage = photos[0] || getNewsPhotoItems(item)[0]?.url || getNewsImage(item) || '';
+    const newsDate = getNewsDate(item);
+    const activeTab = desktopTab === 'content' ? 'content' : desktopTab === 'comments' ? 'comments' : desktopTab === 'related' ? 'related' : 'content';
+    const heroActions = [
+      { id: 'share', icon: '↗', label: 'Поделиться', tone: 'gold', onClick: async () => { await shareNewsItem(item, onToast); trackShare('top'); } },
+      saved ? { id: 'saved', icon: '★', label: 'Сохранено', onClick: () => onSave?.(item) } : { id: 'save', icon: '☆', label: 'Сохранить', onClick: () => onSave?.(item) },
+      later ? { id: 'later', icon: '⏰', label: 'В отложенных', onClick: () => onReadLater?.(item) } : { id: 'add-later', icon: '🕒', label: 'В отложенные', onClick: () => onReadLater?.(item) },
+      { id: 'loki', icon: '🤖', label: 'Loki', onClick: openLokiForArticle },
+    ];
+    const stickyActions = [
+      { id: 'close', icon: '✕', label: 'Закрыть', tone: 'gold', onClick: onClose },
+      { id: 'question', icon: '💬', label: 'Коммент.', onClick: () => setDesktopTab('comments'), disabled: commentsDisabledByFlag },
+      { id: 'prev', icon: '←', label: previousItem ? 'Назад' : 'Назад', onClick: () => previousItem && onNavigate(previousItem), disabled: !previousItem },
+      { id: 'next', icon: '→', label: nextItem ? 'Далее' : 'Далее', onClick: () => nextItem && onNavigate(nextItem), disabled: !nextItem },
+    ];
+    const kpiItems = [
+      { id: 'category', label: 'Категория', value: getNewsCategoryLabel(item), icon: '🏷️' },
+      newsDate ? { id: 'date', label: 'Дата', value: newsDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }), icon: '📅' } : null,
+      { id: 'views', label: 'Просмотры', value: getNewsViews(item), icon: '👁️' },
+      { id: 'reactions', label: 'Реакции', value: getNewsReactionsTotal(item), icon: '💬' },
+      { id: 'comments', label: 'Комментарии', value: stats.comments || 0, icon: '💬' },
+      item.source ? { id: 'source', label: 'Источник', value: item.source, icon: '🔗' } : null,
+    ].filter(Boolean);
+    const heroMetaItems = [
+      { id: 'category', label: 'Категория', value: getNewsCategoryLabel(item), icon: '🏷️' },
+      { id: 'author', label: 'Источник', value: item.source || 'apg', icon: '📰', onClick: item.source === 'vk' && url ? () => openUrl(url) : null },
+      { id: 'reading', label: 'Чтение', value: `${Math.max(1, Math.ceil((text?.length || 0) / 1200))} мин`, icon: '⏱' },
+    ].filter(Boolean);
+    const relatedItems = (related || []).slice(0, 6).map(relatedItem => ({
+      id: getCanonicalNewsId(relatedItem),
+      title: getNewsTitle(relatedItem),
+      subtitle: getNewsCategoryLabel(relatedItem),
+      categoryLabel: getNewsCategory(relatedItem),
+      kicker: 'Связанная новость',
+      onOpen: () => onClose(relatedItem),
+    }));
+    const tabItems = [
+      { id: 'content', label: 'Содержание' },
+      { id: 'related', label: `Связанные ${related.length}` },
+      { id: 'comments', label: `Комментарии${stats?.comments ? ` ${stats.comments}` : ''}` },
+    ];
+    const sourceLabel = item.source === 'apg' ? 'АПГ' : item.source === 'vk' ? 'VK' : item.source || 'АПГ';
+
+    const renderArticleSummary = (
+      <DesktopSection title="Содержание" subtitle={sourceLabel}>
+        <RichText color="var(--apg-news-article-text)" fontSize={15} lineHeight="24px">
+          {text || 'Полный текст новости появляется здесь после публикации.'}
+        </RichText>
+        <ContentBlocks blocks={item.contentBlocks} />
+      </DesktopSection>
+    );
+
+    const articleShell = (
+      <DesktopDetailShell
+        title={title}
+        onBack={onClose}
+        stickyActions={<DesktopStickyActions actions={stickyActions} />}
+        aside={
+          <>
+            <DesktopSidebarCard title="Мета" subtitle="Параметры публикации">
+              <DesktopMeta items={heroMetaItems} />
+            </DesktopSidebarCard>
+            {photos.length > 0 && (
+              <DesktopSidebarCard title="Мини-галерея" subtitle="Фотографии новости">
+                <DesktopGallery items={photos} onOpen={() => setLightboxIndex(0)} />
+              </DesktopSidebarCard>
+            )}
+            <DesktopSidebarCard title="Связанные" subtitle="Еще материалы">
+              {relatedItems.length ? <DesktopRelated items={relatedItems} onOpen={(itemItem) => onClose(itemItem)} /> : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px' }}>Связанных новостей пока нет.</div>}
+            </DesktopSidebarCard>
+            <DesktopSidebarCard title="Теги" subtitle="Темы публикации">
+              {tags.length ? <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{tags.slice(0, 10).map(tag => <span key={tag} style={{ padding: '6px 11px', borderRadius: 999, background: 'rgba(215,184,106,0.10)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.18)', fontSize: 11, fontWeight: 800 }}>#{tag}</span>)}</div> : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Теги не указаны</div>}
+            </DesktopSidebarCard>
+          </>
+        }
+      >
+        <DesktopHero
+          image={heroImage}
+          title={title}
+          subtitle={formatNewsDate(item)}
+          kicker="Новость"
+          status={sourceLabel}
+          badges={getSmartBadges(item).map(([emoji, label]) => ({ id: String(label).toLowerCase(), label: `${emoji} ${label}` }))}
+          description={text ? text.slice(0, 220) : 'Новость АПГ. Подробнее внутри материала.'}
+          meta={<DesktopInfoGrid items={kpiItems} columns="repeat(3, minmax(0, 1fr))" />}
+          actions={<DesktopHeroActions actions={heroActions} />}
+        />
+        <DesktopDetailTabs items={tabItems} activeId={activeTab} onChange={setDesktopTab} />
+
+        {activeTab === 'content' && (
+          <div style={{ display: 'grid', gap: 14 }}>
+            {renderArticleSummary}
+            <DesktopSection title="Медиа" subtitle="Фото и видео">
+              <div style={{ display: 'grid', gap: 12 }}>
+                {photos.length > 0 && <PhotoCarousel photos={photos} onOpen={setLightboxIndex} />}
+                {videos.length > 0 && <VideoSection videos={videos} />}
+                {(links.length > 0 || docs.length > 0) && (
+                  <GlassCard style={{ borderRadius: 28, padding: 16 }}>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Вложения</div>
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {links.map((link, index) => (
+                        <button key={`${link.url}-${index}`} type="button" onClick={() => openUrl(link.url)} style={{ display: 'grid', gridTemplateColumns: link.imageUrl ? '56px 1fr' : '1fr', gap: 12, alignItems: 'center', border: '1px solid rgba(247,241,230,0.10)', background: 'rgba(247,241,230,0.04)', borderRadius: 18, padding: 10, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
+                          {link.imageUrl && <img src={link.imageUrl} alt="" loading="lazy" style={{ width: 56, height: 48, borderRadius: 13, objectFit: 'cover' }} />}
+                          <span style={{ minWidth: 0 }}><span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title || link.url}</span>{link.description && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.description}</span>}</span>
+                        </button>
+                      ))}
+                      {docs.map((doc, index) => (
+                        <button key={`${doc.url}-${index}`} type="button" onClick={() => openUrl(doc.url)} style={{ border: '1px solid rgba(247,241,230,0.10)', background: 'rgba(247,241,230,0.04)', borderRadius: 18, padding: 12, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
+                          <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 820 }}>📎 {doc.title}</span>
+                          {doc.ext && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 4 }}>{doc.ext.toUpperCase()}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </GlassCard>
+                )}
+              </div>
+            </DesktopSection>
+            <DesktopSection title="Рекомендации" subtitle="Что открыть дальше">
+              {!!related.length && <DesktopRelated items={relatedItems} onOpen={(relatedItem) => onClose(relatedItem)} />}
+            </DesktopSection>
+          </div>
+        )}
+
+        {activeTab === 'related' && (
+          <DesktopSection title="Связанные публикации" subtitle="Новости этой же темы">
+            {(relatedItems.length ? (
+              <DesktopRelated items={relatedItems} onOpen={(relatedItem) => onClose(relatedItem)} />
+            ) : (
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Связанных материалов пока нет.</div>
+            ))}
+          </DesktopSection>
+        )}
+
+        {activeTab === 'comments' && (
+          <DesktopSection title="Комментарии" subtitle="Обсуждение публикации">
+            {commentsDisabledByFlag ? (
+              <GlassCard style={{ borderRadius: 28, padding: 14, color: APG2_PROFILE.textMuted, fontSize: 13.5, lineHeight: '20px' }}>Комментарии отключены редакцией.</GlassCard>
+            ) : (
+              <CommentsPanel item={item} user={user} onToast={onToast} />
+            )}
+          </DesktopSection>
+        )}
+        <DesktopSection title="Действия с публикацией" subtitle="Оценки и сохранение">
+          <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
+        </DesktopSection>
+        <DesktopActionBar actions={[
+          previousItem ? { id: 'prev', label: 'Предыдущая', onClick: () => previousItem && onNavigate(previousItem) } : null,
+          nextItem ? { id: 'next', label: 'Следующая', onClick: () => nextItem && onNavigate(nextItem) } : null,
+          showArticleTop ? { id: 'toTop', label: 'Наверх', onClick: scrollArticleTop } : null,
+        ].filter(Boolean)} />
+      </DesktopDetailShell>
+    );
+
+    const desktopLightbox = lightboxIndex !== null && (
+      <Lightbox
+        photos={photos}
+        initial={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
+    );
+
+    return createPortal(
+      <>
+        {articleShell}
+        {desktopLightbox}
+      </>,
+      document.body
+    );
+  }
 
   const DIVIDER = <div style={{ margin: '24px 0', height: 1, background: 'rgba(35,32,24,0.12)' }} />;
 
@@ -1477,6 +1678,7 @@ export function NewsPage({
       onSubscribe={onSubscribe}
       onToast={onToast}
       onOpenLoki={onOpenLoki}
+      desktopMode={desktopMode}
       saved={savedSet.has(selectedId)}
       later={laterSet.has(selectedId)}
       reaction={newsReactions?.[selectedId]}
