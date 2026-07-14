@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Desktop News Experience
+**Коммит:** `pending`
+**Файлы:** `src/NewsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-news-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Раздел `Новости` получил отдельную desktop-ветку на Desktop UI Framework: shell, header, toolbar, KPI, content grid, right rail, empty/skeleton/action states.
+- Популярное, новое, сохранённые, категории и подсказки перенесены в правую колонку; мобильные горизонтальные чипы/карусели и floating-кнопки сохранены только в мобильной ветке.
+- `ArticleView`, поиск, комментарии, реакции, сохранение, read-later и интеграция Локи продолжают использовать существующую логику без новых запросов и моделей данных.
+**Почему:** публичный раздел новостей должен ощущаться полноценной desktop-страницей, не ломая мобильный опыт.
+
 ## [2026-07-14] feat: Desktop UI Framework
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `scripts/desktop-ui-framework-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

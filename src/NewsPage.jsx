@@ -2,6 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
+import {
+  DesktopActionBar,
+  DesktopContentGrid,
+  DesktopEmptyState,
+  DesktopHeader,
+  DesktopKpiStrip,
+  DesktopSectionShell,
+  DesktopSectionTitle,
+  DesktopSidebarCard,
+  DesktopSkeleton,
+  DesktopToolbar,
+} from './components/DesktopUI.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { openUrl } from './vk.js';
 import { API_BASE_URL } from './constants.js';
@@ -54,6 +66,20 @@ const newsFilterPresets = [
   { id: 'month', label: 'Месяц' },
   { id: 'popular', label: 'Популярные' },
   { id: 'all_time', label: 'Все' },
+];
+
+const desktopSortOptions = [
+  { id: 'new', label: 'Новые' },
+  { id: 'popular', label: 'Популярные' },
+  { id: 'discussed', label: 'Обсуждаемые' },
+  { id: 'video', label: 'Видео' },
+];
+
+const desktopPeriodOptions = [
+  { id: 'all_time', label: 'Всё время' },
+  { id: 'today', label: 'Сегодня' },
+  { id: 'week', label: 'Неделя' },
+  { id: 'month', label: 'Месяц' },
 ];
 
 const inputStyle = {
@@ -909,10 +935,10 @@ function NewsSkeleton() {
   );
 }
 
-export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {}, saved, later }) {
+export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {}, saved, later, compact = false }) {
   const title = getNewsTitle(item);
   const text = getNewsText(item);
-  const isLarge = index % 5 === 0;
+  const isLarge = !compact && index % 5 === 0;
   const badges = getSmartBadges(item);
   return (
     <div
@@ -920,7 +946,7 @@ export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {
         ...APG2_PROFILE.glass,
         width: '100%',
         border: (item.isUrgent || (item.priority ?? 0) >= 9) ? '1px solid rgba(255,119,92,0.42)' : APG2_PROFILE.glass.border,
-        borderRadius: 30,
+        borderRadius: compact ? 24 : 30,
         padding: 0,
         overflow: 'hidden',
         textAlign: 'left',
@@ -936,8 +962,8 @@ export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {
         aria-label={`Открыть новость: ${title}`}
         style={{ width: '100%', border: 'none', background: 'transparent', padding: 0, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit', cursor: 'pointer' }}
       >
-        <NewsImage item={item} height={isLarge ? 240 : 174} radius={30}>
-          <div style={{ position: 'absolute', left: 14, right: 14, top: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <NewsImage item={item} height={compact ? 150 : isLarge ? 240 : 174} radius={compact ? 24 : 30}>
+          <div style={{ position: 'absolute', left: compact ? 10 : 14, right: compact ? 10 : 14, top: compact ? 10 : 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
             <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
               <span style={{ padding: '7px 11px', borderRadius: 999, background: 'rgba(8,8,10,0.45)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.28)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', fontSize: 11, fontWeight: 860 }}>{getNewsCategoryLabel(item)}</span>
               {badges.map(([emoji, label]) => (
@@ -950,13 +976,13 @@ export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {
             </span>
           </div>
         </NewsImage>
-        <span style={{ display: 'grid', gap: 10, padding: '16px 16px 10px' }}>
-          <span style={{ color: APG2_PROFILE.text, fontSize: isLarge ? 21 : 17, lineHeight: isLarge ? '26px' : '22px', fontWeight: 920, letterSpacing: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</span>
-          <span style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px', fontWeight: 620, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text || 'Короткая новость АПГ. Подробнее внутри материала.'}</span>
+        <span style={{ display: 'grid', gap: compact ? 8 : 10, padding: compact ? '13px 14px 9px' : '16px 16px 10px' }}>
+          <span style={{ color: APG2_PROFILE.text, fontSize: compact ? 16 : isLarge ? 21 : 17, lineHeight: compact ? '21px' : isLarge ? '26px' : '22px', fontWeight: 920, letterSpacing: 0, display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</span>
+          <span style={{ color: APG2_PROFILE.textSoft, fontSize: compact ? 12.5 : 13, lineHeight: compact ? '18px' : '20px', fontWeight: 620, display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text || 'Короткая новость АПГ. Подробнее внутри материала.'}</span>
           <NewsMeta item={item} compact />
         </span>
       </button>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: '0 16px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: compact ? '0 14px 14px' : '0 16px 16px' }}>
         <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', fontWeight: 700 }}>{getNewsPhotos(item).length > 1 ? `${getNewsPhotos(item).length} фото` : 'Материал АПГ'}</span>
         <button type="button" onClick={() => onShare(item)} aria-label={`Поделиться новостью: ${title}`} style={{ minHeight: 34, borderRadius: 999, padding: '0 12px', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer' }}>Поделиться</button>
       </div>
@@ -1318,6 +1344,7 @@ export function NewsPage({
   onToast,
   onOpenLoki,
   initialNewsTarget = null,
+  desktopMode = false,
 }) {
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('new');
@@ -1417,6 +1444,185 @@ export function NewsPage({
     });
     setSelected(item);
   };
+  const savedItems = useMemo(() => news.filter(item => savedSet.has(getCanonicalNewsId(item))).slice(0, 5), [news, savedNews]);
+  const freshItems = useMemo(() => sortNewsItems(news.filter(isFreshNews), 'new').slice(0, 5), [news]);
+  const categoryCounts = useMemo(() => NEWS_CATEGORIES
+    .map(item => ({
+      ...item,
+      count: item.id === 'all' ? news.length : news.filter(newsItem => getNewsCategory(newsItem) === item.id || (item.id === 'vk' && newsItem?.source === 'vk')).length,
+    }))
+    .filter(item => item.count > 0 || item.id === 'all'), [news]);
+  const popularCount = news.filter(item => getNewsViews(item) > 0).length;
+  const commentsCount = news.reduce((sum, item) => sum + getNewsStats(item).comments, 0);
+  const kpiItems = [
+    { id: 'total', label: 'Всего публикаций', value: news.length, tone: 'gold', icon: '📰' },
+    freshItems.length > 0 && { id: 'fresh', label: 'Новые', value: freshItems.length, icon: '✦' },
+    popularCount > 0 && { id: 'popular', label: 'Популярные', value: popularCount, icon: '↑' },
+    savedItems.length > 0 && { id: 'saved', label: 'Сохранённые', value: savedItems.length, icon: '★' },
+    commentsCount > 0 && { id: 'comments', label: 'Комментариев', value: commentsCount, icon: '💬' },
+  ].filter(Boolean);
+  const selectedArticlePortal = selected && createPortal(
+    <ArticleView
+      item={selected}
+      related={related}
+      previousItem={previousItem}
+      nextItem={nextItem}
+      onClose={(next) => next?.id ? openNewsItem(next, 'article_close_next') : setSelected(null)}
+      onNavigate={(item) => openNewsItem(item, 'article_nav')}
+      onReact={onReact}
+      onSave={onSave}
+      onReadLater={onReadLater}
+      onSubscribe={onSubscribe}
+      onToast={onToast}
+      onOpenLoki={onOpenLoki}
+      saved={savedSet.has(selectedId)}
+      later={laterSet.has(selectedId)}
+      reaction={newsReactions?.[selectedId]}
+      subscriptions={newsSubscriptions}
+      user={user}
+    />,
+    document.body
+  );
+
+  if (desktopMode) {
+    const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 138 };
+    const desktopInputStyle = { ...inputStyle, height: 42, borderRadius: 18, fontSize: 14, padding: '0 14px' };
+    const railButtonStyle = { width: '100%', border: 'none', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 11, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gap: 4 };
+    return (
+      <div ref={pageRef} data-apg-scroll-root="news-feed" onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', background: APG2_PROFILE.bg }}>
+        <DesktopSectionShell
+          header={
+            <DesktopHeader
+              title="Новости"
+              subtitle={`Информационный центр АПГ · ${resultLabel}`}
+              kicker="Информационный центр"
+              onBack={onBack}
+              actions={
+                <>
+                  <GlassButton onClick={focusSearch} style={{ minHeight: 40, borderRadius: 16 }}>Поиск</GlassButton>
+                  <GlassButton onClick={refresh} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>{refreshing ? 'Обновляем...' : 'Обновить'}</GlassButton>
+                  <GlassButton onClick={() => savedItems[0] && openNewsItem(savedItems[0], 'saved_header')} style={{ minHeight: 40, borderRadius: 16 }} disabled={!savedItems.length}>Сохранённые</GlassButton>
+                </>
+              }
+            />
+          }
+          toolbar={
+            <DesktopToolbar
+              leading={<input ref={searchRef} value={query} onChange={e => { setQuery(e.target.value); setVisibleCount(12); }} placeholder="Поиск по новостям, категориям и тексту" aria-label="Поиск по новостям" style={desktopInputStyle} />}
+              trailing={
+                <>
+                  <select aria-label="Категория новостей" value={category} onChange={e => { setCategory(e.target.value); setVisibleCount(12); }} style={selectStyle}>
+                    {categoryCounts.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </select>
+                  <select aria-label="Сортировка новостей" value={desktopSortOptions.some(item => item.id === sort) ? sort : 'new'} onChange={e => { setSort(e.target.value); setVisibleCount(12); }} style={selectStyle}>
+                    {desktopSortOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </select>
+                  <select aria-label="Период новостей" value={desktopPeriodOptions.some(item => item.id === sort) ? sort : 'all_time'} onChange={e => { setSort(e.target.value); setVisibleCount(12); }} style={selectStyle}>
+                    {desktopPeriodOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </select>
+                  {(query || category !== 'all' || sort !== 'new') && <GlassButton onClick={() => { setQuery(''); setCategory('all'); setSort('new'); setVisibleCount(12); }} style={{ minHeight: 42, borderRadius: 18 }}>Сбросить</GlassButton>}
+                </>
+              }
+            />
+          }
+          kpi={<DesktopKpiStrip items={kpiItems} />}
+          rightRail={
+            <>
+              <DesktopSidebarCard title="Популярное" subtitle="Самое читаемое">
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {popular.map(item => (
+                    <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'popular_rail')} style={railButtonStyle}>
+                      <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 820 }}>{getNewsViews(item)} просмотров</span>
+                      <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
+                    </button>
+                  ))}
+                </div>
+              </DesktopSidebarCard>
+              {freshItems.length > 0 && (
+                <DesktopSidebarCard title="Новое" subtitle="Свежие публикации">
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {freshItems.map(item => (
+                      <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'fresh_rail')} style={railButtonStyle}>
+                        <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, fontWeight: 760 }}>{formatNewsDate(item)}</span>
+                        <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </DesktopSidebarCard>
+              )}
+              {savedItems.length > 0 && (
+                <DesktopSidebarCard title="Сохранённые" subtitle="Ваши материалы">
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {savedItems.map(item => (
+                      <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'saved_rail')} style={railButtonStyle}>
+                        <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, fontWeight: 820 }}>Сохранено</span>
+                        <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </DesktopSidebarCard>
+              )}
+              <DesktopSidebarCard title="Категории" subtitle="Быстрый фильтр">
+                <div style={{ display: 'grid', gap: 7 }}>
+                  {categoryCounts.slice(0, 9).map(item => (
+                    <button key={item.id} type="button" onClick={() => { setCategory(item.id); setVisibleCount(12); scrollToTop(); }} style={{ ...railButtonStyle, gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'center', color: category === item.id ? APG2_PROFILE.gold : APG2_PROFILE.text }}>
+                      <span style={{ fontSize: 13, fontWeight: 830 }}>{item.label}</span>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 780 }}>{item.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </DesktopSidebarCard>
+              <DesktopSidebarCard title="Подсказки" subtitle="Как читать быстрее">
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                  Используйте поиск, категории и период в одной строке. Статья, комментарии и Локи открываются через существующий просмотр материала.
+                </div>
+              </DesktopSidebarCard>
+            </>
+          }
+          actionBar={(newItemsCount > 0 || showTopButton) && (
+            <DesktopActionBar
+              actions={[
+                newItemsCount > 0 && { id: 'fresh', label: `Появилось ${newItemsCount}`, tone: 'gold', onClick: scrollToTop },
+                showTopButton && { id: 'top', label: 'Наверх', onClick: scrollToTop },
+              ]}
+            />
+          )}
+          contentStyle={{ gap: 14 }}
+        >
+          <DesktopSectionTitle title={prepared.length ? `${prepared.length} материалов` : 'Материалы'} subtitle={query.trim() ? `По запросу: ${query.trim()}` : 'Городские новости, обновления АПГ и материалы партнёров'} />
+          {showSkeleton ? (
+            <DesktopSkeleton rows={6} variant="grid" />
+          ) : visible.length === 0 ? (
+            <DesktopEmptyState
+              icon="📰"
+              title="Материалы не найдены"
+              text={hasNews ? 'Попробуйте изменить категорию, период или поисковый запрос.' : 'Новости скоро появятся. Если интернет нестабилен, попробуйте обновить ленту.'}
+              action={<GlassButton onClick={refresh} tone="gold" style={{ color: '#17120a' }}>{refreshing ? 'Обновляем...' : 'Обновить'}</GlassButton>}
+            />
+          ) : (
+            <DesktopContentGrid min={285} gap={14}>
+              {visible.map((item, index) => (
+                <NewsCard
+                  key={item.id || `${getNewsTitle(item)}-${index}`}
+                  item={item}
+                  index={index}
+                  onOpen={(item) => openNewsItem(item, 'desktop_card')}
+                  onShare={handleShare}
+                  saved={savedSet.has(getCanonicalNewsId(item))}
+                  later={laterSet.has(getCanonicalNewsId(item))}
+                  compact
+                />
+              ))}
+            </DesktopContentGrid>
+          )}
+          {visibleCount < prepared.length && (
+            <DesktopActionBar actions={[{ id: 'more', label: 'Показать ещё', tone: 'gold', onClick: () => setVisibleCount(v => v + 12) }]} />
+          )}
+        </DesktopSectionShell>
+        {selectedArticlePortal}
+      </div>
+    );
+  }
 
   return (
     <div ref={pageRef} data-apg-scroll-root="news-feed" onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, padding: 'calc(var(--safe-top, 0px) + 12px) 16px calc(108px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
@@ -1523,28 +1729,7 @@ export function NewsPage({
         )}
       </div>
 
-      {selected && createPortal(
-        <ArticleView
-          item={selected}
-          related={related}
-          previousItem={previousItem}
-          nextItem={nextItem}
-          onClose={(next) => next?.id ? openNewsItem(next, 'article_close_next') : setSelected(null)}
-          onNavigate={(item) => openNewsItem(item, 'article_nav')}
-          onReact={onReact}
-          onSave={onSave}
-          onReadLater={onReadLater}
-          onSubscribe={onSubscribe}
-          onToast={onToast}
-          onOpenLoki={onOpenLoki}
-          saved={savedSet.has(selectedId)}
-          later={laterSet.has(selectedId)}
-          reaction={newsReactions?.[selectedId]}
-          subscriptions={newsSubscriptions}
-          user={user}
-        />,
-        document.body
-      )}
+      {selectedArticlePortal}
     </div>
   );
 }

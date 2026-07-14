@@ -3705,6 +3705,7 @@ export function UserApp() {
                     onToast={showToast}
                     onOpenLoki={() => goPanel('loki')}
                     initialNewsTarget={pendingLokiNewsTarget}
+                    desktopMode={desktopDevice}
                   />
                 </Suspense>
               </Panel>
