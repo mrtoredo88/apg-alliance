@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Desktop Partners Catalog
+**Коммит:** `pending`
+**Файлы:** `src/PartnersPage.jsx`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `scripts/desktop-partners-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен отдельный desktop-раздел `Партнёры` на Desktop UI Framework: общий top overview, header, toolbar, KPI, режимы Grid/List/Map/Split, каталог, quick preview и встроенные связанные данные.
+- Верхняя desktop-навигация, поиск и Локи теперь разводят `Партнёры` и `Акции`: партнёры открывают каталог организаций, акции остаются в `OffersPage`.
+- Детальная карточка партнёра продолжает открываться через существующий `PartnerPage`; данные берутся из уже загруженных `partners/enrichedPartners`, `events`, `news`, `favorites` без новых моделей и API.
+**Почему:** раздел партнёров должен стать самостоятельной бизнес-витриной АПГ, а не входом в каталог специальных предложений.
+
 ## [2026-07-14] refactor: Desktop Top Overview Architecture
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/HomePanelV2.jsx`, `src/NewsPage.jsx`, `src/EventsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-news-page-test.mjs`, `scripts/desktop-events-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

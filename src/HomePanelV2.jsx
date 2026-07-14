@@ -408,6 +408,7 @@ function V2FirstScreen({
   onOpenLoki,
   onOpenProfile,
   onOpenOffers,
+  onOpenPartners,
   onOpenNews,
   onOpenMap,
   onOpenExperts,
@@ -444,6 +445,7 @@ function V2FirstScreen({
         onOpenLoki={onOpenLoki}
         onOpenProfile={onOpenProfile}
         onOpenOffers={onOpenOffers}
+        onOpenPartners={onOpenPartners}
         onOpenNews={onOpenNews}
         onOpenMap={onOpenMap}
         onOpenExperts={onOpenExperts}
@@ -772,7 +774,7 @@ function V2FirstScreenDesktop({
     { label: 'Главная', isActive: true, onClick: () => {} },
     { label: 'Новости', onClick: onOpenNews },
     { label: 'Мероприятия', onClick: onOpenEvents },
-    { label: 'Партнёры', onClick: onOpenOffers },
+    { label: 'Партнёры', onClick: onOpenPartners || onOpenOffers },
     { label: 'Эксперты', onClick: onOpenExperts },
     { label: 'Акции', onClick: onOpenOffers },
     { label: 'Подарки', onClick: onOpenRewards },
@@ -790,8 +792,12 @@ function V2FirstScreenDesktop({
       onOpenEvents?.();
       return;
     }
-    if (query.includes('партнер') || query.includes('партн') || query.includes('акци') || query.includes('скид')) {
+    if (query.includes('акци') || query.includes('скид')) {
       onOpenOffers?.();
+      return;
+    }
+    if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) {
+      (onOpenPartners || onOpenOffers)?.();
       return;
     }
     if (query.includes('эксперт') || query.includes('консультац')) {
@@ -807,7 +813,7 @@ function V2FirstScreenDesktop({
       return;
     }
     onOpenLoki?.();
-  }, [desktopSearchQuery, onOpenEvents, onOpenExperts, onOpenLoki, onOpenNearby, onOpenNews, onOpenOffers, onOpenRewards]);
+  }, [desktopSearchQuery, onOpenEvents, onOpenExperts, onOpenLoki, onOpenNearby, onOpenNews, onOpenOffers, onOpenPartners, onOpenRewards]);
 
   const todayCards = [
     { title: 'Мероприятие дня', value: heroTitle, onClick: heroAction, icon: '🎉' },
@@ -850,7 +856,7 @@ function V2FirstScreenDesktop({
           heroImage={heroImage}
           heroActions={[
             { id: 'events', label: 'Все мероприятия', onClick: () => onOpenEvents?.() },
-            { id: 'partner', label: 'Найти партнёра', tone: 'gold', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenOffers },
+            { id: 'partner', label: 'Найти партнёра', tone: 'gold', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : (onOpenPartners || onOpenOffers) },
           ]}
           stats={profileStats}
           progressTitle={nextAchievement?.title || `До уровня ${nextLevel.label}`}

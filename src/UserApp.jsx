@@ -68,6 +68,7 @@ const ContextDialogsPage = lazy(() => import('./contextDialogs/ContextDialogsPag
 const EventsPage      = lazy(() => import('./EventsPage.jsx').then(m => ({ default: m.EventsPage })));
 const LeaderboardPage = lazy(() => import('./LeaderboardPage.jsx').then(m => ({ default: m.LeaderboardPage })));
 const ActivityPage    = lazy(() => import('./ActivityPage.jsx').then(m => ({ default: m.ActivityPage })));
+const PartnersPage    = lazy(() => import('./PartnersPage.jsx').then(m => ({ default: m.PartnersPage })));
 const OffersPage      = lazy(() => import('./OffersPage.jsx').then(m => ({ default: m.OffersPage })));
 const TasksPage       = lazy(() => import('./TasksPage.jsx').then(m => ({ default: m.TasksPage })));
 const ReferralPage    = lazy(() => import('./ReferralPage.jsx').then(m => ({ default: m.ReferralPage })));
@@ -3347,7 +3348,7 @@ export function UserApp() {
       const targetId = partnerId ?? id;
       const partner = targetId ? enrichedPartners.find(p => p.id === targetId && isNotArchived(p)) : enrichedPartners[0];
       if (partner) openPartner(partner);
-      else goPanel('offers');
+      else goPanel('partners');
     },
     [LOKI_APP_ACTIONS.OPEN_EVENT]: ({ eventId, id } = {}) => {
       const targetId = eventId ?? id;
@@ -3360,7 +3361,7 @@ export function UserApp() {
       goPanel('news');
     },
     [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
-    [LOKI_APP_ACTIONS.OPEN_PARTNERS]: () => goPanel('offers'),
+    [LOKI_APP_ACTIONS.OPEN_PARTNERS]: () => goPanel('partners'),
     [LOKI_APP_ACTIONS.OPEN_EXPERTS]: () => goPanel('experts'),
     [LOKI_APP_ACTIONS.OPEN_EVENTS]: () => goPanel('events'),
     [LOKI_APP_ACTIONS.OPEN_NEWS_FEED]: () => goPanel('news'),
@@ -3567,6 +3568,7 @@ export function UserApp() {
     onOpenHealth: () => goPanel('health'),
     onOpenMap: () => goPanel('map'),
     onOpenNearby: () => goPanel('nearby'),
+    onOpenPartners: () => goPanel('partners'),
     onOpenOffers: () => goPanel('offers'),
     onOpenProfile: () => goPanel('profile'),
     onOpenReference: () => goPanel('reference'),
@@ -3585,7 +3587,8 @@ export function UserApp() {
     if (!query) return;
     if (query.includes('новост') || query.includes('публикац')) goPanel('news');
     else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) goPanel('events');
-    else if (query.includes('партнер') || query.includes('партн') || query.includes('акци') || query.includes('скид')) goPanel('offers');
+    else if (query.includes('акци') || query.includes('скид')) goPanel('offers');
+    else if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) goPanel('partners');
     else if (query.includes('эксперт') || query.includes('консультац')) goPanel('experts');
     else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) goPanel('rewards');
     else if (query.includes('рядом') || query.includes('карт')) goPanel('nearby');
@@ -3600,7 +3603,7 @@ export function UserApp() {
       { id: 'home', label: 'Главная', onClick: () => goPanel('home') },
       { id: 'news', label: 'Новости', onClick: () => goPanel('news') },
       { id: 'events', label: 'Мероприятия', onClick: () => goPanel('events') },
-      { id: 'partners', label: 'Партнёры', onClick: () => goPanel('offers') },
+      { id: 'partners', label: 'Партнёры', onClick: () => goPanel('partners') },
       { id: 'experts', label: 'Эксперты', onClick: () => goPanel('experts') },
       { id: 'offers', label: 'Акции', onClick: () => goPanel('offers') },
       { id: 'rewards', label: 'Подарки', onClick: () => goPanel('rewards') },
@@ -3951,6 +3954,24 @@ export function UserApp() {
               <Panel id="offers">
                 <Suspense fallback={<LazyFallback />}>
                   <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onAskQuestion={(partner) => openContextDialog('promotion', partner, 'promotion-card')} onBack={goBackPanel} />
+                </Suspense>
+              </Panel>
+
+              <Panel id="partners">
+                <Suspense fallback={<LazyFallback />}>
+                  <PartnersPage
+                    partners={enrichedPartners}
+                    events={events}
+                    news={news}
+                    favorites={favorites}
+                    onBack={goBackPanel}
+                    onOpenPartner={openPartner}
+                    onAskQuestion={(partner) => openContextDialog('partner', partner, 'partners-catalog')}
+                    onBook={(partner) => openBookingFlow('partner', partner)}
+                    onOpenMap={() => goPanel('map')}
+                    desktopOverview={desktopOverview}
+                    desktopMode={desktopDevice}
+                  />
                 </Suspense>
               </Panel>
 
