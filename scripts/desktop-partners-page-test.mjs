@@ -47,12 +47,20 @@ if (!userAppSource.includes("goPanel('partners')") || !userAppSource.includes("g
   throw new Error('UserApp must keep Partners and Offers as separate routes.');
 }
 
+if (!userAppSource.includes('const handleOpenPartners = useCallback') || !userAppSource.includes('[LOKI_APP_ACTIONS.OPEN_PARTNERS]: handleOpenPartners')) {
+  throw new Error('UserApp must expose one shared handleOpenPartners route for Desktop Home, overview navigation and Loki.');
+}
+
 if (!userAppSource.includes('desktopOverview={desktopOverview}') || !userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktop overview and desktopMode to PartnersPage.');
 }
 
-if (!homeSource.includes('onOpenPartners') || !homeSource.includes('onOpenPartners || onOpenOffers')) {
-  throw new Error('Desktop Home must route the Partners top-nav item to the partners catalog with offers fallback.');
+if (!homeSource.includes('onOpenPartners,') || !homeSource.includes('const handleOpenPartners = onOpenPartners || onOpenOffers')) {
+  throw new Error('Desktop Home must receive onOpenPartners and normalize it to handleOpenPartners with offers fallback.');
+}
+
+if (homeSource.includes('(onOpenPartners || onOpenOffers)')) {
+  throw new Error('Desktop Home must use handleOpenPartners instead of inline onOpenPartners fallback expressions.');
 }
 
 console.log('desktop-partners-page-test: ok');

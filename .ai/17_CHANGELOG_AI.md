@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] fix: Desktop Partners Navigation Hotfix
+**Коммит:** `pending`
+**Файлы:** `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `scripts/desktop-partners-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Исправлен production crash `Can't find variable: onOpenPartners` в desktop Home: `V2FirstScreenDesktop` теперь явно принимает `onOpenPartners` и использует локальный `handleOpenPartners`.
+- В `UserApp` добавлен единый `handleOpenPartners`, который используется Home, верхним desktop overview и Локи `OPEN_PARTNERS`.
+- Тест `desktop-partners-page-test` теперь проверяет единый обработчик и запрещает inline fallback-выражения, которые привели к регрессии.
+**Почему:** после выделения каталога партнёров часть desktop-навигации осталась со ссылкой на необъявленный prop, что падало в Safari production.
+
 ## [2026-07-14] feat: Desktop Partners Catalog
 **Коммит:** `pending`
 **Файлы:** `src/PartnersPage.jsx`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `scripts/desktop-partners-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

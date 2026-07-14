@@ -725,6 +725,7 @@ function V2FirstScreenDesktop({
   onOpenReference,
   onOpenLoki,
   onOpenProfile,
+  onOpenPartners,
   onOpenOffers,
   onOpenNews,
   onOpenMap,
@@ -753,6 +754,7 @@ function V2FirstScreenDesktop({
   const initials = fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
   const avatarUrl = user?.photo_200 || user?.photo || user?.avatarUrl || '';
   const desktopLayout = getDesktopLayout(typeof window === 'undefined' ? 1280 : window.innerWidth);
+  const handleOpenPartners = onOpenPartners || onOpenOffers;
   const nextAchievement = TASKS
     .map(task => ({
       ...task,
@@ -774,7 +776,7 @@ function V2FirstScreenDesktop({
     { label: 'Главная', isActive: true, onClick: () => {} },
     { label: 'Новости', onClick: onOpenNews },
     { label: 'Мероприятия', onClick: onOpenEvents },
-    { label: 'Партнёры', onClick: onOpenPartners || onOpenOffers },
+    { label: 'Партнёры', onClick: handleOpenPartners },
     { label: 'Эксперты', onClick: onOpenExperts },
     { label: 'Акции', onClick: onOpenOffers },
     { label: 'Подарки', onClick: onOpenRewards },
@@ -797,7 +799,7 @@ function V2FirstScreenDesktop({
       return;
     }
     if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) {
-      (onOpenPartners || onOpenOffers)?.();
+      handleOpenPartners?.();
       return;
     }
     if (query.includes('эксперт') || query.includes('консультац')) {
@@ -813,7 +815,7 @@ function V2FirstScreenDesktop({
       return;
     }
     onOpenLoki?.();
-  }, [desktopSearchQuery, onOpenEvents, onOpenExperts, onOpenLoki, onOpenNearby, onOpenNews, onOpenOffers, onOpenPartners, onOpenRewards]);
+  }, [desktopSearchQuery, handleOpenPartners, onOpenEvents, onOpenExperts, onOpenLoki, onOpenNearby, onOpenNews, onOpenOffers, onOpenRewards]);
 
   const todayCards = [
     { title: 'Мероприятие дня', value: heroTitle, onClick: heroAction, icon: '🎉' },
@@ -856,7 +858,7 @@ function V2FirstScreenDesktop({
           heroImage={heroImage}
           heroActions={[
             { id: 'events', label: 'Все мероприятия', onClick: () => onOpenEvents?.() },
-            { id: 'partner', label: 'Найти партнёра', tone: 'gold', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : (onOpenPartners || onOpenOffers) },
+            { id: 'partner', label: 'Найти партнёра', tone: 'gold', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : handleOpenPartners },
           ]}
           stats={profileStats}
           progressTitle={nextAchievement?.title || `До уровня ${nextLevel.label}`}

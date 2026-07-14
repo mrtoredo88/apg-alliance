@@ -979,6 +979,10 @@ export function UserApp() {
     if (id === 'map' || id === 'nearby') showLokiMessage(LOKI_EVENTS.MAP_OPENED, { source: id });
   }, [navigatePanel]);
 
+  const handleOpenPartners = useCallback(() => {
+    goPanel('partners');
+  }, [goPanel]);
+
   const openContextDialog = useCallback((type, item, source = 'ui') => {
     if (!type || !item) return;
     setPendingDialogRequest({ type, item, source, nonce: Date.now() });
@@ -3348,7 +3352,7 @@ export function UserApp() {
       const targetId = partnerId ?? id;
       const partner = targetId ? enrichedPartners.find(p => p.id === targetId && isNotArchived(p)) : enrichedPartners[0];
       if (partner) openPartner(partner);
-      else goPanel('partners');
+      else handleOpenPartners();
     },
     [LOKI_APP_ACTIONS.OPEN_EVENT]: ({ eventId, id } = {}) => {
       const targetId = eventId ?? id;
@@ -3361,7 +3365,7 @@ export function UserApp() {
       goPanel('news');
     },
     [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
-    [LOKI_APP_ACTIONS.OPEN_PARTNERS]: () => goPanel('partners'),
+    [LOKI_APP_ACTIONS.OPEN_PARTNERS]: handleOpenPartners,
     [LOKI_APP_ACTIONS.OPEN_EXPERTS]: () => goPanel('experts'),
     [LOKI_APP_ACTIONS.OPEN_EVENTS]: () => goPanel('events'),
     [LOKI_APP_ACTIONS.OPEN_NEWS_FEED]: () => goPanel('news'),
@@ -3388,7 +3392,7 @@ export function UserApp() {
       if (targetId) setPendingLokiEventTarget({ id: targetId, nonce: Date.now(), action: 'register' });
       goPanel('events');
     },
-  }), [enrichedPartners, favorites, goPanel, openNotifications, openPartner, openScanner, toggleFavorite]);
+  }), [enrichedPartners, favorites, goPanel, handleOpenPartners, openNotifications, openPartner, openScanner, toggleFavorite]);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
@@ -3568,7 +3572,7 @@ export function UserApp() {
     onOpenHealth: () => goPanel('health'),
     onOpenMap: () => goPanel('map'),
     onOpenNearby: () => goPanel('nearby'),
-    onOpenPartners: () => goPanel('partners'),
+    onOpenPartners: handleOpenPartners,
     onOpenOffers: () => goPanel('offers'),
     onOpenProfile: () => goPanel('profile'),
     onOpenReference: () => goPanel('reference'),
@@ -3588,7 +3592,7 @@ export function UserApp() {
     if (query.includes('новост') || query.includes('публикац')) goPanel('news');
     else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) goPanel('events');
     else if (query.includes('акци') || query.includes('скид')) goPanel('offers');
-    else if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) goPanel('partners');
+    else if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) handleOpenPartners();
     else if (query.includes('эксперт') || query.includes('консультац')) goPanel('experts');
     else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) goPanel('rewards');
     else if (query.includes('рядом') || query.includes('карт')) goPanel('nearby');
@@ -3603,7 +3607,7 @@ export function UserApp() {
       { id: 'home', label: 'Главная', onClick: () => goPanel('home') },
       { id: 'news', label: 'Новости', onClick: () => goPanel('news') },
       { id: 'events', label: 'Мероприятия', onClick: () => goPanel('events') },
-      { id: 'partners', label: 'Партнёры', onClick: () => goPanel('partners') },
+      { id: 'partners', label: 'Партнёры', onClick: handleOpenPartners },
       { id: 'experts', label: 'Эксперты', onClick: () => goPanel('experts') },
       { id: 'offers', label: 'Акции', onClick: () => goPanel('offers') },
       { id: 'rewards', label: 'Подарки', onClick: () => goPanel('rewards') },
