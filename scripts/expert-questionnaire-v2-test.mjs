@@ -9,7 +9,7 @@ const fields = {
   categories: ['law', 'finance'], category: 'law', shortDescription: 'Юрист', description: 'Работаю с предпринимателями.',
   services: 'Консультации', workFormats: ['online', 'individual'], audienceTags: ['entrepreneurs'], tariff: 'ambassador', phone: '+7 999 000-00-00',
   email: 'expert@example.ru', website: 'https://example.ru', bookingUrl: 'https://example.ru/book', vk: 'https://vk.com/expert',
-  telegram: 'https://t.me/expert', max: 'https://max.ru/expert', otherSocials: ['https://example.com/social'], inn: '',
+  telegram: 'https://telegram.me/expert', max: 'https://max.ru/expert', otherSocials: ['https://example.com/social'], inn: '',
   whatsapp: '+7 999 000-00-00', address: 'Зеленоград', hours: 'Пн-Пт 10:00-19:00', experience: '15 лет', cost: 'от 3 000 ₽', offer: 'Первая консультация бесплатно',
   videos: [{ url: 'https://youtu.be/dQw4w9WgXcQ', title: '', platform: 'youtube', platformLabel: 'YouTube' }],
   newsInfo: 'Темы публикаций', activities: 'Лекции', comment: 'Только для администрации',

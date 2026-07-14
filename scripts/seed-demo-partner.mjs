@@ -161,7 +161,7 @@ const partner = {
   bookingUrl: `${APP_URL}/#/partners`,
   socialUrl: 'https://vk.com/apg',
   vkGroupUrl: 'https://vk.com/apg',
-  telegramCommunityUrl: 'https://t.me/apg_demo',
+  telegramCommunityUrl: 'https://telegram.me/apg_demo',
   maxCommunityUrl: 'https://max.ru/apg',
   whatsappUrl: 'https://wa.me/79990000000',
   instagramUrl: 'https://instagram.com/apg.demo',
@@ -169,7 +169,7 @@ const partner = {
   links: [
     { label: 'Сайт АПГ', url: APP_URL },
     { label: 'VK', url: 'https://vk.com/apg' },
-    { label: 'Telegram', url: 'https://t.me/apg_demo' },
+    { label: 'Telegram', url: 'https://telegram.me/apg_demo' },
   ],
   stampTarget: 5,
   publicQRUrl: `${APP_URL}/?partner=${DEMO_ID}`,

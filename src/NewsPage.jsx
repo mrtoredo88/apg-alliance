@@ -10,6 +10,7 @@ import { auth } from './firebase.js';
 import { shareLink } from './utils/shareLink.js';
 import { useLoki } from './loki/LokiProvider.jsx';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
+import { telegramShareUrl } from '../server-shared/telegram.js';
 import {
   NEWS_CATEGORIES,
   areNewsCommentsEnabled,
@@ -485,7 +486,7 @@ function SharePanel({ item, onToast, onShare }) {
     }
   };
   const items = [
-    ['Telegram', `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`],
+    ['Telegram', telegramShareUrl({ url, text: title })],
     ['VK', `https://vk.com/share.php?url=${encodedUrl}&title=${encodedTitle}`],
     ['WhatsApp', `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`],
   ];

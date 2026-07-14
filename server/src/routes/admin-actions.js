@@ -8,6 +8,7 @@ import { resolveEmailIdentity } from '../lib/identityCore.js';
 import { ECONOMY_VERSION, economyMigrationPatch } from '../../../server-shared/economy-engine.js';
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentTitle, getLifecycleAutoRecommendation, normalizeContentStatus, summarizeLifecycle } from '../../../server-shared/content-lifecycle.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
+import { telegramUrl } from '../../../server-shared/telegram.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
@@ -724,7 +725,7 @@ async function handleTelegramAuthAdminAction(db, request, actor) {
       createdAt: FieldValue.serverTimestamp(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
-    const url = `https://t.me/apg_zelenograd_bot?start=auth_${state}`;
+    const url = telegramUrl(`apg_zelenograd_bot?start=auth_${state}`);
     await writeAuditLog(db, request, actor, action, 'users', user.id, { label: 'Создана Telegram linking-сессия', state });
     return { ok: true, state, url, expiresInSec: 300 };
   }

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] fix: migrate Telegram links to telegram.me
+**Коммит:** `pending`
+**Файлы:** `server-shared/telegram.js`, `src/utils/externalUrls.js`, `src/NewsPage.jsx`, `src/AdminPanel.jsx`, `src/ExpertCabinetPage.jsx`, `src/expertProfileForm.js`, `server/src/routes/telegram-auth-start.js`, `server/src/routes/admin-actions.js`, `server/src/routes/public-submit.js`, `server/src/lib/telegramUpdates.js`, `scripts/telegram-url-test.mjs`, `scripts/seed-demo-partner.mjs`, `scripts/expert-questionnaire-v2-test.mjs`, `scripts/showcase-builder-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/08_TELEGRAM.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Все Telegram URL в исходниках, backend, bot keyboard, admin share, news share, seed/test data и документации переведены с legacy-домена на `https://telegram.me/`.
+- Добавлен shared helper `server-shared/telegram.js`: `telegramUrl()`, `telegramShareUrl()`, `telegramPath()`; frontend/backend нормализация Telegram-ссылок теперь отдаёт единый домен и принимает старый ввод из базы/форм.
+- `test:core` расширен контрактом `telegram-url-test`, который фиксирует auth/channel/share URL и legacy-normalization.
+**Почему:** Telegram-ссылки должны формироваться системно из одного источника и не возвращать старый домен в новых сценариях.
+
 ## [2026-07-14] feat: Workspace Meetings center
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `src/intelligence/WorkspaceDayPlanner.js`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`

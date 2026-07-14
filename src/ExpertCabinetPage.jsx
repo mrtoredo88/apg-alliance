@@ -1084,7 +1084,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
             <input style={inputStyle} placeholder="https://vk.com/..." value={fVk} onChange={e => setFVk(e.target.value)} />
 
             <label style={labelStyle}>✈️ Telegram</label>
-            <input style={inputStyle} placeholder="https://t.me/..." value={fTelegram} onChange={e => setFTelegram(e.target.value)} />
+            <input style={inputStyle} placeholder="https://telegram.me/..." value={fTelegram} onChange={e => setFTelegram(e.target.value)} />
 
             <label style={labelStyle}>💬 Max</label>
             <input style={inputStyle} placeholder="https://..." value={fMax} onChange={e => setFMax(e.target.value)} />

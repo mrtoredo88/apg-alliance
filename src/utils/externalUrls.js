@@ -1,6 +1,8 @@
+import { TELEGRAM_HOST, telegramUrl } from '../../server-shared/telegram.js';
+
 const SOCIAL_HOSTS = {
   vk: 'vk.com',
-  telegram: 't.me',
+  telegram: TELEGRAM_HOST,
   whatsapp: 'wa.me',
   instagram: 'instagram.com',
   youtube: 'youtube.com',
@@ -11,7 +13,7 @@ const SOCIAL_HOSTS = {
 
 const HOST_PLATFORM = [
   ['vk', /(^|\.)vk\.com$|(^|\.)vk\.me$|(^|\.)vkontakte\.ru$/i],
-  ['telegram', /(^|\.)t\.me$|(^|\.)telegram\.me$/i],
+  ['telegram', /(^|\.)t[.]me$|(^|\.)telegram\.me$/i],
   ['whatsapp', /(^|\.)wa\.me$|(^|\.)whatsapp\.com$/i],
   ['instagram', /(^|\.)instagram\.com$/i],
   ['youtube', /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i],
@@ -44,7 +46,7 @@ function stripKnownHost(value, platform) {
   if (!host) return value;
   const extraHosts = {
     vk: 'vk\\.me|vkontakte\\.ru',
-    telegram: 'telegram\\.me',
+    telegram: 't[.]me',
     whatsapp: 'whatsapp\\.com',
     youtube: 'youtu\\.be',
   }[platform];
@@ -75,6 +77,7 @@ export function normalizeExternalUrl(value, options = {}) {
       path = path.replace(/[^\d]/g, '');
     }
     if (!path) return '';
+    if (platform === 'telegram') return telegramUrl(path);
     return `https://${SOCIAL_HOSTS[platform]}/${path}`;
   }
 

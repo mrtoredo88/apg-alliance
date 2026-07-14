@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { getDb } from '../lib/firebase.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { telegramUrl } from '../../../server-shared/telegram.js';
 
 function normalizeBoolean(value) {
   if (typeof value === 'boolean') return value;
@@ -33,6 +34,6 @@ export default async function telegramAuthStartRoutes(fastify) {
       createdAt: FieldValue.serverTimestamp(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
-    return { state, url: `https://t.me/apg_zelenograd_bot?start=auth_${state}` };
+    return { state, url: telegramUrl(`apg_zelenograd_bot?start=auth_${state}`) };
   });
 }

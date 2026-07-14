@@ -50,7 +50,7 @@
 ▼
 POST /api/telegram-auth-start
 → Создаёт telegramAuthSessions/{state} (status: 'pending', TTL 5 min)
-→ Возвращает { state, url: "t.me/apg_zelenograd_bot?start=auth_{state}" }
+→ Возвращает { state, url: "telegram.me/apg_zelenograd_bot?start=auth_{state}" }
 │
 ▼
 Клиент открывает deep link в браузере / VK Browser
@@ -142,7 +142,7 @@ Authorization: Bearer <Firebase ID Token текущего пользовател
 
 ## Telegram Channel
 
-**Канал:** `https://t.me/apgzel`
+**Канал:** `https://telegram.me/apgzel`
 
 Используется командой АПГ для публикации новостей и анонсов. Не интегрирован в код приложения (ссылка присутствует только в bot-кнопках `/links`).
 
@@ -195,7 +195,7 @@ Authorization: Bearer <Firebase ID Token текущего пользовател
 
 **Формат deep link в Telegram:**
 ```
-https://t.me/apg_zelenograd_bot?start=auth_a1b2c3d4e5f6...
+https://telegram.me/apg_zelenograd_bot?start=auth_a1b2c3d4e5f6...
 ```
 
 При открытии бота Telegram передаёт start parameter в `/start auth_{payload}`.

@@ -14,7 +14,7 @@ export const EXPERT_WORK_FORMATS = [
 
 export const EXPERT_SOCIAL_FIELDS = [
   { key: 'vkUrl', label: 'VK', platform: 'vk', placeholder: 'https://vk.com/...' },
-  { key: 'telegramUrl', label: 'Telegram', platform: 'telegram', placeholder: 'https://t.me/...' },
+  { key: 'telegramUrl', label: 'Telegram', platform: 'telegram', placeholder: 'https://telegram.me/...' },
   { key: 'maxUrl', label: 'MAX', platform: 'max', placeholder: 'https://...' },
   { key: 'instagramUrl', label: 'Instagram', platform: '', placeholder: 'https://instagram.com/...' },
   { key: 'youtubeUrl', label: 'YouTube', platform: '', placeholder: 'https://youtube.com/...' },

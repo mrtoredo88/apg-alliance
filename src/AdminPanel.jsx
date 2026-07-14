@@ -26,6 +26,7 @@ import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, filterByLifecycleView, getLif
 import { useAdminFormDraft, formatDraftTime, clearAdminDraft } from './adminFormDrafts.js';
 import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
 import { formatEventPrice, isPaidEvent } from './eventPrice.js';
+import { telegramShareUrl } from '../server-shared/telegram.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -2234,7 +2235,7 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
 
   const shareTelegram = () => {
     if (!publicMessage) return;
-    const url = `https://t.me/share/url?url=${encodeURIComponent(publicLinkUrl)}&text=${encodeURIComponent(publicMessage.replace(publicLinkUrl, '').trim())}`;
+    const url = telegramShareUrl({ url: publicLinkUrl, text: publicMessage.replace(publicLinkUrl, '').trim() });
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -7363,7 +7364,7 @@ export const AdminPanel = () => {
                 <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
 
                 <label style={s.label}>Telegram эксперта</label>
-                <input style={s.input} placeholder="https://t.me/..." value={exTelegram} onChange={e => setExTelegram(e.target.value)} />
+                <input style={s.input} placeholder="https://telegram.me/..." value={exTelegram} onChange={e => setExTelegram(e.target.value)} />
 
                 <label style={s.label}>Личный сайт / портфолио</label>
                 <input style={s.input} placeholder="https://..." value={exWebsite} onChange={e => setExWebsite(e.target.value)} />
@@ -7705,7 +7706,7 @@ export const AdminPanel = () => {
                 <input style={s.input} placeholder="https://..." value={pWebsite} onChange={e => setPWebsite(e.target.value)} />
 
                 <label style={s.label}>Telegram-сообщество (канал или чат)</label>
-                <input style={s.input} placeholder="https://t.me/..." value={pTelegramCom} onChange={e => setPTelegramCom(e.target.value)} />
+                <input style={s.input} placeholder="https://telegram.me/..." value={pTelegramCom} onChange={e => setPTelegramCom(e.target.value)} />
 
                 <label style={s.label}>Max-сообщество</label>
                 <input style={s.input} placeholder="https://..." value={pMaxCom} onChange={e => setPMaxCom(e.target.value)} />

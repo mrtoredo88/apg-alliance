@@ -1,5 +1,6 @@
 import { APP_URL } from './config.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { telegramUrl } from '../../../server-shared/telegram.js';
 
 const TELEGRAM_HELPER_URL = `${APP_URL}/#/telegram-helper`;
 
@@ -9,7 +10,7 @@ const SOCIAL_KEYBOARD = {
     [{ text: '🚀 Быстрый вход в АПГ', web_app: { url: TELEGRAM_HELPER_URL } }],
     [{ text: '🔗 Приложение АПГ', url: APP_URL }],
     [{ text: '📱 ВКонтакте',      url: 'https://vk.com/apgzelenograd'   },
-     { text: '📢 Telegram-канал', url: 'https://t.me/apgzel'            }],
+     { text: '📢 Telegram-канал', url: telegramUrl('apgzel')            }],
     [{ text: '🎥 YouTube',        url: 'https://www.youtube.com/@ВиталийСтроитАПГ' }],
     [{ text: '📸 Instagram',      url: 'https://www.instagram.com/mr_toredo88' },
      { text: '🎵 Дзен',          url: 'https://dzen.ru/apgzel'          }],

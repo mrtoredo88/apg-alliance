@@ -20,7 +20,7 @@ const partner = {
   logoUrl: 'https://example.com/logo.webp',
   coverPhoto: 'https://example.com/cover.webp',
   gallery: ['https://example.com/1.webp', 'https://example.com/2.webp'],
-  telegramUrl: 'https://t.me/apg',
+  telegramUrl: 'https://telegram.me/apg',
   videos: [{ title: 'Обзор', url: 'https://rutube.ru/video/1' }],
   prices: ['Капучино 220'],
   faq: [{ question: 'Можно с детьми?', answer: 'Да' }],
