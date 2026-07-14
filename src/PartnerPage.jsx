@@ -23,6 +23,19 @@ import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
+import {
+  DesktopDetailShell,
+  DesktopDetailTabs,
+  DesktopGallery,
+  DesktopHero,
+  DesktopHeroActions,
+  DesktopInfoGrid,
+  DesktopMeta,
+  DesktopRelated,
+  DesktopSection,
+  DesktopSidebarCard,
+  DesktopStickyActions,
+} from './components/DesktopUI.jsx';
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
 
@@ -152,7 +165,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, reviewPrompt, reviewPromptBookingId = '', onReviewPromptHandled }) {
+export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, reviewPrompt, reviewPromptBookingId = '', onReviewPromptHandled, desktopMode = false }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -164,6 +177,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const [reviewError, setReviewError]     = useState('');
   const [phoneCopied, setPhoneCopied]     = useState(false);
   const [shareToast, setShareToast]       = useState('');
+  const [desktopTab, setDesktopTab]       = useState('about');
   const phoneCopyTimerRef                 = useRef(null);
   const shareToastRef                     = useRef(null);
   const mountedRef                        = useRef(true);
@@ -183,6 +197,10 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     if (variant !== 'v2' || !partner?.id) return;
     window.scrollTo(0, 0);
   }, [variant, partner?.id]);
+
+  useEffect(() => {
+    setDesktopTab('about');
+  }, [partner?.id]);
 
   useEffect(() => {
     if (!partner) return;
@@ -401,6 +419,176 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(partner), tone: 'gold' },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
+
+    if (desktopMode) {
+      const serviceCatalog = Array.isArray(partner.serviceCatalog) ? partner.serviceCatalog.filter(Boolean) : [];
+      const servicesText = [partner.services, partner.serviceDescription].filter(Boolean).join('\n\n');
+      const hasServices = Boolean(servicesText.trim() || serviceCatalog.length);
+      const hasPhotos = galleryItems.length > 0 || partner.videos?.length > 0;
+      const stamps = visitCounts[partner.id] ?? 0;
+      const stampTarget = Number(partner.stampTarget) || 0;
+      const filledStamps = stampTarget > 0 ? Math.min(Number(stamps) || 0, stampTarget) : 0;
+      const detailTabs = [
+        { id: 'about', label: 'О компании' },
+        hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
+        partner.offer && { id: 'offer', label: 'Акции', count: 1 },
+        hasPhotos && { id: 'photos', label: 'Фото', count: galleryItems.length },
+        { id: 'reviews', label: 'Отзывы', count: reviewCount },
+      ].filter(Boolean);
+      const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
+      const kpiItems = [
+        avgRating > 0 && { id: 'rating', label: 'Рейтинг', value: avgRating.toFixed(1), icon: '★', tone: 'gold' },
+        reviewCount > 0 && { id: 'reviews', label: 'Отзывы', value: reviewCount, icon: '💬' },
+        stampTarget > 0 && { id: 'stamps', label: 'Штампы', value: `${filledStamps}/${stampTarget}`, icon: '🎟️' },
+        partner.keys && { id: 'keys', label: 'Ключей за визит', value: partner.keys, icon: '🗝️' },
+        galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
+      ].filter(Boolean);
+      const heroActions = cta.slice(0, 6).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
+      const stickyActions = [
+        partner.phone && { id: 'call', label: phoneCopied ? 'Скопировано' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', tone: 'gold', onClick: handlePhone },
+        onAskQuestion && { id: 'question', label: 'Написать', icon: '💬', onClick: () => onAskQuestion(partner) },
+        { id: 'favorite', label: isFavorite ? 'В избранном' : 'В избранное', icon: isFavorite ? '♥' : '♡', onClick: () => onToggleFavorite(partner.id) },
+      ].filter(Boolean);
+      const contactItems = [
+        partner.phone && { id: 'phone', label: 'Телефон', value: partner.phone, icon: '📞', onClick: handlePhone },
+        partner.address && { id: 'address', label: 'Адрес', value: partner.address, icon: '📍', onClick: handleMap },
+        partner.hours && { id: 'hours', label: 'График', value: partner.hours, icon: '🕐' },
+        partner.websiteUrl && !isVK() && { id: 'site', label: 'Сайт', value: partner.websiteUrl, icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
+        partner.vkGroupUrl && { id: 'vk', label: 'VK', value: partner.vkGroupUrl, icon: '🔵', onClick: openVkGroup },
+        partner.telegramCommunityUrl && !isVK() && { id: 'telegram', label: 'Telegram', value: partner.telegramCommunityUrl, icon: '✈️', onClick: () => openPartnerUrl(partner.telegramCommunityUrl, 'telegram', { platform: 'telegram' }) },
+      ].filter(Boolean);
+      const relatedItems = similar.map(item => ({ id: item.id, name: item.name, subtitle: item.categoryLabel || item.address, categoryLabel: item.categoryLabel || 'Партнёр' }));
+
+      return (
+        <>
+          {shareToast && createPortal(
+            <div style={{ position:'fixed', top:'calc(var(--safe-top, 0px) + 60px)', left:'50%', transform:'translateX(-50%)', zIndex:20000, ...APG2.glass, borderRadius:18, padding:'11px 18px', fontSize:13, fontWeight:760, color:APG2.text, whiteSpace:'nowrap', pointerEvents:'none' }}>
+              {shareToast}
+            </div>,
+            document.body
+          )}
+          <DesktopDetailShell
+            title={partner.name}
+            onBack={onBack}
+            stickyActions={<DesktopStickyActions actions={stickyActions} />}
+            aside={
+              <>
+                <DesktopSidebarCard title="Контакты" subtitle="Из анкеты партнёра">
+                  <DesktopMeta items={contactItems} />
+                </DesktopSidebarCard>
+                {partner.offer && (
+                  <DesktopSidebarCard title="Активная акция" subtitle="Предложение для участников">
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>{partner.offer}</div>
+                  </DesktopSidebarCard>
+                )}
+                <DesktopSidebarCard title="Получить ключ" subtitle="После визита">
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>Попросите QR-код АПГ у партнёра после получения услуги или товара.</div>
+                    <GlassButton onClick={startPartnerScan} tone="gold" style={{ minHeight: 42, borderRadius: 16, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>Сканировать QR</GlassButton>
+                  </div>
+                </DesktopSidebarCard>
+                {relatedItems.length > 0 && (
+                  <DesktopSidebarCard title="Похожие места" subtitle="Та же категория">
+                    <DesktopRelated items={relatedItems} onOpen={onOpenPartner} />
+                  </DesktopSidebarCard>
+                )}
+              </>
+            }
+          >
+            <DesktopHero
+              image={heroImage}
+              avatar={<PartnerLogo partner={partner} size={74} />}
+              status={status}
+              title={partner.name}
+              subtitle={partner.categoryLabel || partner.address || 'Партнёр АПГ'}
+              badges={heroBadges.map(label => ({ id: label, label, tone: String(label).includes('★') ? 'gold' : undefined }))}
+              description={partner.offer || partner.description || partner.address || 'Проверенное место в экосистеме АПГ.'}
+              meta={<DesktopInfoGrid items={kpiItems} />}
+              actions={<DesktopHeroActions actions={heroActions} />}
+            />
+
+            <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={setDesktopTab} />
+
+            {activeTab === 'about' && (
+              <DesktopSection title="О компании" subtitle="Описание и основная информация">
+                {partner.description ? (
+                  <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(partner.description) : partner.description}</RichText>
+                ) : (
+                  <div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>Описание пока готовится, но карточка уже доступна для посещений и избранного.</div>
+                )}
+                {infoRows.length > 0 && <DesktopMeta items={infoRows.map(row => ({ id: row.label, label: row.label, value: row.value, icon: row.icon, onClick: row.onClick }))} style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} />}
+              </DesktopSection>
+            )}
+
+            {activeTab === 'services' && hasServices && (
+              <DesktopSection title="Услуги" subtitle="Данные из анкеты партнёра">
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {servicesText.trim() && <RichText color={APG2.textSoft} fontSize={14}>{servicesText}</RichText>}
+                  {serviceCatalog.length > 0 && (
+                    <DesktopRelated items={serviceCatalog.map((item, index) => ({ id: item.id || index, name: item.title || item.name || item.service || 'Услуга', subtitle: item.description || item.price || item.duration || '' }))} />
+                  )}
+                </div>
+              </DesktopSection>
+            )}
+
+            {activeTab === 'offer' && partner.offer && (
+              <DesktopSection title="Акция" subtitle="Актуальное предложение">
+                <div style={{ ...APG2.goldGlass, borderRadius: 22, padding: 16, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
+                  <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontSize: 24 }}>🎁</div>
+                  <div style={{ fontSize: 15, lineHeight: '22px', fontWeight: 820 }}>{partner.offer}</div>
+                </div>
+              </DesktopSection>
+            )}
+
+            {activeTab === 'photos' && hasPhotos && (
+              <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
+                <DesktopGallery items={galleryItems} onOpen={gallery.length ? setLightboxIdx : null} />
+                {partner.videos?.length > 0 && <div style={{ marginTop: 12 }}><VideoSection videos={partner.videos} /></div>}
+              </DesktopSection>
+            )}
+
+            {activeTab === 'reviews' && (
+              <DesktopSection
+                title={`Отзывы${reviewCount > 0 ? ` · ${reviewCount}` : ''}`}
+                subtitle="Отзывы участников АПГ"
+                action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
+              >
+                {!canReview && !reviewsLoading && (
+                  <div style={{ borderRadius: 18, padding: 12, color: APG2.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', fontSize: 13, lineHeight: '18px', marginBottom: 10 }}>
+                    Оставить отзыв можно после посещения и скана QR-кода.
+                  </div>
+                )}
+                {showForm && (
+                  <div style={{ borderRadius: 22, padding: 16, marginBottom: 12, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)' }}>
+                    <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780, marginBottom: 10 }}>Ваш отзыв</div>
+                    <StarPicker value={formStars} onChange={setFormStars} size={30} />
+                    <textarea value={formText} onChange={e => setFormText(e.target.value)} placeholder="Расскажите о визите..." maxLength={400} style={{ width:'100%', marginTop: 12, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.14)', borderRadius:18, padding:'12px 13px', color:APG2.text, fontSize:15, resize:'none', minHeight:82, outline:'none', boxSizing:'border-box', fontFamily:'inherit', lineHeight:'22px' }} />
+                    <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                      <GlassButton onClick={() => setShowForm(false)} style={{ flex: 1 }}>Отмена</GlassButton>
+                      <GlassButton onClick={submitReview} tone="gold" style={{ flex: 1, opacity: formStars === 0 || submitting ? 0.5 : 1 }}>{submitting ? '...' : 'Опубликовать'}</GlassButton>
+                    </div>
+                    {reviewError && <div style={{ marginTop: 9, color: '#ff9aa8', fontSize: 12 }}>{reviewError}</div>}
+                  </div>
+                )}
+                {reviewsLoading ? (
+                  <div style={{ color: APG2.textMuted, fontSize: 13 }}>Загружаем отзывы...</div>
+                ) : reviews.length === 0 ? (
+                  <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Отзывов пока нет.</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+                    {reviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
+                  </div>
+                )}
+              </DesktopSection>
+            )}
+          </DesktopDetailShell>
+
+          {lightboxIdx !== null && gallery.length > 0 && (
+            <PhotoLightbox photos={gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+          )}
+        </>
+      );
+    }
 
     return (
       <>

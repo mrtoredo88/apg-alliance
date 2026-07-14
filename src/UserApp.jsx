@@ -3810,6 +3810,7 @@ export function UserApp() {
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
                     reviewPromptBookingId={reviewPromptBookingId}
                     onReviewPromptHandled={() => { setReviewPromptPartnerId(null); setReviewPromptBookingId(''); }}
+                    desktopMode={desktopDevice}
                   />
                 </Suspense>
               </Panel>

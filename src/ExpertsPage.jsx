@@ -32,14 +32,24 @@ import {
   DesktopCardPreview,
   DesktopCatalogGrid,
   DesktopContentGrid,
+  DesktopDetailShell,
+  DesktopDetailTabs,
   DesktopEmptyState,
+  DesktopGallery,
   DesktopHeader,
+  DesktopHero,
+  DesktopHeroActions,
+  DesktopInfoGrid,
+  DesktopMeta,
   DesktopKpiStrip,
   DesktopMetricCard,
+  DesktopRelated,
+  DesktopSection,
   DesktopSectionShell,
   DesktopSectionTitle,
   DesktopSidebarCard,
   DesktopSkeleton,
+  DesktopStickyActions,
   DesktopToolbar,
   DesktopTopOverview,
 } from './components/DesktopUI.jsx';
@@ -187,7 +197,7 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   );
 }
 
-function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan, onAskQuestion, onBook }) {
+function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan, onAskQuestion, onBook, desktopMode = false }) {
   expert = normalizeExpertRecord(expert);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
@@ -294,6 +304,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
   const [myText, setMyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
+  const [desktopTab, setDesktopTab] = useState('about');
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -303,6 +314,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
   useEffect(() => {
     if (!expert?.id) return;
+    setDesktopTab('about');
     let cancelled = false;
     setReviewsLoading(true);
     getDocs(query(collection(db, 'expertReviews'), where('expertId', '==', expert.id)))
@@ -377,6 +389,187 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(expert), tone: 'gold' },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
+
+    if (desktopMode) {
+      const serviceCatalog = Array.isArray(expert.serviceCatalog) ? expert.serviceCatalog.filter(Boolean) : [];
+      const hasServices = Boolean(expert.services || expert.experience || expert.formats?.length || serviceCatalog.length);
+      const hasLocation = Boolean(expert.address || expert.hours || expert.latitude || expert.longitude);
+      const hasPhotos = galleryItems.length > 0 || expert.videos?.length > 0;
+      const detailTabs = [
+        { id: 'about', label: 'О себе' },
+        hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
+        expert.offer && { id: 'offer', label: 'Акция', count: 1 },
+        hasLocation && { id: 'location', label: 'Где и когда' },
+        hasPhotos && { id: 'photos', label: 'Фото', count: galleryItems.length },
+        { id: 'reviews', label: 'Отзывы', count: reviews.length || expert.reviewCount || 0 },
+      ].filter(Boolean);
+      const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
+      const categoryLabels = expert.categories.map(value => getExpertCategory(value)).filter(Boolean);
+      const kpiItems = [
+        (expert.avgRating ?? 0) > 0 && { id: 'rating', label: 'Рейтинг', value: expert.avgRating.toFixed(1), icon: '★', tone: 'gold' },
+        (expert.reviewCount ?? reviews.length) > 0 && { id: 'reviews', label: 'Отзывы', value: expert.reviewCount ?? reviews.length, icon: '💬' },
+        expert.experience && { id: 'experience', label: 'Опыт', value: expert.experience, icon: '🏅' },
+        expert.formats?.length > 0 && { id: 'formats', label: 'Форматы', value: expert.formats.length, icon: '●' },
+        galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
+      ].filter(Boolean);
+      const heroActions = cta.slice(0, 6).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
+      const stickyActions = [
+        expert.telHref && { id: 'call', label: 'Позвонить', icon: '📞', tone: 'gold', onClick: callExpert },
+        canUseApgBooking && { id: 'book', label: 'Записаться', icon: '📅', tone: 'gold', onClick: () => onBook(expert) },
+        !canUseApgBooking && expert.bookingUrl && { id: 'book-url', label: 'Записаться', icon: '📅', tone: 'gold', onClick: () => openExpertContact(expert.bookingUrl, 'booking') },
+        onAskQuestion && { id: 'question', label: 'Написать', icon: '💬', onClick: () => onAskQuestion(expert) },
+      ].filter(Boolean);
+      const contactItems = [
+        expert.telHref && { id: 'phone', label: 'Телефон', value: expert.phone, icon: '📞', onClick: callExpert },
+        expert.email && { id: 'email', label: 'Email', value: expert.email, icon: '✉️', onClick: () => openExpertContact(`mailto:${expert.email}`, 'email') },
+        expert.address && { id: 'address', label: 'Адрес', value: expert.address, icon: '📍', onClick: openExpertMap },
+        expert.hours && { id: 'hours', label: 'График', value: expert.hours, icon: '🕐' },
+        expert.websiteUrl && { id: 'site', label: 'Сайт', value: expert.websiteUrl, icon: '🌐', onClick: () => openExpertContact(expert.websiteUrl, 'website') },
+        expert.vkUrl && { id: 'vk', label: 'VK', value: expert.vkUrl, icon: '🔵', onClick: () => openExpertContact(expert.vkUrl, 'vk', { platform: 'vk' }) },
+        expert.telegramUrl && { id: 'telegram', label: 'Telegram', value: expert.telegramUrl, icon: '✈️', onClick: () => openExpertContact(expert.telegramUrl, 'telegram', { platform: 'telegram' }) },
+      ].filter(Boolean);
+      const servicesRelated = serviceCatalog.map((item, index) => ({ id: item.id || index, name: item.title || item.name || item.service || 'Услуга', subtitle: item.description || item.duration || '' }));
+
+      return createPortal(
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 12000, overflowY: 'auto', background: APG2.bg, color: APG2.text }} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
+            {shareToast && (
+              <div style={{ position: 'fixed', top: 'calc(var(--safe-top, 0px) + 60px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20000, ...APG2.glass, borderRadius: 18, padding: '11px 18px', fontSize: 13, fontWeight: 760, color: APG2.text, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                {shareToast}
+              </div>
+            )}
+            <DesktopDetailShell
+              title={expert.name}
+              onBack={onClose}
+              stickyActions={<DesktopStickyActions actions={stickyActions} />}
+              aside={
+                <>
+                  <DesktopSidebarCard title="Контакты" subtitle="Из анкеты эксперта">
+                    <DesktopMeta items={contactItems} />
+                  </DesktopSidebarCard>
+                  {hasLocation && (
+                    <DesktopSidebarCard title="Где и когда" subtitle="Доступная информация">
+                      <DesktopMeta items={[
+                        expert.address && { id: 'address', label: 'Адрес', value: expert.address, icon: '📍', onClick: openExpertMap },
+                        expert.hours && { id: 'hours', label: 'График', value: expert.hours, icon: '🕐' },
+                      ].filter(Boolean)} />
+                      {(expert.latitude && expert.longitude || expert.address) && <GlassButton onClick={openExpertMap} style={{ marginTop: 10, minHeight: 40, borderRadius: 16 }}>Открыть на карте</GlassButton>}
+                    </DesktopSidebarCard>
+                  )}
+                  <DesktopSidebarCard title="Получить ключ" subtitle="После консультации">
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ color: hasScanned ? '#7fe18b' : APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                        {hasScanned ? 'Консультация уже отмечена в истории.' : 'Попросите эксперта показать QR-код АПГ после консультации.'}
+                      </div>
+                      <GlassButton onClick={startExpertScan} tone="gold" style={{ minHeight: 42, borderRadius: 16, color: '#17120a', opacity: onScan ? 1 : 0.55 }}>Сканировать QR</GlassButton>
+                    </div>
+                  </DesktopSidebarCard>
+                </>
+              }
+            >
+              <DesktopHero
+                image={heroImage}
+                avatar={<ExpertAvatar expert={expert} size={76} />}
+                status={status}
+                title={expert.name}
+                subtitle={expert.specialization || 'Эксперт города'}
+                badges={heroBadges.map(label => ({ id: label, label, tone: String(label).includes('★') ? 'gold' : undefined }))}
+                description={expert.offer || expert.description || 'Проверенный специалист в экосистеме АПГ.'}
+                meta={<DesktopInfoGrid items={kpiItems} />}
+                actions={<DesktopHeroActions actions={heroActions} />}
+              />
+
+              <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={setDesktopTab} />
+
+              {activeTab === 'about' && (
+                <DesktopSection title="О себе" subtitle="Описание и направления работы">
+                  {expert.description ? (
+                    <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
+                  ) : (
+                    <div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>Описание эксперта пока готовится.</div>
+                  )}
+                  {categoryLabels.length > 0 && (
+                    <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 13 }}>
+                      {categoryLabels.map(item => <GlassBadge key={item.id}>{item.emoji} {item.label}</GlassBadge>)}
+                    </div>
+                  )}
+                </DesktopSection>
+              )}
+
+              {activeTab === 'services' && hasServices && (
+                <DesktopSection title="Услуги" subtitle="Данные из анкеты эксперта">
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {expert.services && <RichText color={APG2.textSoft} fontSize={14}>{expert.services}</RichText>}
+                    {expert.experience && (
+                      <div style={{ borderRadius: 18, padding: 12, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                        <strong style={{ color: APG2.gold }}>Опыт: </strong>{expert.experience}
+                      </div>
+                    )}
+                    {expert.formats?.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {expert.formats.map(f => <FormatChip key={f} format={f} />)}
+                      </div>
+                    )}
+                    {servicesRelated.length > 0 && <DesktopRelated items={servicesRelated} />}
+                  </div>
+                </DesktopSection>
+              )}
+
+              {activeTab === 'offer' && expert.offer && (
+                <DesktopSection title="Акция" subtitle="Предложение эксперта">
+                  <div style={{ ...APG2.goldGlass, borderRadius: 22, padding: 16, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
+                    <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontSize: 24 }}>🎁</div>
+                    <div style={{ fontSize: 15, lineHeight: '22px', fontWeight: 820 }}>{expert.offer}</div>
+                  </div>
+                </DesktopSection>
+              )}
+
+              {activeTab === 'location' && hasLocation && (
+                <DesktopSection title="Где и когда" subtitle="Адрес и график">
+                  <DesktopMeta items={[
+                    expert.address && { id: 'address', label: 'Адрес', value: expert.address, icon: '📍', onClick: openExpertMap },
+                    expert.hours && { id: 'hours', label: 'График', value: expert.hours, icon: '🕐' },
+                  ].filter(Boolean)} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} />
+                </DesktopSection>
+              )}
+
+              {activeTab === 'photos' && hasPhotos && (
+                <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
+                  <DesktopGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
+                  {expert.videos?.length > 0 && <div style={{ marginTop: 12 }}><VideoSection videos={expert.videos} /></div>}
+                </DesktopSection>
+              )}
+
+              {activeTab === 'reviews' && (
+                <DesktopSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`} subtitle="Отзывы участников АПГ">
+                  {user && !String(user.id).startsWith('guest_') && !submitDone && (
+                    <div style={{ borderRadius: 22, padding: 16, marginBottom: 12, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)' }}>
+                      <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780, marginBottom: 10 }}>Оставить отзыв</div>
+                      <StarPicker value={myRating} onChange={setMyRating} />
+                      <textarea value={myText} onChange={e => setMyText(e.target.value)} placeholder="Расскажите о своём опыте..." style={{ width: '100%', marginTop: 12, padding: '12px 13px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: APG2.text, fontSize: 15, resize: 'vertical', minHeight: 78, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+                      <GlassButton onClick={handleSubmitReview} tone="gold" style={{ marginTop: 10, opacity: !myRating || submitting ? 0.55 : 1 }}>{submitting ? '...' : 'Опубликовать'}</GlassButton>
+                    </div>
+                  )}
+                  {reviewsLoading ? (
+                    <div style={{ color: APG2.textMuted, fontSize: 13 }}>Загружаем отзывы...</div>
+                  ) : reviews.length === 0 ? (
+                    <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Отзывов пока нет.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+                      {reviews.map(r => <ProfileReviewCard key={r.id} review={r} textFallback="Гость оценил консультацию без комментария." />)}
+                    </div>
+                  )}
+                </DesktopSection>
+              )}
+            </DesktopDetailShell>
+          </div>
+          {lightboxIdx !== null && expert.gallery?.length > 0 && (
+            <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+          )}
+        </>,
+        document.body,
+      );
+    }
 
     return createPortal(
       <>
@@ -1238,6 +1431,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             onScan={onScan}
             onAskQuestion={onAskQuestion}
             onBook={onBook}
+            desktopMode={desktopMode}
           />
         )}
       </DesktopSectionShell>
@@ -1316,6 +1510,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             onScan={onScan}
             onAskQuestion={onAskQuestion}
             onBook={onBook}
+            desktopMode={desktopMode}
           />
         )}
       </>
@@ -1416,6 +1611,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           onScan={onScan}
           onAskQuestion={onAskQuestion}
           onBook={onBook}
+          desktopMode={desktopMode}
         />
       )}
     </>

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Desktop Detail Framework
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен общий Desktop Detail Framework для карточек партнёра и эксперта: shell, hero, actions, KPI/info grid, tabs, sections, gallery, related, sticky actions.
+- `PartnerPage` и `ExpertModal` получили desktop-only композицию поверх существующих данных анкет; мобильные v2-карточки и бизнес-логика не менялись.
+- Desktop-тесты теперь проверяют, что detail-карточки используют общий framework и строят вкладки только из реальных полей.
+**Почему:** карточки партнёра и эксперта должны выглядеть как современный desktop-интерфейс, а не как мобильная лента на широком экране.
+
 ## [2026-07-14] feat: Desktop Experts Catalog
 **Коммит:** `pending`
 **Файлы:** `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

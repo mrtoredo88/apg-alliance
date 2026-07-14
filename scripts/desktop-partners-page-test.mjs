@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const partnersSource = fs.readFileSync(path.join(root, 'src/PartnersPage.jsx'), 'utf8');
+const partnerDetailSource = fs.readFileSync(path.join(root, 'src/PartnerPage.jsx'), 'utf8');
 const userAppSource = fs.readFileSync(path.join(root, 'src/UserApp.jsx'), 'utf8');
 const homeSource = fs.readFileSync(path.join(root, 'src/HomePanelV2.jsx'), 'utf8');
 
@@ -86,6 +87,37 @@ if (partnerCardSource.includes('<GlassCard')) {
 
 if (!partnerCardSource.includes('onMouseEnter={() => onSelect?.(partner)}') || !partnerCardSource.includes('onFocus={() => onSelect?.(partner)}')) {
   throw new Error('PartnersPage desktop cards must update Quick Preview on hover/focus.');
+}
+
+const requiredDetailComponents = [
+  'DesktopDetailShell',
+  'DesktopHero',
+  'DesktopHeroActions',
+  'DesktopInfoGrid',
+  'DesktopDetailTabs',
+  'DesktopSection',
+  'DesktopMeta',
+  'DesktopGallery',
+  'DesktopSidebarCard',
+  'DesktopStickyActions',
+];
+
+for (const name of requiredDetailComponents) {
+  if (!partnerDetailSource.includes(name)) {
+    throw new Error(`PartnerPage desktop detail must use ${name}`);
+  }
+}
+
+if (!partnerDetailSource.includes('desktopMode = false') || !partnerDetailSource.includes('if (desktopMode)')) {
+  throw new Error('PartnerPage desktop detail must be explicitly gated by desktopMode.');
+}
+
+if (!partnerDetailSource.includes("hasServices && { id: 'services'") || !partnerDetailSource.includes("partner.offer && { id: 'offer'") || !partnerDetailSource.includes("hasPhotos && { id: 'photos'")) {
+  throw new Error('PartnerPage desktop tabs must be built from existing partner data only.');
+}
+
+if (!userAppSource.includes('<PartnerPage') || !userAppSource.includes('desktopMode={desktopDevice}')) {
+  throw new Error('UserApp must pass desktopMode into PartnerPage detail.');
 }
 
 console.log('desktop-partners-page-test: ok');

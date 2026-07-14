@@ -31,6 +31,173 @@ export function DesktopSectionShell({ children, topOverview, header, toolbar, kp
   );
 }
 
+export function DesktopDetailShell({ children, aside, stickyActions, onBack, title, maxWidth = 1440, style, contentStyle }) {
+  return (
+    <div style={{ minHeight: '100svh', width: '100%', boxSizing: 'border-box', padding: 'calc(16px + var(--safe-top, 0px)) 24px 34px', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, ...style }}>
+      <div style={{ width: '100%', maxWidth, margin: '0 auto', display: 'grid', gap: 14 }}>
+        <GlassCard style={{ borderRadius: 26, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: 10 }}>
+          <GlassButton onClick={onBack} style={{ width: 42, minHeight: 42, borderRadius: 16, padding: 0, fontSize: 18 }}>‹</GlassButton>
+          <div style={{ minWidth: 0, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '17px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+          {stickyActions}
+        </GlassCard>
+        <div style={{ display: 'grid', gridTemplateColumns: aside ? 'minmax(0, 1fr) minmax(270px, 330px)' : 'minmax(0, 1fr)', gap: 14, alignItems: 'start', ...contentStyle }}>
+          <main style={{ display: 'grid', gap: 14, minWidth: 0 }}>{children}</main>
+          {aside && <aside style={{ display: 'grid', gap: 12, position: 'sticky', top: 'calc(16px + var(--safe-top, 0px))', minWidth: 0 }}>{aside}</aside>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DesktopHero({ image, avatar, kicker, title, subtitle, status, badges = [], description, actions, meta, style }) {
+  const safeBadges = asArray(badges);
+  return (
+    <GlassCard style={{ borderRadius: 34, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: 'minmax(320px, 0.96fr) minmax(360px, 1.04fr)', minHeight: 310, ...style }}>
+      <div style={{ minHeight: 310, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 24% 20%, rgba(201,168,76,0.20), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.06)' }}>
+        {image ? <img src={image} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', minHeight: 310, objectFit: 'cover', display: 'block' }} /> : null}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.02), rgba(12,12,14,0.42) 68%, rgba(12,12,14,0.72))' }} />
+        {avatar && <div style={{ position: 'absolute', left: 22, bottom: 22, width: 94, height: 94, borderRadius: 28, padding: 8, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.78)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.48)', boxShadow: '0 20px 46px rgba(0,0,0,0.24)' }}>{avatar}</div>}
+      </div>
+      <div style={{ padding: 22, display: 'grid', alignContent: 'center', gap: 14, minWidth: 0 }}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {status && <div style={{ justifySelf: 'start', borderRadius: 999, padding: '5px 10px', color: APG2_PROFILE.gold, background: 'rgba(201,168,76,0.13)', border: '1px solid rgba(201,168,76,0.28)', fontSize: 11, lineHeight: '14px', fontWeight: 820 }}>{status}</div>}
+          {kicker && <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 840, letterSpacing: 0.8, textTransform: 'uppercase' }}>{kicker}</div>}
+          <div style={{ color: APG2_PROFILE.text, fontSize: 34, lineHeight: '38px', fontWeight: 930, letterSpacing: 0 }}>{title}</div>
+          {subtitle && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15, lineHeight: '21px', fontWeight: 760 }}>{subtitle}</div>}
+          {safeBadges.length > 0 && <DesktopCardBadges items={safeBadges} />}
+          {description && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', maxWidth: 620 }}>{description}</div>}
+        </div>
+        {meta}
+        {actions}
+      </div>
+    </GlassCard>
+  );
+}
+
+export function DesktopHeroInfo({ children, style }) {
+  return <div style={{ display: 'grid', gap: 10, minWidth: 0, ...style }}>{children}</div>;
+}
+
+export function DesktopHeroActions({ actions = [], style }) {
+  const safeActions = asArray(actions);
+  if (!safeActions.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', ...style }}>
+      {safeActions.map(action => (
+        <GlassButton key={action.id || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 38, borderRadius: 15, padding: '8px 12px', fontSize: 12.2, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}>
+          {action.icon && <span>{action.icon}</span>}<span>{action.label}</span>
+        </GlassButton>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopInfoGrid({ items = [], columns, style }) {
+  const safeItems = asArray(items).filter(item => item?.value || item?.label);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: columns || `repeat(${Math.min(safeItems.length, 5)}, minmax(0, 1fr))`, gap: 10, ...style }}>
+      {safeItems.map(item => (
+        <DesktopMetricCard key={item.id || item.label} label={item.label} value={item.value} icon={item.icon} tone={item.tone} onClick={item.onClick} style={{ minHeight: 82, ...item.style }} />
+      ))}
+    </div>
+  );
+}
+
+export function DesktopMeta({ items = [], style }) {
+  const safeItems = asArray(items).filter(item => item?.value);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'grid', gap: 8, ...style }}>
+      {safeItems.map(item => (
+        <button key={item.id || item.label} type="button" disabled={!item.onClick} onClick={item.onClick} style={{ display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: 9, alignItems: 'start', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 15, padding: '10px 11px', color: APG2_PROFILE.text, textAlign: 'left', fontFamily: 'inherit', cursor: item.onClick ? 'pointer' : 'default' }}>
+          <span style={{ width: 28, height: 28, borderRadius: 11, display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, background: APG2_PROFILE.goldSoft, fontSize: 14 }}>{item.icon || '•'}</span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 10, lineHeight: '12px', fontWeight: 760, marginBottom: 3 }}>{item.label}</span>
+            <span style={{ display: 'block', color: item.onClick ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px', fontWeight: 760, wordBreak: 'break-word' }}>{item.value}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopGallery({ items = [], onOpen, style }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: safeItems.length === 1 ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 8, ...style }}>
+      {safeItems.slice(0, 6).map((url, index) => (
+        <button key={`${url}_${index}`} type="button" onClick={() => onOpen?.(index)} style={{ padding: 0, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 17, overflow: 'hidden', cursor: onOpen ? 'pointer' : 'default', aspectRatio: index === 0 && safeItems.length > 2 ? '1.5' : '1' }}>
+          <img src={url} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopSection({ title, subtitle, action, children, style }) {
+  if (!children) return null;
+  return (
+    <GlassCard style={{ borderRadius: 28, padding: 18, display: 'grid', gap: 13, ...style }}>
+      {(title || subtitle || action) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'start' }}>
+          <div style={{ minWidth: 0 }}>
+            {title && <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 890 }}>{title}</div>}
+            {subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{subtitle}</div>}
+          </div>
+          {action}
+        </div>
+      )}
+      {children}
+    </GlassCard>
+  );
+}
+
+export function DesktopRelated({ items = [], onOpen, style }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 9, ...style }}>
+      {safeItems.slice(0, 6).map(item => (
+        <button key={item.id || item.title || item.name} type="button" onClick={() => onOpen?.(item)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 18, padding: 11, color: APG2_PROFILE.text, textAlign: 'left', fontFamily: 'inherit', cursor: onOpen ? 'pointer' : 'default', minHeight: 92 }}>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '13px', fontWeight: 760, marginBottom: 10 }}>{item.kicker || item.categoryLabel || item.type || 'АПГ'}</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 850, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title || item.name}</div>
+          {item.subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '13px', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.subtitle}</div>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopStickyActions({ actions = [], style }) {
+  const safeActions = asArray(actions);
+  if (!safeActions.length) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, ...style }}>
+      {safeActions.map(action => (
+        <GlassButton key={action.id || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 11.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}>
+          {action.icon && <span>{action.icon}</span>}<span>{action.label}</span>
+        </GlassButton>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopDetailTabs({ items = [], activeId, onChange, style }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
+  return (
+    <GlassCard style={{ borderRadius: 26, padding: 7, display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', ...style }}>
+      {safeItems.map(item => (
+        <button key={item.id} type="button" onClick={() => onChange?.(item.id)} style={{ minHeight: 34, borderRadius: 999, border: item.id === activeId ? '1px solid rgba(201,168,76,0.62)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: item.id === activeId ? 'rgba(201,168,76,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: item.id === activeId ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, padding: '7px 12px', fontSize: 11.5, lineHeight: '15px', fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {item.label}{Number(item.count) > 0 ? ` ${item.count}` : ''}
+        </button>
+      ))}
+    </GlassCard>
+  );
+}
+
 export function DesktopTopOverview({
   activeSection = 'home',
   navItems = [],

@@ -68,6 +68,37 @@ if (!expertsSource.includes('<ExpertModal') || !expertsSource.includes('onOpen={
   throw new Error('ExpertsPage desktop detail must continue using the existing ExpertModal flow.');
 }
 
+const requiredDetailComponents = [
+  'DesktopDetailShell',
+  'DesktopHero',
+  'DesktopHeroActions',
+  'DesktopInfoGrid',
+  'DesktopDetailTabs',
+  'DesktopSection',
+  'DesktopMeta',
+  'DesktopGallery',
+  'DesktopSidebarCard',
+  'DesktopStickyActions',
+];
+
+for (const name of requiredDetailComponents) {
+  if (!expertsSource.includes(name)) {
+    throw new Error(`Expert desktop detail must use ${name}`);
+  }
+}
+
+if (!expertsSource.includes('desktopMode = false') || !expertsSource.includes('if (desktopMode)')) {
+  throw new Error('Expert desktop detail must be explicitly gated by desktopMode.');
+}
+
+if (!expertsSource.includes("hasServices && { id: 'services'") || !expertsSource.includes("expert.offer && { id: 'offer'") || !expertsSource.includes("hasPhotos && { id: 'photos'")) {
+  throw new Error('Expert desktop tabs must be built from existing expert data only.');
+}
+
+if (!expertsSource.includes('desktopMode={desktopMode}')) {
+  throw new Error('ExpertsPage must pass desktopMode into ExpertModal.');
+}
+
 if (!userAppSource.includes('<ExpertsPage') || !userAppSource.includes('desktopOverview={desktopOverview}') || !userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktop overview and desktopMode to ExpertsPage.');
 }

@@ -28,6 +28,17 @@ const requiredExports = [
   'DesktopCardBadges',
   'DesktopCardPreview',
   'DesktopCardHover',
+  'DesktopDetailShell',
+  'DesktopHero',
+  'DesktopHeroInfo',
+  'DesktopHeroActions',
+  'DesktopInfoGrid',
+  'DesktopMeta',
+  'DesktopGallery',
+  'DesktopSection',
+  'DesktopRelated',
+  'DesktopStickyActions',
+  'DesktopDetailTabs',
 ];
 
 const requiredSections = ['news', 'events', 'partners', 'experts', 'offers', 'rewards'];
@@ -58,6 +69,10 @@ if (source.includes('<DesktopRightRail')) {
 
 if (!source.includes('onMouseEnter') || !source.includes('translateY(-3px)') || !source.includes('DesktopCardPreview')) {
   throw new Error('Desktop Catalog Framework must include desktop hover behavior and preview composition.');
+}
+
+if (!source.includes('DesktopDetailShell') || !source.includes('DesktopDetailTabs') || !source.includes('DesktopHeroActions')) {
+  throw new Error('Desktop Detail Framework must provide shared shell, tabs and hero actions for partner/expert cards.');
 }
 
 console.log('desktop-ui-framework-test: ok');
