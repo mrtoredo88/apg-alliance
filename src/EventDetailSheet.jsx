@@ -10,6 +10,7 @@ import {
   DesktopInfoGrid,
   DesktopMeta,
   DesktopGallery,
+  DesktopEmptyState,
   DesktopRelated,
   DesktopSection,
   DesktopSidebarCard,
@@ -1232,7 +1233,11 @@ export function EventDetailSheet({
                     onOpen={handleOpenDesktopRelated}
                   />
                 ) : (
-                  <div style={{ color: A.textMuted, fontSize: 13 }}>Связанных мероприятий нет.</div>
+                  <DesktopEmptyState
+                    icon="📆"
+                    title="Связанных мероприятий нет"
+                    text="Выпуски и события пока не связаны."
+                  />
                 )}
               </DesktopSidebarCard>
             </>

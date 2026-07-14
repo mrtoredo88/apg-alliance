@@ -1225,7 +1225,13 @@ function ArticleView({
               </DesktopSidebarCard>
             )}
             <DesktopSidebarCard title="Связанные" subtitle="Еще материалы">
-              {relatedItems.length ? <DesktopRelated items={relatedItems} onOpen={(itemItem) => onClose(itemItem)} /> : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px' }}>Связанных новостей пока нет.</div>}
+              {relatedItems.length ? <DesktopRelated items={relatedItems} onOpen={(itemItem) => onClose(itemItem)} /> : (
+                <DesktopEmptyState
+                  icon="📰"
+                  title="Связанных новостей пока нет"
+                  text="Новые материалы появятся в ленте публикаций."
+                />
+              )}
             </DesktopSidebarCard>
             <DesktopSidebarCard title="Теги" subtitle="Темы публикации">
               {tags.length ? <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{tags.slice(0, 10).map(tag => <span key={tag} style={{ padding: '6px 11px', borderRadius: 999, background: 'rgba(215,184,106,0.10)', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.18)', fontSize: 11, fontWeight: 800 }}>#{tag}</span>)}</div> : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Теги не указаны</div>}
@@ -1285,7 +1291,11 @@ function ArticleView({
             {(relatedItems.length ? (
               <DesktopRelated items={relatedItems} onOpen={(relatedItem) => onClose(relatedItem)} />
             ) : (
-              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Связанных материалов пока нет.</div>
+              <DesktopEmptyState
+                icon="🧩"
+                title="Связанных материалов пока нет"
+                text="В этой теме пока нет дополнительных публикаций."
+              />
             ))}
           </DesktopSection>
         )}

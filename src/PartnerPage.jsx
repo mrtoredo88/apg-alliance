@@ -27,6 +27,7 @@ import {
   DesktopDetailShell,
   DesktopDetailTabs,
   DesktopGallery,
+  DesktopEmptyState,
   DesktopHero,
   DesktopHeroActions,
   DesktopInfoGrid,
@@ -590,7 +591,11 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 {reviewsLoading ? (
                   <div style={{ color: APG2.textMuted, fontSize: 13 }}>Загружаем отзывы...</div>
                 ) : reviews.length === 0 ? (
-                  <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Отзывов пока нет.</div>
+                  <DesktopEmptyState
+                    icon="💬"
+                    title="Отзывы пока не добавлены"
+                    text="Оценки и отзывы появятся после посещений и закрытых записей."
+                  />
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
                     {reviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}

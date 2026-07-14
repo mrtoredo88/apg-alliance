@@ -558,11 +558,15 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                       <GlassButton onClick={handleSubmitReview} tone="gold" style={{ marginTop: 10, opacity: !myRating || submitting ? 0.55 : 1 }}>{submitting ? '...' : 'Опубликовать'}</GlassButton>
                     </div>
                   )}
-                  {reviewsLoading ? (
-                    <div style={{ color: APG2.textMuted, fontSize: 13 }}>Загружаем отзывы...</div>
-                  ) : reviews.length === 0 ? (
-                    <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Отзывов пока нет.</div>
-                  ) : (
+                {reviewsLoading ? (
+                  <div style={{ color: APG2.textMuted, fontSize: 13 }}>Загружаем отзывы...</div>
+                ) : reviews.length === 0 ? (
+                  <DesktopEmptyState
+                    icon="💬"
+                    title="Отзывы пока не добавлены"
+                    text="После посещения или консультации можно оставить оценку и комментарий."
+                  />
+                ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
                       {reviews.map(r => <ProfileReviewCard key={r.id} review={r} textFallback="Гость оценил консультацию без комментария." />)}
                     </div>
