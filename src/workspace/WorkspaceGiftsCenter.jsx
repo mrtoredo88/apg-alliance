@@ -9,6 +9,7 @@ import {
   workspaceGiftStatus,
   workspaceGiftStatusLabel,
 } from '../../server-shared/workspace-gifts.js';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
   text: '#1F1A14',
@@ -323,15 +324,16 @@ function GiftEditor({ item, profile, role, events, news, onSaved, onToast }) {
   );
 }
 
-export function WorkspaceGiftsCenter({ role, profile, events = [], news = [], onOpenPanel, onToast }) {
+export function WorkspaceGiftsCenter({ role, profile, events = [], news = [], actions, onOpenPanel, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('rewards') || {}, []);
   const [items, setItems] = useState([]);
   const [claims, setClaims] = useState([]);
   const [entries, setEntries] = useState([]);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(initialIntent.giftId || '');
   const [newMode, setNewMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialIntent.query || '');
   const [status, setStatus] = useState('active');
   const [type, setType] = useState('all');
   const [period, setPeriod] = useState('all');
@@ -459,6 +461,11 @@ export function WorkspaceGiftsCenter({ role, profile, events = [], news = [], on
           </div>
           <div style={{ display: 'grid', gap: 12 }}>
             <GiftEditor item={selected || { ...defaultDraft(editorProfile, editorRole) }} profile={editorProfile} role={editorRole} events={events} news={news} onSaved={upsert} onToast={onToast} />
+            <WorkspaceRelatedLinks
+              links={buildWorkspaceRelatedLinks({ source: 'gift', item: selected || {}, events, news, gifts: items, profile })}
+              actions={actions}
+              emptyText="Выберите подарок, чтобы увидеть акцию, событие, получателей и аналитику."
+            />
             <div style={card({ padding: 14, display: 'grid', gap: 10, background: UI.strong })}>
               <div style={{ color: UI.text, fontSize: 16, fontWeight: 920 }}>История выдачи</div>
               {!selected && <div style={{ color: UI.soft, fontSize: 13 }}>Сохраните подарок, чтобы увидеть выдачи и заявки.</div>}

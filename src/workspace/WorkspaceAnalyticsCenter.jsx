@@ -5,6 +5,7 @@ import {
   buildWorkspaceAnalyticsRange,
   workspaceAnalyticsRowsToCsv,
 } from '../../server-shared/workspace-analytics.js';
+import { openWorkspaceLink, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
   text: '#1F1A14',
@@ -97,13 +98,14 @@ function downloadFile(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
-function KpiCard({ label, value, tone }) {
+function KpiCard({ label, value, tone, onClick }) {
   const color = tone === 'green' ? UI.green : tone === 'red' ? UI.red : tone === 'blue' ? UI.blue : UI.gold;
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <div style={card({ padding: 12, minHeight: 74, boxShadow: '0 12px 32px rgba(82,60,30,0.07)' })}>
+    <Tag type={onClick ? 'button' : undefined} onClick={onClick} style={{ ...card({ padding: 12, minHeight: 74, boxShadow: '0 12px 32px rgba(82,60,30,0.07)' }), textAlign: 'left', fontFamily: 'inherit', cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{ color: UI.muted, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0 }}>{label}</div>
       <div style={{ color, fontSize: 24, lineHeight: '29px', fontWeight: 930, marginTop: 4 }}>{value}</div>
-    </div>
+    </Tag>
   );
 }
 
@@ -159,7 +161,7 @@ function Funnel({ items }) {
   );
 }
 
-function MiniChart({ rows, valueKey = 'views' }) {
+function MiniChart({ rows, valueKey = 'views', actions }) {
   const max = Math.max(1, ...rows.map(item => Number(item[valueKey] || item.score || 0)));
   if (!rows.length) return <div style={{ color: UI.soft, fontSize: 13 }}>Данных нет.</div>;
   return (
@@ -167,7 +169,7 @@ function MiniChart({ rows, valueKey = 'views' }) {
       {rows.map(item => {
         const value = Number(item[valueKey] || item.score || 0);
         return (
-          <div key={`${item.type}:${item.id}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 78px', gap: 10, alignItems: 'center' }}>
+          <button key={`${item.type}:${item.id}`} type="button" onClick={() => openWorkspaceLink(actions, item.type === 'event' ? 'events' : item.type === 'news' ? 'news' : 'analytics', { [`${item.type}Id`]: item.id, query: item.title })} style={{ border: 0, background: 'transparent', padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 78px', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ color: UI.text, fontSize: 13, fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
               <div style={{ height: 7, borderRadius: 999, background: 'rgba(88,67,37,0.08)', overflow: 'hidden', marginTop: 5 }}>
@@ -175,27 +177,28 @@ function MiniChart({ rows, valueKey = 'views' }) {
               </div>
             </div>
             <div style={{ color: UI.soft, fontSize: 12, fontWeight: 820, textAlign: 'right' }}>{formatValue(value)}</div>
-          </div>
+          </button>
         );
       })}
     </div>
   );
 }
 
-function PairGrid({ rows }) {
+function PairGrid({ rows, actions, target }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
       {rows.map(row => (
-        <div key={row.label} style={{ border: `1px solid ${UI.line}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.50)' }}>
+        <button key={row.label} type="button" onClick={() => target && openWorkspaceLink(actions, target, { filter: row.filter, query: row.query || '' })} style={{ border: `1px solid ${UI.line}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.50)', textAlign: 'left', cursor: target ? 'pointer' : 'default', fontFamily: 'inherit' }}>
           <div style={{ color: UI.muted, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>{row.label}</div>
           <div style={{ color: row.color || UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 930, marginTop: 3 }}>{row.value}</div>
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
-export function WorkspaceAnalyticsCenter({ role, profile, onOpenPanel, onToast }) {
+export function WorkspaceAnalyticsCenter({ role, profile, actions, onOpenPanel, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('analytics') || {}, []);
   const storageKey = `apg.workspace.analytics.period.${role?.id || 'partner'}.${profile?.id || 'none'}`;
   const saved = useMemo(() => {
     try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
@@ -234,6 +237,7 @@ export function WorkspaceAnalyticsCenter({ role, profile, onOpenPanel, onToast }
   const kpis = snapshot?.kpis || {};
   const hasAnyData = snapshot && Object.values(kpis).some(value => Number(value || 0) > 0);
   const exportBase = `apg-analytics-${profile?.id || 'profile'}-${range.period}`;
+  const kpiTarget = key => key.includes('Booking') ? 'booking' : key.includes('Dialog') || key === 'newRequests' ? 'dialogs' : key.includes('news') || key === 'newsViews' || key === 'comments' ? 'news' : key.includes('event') || key === 'eventViews' ? 'events' : 'profile';
 
   const exportCsv = () => {
     downloadFile(`${exportBase}.csv`, `\uFEFF${csv}`, 'text/csv;charset=utf-8');
@@ -298,7 +302,7 @@ export function WorkspaceAnalyticsCenter({ role, profile, onOpenPanel, onToast }
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
             {Object.entries(KPI_LABELS).map(([key, label]) => (
-              <KpiCard key={key} label={label} value={key === 'conversion' ? formatValue(kpis[key], '%') : formatValue(kpis[key])} tone={key.includes('completed') || key.includes('conversion') ? 'green' : key.includes('Dialogs') || key.includes('Requests') ? 'blue' : 'gold'} />
+              <KpiCard key={key} label={label} value={key === 'conversion' ? formatValue(kpis[key], '%') : formatValue(kpis[key])} tone={key.includes('completed') || key.includes('conversion') ? 'green' : key.includes('Dialogs') || key.includes('Requests') ? 'blue' : 'gold'} onClick={() => openWorkspaceLink(actions, kpiTarget(key), { metric: key, filter: key === 'newBookings' ? 'active' : key === 'completedBookings' ? 'completed' : key === 'newDialogs' ? 'active' : '' })} />
             ))}
           </div>
 
@@ -320,46 +324,46 @@ export function WorkspaceAnalyticsCenter({ role, profile, onOpenPanel, onToast }
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14 }}>
             <Section title="Новости" subtitle="Лучшие публикации, просмотры, комментарии и CTR.">
-              <PairGrid rows={[
+              <PairGrid actions={actions} target="news" rows={[
                 { label: 'Материалов', value: snapshot.news.total },
                 { label: 'Просмотры', value: snapshot.news.views },
                 { label: 'Комментарии', value: snapshot.news.comments },
                 { label: 'CTR', value: `${snapshot.news.ctr}%`, color: UI.green },
               ]} />
-              <div style={{ marginTop: 12 }}><MiniChart rows={snapshot.news.top || []} valueKey="views" /></div>
+              <div style={{ marginTop: 12 }}><MiniChart rows={snapshot.news.top || []} valueKey="views" actions={actions} /></div>
             </Section>
             <Section title="Мероприятия" subtitle="Просмотры, регистрации, посещения и лучшие события.">
-              <PairGrid rows={[
+              <PairGrid actions={actions} target="events" rows={[
                 { label: 'Событий', value: snapshot.events.total },
                 { label: 'Просмотры', value: snapshot.events.views },
                 { label: 'Регистрации', value: snapshot.events.registrations },
                 { label: 'Отказы', value: snapshot.events.cancellations, color: UI.red },
               ]} />
-              <div style={{ marginTop: 12 }}><MiniChart rows={snapshot.events.top || []} valueKey="registrations" /></div>
+              <div style={{ marginTop: 12 }}><MiniChart rows={snapshot.events.top || []} valueKey="registrations" actions={actions} /></div>
             </Section>
             <Section title="Встречи" subtitle="Статусы CRM, переносы, отмены и повторные встречи.">
-              <PairGrid rows={[
-                { label: 'Новые', value: snapshot.bookings.new },
-                { label: 'Завершены', value: snapshot.bookings.completed, color: UI.green },
-                { label: 'Отменены', value: snapshot.bookings.cancelled, color: UI.red },
-                { label: 'Неявки', value: snapshot.bookings.noShow, color: UI.red },
-                { label: 'Переносы', value: snapshot.bookings.rescheduled },
-                { label: 'Повторные', value: snapshot.bookings.repeated, color: UI.green },
+              <PairGrid actions={actions} target="booking" rows={[
+                { label: 'Новые', value: snapshot.bookings.new, filter: 'active' },
+                { label: 'Завершены', value: snapshot.bookings.completed, color: UI.green, filter: 'completed' },
+                { label: 'Отменены', value: snapshot.bookings.cancelled, color: UI.red, filter: 'cancelled' },
+                { label: 'Неявки', value: snapshot.bookings.noShow, color: UI.red, filter: 'completed' },
+                { label: 'Переносы', value: snapshot.bookings.rescheduled, filter: 'confirmed' },
+                { label: 'Повторные', value: snapshot.bookings.repeated, color: UI.green, filter: 'all' },
               ]} />
             </Section>
             <Section title="Диалоги" subtitle="Новые, активные, непрочитанные и закрытые обращения.">
-              <PairGrid rows={[
-                { label: 'Новые', value: snapshot.dialogs.new },
-                { label: 'Активные', value: snapshot.dialogs.active, color: UI.green },
-                { label: 'Непрочитанные', value: snapshot.dialogs.unread, color: snapshot.dialogs.unread ? UI.red : UI.green },
-                { label: 'Закрытые', value: snapshot.dialogs.closed },
+              <PairGrid actions={actions} target="dialogs" rows={[
+                { label: 'Новые', value: snapshot.dialogs.new, filter: 'active' },
+                { label: 'Активные', value: snapshot.dialogs.active, color: UI.green, filter: 'active' },
+                { label: 'Непрочитанные', value: snapshot.dialogs.unread, color: snapshot.dialogs.unread ? UI.red : UI.green, filter: 'unread' },
+                { label: 'Закрытые', value: snapshot.dialogs.closed, filter: 'archived' },
               ]} />
             </Section>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 14 }}>
             <Section title="Профиль" subtitle="Нажатия и переходы, которые уже сохранены в карточке.">
-              <PairGrid rows={[
+              <PairGrid actions={actions} target="profile" rows={[
                 { label: 'Сайт', value: snapshot.profileActions.website },
                 { label: 'Telegram', value: snapshot.profileActions.telegram },
                 { label: 'Телефон', value: snapshot.profileActions.phone },

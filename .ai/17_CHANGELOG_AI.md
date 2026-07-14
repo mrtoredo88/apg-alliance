@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Workspace links integration
+**Коммит:** `pending`
+**Файлы:** `src/workspace/WorkspaceLinks.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceEventsManager.jsx`, `src/workspace/WorkspaceMeetingsCRM.jsx`, `src/workspace/WorkspaceDialogsCRM.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `src/workspace/WorkspacePromotionsCenter.jsx`, `src/workspace/WorkspaceGiftsCenter.jsx`, `src/workspace/WorkspaceAnalyticsCenter.jsx`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен общий слой `WorkspaceLinks`: карта связей, compact-блок `Связанные объекты`, link intent и переходы между существующими центрами Workspace без новых окон.
+- Связи подключены к профилю, мероприятиям, встречам, диалогам, новостям, акциям, подаркам, аналитике и fallback-центрам.
+- KPI, секционные показатели и top-чарты в Analytics стали интерактивными и открывают соответствующие разделы с контекстом.
+**Почему:** Desktop Workspace должен ощущаться единой рабочей системой, где новости, события, встречи, диалоги, акции, подарки и аналитика связаны между собой.
+
 ## [2026-07-14] feat: Workspace workday dashboard
 **Коммит:** `pending`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`

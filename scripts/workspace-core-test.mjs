@@ -100,6 +100,14 @@ const navIds = WORKSPACE_NAV_ITEMS.map(item => item.id);
 assert.equal(navIds.length, new Set(navIds).size);
 
 const desktopWorkspaceSource = readFileSync(new URL('../src/workspace/DesktopWorkspace.jsx', import.meta.url), 'utf8');
+const workspaceLinksSource = readFileSync(new URL('../src/workspace/WorkspaceLinks.jsx', import.meta.url), 'utf8');
+const workspaceEventsSource = readFileSync(new URL('../src/workspace/WorkspaceEventsManager.jsx', import.meta.url), 'utf8');
+const workspaceMeetingsSource = readFileSync(new URL('../src/workspace/WorkspaceMeetingsCRM.jsx', import.meta.url), 'utf8');
+const workspaceDialogsSource = readFileSync(new URL('../src/workspace/WorkspaceDialogsCRM.jsx', import.meta.url), 'utf8');
+const workspaceNewsSource = readFileSync(new URL('../src/workspace/WorkspaceNewsCenter.jsx', import.meta.url), 'utf8');
+const workspacePromotionsSource = readFileSync(new URL('../src/workspace/WorkspacePromotionsCenter.jsx', import.meta.url), 'utf8');
+const workspaceGiftsSource = readFileSync(new URL('../src/workspace/WorkspaceGiftsCenter.jsx', import.meta.url), 'utf8');
+const workspaceAnalyticsSource = readFileSync(new URL('../src/workspace/WorkspaceAnalyticsCenter.jsx', import.meta.url), 'utf8');
 const navBlock = desktopWorkspaceSource.match(/const NAV_ITEMS = \[([\s\S]*?)\];/)?.[1] || '';
 const desktopWorkspaceNavIds = [...navBlock.matchAll(/id: '([^']+)'/g)].map(match => match[1]);
 assert.deepEqual(desktopWorkspaceNavIds.slice(0, 5), ['dashboard', 'profile', 'events', 'booking', 'dialogs']);
@@ -116,6 +124,12 @@ assert.ok(desktopWorkspaceSource.includes('Центр рабочего дня'))
 assert.ok(desktopWorkspaceSource.includes('Лента активности'));
 assert.ok(desktopWorkspaceSource.includes('Быстрые действия'));
 assert.ok(!desktopWorkspaceSource.includes('Что изменилось'));
+assert.ok(workspaceLinksSource.includes('buildWorkspaceRelatedLinks'));
+assert.ok(workspaceLinksSource.includes('openWorkspaceLink'));
+assert.ok(workspaceLinksSource.includes('apg.workspace.linkIntent'));
+assert.ok([desktopWorkspaceSource, workspaceEventsSource, workspaceMeetingsSource, workspaceDialogsSource, workspaceNewsSource, workspacePromotionsSource, workspaceGiftsSource].every(source => source.includes('WorkspaceRelatedLinks')));
+assert.ok([workspaceEventsSource, workspaceMeetingsSource, workspaceDialogsSource, workspaceNewsSource, workspacePromotionsSource, workspaceGiftsSource, workspaceAnalyticsSource].every(source => source.includes('readWorkspaceLinkIntent') || source.includes('openWorkspaceLink')));
+assert.ok(workspaceAnalyticsSource.includes('onClick={() => openWorkspaceLink'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
 const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };

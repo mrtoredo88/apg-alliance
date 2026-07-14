@@ -18,6 +18,7 @@ import {
   isWorkspaceBookingArchived,
   sanitizeBookingInternalNotes,
 } from '../../server-shared/workspace-bookings.js';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const CRM = {
   text: '#1F1A14',
@@ -178,7 +179,7 @@ function MeetingCard({ item, onOpen, onAction, onOpenDialog, onArchive, onResche
   );
 }
 
-function MeetingCrmSheet({ item, bookings, events, onClose, onAction, onSaved, onOpenDialog, onOpenPanel, onToast, onReschedule }) {
+function MeetingCrmSheet({ item, bookings, events, actions, profile, onClose, onAction, onSaved, onOpenDialog, onOpenPanel, onToast, onReschedule }) {
   const [tab, setTab] = useState('main');
   const [notes, setNotes] = useState(() => {
     const stored = localStorage.getItem(`apg.meeting.notes.${item.id || item.bookingId}`);
@@ -300,6 +301,12 @@ function MeetingCrmSheet({ item, bookings, events, onClose, onAction, onSaved, o
               {item.dialogId && <button onClick={() => onOpenDialog(item)} style={button('primary')}>Открыть диалог</button>}
               {relatedEvent && <button onClick={() => onOpenPanel?.('events')} style={button('light')}>Открыть мероприятие</button>}
             </div>
+            <WorkspaceRelatedLinks
+              links={buildWorkspaceRelatedLinks({ source: 'booking', item, bookings, events, profile })}
+              actions={actions}
+              emptyText="У встречи пока нет связанных объектов."
+              style={{ boxShadow: 'none' }}
+            />
             <div style={card({ padding: 12, boxShadow: 'none' })}>
               <div style={{ color: CRM.text, fontSize: 15, fontWeight: 900 }}>Предыдущие встречи</div>
               {previous.length ? previous.map(row => <div key={row.id} style={{ color: CRM.soft, fontSize: 13, marginTop: 7 }}>{formatDateTime(row)} · {row.serviceTitle} · {row.statusLabel}</div>) : <div style={{ color: CRM.muted, fontSize: 13, marginTop: 7 }}>Истории предыдущих встреч пока нет.</div>}
@@ -408,12 +415,13 @@ function ManualBookingModal({ profile, providerType, bookingProfile, bookings, o
 }
 
 export function WorkspaceMeetingsCRM({ role, profile, events = [], actions, onOpenDialog, onOpenPanel, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('booking') || {}, []);
   const providerType = role?.id === 'expert' ? 'expert' : 'partner';
   const bookingProfile = useMemo(() => buildBookingProfile(profile || {}, providerType), [profile, providerType]);
   const [calendarMode, setCalendarMode] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1180 ? 'week' : 'day');
-  const [statusFilter, setStatusFilter] = useState('active');
+  const [statusFilter, setStatusFilter] = useState(initialIntent.filter || 'active');
   const [specialistFilter, setSpecialistFilter] = useState('');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialIntent.query || '');
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -466,6 +474,12 @@ export function WorkspaceMeetingsCRM({ role, profile, events = [], actions, onOp
     setBookings(prev => prev.some(row => String(row.id || row.bookingId) === String(next.id || next.bookingId)) ? prev.map(row => String(row.id || row.bookingId) === String(next.id || next.bookingId) ? next : row) : [next, ...prev]);
     setSelectedBooking(prev => prev && String(prev.id || prev.bookingId) === String(next.id || next.bookingId) ? next : prev);
   };
+
+  useEffect(() => {
+    if (!initialIntent.bookingId || selectedBooking) return;
+    const found = rows.find(item => String(item.id || item.bookingId) === String(initialIntent.bookingId));
+    if (found) setSelectedBooking(found);
+  }, [initialIntent.bookingId, rows, selectedBooking]);
 
   const runAction = async (action, item, payload = {}) => {
     try {
@@ -581,7 +595,7 @@ export function WorkspaceMeetingsCRM({ role, profile, events = [], actions, onOp
         </div>
       </div>
 
-      {selectedBooking && <MeetingCrmSheet item={selectedBooking} bookings={rows} events={events} onClose={() => setSelectedBooking(null)} onAction={runAction} onSaved={upsertBooking} onOpenDialog={openDialog} onOpenPanel={onOpenPanel} onToast={onToast} onReschedule={requestReschedule} />}
+      {selectedBooking && <MeetingCrmSheet item={selectedBooking} bookings={rows} events={events} actions={actions} profile={profile} onClose={() => setSelectedBooking(null)} onAction={runAction} onSaved={upsertBooking} onOpenDialog={openDialog} onOpenPanel={onOpenPanel} onToast={onToast} onReschedule={requestReschedule} />}
       {showCreate && <ManualBookingModal profile={profile} providerType={providerType} bookingProfile={bookingProfile} bookings={rows} onClose={() => setShowCreate(false)} onCreated={upsertBooking} onToast={onToast} />}
     </div>
   );

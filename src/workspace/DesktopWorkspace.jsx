@@ -18,6 +18,7 @@ import { WorkspaceNewsCenter } from './WorkspaceNewsCenter.jsx';
 import { WorkspacePromotionsCenter } from './WorkspacePromotionsCenter.jsx';
 import { WorkspaceGiftsCenter } from './WorkspaceGiftsCenter.jsx';
 import { WorkspaceAnalyticsCenter } from './WorkspaceAnalyticsCenter.jsx';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, openWorkspaceLink } from './WorkspaceLinks.jsx';
 import {
   BOOKING_STATUSES,
   buildBookingCalendar,
@@ -738,7 +739,7 @@ function profileEvents(events = [], profile = {}, roleId = '') {
   });
 }
 
-function WorkspaceProfileSection({ role, profile, events = [], roleState, onRoleChange, onSaved, onOpenPanel, onToast }) {
+function WorkspaceProfileSection({ role, profile, events = [], roleState, actions, onRoleChange, onSaved, onOpenPanel, onToast }) {
   if (!role || !['partner', 'expert'].includes(role.id) || !profile?.id) {
     return (
       <PlaceholderSection
@@ -788,6 +789,11 @@ function WorkspaceProfileSection({ role, profile, events = [], roleState, onRole
         }}
         onToast={onToast}
         publicUrl={publicUrl}
+      />
+      <WorkspaceRelatedLinks
+        links={buildWorkspaceRelatedLinks({ source: 'profile', item: profile || {}, events, profile })}
+        actions={actions}
+        emptyText="Связанные события, встречи, диалоги и аналитика появятся после активности профиля."
       />
     </div>
   );
@@ -1423,6 +1429,11 @@ function WorkspaceCenter({ center, data, actions, intelligence }) {
   return (
     <div data-workspace-center={center.id} style={{ display: 'grid', gap: 14 }}>
       <WorkspaceCenterHeader center={center} context={context} />
+      <WorkspaceRelatedLinks
+        links={buildWorkspaceRelatedLinks({ source: center.id, item: data.activeProfile || {}, events: data.events, news: data.news, profile: data.activeProfile, analytics: true })}
+        actions={actions}
+        emptyText="Связи появятся после действий в Workspace."
+      />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10 }}>
         {center.metrics.map(metric => (
           <MetricTile key={metric.label} label={metric.label} value={metric.value} delta={metric.delta} />
@@ -1714,6 +1725,7 @@ export function DesktopWorkspace({
     openMessages: () => setActiveSection('notifications'),
     openAnalytics: () => setActiveSection('analytics'),
     openLoki: () => onOpenPanel?.('loki'),
+    openWorkspaceLink: (target, payload) => openWorkspaceLink(actions, target, payload),
   };
 
   useEffect(() => {
@@ -1771,14 +1783,14 @@ export function DesktopWorkspace({
 
   const renderContent = () => {
     if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} intelligence={workspaceIntelligence} dayPlan={workspaceDayPlan} />;
-    if (activeSection === 'profile') return <WorkspaceProfileSection role={activeRole} profile={activeProfile} events={events} roleState={roleState} onRoleChange={setActiveWorkspaceViewId} onSaved={handleProfileSaved} onOpenPanel={onOpenPanel} />;
-    if (activeSection === 'content') return <WorkspaceNewsCenter role={activeRole} profile={activeProfile} events={events} onOpenPanel={onOpenPanel} onToast={onToast} />;
-    if (activeSection === 'events') return <WorkspaceEventsManager role={activeRole} profile={activeProfile} roleViews={availableWorkspaceViews} activeViewId={workspaceView.id} onRoleChange={setActiveWorkspaceViewId} events={events} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventChanged} onToast={onToast} />;
+    if (activeSection === 'profile') return <WorkspaceProfileSection role={activeRole} profile={activeProfile} events={events} roleState={roleState} actions={actions} onRoleChange={setActiveWorkspaceViewId} onSaved={handleProfileSaved} onOpenPanel={onOpenPanel} />;
+    if (activeSection === 'content') return <WorkspaceNewsCenter role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
+    if (activeSection === 'events') return <WorkspaceEventsManager role={activeRole} profile={activeProfile} roleViews={availableWorkspaceViews} activeViewId={workspaceView.id} onRoleChange={setActiveWorkspaceViewId} events={events} actions={actions} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventChanged} onToast={onToast} />;
     if (activeSection === 'booking') return <WorkspaceMeetingsCRM role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenDialog={onOpenDialog} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'dialogs') return <WorkspaceDialogsCRM user={user} role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
-    if (activeSection === 'analytics') return <WorkspaceAnalyticsCenter role={activeRole} profile={activeProfile} onOpenPanel={onOpenPanel} onToast={onToast} />;
-    if (activeSection === 'offers') return <WorkspacePromotionsCenter role={activeRole} profile={activeProfile} events={events} news={news} onOpenPanel={onOpenPanel} onToast={onToast} />;
-    if (activeSection === 'rewards') return <WorkspaceGiftsCenter role={activeRole} profile={activeProfile} events={events} news={news} onOpenPanel={onOpenPanel} onToast={onToast} />;
+    if (activeSection === 'analytics') return <WorkspaceAnalyticsCenter role={activeRole} profile={activeProfile} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
+    if (activeSection === 'offers') return <WorkspacePromotionsCenter role={activeRole} profile={activeProfile} events={events} news={news} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
+    if (activeSection === 'rewards') return <WorkspaceGiftsCenter role={activeRole} profile={activeProfile} events={events} news={news} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'settings' && businessHubAvailable) {
       return (
         <div style={{ display: 'grid', gap: 14 }}>

@@ -11,6 +11,7 @@ import {
   filterWorkspaceDialogs,
   sanitizeDialogWorkspaceNotes,
 } from '../../server-shared/workspace-dialogs.js';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
   text: '#1F1A14',
@@ -201,7 +202,7 @@ function MessageBubble({ message, own }) {
   );
 }
 
-function CrmPanel({ dialog, userId, onOpenPanel, onPatch, onCreateMeeting }) {
+function CrmPanel({ dialog, userId, events = [], bookings = [], actions, onOpenPanel, onPatch, onCreateMeeting }) {
   const [notes, setNotes] = useState(() => dialog?.workspaceState?.notes || '');
   const [status, setStatus] = useState('Готово');
   const dirtyRef = useRef(false);
@@ -301,6 +302,12 @@ function CrmPanel({ dialog, userId, onOpenPanel, onPatch, onCreateMeeting }) {
       <div style={card({ padding: 14 })}>
         <div style={{ color: UI.text, fontSize: 16, fontWeight: 910 }}>Связи и история</div>
         <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
+          <WorkspaceRelatedLinks
+            compact
+            links={buildWorkspaceRelatedLinks({ source: 'dialog', item: dialog, events, bookings, profile: { id: dialog?.context?.parentId, name: dialog?.context?.parentTitle } })}
+            actions={actions}
+            emptyText="Связи появятся после встречи или действия по объекту."
+          />
           {dialog.relatedEvents?.slice(0, 3).map(item => <button key={item.id} onClick={() => onOpenPanel?.('events')} style={{ ...button('light', { textAlign: 'left', minHeight: 32, padding: '6px 8px', fontSize: 12 }) }}>{item.title || item.name || 'Мероприятие'}</button>)}
           {history.map(item => <div key={item.id} style={{ color: UI.soft, fontSize: 12, lineHeight: '17px' }}>{dateText(item.at)} · {item.text}</div>)}
           {!history.length && <div style={{ color: UI.muted, fontSize: 12.5 }}>История появится после сообщений и действий.</div>}
@@ -311,14 +318,15 @@ function CrmPanel({ dialog, userId, onOpenPanel, onPatch, onCreateMeeting }) {
 }
 
 export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions, onOpenPanel, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('dialogs') || {}, []);
   const uid = actorId(user);
   const providerType = role?.id === 'expert' ? 'expert' : 'partner';
   const [dialogs, setDialogs] = useState([]);
   const [messages, setMessages] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [activeId, setActiveId] = useState('');
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('active');
+  const [activeId, setActiveId] = useState(initialIntent.dialogId || '');
+  const [query, setQuery] = useState(initialIntent.query || '');
+  const [filter, setFilter] = useState(initialIntent.filter || 'active');
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -365,6 +373,12 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
   const activeMessages = activeDialog?.messages || [];
   const isOwner = activeDialog?.ownerUserIds?.includes?.(uid);
   const typingUsers = Object.entries(activeDialog?.typing || {}).filter(([id, value]) => id !== uid && value).length;
+
+  useEffect(() => {
+    if (!initialIntent.dialogId || activeId) return;
+    const found = enriched.find(item => String(item.id || item.dialogId) === String(initialIntent.dialogId));
+    if (found) setActiveId(found.id);
+  }, [initialIntent.dialogId, enriched, activeId]);
 
   useEffect(() => {
     if (!activeDialog?.id) return;
@@ -507,7 +521,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
           ) : <Empty title="Выберите диалог" text="Коммуникационный центр покажет чат и CRM-панель по выбранному обращению." />}
         </main>
 
-        <CrmPanel dialog={activeDialog} userId={uid} onOpenPanel={onOpenPanel} onPatch={patchDialog} onCreateMeeting={() => actions?.openBooking?.()} />
+        <CrmPanel dialog={activeDialog} userId={uid} events={events} bookings={bookings} actions={actions} onOpenPanel={onOpenPanel} onPatch={patchDialog} onCreateMeeting={() => actions?.openBooking?.()} />
       </div>
     </div>
   );

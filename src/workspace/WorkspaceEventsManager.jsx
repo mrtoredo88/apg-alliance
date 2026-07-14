@@ -10,6 +10,7 @@ import {
   workspaceEventStatus,
   workspaceEventStatusLabel,
 } from '../../server-shared/workspace-events.js';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const WSE = {
   text: '#1F1A14',
@@ -407,15 +408,15 @@ function WorkspaceEventEditor({ event, events, profileType, profile, onClose, on
   );
 }
 
-function EventCard({ event, onEdit, onSubmit, onDuplicate, onArchive, onDelete, onStats, onPublic }) {
+function EventCard({ event, events, profile, actions: workspaceActions, onEdit, onSubmit, onDuplicate, onArchive, onDelete, onStats, onPublic }) {
   const status = workspaceEventStatus(event);
-  const actions = [];
-  if (['draft', 'revision_requested', 'rejected'].includes(status)) actions.push(['Продолжить', onEdit, 'primary'], ['На модерацию', onSubmit, 'light']);
-  if (['moderation', 'pending_review'].includes(status)) actions.push(['Открыть', onEdit, 'light']);
-  if (['published', 'approved'].includes(status)) actions.push(['Редактировать', onEdit, 'light'], ['Публичная карточка', onPublic, 'light']);
-  if (!['deleted', 'trash'].includes(status)) actions.push(['Создать похожее', onDuplicate, 'light'], ['Статистика', onStats, 'light']);
-  if (!['archived', 'deleted', 'trash'].includes(status)) actions.push(['Архив', onArchive, 'light']);
-  if (['draft', 'rejected', 'archived'].includes(status)) actions.push(['Удалить', onDelete, 'danger']);
+  const cardActions = [];
+  if (['draft', 'revision_requested', 'rejected'].includes(status)) cardActions.push(['Продолжить', onEdit, 'primary'], ['На модерацию', onSubmit, 'light']);
+  if (['moderation', 'pending_review'].includes(status)) cardActions.push(['Открыть', onEdit, 'light']);
+  if (['published', 'approved'].includes(status)) cardActions.push(['Редактировать', onEdit, 'light'], ['Публичная карточка', onPublic, 'light']);
+  if (!['deleted', 'trash'].includes(status)) cardActions.push(['Создать похожее', onDuplicate, 'light'], ['Статистика', onStats, 'light']);
+  if (!['archived', 'deleted', 'trash'].includes(status)) cardActions.push(['Архив', onArchive, 'light']);
+  if (['draft', 'rejected', 'archived'].includes(status)) cardActions.push(['Удалить', onDelete, 'danger']);
 
   return (
     <div style={cardStyle({ padding: 12, display: 'grid', gridTemplateColumns: '72px minmax(0,1fr)', gap: 12 })}>
@@ -439,17 +440,24 @@ function EventCard({ event, onEdit, onSubmit, onDuplicate, onArchive, onDelete, 
           <div style={{ marginTop: 8, color: WSE.red, fontSize: 12, lineHeight: '17px', background: 'rgba(217,93,84,0.08)', borderRadius: 8, padding: 8 }}>{event.moderationComment || event.adminComment || event.rejectionReason}</div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-          {actions.map(([label, fn, tone]) => <button key={label} onClick={() => fn(event)} style={buttonStyle(tone, { minHeight: 32, padding: '6px 9px', fontSize: 12 })}>{label}</button>)}
+          {cardActions.map(([label, fn, tone]) => <button key={label} onClick={() => fn(event)} style={buttonStyle(tone, { minHeight: 32, padding: '6px 9px', fontSize: 12 })}>{label}</button>)}
         </div>
+        <WorkspaceRelatedLinks
+          compact
+          links={buildWorkspaceRelatedLinks({ source: 'event', item: event, events, profile })}
+          actions={workspaceActions}
+          style={{ marginTop: 10 }}
+        />
       </div>
     </div>
   );
 }
 
-export function WorkspaceEventsManager({ role, profile, roleViews = [], activeViewId, onRoleChange, events = [], onOpenPublicEvents, onEventChanged, onToast }) {
+export function WorkspaceEventsManager({ role, profile, roleViews = [], activeViewId, onRoleChange, events = [], actions, onOpenPublicEvents, onEventChanged, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('events') || {}, []);
   const profileType = role?.id === 'expert' ? 'expert' : 'partner';
   const [localEvents, setLocalEvents] = useState(events || []);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialIntent.query || '');
   const [statusFilter, setStatusFilter] = useState('active');
   const [dateFilter, setDateFilter] = useState('all');
   const [viewMode, setViewMode] = useState('list');
@@ -460,6 +468,12 @@ export function WorkspaceEventsManager({ role, profile, roleViews = [], activeVi
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setLocalEvents(events || []), [events]);
+
+  useEffect(() => {
+    if (!initialIntent.eventId || editing?.id) return;
+    const found = localEvents.find(item => String(item.id || '') === String(initialIntent.eventId));
+    if (found) setEditing(found);
+  }, [initialIntent.eventId, localEvents, editing?.id]);
 
   const ownedEvents = useMemo(() => filterWorkspaceEvents(localEvents, profile, profileType, { includeDeleted: true }), [localEvents, profile, profileType]);
   const visibleEvents = useMemo(() => {
@@ -612,7 +626,7 @@ export function WorkspaceEventsManager({ role, profile, roleViews = [], activeVi
             </div>
           )}
           {viewMode === 'list' && visibleEvents.map(event => (
-            <EventCard key={event.id} event={event} onEdit={setEditing} onSubmit={submitEvent} onDuplicate={duplicateEvent} onArchive={item => lifecycle(item, 'workspace:eventArchive')} onDelete={item => lifecycle(item, 'workspace:eventDelete')} onStats={setStatsEvent} onPublic={onOpenPublicEvents} />
+            <EventCard key={event.id} event={event} events={ownedEvents} profile={profile} actions={actions} onEdit={setEditing} onSubmit={submitEvent} onDuplicate={duplicateEvent} onArchive={item => lifecycle(item, 'workspace:eventArchive')} onDelete={item => lifecycle(item, 'workspace:eventDelete')} onStats={setStatsEvent} onPublic={onOpenPublicEvents} />
           ))}
         </div>
 
@@ -649,6 +663,11 @@ export function WorkspaceEventsManager({ role, profile, roleViews = [], activeVi
               <KpiCard label="Сохранения" value={eventMetric(statsEvent, ['savesCount', 'savedCount'])} />
               <KpiCard label="Переходы" value={eventMetric(statsEvent, ['clicksCount', 'linkClicks'])} />
             </div>
+            <WorkspaceRelatedLinks
+              links={buildWorkspaceRelatedLinks({ source: 'event', item: statsEvent, events: ownedEvents, profile, analytics: true })}
+              actions={actions}
+              style={{ marginTop: 12, boxShadow: 'none' }}
+            />
             <div style={{ color: WSE.muted, fontSize: 12, lineHeight: '18px', marginTop: 12 }}>Показываются только реально сохранённые метрики. Если сбор данных для показателя ещё не подключён, значение остаётся нулевым.</div>
             <button onClick={() => setStatsEvent(null)} style={buttonStyle('primary', { width: '100%', marginTop: 14 })}>Закрыть</button>
           </div>

@@ -9,6 +9,7 @@ import {
   workspacePromotionStatus,
   workspacePromotionStatusLabel,
 } from '../../server-shared/workspace-promotions.js';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
   text: '#1F1A14',
@@ -293,12 +294,13 @@ function PromotionEditor({ item, profile, role, events, news, onSaved, onToast }
   );
 }
 
-export function WorkspacePromotionsCenter({ role, profile, events = [], news = [], onOpenPanel, onToast }) {
+export function WorkspacePromotionsCenter({ role, profile, events = [], news = [], actions, onOpenPanel, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('offers') || {}, []);
   const [items, setItems] = useState([]);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(initialIntent.promotionId || '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialIntent.query || '');
   const [status, setStatus] = useState('active');
   const [category, setCategory] = useState('all');
   const [period, setPeriod] = useState('all');
@@ -413,7 +415,14 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
               </div>
             )}
           </div>
-          <PromotionEditor item={selected || { ...defaultDraft(editorProfile, editorRole), id: `${editorRole?.id || 'partner'}:${editorProfile?.id || 'profile'}:main`, profileId: editorProfile?.id, profileType: editorRole?.id }} profile={editorProfile} role={editorRole} events={events} news={news} onSaved={upsert} onToast={onToast} />
+          <div style={{ display: 'grid', gap: 10 }}>
+            <PromotionEditor item={selected || { ...defaultDraft(editorProfile, editorRole), id: `${editorRole?.id || 'partner'}:${editorProfile?.id || 'profile'}:main`, profileId: editorProfile?.id, profileType: editorRole?.id }} profile={editorProfile} role={editorRole} events={events} news={news} onSaved={upsert} onToast={onToast} />
+            <WorkspaceRelatedLinks
+              links={buildWorkspaceRelatedLinks({ source: 'promotion', item: selected || {}, events, news, promotions: items, profile })}
+              actions={actions}
+              emptyText="Выберите акцию, чтобы увидеть связанные подарки, события, новости и аналитику."
+            />
+          </div>
         </div>
       )}
     </div>

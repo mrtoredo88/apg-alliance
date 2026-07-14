@@ -10,6 +10,7 @@ import {
   workspaceNewsStatus,
   workspaceNewsStatusLabel,
 } from '../../server-shared/workspace-news.js';
+import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
   text: '#1F1A14',
@@ -323,10 +324,11 @@ function Preview({ item }) {
   );
 }
 
-export function WorkspaceNewsCenter({ role, profile, events = [], onOpenPanel, onToast }) {
+export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpenPanel, onToast }) {
+  const initialIntent = useMemo(() => readWorkspaceLinkIntent('content') || {}, []);
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialIntent.query || '');
   const [status, setStatus] = useState('active');
   const [category, setCategory] = useState('all');
   const [period, setPeriod] = useState('all');
@@ -372,6 +374,12 @@ export function WorkspaceNewsCenter({ role, profile, events = [], onOpenPanel, o
     setItems(prev => prev.some(item => item.id === news.id) ? prev.map(item => item.id === news.id ? { ...item, ...news } : item) : [news, ...prev]);
     setSelected(prev => prev?.id === news.id ? { ...prev, ...news } : news);
   };
+
+  useEffect(() => {
+    if (!initialIntent.newsId || selected?.id) return;
+    const found = items.find(item => String(item.id || '') === String(initialIntent.newsId));
+    if (found) setSelected(found);
+  }, [initialIntent.newsId, items, selected?.id]);
 
   const submit = async item => {
     const result = await userAction('workspaceNews:submit', { id: item.id, profileId: profile.id, role: role.id });
@@ -440,6 +448,11 @@ export function WorkspaceNewsCenter({ role, profile, events = [], onOpenPanel, o
         <div style={{ display: 'grid', gap: 10 }}>
           <NewsEditor item={selected} profile={profile} role={role} events={events.filter(event => String(event.partnerId || event.expertId || event.submittedProfileId || '') === String(profile.id || ''))} onSaved={upsert} onCreatedFromEvent={createFromEvent} onClose={() => setSelected(null)} onToast={onToast} />
           <Preview item={selected} />
+          <WorkspaceRelatedLinks
+            links={buildWorkspaceRelatedLinks({ source: 'news', item: selected || {}, events, profile })}
+            actions={actions}
+            emptyText="Выберите новость, чтобы увидеть связанные мероприятия, автора и аналитику."
+          />
           <div style={card({ padding: 14 })}>
             <div style={{ color: UI.text, fontSize: 16, fontWeight: 910 }}>Комментарии</div>
             <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
