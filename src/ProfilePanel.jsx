@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
@@ -96,7 +96,7 @@ const ACHIEVEMENTS = [
   { id: 'legend',       title: 'Легенда',        emoji: '🏆', color: '#FFD700', cond: (k)       => k >= 100 },
 ];
 
-function AchievementBadge({ a, unlocked }) {
+const AchievementBadge = memo(function AchievementBadge({ a, unlocked }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 76, gap: 6, opacity: unlocked ? 1 : 0.3, filter: unlocked ? 'none' : 'grayscale(1)' }}>
       <div style={{ width: 52, height: 52, borderRadius: 16, background: unlocked ? a.color + '20' : 'rgba(255,255,255,0.08)', border: `2px solid ${unlocked ? a.color + '60' : 'rgba(255,255,255,0.12)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, position: 'relative' }}>
@@ -106,7 +106,7 @@ function AchievementBadge({ a, unlocked }) {
       <span style={{ fontSize: 10, color: unlocked ? APG2.text : APG2.textSoft, fontWeight: unlocked ? 700 : 400, textAlign: 'center', lineHeight: '13px' }}>{a.title}</span>
     </div>
   );
-}
+});
 
 function ThemeToggle({ isDark, onToggle }) {
   return (
@@ -312,7 +312,7 @@ function DesktopProgress({ value, color = DP.gold }) {
   );
 }
 
-function DesktopBookingRow({ item, onDialog, onReschedule, onCancel, onReview }) {
+const DesktopBookingRow = memo(function DesktopBookingRow({ item, onDialog, onReschedule, onCancel, onReview }) {
   const active = item?.isActive;
   const completed = item?.status === 'completed';
   return (
@@ -333,9 +333,9 @@ function DesktopBookingRow({ item, onDialog, onReschedule, onCancel, onReview })
       </div>
     </div>
   );
-}
+});
 
-function DesktopFavoriteRow({ item, onOpen }) {
+const DesktopFavoriteRow = memo(function DesktopFavoriteRow({ item, onOpen }) {
   return (
     <button onClick={() => onOpen?.(item)} style={{ border: 0, background: 'transparent', padding: 0, display: 'grid', gridTemplateColumns: '42px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
       {item?.logoUrl ? <img src={item.logoUrl} alt="" loading="lazy" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover' }} /> : <div style={{ width: 42, height: 42, borderRadius: 8, background: DP.goldSoft, color: DP.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{item?.emoji || '◆'}</div>}
@@ -346,16 +346,16 @@ function DesktopFavoriteRow({ item, onOpen }) {
       <span style={{ color: DP.gold, fontSize: 18 }}>›</span>
     </button>
   );
-}
+});
 
-function DesktopNewsRow({ item, onOpen }) {
+const DesktopNewsRow = memo(function DesktopNewsRow({ item, onOpen }) {
   return (
     <button onClick={() => onOpen?.(item)} style={{ border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.46)', borderRadius: 8, padding: '9px 10px', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
       <span style={{ display: 'block', color: DP.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getNewsTitle(item)}</span>
       <span style={{ display: 'block', color: DP.soft, fontSize: 11.5, lineHeight: '15px', marginTop: 3 }}>{formatNewsDate(item)}</span>
     </button>
   );
-}
+});
 
 function DesktopProfileEditor({ user, onClose, onSaved }) {
   const [form, setForm] = useState(() => ({
@@ -982,11 +982,26 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [achievements, dismissToast]);
   useEffect(() => () => clearTimeout(dismissTimerRef.current), []);
   const unlockedCount = achievements.filter(a => a.unlocked).length;
-  const favoritePartners = useMemo(() => partners.filter(p => favorites.includes(p.id)), [partners, favorites]);
-  const [localBookings, setLocalBookings] = useState(() => Array.isArray(bookings) ? bookings.map(normalizeBooking) : []);
+  const favoritePartnerIds = useMemo(() => new Set((favorites || []).map((id) => String(id))), [favorites]);
+  const favoritePartners = useMemo(
+    () => (Array.isArray(partners) ? partners.filter((p) => favoritePartnerIds.has(String(p?.id))) : []),
+    [partners, favoritePartnerIds]
+  );
+  const sourceBookings = useMemo(() => Array.isArray(bookings) ? bookings.map(normalizeBooking) : [], [bookings]);
+  const [localBookings, setLocalBookings] = useState(sourceBookings);
   useEffect(() => {
-    setLocalBookings(Array.isArray(bookings) ? bookings.map(normalizeBooking) : []);
-  }, [bookings]);
+    setLocalBookings((prev) => {
+      if (prev.length === sourceBookings.length && prev.every((item, index) => {
+        const next = sourceBookings[index];
+        const itemId = String(item?.id || item?.bookingId || '');
+        const nextId = String(next?.id || next?.bookingId || '');
+        return itemId === nextId && String(item?.status || '') === String(next?.status || '') && String(item?.updatedAt || '') === String(next?.updatedAt || '');
+      })) {
+        return prev;
+      }
+      return sourceBookings;
+    });
+  }, [sourceBookings]);
   const savedNewsItems = useMemo(() => {
     const saved = new Set((savedNews || []).map(String));
     const later = new Set((readLaterNews || []).map(String));
@@ -1006,29 +1021,29 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     };
   }, [localBookings]);
 
-  const runBookingAction = async (action, item, payload = {}) => {
+  const runBookingAction = useCallback(async (action, item, payload = {}) => {
     if (!item?.id && !item?.bookingId) return;
     try {
       const result = await userAction(action, { bookingId: item.id || item.bookingId, ...payload });
       if (result?.booking) {
-        setLocalBookings(prev => {
+        setLocalBookings((prev) => {
           const next = normalizeBooking(result.booking);
           const key = String(next.id || next.bookingId);
-          const exists = prev.some(row => String(row.id || row.bookingId) === key);
-          return (exists ? prev.map(row => String(row.id || row.bookingId) === key ? next : row) : [next, ...prev]);
+          const exists = prev.some((row) => String(row.id || row.bookingId) === key);
+          return (exists ? prev.map((row) => String(row.id || row.bookingId) === key ? next : row) : [next, ...prev]);
         });
       }
     } catch (error) {
       logError(error, `ProfilePanel.${action}`);
       alert(error?.message || 'Не удалось обновить встречу.');
     }
-  };
+  }, [userAction]);
 
-  const stats = [
-    { label: 'Ключей',    value: userKeys,          emoji: '🗝️' },
-    { label: 'Избранное', value: favorites.length,   emoji: '⭐' },
-    { label: 'Достижения',value: `${unlockedCount}/${achievements.length}`, emoji: '🏆' },
-  ];
+  const stats = useMemo(() => [
+    { label: 'Ключей', value: userKeys, emoji: '🗝️' },
+    { label: 'Избранное', value: favorites.length, emoji: '⭐' },
+    { label: 'Достижения', value: `${unlockedCount}/${achievements.length}`, emoji: '🏆' },
+  ], [userKeys, favorites.length, unlockedCount, achievements.length]);
 
   const handleSupport = async () => {
     try {
@@ -1042,19 +1057,47 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     openUrl('https://vk.me/id988504');
   };
 
+  const isEmailUser = !!user && String(user.id).startsWith('email:');
+  const isTelegramUser = !!user && String(user.id).startsWith('tg_');
+  const userEmail = user?.email || user?.linkedEmail || (isEmailUser ? String(user.id).replace('email:', '') : '');
+  const linkedTelegram = user?.linkedTelegram;
+  const linkedTelegramName = linkedTelegram
+    ? [linkedTelegram.firstName, linkedTelegram.lastName].filter(Boolean).join(' ') || 'Telegram привязан'
+    : '';
+  const telegramDisplayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.displayName || 'Telegram';
+  const contactRows = useMemo(() => [
+    userEmail && { id: 'email', label: 'Email', value: userEmail, href: `mailto:${userEmail}`, icon: '✉' },
+    (user?.phone) && { id: 'phone', label: 'Телефон', value: user.phone, href: `tel:${String(user.phone).replace(/[^\d+]/g, '')}`, icon: '☎' },
+    (user?.telegram || user?.telegramUsername || user?.linkedTelegram?.username) && { id: 'telegram', label: 'Telegram', value: user.telegram || user.telegramUsername || `@${user.linkedTelegram.username}`, href: `https://telegram.me/${String(user.telegram || user.telegramUsername || user.linkedTelegram.username).replace(/^@+/, '')}`, icon: '↗' },
+    (user?.vk || user?.vkUrl) && { id: 'vk', label: 'VK', value: user.vk || user.vkUrl, href: String(user.vk || user.vkUrl).startsWith('http') ? user.vk || user.vkUrl : `https://vk.com/${user.vk || user.vkUrl}`, icon: '↗' },
+  ].filter(Boolean), [userEmail, user?.phone, user?.telegram, user?.telegramUsername, user?.vk, user?.vkUrl, user?.linkedTelegram]);
+  const quickActions = useMemo(() => [
+    { id: 'activity', label: 'Активность', icon: '◷', onClick: onOpenActivity },
+    { id: 'referral', label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+    { id: 'notifications', label: notificationsEnabled ? 'Уведомления вкл' : 'Уведомления', icon: notificationsEnabled ? '✓' : '🔔', onClick: onEnableNotifications },
+    { id: 'theme', label: isDark ? 'Светлая тема' : 'Тёмная тема', icon: isDark ? '☀' : '☾', onClick: onToggleTheme },
+    ownedPartner && { id: 'partner', label: 'Кабинет партнёра', icon: '◆', onClick: onOpenPartnerCabinet },
+    ownedExpert && { id: 'expert', label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
+  ].filter(Boolean), [isDark, notificationsEnabled, onEnableNotifications, onOpenActivity, onOpenReferral, onOpenPartnerCabinet, onOpenExpertCabinet, ownedPartner, ownedExpert]);
+  const handleDesktopReschedule = useCallback((item) => {
+    const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
+    if (!startAt) return;
+    const start = new Date(String(startAt).trim().replace(' ', 'T'));
+    if (Number.isNaN(start.getTime())) return alert('Не удалось распознать дату.');
+    const duration = Number(item.durationMinutes || 60);
+    runBookingAction('booking:requestReschedule', item, { slot: { startAt: start.toISOString(), endAt: new Date(start.getTime() + duration * 60000).toISOString() }, reason: 'Запрос пользователя' });
+  }, [runBookingAction]);
+  const handleDesktopCancel = useCallback((item) => {
+    if (!confirm('Отменить запись?')) return;
+    const reason = prompt('Причина отмены, если хотите указать') || '';
+    runBookingAction('booking:cancel', item, { reason });
+  }, [runBookingAction]);
+
   if (variant === 'v2') {
     const displayName = safeUser.displayName || [safeUser.first_name, safeUser.last_name].filter(Boolean).join(' ') || 'Участник АПГ';
     const toNext = getKeysToNext(userKeys);
     const pct = getLevelProgress(userKeys);
     const nextLabel = nextLevel ? `До ${nextLevel.label}: ${toNext} ключей` : 'Максимальный уровень';
-    const isEmailUser = !!user && String(user.id).startsWith('email:');
-    const isTelegramUser = !!user && String(user.id).startsWith('tg_');
-    const userEmail = user?.email || user?.linkedEmail || (isEmailUser ? String(user.id).replace('email:', '') : '');
-    const linkedTelegram = user?.linkedTelegram;
-    const linkedTelegramName = linkedTelegram
-      ? [linkedTelegram.firstName, linkedTelegram.lastName].filter(Boolean).join(' ') || 'Telegram привязан'
-      : '';
-    const telegramDisplayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.displayName || 'Telegram';
     const primaryActions = [
       { label: 'Активность', icon: '◷', onClick: onOpenActivity },
       { label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
@@ -1077,33 +1120,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       ].slice(0, 4);
       const nextAchievement = achievements.find(item => !item.unlocked);
       const unlockedPreview = achievements.filter(item => item.unlocked).slice(0, 4);
-      const contactRows = [
-        userEmail && { id: 'email', label: 'Email', value: userEmail, href: `mailto:${userEmail}`, icon: '✉' },
-        (user?.phone) && { id: 'phone', label: 'Телефон', value: user.phone, href: `tel:${String(user.phone).replace(/[^\d+]/g, '')}`, icon: '☎' },
-        (user?.telegram || user?.telegramUsername || user?.linkedTelegram?.username) && { id: 'telegram', label: 'Telegram', value: user.telegram || user.telegramUsername || `@${user.linkedTelegram.username}`, href: `https://telegram.me/${String(user.telegram || user.telegramUsername || user.linkedTelegram.username).replace(/^@+/, '')}`, icon: '↗' },
-        (user?.vk || user?.vkUrl) && { id: 'vk', label: 'VK', value: user.vk || user.vkUrl, href: String(user.vk || user.vkUrl).startsWith('http') ? user.vk || user.vkUrl : `https://vk.com/${user.vk || user.vkUrl}`, icon: '↗' },
-      ].filter(Boolean);
-      const quickActions = [
-        { id: 'activity', label: 'Активность', icon: '◷', onClick: onOpenActivity },
-        { id: 'referral', label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
-        { id: 'notifications', label: notificationsEnabled ? 'Уведомления вкл' : 'Уведомления', icon: notificationsEnabled ? '✓' : '🔔', onClick: onEnableNotifications },
-        { id: 'theme', label: isDark ? 'Светлая тема' : 'Тёмная тема', icon: isDark ? '☀' : '☾', onClick: onToggleTheme },
-        ownedPartner && { id: 'partner', label: 'Кабинет партнёра', icon: '◆', onClick: onOpenPartnerCabinet },
-        ownedExpert && { id: 'expert', label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
-      ].filter(Boolean);
-      const handleDesktopReschedule = item => {
-        const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
-        if (!startAt) return;
-        const start = new Date(String(startAt).trim().replace(' ', 'T'));
-        if (Number.isNaN(start.getTime())) return alert('Не удалось распознать дату.');
-        const duration = Number(item.durationMinutes || 60);
-        runBookingAction('booking:requestReschedule', item, { slot: { startAt: start.toISOString(), endAt: new Date(start.getTime() + duration * 60000).toISOString() }, reason: 'Запрос пользователя' });
-      };
-      const handleDesktopCancel = item => {
-        if (!confirm('Отменить запись?')) return;
-        const reason = prompt('Причина отмены, если хотите указать') || '';
-        runBookingAction('booking:cancel', item, { reason });
-      };
       const desktopModals = (
         <>
           {showProfileEditor && createPortal(

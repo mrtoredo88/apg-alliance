@@ -3586,42 +3586,65 @@ export function UserApp() {
     recommendations,
   };
 
-  const desktopOverviewSearch = (raw = '') => {
+  const handleOpenHome = useCallback(() => goPanel('home'), [goPanel]);
+  const handleOpenNews = useCallback(() => goPanel('news'), [goPanel]);
+  const handleOpenEvents = useCallback(() => goPanel('events'), [goPanel]);
+  const handleOpenExperts = useCallback(() => goPanel('experts'), [goPanel]);
+  const handleOpenOffers = useCallback(() => goPanel('offers'), [goPanel]);
+  const handleOpenRewards = useCallback(() => goPanel('rewards'), [goPanel]);
+  const handleOpenNearby = useCallback(() => goPanel('nearby'), [goPanel]);
+  const handleOpenLoki = useCallback(() => goPanel('loki'), [goPanel]);
+  const handleOpenProfile = useCallback(() => goPanel('profile'), [goPanel]);
+  const handleDesktopWorkspaceMode = useCallback(() => {
+    setAppModePersisted(resolvedAppMode === 'workspace' ? 'user' : 'workspace');
+  }, [resolvedAppMode, setAppModePersisted]);
+
+  const desktopOverviewSearch = useCallback((raw = '') => {
     const query = String(raw || '').trim().toLowerCase().replace(/ё/g, 'е');
     if (!query) return;
-    if (query.includes('новост') || query.includes('публикац')) goPanel('news');
-    else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) goPanel('events');
-    else if (query.includes('акци') || query.includes('скид')) goPanel('offers');
+    if (query.includes('новост') || query.includes('публикац')) handleOpenNews();
+    else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) handleOpenEvents();
+    else if (query.includes('акци') || query.includes('скид')) handleOpenOffers();
     else if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) handleOpenPartners();
-    else if (query.includes('эксперт') || query.includes('консультац')) goPanel('experts');
-    else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) goPanel('rewards');
-    else if (query.includes('рядом') || query.includes('карт')) goPanel('nearby');
-    else goPanel('loki');
-  };
-  const desktopOverviewUserName = [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник';
-  const desktopOverviewInitials = desktopOverviewUserName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
-  const desktopOverviewHero = events.find(event => event?.title) || news.find(item => item?.title || item?.text) || enrichedPartners[0] || null;
-  const desktopOverviewHeroImage = desktopOverviewHero?.coverPhoto || desktopOverviewHero?.imageUrl || desktopOverviewHero?.photoUrl || desktopOverviewHero?.photo || desktopOverviewHero?.image || '';
-  const desktopOverview = {
+    else if (query.includes('эксперт') || query.includes('консультац')) handleOpenExperts();
+    else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) handleOpenRewards();
+    else if (query.includes('рядом') || query.includes('карт')) handleOpenNearby();
+    else handleOpenLoki();
+  }, [handleOpenLoki, handleOpenEvents, handleOpenExperts, handleOpenNearby, handleOpenNews, handleOpenOffers, handleOpenPartners, handleOpenRewards]);
+  const desktopOverviewUserName = useMemo(
+    () => [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник',
+    [user?.first_name, user?.firstName, user?.last_name, user?.lastName, user?.displayName, user?.name],
+  );
+  const desktopOverviewInitials = useMemo(
+    () => desktopOverviewUserName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У',
+    [desktopOverviewUserName],
+  );
+  const desktopOverviewHero = useMemo(() => (
+    events.find(event => event?.title) || news.find(item => item?.title || item?.text) || enrichedPartners[0] || null
+  ), [events, news, enrichedPartners]);
+  const desktopOverviewHeroImage = useMemo(() => (
+    desktopOverviewHero?.coverPhoto || desktopOverviewHero?.imageUrl || desktopOverviewHero?.photoUrl || desktopOverviewHero?.photo || desktopOverviewHero?.image || ''
+  ), [desktopOverviewHero]);
+  const desktopOverview = useMemo(() => ({
     navItems: [
-      { id: 'home', label: 'Главная', onClick: () => goPanel('home') },
-      { id: 'news', label: 'Новости', onClick: () => goPanel('news') },
-      { id: 'events', label: 'Мероприятия', onClick: () => goPanel('events') },
+      { id: 'home', label: 'Главная', onClick: handleOpenHome },
+      { id: 'news', label: 'Новости', onClick: handleOpenNews },
+      { id: 'events', label: 'Мероприятия', onClick: handleOpenEvents },
       { id: 'partners', label: 'Партнёры', onClick: handleOpenPartners },
-      { id: 'experts', label: 'Эксперты', onClick: () => goPanel('experts') },
-      { id: 'offers', label: 'Акции', onClick: () => goPanel('offers') },
-      { id: 'rewards', label: 'Подарки', onClick: () => goPanel('rewards') },
+      { id: 'experts', label: 'Эксперты', onClick: handleOpenExperts },
+      { id: 'offers', label: 'Акции', onClick: handleOpenOffers },
+      { id: 'rewards', label: 'Подарки', onClick: handleOpenRewards },
     ],
     onSearchSubmit: desktopOverviewSearch,
     onSearchClear: () => {},
     unreadCount,
     onOpenNotifications: openNotifications,
-    onOpenLoki: () => goPanel('loki'),
-    onOpenProfile: () => goPanel('profile'),
+    onOpenLoki: handleOpenLoki,
+    onOpenProfile: handleOpenProfile,
     workspaceAction: desktopWorkspaceAvailable ? (
       <button
         type="button"
-        onClick={() => setAppModePersisted(resolvedAppMode === 'workspace' ? 'user' : 'workspace')}
+        onClick={handleDesktopWorkspaceMode}
         style={{ border: '1px solid rgba(201,168,76,0.42)', borderRadius: 999, background: 'linear-gradient(145deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))', color: APG2_PROFILE.text, cursor: 'pointer', minHeight: 30, padding: '0 10px', fontWeight: 760, fontSize: 10.8, fontFamily: 'inherit' }}
       >
         {resolvedAppMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
@@ -3637,8 +3660,8 @@ export function UserApp() {
     heroKicker: 'Сегодня в АПГ',
     heroImage: desktopOverviewHeroImage,
     heroActions: [
-      { id: 'events', label: 'Все мероприятия', onClick: () => goPanel('events') },
-      { id: 'loki', label: 'Спросить Локи', tone: 'gold', onClick: () => goPanel('loki') },
+      { id: 'events', label: 'Все мероприятия', onClick: handleOpenEvents },
+      { id: 'loki', label: 'Спросить Локи', tone: 'gold', onClick: handleOpenLoki },
     ],
     stats: [
       { label: 'Ключи', value: userKeys, accent: APG2_PROFILE.gold },
@@ -3652,12 +3675,56 @@ export function UserApp() {
     progressSubtitle: personalHomeContext?.lokiTip || 'Локи держит контекст приложения рядом.',
     progressValue: Math.min(100, Math.max(8, Math.round((registeredEventIds.length + Object.keys(scannedPartnerIds).length + savedNews.length) * 7))),
     quickActions: [
-      { id: 'profile', label: 'Профиль', tone: 'gold', onClick: () => goPanel('profile') },
-      { id: 'loki', label: 'Локи', onClick: () => goPanel('loki') },
+      { id: 'profile', label: 'Профиль', tone: 'gold', onClick: handleOpenProfile },
+      { id: 'loki', label: 'Локи', onClick: handleOpenLoki },
       { id: 'notify', label: 'Уведомления', onClick: openNotifications },
     ],
     isOffline: !isOnline,
-  };
+  }), [
+    desktopOverviewSearch,
+    desktopOverviewHeroImage,
+    handleDesktopWorkspaceMode,
+    handleOpenEvents,
+    handleOpenExperts,
+    handleOpenHome,
+    handleOpenLoki,
+    handleOpenNews,
+    handleOpenOffers,
+    handleOpenPartners,
+    handleOpenProfile,
+    handleOpenRewards,
+    handleOpenNearby,
+    unreadCount,
+    openNotifications,
+    desktopOverviewHero?.title,
+    desktopOverviewHero?.name,
+    desktopOverviewHero?.date,
+    desktopOverviewHero?.offer,
+    desktopOverviewInitials,
+    desktopOverviewUserName,
+    desktopWorkspaceAvailable,
+    registeredEventIds.length,
+    news.length,
+    enrichedPartners.length,
+    experts.length,
+    personalHomeContext?.lokiTip,
+    personalHomeContext?.nextAchievement?.title,
+    scannedPartnerIds,
+    savedNews.length,
+    user?.avatar,
+    user?.avatarUrl,
+    user?.first_name,
+    user?.firstName,
+    user?.last_name,
+    user?.lastName,
+    user?.displayName,
+    user?.name,
+    user?.photo,
+    user?.photo_200,
+    userKeys,
+    isOnline,
+    resolvedAppMode,
+  ]);
 
   return (
     <ConfigProvider appearance={appearance}>

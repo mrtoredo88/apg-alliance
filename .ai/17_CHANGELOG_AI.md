@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] perf: stabilize ProfilePanel and desktop overview navigation
+**Коммит:** `pending`
+**Файлы:** `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** perf
+**Что изменено:**
+- Уменьшена стоимость рендеров в `ProfilePanel` через `memo`, `useMemo`, `useCallback`, кэширование списков избранного и стабильных обработчиков действий встреч без изменения бизнес-логики.
+- В `UserApp` стабилизирован набор обработчиков верхней панели desktop-навигации (`Home`, `Новости`, `Мероприятия`, `Партнёры`, `Эксперты`, `Акции`, `Подарки`, `Профиль`, `Локи`) и объект `desktopOverview`.
+- Предотвращены лишние перерисовки состояния записей на мобильном и desktop профиля при неизменных данных.
+**Почему:** профиль и desktop-overview были главным источником ощутимых подтормаживаний на переключении/открытии и на открытии профиля.
+
 ## [2026-07-14] fix: PWA boot fallback and Desktop Detail parity
 **Коммит:** `pending`
 **Файлы:** `vite.config.js`, `index.html`, `package.json`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/pwa-build-compat-test.mjs`, `scripts/pwa-update-manager-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
