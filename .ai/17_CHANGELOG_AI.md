@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Desktop UI Framework
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `scripts/desktop-ui-framework-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен общий публичный слой desktop-компонентов: `DesktopSectionShell`, `DesktopHeader`, `DesktopToolbar`, `DesktopKpiStrip`, `DesktopContentGrid`, `DesktopRightRail`, `DesktopSidebarCard`, `DesktopMetricCard`, `DesktopEmptyState`, `DesktopSkeleton`, `DesktopActionBar`, `DesktopSectionTitle`.
+- Desktop UI Framework переиспользует существующие Workspace-примитивы (`WorkspaceHeader`, `WorkspacePanel`, `ContentGrid`, `MetricCard`, `QuickActions`, `SectionHeader`) без копирования JSX.
+- Добавлен контрактный тест `desktop-ui-framework-test`, включённый в `test:core`.
+**Почему:** публичные desktop-разделы верхнего меню должны переходить на единый язык интерфейса без изменения мобильной версии и бизнес-логики.
+
 ## [2026-07-14] feat: Workspace links integration
 **Коммит:** `pending`
 **Файлы:** `src/workspace/WorkspaceLinks.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceEventsManager.jsx`, `src/workspace/WorkspaceMeetingsCRM.jsx`, `src/workspace/WorkspaceDialogsCRM.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `src/workspace/WorkspacePromotionsCenter.jsx`, `src/workspace/WorkspaceGiftsCenter.jsx`, `src/workspace/WorkspaceAnalyticsCenter.jsx`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`
