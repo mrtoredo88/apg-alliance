@@ -2,6 +2,14 @@ function asText(value, max = 400) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
 function asMs(value) {
   if (!value) return 0;
   if (typeof value.toMillis === 'function') return value.toMillis();
@@ -29,6 +37,7 @@ export function sanitizeDialogWorkspaceNotes(value) {
 }
 
 export function getDialogWorkspaceState(dialog = {}) {
+  if (!isRecord(dialog)) dialog = {};
   const state = dialog.workspacePrivate && typeof dialog.workspacePrivate === 'object' ? dialog.workspacePrivate : {};
   return {
     pinned: state.pinned === true,
@@ -40,6 +49,8 @@ export function getDialogWorkspaceState(dialog = {}) {
 }
 
 export function buildWorkspaceDialogSearchText(dialog = {}, messages = []) {
+  if (!isRecord(dialog)) dialog = {};
+  messages = asArray(messages);
   const context = dialog.context || {};
   const state = getDialogWorkspaceState(dialog);
   return [
@@ -64,25 +75,30 @@ export function buildWorkspaceDialogSearchText(dialog = {}, messages = []) {
 export function enrichWorkspaceDialogs({ dialogs = [], messages = [], bookings = [], events = [], now = new Date() } = {}) {
   const today = dayKey(now);
   const currentWeek = weekKey(now);
+  const safeDialogs = asArray(dialogs);
+  const safeMessages = asArray(messages);
+  const safeBookings = asArray(bookings);
+  const safeEvents = asArray(events);
   const byDialog = new Map();
-  messages.forEach(message => {
+  safeMessages.forEach(message => {
     const id = asText(message.dialogId || '', 260);
     if (!id) return;
     if (!byDialog.has(id)) byDialog.set(id, []);
     byDialog.get(id).push(message);
   });
-  const rows = dialogs.map(dialog => {
+  const rows = safeDialogs.map(dialog => {
     const id = asText(dialog.dialogId || dialog.id, 260);
+    if (!id) return null;
     const dialogMessages = (byDialog.get(id) || []).sort((a, b) => asMs(a.createdAt) - asMs(b.createdAt));
-    const context = dialog.context || {};
+    const context = isRecord(dialog.context) ? dialog.context : {};
     const state = getDialogWorkspaceState(dialog);
-    const relatedBookings = bookings
+    const relatedBookings = safeBookings
       .filter(item => String(item.dialogId || '') === id || String(item.userId || '') === String(dialog.userId || ''))
       .sort((a, b) => asMs(b.startAt || b.createdAt) - asMs(a.startAt || a.createdAt));
     const upcomingBooking = relatedBookings
       .filter(item => asMs(item.startAt) >= Number(now))
       .sort((a, b) => asMs(a.startAt) - asMs(b.startAt))[0] || null;
-    const relatedEvents = events.filter(event => String(event.id || '') === String(context.eventId || context.objectId || '') || String(event.partnerId || '') === String(context.partnerId || ''));
+    const relatedEvents = safeEvents.filter(event => String(event.id || '') === String(context.eventId || context.objectId || '') || String(event.partnerId || '') === String(context.partnerId || ''));
     const lastMessageAt = dialog.lastMessageAt || dialog.lastMessage?.createdAt || dialog.updatedAt;
     return {
       ...dialog,
@@ -104,7 +120,7 @@ export function enrichWorkspaceDialogs({ dialogs = [], messages = [], bookings =
       awaitingReply: dialog.lastMessage?.senderRole === 'user' || Number(dialog.unreadCount || 0) > 0,
       searchText: '',
     };
-  });
+  }).filter(Boolean);
   return rows
     .map(row => ({ ...row, searchText: buildWorkspaceDialogSearchText(row, row.messages) }))
     .sort((a, b) => Number(b.workspaceState.pinned) - Number(a.workspaceState.pinned) || b.lastMessageMs - a.lastMessageMs);
@@ -112,7 +128,7 @@ export function enrichWorkspaceDialogs({ dialogs = [], messages = [], bookings =
 
 export function filterWorkspaceDialogs(dialogs = [], { filter = 'active', query = '' } = {}) {
   const text = asText(query, 300).toLowerCase();
-  return dialogs.filter(dialog => {
+  return asArray(dialogs).filter(dialog => {
     if (filter === 'unread' && !dialog.unreadCount) return false;
     if (filter === 'today' && !dialog.isToday) return false;
     if (filter === 'week' && !dialog.isThisWeek) return false;
@@ -129,21 +145,24 @@ export function filterWorkspaceDialogs(dialogs = [], { filter = 'active', query 
 }
 
 export function buildWorkspaceDialogKpis(dialogs = []) {
+  const rows = asArray(dialogs);
   return {
-    all: dialogs.length,
-    unread: dialogs.filter(item => item.unreadCount > 0).length,
-    awaiting: dialogs.filter(item => item.awaitingReply).length,
-    today: dialogs.filter(item => item.isToday).length,
-    withBookings: dialogs.filter(item => item.relatedBookings?.length).length,
-    notes: dialogs.filter(item => item.hasNotes).length,
-    pinned: dialogs.filter(item => item.workspaceState?.pinned).length,
-    archived: dialogs.filter(item => item.workspaceState?.archived).length,
+    all: rows.length,
+    unread: rows.filter(item => item.unreadCount > 0).length,
+    awaiting: rows.filter(item => item.awaitingReply).length,
+    today: rows.filter(item => item.isToday).length,
+    withBookings: rows.filter(item => item.relatedBookings?.length).length,
+    notes: rows.filter(item => item.hasNotes).length,
+    pinned: rows.filter(item => item.workspaceState?.pinned).length,
+    archived: rows.filter(item => item.workspaceState?.archived).length,
   };
 }
 
 export function buildDialogWorkspaceHistory(dialog = {}) {
-  const messages = Array.isArray(dialog.messages) ? dialog.messages : [];
-  const bookingEvents = (dialog.relatedBookings || []).flatMap(item => [
+  if (!isRecord(dialog)) return [];
+  const messages = asArray(dialog.messages);
+  const relatedBookings = asArray(dialog.relatedBookings);
+  const bookingEvents = relatedBookings.flatMap(item => [
     ...(Array.isArray(item.statusHistory) ? item.statusHistory : []),
     ...(Array.isArray(item.workspaceHistory) ? item.workspaceHistory : []),
   ].map(event => ({ ...event, source: 'booking', bookingId: item.id || item.bookingId })));

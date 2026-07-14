@@ -108,6 +108,14 @@ function actorId(user) {
   return String(user?.id || user?.uid || '');
 }
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function firestoreRows(snap) {
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(isRecord);
+}
+
 function avatarLabel(dialog) {
   const name = dialog.context?.title || dialog.context?.parentTitle || dialog.userName || 'Диалог';
   const parts = String(name).split(/\s+/).filter(Boolean);
@@ -207,7 +215,7 @@ function CrmPanel({ dialog, userId, events = [], bookings = [], actions, onOpenP
   const [status, setStatus] = useState('Готово');
   const dirtyRef = useRef(false);
   const context = dialog?.context || {};
-  const history = useMemo(() => buildDialogWorkspaceHistory(dialog).slice(0, 10), [dialog]);
+  const history = useMemo(() => (dialog ? buildDialogWorkspaceHistory(dialog).slice(0, 10) : []), [dialog]);
   const contacts = [
     ['phone', 'Позвонить', context.phone || dialog?.userPhone],
     ['telegram', 'Telegram', context.telegram || dialog?.userTelegram],
@@ -338,14 +346,14 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
     if (!uid) return undefined;
     setLoading(true);
     const unsubDialogs = onSnapshot(collection(db, 'users', uid, 'contextDialogs'), snap => {
-      setDialogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setDialogs(firestoreRows(snap));
       setLoading(false);
     }, err => {
       setError(err?.message || 'Не удалось загрузить диалоги');
       setLoading(false);
     });
     const unsubMessages = onSnapshot(collection(db, 'users', uid, 'contextDialogMessages'), snap => {
-      setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMessages(firestoreRows(snap));
     });
     return () => { unsubDialogs(); unsubMessages(); };
   }, [uid]);
@@ -358,7 +366,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
       const to = new Date();
       to.setDate(to.getDate() + 180);
       const result = await userAction('booking:calendar', { providerType, providerId: profile.id, from: from.toISOString(), to: to.toISOString(), status: '' });
-      setBookings(Array.isArray(result.bookings) ? result.bookings.map(normalizeBooking) : []);
+      setBookings(Array.isArray(result.bookings) ? result.bookings.filter(isRecord).map(normalizeBooking) : []);
     } catch (err) {
       onToast?.(err?.message || 'Не удалось загрузить связи со встречами.', 'error');
     }
@@ -370,7 +378,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
   const filtered = useMemo(() => filterWorkspaceDialogs(enriched, { filter, query }), [enriched, filter, query]);
   const kpis = useMemo(() => buildWorkspaceDialogKpis(enriched), [enriched]);
   const activeDialog = useMemo(() => enriched.find(item => item.id === activeId) || filtered[0] || enriched[0] || null, [enriched, filtered, activeId]);
-  const activeMessages = activeDialog?.messages || [];
+  const activeMessages = Array.isArray(activeDialog?.messages) ? activeDialog.messages : [];
   const isOwner = activeDialog?.ownerUserIds?.includes?.(uid);
   const typingUsers = Object.entries(activeDialog?.typing || {}).filter(([id, value]) => id !== uid && value).length;
 
@@ -476,7 +484,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
               {FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </div>
-          {loading ? <Skeleton /> : !filtered.length ? <Empty title="Диалогов нет" text="Измените фильтр или откройте диалог из карточки объекта." /> : filtered.map(dialog => <DialogRow key={dialog.id} dialog={dialog} active={activeDialog?.id === dialog.id} onClick={() => setActiveId(dialog.id)} />)}
+          {loading ? <Skeleton /> : !filtered.length ? <Empty title="Диалогов нет" text="Измените фильтр или откройте диалог из карточки объекта." /> : filtered.filter(isRecord).map(dialog => <DialogRow key={dialog.id} dialog={dialog} active={activeDialog?.id === dialog.id} onClick={() => setActiveId(dialog.id)} />)}
         </aside>
 
         <main onDrop={onDropFile} onDragOver={event => event.preventDefault()} style={card({ minHeight: 640, display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden' })}>

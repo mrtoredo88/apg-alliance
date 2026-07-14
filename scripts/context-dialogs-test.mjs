@@ -111,5 +111,28 @@ assert.equal(filterWorkspaceDialogs(workspaceDialogs, { filter: 'archive' }).len
 assert.equal(filterWorkspaceDialogs(workspaceDialogs, { filter: 'notes', query: 'vip' }).length, 1);
 assert.equal(filterWorkspaceDialogs(workspaceDialogs, { filter: 'has-bookings' }).map(item => item.id).join(','), 'user_1__partner__p1');
 assert.equal(buildDialogWorkspaceHistory(workspaceDialogs[0])[0].text, 'Встреча подтверждена');
+assert.deepEqual(buildDialogWorkspaceHistory(null), []);
+assert.deepEqual(buildDialogWorkspaceHistory({ id: 'empty', messages: null, relatedBookings: null }), [{ id: 'empty:created', type: 'dialog_created', text: 'Создан диалог', at: undefined }]);
+
+const damagedWorkspaceDialogs = enrichWorkspaceDialogs({
+  now,
+  dialogs: [
+    null,
+    { id: '', context: null },
+    { id: 'broken-dialog', dialogId: 'broken-dialog', userId: 'user_3', context: null, workspacePrivate: null },
+  ],
+  messages: [
+    null,
+    { id: 'm3', dialogId: 'broken-dialog', text: 'Сообщение ещё грузится', createdAt: '2026-07-14T09:04:00.000Z' },
+  ],
+  bookings: [null],
+  events: [null],
+});
+assert.equal(damagedWorkspaceDialogs.length, 1);
+assert.equal(damagedWorkspaceDialogs[0].id, 'broken-dialog');
+assert.equal(damagedWorkspaceDialogs[0].messageCount, 1);
+assert.equal(filterWorkspaceDialogs([null, ...damagedWorkspaceDialogs], { filter: 'active' }).length, 1);
+assert.equal(buildWorkspaceDialogKpis([null, ...damagedWorkspaceDialogs]).all, 1);
+assert.deepEqual(enrichWorkspaceDialogs({ dialogs: null, messages: null, bookings: null, events: null }), []);
 
 console.log('context-dialogs-test passed');

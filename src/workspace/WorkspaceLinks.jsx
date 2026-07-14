@@ -39,11 +39,21 @@ function sameId(a, b) {
   return String(a || '') && String(a || '') === String(b || '');
 }
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
 function titleOf(item, fallback = 'Объект') {
+  if (!isRecord(item)) return fallback;
   return item?.title || item?.name || item?.displayName || item?.serviceTitle || item?.context?.title || fallback;
 }
 
 function itemId(item) {
+  if (!isRecord(item)) return '';
   return item?.id || item?.bookingId || item?.dialogId || item?.objectId || '';
 }
 
@@ -98,6 +108,14 @@ export function openWorkspaceLink(actions, target, payload = {}) {
 }
 
 export function buildWorkspaceRelatedLinks({ source = '', item = {}, events = [], news = [], promotions = [], gifts = [], bookings = [], dialogs = [], profile = {}, analytics } = {}) {
+  item = isRecord(item) ? item : {};
+  profile = isRecord(profile) ? profile : {};
+  events = asArray(events);
+  news = asArray(news);
+  promotions = asArray(promotions);
+  gifts = asArray(gifts);
+  bookings = asArray(bookings);
+  dialogs = asArray(dialogs);
   const id = itemId(item);
   const eventId = item.eventId || item.sourceEventId || item.context?.eventId || (source === 'event' ? id : '');
   const newsId = item.newsId || item.sourceNewsId || (source === 'news' ? id : '');
