@@ -12,7 +12,9 @@ const requiredFrameworkComponents = [
   'DesktopHeader',
   'DesktopToolbar',
   'DesktopKpiStrip',
-  'DesktopContentGrid',
+  'DesktopCatalogGrid',
+  'DesktopCard',
+  'DesktopCardPreview',
   'DesktopActionBar',
   'DesktopMetricCard',
   'DesktopSidebarCard',
@@ -67,8 +69,23 @@ if (!homeSource.includes('onOpenPartners={onOpenPartners}')) {
   throw new Error('HomePanelV2 must pass onOpenPartners into the desktop first screen and desktop content.');
 }
 
-if (!partnersSource.includes('function getCatalogColumns') || !partnersSource.includes('repeat(${gridColumns}, minmax(0, 1fr))') || !partnersSource.includes('style={catalogGridStyle}')) {
-  throw new Error('PartnersPage desktop catalog must use an explicit responsive grid, not only DesktopContentGrid auto-fit defaults.');
+if (!partnersSource.includes('function getCatalogColumns') || !partnersSource.includes('if (width >= 1600) return 4') || !partnersSource.includes('if (width >= 1300) return 3') || !partnersSource.includes('if (width >= 1000) return 2')) {
+  throw new Error('PartnersPage desktop catalog must use explicit 4/3/2/1 responsive columns.');
+}
+
+if (!partnersSource.includes('<DesktopCatalogGrid') || !partnersSource.includes('<DesktopCard') || !partnersSource.includes('<DesktopCardPreview')) {
+  throw new Error('PartnersPage desktop cards must be assembled from Desktop Catalog Framework components.');
+}
+
+const partnerCardStart = partnersSource.indexOf('function PartnerCatalogCard');
+const partnerCardEnd = partnersSource.indexOf('function PartnersMapPreview');
+const partnerCardSource = partnersSource.slice(partnerCardStart, partnerCardEnd);
+if (partnerCardSource.includes('<GlassCard')) {
+  throw new Error('PartnersPage desktop catalog must not use the old local mobile-like GlassCard layout.');
+}
+
+if (!partnerCardSource.includes('onMouseEnter={() => onSelect?.(partner)}') || !partnerCardSource.includes('onFocus={() => onSelect?.(partner)}')) {
+  throw new Error('PartnersPage desktop cards must update Quick Preview on hover/focus.');
 }
 
 console.log('desktop-partners-page-test: ok');

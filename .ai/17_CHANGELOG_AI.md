@@ -2846,6 +2846,14 @@
 - Кабинет партнёра/эксперта дополнил модуль `Встречи` компактной journey-аналитикой: завершено, ключи, штампы, отзывы.
 - Обновлены контрактные тесты `scripts/booking-test.mjs`.
 
+# 2026-07-14 — Desktop Catalog Framework
+
+- Создан общий Desktop Catalog Framework в `DesktopUI`: `DesktopCatalogGrid`, `DesktopCard`, header/meta/tags/actions/footer/badges/preview/hover primitives.
+- Desktop-каталог `Партнёры` переведён с локальной mobile-like `GlassCard` карточки на общий `DesktopCard`: обложка, логотип, название, категория, рейтинг, адрес, описание, бейджи, быстрые действия и hover/focus preview.
+- Desktop-каталог `Эксперты` использует тот же framework: фото, имя, специализация, категории, опыт/город/рейтинг, статусы, описание и быстрые действия.
+- Каталоги сохраняют явную desktop-сетку 4/3/2/1 по ширине экрана и не меняют mobile ветки, detail pages, API или модели данных.
+- Regression-тесты `desktop-ui`, `desktop-partners`, `desktop-experts` теперь проверяют общий catalog-layer и запрещают возврат старого локального `GlassCard` layout в desktop-карточках.
+
 # 2026-07-14 — Desktop Production Audit Fixes
 
 - Исправлена проводка верхней desktop-навигации Home: `Партнёры` теперь получает `onOpenPartners` из `UserApp`, а не уходит fallback-ом в `Акции`.

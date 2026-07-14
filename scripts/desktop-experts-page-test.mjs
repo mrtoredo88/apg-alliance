@@ -12,7 +12,9 @@ const requiredFrameworkComponents = [
   'DesktopHeader',
   'DesktopToolbar',
   'DesktopKpiStrip',
-  'DesktopContentGrid',
+  'DesktopCatalogGrid',
+  'DesktopCard',
+  'DesktopCardPreview',
   'DesktopActionBar',
   'DesktopMetricCard',
   'DesktopSidebarCard',
@@ -39,8 +41,23 @@ if (!expertsSource.includes('function ExpertCatalogCard') || !expertsSource.incl
   throw new Error('ExpertsPage must provide compact desktop catalog cards and map/split preview.');
 }
 
-if (!expertsSource.includes('function getDesktopCatalogColumns') || !expertsSource.includes('repeat(${desktopColumns}, minmax(0, 1fr))') || !expertsSource.includes('style={desktopGridStyle}')) {
-  throw new Error('ExpertsPage desktop catalog must use an explicit responsive grid.');
+if (!expertsSource.includes('function getDesktopCatalogColumns') || !expertsSource.includes('if (width >= 1600) return 4') || !expertsSource.includes('if (width >= 1300) return 3') || !expertsSource.includes('if (width >= 1000) return 2')) {
+  throw new Error('ExpertsPage desktop catalog must use explicit 4/3/2/1 responsive columns.');
+}
+
+if (!expertsSource.includes('<DesktopCatalogGrid') || !expertsSource.includes('<DesktopCard') || !expertsSource.includes('<DesktopCardPreview')) {
+  throw new Error('ExpertsPage desktop cards must be assembled from Desktop Catalog Framework components.');
+}
+
+const expertCardStart = expertsSource.indexOf('function ExpertCatalogCard');
+const expertCardEnd = expertsSource.indexOf('function ExpertsMapPreview');
+const expertCardSource = expertsSource.slice(expertCardStart, expertCardEnd);
+if (expertCardSource.includes('<GlassCard')) {
+  throw new Error('ExpertsPage desktop catalog must not use the old local mobile-like GlassCard layout.');
+}
+
+if (!expertCardSource.includes('onMouseEnter={() => onSelect?.(expert)}') || !expertCardSource.includes('onFocus={() => onSelect?.(expert)}')) {
+  throw new Error('ExpertsPage desktop cards must update Quick Preview on hover/focus.');
 }
 
 if (!expertsSource.includes('DesktopToolbar') || !expertsSource.includes('value={activeCategory}') || !expertsSource.includes('value={availabilityFilter}')) {

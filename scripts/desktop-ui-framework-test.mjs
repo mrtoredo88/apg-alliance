@@ -18,6 +18,16 @@ const requiredExports = [
   'DesktopSkeleton',
   'DesktopActionBar',
   'DesktopSectionTitle',
+  'DesktopCatalogGrid',
+  'DesktopCard',
+  'DesktopCardHeader',
+  'DesktopCardMeta',
+  'DesktopCardTags',
+  'DesktopCardActions',
+  'DesktopCardFooter',
+  'DesktopCardBadges',
+  'DesktopCardPreview',
+  'DesktopCardHover',
 ];
 
 const requiredSections = ['news', 'events', 'partners', 'experts', 'offers', 'rewards'];
@@ -44,6 +54,10 @@ if (!source.includes('../workspace/WorkspaceComponents.jsx')) {
 
 if (source.includes('<DesktopRightRail')) {
   throw new Error('DesktopSectionShell must not compose a permanent right rail.');
+}
+
+if (!source.includes('onMouseEnter') || !source.includes('translateY(-3px)') || !source.includes('DesktopCardPreview')) {
+  throw new Error('Desktop Catalog Framework must include desktop hover behavior and preview composition.');
 }
 
 console.log('desktop-ui-framework-test: ok');

@@ -28,6 +28,9 @@ import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import {
   DesktopActionBar,
+  DesktopCard,
+  DesktopCardPreview,
+  DesktopCatalogGrid,
   DesktopContentGrid,
   DesktopEmptyState,
   DesktopHeader,
@@ -919,36 +922,57 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
   const rating = expertRating(expert);
   const canBookExpert = hasExpertBooking(expert);
   const canCall = Boolean(expert.telHref);
+  const cover = expert.coverPhoto || expert.imageUrl || expert.photoUrl || expert.photo || expert.avatarUrl || '';
+  const isNew = (() => {
+    const raw = expert.createdAt?.toDate ? expert.createdAt.toDate() : expert.createdAt;
+    const date = raw ? new Date(raw) : null;
+    return date && !Number.isNaN(date.getTime()) && Date.now() - date.getTime() <= 30 * 24 * 60 * 60 * 1000;
+  })();
+  const categoryLabels = (Array.isArray(expert.categories) ? expert.categories : [expert.category])
+    .map(id => getExpertCategory(id))
+    .filter(Boolean)
+    .slice(0, 2);
+  const badges = [
+    isTop && { id: 'top', label: 'В топе', tone: 'gold' },
+    (expert.verified || expert.isVerified) && { id: 'verified', label: 'Проверен' },
+    expert.ambassador && { id: 'ambassador', label: 'Амбассадор', tone: 'gold' },
+    isNew && { id: 'new', label: 'Новый' },
+    canBookExpert && { id: 'booking', label: 'Запись доступна' },
+  ].filter(Boolean);
+  const meta = [
+    rating > 0 && { id: 'rating', label: 'Рейтинг', value: `★ ${rating.toFixed(1)}`, tone: 'gold' },
+    expert.experience && { id: 'experience', label: 'Опыт', value: expert.experience },
+    { id: 'city', label: 'Город', value: expertCity(expert) },
+  ].filter(Boolean);
+  const tags = [
+    ...categoryLabels.map(item => ({ id: item.id, label: `${item.emoji} ${item.label}` })),
+    ...(Array.isArray(expert.formats) ? expert.formats.slice(0, 2).map(format => ({ id: format, label: FORMAT_LABELS[format]?.label || format })) : []),
+  ];
+  const actions = [
+    { id: 'open', label: 'Подробнее', tone: 'gold', onClick: () => onOpen?.(expert) },
+    { id: 'book', label: 'Записаться', disabled: !canBookExpert, onClick: () => onBook?.(expert) },
+    onAskQuestion && { id: 'message', label: 'Написать', onClick: () => onAskQuestion?.(expert) },
+    { id: 'call', label: 'Позвонить', disabled: !canCall, onClick: () => { if (expert.telHref) openUrl(expert.telHref); } },
+  ].filter(Boolean);
   return (
-    <GlassCard
+    <DesktopCard
+      selected={selected}
+      compact={compact}
       onClick={() => onSelect?.(expert)}
-      style={{ borderRadius: 26, padding: compact ? 12 : 14, minHeight: compact ? 126 : 214, cursor: 'pointer', border: selected ? '1px solid rgba(201,168,76,0.62)' : APG2.glass.border, display: 'grid', gap: compact ? 10 : 12, alignContent: 'space-between' }}
-    >
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 0 }}>
-        <ExpertAvatar expert={expert} size={compact ? 46 : 58} />
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 7 }}>
-            {isTop && <GlassBadge tone="gold">В топе</GlassBadge>}
-            {expert.verified && <GlassBadge>Проверен</GlassBadge>}
-            {category && <GlassBadge>{category.emoji} {category.label}</GlassBadge>}
-          </div>
-          <div style={{ color: APG2.text, fontSize: compact ? 15 : 18, lineHeight: compact ? '19px' : '22px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: compact ? 'nowrap' : undefined, display: compact ? 'block' : '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{expert.name || 'Эксперт АПГ'}</div>
-          <div style={{ color: APG2.gold, fontSize: 12.5, lineHeight: '17px', marginTop: 4, fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expert.specialization || 'Консультации и услуги'}</div>
-        </div>
-        {rating > 0 && <div style={{ color: APG2.gold, fontSize: 12, fontWeight: 840, whiteSpace: 'nowrap' }}>★ {rating.toFixed(1)}</div>}
-      </div>
-      {!compact && <div style={{ color: APG2.textSoft, fontSize: 12.5, lineHeight: '18px', minHeight: 36, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{expert.description || expert.experience || expert.offer || 'Проверенный специалист в экосистеме АПГ.'}</div>}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {expert.formats?.slice(0, 3).map(format => <FormatChip key={format} format={format} />)}
-        <GlassBadge>{expertCity(expert)}</GlassBadge>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${onAskQuestion ? 4 : 3}, minmax(0, 1fr))`, gap: 6 }}>
-        <GlassButton onClick={event => { event.stopPropagation(); onOpen?.(expert); }} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11, color: '#17120a' }}>Подробнее</GlassButton>
-        <GlassButton disabled={!canBookExpert} onClick={event => { event.stopPropagation(); onBook?.(expert); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11 }}>Записаться</GlassButton>
-        {onAskQuestion && <GlassButton onClick={event => { event.stopPropagation(); onAskQuestion?.(expert); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11 }}>Написать</GlassButton>}
-        <GlassButton disabled={!canCall} onClick={event => { event.stopPropagation(); if (expert.telHref) openUrl(expert.telHref); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11 }}>Позвонить</GlassButton>
-      </div>
-    </GlassCard>
+      onMouseEnter={() => onSelect?.(expert)}
+      onFocus={() => onSelect?.(expert)}
+      preview={<DesktopCardPreview image={cover} height={60} />}
+      avatar={<ExpertAvatar expert={expert} size={compact ? 42 : 48} />}
+      badges={badges}
+      title={expert.name || 'Эксперт АПГ'}
+      subtitle={expert.specialization || 'Консультации и услуги'}
+      side={rating > 0 ? `★ ${rating.toFixed(1)}` : ''}
+      description={expert.description || expert.experience || expert.offer || 'Проверенный специалист в экосистеме АПГ.'}
+      meta={meta}
+      tags={tags}
+      actions={actions}
+      footer={category ? `Категория: ${category.label}` : ''}
+    />
   );
 }
 
@@ -1188,7 +1212,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
         ) : viewMode === 'map' ? (
           <ExpertsMapPreview experts={filtered} selected={desktopPreviewExpert} onSelect={setPreviewExpert} />
         ) : (
-          <DesktopContentGrid min={240} gap={14} style={desktopGridStyle}>
+          <DesktopCatalogGrid columns={viewMode === 'list' ? 1 : viewMode === 'split' ? Math.min(desktopColumns, 2) : desktopColumns} gap={12} style={desktopGridStyle}>
             {filtered.map(expert => (
               <ExpertCatalogCard
                 key={expert.id}
@@ -1202,7 +1226,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
                 onBook={onBook}
               />
             ))}
-          </DesktopContentGrid>
+          </DesktopCatalogGrid>
         )}
         {selected && (
           <ExpertModal

@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE, GlassBadge, GlassButton } from './components/Apg2ProfileGlass.jsx';
 import {
   DesktopActionBar,
+  DesktopCard,
+  DesktopCardPreview,
+  DesktopCatalogGrid,
   DesktopContentGrid,
   DesktopEmptyState,
   DesktopHeader,
@@ -149,40 +152,49 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const canCall = Boolean(text(partner?.phone || partner?.contactPhone));
   const canBook = Boolean(partner?.bookingEnabled || partner?.bookingUrl || partner?.services?.length || partner?.serviceCatalog?.length);
   const cover = partner?.coverPhoto || partner?.imageUrl || partner?.photoUrl || partner?.photo || partner?.image || '';
+  const address = text(partner?.address);
+  const isNew = (toDate(partner?.createdAt)?.getTime() || 0) >= Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const badges = [
+    partner?.featured && { id: 'featured', label: 'Партнёр дня', tone: 'gold' },
+    (partner?.verified || partner?.isVerified) && { id: 'verified', label: 'Проверен' },
+    isNew && { id: 'new', label: 'Новый' },
+    partner?.offer && { id: 'offer', label: 'Акция', tone: 'gold' },
+    canBook && { id: 'booking', label: 'Запись доступна' },
+  ].filter(Boolean);
+  const meta = [
+    rating > 0 && { id: 'rating', label: 'Рейтинг', value: `★ ${rating.toFixed(1)}`, tone: 'gold' },
+    address && { id: 'address', label: 'Адрес', value: address },
+    { id: 'city', label: 'Город', value: city },
+  ].filter(Boolean);
+  const tags = [
+    { id: 'category', label: category.label },
+    partnerFormat(partner) !== 'offline' && { id: 'format', label: partnerFormat(partner) === 'online' ? 'Онлайн' : 'Гибрид' },
+  ].filter(Boolean);
+  const actions = [
+    { id: 'open', label: 'Подробнее', tone: 'gold', onClick: () => onOpen?.(partner) },
+    { id: 'call', label: 'Позвонить', disabled: !canCall, onClick: () => callPartner(partner) },
+    { id: 'route', label: 'Маршрут', disabled: !canRoute, onClick: () => routeToPartner(partner) },
+    canBook && { id: 'book', label: 'Записаться', onClick: () => onBook?.(partner) },
+  ].filter(Boolean);
   return (
-    <GlassCard
+    <DesktopCard
+      selected={selected}
+      compact={compact}
       onClick={() => onSelect?.(partner)}
-      style={{ borderRadius: 26, padding: 0, overflow: 'hidden', minHeight: compact ? 132 : 236, cursor: 'pointer', border: selected ? '1px solid rgba(201,168,76,0.62)' : APG2_PROFILE.glass.border, display: 'grid', gridTemplateRows: compact ? '1fr' : '96px 1fr' }}
-    >
-      {!compact && (
-        <div style={{ position: 'relative', overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)' }}>
-          {cover ? <img src={cover} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} /> : <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 18% 20%, rgba(201,168,76,0.24), transparent 42%), linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03))' }} />}
-          <div style={{ position: 'absolute', left: 12, bottom: -22 }}><PartnerLogo partner={partner} size={54} /></div>
-        </div>
-      )}
-      <div style={{ padding: compact ? 12 : '30px 13px 13px', display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', minWidth: 0 }}>
-          {compact && <PartnerLogo partner={partner} size={44} />}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-              {partner?.featured && <GlassBadge tone="gold">Партнёр дня</GlassBadge>}
-              {(partner?.verified || partner?.isVerified) && <GlassBadge>Проверен</GlassBadge>}
-              {partner?.offer && <GlassBadge tone="gold">Акция</GlassBadge>}
-            </div>
-            <div style={{ color: APG2_PROFILE.text, fontSize: compact ? 15 : 17, lineHeight: compact ? '19px' : '21px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: compact ? 'nowrap' : undefined, display: compact ? 'block' : '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{partner?.name || 'Партнёр АПГ'}</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{category.label} · {city}</div>
-          </div>
-          {rating > 0 && <div style={{ color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 840, whiteSpace: 'nowrap' }}>★ {rating.toFixed(1)}</div>}
-        </div>
-        {!compact && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', minHeight: 36, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{partner?.description || partner?.offer || partner?.address || 'Организация АПГ'}</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${canBook ? 4 : 3}, minmax(0, 1fr))`, gap: 6 }}>
-          <GlassButton onClick={event => { event.stopPropagation(); onOpen?.(partner); }} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11, color: '#17120a' }}>Подробнее</GlassButton>
-          <GlassButton disabled={!canCall} onClick={event => { event.stopPropagation(); callPartner(partner); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11 }}>Позвонить</GlassButton>
-          <GlassButton disabled={!canRoute} onClick={event => { event.stopPropagation(); routeToPartner(partner); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11 }}>Маршрут</GlassButton>
-          {canBook && <GlassButton onClick={event => { event.stopPropagation(); onBook?.(partner); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 8px', fontSize: 11 }}>Записаться</GlassButton>}
-        </div>
-      </div>
-    </GlassCard>
+      onMouseEnter={() => onSelect?.(partner)}
+      onFocus={() => onSelect?.(partner)}
+      preview={<DesktopCardPreview image={cover} height={66} />}
+      avatar={<PartnerLogo partner={partner} size={compact ? 42 : 48} />}
+      badges={badges}
+      title={partner?.name || 'Партнёр АПГ'}
+      subtitle={`${category.label} · ${city}`}
+      side={rating > 0 ? `★ ${rating.toFixed(1)}` : ''}
+      description={partner?.description || partner?.offer || partner?.address || 'Организация АПГ'}
+      meta={meta}
+      tags={tags}
+      actions={actions}
+      footer={partner?.offer ? `Акция: ${partner.offer}` : ''}
+    />
   );
 }
 
@@ -368,11 +380,11 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
       ) : view === 'map' ? (
         <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />
       ) : (
-        <DesktopContentGrid min={240} gap={14} style={catalogGridStyle}>
+        <DesktopCatalogGrid columns={view === 'list' ? 1 : view === 'split' ? Math.min(gridColumns, 2) : gridColumns} gap={12} style={catalogGridStyle}>
           {filtered.map(partner => (
             <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} />
           ))}
-        </DesktopContentGrid>
+        </DesktopCatalogGrid>
       )}
     </DesktopSectionShell>
   );

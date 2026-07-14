@@ -254,6 +254,211 @@ export function DesktopContentGrid({ children, min = 260, gap = 14, style }) {
   return <ContentGrid min={min} gap={gap} style={style}>{children}</ContentGrid>;
 }
 
+export function DesktopCatalogGrid({ children, columns, gap = 12, style }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: columns ? `repeat(${columns}, minmax(0, 1fr))` : 'repeat(auto-fit, minmax(260px, 1fr))',
+      gap,
+      alignItems: 'stretch',
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+export function DesktopCardHover({ active = false, children, style }) {
+  return (
+    <div style={{
+      transition: motionTransition(['transform', 'box-shadow', 'border-color', 'background'], 'base'),
+      transform: active ? 'translateY(-3px)' : 'translateY(0)',
+      boxShadow: active ? '0 20px 44px rgba(0,0,0,0.18)' : '0 10px 28px rgba(0,0,0,0.10)',
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+export function DesktopCardPreview({ image, children, height = 70, style }) {
+  return (
+    <div style={{ height, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 20% 20%, rgba(201,168,76,0.20), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.06)', ...style }}>
+      {image ? <img src={image} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.78 }} /> : null}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.00), rgba(12,12,14,0.42))' }} />
+      {children}
+    </div>
+  );
+}
+
+export function DesktopCardBadges({ items = [], style }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', minWidth: 0, ...style }}>
+      {safeItems.slice(0, 4).map(item => (
+        <span key={item.id || item.label} style={{
+          minHeight: 20,
+          display: 'inline-flex',
+          alignItems: 'center',
+          borderRadius: 999,
+          padding: '3px 7px',
+          color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft,
+          background: item.tone === 'gold' ? 'rgba(201,168,76,0.13)' : 'rgba(var(--apg2-glass-a,255,255,255),0.08)',
+          border: item.tone === 'gold' ? '1px solid rgba(201,168,76,0.28)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)',
+          fontSize: 10,
+          lineHeight: '12px',
+          fontWeight: 780,
+          whiteSpace: 'nowrap',
+        }}>
+          {item.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopCardTags({ items = [], style }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', minWidth: 0, ...style }}>
+      {safeItems.slice(0, 4).map(item => (
+        <span key={item.id || item.label || item} style={{
+          borderRadius: 999,
+          padding: '3px 7px',
+          color: APG2_PROFILE.textMuted,
+          background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)',
+          border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)',
+          fontSize: 10,
+          lineHeight: '12px',
+          fontWeight: 720,
+          whiteSpace: 'nowrap',
+        }}>
+          {item.label || item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopCardMeta({ items = [], style }) {
+  const safeItems = asArray(items).filter(item => item?.value || item?.label);
+  if (!safeItems.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeItems.length, 3)}, minmax(0, 1fr))`, gap: 6, ...style }}>
+      {safeItems.slice(0, 3).map(item => (
+        <div key={item.id || item.label} style={{ minWidth: 0, borderRadius: 12, padding: '6px 7px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+          <div style={{ color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.text, fontSize: 11.5, lineHeight: '13px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</div>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 8.8, lineHeight: '10px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopCardActions({ actions = [], style }) {
+  const safeActions = asArray(actions);
+  if (!safeActions.length) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${safeActions.length}, minmax(0, 1fr))`, gap: 6, ...style }}>
+      {safeActions.map(action => (
+        <GlassButton
+          key={action.id || action.label}
+          disabled={action.disabled}
+          onClick={event => {
+            event.stopPropagation();
+            action.onClick?.(event);
+          }}
+          tone={action.tone || 'glass'}
+          style={{ minHeight: 32, borderRadius: 13, padding: '6px 7px', fontSize: 10.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}
+        >
+          {action.label}
+        </GlassButton>
+      ))}
+    </div>
+  );
+}
+
+export function DesktopCardFooter({ children, style }) {
+  if (!children) return null;
+  return <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', ...style }}>{children}</div>;
+}
+
+export function DesktopCardHeader({ avatar, badges, title, subtitle, side, compact = false, style }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `${avatar ? (compact ? '42px' : '48px') : '0'} minmax(0, 1fr) auto`, gap: avatar ? 10 : 0, alignItems: 'start', minWidth: 0, ...style }}>
+      {avatar ? <div style={{ minWidth: 0 }}>{avatar}</div> : null}
+      <div style={{ minWidth: 0 }}>
+        <DesktopCardBadges items={badges} style={{ marginBottom: badges?.length ? 5 : 0 }} />
+        <div style={{ color: APG2_PROFILE.text, fontSize: compact ? 14.5 : 15.5, lineHeight: compact ? '18px' : '19px', fontWeight: 880, display: '-webkit-box', WebkitLineClamp: compact ? 1 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</div>
+        {subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.2, lineHeight: '15px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+      </div>
+      {side ? <div style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '14px', fontWeight: 850, whiteSpace: 'nowrap' }}>{side}</div> : null}
+    </div>
+  );
+}
+
+export function DesktopCard({
+  selected = false,
+  compact = false,
+  onClick,
+  preview,
+  avatar,
+  badges = [],
+  title,
+  subtitle,
+  side,
+  description,
+  meta = [],
+  tags = [],
+  actions = [],
+  footer,
+  children,
+  onMouseEnter,
+  onFocus,
+  style,
+}) {
+  const [hovered, setHovered] = React.useState(false);
+  const active = selected || hovered;
+  return (
+    <DesktopCardHover active={active}>
+      <GlassCard
+        onClick={onClick}
+        onMouseEnter={(event) => { setHovered(true); onMouseEnter?.(event); }}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={(event) => { setHovered(true); onFocus?.(event); }}
+        style={{
+          borderRadius: 24,
+          padding: 0,
+          overflow: 'hidden',
+          minHeight: compact ? 132 : 178,
+          cursor: onClick ? 'pointer' : 'default',
+          border: selected ? '1px solid rgba(201,168,76,0.64)' : APG2_PROFILE.glass.border,
+          display: 'grid',
+          gridTemplateRows: preview && !compact ? '70px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+          background: active ? 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.06))' : undefined,
+          transition: motionTransition(['background', 'border-color'], 'base'),
+          ...style,
+        }}
+      >
+        {preview && !compact ? preview : null}
+        <div style={{ padding: compact ? 11 : 12, display: 'grid', gap: compact ? 8 : 9, alignContent: 'start', minWidth: 0 }}>
+          <DesktopCardHeader avatar={compact ? avatar : avatar} badges={badges} title={title} subtitle={subtitle} side={side} compact={compact} />
+          {description && !compact ? (
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.8, lineHeight: '16px', minHeight: 32, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</div>
+          ) : null}
+          <DesktopCardMeta items={meta} />
+          <DesktopCardTags items={tags} />
+          {children}
+          <DesktopCardActions actions={actions} />
+          <DesktopCardFooter>{footer}</DesktopCardFooter>
+        </div>
+      </GlassCard>
+    </DesktopCardHover>
+  );
+}
+
 export function DesktopSidebarCard({ title, subtitle, actions, children, tone = 'quiet', style }) {
   return (
     <WorkspacePanel title={title} subtitle={subtitle} actions={actions} style={{ borderRadius: 30, padding: 16, background: tone === 'quiet' ? APG2_PROFILE.quietSurface : undefined, ...style }}>
