@@ -1,3 +1,5 @@
+import { normalizeExternalUrl } from '../utils/externalUrls.js';
+
 function text(value, fallback = '') {
   return String(value ?? fallback).trim();
 }
@@ -106,6 +108,21 @@ export function buildShowcaseDraft(profile = {}, roleId = 'partner') {
 }
 
 export function buildShowcasePatch(draft = {}, roleId = 'partner') {
+  const telegramUrl = normalizeExternalUrl(draft.telegramUrl, { platform: 'telegram' });
+  const vkUrl = normalizeExternalUrl(draft.vkUrl, { platform: 'vk' });
+  const websiteUrl = normalizeExternalUrl(draft.websiteUrl);
+  const bookingUrl = normalizeExternalUrl(draft.bookingUrl);
+  const whatsappUrl = normalizeExternalUrl(draft.whatsappUrl, { platform: 'whatsapp' });
+  const socialLinks = (Array.isArray(draft.socialLinks) ? draft.socialLinks : []).map(item => {
+    const type = text(item?.type || item?.id);
+    const platform = type === 'telegram' ? 'telegram' : type === 'vk' ? 'vk' : type === 'whatsapp' ? 'whatsapp' : '';
+    return {
+      ...item,
+      type,
+      label: text(item?.label),
+      url: normalizeExternalUrl(item?.url, platform ? { platform } : {}),
+    };
+  }).filter(item => item.url);
   const patch = {
     name: draft.name,
     category: draft.category,
@@ -125,13 +142,13 @@ export function buildShowcasePatch(draft = {}, roleId = 'partner') {
     workingHours: draft.hours,
     phone: draft.phone,
     email: draft.email,
-    websiteUrl: draft.websiteUrl,
-    bookingUrl: draft.bookingUrl,
-    vkUrl: draft.vkUrl,
-    socialUrl: draft.vkUrl || draft.telegramUrl || draft.websiteUrl,
-    telegramUrl: draft.telegramUrl,
-    whatsappUrl: draft.whatsappUrl,
-    socialLinks: draft.socialLinks || [],
+    websiteUrl,
+    bookingUrl,
+    vkUrl,
+    socialUrl: vkUrl || telegramUrl || websiteUrl,
+    telegramUrl,
+    whatsappUrl,
+    socialLinks,
     services: draft.services || [],
     serviceDescription: (draft.services || []).join('\n'),
     directions: draft.directions || [],

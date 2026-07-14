@@ -1,4 +1,4 @@
-import { TELEGRAM_HOST, telegramUrl } from '../../server-shared/telegram.js';
+import { TELEGRAM_HOST, normalizeTelegramUrl } from '../../server-shared/telegram.js';
 
 const SOCIAL_HOSTS = {
   vk: 'vk.com',
@@ -77,7 +77,7 @@ export function normalizeExternalUrl(value, options = {}) {
       path = path.replace(/[^\d]/g, '');
     }
     if (!path) return '';
-    if (platform === 'telegram') return telegramUrl(path);
+    if (platform === 'telegram') return normalizeTelegramUrl(path);
     return `https://${SOCIAL_HOSTS[platform]}/${path}`;
   }
 

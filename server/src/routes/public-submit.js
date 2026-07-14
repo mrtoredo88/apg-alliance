@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { EXPERT_CATEGORIES, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../../../server-shared/expert-directory.js';
-import { TELEGRAM_HOST, telegramUrl } from '../../../server-shared/telegram.js';
+import { TELEGRAM_HOST, normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 
 async function loadCustomExpertCategories(db) {
   const snap = await db.collection('config').doc('expertCategories').get().catch(() => null);
@@ -96,6 +96,7 @@ function normalizeUrl(value, platform = '') {
   const raw = cleanText(value, 500).normalize('NFKC').replace(/^@+/, '');
   if (!raw) return '';
   const hosts = { vk: 'vk.com', telegram: TELEGRAM_HOST, max: 'max.ru', whatsapp: 'wa.me' };
+  if (!platform && /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:www\.)?(?:telegram\.me|t[.]me)\//i.test(raw)) return normalizeTelegramUrl(raw);
   if (platform && hosts[platform]) {
     const hostPattern = platform === 'vk' ? '(?:vk\\.com|vk\\.me|vkontakte\\.ru)' : platform === 'telegram' ? '(?:t[.]me|telegram\\.me)' : platform === 'whatsapp' ? '(?:wa\\.me|whatsapp\\.com)' : hosts[platform].replace('.', '\\.');
     let path = raw
@@ -106,7 +107,7 @@ function normalizeUrl(value, platform = '') {
       .replace(/\s+/g, '');
     if (platform === 'whatsapp' && !/[/?]/.test(path)) path = path.replace(/\D/g, '');
     if (!path) return '';
-    return platform === 'telegram' ? telegramUrl(path) : `https://${hosts[platform]}/${path}`;
+    return platform === 'telegram' ? normalizeTelegramUrl(path) : `https://${hosts[platform]}/${path}`;
   }
   const next = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
   try {

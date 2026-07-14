@@ -33,12 +33,80 @@ import {
   normalizeBookingStatus,
   rangesOverlap,
 } from '../../../server-shared/booking.js';
+import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 
 const MAX_TEXT = 4000;
 const MAX_DIALOG_TEXT = 1800;
 
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
+}
+
+const URL_FIELD_PLATFORMS = {
+  telegramUrl: 'telegram',
+  telegramCommunityUrl: 'telegram',
+  vkUrl: 'vk',
+  vkGroupUrl: 'vk',
+  maxUrl: 'max',
+  maxCommunityUrl: 'max',
+  whatsappUrl: 'whatsapp',
+  websiteUrl: '',
+  bookingUrl: '',
+  socialUrl: '',
+  linkUrl: '',
+};
+
+function normalizeProfileUrl(value, platform = '') {
+  const raw = safeString(value, 1000).normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  if (!raw) return '';
+  if (platform === 'telegram' || /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:www\.)?(?:telegram\.me|t[.]me)\//i.test(raw)) return normalizeTelegramUrl(raw);
+  const hostMap = { vk: 'vk.com', max: 'max.ru', whatsapp: 'wa.me' };
+  if (platform && hostMap[platform]) {
+    const extraHosts = {
+      vk: 'vk\\.me|vkontakte\\.ru',
+      whatsapp: 'whatsapp\\.com',
+    }[platform];
+    const hostPattern = [hostMap[platform].replace('.', '\\.'), extraHosts].filter(Boolean).join('|');
+    let path = raw
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(new RegExp(`^(?:${hostPattern})/?`, 'i'), '')
+      .replace(/^@+/, '')
+      .replace(/\s+/g, '');
+    if (platform === 'whatsapp' && !/[/?]/.test(path)) path = path.replace(/\D/g, '');
+    return path ? `https://${hostMap[platform]}/${path}` : '';
+  }
+  const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const url = new URL(withProtocol);
+    if (!/^https?:$/i.test(url.protocol)) return '';
+    url.hostname = url.hostname.replace(/^www\./i, '');
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function normalizeProfileSocialLinks(value) {
+  return (Array.isArray(value) ? value : []).slice(0, 24).map(item => {
+    if (!item || typeof item !== 'object') return null;
+    const type = safeString(item.type || item.id, 80);
+    const platform = type === 'telegram' ? 'telegram' : type === 'vk' ? 'vk' : type === 'max' ? 'max' : type === 'whatsapp' ? 'whatsapp' : '';
+    return {
+      ...item,
+      id: safeString(item.id || type, 100) || undefined,
+      type,
+      label: safeString(item.label, 120),
+      url: normalizeProfileUrl(item.url, platform),
+    };
+  }).filter(item => item?.url);
+}
+
+function normalizeProfilePatchField(key, value) {
+  if (key === 'aiProfile') return sanitizeAiProfile(value);
+  if (key === 'socialLinks') return normalizeProfileSocialLinks(value);
+  if (Object.hasOwn(URL_FIELD_PLATFORMS, key)) return normalizeProfileUrl(value, URL_FIELD_PLATFORMS[key]);
+  return typeof value === 'string' ? safeString(value, 4000) : value;
 }
 
 function safeUserId(value) {
@@ -920,7 +988,7 @@ function inferPartnerAiDraft(message = {}, profile = {}) {
     date: safeString(message.date, 40),
     time: safeString(message.time, 40),
     place: safeString(message.place || profile.address, 300),
-    linkUrl: safeString(message.linkUrl || profile.websiteUrl || profile.socialUrl, 1000),
+    linkUrl: normalizeProfileUrl(message.linkUrl || profile.websiteUrl || profile.socialUrl, ''),
     rewardKeys: Math.max(0, Math.min(1000, Number(message.rewardKeys || 0))),
   };
 }
@@ -1150,7 +1218,7 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (!allowedFields.has(key)) return;
-    patch[key] = key === 'aiProfile' ? sanitizeAiProfile(value) : typeof value === 'string' ? safeString(value, 4000) : value;
+    patch[key] = normalizeProfilePatchField(key, value);
   });
   patch.profileUpdatedAt = FieldValue.serverTimestamp();
   await ref.set(patch, { merge: true });

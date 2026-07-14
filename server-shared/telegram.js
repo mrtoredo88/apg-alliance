@@ -13,9 +13,13 @@ export function telegramPath(value = '') {
     .replace(/\s+/g, '');
 }
 
+export function normalizeTelegramUrl(value = '') {
+  const clean = telegramPath(value);
+  return clean ? `${TELEGRAM_BASE_URL}/${clean}` : '';
+}
+
 export function telegramUrl(path = '') {
-  const clean = telegramPath(path);
-  return clean ? `${TELEGRAM_BASE_URL}/${clean}` : TELEGRAM_BASE_URL;
+  return normalizeTelegramUrl(path) || TELEGRAM_BASE_URL;
 }
 
 export function telegramShareUrl({ url = '', text = '' } = {}) {

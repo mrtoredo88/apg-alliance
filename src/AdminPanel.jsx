@@ -4093,6 +4093,16 @@ export const AdminPanel = () => {
 
   const normalizeUrl = (val, platform = '') => normalizeExternalUrl(val, platform ? { platform } : {});
 
+  const normalizeLinkItem = (item = {}) => {
+    const type = String(item.type || item.platform || '').trim();
+    const platform = type === 'telegram' ? 'telegram' : type === 'vk' ? 'vk' : type === 'max' ? 'max' : type === 'whatsapp' ? 'whatsapp' : '';
+    return {
+      ...item,
+      url: normalizeExternalUrl(item.url, platform ? { platform } : {}),
+      ...(item.linkUrl !== undefined ? { linkUrl: normalizeExternalUrl(item.linkUrl, platform ? { platform } : {}) } : {}),
+    };
+  };
+
   const validateUrlFields = (fields) => {
     for (const field of fields) {
       const result = validateExternalUrl(field.value, field.platform ? { platform: field.platform } : {});
@@ -5370,12 +5380,12 @@ export const AdminPanel = () => {
       gallery: nGallery,
       photoItems: normalizeNewsGallery(nGallery, nPhotoCaptions),
       videos: nVideos,
-      socialLinks: nSocialLinks,
-      contentBlocks: nContentBlocks,
+      socialLinks: nSocialLinks.map(normalizeLinkItem).filter(item => item.url),
+      contentBlocks: nContentBlocks.map(block => ({ ...block, url: normalizeUrl(block.url) })),
       tags: nTags.split(',').map(tag => tag.trim().replace(/^#/, '')).filter(Boolean).slice(0, 12),
       author: nAuthor.trim(),
       sourceName: nSourceName.trim(),
-      linkUrl: nLinkUrl.trim(),
+      linkUrl: normalizeUrl(nLinkUrl),
       linkLabel: nLinkLabel.trim(),
       priority: Number(nPriority) || 0,
       category: nCategory || null,
@@ -5475,7 +5485,7 @@ export const AdminPanel = () => {
       priority: Number(quickNewsDraft.priority) || 0,
       coverPhoto: (quickNewsDraft.coverPhoto || '').trim(),
       imageUrl: (quickNewsDraft.coverPhoto || '').trim(),
-      linkUrl: (quickNewsDraft.linkUrl || '').trim(),
+      linkUrl: normalizeUrl(quickNewsDraft.linkUrl || ''),
       linkLabel: (quickNewsDraft.linkLabel || '').trim(),
     };
     try {
@@ -5837,7 +5847,7 @@ export const AdminPanel = () => {
     const data = {
       title: eTitle.trim(), date: eDate.trim(), partner: ePartner.trim(),
       emoji: eEmoji, description: eDesc.trim(),
-      socialUrl: eSocial.trim(), address: eAddress.trim(),
+      socialUrl: normalizeUrl(eSocial), address: eAddress.trim(),
       deadline: eDeadline.trim(),
       isPrivate: eIsPrivate,
       minKeys: eMinKeys !== '' ? Number(eMinKeys) : 0,
@@ -5848,7 +5858,7 @@ export const AdminPanel = () => {
       pricePublic: ePricePublic.trim(),
       partnerId: ePartnerId || null,
       linkLabel: eLinkLabel.trim(),
-      linkUrl:   eLinkUrl.trim(),
+      linkUrl:   normalizeUrl(eLinkUrl),
       priority:  Number(ePriority) || 0,
       category:  eCategory || null,
       coverPhoto: eCoverPhoto.trim(),

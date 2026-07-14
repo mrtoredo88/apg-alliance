@@ -250,7 +250,12 @@ function ContactsModule({ role, profile, onSaved, onToast }) {
     try {
       const patch = {};
       Object.entries(fields).forEach(([key, value]) => {
-        patch[key] = ['whatsappUrl', 'telegramUrl', 'vkUrl', 'maxUrl', 'websiteUrl', 'bookingUrl'].includes(key) ? normalizeExternalUrl(value) : String(value || '').trim();
+        if (['whatsappUrl', 'telegramUrl', 'vkUrl', 'maxUrl', 'websiteUrl', 'bookingUrl'].includes(key)) {
+          const platform = key === 'telegramUrl' ? 'telegram' : key === 'vkUrl' ? 'vk' : key === 'maxUrl' ? 'max' : key === 'whatsappUrl' ? 'whatsapp' : '';
+          patch[key] = normalizeExternalUrl(value, platform ? { platform } : {});
+        } else {
+          patch[key] = String(value || '').trim();
+        }
       });
       if (role.id === 'partner') {
         patch.socialUrl = patch.vkUrl || patch.telegramUrl || patch.websiteUrl || '';

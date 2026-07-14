@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] fix: normalize Telegram input before saving
+**Коммит:** `pending`
+**Файлы:** `server-shared/telegram.js`, `src/utils/externalUrls.js`, `src/AdminPanel.jsx`, `src/cabinet/CabinetCorePage.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `server/src/routes/public-submit.js`, `server/src/routes/user-actions.js`, `scripts/telegram-url-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Добавлена единая функция `normalizeTelegramUrl()`; `telegramUrl()` теперь безопасно принимает полный URL, username, `@username` и `/username`.
+- Telegram-ссылки нормализуются перед сохранением в профилях партнёров/экспертов, публичных формах, витрине, админских новостях/мероприятиях и partner AI-черновиках.
+- Контрактный тест расширен кейсами legacy URL, `telegram.me`, `www.telegram.me`, username, invite, share, query и hash.
+**Почему:** старые Telegram-ссылки из пользовательского ввода и внешних источников должны попадать в Firestore уже в новом формате `https://telegram.me/...`.
+
 ## [2026-07-14] fix: migrate Telegram links to telegram.me
 **Коммит:** `pending`
 **Файлы:** `server-shared/telegram.js`, `src/utils/externalUrls.js`, `src/NewsPage.jsx`, `src/AdminPanel.jsx`, `src/ExpertCabinetPage.jsx`, `src/expertProfileForm.js`, `server/src/routes/telegram-auth-start.js`, `server/src/routes/admin-actions.js`, `server/src/routes/public-submit.js`, `server/src/lib/telegramUpdates.js`, `scripts/telegram-url-test.mjs`, `scripts/seed-demo-partner.mjs`, `scripts/expert-questionnaire-v2-test.mjs`, `scripts/showcase-builder-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/08_TELEGRAM.md`, `.ai/17_CHANGELOG_AI.md`
