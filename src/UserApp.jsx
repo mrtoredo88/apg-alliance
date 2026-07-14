@@ -1437,237 +1437,240 @@ export function UserApp() {
       setUnreadCount(unread);
       if (isMounted.current) setLoading(false);
 
-      if (!isGuest) { try {
-      const userRef = doc(db, 'users', String(userData.id));
-      const docSnap = await getDoc(userRef);
-      if (!isMounted.current) return;
+      if (!isGuest) {
+        void (async () => {
+          try {
+            const userRef = doc(db, 'users', String(userData.id));
+            const docSnap = await getDoc(userRef);
+            if (!isMounted.current) return;
 
-      const todayKey = new Date().toLocaleDateString('sv');
+            const todayKey = new Date().toLocaleDateString('sv');
 
-      const profilePatch = {
-        displayName: [userData.first_name, userData.last_name].filter(Boolean).join(' ') || null,
-        firstName: userData.first_name ?? null,
-        lastName:  userData.last_name  ?? null,
-        photo:     userData.photo_200  ?? null,
-      };
+            const profilePatch = {
+              displayName: [userData.first_name, userData.last_name].filter(Boolean).join(' ') || null,
+              firstName: userData.first_name ?? null,
+              lastName:  userData.last_name  ?? null,
+              photo:     userData.photo_200  ?? null,
+            };
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const needsLegalConsent = !CONSENT_SCREEN_DISABLED_FOR_DEMO && !hasAcceptedCurrentLegal(data);
-        if (needsLegalConsent && isMounted.current) {
-          setConsentRequest({
-            user: userData,
-            mode: 'gate',
-            title: 'Добро пожаловать в обновлённый АПГ!',
-            subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
-            badge: `Документы v${LEGAL_VERSION}`,
-            notificationsDefault: data.notificationConsent ?? data.notificationsEnabled ?? true,
-            needsOnboarding: !data.onboardingDone,
-          });
-        }
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              const needsLegalConsent = !CONSENT_SCREEN_DISABLED_FOR_DEMO && !hasAcceptedCurrentLegal(data);
+              if (needsLegalConsent && isMounted.current) {
+                setConsentRequest({
+                  user: userData,
+                  mode: 'gate',
+                  title: 'Добро пожаловать в обновлённый АПГ!',
+                  subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
+                  badge: `Документы v${LEGAL_VERSION}`,
+                  notificationsDefault: data.notificationConsent ?? data.notificationsEnabled ?? true,
+                  needsOnboarding: !data.onboardingDone,
+                });
+              }
 
-        // Если в localStorage фото нет, но в Firestore есть — используем Firestore и не перезаписываем его null
-        if (data.photo && !userData.photo_200) {
-          profilePatch.photo = data.photo;
-          setUser(u => ({ ...u, photo_200: data.photo }));
-          if (String(userData.id).startsWith('tg_')) {
-            try { localStorage.setItem('apg_tg_user', JSON.stringify({ ...userData, photo_200: data.photo })); } catch {}
-          }
-        }
-        const keys = data.keys ?? 0;
-        const tickets = Number(data.tickets || 0);
-        const reputation = Number(data.reputation || data.keys || 0);
-        const reputationStatus = data.reputationStatusLabel ? { label: data.reputationStatusLabel } : getReputationStatus(reputation);
-        setUser(u => u ? ({
-          ...u,
-          canonicalUserId: data.canonicalUserId || data.id || String(userData.id),
-          ...(data.displayName ? { displayName: data.displayName } : {}),
-          ...(data.email ? { email: data.email } : {}),
-          ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
-          ...(data.linkedTelegram ? { linkedTelegram: data.linkedTelegram } : {}),
-          ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
-          ...(Array.isArray(data.linkedEmails) ? { linkedEmails: data.linkedEmails } : {}),
-          ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),
-          ...(data.notificationsEnabled !== undefined ? { notificationsEnabled: data.notificationsEnabled } : {}),
-        }) : u);
-        setUserKeys(keys);
-        setUserTickets(tickets);
-        setUserReputation(reputation);
-        setFavorites(data.favorites ?? []);
-        setSavedNews(Array.isArray(data.savedNews) ? data.savedNews.map(String) : []);
-        setReadLaterNews(Array.isArray(data.readLaterNews) ? data.readLaterNews.map(String) : []);
-        setNewsReactions(data.newsReactions && typeof data.newsReactions === 'object' ? data.newsReactions : {});
-        setNewsSubscriptions(data.newsSubscriptions && typeof data.newsSubscriptions === 'object' ? data.newsSubscriptions : {});
-        setInterestProfile(data.interestProfile && typeof data.interestProfile === 'object' ? data.interestProfile : null);
-        setScannedPartnerIds(data.scannedPartners ?? {});
-        setCompletedTasks(data.completedTasks ?? []);
-        setLearningProgress(normalizeLearningProgress(data.learningProgress));
-        setLearningHintsEnabled(data.learningHintsEnabled !== false);
-        setStreak(data.streak ?? 0);
-        setLastScanDate(data.lastScanDate ?? null);
-        setReferralCount(data.referralCount ?? 0);
-        setScanDates(data.scanDates ?? []);
-        setVisitCounts(data.visitCounts ?? {});
-        setRegisteredEventIds(data.registeredEvents ?? []);
-        setJoinedGroup(data.joinedGroup ?? false);
-        setLastBonusDate(data.lastBonusDate ?? null);
-        setScannedExperts(data.scannedExperts ?? {});
-
-        // localStorage-сессия не содержит partnerId/expertId, выставленных админом после привязки — владение перепроверяется по свежему документу
-        const fsEmail = (data.email || data.linkedEmail)?.trim().toLowerCase();
-        const identityUser = {
-          ...userData,
-          firebaseUid: data.firebaseUid || data.uid || userData.firebaseUid,
-          linkedTelegram: data.linkedTelegram || userData.linkedTelegram,
-          linkedEmail: data.linkedEmail || userData.linkedEmail,
-          normalizedEmail: data.normalizedEmail,
-          partnerId: data.partnerId,
-          partnerCabinetIds: data.partnerCabinetIds,
-          expertId: data.expertId,
-          expertCabinetIds: data.expertCabinetIds,
-        };
-        if (isMounted.current) {
-          setUser(u => u ? ({
-            ...u,
-            partnerId: data.partnerId ?? null,
-            partnerCabinetIds: safeStringList(data.partnerCabinetIds),
-            expertId: data.expertId ?? null,
-            expertCabinetIds: safeStringList(data.expertCabinetIds),
-            role: data.role ?? u.role ?? null,
-            userRole: data.userRole ?? u.userRole ?? null,
-            authRole: data.authRole ?? u.authRole ?? null,
-            roles: Array.isArray(data.roles) ? data.roles : (u.roles ?? null),
-            firebaseUid: data.firebaseUid || data.uid || u.firebaseUid || null,
-          }) : u);
-          const exOwned = freshExperts.find(e => profileOwnedByUser(e, identityUser, fsEmail));
-          if (exOwned) setOwnedExpert(exOwned);
-          else if (data.expertId || safeStringList(data.expertCabinetIds).length) {
-            const wantedExpert = String(data.expertId || safeStringList(data.expertCabinetIds)[0]);
-            getDoc(doc(db, 'experts', wantedExpert))
-              .then(snap => {
-                if (snap.exists() && isMounted.current) {
-                  const expert = normalizeExpertRecord({ id: snap.id, ...snap.data() });
-                  if (isNotArchived(expert)) setOwnedExpert(expert);
+              // Если в localStorage фото нет, но в Firestore есть — используем Firestore и не перезаписываем его null
+              if (data.photo && !userData.photo_200) {
+                profilePatch.photo = data.photo;
+                setUser(u => ({ ...u, photo_200: data.photo }));
+                if (String(userData.id).startsWith('tg_')) {
+                  try { localStorage.setItem('apg_tg_user', JSON.stringify({ ...userData, photo_200: data.photo })); } catch {}
                 }
-              })
-              .catch(() => {});
-          }
-          const ptOwned = freshPartners.find(p => profileOwnedByUser(p, identityUser, fsEmail));
-          if (ptOwned) setOwnedPartner(ptOwned);
-          else if (data.partnerId || safeStringList(data.partnerCabinetIds).length) {
-            const wantedPartner = String(data.partnerId || safeStringList(data.partnerCabinetIds)[0]);
-            getDoc(doc(db, 'partners', wantedPartner))
-              .then(snap => {
-                if (snap.exists() && isMounted.current) {
-                  const partner = { id: snap.id, ...snap.data() };
-                  if (isNotArchived(partner)) setOwnedPartner(partner);
+              }
+              const keys = data.keys ?? 0;
+              const tickets = Number(data.tickets || 0);
+              const reputation = Number(data.reputation || data.keys || 0);
+              const reputationStatus = data.reputationStatusLabel ? { label: data.reputationStatusLabel } : getReputationStatus(reputation);
+              setUser(u => u ? ({
+                ...u,
+                canonicalUserId: data.canonicalUserId || data.id || String(userData.id),
+                ...(data.displayName ? { displayName: data.displayName } : {}),
+                ...(data.email ? { email: data.email } : {}),
+                ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
+                ...(data.linkedTelegram ? { linkedTelegram: data.linkedTelegram } : {}),
+                ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
+                ...(Array.isArray(data.linkedEmails) ? { linkedEmails: data.linkedEmails } : {}),
+                ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),
+                ...(data.notificationsEnabled !== undefined ? { notificationsEnabled: data.notificationsEnabled } : {}),
+              }) : u);
+              setUserKeys(keys);
+              setUserTickets(tickets);
+              setUserReputation(reputation);
+              setFavorites(data.favorites ?? []);
+              setSavedNews(Array.isArray(data.savedNews) ? data.savedNews.map(String) : []);
+              setReadLaterNews(Array.isArray(data.readLaterNews) ? data.readLaterNews.map(String) : []);
+              setNewsReactions(data.newsReactions && typeof data.newsReactions === 'object' ? data.newsReactions : {});
+              setNewsSubscriptions(data.newsSubscriptions && typeof data.newsSubscriptions === 'object' ? data.newsSubscriptions : {});
+              setInterestProfile(data.interestProfile && typeof data.interestProfile === 'object' ? data.interestProfile : null);
+              setScannedPartnerIds(data.scannedPartners ?? {});
+              setCompletedTasks(data.completedTasks ?? []);
+              setLearningProgress(normalizeLearningProgress(data.learningProgress));
+              setLearningHintsEnabled(data.learningHintsEnabled !== false);
+              setStreak(data.streak ?? 0);
+              setLastScanDate(data.lastScanDate ?? null);
+              setReferralCount(data.referralCount ?? 0);
+              setScanDates(data.scanDates ?? []);
+              setVisitCounts(data.visitCounts ?? {});
+              setRegisteredEventIds(data.registeredEvents ?? []);
+              setJoinedGroup(data.joinedGroup ?? false);
+              setLastBonusDate(data.lastBonusDate ?? null);
+              setScannedExperts(data.scannedExperts ?? {});
+
+              // localStorage-сессия не содержит partnerId/expertId, выставленных админом после привязки — владелец перепроверяется по свежему документу
+              const fsEmail = (data.email || data.linkedEmail)?.trim().toLowerCase();
+              const identityUser = {
+                ...userData,
+                firebaseUid: data.firebaseUid || data.uid || userData.firebaseUid,
+                linkedTelegram: data.linkedTelegram || userData.linkedTelegram,
+                linkedEmail: data.linkedEmail || userData.linkedEmail,
+                normalizedEmail: data.normalizedEmail,
+                partnerId: data.partnerId,
+                partnerCabinetIds: data.partnerCabinetIds,
+                expertId: data.expertId,
+                expertCabinetIds: data.expertCabinetIds,
+              };
+              if (isMounted.current) {
+                setUser(u => u ? ({
+                  ...u,
+                  partnerId: data.partnerId ?? null,
+                  partnerCabinetIds: safeStringList(data.partnerCabinetIds),
+                  expertId: data.expertId ?? null,
+                  expertCabinetIds: safeStringList(data.expertCabinetIds),
+                  role: data.role ?? u.role ?? null,
+                  userRole: data.userRole ?? u.userRole ?? null,
+                  authRole: data.authRole ?? u.authRole ?? null,
+                  roles: Array.isArray(data.roles) ? data.roles : (u.roles ?? null),
+                  firebaseUid: data.firebaseUid || data.uid || u.firebaseUid || null,
+                }) : u);
+                const exOwned = freshExperts.find(e => profileOwnedByUser(e, identityUser, fsEmail));
+                if (exOwned) setOwnedExpert(exOwned);
+                else if (data.expertId || safeStringList(data.expertCabinetIds).length) {
+                  const wantedExpert = String(data.expertId || safeStringList(data.expertCabinetIds)[0]);
+                  getDoc(doc(db, 'experts', wantedExpert))
+                    .then(snap => {
+                      if (snap.exists() && isMounted.current) {
+                        const expert = normalizeExpertRecord({ id: snap.id, ...snap.data() });
+                        if (isNotArchived(expert)) setOwnedExpert(expert);
+                      }
+                    })
+                    .catch(() => {});
                 }
-              })
-              .catch(() => {});
+                const ptOwned = freshPartners.find(p => profileOwnedByUser(p, identityUser, fsEmail));
+                if (ptOwned) setOwnedPartner(ptOwned);
+                else if (data.partnerId || safeStringList(data.partnerCabinetIds).length) {
+                  const wantedPartner = String(data.partnerId || safeStringList(data.partnerCabinetIds)[0]);
+                  getDoc(doc(db, 'partners', wantedPartner))
+                    .then(snap => {
+                      if (snap.exists() && isMounted.current) {
+                        const partner = { id: snap.id, ...snap.data() };
+                        if (isNotArchived(partner)) setOwnedPartner(partner);
+                      }
+                    })
+                    .catch(() => {});
+                }
+              }
+
+              if (data.notificationsEnabled) {
+                localStorage.setItem('apg_notif_enabled', '1');
+                setNotifEnabled(true);
+              }
+              if (!data.onboardingDone && !needsLegalConsent) setShowOnboarding(true);
+
+              // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
+              getCountFromServer(query(collection(db, 'users'), where('keys', '>', keys)))
+                .then(snap => { if (isMounted.current) setUserRank(snap.data().count + 1); })
+                .catch(() => {});
+
+              const existingRefId = !String(userData.id).startsWith('guest_') && pendingRefId && pendingRefId !== String(userData.id) && !data.referredBy && data.referralBonusGranted !== true
+                ? pendingRefId
+                : null;
+              const syncExistingPayload = {
+                userId: String(userData.id),
+                profile: { ...userData, ...profilePatch },
+                ...(existingRefId ? { referrerId: existingRefId } : {}),
+              };
+              const handleReferralSyncResult = result => {
+                if (!result?.referralBonusAwarded || !isMounted.current) return;
+                localStorage.removeItem('apg_pending_ref');
+                setUserKeys(prev => prev + 2);
+                setUserReputation(prev => prev + 8);
+                setTimeout(() => {
+                  if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
+                }, 1200);
+              };
+
+              // Ежедневный бонус: +1 ключ за первый вход каждый день
+              if (data.lastBonusDate !== todayKey) {
+                userAction('profile:sync', syncExistingPayload)
+                  .then(result => {
+                    if (!isMounted.current) return;
+                    setUserKeys(prev => prev + 1);
+                    setUserReputation(prev => prev + 1);
+                    if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+                    return result;
+                  })
+                  .then(handleReferralSyncResult)
+                  .catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
+              } else {
+                userAction('profile:sync', syncExistingPayload).then(handleReferralSyncResult).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
+              }
+            } else {
+              // Новый пользователь
+              const isRealUser = !String(userData.id).startsWith('guest_');
+              const refId = isRealUser ? pendingRefId : null;
+
+              const isValidRef = refId && refId !== String(userData.id);
+              let pendingConsents = null;
+              try {
+                const raw = localStorage.getItem('apg_pending_consents');
+                const parsed = raw ? JSON.parse(raw) : null;
+                if (parsed?.userId === String(userData.id) && parsed?.consents?.termsAccepted && parsed?.consents?.privacyAccepted) {
+                  pendingConsents = parsed;
+                }
+              } catch {}
+              await userAction('profile:sync', {
+                userId: String(userData.id),
+                profile: { ...userData, ...profilePatch },
+                referrerId: refId,
+                consent: pendingConsents ? {
+                  ...pendingConsents.consents,
+                  docsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
+                  legalVersion: pendingConsents.consentLegalVersion ?? LEGAL_VERSION,
+                  notificationsAccepted: !!pendingConsents.notificationConsent,
+                } : null,
+              });
+              if (pendingConsents) localStorage.removeItem('apg_pending_consents');
+
+              if (isValidRef) {
+                localStorage.removeItem('apg_pending_ref');
+                if (isMounted.current) {
+                  setTimeout(() => {
+                    if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
+                  }, 1800);
+                }
+              }
+
+              if (isValidRef) setUserKeys(2);
+              if (pendingConsents) {
+                setShowOnboarding(true);
+              } else if (!CONSENT_SCREEN_DISABLED_FOR_DEMO && isRealUser && isMounted.current) {
+                setConsentRequest({
+                  user: userData,
+                  mode: 'gate',
+                  title: 'Добро пожаловать в обновлённый АПГ!',
+                  subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
+                  badge: `Документы v${LEGAL_VERSION}`,
+                  notificationsDefault: true,
+                  needsOnboarding: true,
+                });
+              } else {
+                setShowOnboarding(true);
+              }
+            }
+          } catch (e) {
+            console.warn('[APG] User data load failed:', e.code, e.message);
           }
-        }
-
-        if (data.notificationsEnabled) {
-          localStorage.setItem('apg_notif_enabled', '1');
-          setNotifEnabled(true);
-        }
-        if (!data.onboardingDone && !needsLegalConsent) setShowOnboarding(true);
-
-        // Ранг пользователя — количество юзеров с бо́льшим числом ключей + 1
-        getCountFromServer(query(collection(db, 'users'), where('keys', '>', keys)))
-          .then(snap => { if (isMounted.current) setUserRank(snap.data().count + 1); })
-          .catch(() => {});
-
-        const existingRefId = !String(userData.id).startsWith('guest_') && pendingRefId && pendingRefId !== String(userData.id) && !data.referredBy && data.referralBonusGranted !== true
-          ? pendingRefId
-          : null;
-        const syncExistingPayload = {
-          userId: String(userData.id),
-          profile: { ...userData, ...profilePatch },
-          ...(existingRefId ? { referrerId: existingRefId } : {}),
-        };
-        const handleReferralSyncResult = result => {
-          if (!result?.referralBonusAwarded || !isMounted.current) return;
-          localStorage.removeItem('apg_pending_ref');
-          setUserKeys(prev => prev + 2);
-          setUserReputation(prev => prev + 8);
-          setTimeout(() => {
-            if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
-          }, 1200);
-        };
-
-        // Ежедневный бонус: +1 ключ за первый вход каждый день
-        if (data.lastBonusDate !== todayKey) {
-          userAction('profile:sync', syncExistingPayload)
-            .then(result => {
-              if (!isMounted.current) return;
-              setUserKeys(prev => prev + 1);
-              setUserReputation(prev => prev + 1);
-              if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
-              return result;
-            })
-            .then(handleReferralSyncResult)
-            .catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
-        } else {
-          userAction('profile:sync', syncExistingPayload).then(handleReferralSyncResult).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
-        }
-      } else {
-        // Новый пользователь
-        const isRealUser = !String(userData.id).startsWith('guest_');
-        const refId = isRealUser ? pendingRefId : null;
-
-        const isValidRef = refId && refId !== String(userData.id);
-        let pendingConsents = null;
-        try {
-          const raw = localStorage.getItem('apg_pending_consents');
-          const parsed = raw ? JSON.parse(raw) : null;
-          if (parsed?.userId === String(userData.id) && parsed?.consents?.termsAccepted && parsed?.consents?.privacyAccepted) {
-            pendingConsents = parsed;
-          }
-        } catch {}
-        await userAction('profile:sync', {
-          userId: String(userData.id),
-          profile: { ...userData, ...profilePatch },
-          referrerId: refId,
-          consent: pendingConsents ? {
-            ...pendingConsents.consents,
-            docsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
-            legalVersion: pendingConsents.consentLegalVersion ?? LEGAL_VERSION,
-            notificationsAccepted: !!pendingConsents.notificationConsent,
-          } : null,
-        });
-        if (pendingConsents) localStorage.removeItem('apg_pending_consents');
-
-        if (isValidRef) {
-          localStorage.removeItem('apg_pending_ref');
-          if (isMounted.current) {
-            setTimeout(() => {
-              if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
-            }, 1800);
-          }
-        }
-
-        if (isValidRef) setUserKeys(2);
-        if (pendingConsents) {
-          setShowOnboarding(true);
-        } else if (!CONSENT_SCREEN_DISABLED_FOR_DEMO && isRealUser && isMounted.current) {
-          setConsentRequest({
-            user: userData,
-            mode: 'gate',
-            title: 'Добро пожаловать в обновлённый АПГ!',
-            subtitle: 'Перед продолжением использования приложения подтвердите необходимые согласия.',
-            badge: `Документы v${LEGAL_VERSION}`,
-            notificationsDefault: true,
-            needsOnboarding: true,
-          });
-        } else {
-          setShowOnboarding(true);
-        }
+        })();
       }
-
-      } catch (e) {
-        console.warn('[APG] User data load failed:', e.code, e.message);
-      }} // end if (!isGuest)
     } catch (e) {
       logError(e, 'UserApp.loadData.fatal');
       if (isMounted.current) setError('Не удалось загрузить данные.');
