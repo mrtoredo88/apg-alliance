@@ -31,6 +31,12 @@ import {
   workspaceNewsStatus,
   workspaceNewsStatusLabel,
 } from '../server-shared/workspace-news.js';
+import {
+  buildWorkspaceAnalyticsRange,
+  buildWorkspaceAnalyticsSnapshot,
+  filterWorkspaceAnalyticsSources,
+  workspaceAnalyticsRowsToCsv,
+} from '../server-shared/workspace-analytics.js';
 
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.mobile), WORKSPACE_MODES.mobile);
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.tablet), WORKSPACE_MODES.tablet);
@@ -86,6 +92,7 @@ assert.ok(desktopWorkspaceSource.includes('<WorkspaceEventsManager'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceMeetingsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceDialogsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceNewsCenter'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspaceAnalyticsCenter'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
 const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };
@@ -140,6 +147,66 @@ const newsFromEvent = buildWorkspaceNewsFromEvent(workspaceEvents[0], partnerPro
 assert.equal(newsFromEvent.partnerId, 'partner-1');
 assert.equal(newsFromEvent.eventId, 'own-draft');
 assert.equal(newsFromEvent.category, 'events');
+
+const analyticsRange = buildWorkspaceAnalyticsRange({ period: '30d', now: '2026-07-14T12:00:00.000Z' });
+assert.equal(analyticsRange.period, '30d');
+assert.ok(new Date(analyticsRange.to).getTime() - new Date(analyticsRange.from).getTime() >= 29 * 24 * 60 * 60 * 1000);
+const analyticsSources = {
+  news: [
+    { id: 'n1', partnerId: 'partner-1', title: 'Лучшая новость', status: 'published', stats: { views: 100, clicks: 12, comments: 3 }, publishedAt: '2026-07-13T10:00:00.000Z' },
+    { id: 'n2', partnerId: 'partner-2', title: 'Чужая', status: 'published', stats: { views: 999 }, publishedAt: '2026-07-13T10:00:00.000Z' },
+  ],
+  events: [
+    { id: 'e1', partnerId: 'partner-1', title: 'Нетворкинг', status: 'published', views: 40, registeredCount: 6, visitsCount: 4, startAt: '2026-07-14T10:00:00.000Z' },
+    { id: 'e2', partnerId: 'partner-2', title: 'Чужое', views: 400, startAt: '2026-07-14T10:00:00.000Z' },
+  ],
+  bookings: [
+    { id: 'b1', providerType: 'partner', providerId: 'partner-1', userId: 'u1', status: 'completed', startAt: '2026-07-14T12:00:00.000Z', createdAt: '2026-07-13T12:00:00.000Z' },
+    { id: 'b2', providerType: 'partner', providerId: 'partner-1', userId: 'u1', status: 'confirmed', startAt: '2026-07-14T13:00:00.000Z', createdAt: '2026-07-14T12:00:00.000Z' },
+    { id: 'b3', providerType: 'expert', providerId: 'expert-1', userId: 'u9', status: 'completed', startAt: '2026-07-14T12:00:00.000Z', createdAt: '2026-07-13T12:00:00.000Z' },
+  ],
+  dialogs: [
+    { id: 'd1', objectId: 'partner-1', context: { title: 'Coffee House' }, unreadBy: { owner: 2 }, lastMessageAt: '2026-07-14T11:00:00.000Z', createdAt: '2026-07-14T10:00:00.000Z' },
+  ],
+  comments: [
+    { id: 'c1', newsId: 'n1', text: 'Комментарий', createdAt: '2026-07-14T11:00:00.000Z' },
+  ],
+  notifications: [
+    { id: 'nt1', objectId: 'partner-1', source: 'push', createdAt: '2026-07-14T11:00:00.000Z' },
+  ],
+  scans: [
+    { id: 's1', partnerId: 'partner-1', createdAt: '2026-07-14T11:00:00.000Z' },
+  ],
+};
+const filteredAnalytics = filterWorkspaceAnalyticsSources(analyticsSources, partnerProfile, 'partner', analyticsRange);
+assert.deepEqual(filteredAnalytics.news.map(item => item.id), ['n1']);
+assert.deepEqual(filteredAnalytics.events.map(item => item.id), ['e1']);
+assert.deepEqual(filteredAnalytics.bookings.map(item => item.id), ['b1', 'b2']);
+const analyticsSnapshot = buildWorkspaceAnalyticsSnapshot({
+  profile: { ...partnerProfile, stats: { profileViews: 30, websiteClicks: 2, routeClicks: 3 } },
+  role: 'partner',
+  range: analyticsRange,
+  sources: analyticsSources,
+});
+assert.equal(analyticsSnapshot.dataPolicy, 'real-system-data-only');
+assert.equal(analyticsSnapshot.kpis.newsViews, 100);
+assert.equal(analyticsSnapshot.kpis.eventViews, 40);
+assert.equal(analyticsSnapshot.kpis.completedBookings, 1);
+assert.equal(analyticsSnapshot.kpis.repeatedBookings, 1);
+assert.ok(analyticsSnapshot.funnel.some(item => item.id === 'completed'));
+assert.ok(analyticsSnapshot.news.top[0].id === 'n1');
+assert.ok(analyticsSnapshot.recommendations.every(item => item.confidence === 'real-data'));
+assert.ok(analyticsSnapshot.lokiContext.kpis);
+const analyticsCsv = workspaceAnalyticsRowsToCsv(analyticsSnapshot.exportRows);
+assert.ok(analyticsCsv.includes('"KPI";"newsViews";"100"'));
+const adminAnalyticsSnapshot = buildWorkspaceAnalyticsSnapshot({
+  profile: { id: 'all', name: 'Вся система' },
+  role: 'admin',
+  range: analyticsRange,
+  sources: analyticsSources,
+});
+assert.equal(adminAnalyticsSnapshot.sourceCounts.news, 2);
+assert.equal(adminAnalyticsSnapshot.kpis.newsViews, 1099);
 
 const cache = createWorkspaceCache({ ttl: 1000, max: 1 });
 cache.set('a', 1);

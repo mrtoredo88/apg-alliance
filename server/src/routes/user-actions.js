@@ -43,6 +43,11 @@ import {
   sanitizeWorkspaceNewsPatch,
   workspaceNewsBelongsToProfile,
 } from '../../../server-shared/workspace-news.js';
+import {
+  buildWorkspaceAnalyticsRange,
+  buildWorkspaceAnalyticsSnapshot,
+  workspaceAnalyticsRowsToCsv,
+} from '../../../server-shared/workspace-analytics.js';
 import { buildLifecyclePatch, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import {
@@ -1554,6 +1559,62 @@ async function actionWorkspaceNewsFromEvent(db, req, actor) {
   const ref = await db.collection('news').add(draft);
   await audit(db, req, actor, 'workspaceNews:fromEvent', 'news', ref.id, 'success', { eventId, profileId: profile.id });
   return { ok: true, id: ref.id, news: { ...draft, id: ref.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
+}
+
+async function getWorkspaceAnalyticsComments(db, newsIds = []) {
+  const ids = Array.from(new Set(newsIds.map(id => safeString(id, 220)).filter(Boolean))).slice(0, 60);
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+  const results = [];
+  for (const chunk of chunks) {
+    const snap = await db.collection('newsComments').where('newsId', 'in', chunk).limit(300).get().catch(() => null);
+    if (snap?.docs?.length) results.push(...snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })));
+  }
+  return results;
+}
+
+async function actionWorkspaceAnalyticsSnapshot(db, req, actor) {
+  const requestedRole = safeString(req.body?.role, 40).toLowerCase();
+  const adminAccess = hasRole(actor.user || {}, ROLES.admin) || hasRole(actor.user || {}, ROLES.owner);
+  const role = requestedRole === 'admin' && adminAccess ? 'admin' : requestedRole === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = role === 'admin'
+    ? { id: 'all', name: 'Вся система' }
+    : await assertOwnedProfile(db, actor, role, profileId);
+  const range = buildWorkspaceAnalyticsRange({
+    period: safeString(req.body?.period || '30d', 40),
+    from: safeString(req.body?.from, 80),
+    to: safeString(req.body?.to, 80),
+  });
+  const profileField = role === 'expert' ? 'expertId' : 'partnerId';
+  const profileName = safeString(profile.name || profile.title || profile.displayName, 220);
+
+  const [newsSnap, eventsSnap, bookingsSnap, dialogsSnap, notificationsSnap, scansSnap] = await Promise.all([
+    db.collection('news').orderBy('updatedAt', 'desc').limit(500).get(),
+    role === 'admin' ? db.collection('events').limit(500).get().catch(() => null) : db.collection('events').where(profileField, '==', profile.id).limit(300).get().catch(() => null),
+    role === 'admin' ? db.collection('bookings').limit(500).get().catch(() => null) : db.collection('bookings').where('providerId', '==', profile.id).limit(500).get().catch(() => null),
+    role === 'admin' ? db.collection('contextDialogs').limit(500).get().catch(() => null) : db.collection('contextDialogs').where('participantIds', 'array-contains', actor.userId).limit(500).get().catch(() => null),
+    role === 'admin' ? db.collection('notifications').limit(500).get().catch(() => null) : db.collection('notifications').where('userId', '==', actor.userId).limit(500).get().catch(() => null),
+    role === 'admin' ? db.collection('scans').limit(500).get().catch(() => null) : db.collection('scans').where(profileField, '==', profile.id).limit(500).get().catch(() => null),
+  ]);
+
+  const news = newsSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const events = eventsSnap?.docs?.map(doc => ({ id: doc.id, ...(doc.data() || {}) })) || [];
+  const bookings = bookingsSnap?.docs?.map(doc => ({ id: doc.id, ...(doc.data() || {}) })) || [];
+  const dialogs = dialogsSnap?.docs?.map(doc => ({ id: doc.id, ...(doc.data() || {}) })) || [];
+  const notifications = notificationsSnap?.docs?.map(doc => ({ id: doc.id, ...(doc.data() || {}) })) || [];
+  const scans = scansSnap?.docs?.map(doc => ({ id: doc.id, ...(doc.data() || {}) })) || [];
+  const comments = await getWorkspaceAnalyticsComments(db, (role === 'admin' ? news : news.filter(item => workspaceNewsBelongsToProfile(item, profile, role))).map(item => item.id));
+
+  const snapshot = buildWorkspaceAnalyticsSnapshot({
+    profile: { ...profile, name: profileName || profile.name || profile.title || '' },
+    role,
+    range,
+    sources: { news, events, bookings, dialogs, notifications, scans, comments },
+  });
+  const csv = workspaceAnalyticsRowsToCsv(snapshot.exportRows);
+  await audit(db, req, actor, 'workspaceAnalytics:snapshot', role === 'admin' ? 'stats' : role === 'expert' ? 'experts' : 'partners', profile.id, 'success', { role, period: range.period, sourceCounts: snapshot.sourceCounts });
+  return { ok: true, snapshot, csv };
 }
 
 async function actionLokiSettings(db, req, actor) {
@@ -3123,6 +3184,7 @@ async function routeAction(db, req, actor) {
   if (action === 'workspaceNews:submit') return actionWorkspaceNewsSubmit(db, req, actor);
   if (action === 'workspaceNews:archive') return actionWorkspaceNewsArchive(db, req, actor);
   if (action === 'workspaceNews:fromEvent') return actionWorkspaceNewsFromEvent(db, req, actor);
+  if (action === 'workspaceAnalytics:snapshot') return actionWorkspaceAnalyticsSnapshot(db, req, actor);
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);
