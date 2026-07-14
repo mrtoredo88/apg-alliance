@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Workspace News Content Center
+**Коммит:** `pending`
+**Файлы:** `src/workspace/WorkspaceNewsCenter.jsx`, `src/workspace/DesktopWorkspace.jsx`, `server-shared/workspace-news.js`, `server/src/routes/user-actions.js`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Раздел `Новости` в Desktop Workspace стал Контент-центром: KPI, поиск, фильтры, статусы, категории, периоды, режимы карточки/таблица/календарь, список публикаций, предпросмотр и комментарии.
+- Добавлен Workspace-редактор публикаций с PhotoUpload/GalleryUpload, локальным draft, autosave, Cmd/Ctrl+S, beforeunload, планированием, SEO/CTA/ссылками и подсказками Локи.
+- Добавлены серверные `workspaceNews:list/save/submit/archive/fromEvent` с проверкой ownership; AdminPanel остаётся инструментом модерации.
+**Почему:** новости для партнёра/эксперта должны быть рабочим инструментом привлечения клиентов, а не скрытой админской формой.
+
 ## [2026-07-14] feat: Workspace Dialogs CRM
 **Коммит:** `pending`
 **Файлы:** `src/workspace/WorkspaceDialogsCRM.jsx`, `src/workspace/DesktopWorkspace.jsx`, `server-shared/workspace-dialogs.js`, `server/src/routes/user-actions.js`, `scripts/context-dialogs-test.mjs`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`

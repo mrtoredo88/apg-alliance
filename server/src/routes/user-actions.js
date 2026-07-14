@@ -38,6 +38,12 @@ import {
   sanitizeBookingInternalNotes,
 } from '../../../server-shared/workspace-bookings.js';
 import { sanitizeDialogWorkspaceNotes } from '../../../server-shared/workspace-dialogs.js';
+import {
+  buildWorkspaceNewsFromEvent,
+  sanitizeWorkspaceNewsPatch,
+  workspaceNewsBelongsToProfile,
+} from '../../../server-shared/workspace-news.js';
+import { buildLifecyclePatch, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import {
   buildWorkspaceEventBase,
@@ -1418,6 +1424,136 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   await ref.set(patch, { merge: true });
   await audit(db, req, actor, `${type}:profileUpdate`, collection, id, 'success', { fields: Object.keys(patch) });
   return { ok: true, patch: req.body?.patch || {} };
+}
+
+function workspaceNewsProfilePayload(profile = {}, role = 'partner') {
+  return {
+    ownerProfileType: role === 'expert' ? 'expert' : 'partner',
+    ownerProfileId: safeString(profile.id, 180),
+    profileId: safeString(profile.id, 180),
+    submittedProfileId: safeString(profile.id, 180),
+    sourceName: safeString(profile.name || profile.title || profile.displayName || 'Workspace', 220),
+    author: safeString(profile.name || profile.title || profile.displayName || 'АПГ', 220),
+    ...(role === 'expert' ? { expertId: safeString(profile.id, 180), authorExpertId: safeString(profile.id, 180) } : { partnerId: safeString(profile.id, 180), authorPartnerId: safeString(profile.id, 180) }),
+  };
+}
+
+async function actionWorkspaceNewsList(db, req, actor) {
+  const role = safeString(req.body?.role, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const profile = await assertOwnedProfile(db, actor, role, profileId);
+  const adminAccess = hasRole(actor.user || {}, ROLES.admin) || hasRole(actor.user || {}, ROLES.owner);
+  const snap = await db.collection('news').orderBy('updatedAt', 'desc').limit(500).get();
+  const rows = snap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(item => adminAccess || workspaceNewsBelongsToProfile(item, profile, role));
+  await audit(db, req, actor, 'workspaceNews:list', 'news', profileId, 'success', { role, count: rows.length });
+  return { ok: true, news: rows, profile: { id: profile.id, name: profile.name || profile.title || '' } };
+}
+
+async function assertWorkspaceNewsAccess(db, req, actor) {
+  const id = safeString(req.body?.id || req.body?.newsId, 220);
+  if (!id) throw Object.assign(new Error('Не указана новость.'), { statusCode: 400, code: 'NEWS_BAD_ID' });
+  const ref = db.collection('news').doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Новость не найдена.'), { statusCode: 404, code: 'NEWS_NOT_FOUND' });
+  const news = { id: snap.id, ...(snap.data() || {}) };
+  const role = safeString(req.body?.role || news.ownerProfileType, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId || news.ownerProfileId || news.profileId || news.partnerId || news.expertId, 180);
+  const profile = await assertOwnedProfile(db, actor, role, profileId);
+  const adminAccess = hasRole(actor.user || {}, ROLES.admin) || hasRole(actor.user || {}, ROLES.owner);
+  if (!adminAccess && !workspaceNewsBelongsToProfile(news, profile, role)) {
+    throw Object.assign(new Error('Нет доступа к этой новости.'), { statusCode: 403, code: 'NEWS_FORBIDDEN' });
+  }
+  return { ref, news, role, profile };
+}
+
+async function actionWorkspaceNewsSave(db, req, actor) {
+  const role = safeString(req.body?.role, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const patch = sanitizeWorkspaceNewsPatch(req.body?.patch || {});
+  if (!patch.title && !patch.text && !patch.fullText) {
+    throw Object.assign(new Error('Для публикации нужен хотя бы заголовок или текст.'), { statusCode: 400, code: 'NEWS_EMPTY' });
+  }
+  const id = safeString(req.body?.id || req.body?.newsId, 220);
+  if (!id) {
+    const profile = await assertOwnedProfile(db, actor, role, profileId);
+    const data = {
+      ...workspaceNewsProfilePayload(profile, role),
+      ...patch,
+      status: patch.status || 'draft',
+      active: patch.active === true,
+      commentsEnabled: patch.commentsEnabled !== false,
+      source: patch.source || 'workspace',
+      createdByUserId: actor.userId,
+      updatedByUserId: actor.userId,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    const ref = await db.collection('news').add(data);
+    await audit(db, req, actor, 'workspaceNews:create', 'news', ref.id, 'success', { role, profileId: profile.id });
+    return { ok: true, id: ref.id, news: { ...data, id: ref.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
+  }
+  const { ref, news, profile } = await assertWorkspaceNewsAccess(db, req, actor);
+  const currentStatus = normalizeContentStatus(news);
+  const lifecyclePatch = currentStatus === 'published' && req.body?.submit !== true
+    ? buildLifecyclePatch({ item: news, resource: 'news', nextStatus: 'moderation', actorId: actor.userId, reason: 'Редактирование опубликованной новости из Workspace' })
+    : {};
+  const data = {
+    ...patch,
+    ...lifecyclePatch,
+    updatedByUserId: actor.userId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(data, { merge: true });
+  await audit(db, req, actor, 'workspaceNews:update', 'news', ref.id, 'success', { fields: Object.keys(patch), profileId: profile.id });
+  return { ok: true, id: ref.id, patch: { ...patch, lifecycleStatus: lifecyclePatch.lifecycleStatus || news.lifecycleStatus || '', contentStatus: lifecyclePatch.contentStatus || news.contentStatus || '' }, news: { ...news, ...patch, id: ref.id, lifecycleStatus: lifecyclePatch.lifecycleStatus || news.lifecycleStatus || '', contentStatus: lifecyclePatch.contentStatus || news.contentStatus || '', status: lifecyclePatch.contentStatus || patch.status || news.status, updatedAt: new Date().toISOString() } };
+}
+
+async function actionWorkspaceNewsSubmit(db, req, actor) {
+  const { ref, news, profile } = await assertWorkspaceNewsAccess(db, req, actor);
+  const patch = {
+    ...buildLifecyclePatch({ item: news, resource: 'news', nextStatus: 'moderation', actorId: actor.userId, reason: safeString(req.body?.reason || 'Отправлено на модерацию из Workspace', 500) }),
+    submittedAt: FieldValue.serverTimestamp(),
+    submittedByUserId: actor.userId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspaceNews:submit', 'news', ref.id, 'success', { profileId: profile.id });
+  return { ok: true, id: ref.id, patch: { status: 'moderation', lifecycleStatus: 'moderation', contentStatus: 'moderation', active: false }, news: { ...news, id: ref.id, status: 'moderation', lifecycleStatus: 'moderation', contentStatus: 'moderation', active: false, updatedAt: new Date().toISOString() } };
+}
+
+async function actionWorkspaceNewsArchive(db, req, actor) {
+  const { ref, news, profile } = await assertWorkspaceNewsAccess(db, req, actor);
+  const patch = {
+    ...buildLifecyclePatch({ item: news, resource: 'news', nextStatus: 'archived', actorId: actor.userId, reason: safeString(req.body?.reason || 'Архив из Workspace', 500) }),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspaceNews:archive', 'news', ref.id, 'success', { profileId: profile.id });
+  return { ok: true, id: ref.id, patch: { status: 'archived', lifecycleStatus: 'archived', contentStatus: 'archived', active: false, archived: true }, news: { ...news, id: ref.id, status: 'archived', lifecycleStatus: 'archived', contentStatus: 'archived', active: false, archived: true, updatedAt: new Date().toISOString() } };
+}
+
+async function actionWorkspaceNewsFromEvent(db, req, actor) {
+  const role = safeString(req.body?.role, 40) === 'expert' ? 'expert' : 'partner';
+  const profileId = safeString(req.body?.profileId, 180);
+  const eventId = safeString(req.body?.eventId, 220);
+  if (!eventId) throw Object.assign(new Error('Не указано мероприятие.'), { statusCode: 400, code: 'EVENT_BAD_ID' });
+  const profile = await assertOwnedProfile(db, actor, role, profileId);
+  const eventSnap = await db.collection('events').doc(eventId).get();
+  if (!eventSnap.exists) throw Object.assign(new Error('Мероприятие не найдено.'), { statusCode: 404, code: 'EVENT_NOT_FOUND' });
+  const event = { id: eventSnap.id, ...(eventSnap.data() || {}) };
+  const draft = {
+    ...workspaceNewsProfilePayload(profile, role),
+    ...buildWorkspaceNewsFromEvent(event, profile, role),
+    createdByUserId: actor.userId,
+    updatedByUserId: actor.userId,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  const ref = await db.collection('news').add(draft);
+  await audit(db, req, actor, 'workspaceNews:fromEvent', 'news', ref.id, 'success', { eventId, profileId: profile.id });
+  return { ok: true, id: ref.id, news: { ...draft, id: ref.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
 }
 
 async function actionLokiSettings(db, req, actor) {
@@ -2982,6 +3118,11 @@ async function routeAction(db, req, actor) {
   if (action === 'workspace:eventArchive') return actionWorkspaceEventLifecycle(db, req, actor, 'archive');
   if (action === 'workspace:eventDelete') return actionWorkspaceEventLifecycle(db, req, actor, 'delete');
   if (action === 'workspace:eventDuplicate') return actionWorkspaceEventDuplicate(db, req, actor);
+  if (action === 'workspaceNews:list') return actionWorkspaceNewsList(db, req, actor);
+  if (action === 'workspaceNews:save') return actionWorkspaceNewsSave(db, req, actor);
+  if (action === 'workspaceNews:submit') return actionWorkspaceNewsSubmit(db, req, actor);
+  if (action === 'workspaceNews:archive') return actionWorkspaceNewsArchive(db, req, actor);
+  if (action === 'workspaceNews:fromEvent') return actionWorkspaceNewsFromEvent(db, req, actor);
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);

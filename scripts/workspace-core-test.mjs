@@ -22,6 +22,15 @@ import {
   workspaceEventStatus,
   workspaceEventStatusLabel,
 } from '../server-shared/workspace-events.js';
+import {
+  buildWorkspaceNewsFromEvent,
+  buildWorkspaceNewsKpis,
+  filterWorkspaceNews,
+  sanitizeWorkspaceNewsPatch,
+  workspaceNewsBelongsToProfile,
+  workspaceNewsStatus,
+  workspaceNewsStatusLabel,
+} from '../server-shared/workspace-news.js';
 
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.mobile), WORKSPACE_MODES.mobile);
 assert.equal(getWorkspaceMode(WORKSPACE_BREAKPOINTS.tablet), WORKSPACE_MODES.tablet);
@@ -76,6 +85,7 @@ assert.ok(desktopWorkspaceSource.includes('<DigitalShowcaseBuilder'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceEventsManager'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceMeetingsCRM'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceDialogsCRM'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspaceNewsCenter'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
 const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };
@@ -104,6 +114,32 @@ assert.equal(duplicate.registeredCount, 0);
 assert.equal(duplicate.views, 0);
 assert.equal(duplicate.startAt, '');
 assert.equal(Object.hasOwn(duplicate, 'id'), false);
+
+const workspaceNews = [
+  { id: 'n1', partnerId: 'partner-1', title: 'Акция Coffee House', text: 'Скидка на кофе', status: 'draft', active: false, stats: { views: 4, comments: 1, clicks: 2, likes: 3 }, category: 'offers', updatedAt: '2026-07-14T10:00:00.000Z' },
+  { id: 'n2', partnerId: 'partner-1', title: 'Опубликовано', status: 'published', active: true, stats: { views: 10 }, category: 'partners', publishedAt: '2026-07-13T10:00:00.000Z' },
+  { id: 'n3', expertId: 'expert-1', title: 'Экспертная заметка', lifecycleStatus: 'moderation', text: 'Советы', category: 'experts' },
+  { id: 'n4', partnerId: 'partner-2', title: 'Чужая новость', status: 'published', active: true },
+];
+assert.equal(workspaceNewsBelongsToProfile(workspaceNews[0], partnerProfile, 'partner'), true);
+assert.equal(workspaceNewsBelongsToProfile(workspaceNews[3], partnerProfile, 'partner'), false);
+assert.equal(workspaceNewsBelongsToProfile(workspaceNews[2], expertProfile, 'expert'), true);
+assert.equal(workspaceNewsStatus(workspaceNews[2]), 'moderation');
+assert.equal(workspaceNewsStatusLabel(workspaceNews[0]), 'Черновик');
+const newsKpis = buildWorkspaceNewsKpis(workspaceNews.filter(item => workspaceNewsBelongsToProfile(item, partnerProfile, 'partner')));
+assert.equal(newsKpis.total, 2);
+assert.equal(newsKpis.draft, 1);
+assert.equal(newsKpis.published, 1);
+assert.equal(newsKpis.views, 14);
+assert.equal(newsKpis.comments, 1);
+assert.equal(newsKpis.clicks, 2);
+assert.deepEqual(filterWorkspaceNews(workspaceNews, { status: 'draft' }).map(item => item.id), ['n1']);
+assert.deepEqual(filterWorkspaceNews(workspaceNews, { category: 'offers', query: 'кофе' }).map(item => item.id), ['n1']);
+assert.deepEqual(sanitizeWorkspaceNewsPatch({ title: ' Тест ', unknown: 'x', tags: ['a'], priority: 101 }), { title: 'Тест', tags: ['a'], priority: 99 });
+const newsFromEvent = buildWorkspaceNewsFromEvent(workspaceEvents[0], partnerProfile, 'partner');
+assert.equal(newsFromEvent.partnerId, 'partner-1');
+assert.equal(newsFromEvent.eventId, 'own-draft');
+assert.equal(newsFromEvent.category, 'events');
 
 const cache = createWorkspaceCache({ ttl: 1000, max: 1 });
 cache.set('a', 1);

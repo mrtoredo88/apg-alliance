@@ -48,13 +48,15 @@ assert.equal(profile.services[0].title, 'Бранч');
 assert.equal(profile.services[0].price, '1200 ₽');
 assert.equal(profile.specialists.length, 1);
 
-const dates = getUpcomingBookingDates(4, new Date('2026-07-13T10:00:00+03:00'));
+const bookingTestNow = new Date(Date.now() + 7 * 86400000);
+bookingTestNow.setHours(10, 0, 0, 0);
+const dates = getUpcomingBookingDates(4, bookingTestNow);
 assert.ok(dates.length > 0);
-assert.equal(formatBookingDateKey(dates[0]), '2026-07-13');
+assert.equal(formatBookingDateKey(dates[0]), formatBookingDateKey(bookingTestNow));
 
 const slots = buildBookingSlots({ date: dates[1], service: profile.services[0], specialist: profile.specialists[0], profile: partner });
 assert.ok(slots.length > 0);
-assert.match(slots[0].startAt, /^2026-07-/);
+assert.ok(slots[0].startAt.startsWith(formatBookingDateKey(dates[1])));
 assert.equal(slots[0].durationMinutes, 60);
 
 const context = buildBookingDialogContext({
