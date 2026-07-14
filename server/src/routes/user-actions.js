@@ -33,6 +33,10 @@ import {
   normalizeBookingStatus,
   rangesOverlap,
 } from '../../../server-shared/booking.js';
+import {
+  buildBookingChangeEntry,
+  sanitizeBookingInternalNotes,
+} from '../../../server-shared/workspace-bookings.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import {
   buildWorkspaceEventBase,
@@ -1590,6 +1594,112 @@ async function actionBookingCreate(db, req, actor) {
   return { ok: true, booking, dialogId };
 }
 
+async function actionBookingManualCreate(db, req, actor) {
+  const providerType = safeString(req.body?.providerType, 40) === 'expert' ? 'expert' : 'partner';
+  const providerId = safeString(req.body?.providerId, 160);
+  if (!providerId) throw Object.assign(new Error('Не указан профиль для встречи.'), { statusCode: 400, code: 'BOOKING_BAD_PROVIDER' });
+  const providerCollection = providerType === 'expert' ? 'experts' : 'partners';
+  const providerSnap = await db.collection(providerCollection).doc(providerId).get();
+  if (!providerSnap.exists) throw Object.assign(new Error('Профиль для встречи не найден.'), { statusCode: 404, code: 'BOOKING_PROVIDER_NOT_FOUND' });
+  const provider = { id: providerSnap.id, ...(providerSnap.data() || {}) };
+  if (!actorOwnsProfile(provider, actor) && !hasRole(actor.user || {}, ROLES.owner) && !hasRole(actor.user || {}, ROLES.admin)) {
+    throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+  }
+  const bookingProfile = buildBookingProfile(provider, providerType);
+  const serviceId = safeString(req.body?.serviceId, 80);
+  const service = bookingProfile.services.find(item => item.id === serviceId) || bookingProfile.services[0];
+  if (!service) throw Object.assign(new Error('Не выбрана услуга.'), { statusCode: 400, code: 'BOOKING_BAD_SERVICE' });
+  const specialistId = safeString(req.body?.specialistId || 'default', 80);
+  const specialist = bookingProfile.specialists.find(item => item.id === specialistId) || bookingProfile.specialists[0];
+  const slot = normalizeSlotFromBody(req.body, { specialistId: specialist?.id || 'default', specialistName: specialist?.name || bookingProfile.title });
+  if (!slot) throw Object.assign(new Error('Выберите корректное время встречи.'), { statusCode: 400, code: 'BOOKING_BAD_SLOT' });
+  const ownerUserIds = uniqueSafeIds([provider.ownerUserIds, provider.ownerIds, provider.ownerId, provider.ownerUserId, provider.userId, provider.managerUserId, provider.createdByUserId, actor.userId].flat());
+  const customer = req.body?.customer && typeof req.body.customer === 'object' ? req.body.customer : {};
+  const userId = safeUserId(customer.userId || req.body?.userId) || `manual:${providerType}:${providerId}:${Date.now()}`;
+  const bookingRef = db.collection('bookings').doc(`manual_${providerType}_${providerId}_${slot.specialistId || specialist?.id || 'default'}_${new Date(slot.startAt).getTime()}`.replace(/[^a-zA-Z0-9а-яА-ЯёЁ:_-]+/g, '_').slice(0, 420));
+  const dialogId = userId.startsWith('manual:') ? '' : buildContextDialogId(userId, 'booking', bookingRef.id);
+  let booking = null;
+  await db.runTransaction(async tx => {
+    const existing = await tx.get(bookingRef);
+    if (existing.exists && ![BOOKING_STATUSES.cancelled, BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider, BOOKING_STATUSES.noShow, BOOKING_STATUSES.archived].includes(normalizeBookingStatus(existing.data()?.status))) {
+      throw Object.assign(new Error('Это время уже занято. Выберите другое окно.'), { statusCode: 409, code: 'BOOKING_SLOT_TAKEN' });
+    }
+    await assertBookingSlotFree(tx, db, { providerType, providerId, specialistId: specialist?.id || 'default' }, slot, bookingRef.id);
+    booking = {
+      id: bookingRef.id,
+      bookingId: bookingRef.id,
+      dialogId,
+      providerType,
+      providerId,
+      providerName: bookingProfile.title,
+      providerPhone: bookingProfile.phone || null,
+      address: bookingProfile.address || null,
+      serviceId: service.id,
+      serviceTitle: service.title,
+      serviceDescription: service.description || null,
+      durationMinutes: Number(service.durationMinutes || 60),
+      price: service.price || null,
+      specialistId: slot.specialistId || specialist?.id || 'default',
+      specialistName: slot.specialistName || specialist?.name || bookingProfile.title,
+      userId,
+      userName: safeString(customer.name || customer.userName || req.body?.userName || 'Клиент', 200),
+      userPhone: safeString(customer.phone || req.body?.userPhone, 80),
+      userTelegram: normalizeProfileUrl(customer.telegram || customer.telegramUrl || '', 'telegram'),
+      userWhatsapp: normalizeProfileUrl(customer.whatsapp || customer.whatsappUrl || '', 'whatsapp'),
+      userEmail: safeString(customer.email || req.body?.userEmail, 200),
+      userPhoto: safeString(customer.photo || '', 1000) || null,
+      ownerUserIds,
+      status: BOOKING_STATUSES.confirmed,
+      statusLabel: getBookingStatusLabel(BOOKING_STATUSES.confirmed),
+      statusHistory: [buildBookingHistoryEntry({ fromStatus: '', toStatus: BOOKING_STATUSES.confirmed, actorId: actor.userId, actorRole: 'provider', reason: 'Создано вручную в Workspace' })],
+      workspaceHistory: [buildBookingChangeEntry({ type: 'manual_create', actorId: actor.userId, actorRole: 'provider', text: 'Встреча создана вручную' })],
+      dateKey: slot.dateKey,
+      dateLabel: slot.dateLabel,
+      time: slot.time,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      reminders: buildBookingReminders(slot.startAt),
+      comment: safeString(req.body?.comment, 800),
+      internalNotes: sanitizeBookingInternalNotes(req.body?.internalNotes),
+      source: safeString(req.body?.source || 'manual', 80),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    tx.set(bookingRef, booking, { merge: true });
+    if (!userId.startsWith('manual:')) tx.set(db.collection('users').doc(userId).collection('bookings').doc(bookingRef.id), booking, { merge: true });
+    ownerUserIds.forEach(ownerId => {
+      tx.set(db.collection('users').doc(ownerId).collection('bookings').doc(bookingRef.id), { ...booking, ownerView: true }, { merge: true });
+    });
+  });
+  if (dialogId) {
+    const context = buildBookingDialogContext(booking);
+    const participantIds = uniqueSafeIds([userId, ...ownerUserIds]);
+    const dialog = {
+      id: dialogId,
+      type: 'booking',
+      objectId: booking.id,
+      userId,
+      context,
+      participantIds,
+      ownerUserIds,
+      unreadBy: {},
+      typing: {},
+      lastMessage: { id: `booking_manual_${booking.id}`, text: `Встреча создана: ${booking.serviceTitle}, ${booking.dateLabel} ${booking.time}`, senderId: 'system', senderName: 'АПГ', senderRole: 'system', createdAt: FieldValue.serverTimestamp() },
+      lastMessageAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    const batch = db.batch();
+    batch.set(db.collection('contextDialogs').doc(dialogId), dialog, { merge: true });
+    participantIds.forEach(participantId => {
+      batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialogId), dialogMirrorPayload(dialog, participantId), { merge: true });
+    });
+    await batch.commit();
+  }
+  await audit(db, req, actor, 'booking:manualCreate', 'bookings', booking.id, 'success', { providerType, providerId, source: booking.source, dialogId });
+  return { ok: true, booking, dialogId };
+}
+
 function bookingActorRole(booking = {}, actor = {}) {
   if (String(booking.userId || '') === String(actor.userId || '')) return 'user';
   if (uniqueSafeIds(booking.ownerUserIds || []).includes(actor.userId) || hasRole(actor.user || {}, ROLES.owner) || hasRole(actor.user || {}, ROLES.admin)) return 'provider';
@@ -2056,6 +2166,86 @@ async function actionBookingLifecycle(db, req, actor, kind) {
   await Promise.all(bookingRecipientIds(booking, actor).map(userId => writeBookingNotification(db, booking, userId, `📅 ${booking.providerName || 'Встреча АПГ'}`, notificationText, notificationType).catch(() => {})));
   await audit(db, req, actor, `booking:${kind}`, 'bookings', booking.id, 'success', { fromStatus: before.status, toStatus: booking.status, dialogId: booking.dialogId || '' });
   return { ok: true, booking, dialogId: booking.dialogId || '' };
+}
+
+async function actionBookingWorkspaceUpdate(db, req, actor) {
+  const bookingId = safeString(req.body?.bookingId || req.body?.id, 260);
+  if (!bookingId) throw Object.assign(new Error('Не указана встреча.'), { statusCode: 400, code: 'BOOKING_BAD_ID' });
+  const ref = db.collection('bookings').doc(bookingId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Встреча не найдена.'), { statusCode: 404, code: 'BOOKING_NOT_FOUND' });
+  const before = normalizeBooking({ id: snap.id, ...(snap.data() || {}) });
+  const role = await assertBookingAccess(db, before, actor, 'provider');
+  if (role !== 'provider') throw Object.assign(new Error('Изменять CRM-поля может только владелец встречи.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+  const patch = req.body?.patch && typeof req.body.patch === 'object' ? req.body.patch : {};
+  const clean = {};
+  if (Object.hasOwn(patch, 'internalNotes')) clean.internalNotes = sanitizeBookingInternalNotes(patch.internalNotes);
+  if (Object.hasOwn(patch, 'workspaceComment')) clean.workspaceComment = safeString(patch.workspaceComment, 1200);
+  if (Object.hasOwn(patch, 'clientTags')) clean.clientTags = Array.isArray(patch.clientTags) ? patch.clientTags.map(item => safeString(item, 80)).filter(Boolean).slice(0, 12) : [];
+  if (Object.hasOwn(patch, 'source')) clean.source = safeString(patch.source, 80);
+  if (!Object.keys(clean).length) return { ok: true, booking: before };
+  const history = Array.isArray(before.workspaceHistory) ? before.workspaceHistory.slice(-49) : [];
+  const entry = buildBookingChangeEntry({ type: Object.hasOwn(clean, 'internalNotes') ? 'note' : 'workspace_update', actorId: actor.userId, actorRole: 'provider', text: Object.hasOwn(clean, 'internalNotes') ? 'Внутренние заметки обновлены' : 'CRM-поля обновлены', changes: Object.keys(clean).reduce((acc, key) => ({ ...acc, [key]: true }), {}) });
+  const booking = normalizeBooking({
+    ...before,
+    ...clean,
+    workspaceHistory: [...history, entry],
+    workspaceUpdatedAt: new Date().toISOString(),
+  });
+  await ref.set({
+    ...clean,
+    workspaceHistory: booking.workspaceHistory,
+    workspaceUpdatedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await persistBookingMirrors(db, booking);
+  await audit(db, req, actor, 'booking:workspaceUpdate', 'bookings', booking.id, 'success', { fields: Object.keys(clean) });
+  return { ok: true, booking };
+}
+
+async function actionBookingArchive(db, req, actor) {
+  const bookingId = safeString(req.body?.bookingId || req.body?.id, 260);
+  if (!bookingId) throw Object.assign(new Error('Не указана встреча.'), { statusCode: 400, code: 'BOOKING_BAD_ID' });
+  const ref = db.collection('bookings').doc(bookingId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error('Встреча не найдена.'), { statusCode: 404, code: 'BOOKING_NOT_FOUND' });
+  const before = normalizeBooking({ id: snap.id, ...(snap.data() || {}) });
+  const role = await assertBookingAccess(db, before, actor, 'provider');
+  if (role !== 'provider') throw Object.assign(new Error('Архивировать встречу может только владелец.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+  const historyEntry = buildBookingHistoryEntry({
+    fromStatus: before.status,
+    toStatus: BOOKING_STATUSES.archived,
+    actorId: actor.userId,
+    actorRole: 'provider',
+    reason: safeString(req.body?.reason || 'Архивировано в Workspace', 800),
+  });
+  const workspaceEntry = buildBookingChangeEntry({ type: 'archive', actorId: actor.userId, actorRole: 'provider', text: 'Встреча отправлена в архив' });
+  const booking = normalizeBooking({
+    ...before,
+    status: BOOKING_STATUSES.archived,
+    statusLabel: getBookingStatusLabel(BOOKING_STATUSES.archived),
+    archived: true,
+    workspaceArchived: true,
+    archivedAt: new Date().toISOString(),
+    archivedBy: actor.userId,
+    statusHistory: [...(Array.isArray(before.statusHistory) ? before.statusHistory : []), historyEntry],
+    workspaceHistory: [...(Array.isArray(before.workspaceHistory) ? before.workspaceHistory.slice(-49) : []), workspaceEntry],
+  });
+  await ref.set({
+    status: BOOKING_STATUSES.archived,
+    statusLabel: getBookingStatusLabel(BOOKING_STATUSES.archived),
+    archived: true,
+    workspaceArchived: true,
+    archivedAt: FieldValue.serverTimestamp(),
+    archivedBy: actor.userId,
+    statusHistory: booking.statusHistory,
+    workspaceHistory: booking.workspaceHistory,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await persistBookingMirrors(db, booking);
+  await appendBookingSystemEvent(db, booking, 'Встреча архивирована владельцем.', actor);
+  await audit(db, req, actor, 'booking:archive', 'bookings', booking.id, 'success', { fromStatus: before.status });
+  return { ok: true, booking };
 }
 
 async function actionBookingList(db, req, actor, calendar = false) {
@@ -2757,12 +2947,15 @@ async function routeAction(db, req, actor) {
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');
   if (action === 'expert:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'expert');
   if (action === 'booking:create') return actionBookingCreate(db, req, actor);
+  if (action === 'booking:manualCreate') return actionBookingManualCreate(db, req, actor);
   if (action === 'booking:confirm') return actionBookingLifecycle(db, req, actor, 'confirm');
   if (action === 'booking:cancel') return actionBookingLifecycle(db, req, actor, 'cancel');
   if (action === 'booking:requestReschedule') return actionBookingLifecycle(db, req, actor, 'requestReschedule');
   if (action === 'booking:respondReschedule') return actionBookingLifecycle(db, req, actor, 'respondReschedule');
   if (action === 'booking:complete') return actionBookingLifecycle(db, req, actor, 'complete');
   if (action === 'booking:noShow') return actionBookingLifecycle(db, req, actor, 'noShow');
+  if (action === 'booking:workspaceUpdate') return actionBookingWorkspaceUpdate(db, req, actor);
+  if (action === 'booking:archive') return actionBookingArchive(db, req, actor);
   if (action === 'booking:list') return actionBookingList(db, req, actor, false);
   if (action === 'booking:calendar') return actionBookingList(db, req, actor, true);
   if (action === 'booking:moment') return actionBookingMoment(db, req, actor);

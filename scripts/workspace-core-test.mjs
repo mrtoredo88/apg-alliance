@@ -74,6 +74,7 @@ assert.deepEqual(desktopWorkspaceNavIds.slice(0, 5), ['dashboard', 'profile', 'e
 assert.ok(desktopWorkspaceSource.includes("if (activeSection === 'profile')"));
 assert.ok(desktopWorkspaceSource.includes('<DigitalShowcaseBuilder'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceEventsManager'));
+assert.ok(desktopWorkspaceSource.includes('<WorkspaceMeetingsCRM'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
 const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };

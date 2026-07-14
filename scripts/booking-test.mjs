@@ -18,6 +18,16 @@ import {
   normalizeBookingJourney,
   rangesOverlap,
 } from '../server-shared/booking.js';
+import {
+  buildBookingChangeEntry,
+  buildFreeTimeSlots,
+  buildWorkspaceBookingKpis,
+  buildWorkspaceBookingSearchText,
+  filterWorkspaceBookings,
+  findBookingConflicts,
+  getBookingSourceLabel,
+  sanitizeBookingInternalNotes,
+} from '../server-shared/workspace-bookings.js';
 
 const partner = {
   id: 'coffee-time',
@@ -111,6 +121,7 @@ assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.pending, BOOKING_STATUS
 assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.completed, BOOKING_STATUSES.confirmed), false);
 assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.confirmed, BOOKING_STATUSES.cancelledByProvider), true);
 assert.equal(canTransitionBookingStatus(BOOKING_STATUSES.rescheduleRequested, BOOKING_STATUSES.rescheduled), true);
+assert.equal(normalizeBooking({ id: 'arch', status: BOOKING_STATUSES.archived, archived: true }).status, BOOKING_STATUSES.archived);
 
 const history = buildBookingHistoryEntry({
   fromStatus: BOOKING_STATUSES.pending,
@@ -140,5 +151,29 @@ const grouped = groupBookingsForProfile([
 assert.equal(grouped.pending.length, 1);
 assert.equal(grouped.actionRequired.length, 1);
 assert.equal(grouped.cancelled.length, 1);
+
+const crmBookings = [
+  { id: 'today', status: BOOKING_STATUSES.confirmed, userName: 'Иван Петров', userPhone: '+79990000000', userTelegram: '@ivan', serviceTitle: 'Стрижка', source: 'manual', startAt: '2026-07-14T10:00:00+03:00', endAt: '2026-07-14T11:00:00+03:00' },
+  { id: 'pending', status: BOOKING_STATUSES.pending, userName: 'Мария', serviceTitle: 'Маникюр', source: 'event', startAt: '2026-07-15T10:00:00+03:00', endAt: '2026-07-15T11:00:00+03:00' },
+  { id: 'archived', status: BOOKING_STATUSES.archived, archived: true, userName: 'Старый клиент', startAt: '2026-07-12T10:00:00+03:00', endAt: '2026-07-12T11:00:00+03:00' },
+];
+const crmKpis = buildWorkspaceBookingKpis(crmBookings, new Date('2026-07-14T08:00:00+03:00'));
+assert.equal(crmKpis.today, 1);
+assert.equal(crmKpis.tomorrow, 1);
+assert.equal(crmKpis.pending, 1);
+assert.equal(getBookingSourceLabel(crmBookings[0]), 'Ручное создание');
+assert.equal(getBookingSourceLabel(crmBookings[1]), 'Мероприятие');
+assert.equal(filterWorkspaceBookings(crmBookings).map(item => item.id).includes('archived'), false);
+assert.equal(filterWorkspaceBookings(crmBookings, { includeArchived: true }).map(item => item.id).includes('archived'), true);
+assert.ok(buildWorkspaceBookingSearchText(crmBookings[0]).includes('иван'));
+assert.equal(sanitizeBookingInternalNotes('a'.repeat(4000)).length, 3000);
+const change = buildBookingChangeEntry({ type: 'note', actorId: 'owner-1', actorRole: 'provider', text: 'Заметка' });
+assert.equal(change.type, 'note');
+assert.equal(change.actorRole, 'provider');
+const conflicts = findBookingConflicts(crmBookings, { providerType: '', providerId: '', specialistId: 'default', startAt: '2026-07-14T10:30:00+03:00', endAt: '2026-07-14T11:30:00+03:00' });
+assert.equal(conflicts.length, 1);
+const freeSlots = buildFreeTimeSlots({ bookings: crmBookings, date: new Date('2026-07-14T08:00:00+03:00'), slotTimes: ['10:00', '11:30'], durationMinutes: 60 });
+assert.equal(freeSlots[0].occupied, true);
+assert.equal(freeSlots[1].occupied, false);
 
 console.log('Booking/Meetings V1.1 contract test passed');

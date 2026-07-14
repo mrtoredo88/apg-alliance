@@ -12,6 +12,7 @@ import { CAPABILITIES, hasCapability } from '../roleEngine.js';
 import { motionTransition } from '../motion.js';
 import { userAction } from '../userApi.js';
 import { WorkspaceEventsManager } from './WorkspaceEventsManager.jsx';
+import { WorkspaceMeetingsCRM } from './WorkspaceMeetingsCRM.jsx';
 import {
   BOOKING_STATUSES,
   buildBookingCalendar,
@@ -1570,7 +1571,7 @@ export function DesktopWorkspace({
       </div>
     );
     if (activeSection === 'events') return <WorkspaceEventsManager role={activeRole} profile={activeProfile} roleViews={availableWorkspaceViews} activeViewId={workspaceView.id} onRoleChange={setActiveWorkspaceViewId} events={events} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventChanged} onToast={onToast} />;
-    if (activeSection === 'booking') return <WorkspaceMeetings role={activeRole} profile={activeProfile} actions={actions} onOpenDialog={onOpenDialog} />;
+    if (activeSection === 'booking') return <WorkspaceMeetingsCRM role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenDialog={onOpenDialog} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'offers') return (
       <div style={{ display: 'grid', gap: 14 }}>
         <WorkspaceCenter center={buildCenterConfig({ id: 'offers', data: workspaceData, actions, intelligence: workspaceIntelligence, businessHubAvailable, isAdminRole, onOpenAdmin, onOpenPanel, onOpenScan })} data={workspaceData} actions={actions} intelligence={workspaceIntelligence} />

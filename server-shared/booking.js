@@ -9,6 +9,7 @@ export const BOOKING_STATUSES = {
   cancelledByProvider: 'cancelled_by_provider',
   completed: 'completed',
   noShow: 'no_show',
+  archived: 'archived',
 };
 
 export const BOOKING_STATUS_LABELS = {
@@ -22,6 +23,7 @@ export const BOOKING_STATUS_LABELS = {
   [BOOKING_STATUSES.cancelledByProvider]: 'Отменена партнером',
   [BOOKING_STATUSES.completed]: 'Завершена',
   [BOOKING_STATUSES.noShow]: 'Не пришел',
+  [BOOKING_STATUSES.archived]: 'Архив',
 };
 
 export const BOOKING_STATUS_TONES = {
@@ -35,6 +37,7 @@ export const BOOKING_STATUS_TONES = {
   [BOOKING_STATUSES.cancelledByProvider]: 'cancelled',
   [BOOKING_STATUSES.completed]: 'completed',
   [BOOKING_STATUSES.noShow]: 'cancelled',
+  [BOOKING_STATUSES.archived]: 'completed',
 };
 
 export const BOOKING_TRANSITIONS = Object.freeze({
@@ -77,6 +80,7 @@ export const BOOKING_TRANSITIONS = Object.freeze({
   [BOOKING_STATUSES.cancelledByProvider]: [],
   [BOOKING_STATUSES.completed]: [],
   [BOOKING_STATUSES.noShow]: [],
+  [BOOKING_STATUSES.archived]: [],
 });
 
 export const BOOKING_BLOCKING_STATUSES = [
@@ -101,6 +105,7 @@ export const BOOKING_HISTORY_STATUSES = [
   BOOKING_STATUSES.cancelledByProvider,
   BOOKING_STATUSES.completed,
   BOOKING_STATUSES.noShow,
+  BOOKING_STATUSES.archived,
 ];
 
 const DEFAULT_SLOT_TIMES = ['10:00', '11:30', '13:00', '15:00', '16:30', '18:00'];
