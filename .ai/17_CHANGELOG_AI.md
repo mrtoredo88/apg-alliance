@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Workspace workday dashboard
+**Коммит:** `pending`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Экран `Рабочий стол` в Desktop Workspace собран в единый `Центр рабочего дня`: компактная сводка, очередь действий, план на сегодня, лента активности, реальные проблемы, мини-аналитика, быстрые действия и совет Локи.
+- Убрано дублирование старых hero/tasks/Loki/quick-actions при наличии `WorkspaceDayPlanner`; прежний dashboard остался только fallback без dayPlan.
+- Быстрые действия ведут в существующие рабочие центры Workspace без новых форм; core-test фиксирует новую структуру и отсутствие старого блока `Что изменилось`.
+**Почему:** Workspace должен сразу показывать партнёру/эксперту рабочий день, приоритеты и действия, а не набор повторяющихся карточек.
+
 ## [2026-07-14] feat: Workspace News Content Center
 **Коммит:** `pending`
 **Файлы:** `src/workspace/WorkspaceNewsCenter.jsx`, `src/workspace/DesktopWorkspace.jsx`, `server-shared/workspace-news.js`, `server/src/routes/user-actions.js`, `scripts/workspace-core-test.mjs`, `.ai/17_CHANGELOG_AI.md`

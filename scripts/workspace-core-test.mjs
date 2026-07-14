@@ -112,6 +112,10 @@ assert.ok(desktopWorkspaceSource.includes('<WorkspaceNewsCenter'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspacePromotionsCenter'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceGiftsCenter'));
 assert.ok(desktopWorkspaceSource.includes('<WorkspaceAnalyticsCenter'));
+assert.ok(desktopWorkspaceSource.includes('Центр рабочего дня'));
+assert.ok(desktopWorkspaceSource.includes('Лента активности'));
+assert.ok(desktopWorkspaceSource.includes('Быстрые действия'));
+assert.ok(!desktopWorkspaceSource.includes('Что изменилось'));
 
 const partnerProfile = { id: 'partner-1', name: 'Coffee House' };
 const expertProfile = { id: 'expert-1', name: 'Анна Эксперт' };

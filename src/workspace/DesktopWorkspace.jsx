@@ -297,7 +297,7 @@ function WorkspaceButton({ children, onClick, style, type = 'button' }) {
 function SectionTitle({ title, action }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 12 }}>
-      <h2 style={{ margin: 0, color: WS.text, fontSize: 22, lineHeight: '27px', fontWeight: 940, letterSpacing: -0.35 }}>{title}</h2>
+      <h2 style={{ margin: 0, color: WS.text, fontSize: 22, lineHeight: '27px', fontWeight: 940, letterSpacing: 0 }}>{title}</h2>
       {action && <div>{action}</div>}
     </div>
   );
@@ -323,7 +323,7 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
             <img src="/logo.png" alt="АПГ" style={{ width: 44, height: 44, borderRadius: 16, objectFit: 'cover', display: 'block', boxShadow: '0 14px 30px rgba(47,28,105,0.18)' }} />
           </picture>
           <div style={{ minWidth: 0 }}>
-            <div style={{ color: WS.text, fontSize: 19, lineHeight: '22px', fontWeight: 950, letterSpacing: -0.35, whiteSpace: 'nowrap' }}>АПГ: ЗЕЛЕНОГРАД</div>
+            <div style={{ color: WS.text, fontSize: 19, lineHeight: '22px', fontWeight: 950, letterSpacing: 0, whiteSpace: 'nowrap' }}>АПГ: ЗЕЛЕНОГРАД</div>
             <div style={{ color: WS.soft, fontSize: 12, lineHeight: '15px', fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.4 }}>Альянс партнёров города</div>
           </div>
         </div>
@@ -449,7 +449,7 @@ function DashboardHero({ data, profileStatus, workspaceView, actions }) {
             <div style={{ color: 'rgba(255,255,255,0.74)', fontSize: 20, lineHeight: '25px', fontWeight: 650 }}>{getDayGreeting()}, {data.userName} 👋</div>
             <div style={{ borderRadius: 17, background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.12)', padding: '9px 13px', color: '#F5D77E', fontSize: 13.5, fontWeight: 850, backdropFilter: 'blur(18px)' }}>♕ {workspaceView.memberLabel}</div>
           </div>
-          <h1 style={{ margin: '13px 0 0', maxWidth: 600, color: '#fff', fontSize: 32, lineHeight: '38px', fontWeight: 950, letterSpacing: -0.72 }}>{workspaceView.heroTitle}</h1>
+          <h1 style={{ margin: '13px 0 0', maxWidth: 600, color: '#fff', fontSize: 32, lineHeight: '38px', fontWeight: 950, letterSpacing: 0 }}>{workspaceView.heroTitle}</h1>
           <button type="button" onClick={actions.openCabinet} style={{ marginTop: 14, border: 0, minHeight: 42, borderRadius: 18, padding: '0 18px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B', fontFamily: 'inherit', fontSize: 14, fontWeight: 900, cursor: 'pointer', boxShadow: '0 14px 30px rgba(201,155,60,0.18)' }}>Продолжить работу</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10, padding: 10, borderRadius: 21, background: 'rgba(10,10,12,0.42)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(26px)' }}>
@@ -569,6 +569,8 @@ function getWorkspaceAction(actions, target) {
     booking: actions.openBooking,
     dialogs: actions.openDialogs,
     offers: actions.openOffers,
+    rewards: actions.openRewards,
+    gifts: actions.openRewards,
     clients: actions.openExperts,
     reviews: actions.openReviews,
     analytics: actions.openAnalytics,
@@ -578,6 +580,153 @@ function getWorkspaceAction(actions, target) {
     loki: actions.openLoki,
   };
   return map[target] || actions.openDashboard;
+}
+
+function isSameCalendarDay(value, base = new Date()) {
+  const date = toDate(value);
+  if (!date) return false;
+  return date.getFullYear() === base.getFullYear() && date.getMonth() === base.getMonth() && date.getDate() === base.getDate();
+}
+
+function formatActivityTime(value) {
+  const date = toDate(value);
+  if (!date) return '';
+  return date.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function priorityRank(priority) {
+  if (priority === 'critical') return 30;
+  if (priority === 'important') return 20;
+  if (priority === 'later') return 10;
+  return 0;
+}
+
+function priorityLabel(priority) {
+  if (priority === 'critical') return 'Критично';
+  if (priority === 'important') return 'Важно';
+  if (priority === 'later') return 'Можно позже';
+  return 'Инфо';
+}
+
+function buildWorkdaySummary({ data = {}, plan = {} }) {
+  const now = new Date();
+  const eventsToday = (data.events || []).filter(item => isSameCalendarDay(item.eventDate || item.date || item.startAt, now)).length;
+  const meetingsToday = (data.bookings || []).filter(item => isSameCalendarDay(item.startAt || item.date, now)).length;
+  return [
+    { id: 'events', label: 'События сегодня', value: eventsToday || plan.summary?.expectedEvents || 0, tone: WS.blue, target: 'events' },
+    { id: 'meetings', label: 'Встречи сегодня', value: meetingsToday, tone: WS.green, target: 'booking' },
+    { id: 'messages', label: 'Новые сообщения', value: data.dialogUnreadCount || 0, tone: (data.dialogUnreadCount || 0) > 0 ? WS.gold : WS.green, target: 'dialogs' },
+    { id: 'tasks', label: 'Задачи в плане', value: (plan.tasks || []).length, tone: plan.summary?.criticalProblems ? WS.red : WS.gold, target: 'dashboard' },
+  ];
+}
+
+function mergeWorkdayQueue(plan = {}) {
+  const rows = [...(plan.tasks || []), ...(plan.attention || [])];
+  const map = new Map();
+  rows.forEach((item, index) => {
+    if (!item?.title) return;
+    const id = item.id || `${item.target || 'item'}-${item.title}`;
+    const current = map.get(id);
+    const normalized = {
+      ...item,
+      id,
+      priority: item.priority || 'later',
+      priorityLabel: item.priorityLabel || priorityLabel(item.priority),
+      priorityIcon: item.priorityIcon || (item.priority === 'critical' ? '!' : item.priority === 'important' ? '•' : '✓'),
+      weight: priorityRank(item.priority) * 100 - index,
+    };
+    if (!current || normalized.weight > current.weight) map.set(id, normalized);
+  });
+  return Array.from(map.values()).sort((a, b) => b.weight - a.weight).slice(0, 7);
+}
+
+function buildDashboardActivityFeed({ data = {}, plan = {} }) {
+  const rows = [];
+  (data.notifications || []).slice(0, 8).forEach(item => {
+    rows.push({
+      id: `notification-${item.id || rows.length}`,
+      title: safeTitle(item, item.title || 'Уведомление'),
+      text: item.text || item.body || item.message || item.type || item.category || 'Новое событие Workspace',
+      time: item.createdAt || item.updatedAt,
+      target: item.category === 'messages' || item.type === 'contextDialogMessage' ? 'dialogs' : 'notifications',
+      priority: item.isRead === false || item.read === false ? 'important' : 'info',
+    });
+  });
+  (plan.changes || []).forEach((item, index) => {
+    const title = typeof item === 'string' ? item : item?.title;
+    if (!title || title === 'Новых критичных изменений нет') return;
+    rows.push({
+      id: `plan-change-${index}`,
+      title,
+      text: typeof item === 'string' ? 'Сигнал из Activity Timeline и Analytics Collector' : item.text,
+      time: item?.createdAt || item?.updatedAt,
+      target: item?.target || 'analytics',
+      priority: item?.priority || 'info',
+    });
+  });
+  (data.news || []).slice(0, 5).forEach(item => {
+    const time = item.publishedAt || item.createdAt || item.updatedAt;
+    if (!time) return;
+    rows.push({
+      id: `news-${item.id || rows.length}`,
+      title: safeTitle(item, 'Новость'),
+      text: 'Публикация в контент-центре',
+      time,
+      target: 'content',
+      priority: 'info',
+    });
+  });
+  (data.events || []).slice(0, 5).forEach(item => {
+    const time = item.eventDate || item.date || item.startAt;
+    if (!time) return;
+    rows.push({
+      id: `event-${item.id || rows.length}`,
+      title: safeTitle(item, 'Мероприятие'),
+      text: isSameCalendarDay(time) ? 'Мероприятие сегодня' : 'Событие в афише',
+      time,
+      target: 'events',
+      priority: isSameCalendarDay(time) ? 'important' : 'info',
+    });
+  });
+  return rows
+    .sort((a, b) => (toDate(b.time)?.getTime() || 0) - (toDate(a.time)?.getTime() || 0))
+    .slice(0, 6);
+}
+
+function buildTodayPlanRows({ data = {}, plan = {} }) {
+  const now = new Date();
+  const rows = (plan.tasks || []).map(item => ({ ...item, source: 'task' }));
+  (data.events || []).filter(item => isSameCalendarDay(item.eventDate || item.date || item.startAt, now)).slice(0, 3).forEach(item => {
+    rows.push({
+      id: `today-event-${item.id}`,
+      title: safeTitle(item, 'Мероприятие сегодня'),
+      text: item.time || item.place || item.address || 'Проверить карточку и участников',
+      priority: 'important',
+      priorityLabel: 'Сегодня',
+      priorityIcon: '◆',
+      target: 'events',
+      action: 'Открыть',
+      reason: 'Мероприятие проходит сегодня.',
+      source: 'event',
+    });
+  });
+  (data.bookings || []).filter(item => isSameCalendarDay(item.startAt || item.date, now)).slice(0, 3).forEach(item => {
+    rows.push({
+      id: `today-booking-${item.id}`,
+      title: safeTitle(item, item.clientName || 'Встреча сегодня'),
+      text: bookingTimeText(item),
+      priority: item.status === BOOKING_STATUSES.pending ? 'critical' : 'important',
+      priorityLabel: item.status === BOOKING_STATUSES.pending ? 'Ждёт подтверждения' : 'Встреча',
+      priorityIcon: '●',
+      target: 'booking',
+      action: 'Открыть',
+      reason: 'Встреча входит в рабочий день.',
+      source: 'booking',
+    });
+  });
+  const unique = new Map();
+  rows.forEach(item => unique.set(item.id || item.title, item));
+  return Array.from(unique.values()).sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority)).slice(0, 8);
 }
 
 function profileEvents(events = [], profile = {}, roleId = '') {
@@ -644,11 +793,11 @@ function WorkspaceProfileSection({ role, profile, events = [], roleState, onRole
   );
 }
 
-function IntelligenceTaskRow({ item, actions }) {
+function IntelligenceTaskRow({ item, actions, compact = false }) {
   const tone = getPriorityTone(item.priority);
   const onClick = getWorkspaceAction(actions, item.target);
   return (
-    <button type="button" onClick={onClick} title={item.reason} style={{ border: 0, background: 'transparent', padding: '9px 0', borderBottom: `1px solid ${WS.line}`, display: 'grid', gridTemplateColumns: '30px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+    <button type="button" onClick={onClick} title={item.reason} style={{ border: 0, background: 'transparent', padding: compact ? '8px 0' : '10px 0', borderBottom: `1px solid ${WS.line}`, display: 'grid', gridTemplateColumns: '30px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
       <span style={{ width: 30, height: 30, borderRadius: 12, background: `${tone}17`, color: tone, display: 'grid', placeItems: 'center', fontSize: 13 }}>{item.priorityIcon || '●'}</span>
       <span style={{ minWidth: 0 }}>
         <span style={{ display: 'block', color: WS.text, fontSize: 14, lineHeight: '18px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
@@ -659,55 +808,84 @@ function IntelligenceTaskRow({ item, actions }) {
   );
 }
 
-function WorkspaceIntelligenceDashboard({ plan, actions }) {
+function WorkspaceIntelligenceDashboard({ plan, actions, data, workspaceName }) {
   if (!plan) return null;
-  const counts = [
-    ['🟢', plan.summary?.quickTasks || 0, 'быстрые'],
-    ['🟡', plan.summary?.importantTasks || 0, 'важные'],
-    ['🔴', plan.summary?.criticalProblems || 0, 'критичные'],
-  ];
-  const expected = [
-    `${plan.summary?.expectedEvents || 0} мероприятия`,
-    `${plan.summary?.forecastClients || 0} клиента прогноз`,
-    plan.summary?.topNews || 'новая публикация',
+  const summary = buildWorkdaySummary({ data, plan });
+  const queue = mergeWorkdayQueue(plan);
+  const todayPlan = buildTodayPlanRows({ data, plan });
+  const activityFeed = buildDashboardActivityFeed({ data, plan });
+  const attention = (plan.attention || []).filter(item => item.priority === 'critical' || item.priority === 'important');
+  const analyticsMax = Math.max(...(plan.miniAnalytics || []).map(item => Number.parseFloat(item.value) || 0), 1);
+  const quickActions = [
+    { label: 'Создать новость', target: 'content' },
+    { label: 'Создать событие', target: 'events' },
+    { label: 'Открыть встречи', target: 'booking' },
+    { label: 'Запустить акцию', target: 'offers' },
+    { label: 'Проверить подарки', target: 'rewards' },
   ];
   return (
-    <section data-workspace-intelligence-dashboard style={cardStyle({ padding: 18, borderRadius: 26, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))', boxShadow: '0 18px 54px rgba(82,60,30,0.10)' })}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(390px,0.95fr)', gap: 16, alignItems: 'start' }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Workspace Intelligence</div>
-          <h1 style={{ margin: '7px 0 0', color: WS.text, fontSize: 29, lineHeight: '34px', fontWeight: 950, letterSpacing: -0.55 }}>{plan.greeting}</h1>
-          <div style={{ color: WS.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 8 }}>Сегодня Workspace ведёт вас по рабочему дню: что произошло, где проблема и какое действие принесёт пользу.</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10, marginTop: 14 }}>
-            {counts.map(([icon, value, label]) => (
-              <div key={label} style={{ borderRadius: 18, background: 'rgba(255,255,255,0.72)', border: `1px solid ${WS.line}`, padding: 12 }}>
-                <div style={{ color: WS.text, fontSize: 22, lineHeight: '24px', fontWeight: 950 }}>{icon} {value}</div>
-                <div style={{ color: WS.soft, fontSize: 12.5, lineHeight: '16px', marginTop: 5 }}>{label} задачи</div>
-              </div>
-            ))}
+    <section data-workspace-intelligence-dashboard style={{ display: 'grid', gap: 14 }}>
+      <div style={cardStyle({ padding: 18, borderRadius: 26, background: 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,232,0.86))', boxShadow: '0 18px 54px rgba(82,60,30,0.10)' })}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'center' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Рабочий день</div>
+            <h1 style={{ margin: '6px 0 0', color: WS.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, letterSpacing: 0 }}>{plan.greeting || `${getDayGreeting()}, ${workspaceName}.`}</h1>
           </div>
-          <div style={{ marginTop: 13, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {expected.map(item => <span key={item} style={{ borderRadius: 999, padding: '7px 10px', background: 'rgba(201,155,60,0.12)', color: '#8A6422', fontSize: 12.5, fontWeight: 850 }}>{item}</span>)}
-          </div>
+          <button type="button" onClick={actions.openLoki} style={buttonStyle({ minHeight: 38, borderRadius: 16, padding: '8px 13px', background: 'rgba(255,255,255,0.72)', color: WS.text, boxShadow: 'inset 0 0 0 1px rgba(88,67,37,0.09)' })}>Спросить Локи</button>
         </div>
-        <Panel title="План на сегодня" style={{ padding: 16, boxShadow: 'none', background: 'rgba(255,255,255,0.72)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 9, marginTop: 14 }}>
+          {summary.map(item => (
+            <button key={item.id} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${WS.line}`, borderRadius: 17, background: 'rgba(255,255,255,0.66)', padding: 11, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <span style={{ display: 'block', color: item.tone, fontSize: 23, lineHeight: '25px', fontWeight: 950 }}>{item.value}</span>
+              <span style={{ display: 'block', color: WS.soft, fontSize: 12.4, lineHeight: '16px', marginTop: 4, fontWeight: 780, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(360px,0.95fr)', gap: 14, alignItems: 'stretch' }}>
+        <Panel title="Центр рабочего дня" style={{ padding: 18, boxShadow: 'none', background: 'rgba(255,255,255,0.78)' }}>
           <div style={{ display: 'grid' }}>
-            {(plan.tasks || []).slice(0, 5).map(item => <IntelligenceTaskRow key={item.id} item={item} actions={actions} />)}
+            {queue.length ? queue.map(item => <IntelligenceTaskRow key={item.id} item={item} actions={actions} />) : (
+              <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px' }}>Срочных действий нет. Можно перейти к росту, контенту или аналитике.</div>
+            )}
+          </div>
+        </Panel>
+        <Panel title="План на сегодня" style={{ padding: 18, boxShadow: 'none', background: 'rgba(255,255,255,0.78)' }}>
+          <div style={{ display: 'grid' }}>
+            {todayPlan.length ? todayPlan.slice(0, 6).map(item => <IntelligenceTaskRow key={item.id} item={item} actions={actions} compact />) : (
+              <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px' }}>На сегодня нет обязательных задач из реальных данных Workspace.</div>
+            )}
           </div>
         </Panel>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.95fr) minmax(0,1.05fr) minmax(320px,0.72fr)', gap: 14, marginTop: 14 }}>
-        <Panel title="Что изменилось" style={{ padding: 16, boxShadow: 'none' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {(plan.changes || []).slice(0, 4).map(item => <div key={item} style={{ color: WS.soft, fontSize: 13.2, lineHeight: '18px' }}>• {item}</div>)}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,0.95fr) minmax(340px,0.75fr)', gap: 14, alignItems: 'stretch' }}>
+        <Panel title="Лента активности" style={{ padding: 16, boxShadow: 'none' }}>
+          <div style={{ display: 'grid', gap: 9 }}>
+            {activityFeed.length ? activityFeed.map(item => {
+              const tone = getPriorityTone(item.priority);
+              return (
+                <button key={item.id} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: 0, borderBottom: `1px solid ${WS.line}`, background: 'transparent', padding: '6px 0 9px', display: 'grid', gridTemplateColumns: '8px minmax(0,1fr)', gap: 10, alignItems: 'start', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginTop: 6 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', minWidth: 0 }}>
+                      <span style={{ color: WS.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                      {formatActivityTime(item.time) && <span style={{ color: WS.muted, fontSize: 11, lineHeight: '14px', whiteSpace: 'nowrap' }}>{formatActivityTime(item.time)}</span>}
+                    </span>
+                    <span style={{ display: 'block', color: WS.soft, fontSize: 12, lineHeight: '16px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</span>
+                  </span>
+                </button>
+              );
+            }) : <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px' }}>Новых событий в рабочем контуре нет.</div>}
           </div>
         </Panel>
         <Panel title="Требует внимания" style={{ padding: 16, boxShadow: 'none' }}>
           <div style={{ display: 'grid', gap: 9 }}>
-            {(plan.attention || []).slice(0, 3).map(item => {
+            {attention.length ? attention.slice(0, 4).map(item => {
               const tone = getPriorityTone(item.priority);
               return (
-                <button key={item.title} type="button" onClick={getWorkspaceAction(actions, item.target)} title={`Мы рекомендуем это, потому что: ${item.reason}`} style={{ border: `1px solid ${tone}20`, background: `${tone}08`, borderRadius: 15, padding: 10, display: 'grid', gridTemplateColumns: '24px 1fr auto', gap: 8, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <button key={item.title} type="button" onClick={getWorkspaceAction(actions, item.target)} title={`Мы рекомендуем это, потому что: ${item.reason}`} style={{ border: `1px solid ${tone}22`, background: `${tone}08`, borderRadius: 15, padding: 10, display: 'grid', gridTemplateColumns: '24px 1fr auto', gap: 8, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
                   <span>{item.priorityIcon}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', color: WS.text, fontSize: 13.2, lineHeight: '17px', fontWeight: 890, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
@@ -716,29 +894,44 @@ function WorkspaceIntelligenceDashboard({ plan, actions }) {
                   <span style={{ color: tone, fontSize: 11.5, fontWeight: 900 }}>{item.action}</span>
                 </button>
               );
-            })}
+            }) : <div style={{ borderRadius: 16, background: 'rgba(46,179,107,0.10)', color: WS.green, padding: 12, fontSize: 13.5, lineHeight: '19px', fontWeight: 850 }}>Критичных проблем нет. Рабочий день можно вести спокойно.</div>}
           </div>
         </Panel>
         <Panel title="Мини-аналитика" style={{ padding: 16, boxShadow: 'none' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 6 }}>
-            {(plan.miniAnalytics || []).slice(0, 5).map(item => (
-              <div key={item.label} style={{ borderRadius: 13, background: 'rgba(88,67,37,0.05)', padding: '8px 6px', textAlign: 'center' }}>
-                <div style={{ color: WS.text, fontSize: 15, lineHeight: '18px', fontWeight: 950 }}>{item.value}</div>
-                <div style={{ color: WS.soft, fontSize: 10.5, lineHeight: '13px', marginTop: 3 }}>{item.label}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ marginTop: 11, borderTop: `1px solid ${WS.line}`, paddingTop: 10 }}>
-            <div style={{ color: WS.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 900 }}>💡 Совет Локи</div>
-            <div style={{ color: WS.soft, fontSize: 12.3, lineHeight: '17px', marginTop: 4 }}>{plan.lokiAdvice?.text}</div>
-            <button type="button" onClick={getWorkspaceAction(actions, plan.lokiAdvice?.target || 'loki')} style={buttonStyle({ minHeight: 32, borderRadius: 14, padding: '7px 11px', marginTop: 9, background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' })}>{plan.lokiAdvice?.action || 'Открыть'}</button>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {(plan.miniAnalytics || []).slice(0, 5).map(item => {
+              const value = Number.parseFloat(item.value) || 0;
+              const width = Math.max(8, Math.round(value / analyticsMax * 100));
+              return (
+                <div key={item.label} style={{ display: 'grid', gap: 5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: WS.text, fontSize: 12.5, lineHeight: '16px', fontWeight: 850 }}>
+                    <span>{item.label}</span>
+                    <span>{item.value}</span>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 999, background: 'rgba(88,67,37,0.08)', overflow: 'hidden' }}>
+                    <div style={{ width: `${width}%`, height: '100%', borderRadius: 999, background: item.label === 'Конверсия' ? WS.green : WS.blue }} />
+                  </div>
+                  <div style={{ color: WS.muted, fontSize: 10.8, lineHeight: '13px' }}>{item.delta || 'текущий период'}</div>
+                </div>
+              );
+            })}
           </div>
         </Panel>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 13 }}>
-        {(plan.opportunities || []).slice(0, 4).map(item => (
-          <button key={item.title} type="button" onClick={getWorkspaceAction(actions, item.target)} style={buttonStyle({ minHeight: 34, borderRadius: 999, padding: '7px 11px', background: 'rgba(255,255,255,0.72)', color: WS.text, boxShadow: 'inset 0 0 0 1px rgba(88,67,37,0.08)' })}>{item.title}</button>
-        ))}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,0.55fr)', gap: 14, alignItems: 'stretch' }}>
+        <Panel title="Быстрые действия" style={{ padding: 16, boxShadow: 'none' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 8 }}>
+            {quickActions.map(item => (
+              <button key={item.label} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.72)', borderRadius: 15, padding: '10px 9px', color: WS.text, fontSize: 12.6, lineHeight: '16px', fontWeight: 870, textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit', minHeight: 54 }}>{item.label}</button>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Совет Локи" style={{ padding: 16, boxShadow: 'none' }}>
+          <div style={{ color: WS.text, fontSize: 14.5, lineHeight: '19px', fontWeight: 900 }}>{plan.lokiAdvice?.title || queue[0]?.title || 'План дня готов'}</div>
+          <div style={{ color: WS.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 5 }}>{plan.lokiAdvice?.text || queue[0]?.reason || 'Локи использует только реальные сигналы Workspace.'}</div>
+          <button type="button" onClick={getWorkspaceAction(actions, plan.lokiAdvice?.target || queue[0]?.target || 'loki')} style={buttonStyle({ minHeight: 32, borderRadius: 14, padding: '7px 11px', marginTop: 10, background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B' })}>{plan.lokiAdvice?.action || 'Открыть'}</button>
+        </Panel>
       </div>
     </section>
   );
@@ -747,6 +940,7 @@ function WorkspaceIntelligenceDashboard({ plan, actions }) {
 function WorkspaceDashboard({ data, actions, workspaceView, intelligence, dayPlan }) {
   const profileStatus = getProfileCompletion(data.activeProfile);
   const tasks = getRoleSpecificTasks({ view: workspaceView, data, profileStatus, actions });
+  const workspaceName = data.userName || data.activeProfile?.name || 'АПГ';
   const fallbackEvents = [
     { id: 'fallback-1', title: '9-й Большой Нетворкинг', eventDate: '2026-07-22', time: '11:00 – 16:00', place: 'Зеленоград, к1462' },
     { id: 'fallback-2', title: 'Бизнес-завтрак с экспертами', eventDate: '2026-07-25', time: '09:30 – 11:30', place: 'Онлайн' },
@@ -760,9 +954,16 @@ function WorkspaceDashboard({ data, actions, workspaceView, intelligence, dayPla
     'Workspace уже собирает события через Intelligence Platform.',
   ];
 
+  if (dayPlan) {
+    return (
+      <div data-workspace-v2-dashboard data-workspace-role-view={workspaceView.id} style={{ display: 'grid', gap: 14 }}>
+        <WorkspaceIntelligenceDashboard plan={dayPlan} actions={actions} data={data} workspaceName={workspaceName} />
+      </div>
+    );
+  }
+
   return (
     <div data-workspace-v2-dashboard data-workspace-role-view={workspaceView.id} style={{ display: 'grid', gap: 14 }}>
-      <WorkspaceIntelligenceDashboard plan={dayPlan} actions={actions} />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.12fr) minmax(390px,0.88fr)', gap: 14 }}>
         <DashboardHero data={data} profileStatus={profileStatus} workspaceView={workspaceView} actions={actions} />
         <MetricsPanel data={data} />
@@ -885,7 +1086,7 @@ function MeetingSheet({ item, onClose, onAction, onOpenDialog }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Карточка встречи</div>
-          <h2 style={{ margin: '7px 0 0', color: WS.text, fontSize: 24, lineHeight: '29px', fontWeight: 950, letterSpacing: -0.35 }}>{item.userName || 'Клиент'}</h2>
+          <h2 style={{ margin: '7px 0 0', color: WS.text, fontSize: 24, lineHeight: '29px', fontWeight: 950, letterSpacing: 0 }}>{item.userName || 'Клиент'}</h2>
           <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px', marginTop: 6 }}>{item.serviceTitle || 'Услуга'} · {bookingTimeText(item)} · {item.durationMinutes || 60} мин</div>
         </div>
         <button type="button" onClick={onClose} style={buttonStyle({ width: 38, minHeight: 38, padding: 0, borderRadius: 14, background: 'rgba(88,67,37,0.06)' })}>×</button>
@@ -1039,7 +1240,7 @@ function WorkspaceMeetings({ role, profile, actions, onOpenDialog }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'start' }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Встречи</div>
-            <h1 style={{ margin: '7px 0 0', color: WS.text, fontSize: 28, lineHeight: '34px', fontWeight: 950, letterSpacing: -0.55 }}>Календарь ежедневной работы</h1>
+            <h1 style={{ margin: '7px 0 0', color: WS.text, fontSize: 28, lineHeight: '34px', fontWeight: 950, letterSpacing: 0 }}>Календарь ежедневной работы</h1>
             <div style={{ color: WS.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 7 }}>{bookingProfile.title}: кто записан сегодня, кого подтвердить и где есть свободное время.</div>
           </div>
           <WorkspaceButton onClick={loadBookings} style={{ minHeight: 40, borderRadius: 16, padding: '8px 13px', background: loading ? 'rgba(88,67,37,0.06)' : 'linear-gradient(135deg,#F6D891,#D0A14C)', color: loading ? WS.soft : '#24190B' }}>{loading ? 'Обновляем...' : 'Обновить'}</WorkspaceButton>
@@ -1180,7 +1381,7 @@ function WorkspaceCenterHeader({ center, context }) {
           <span>{center.icon}</span>
           <span>{context.prompt}</span>
         </div>
-        <h1 style={{ margin: 0, color: WS.text, fontSize: 31, lineHeight: '36px', fontWeight: 950, letterSpacing: -0.62 }}>{center.label}</h1>
+        <h1 style={{ margin: 0, color: WS.text, fontSize: 31, lineHeight: '36px', fontWeight: 950, letterSpacing: 0 }}>{center.label}</h1>
         <div style={{ color: WS.soft, fontSize: 15, lineHeight: '22px', marginTop: 7, maxWidth: 780 }}>{center.subtitle}</div>
       </div>
       <div style={cardStyle({ padding: '11px 14px', borderRadius: 18, boxShadow: 'none', minWidth: 210 })}>
@@ -1507,6 +1708,7 @@ export function DesktopWorkspace({
     openExperts: () => setActiveSection('clients'),
     openReviews: () => setActiveSection('reviews'),
     openOffers: () => setActiveSection('offers'),
+    openRewards: () => setActiveSection('rewards'),
     openFinance: () => setActiveSection('finance'),
     openDialogs: () => setActiveSection('dialogs'),
     openMessages: () => setActiveSection('notifications'),
