@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Desktop Experts Catalog
+**Коммит:** `pending`
+**Файлы:** `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- `PartnersPage` получил явный responsive desktop-grid 4/3/2/1 вместо зависимости только от `DesktopContentGrid` auto-fit.
+- `ExpertsPage` получил desktop-ветку на Desktop UI Framework: top overview, header, toolbar, KPI, режимы Grid/List/Map/Split, compact cards и quick preview.
+- Добавлен `test:desktop-experts`, а `test:desktop-partners` теперь проверяет реальный responsive grid партнёров.
+**Почему:** публичные desktop-каталоги должны использовать Framework как полноценную desktop-композицию, а не как оболочку вокруг мобильной ленты.
+
 ## [2026-07-14] fix: Desktop Partners Navigation Hotfix
 **Коммит:** `pending`
 **Файлы:** `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `scripts/desktop-partners-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

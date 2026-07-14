@@ -63,4 +63,8 @@ if (homeSource.includes('(onOpenPartners || onOpenOffers)')) {
   throw new Error('Desktop Home must use handleOpenPartners instead of inline onOpenPartners fallback expressions.');
 }
 
+if (!partnersSource.includes('function getCatalogColumns') || !partnersSource.includes('repeat(${gridColumns}, minmax(0, 1fr))') || !partnersSource.includes('style={catalogGridStyle}')) {
+  throw new Error('PartnersPage desktop catalog must use an explicit responsive grid, not only DesktopContentGrid auto-fit defaults.');
+}
+
 console.log('desktop-partners-page-test: ok');

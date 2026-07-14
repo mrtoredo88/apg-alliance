@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard } from './components/Apg2ProfileGlass.jsx';
 import {
@@ -110,6 +110,24 @@ function callPartner(partner) {
   openUrl(`tel:${phone.replace(/[^\d+]/g, '')}`);
 }
 
+function useViewportWidth(defaultWidth = 1440) {
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? defaultWidth : window.innerWidth));
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  return width;
+}
+
+function getCatalogColumns(width) {
+  if (width >= 1600) return 4;
+  if (width >= 1300) return 3;
+  if (width >= 1000) return 2;
+  return 1;
+}
+
 function PartnerLogo({ partner, size = 46 }) {
   const [failed, setFailed] = useState(false);
   const name = text(partner?.name) || 'П';
@@ -197,6 +215,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
   const [view, setView] = useState('grid');
   const [selected, setSelected] = useState(null);
   const searchRef = useRef(null);
+  const viewportWidth = useViewportWidth();
   const favoriteSet = useMemo(() => new Set((favorites || []).map(String)), [favorites]);
   const visiblePartners = useMemo(() => (Array.isArray(partners) ? partners : []).filter(Boolean), [partners]);
   const categories = useMemo(() => {
@@ -258,6 +277,12 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
   const relatedNews = useMemo(() => selectedPartner ? news.filter(item => String(item?.partnerId || item?.partner?.id || '') === String(selectedPartner.id) || text(item?.partnerName || item?.partner).toLowerCase() === text(selectedPartner.name).toLowerCase()).slice(0, 3) : [], [news, selectedPartner]);
   const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
   const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box' };
+  const gridColumns = getCatalogColumns(viewportWidth);
+  const catalogGridStyle = view === 'list'
+    ? { gridTemplateColumns: 'minmax(0, 1fr)' }
+    : view === 'split'
+      ? { gridTemplateColumns: `repeat(${Math.min(gridColumns, 2)}, minmax(0, 1fr))` }
+      : { gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))` };
 
   if (!desktopMode) {
     return (
@@ -343,7 +368,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
       ) : view === 'map' ? (
         <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />
       ) : (
-        <DesktopContentGrid min={view === 'list' ? 520 : view === 'split' ? 360 : 270} gap={14}>
+        <DesktopContentGrid min={240} gap={14} style={catalogGridStyle}>
           {filtered.map(partner => (
             <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} />
           ))}

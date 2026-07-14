@@ -4094,6 +4094,8 @@ export function UserApp() {
                     onAskQuestion={(expert) => openContextDialog('expert', expert, 'expert-card')}
                     onBook={(expert) => openBookingFlow('expert', expert)}
                     onScan={() => openScanner('expert')}
+                    desktopOverview={desktopOverview}
+                    desktopMode={desktopDevice}
                   />
                 </Suspense>
               </Panel>
