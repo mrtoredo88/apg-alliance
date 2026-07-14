@@ -27,6 +27,7 @@
     "test:desktop-profile": "node scripts/desktop-profile-test.mjs",
     "test:pwa-user-mode": "node scripts/pwa-user-mode-regression.mjs",
     "test:pwa-update": "node scripts/pwa-update-manager-test.mjs",
+    "test:pwa": "npm run test:pwa-update && npm run test:pwa-user-mode && node scripts/pwa-build-compat-test.mjs",
     "test:roles": "node scripts/role-engine-test.mjs",
     "test:identity": "node scripts/identity-core-test.mjs",
     "test:content-lifecycle": "node scripts/content-lifecycle-test.mjs",

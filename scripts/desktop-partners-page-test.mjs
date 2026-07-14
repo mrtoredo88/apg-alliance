@@ -116,6 +116,12 @@ if (!partnerDetailSource.includes("hasServices && { id: 'services'") || !partner
   throw new Error('PartnerPage desktop tabs must be built from existing partner data only.');
 }
 
+for (const requiredPartnerField of ['partner.bookingUrl', 'partner.socialUrl', 'partner.maxCommunityUrl', 'partner.telegramCommunityUrl', 'stampTarget > 0']) {
+  if (!partnerDetailSource.includes(requiredPartnerField)) {
+    throw new Error(`PartnerPage desktop detail must preserve mobile partner field/action: ${requiredPartnerField}`);
+  }
+}
+
 if (!userAppSource.includes('<PartnerPage') || !userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktopMode into PartnerPage detail.');
 }

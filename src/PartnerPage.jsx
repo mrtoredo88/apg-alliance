@@ -453,9 +453,12 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         partner.phone && { id: 'phone', label: 'Телефон', value: partner.phone, icon: '📞', onClick: handlePhone },
         partner.address && { id: 'address', label: 'Адрес', value: partner.address, icon: '📍', onClick: handleMap },
         partner.hours && { id: 'hours', label: 'График', value: partner.hours, icon: '🕐' },
+        !canUseApgBooking && !isVK() && partner.bookingUrl && { id: 'booking', label: 'Запись', value: partner.bookingUrl, icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking') },
         partner.websiteUrl && !isVK() && { id: 'site', label: 'Сайт', value: partner.websiteUrl, icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
         partner.vkGroupUrl && { id: 'vk', label: 'VK', value: partner.vkGroupUrl, icon: '🔵', onClick: openVkGroup },
         partner.telegramCommunityUrl && !isVK() && { id: 'telegram', label: 'Telegram', value: partner.telegramCommunityUrl, icon: '✈️', onClick: () => openPartnerUrl(partner.telegramCommunityUrl, 'telegram', { platform: 'telegram' }) },
+        !isVK() && partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && partner.socialUrl !== partner.websiteUrl && { id: 'social', label: /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? 'ВКонтакте' : 'Соцсеть', value: partner.socialUrl, icon: /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? '🔵' : '🌐', onClick: () => openPartnerUrl(partner.socialUrl, /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? 'vk' : 'social', /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? { platform: 'vk' } : undefined) },
+        !isVK() && partner.maxCommunityUrl && { id: 'max', label: 'MAX', value: partner.maxCommunityUrl, icon: '💬', onClick: () => openPartnerUrl(partner.maxCommunityUrl, 'max', { platform: 'max' }) },
       ].filter(Boolean);
       const relatedItems = similar.map(item => ({ id: item.id, name: item.name, subtitle: item.categoryLabel || item.address, categoryLabel: item.categoryLabel || 'Партнёр' }));
 
@@ -479,6 +482,20 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 {partner.offer && (
                   <DesktopSidebarCard title="Активная акция" subtitle="Предложение для участников">
                     <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>{partner.offer}</div>
+                  </DesktopSidebarCard>
+                )}
+                {stampTarget > 0 && (
+                  <DesktopSidebarCard title="Штамп-карта" subtitle={`${filledStamps}/${stampTarget} отметок`}>
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {Array.from({ length: stampTarget }).map((_, index) => (
+                          <div key={index} style={{ width: 22, height: 22, borderRadius: 9, display: 'grid', placeItems: 'center', background: index < filledStamps ? APG2.gold : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: `1px solid ${index < filledStamps ? 'rgba(201,168,76,0.55)' : 'rgba(var(--apg2-glass-a,255,255,255),0.12)'}`, color: index < filledStamps ? '#17120a' : APG2.textMuted, fontSize: 12, fontWeight: 850 }}>{index < filledStamps ? '✓' : ''}</div>
+                        ))}
+                      </div>
+                      <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                        {filledStamps >= stampTarget ? 'Карта заполнена. Уточните награду у партнёра.' : `До награды осталось ${stampTarget - filledStamps}.`}
+                      </div>
+                    </div>
                   </DesktopSidebarCard>
                 )}
                 <DesktopSidebarCard title="Получить ключ" subtitle="После визита">

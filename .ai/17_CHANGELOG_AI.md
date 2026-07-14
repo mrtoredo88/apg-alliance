@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] fix: PWA boot fallback and Desktop Detail parity
+**Коммит:** `pending`
+**Файлы:** `vite.config.js`, `index.html`, `package.json`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/pwa-build-compat-test.mjs`, `scripts/pwa-update-manager-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Production build подключён к `@vitejs/plugin-legacy`, чтобы браузеры без native dynamic import получали SystemJS fallback вместо остановки до `main_module_loaded`.
+- Bootstrap diagnostics теперь фиксирует `main_module_script_failed`, если entry module не загрузился.
+- Desktop-карточки партнёра и эксперта вернули недостающие поля мобильной версии: дополнительные соцсети/запись/штамп-карту у партнёра, WhatsApp/MAX/запись/стоимость услуг у эксперта.
+**Почему:** часть пользователей видела аварийный экран на `index_loaded`, а desktop detail не должен быть функционально беднее мобильных карточек.
+
 ## [2026-07-14] feat: Desktop Detail Framework
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

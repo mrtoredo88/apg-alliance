@@ -95,6 +95,12 @@ if (!expertsSource.includes("hasServices && { id: 'services'") || !expertsSource
   throw new Error('Expert desktop tabs must be built from existing expert data only.');
 }
 
+for (const requiredExpertField of ['expert.bookingUrl', 'expert.whatsappUrl', 'expert.maxUrl', 'expert.serviceCost']) {
+  if (!expertsSource.includes(requiredExpertField)) {
+    throw new Error(`Expert desktop detail must preserve mobile expert field/action: ${requiredExpertField}`);
+  }
+}
+
 if (!expertsSource.includes('desktopMode={desktopMode}')) {
   throw new Error('ExpertsPage must pass desktopMode into ExpertModal.');
 }

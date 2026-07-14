@@ -392,7 +392,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
     if (desktopMode) {
       const serviceCatalog = Array.isArray(expert.serviceCatalog) ? expert.serviceCatalog.filter(Boolean) : [];
-      const hasServices = Boolean(expert.services || expert.experience || expert.formats?.length || serviceCatalog.length);
+      const hasServices = Boolean(expert.services || expert.experience || expert.serviceCost || expert.formats?.length || serviceCatalog.length);
       const hasLocation = Boolean(expert.address || expert.hours || expert.latitude || expert.longitude);
       const hasPhotos = galleryItems.length > 0 || expert.videos?.length > 0;
       const detailTabs = [
@@ -424,9 +424,12 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
         expert.email && { id: 'email', label: 'Email', value: expert.email, icon: '✉️', onClick: () => openExpertContact(`mailto:${expert.email}`, 'email') },
         expert.address && { id: 'address', label: 'Адрес', value: expert.address, icon: '📍', onClick: openExpertMap },
         expert.hours && { id: 'hours', label: 'График', value: expert.hours, icon: '🕐' },
+        !canUseApgBooking && expert.bookingUrl && { id: 'booking', label: 'Запись', value: expert.bookingUrl, icon: '📅', onClick: () => openExpertContact(expert.bookingUrl, 'booking') },
+        expert.whatsappUrl && { id: 'whatsapp', label: 'WhatsApp', value: expert.whatsappUrl, icon: '🟢', onClick: () => openExpertContact(expert.whatsappUrl, 'whatsapp', { platform: 'whatsapp' }) },
         expert.websiteUrl && { id: 'site', label: 'Сайт', value: expert.websiteUrl, icon: '🌐', onClick: () => openExpertContact(expert.websiteUrl, 'website') },
         expert.vkUrl && { id: 'vk', label: 'VK', value: expert.vkUrl, icon: '🔵', onClick: () => openExpertContact(expert.vkUrl, 'vk', { platform: 'vk' }) },
         expert.telegramUrl && { id: 'telegram', label: 'Telegram', value: expert.telegramUrl, icon: '✈️', onClick: () => openExpertContact(expert.telegramUrl, 'telegram', { platform: 'telegram' }) },
+        expert.maxUrl && { id: 'max', label: 'MAX', value: expert.maxUrl, icon: '💬', onClick: () => openExpertContact(expert.maxUrl, 'max', { platform: 'max' }) },
       ].filter(Boolean);
       const servicesRelated = serviceCatalog.map((item, index) => ({ id: item.id || index, name: item.title || item.name || item.service || 'Услуга', subtitle: item.description || item.duration || '' }));
 
@@ -503,6 +506,11 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                     {expert.experience && (
                       <div style={{ borderRadius: 18, padding: 12, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
                         <strong style={{ color: APG2.gold }}>Опыт: </strong>{expert.experience}
+                      </div>
+                    )}
+                    {expert.serviceCost && (
+                      <div style={{ borderRadius: 18, padding: 12, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                        <strong style={{ color: APG2.gold }}>Стоимость услуг: </strong>{expert.serviceCost}
                       </div>
                     )}
                     {expert.formats?.length > 0 && (

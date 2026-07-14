@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 import { execSync } from 'child_process'
 import { writeFileSync } from 'fs'
 import { resolve } from 'path'
@@ -24,7 +25,13 @@ function versionPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), versionPlugin()],
+  plugins: [
+    react(),
+    legacy({
+      targets: ['defaults', 'not IE 11'],
+    }),
+    versionPlugin(),
+  ],
   esbuild: {
     legalComments: 'none',
   },

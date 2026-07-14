@@ -137,4 +137,11 @@ const swSource = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8
 assert.doesNotMatch(swSource, /install[\s\S]{0,90}clearAllCaches/);
 assert.doesNotMatch(swSource, /activate[\s\S]{0,90}clearAllCaches/);
 
+const viteConfigSource = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
+assert.match(viteConfigSource, /@vitejs\/plugin-legacy/, 'production build must include a legacy fallback for browsers without native dynamic import');
+assert.match(viteConfigSource, /legacy\(\{/, 'production build must enable the Vite legacy plugin');
+
+const indexSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+assert.match(indexSource, /main_module_script_failed/, 'bootstrap diagnostics must record module script load failures');
+
 console.log('PWA Update Manager V1 regression passed');
