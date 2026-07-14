@@ -9,12 +9,30 @@ function versionPlugin() {
   return {
     name: 'version-json',
     closeBundle() {
-      let v;
-      try {
-        v = execSync('git rev-parse --short HEAD').toString().trim();
-      } catch {
-        v = Date.now().toString(36);
+      const normalize = (value) => {
+        if (!value || typeof value !== 'string') return '';
+        const trimmed = value.trim();
+        if (!trimmed) return '';
+        if (/^[0-9a-f]{4,}$/i.test(trimmed)) {
+          return trimmed.slice(0, 8);
+        }
+        return trimmed;
+      };
+      const candidates = [
+        process.env.VERCEL_GIT_COMMIT_SHA,
+        process.env.APG_BUILD_VERSION,
+        process.env.GITHUB_SHA,
+      ];
+
+      let v = candidates.map(normalize).find(Boolean);
+      if (!v) {
+        try {
+          v = execSync('git rev-parse --short HEAD').toString().trim();
+        } catch {
+          v = Date.now().toString(36);
+        }
       }
+
       writeFileSync(
         resolve(__dirname, 'dist/version.json'),
         JSON.stringify({ v }),
