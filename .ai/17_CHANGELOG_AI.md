@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] feat: Desktop Events Experience
+**Коммит:** `pending`
+**Файлы:** `src/EventsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-events-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Раздел `Мероприятия` получил отдельную desktop-ветку на Desktop UI Framework: shell, header, toolbar, KPI, content grid, right rail, action bar, empty/skeleton states.
+- Сегодня, завтра, дедлайны регистрации, популярные события, мои регистрации и календарь месяца вынесены в правую колонку; фильтры собраны в одну desktop-toolbar строку.
+- Существующие карточки мероприятий, календарь, `EventDetailSheet`, регистрация, вопросы организатору и мобильная версия продолжают использовать прежнюю бизнес-логику.
+**Почему:** публичная афиша должна стать полноценной desktop-страницей, сохранив текущие сценарии открытия и регистрации.
+
 ## [2026-07-14] feat: Desktop News Experience
 **Коммит:** `pending`
 **Файлы:** `src/NewsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-news-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

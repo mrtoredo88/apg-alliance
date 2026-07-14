@@ -1,8 +1,20 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 
 import { T, GLASS } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, ApgModal, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import {
+  DesktopActionBar,
+  DesktopContentGrid,
+  DesktopEmptyState,
+  DesktopHeader,
+  DesktopKpiStrip,
+  DesktopSectionShell,
+  DesktopSectionTitle,
+  DesktopSidebarCard,
+  DesktopSkeleton,
+  DesktopToolbar,
+} from './components/DesktopUI.jsx';
 import { EventDetailSheet } from './EventDetailSheet.jsx';
 import { openUrl } from './vk.js';
 import { formatEventPrice, isFreeEvent, isPaidEvent } from './eventPrice.js';
@@ -39,6 +51,33 @@ const CATEGORY_COLORS = {
   kids: '#fb7185',
   family: '#D7B86A',
 };
+
+const desktopDateOptions = [
+  ['all', 'Все даты'],
+  ['today', 'Сегодня'],
+  ['tomorrow', 'Завтра'],
+  ['week', 'Неделя'],
+  ['weekend', 'Выходные'],
+  ['deadline', 'Регистрация скоро'],
+];
+
+const desktopFormatOptions = [
+  ['all', 'Все форматы'],
+  ['offline', 'Офлайн'],
+  ['online', 'Онлайн'],
+  ['hybrid', 'Гибрид'],
+  ['free', 'Бесплатно'],
+  ['paid', 'Платно'],
+  ['kids', 'Детям'],
+  ['adult', '18+'],
+];
+
+const desktopSortOptions = [
+  ['date', 'По дате'],
+  ['popular', 'Популярные'],
+  ['deadline', 'Дедлайн'],
+  ['new', 'Новые'],
+];
 
 function toDateValue(value) {
   if (!value) return null;
@@ -105,6 +144,36 @@ function eventCoords(event) {
   const lat = Number(event?.latitude ?? event?.lat ?? event?.coords?.lat);
   const lng = Number(event?.longitude ?? event?.lng ?? event?.coords?.lng);
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function normalizeEventMode(event) {
+  const mode = String(event?.locationMode || event?.mode || event?.platform || event?.format || '').toLowerCase();
+  const formats = Array.isArray(event?.formats) ? event.formats.map(value => String(value).toLowerCase()) : [];
+  if (mode.includes('hybrid') || (formats.includes('online') && formats.includes('offline'))) return 'hybrid';
+  if (mode.includes('online') || event?.isOnline || event?.online || formats.includes('online')) return 'online';
+  return 'offline';
+}
+
+function eventCity(event) {
+  return String(event?.city || event?.town || event?.settlement || '').trim();
+}
+
+function eventCategoryLabel(event) {
+  return String(event?.categoryLabel || event?.categoryName || event?.category || 'Событие').trim();
+}
+
+function eventSearchText(event) {
+  return [
+    event?.title,
+    event?.description,
+    event?.partner,
+    event?.partnerName,
+    event?.expert,
+    event?.expertName,
+    event?.address,
+    event?.location,
+    eventCategoryLabel(event),
+  ].filter(Boolean).join(' ').toLowerCase();
 }
 
 function formatEventDate(event) {
@@ -515,7 +584,7 @@ function EventsCalendarView({ events, selectedDay, onSelectDay, onOpenEvent }) {
   );
 }
 
-export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen, onAskQuestion }) {
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen, onAskQuestion, onCreateEvent, desktopMode = false }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
@@ -526,6 +595,14 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
   const [selectedDay, setSelectedDay] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [nearRadius, setNearRadius] = useState(1);
+  const [desktopQuery, setDesktopQuery] = useState('');
+  const [desktopCategory, setDesktopCategory] = useState('all');
+  const [desktopFormat, setDesktopFormat] = useState('all');
+  const [desktopDate, setDesktopDate] = useState('all');
+  const [desktopCity, setDesktopCity] = useState('all');
+  const [desktopSort, setDesktopSort] = useState('date');
+  const [desktopOnlyRegistered, setDesktopOnlyRegistered] = useState(false);
+  const desktopSearchRef = useRef(null);
 
   useEffect(() => {
     if (!selectedEvent) return;
@@ -611,6 +688,72 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
     ['🎁 Бесплатные', upcoming.filter(isFreeEvent).slice(0, 6)],
     ['👨‍👩‍👧 Для всей семьи', upcoming.filter(isKidsEvent).slice(0, 6)],
   ].filter(([, items]) => items.length);
+  const registeredSet = useMemo(() => new Set((registeredEventIds || []).map(String)), [registeredEventIds]);
+  const desktopCategories = useMemo(() => {
+    const counts = new Map();
+    upcoming.forEach(event => {
+      const id = String(event?.category || event?.type || 'other').trim() || 'other';
+      const label = eventCategoryLabel(event);
+      const prev = counts.get(id) || { id, label, count: 0 };
+      counts.set(id, { ...prev, count: prev.count + 1 });
+    });
+    return [{ id: 'all', label: 'Все категории', count: upcoming.length }, ...Array.from(counts.values()).sort((a, b) => b.count - a.count)];
+  }, [upcoming]);
+  const desktopCities = useMemo(() => {
+    const counts = new Map();
+    upcoming.forEach(event => {
+      const city = eventCity(event);
+      if (!city) return;
+      counts.set(city, (counts.get(city) || 0) + 1);
+    });
+    return [{ id: 'all', label: 'Весь город', count: upcoming.length }, ...Array.from(counts.entries()).map(([id, count]) => ({ id, label: id, count })).sort((a, b) => b.count - a.count)];
+  }, [upcoming]);
+  const registeredEvents = useMemo(() => upcoming.filter(event => registeredSet.has(String(event?.id || ''))), [registeredSet, upcoming]);
+  const desktopFiltered = useMemo(() => {
+    const q = desktopQuery.trim().toLowerCase();
+    return upcoming.filter(event => {
+      const d = eventDate(event);
+      if (q && !eventSearchText(event).includes(q)) return false;
+      if (desktopOnlyRegistered && !registeredSet.has(String(event?.id || ''))) return false;
+      if (desktopCategory !== 'all' && String(event?.category || event?.type || 'other') !== desktopCategory) return false;
+      if (desktopCity !== 'all' && eventCity(event) !== desktopCity) return false;
+      if (desktopFormat === 'online' && normalizeEventMode(event) !== 'online') return false;
+      if (desktopFormat === 'offline' && normalizeEventMode(event) !== 'offline') return false;
+      if (desktopFormat === 'hybrid' && normalizeEventMode(event) !== 'hybrid') return false;
+      if (desktopFormat === 'free' && !isFreeEvent(event)) return false;
+      if (desktopFormat === 'paid' && !isPaidEvent(event)) return false;
+      if (desktopFormat === 'kids' && !isKidsEvent(event)) return false;
+      if (desktopFormat === 'adult' && !isAdultEvent(event)) return false;
+      if (desktopDate === 'today' && !isSameDay(d, today)) return false;
+      if (desktopDate === 'tomorrow' && !isSameDay(d, tomorrow)) return false;
+      if (desktopDate === 'week' && (!d || d < today || d > weekEnd)) return false;
+      if (desktopDate === 'weekend' && !isWeekendDate(d)) return false;
+      if (desktopDate === 'deadline' && !deadlineSoon(event)) return false;
+      return true;
+    }).sort((a, b) => {
+      if (desktopSort === 'popular') return Number(b.registeredCount || 0) - Number(a.registeredCount || 0) || (eventDate(a)?.getTime() || 0) - (eventDate(b)?.getTime() || 0);
+      if (desktopSort === 'deadline') return (toDateValue(a.deadline)?.getTime() || Number.MAX_SAFE_INTEGER) - (toDateValue(b.deadline)?.getTime() || Number.MAX_SAFE_INTEGER);
+      if (desktopSort === 'new') return (toDateValue(b.createdAt)?.getTime() || 0) - (toDateValue(a.createdAt)?.getTime() || 0);
+      return (eventDate(a)?.getTime() || Number.MAX_SAFE_INTEGER) - (eventDate(b)?.getTime() || Number.MAX_SAFE_INTEGER);
+    });
+  }, [desktopCategory, desktopCity, desktopDate, desktopFormat, desktopOnlyRegistered, desktopQuery, desktopSort, registeredSet, today, tomorrow, upcoming, weekEnd]);
+  const todayEvents = useMemo(() => upcoming.filter(event => isSameDay(eventDate(event), today)), [today, upcoming]);
+  const tomorrowEvents = useMemo(() => upcoming.filter(event => isSameDay(eventDate(event), tomorrow)), [tomorrow, upcoming]);
+  const weekEvents = useMemo(() => upcoming.filter(event => {
+    const d = eventDate(event);
+    return d && d >= today && d <= weekEnd;
+  }), [today, upcoming, weekEnd]);
+  const soonEvents = useMemo(() => upcoming.filter(deadlineSoon).slice(0, 5), [upcoming]);
+  const popularEvents = useMemo(() => [...upcoming].sort((a, b) => Number(b.registeredCount || 0) - Number(a.registeredCount || 0)).filter(event => Number(event.registeredCount || 0) > 0 || Number(event.priority || 0) >= 8).slice(0, 5), [upcoming]);
+  const onlineCount = upcoming.filter(event => normalizeEventMode(event) === 'online' || normalizeEventMode(event) === 'hybrid').length;
+  const kpiItems = [
+    todayEvents.length > 0 && { id: 'today', label: 'Сегодня', value: todayEvents.length, tone: 'gold', icon: '📅', onClick: () => setDesktopDate('today') },
+    weekEvents.length > 0 && { id: 'week', label: 'На неделе', value: weekEvents.length, icon: '7' },
+    upcoming.length > 0 && { id: 'nearest', label: 'Ближайшие', value: upcoming.length, icon: '→' },
+    upcoming.filter(isFreeEvent).length > 0 && { id: 'free', label: 'Бесплатные', value: upcoming.filter(isFreeEvent).length, icon: '₽' },
+    onlineCount > 0 && { id: 'online', label: 'Онлайн', value: onlineCount, icon: '💻' },
+    registeredEvents.length > 0 && { id: 'registered', label: 'Мои регистрации', value: registeredEvents.length, icon: '✓' },
+  ].filter(Boolean);
 
   useEffect(() => {
     const targetId = initialEventTarget?.id ? String(initialEventTarget.id) : '';
@@ -620,6 +763,146 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
     setTab(isEventPast(target) ? 'past' : 'upcoming');
     setSelectedEvent(target);
   }, [events, initialEventTarget]);
+
+  if (variant === 'v2' && desktopMode) {
+    const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 132 };
+    const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box' };
+    const railButtonStyle = { width: '100%', border: 'none', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 11, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gap: 4 };
+    const renderRailList = (items, source) => (
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.map(event => (
+          <button key={event.id || event.title} type="button" onClick={() => openEventSheet(event)} style={railButtonStyle}>
+            <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, fontWeight: 820 }}>{formatEventDate(event)}{formatEventTime(event) ? ` · ${formatEventTime(event)}` : ''}</span>
+            <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Мероприятие АПГ'}</span>
+            <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.partner || event.address || eventCategoryLabel(event)}</span>
+          </button>
+        ))}
+        {items.length === 0 && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px' }}>{source}</div>}
+      </div>
+    );
+    return (
+      <DesktopSectionShell
+        maxWidth={1420}
+        railWidth={360}
+        header={
+          <DesktopHeader
+            title="Мероприятия"
+            subtitle={`Афиша города · ${desktopFiltered.length} из ${upcoming.length} предстоящих`}
+            kicker="События АПГ"
+            onBack={onBack}
+            actions={
+              <>
+                {onCreateEvent && <GlassButton onClick={onCreateEvent} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Создать мероприятие</GlassButton>}
+                <GlassButton onClick={() => desktopSearchRef.current?.focus()} style={{ minHeight: 40, borderRadius: 16 }}>Поиск</GlassButton>
+                <GlassButton onClick={() => setView(view === 'calendar' ? 'list' : 'calendar')} tone={view === 'calendar' ? 'gold' : 'glass'} style={{ minHeight: 40, borderRadius: 16, color: view === 'calendar' ? '#17120a' : APG2_PROFILE.text }}>Календарь</GlassButton>
+              </>
+            }
+          />
+        }
+        toolbar={
+          <DesktopToolbar
+            leading={<input ref={desktopSearchRef} value={desktopQuery} onChange={e => setDesktopQuery(e.target.value)} placeholder="Поиск по названию, месту, партнёру" aria-label="Поиск мероприятий" style={searchStyle} />}
+            trailing={
+              <>
+                <select aria-label="Категория мероприятия" value={desktopCategory} onChange={e => setDesktopCategory(e.target.value)} style={selectStyle}>
+                  {desktopCategories.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+                <select aria-label="Формат мероприятия" value={desktopFormat} onChange={e => setDesktopFormat(e.target.value)} style={selectStyle}>
+                  {desktopFormatOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+                <select aria-label="Дата мероприятия" value={desktopDate} onChange={e => setDesktopDate(e.target.value)} style={selectStyle}>
+                  {desktopDateOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+                {desktopCities.length > 1 && (
+                  <select aria-label="Город мероприятия" value={desktopCity} onChange={e => setDesktopCity(e.target.value)} style={selectStyle}>
+                    {desktopCities.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </select>
+                )}
+                <select aria-label="Сортировка мероприятий" value={desktopSort} onChange={e => setDesktopSort(e.target.value)} style={selectStyle}>
+                  {desktopSortOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+                {(desktopQuery || desktopCategory !== 'all' || desktopFormat !== 'all' || desktopDate !== 'all' || desktopCity !== 'all' || desktopSort !== 'date' || desktopOnlyRegistered) && (
+                  <GlassButton onClick={() => { setDesktopQuery(''); setDesktopCategory('all'); setDesktopFormat('all'); setDesktopDate('all'); setDesktopCity('all'); setDesktopSort('date'); setDesktopOnlyRegistered(false); }} style={{ minHeight: 42, borderRadius: 18 }}>Сбросить</GlassButton>
+                )}
+              </>
+            }
+          />
+        }
+        kpi={<DesktopKpiStrip items={kpiItems} />}
+        rightRail={
+          <>
+            <DesktopSidebarCard title="Сегодня" subtitle={`${todayEvents.length} событий`}>
+              {renderRailList(todayEvents.slice(0, 5), 'На сегодня мероприятий нет.')}
+            </DesktopSidebarCard>
+            <DesktopSidebarCard title="Завтра" subtitle={`${tomorrowEvents.length} событий`}>
+              {renderRailList(tomorrowEvents.slice(0, 5), 'На завтра мероприятий нет.')}
+            </DesktopSidebarCard>
+            {soonEvents.length > 0 && (
+              <DesktopSidebarCard title="Скоро начнётся" subtitle="Регистрация закрывается">
+                {renderRailList(soonEvents, 'Нет срочных дедлайнов.')}
+              </DesktopSidebarCard>
+            )}
+            {popularEvents.length > 0 && (
+              <DesktopSidebarCard title="Популярные" subtitle="По регистрациям и приоритету">
+                {renderRailList(popularEvents, 'Популярные события появятся позже.')}
+              </DesktopSidebarCard>
+            )}
+            {registeredEvents.length > 0 && (
+              <DesktopSidebarCard title="Мои регистрации" subtitle={`${registeredEvents.length} событий`}>
+                {renderRailList(registeredEvents.slice(0, 5), 'Вы пока не зарегистрированы.')}
+              </DesktopSidebarCard>
+            )}
+            <DesktopSidebarCard title="Календарь месяца" subtitle="Выберите дату">
+              <EventsCalendarView events={desktopFiltered} selectedDay={selectedDay} onSelectDay={setSelectedDay} onOpenEvent={openEventSheet} />
+            </DesktopSidebarCard>
+            <DesktopSidebarCard title="Подсказки" subtitle="Как быстрее найти событие">
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                Используйте поиск и фильтры в одной строке. Детальная карточка, регистрация, вопросы организатору и маршрут открываются через существующий экран мероприятия.
+              </div>
+            </DesktopSidebarCard>
+          </>
+        }
+        actionBar={
+          <DesktopActionBar
+            actions={[
+              { id: 'today', label: 'Сегодня', tone: desktopDate === 'today' ? 'gold' : undefined, onClick: () => setDesktopDate('today') },
+              { id: 'nearest', label: 'Ближайшие', tone: desktopDate === 'all' ? 'gold' : undefined, onClick: () => { setDesktopDate('all'); setDesktopSort('date'); } },
+              { id: 'calendar', label: view === 'calendar' ? 'Список' : 'Календарь', onClick: () => setView(view === 'calendar' ? 'list' : 'calendar') },
+              registeredEvents.length > 0 && { id: 'registered', label: 'Мои регистрации', tone: desktopOnlyRegistered ? 'gold' : undefined, onClick: () => setDesktopOnlyRegistered(value => !value) },
+            ]}
+          />
+        }
+      >
+        <DesktopSectionTitle title={view === 'calendar' ? 'Календарь мероприятий' : `${desktopFiltered.length} мероприятий`} subtitle={desktopQuery ? `По запросу: ${desktopQuery}` : 'Ближайшие события, встречи партнёров и городская афиша'} />
+        {view === 'calendar' ? (
+          <EventsCalendarView events={desktopFiltered} selectedDay={selectedDay} onSelectDay={setSelectedDay} onOpenEvent={openEventSheet} />
+        ) : desktopFiltered.length === 0 && events.length === 0 ? (
+          <DesktopSkeleton rows={6} variant="grid" />
+        ) : desktopFiltered.length === 0 ? (
+          <DesktopEmptyState
+            icon="📅"
+            title="Мероприятия не найдены"
+            text="Попробуйте изменить дату, формат, категорию или поисковый запрос."
+            action={<GlassButton tone="gold" onClick={() => { setDesktopQuery(''); setDesktopCategory('all'); setDesktopFormat('all'); setDesktopDate('all'); setDesktopCity('all'); setDesktopOnlyRegistered(false); }} style={{ color: '#17120a' }}>Показать ближайшие</GlassButton>}
+          />
+        ) : (
+          <DesktopContentGrid min={330} gap={14}>
+            {desktopFiltered.map((event, index) => <EventPosterCard key={event.id || index} event={event} index={index} compact onClick={openEventSheet} />)}
+          </DesktopContentGrid>
+        )}
+
+        <EventDetailSheet
+          open={Boolean(selectedEvent)}
+          event={selectedEvent}
+          role="user"
+          registeredEventIds={registeredEventIds}
+          onRegister={onEventRegister}
+          onAskQuestion={onAskQuestion}
+          onClose={() => setSelectedEvent(null)}
+        />
+      </DesktopSectionShell>
+    );
+  }
 
   if (variant === 'v2') {
     return (

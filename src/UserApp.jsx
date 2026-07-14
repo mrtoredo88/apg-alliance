@@ -3827,6 +3827,7 @@ export function UserApp() {
                     appearance={appearance}
                     initialEventTarget={pendingLokiEventTarget}
                     registeredEventIds={registeredEventIds}
+                    desktopMode={desktopDevice}
                     onEventRegister={handleEventRegister}
                     onEventOpen={(event) => {
                       markLearningAction('eventOpened');
