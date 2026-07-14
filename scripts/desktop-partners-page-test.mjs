@@ -55,12 +55,16 @@ if (!userAppSource.includes('desktopOverview={desktopOverview}') || !userAppSour
   throw new Error('UserApp must pass desktop overview and desktopMode to PartnersPage.');
 }
 
-if (!homeSource.includes('onOpenPartners,') || !homeSource.includes('const handleOpenPartners = onOpenPartners || onOpenOffers')) {
-  throw new Error('Desktop Home must receive onOpenPartners and normalize it to handleOpenPartners with offers fallback.');
+if (!homeSource.includes('onOpenPartners,') || !homeSource.includes('const handleOpenPartners = onOpenPartners')) {
+  throw new Error('Desktop Home must receive onOpenPartners and route partners through the dedicated handler.');
 }
 
-if (homeSource.includes('(onOpenPartners || onOpenOffers)')) {
-  throw new Error('Desktop Home must use handleOpenPartners instead of inline onOpenPartners fallback expressions.');
+if (homeSource.includes('onOpenPartners || onOpenOffers') || homeSource.includes('(onOpenPartners || onOpenOffers)')) {
+  throw new Error('Desktop Home must not fallback Partners navigation to Offers.');
+}
+
+if (!homeSource.includes('onOpenPartners={onOpenPartners}')) {
+  throw new Error('HomePanelV2 must pass onOpenPartners into the desktop first screen and desktop content.');
 }
 
 if (!partnersSource.includes('function getCatalogColumns') || !partnersSource.includes('repeat(${gridColumns}, minmax(0, 1fr))') || !partnersSource.includes('style={catalogGridStyle}')) {

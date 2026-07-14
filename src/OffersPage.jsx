@@ -2,6 +2,17 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import {
+  DesktopContentGrid,
+  DesktopEmptyState,
+  DesktopHeader,
+  DesktopKpiStrip,
+  DesktopSectionShell,
+  DesktopSectionTitle,
+  DesktopSidebarCard,
+  DesktopToolbar,
+  DesktopTopOverview,
+} from './components/DesktopUI.jsx';
 
 function OfferCard({ partner, onOpenPartner, onAskQuestion, index }) {
   return (
@@ -159,7 +170,7 @@ function OfferCardV2({ partner, onOpenPartner, onAskQuestion, index }) {
   );
 }
 
-export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner, onAskQuestion }) {
+export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner, onAskQuestion, desktopOverview = null, desktopMode = false }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch]                 = useState('');
   const inputRef                            = useRef(null);
@@ -206,6 +217,75 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
       : withOffers.filter(p => (p.category || 'other') === activeCategory),
     [withOffers, activeCategory]
   );
+
+  if (variant === 'v2' && desktopMode) {
+    const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 150 };
+    const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 260, width: '100%', boxSizing: 'border-box' };
+    const activeList = isSearching ? searchResults : filtered;
+    const featuredOffer = withOffers[0] || null;
+    const kpiItems = [
+      withOffers.length > 0 && { id: 'offers', label: 'Акций', value: withOffers.length, tone: 'gold', icon: '🎁' },
+      partners.length > 0 && { id: 'partners', label: 'Партнёров', value: partners.length, icon: '🏢' },
+      categories.length > 0 && { id: 'categories', label: 'Категорий', value: categories.length, icon: '⌘' },
+      search.trim() && { id: 'search', label: 'Найдено', value: searchResults.length, icon: '⌕' },
+    ].filter(Boolean);
+
+    return (
+      <DesktopSectionShell
+        maxWidth={1460}
+        topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="offers" /> : null}
+        header={
+          <DesktopHeader
+            title="Акции"
+            subtitle={`${withOffers.length} предложений · ${partners.length} партнёров`}
+            kicker="Выгода АПГ"
+            onBack={onBack}
+            actions={
+              <>
+                <GlassButton onClick={() => inputRef.current?.focus()} style={{ minHeight: 40, borderRadius: 16 }}>Поиск</GlassButton>
+                <GlassButton onClick={() => { setSearch(''); setActiveCategory('all'); }} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Сбросить</GlassButton>
+              </>
+            }
+          />
+        }
+        toolbar={
+          <DesktopToolbar
+            leading={<input ref={inputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Найти партнёра или акцию" aria-label="Поиск акций" style={searchStyle} />}
+            trailing={
+              <select aria-label="Категория акции" value={activeCategory} onChange={event => setActiveCategory(event.target.value)} style={selectStyle}>
+                <option value="all">Все · {withOffers.length}</option>
+                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label} · {cat.count}</option>)}
+              </select>
+            }
+          />
+        }
+        kpi={<DesktopKpiStrip items={kpiItems} />}
+        info={
+          <DesktopSidebarCard title="Акция дня" subtitle={featuredOffer?.name || 'Предложения АПГ'}>
+            {featuredOffer ? (
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '22px', fontWeight: 880 }}>{featuredOffer.offer}</div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>{featuredOffer.name}</div>
+                {featuredOffer.categoryLabel && <GlassBadge>{featuredOffer.categoryLabel}</GlassBadge>}
+                <GlassButton tone="gold" onClick={() => onOpenPartner?.(featuredOffer)} style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Открыть партнёра</GlassButton>
+              </div>
+            ) : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Партнёры АПГ скоро добавят специальные предложения.</div>}
+          </DesktopSidebarCard>
+        }
+      >
+        <DesktopSectionTitle title={isSearching ? `Найдено ${searchResults.length}` : `${filtered.length} предложений`} subtitle={isSearching ? `По запросу: ${search.trim()}` : 'Актуальные предложения партнёров'} />
+        {withOffers.length === 0 ? (
+          <DesktopEmptyState icon="🎁" title="Акции скоро появятся" text="Партнёры АПГ готовят специальные предложения." />
+        ) : activeList.length === 0 ? (
+          <DesktopEmptyState icon="🔍" title="Ничего не найдено" text="Попробуйте другой запрос или сбросьте фильтры." action={<GlassButton onClick={() => { setSearch(''); setActiveCategory('all'); }} tone="gold" style={{ color: '#17120a' }}>Сбросить</GlassButton>} />
+        ) : (
+          <DesktopContentGrid min={260} gap={14}>
+            {activeList.map((p, i) => <OfferCardV2 key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} onAskQuestion={onAskQuestion} />)}
+          </DesktopContentGrid>
+        )}
+      </DesktopSectionShell>
+    );
+  }
 
   if (variant === 'v2') {
     return (

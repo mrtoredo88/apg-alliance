@@ -5,6 +5,17 @@ import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import {
+  DesktopContentGrid,
+  DesktopEmptyState,
+  DesktopHeader,
+  DesktopKpiStrip,
+  DesktopSectionShell,
+  DesktopSectionTitle,
+  DesktopSidebarCard,
+  DesktopSkeleton,
+  DesktopTopOverview,
+} from './components/DesktopUI.jsx';
 import { logError } from './errorLogger.js';
 import { calculateTicketExchange, getReputationStatus, normalizeOpportunityType } from './economyEngine.js';
 
@@ -435,7 +446,7 @@ function ClaimSuccessModal({ prize, onClose, partners = [], experts = [] }) {
 
 // ─── Главная страница наград ──────────────────────────────────────────────────
 
-export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, userTickets = 0, userReputation = 0, onBack, onClaim, onExchangeTickets, onRaffleEnter, partners = [], experts = [] }) {
+export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, userTickets = 0, userReputation = 0, onBack, onClaim, onExchangeTickets, onRaffleEnter, partners = [], experts = [], desktopOverview = null, desktopMode = false }) {
   const [prizes, setPrizes]               = useState([]);
   const [myClaims, setMyClaims]           = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -559,8 +570,93 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, u
   const purchasePrizes = useMemo(() => prizes.filter(p => normalizeOpportunityType(p) !== 'raffle'), [prizes]);
   const rafflePrizes   = useMemo(() => prizes.filter(p => p.type === 'raffle'), [prizes]);
 
+  const reputationStatus = getReputationStatus(userReputation);
+
+  if (variant === 'v2' && desktopMode) {
+    const kpiItems = [
+      { id: 'keys', label: 'Ключей', value: userKeys, tone: 'gold', icon: '🗝️' },
+      { id: 'tickets', label: 'Билетов', value: userTickets, icon: '🎟️' },
+      { id: 'reputation', label: 'Репутация', value: reputationStatus.label, icon: '★' },
+      prizes.length > 0 && { id: 'prizes', label: 'Возможностей', value: prizes.length, icon: '🎁' },
+      myClaims.length > 0 && { id: 'claims', label: 'Мои призы', value: myClaims.length, icon: '✓' },
+    ].filter(Boolean);
+
+    return (
+      <DesktopSectionShell
+        maxWidth={1460}
+        topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="rewards" /> : null}
+        header={
+          <DesktopHeader
+            title="Подарки"
+            subtitle={`${userKeys} ключей · ${userTickets} билетов`}
+            kicker="APG Economy 1.0"
+            onBack={onBack}
+          />
+        }
+        kpi={<DesktopKpiStrip items={kpiItems} />}
+        info={
+          <DesktopSidebarCard title="Баланс" subtitle="Доступно для обмена">
+            <div style={{ display: 'grid', gap: 12 }}>
+              <GlassCard tone="gold" style={{ borderRadius: 24, padding: 18 }}>
+                <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 760, marginBottom: 4 }}>Ключи</div>
+                <div style={{ color: '#17120a', fontSize: 42, lineHeight: '44px', fontWeight: 940 }}>{userKeys} <span style={{ fontSize: 22 }}>🗝️</span></div>
+              </GlassCard>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>Ключи открывают возможности. Розыгрыши используют билеты, а репутация растёт и не тратится.</div>
+            </div>
+          </DesktopSidebarCard>
+        }
+      >
+        <DesktopSectionTitle title="Магазин возможностей" subtitle="Подарки, розыгрыши и доступные обмены" />
+        {loadError && <DesktopEmptyState icon="⚠️" title="Не удалось загрузить призы" text="Проверьте соединение и попробуйте снова." />}
+        {loading ? (
+          <DesktopSkeleton rows={6} variant="grid" />
+        ) : prizes.length === 0 ? (
+          <DesktopEmptyState icon="🎁" title="Призы скоро появятся" text="Мы готовим награды, которые будет приятно получить." />
+        ) : (
+          <div style={{ display: 'grid', gap: 18 }}>
+            {rafflePrizes.length > 0 && (
+              <section>
+                <DesktopSectionTitle title="Розыгрыши" subtitle={`${rafflePrizes.length} активных`} />
+                <DesktopContentGrid min={320} gap={14}>
+                  {rafflePrizes.map((prize, i) => <RaffleCardV2 key={prize.id} prize={prize} userTickets={userTickets} myEntry={myRaffleEntries[prize.id]} counts={raffleCounts[prize.id]} onEnter={p => setRaffleSheet(p)} index={i} />)}
+                </DesktopContentGrid>
+              </section>
+            )}
+            {purchasePrizes.length > 0 && (
+              <section>
+                <DesktopSectionTitle title="Возможности за ключи" subtitle={`${purchasePrizes.length} доступных`} />
+                <DesktopContentGrid min={320} gap={14}>
+                  {purchasePrizes.map((prize, i) => <PrizeCardV2 key={prize.id} prize={prize} userKeys={userKeys} onClaim={p => setConfirmPrize(p)} isClaimed={claimedIds.has(prize.id)} index={i} />)}
+                </DesktopContentGrid>
+              </section>
+            )}
+            {myClaims.length > 0 && (
+              <section>
+                <DesktopSectionTitle title="Мои призы" subtitle={`${myClaims.length} получено`} />
+                <GlassCard style={{ borderRadius: 30, padding: 8 }}>
+                  {myClaims.map((claim, i) => (
+                    <div key={claim.id} style={{ padding: '12px 10px', borderBottom: i < myClaims.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 0, display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{claim.prizeEmoji ?? '🎁'}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: APG2_PROFILE.text, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.prizeName}</div>
+                        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 2 }}>−{claim.cost} ключей</div>
+                      </div>
+                      <GlassBadge>выдадут</GlassBadge>
+                    </div>
+                  ))}
+                </GlassCard>
+              </section>
+            )}
+          </div>
+        )}
+        {confirmPrize && <ConfirmModal prize={confirmPrize} userKeys={userKeys} onConfirm={handleConfirmClaim} onCancel={() => !claiming && setConfirmPrize(null)} claiming={claiming} />}
+        {claimedPrize && <ClaimSuccessModal prize={claimedPrize} onClose={() => setClaimedPrize(null)} partners={partners} experts={experts} />}
+        {raffleSheet && <TicketSheet prize={raffleSheet} userKeys={userKeys} userTickets={userTickets} onConfirm={handleEnterRaffle} onCancel={() => !enteringRaffle && setRaffleSheet(null)} confirming={enteringRaffle} />}
+      </DesktopSectionShell>
+    );
+  }
+
   if (variant === 'v2') {
-    const reputationStatus = getReputationStatus(userReputation);
     return (
       <GlassPanel>
         <ScreenHeader title="Магазин возможностей" subtitle={`${userKeys} ключей · ${userTickets} билетов`} kicker="APG Economy 1.0" onBack={onBack} />

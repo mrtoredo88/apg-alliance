@@ -754,7 +754,7 @@ function V2FirstScreenDesktop({
   const initials = fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
   const avatarUrl = user?.photo_200 || user?.photo || user?.avatarUrl || '';
   const desktopLayout = getDesktopLayout(typeof window === 'undefined' ? 1280 : window.innerWidth);
-  const handleOpenPartners = onOpenPartners || onOpenOffers;
+  const handleOpenPartners = onOpenPartners;
   const nextAchievement = TASKS
     .map(task => ({
       ...task,
@@ -1222,6 +1222,7 @@ function V2SecondScreen({
   onOpenPartner,
   onOpenEvents,
   onOpenExperts,
+  onOpenPartners,
   onOpenOffers,
   onOpenRewards,
   onOpenTasks,
@@ -1251,6 +1252,7 @@ function V2SecondScreen({
         onOpenPartner={onOpenPartner}
         onOpenEvents={onOpenEvents}
         onOpenExperts={onOpenExperts}
+        onOpenPartners={onOpenPartners}
         onOpenOffers={onOpenOffers}
         onOpenRewards={onOpenRewards}
         onOpenTasks={onOpenTasks}
@@ -1558,6 +1560,7 @@ function V2SecondScreenDesktop({
   onOpenPartner,
   onOpenEvents,
   onOpenExperts,
+  onOpenPartners,
   onOpenOffers,
   onOpenRewards,
   onOpenTasks,
@@ -1894,7 +1897,8 @@ function V2SecondScreenDesktop({
     }
     if (row.type === 'event') return () => onOpenEvents?.(row.item || undefined);
     if (row.type === 'expert') return () => onOpenExperts?.();
-    if (row.type === 'partner' || row.type === 'offer') return row.item ? () => onOpenPartner?.(row.item) : () => onOpenOffers?.();
+    if (row.type === 'partner') return row.item ? () => onOpenPartner?.(row.item) : () => onOpenPartners?.();
+    if (row.type === 'offer') return row.item ? () => onOpenPartner?.(row.item) : () => onOpenOffers?.();
     return undefined;
   };
   const desktopLayout = getDesktopLayout(typeof window === 'undefined' ? 1280 : window.innerWidth);
@@ -2146,7 +2150,7 @@ function V2SecondScreenDesktop({
                 <div>
                   <div style={{ ...DesktopSectionHeader, fontSize: 23 }}>Популярные партнёры</div>
                 </div>
-                <button type="button" onClick={onOpenOffers} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все партнёры</button>
+                <button type="button" onClick={onOpenPartners} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все партнёры</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactPartnerColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
                 {loading ? [0, 1, 2].map(i => (
@@ -3093,7 +3097,7 @@ export function HomePanelV2({
   counterPulse = false,
   interestProfile = null,
   desktopMode = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenPartners, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
   onOpenProfile,
   desktopWorkspaceAvailable = false,
   onSwitchAppMode,
@@ -3234,6 +3238,7 @@ export function HomePanelV2({
         onOpenNotifications={onOpenNotifications}
         onOpenPartner={onOpenPartner}
         onOpenNearby={onOpenNearby}
+        onOpenPartners={onOpenPartners}
         onOpenOffers={onOpenOffers}
         onOpenEvents={onOpenEvents}
         onOpenRewards={onOpenRewards}
@@ -3243,6 +3248,7 @@ export function HomePanelV2({
         onOpenProfile={onOpenProfile}
         onOpenNews={onOpenNews}
         onOpenMap={onOpenMap}
+        onOpenExperts={onOpenExperts}
         isOffline={isOffline}
         desktopWorkspaceAvailable={desktopWorkspaceAvailable}
         onSwitchAppMode={onSwitchAppMode}
@@ -3324,6 +3330,7 @@ export function HomePanelV2({
               onOpenPartner={onOpenPartner}
               onOpenEvents={onOpenEvents}
               onOpenExperts={onOpenExperts}
+              onOpenPartners={onOpenPartners}
               onOpenRewards={onOpenRewards}
               onOpenNews={onOpenNews}
               onOpenNewsItem={onOpenNewsItem}

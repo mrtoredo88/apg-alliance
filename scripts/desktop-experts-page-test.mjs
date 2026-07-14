@@ -4,6 +4,7 @@ import path from 'node:path';
 const root = process.cwd();
 const expertsSource = fs.readFileSync(path.join(root, 'src/ExpertsPage.jsx'), 'utf8');
 const userAppSource = fs.readFileSync(path.join(root, 'src/UserApp.jsx'), 'utf8');
+const homeSource = fs.readFileSync(path.join(root, 'src/HomePanelV2.jsx'), 'utf8');
 
 const requiredFrameworkComponents = [
   'DesktopTopOverview',
@@ -52,6 +53,10 @@ if (!expertsSource.includes('<ExpertModal') || !expertsSource.includes('onOpen={
 
 if (!userAppSource.includes('<ExpertsPage') || !userAppSource.includes('desktopOverview={desktopOverview}') || !userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktop overview and desktopMode to ExpertsPage.');
+}
+
+if (!homeSource.includes('onOpenExperts={onOpenExperts}') || !homeSource.includes("{ label: 'Эксперты', onClick: onOpenExperts }")) {
+  throw new Error('Desktop Home must pass onOpenExperts into the top navigation.');
 }
 
 console.log('desktop-experts-page-test: ok');

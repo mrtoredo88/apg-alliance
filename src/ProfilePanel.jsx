@@ -12,6 +12,7 @@ import { auth } from './firebase.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
+import { DesktopTopOverview } from './components/DesktopUI.jsx';
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 import { CAPABILITIES, hasCapability } from './roleEngine.js';
@@ -612,7 +613,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingReview, desktopMode = false, onBack }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingReview, desktopOverview = null, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -1162,6 +1163,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           )}
 
           <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gap: 16 }}>
+            {desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="profile" /> : null}
             <header style={dpCard({ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.72)' })}>
               <button type="button" onClick={() => onBack?.()} style={{ ...dpButton('light', { minHeight: 36, background: 'transparent', borderColor: 'transparent' }) }}>← Назад в приложение</button>
               <div style={{ flex: 1, minWidth: 0 }}>

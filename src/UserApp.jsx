@@ -3890,6 +3890,7 @@ export function UserApp() {
                     onOpenHealth={() => goPanel('health')}
                     onOpenDialog={openContextDialogById}
                     onOpenBookingReview={openBookingReview}
+                    desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
                     onBack={() => goPanel('home')}
                   />
@@ -3957,7 +3958,15 @@ export function UserApp() {
 
               <Panel id="offers">
                 <Suspense fallback={<LazyFallback />}>
-                  <OffersPage variant="v2" partners={enrichedPartners} onOpenPartner={openPartner} onAskQuestion={(partner) => openContextDialog('promotion', partner, 'promotion-card')} onBack={goBackPanel} />
+                  <OffersPage
+                    variant="v2"
+                    partners={enrichedPartners}
+                    onOpenPartner={openPartner}
+                    onAskQuestion={(partner) => openContextDialog('promotion', partner, 'promotion-card')}
+                    onBack={goBackPanel}
+                    desktopOverview={desktopOverview}
+                    desktopMode={desktopDevice}
+                  />
                 </Suspense>
               </Panel>
 
@@ -4065,6 +4074,8 @@ export function UserApp() {
                     onRaffleEnter={handleRaffleEnter}
                     partners={partners}
                     experts={experts}
+                    desktopOverview={desktopOverview}
+                    desktopMode={desktopDevice}
                   />
                 </Suspense>
               </Panel>
