@@ -15,20 +15,193 @@ const asArray = value => Array.isArray(value) ? value.filter(Boolean) : [];
 
 export const DESKTOP_PUBLIC_SECTIONS = ['news', 'events', 'partners', 'experts', 'offers', 'rewards'];
 
-export function DesktopSectionShell({ children, header, toolbar, kpi, rightRail, actionBar, maxWidth = 1360, railWidth = 336, withRail = Boolean(rightRail), style, contentStyle, railStyle }) {
+export function DesktopSectionShell({ children, topOverview, header, toolbar, kpi, info, actionBar, maxWidth = 1360, style, contentStyle }) {
   return (
     <div style={{ minHeight: '100svh', width: '100%', boxSizing: 'border-box', padding: 'calc(18px + var(--safe-top, 0px)) 24px 34px', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, ...style }}>
       <div style={{ width: '100%', maxWidth, margin: '0 auto', display: 'grid', gap: 16 }}>
+        {topOverview}
         {header}
         {toolbar}
         {kpi}
-        <div style={{ display: 'grid', gridTemplateColumns: withRail ? `minmax(0, 1fr) minmax(280px, ${railWidth}px)` : 'minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
-          <main style={{ minWidth: 0, display: 'grid', gap: 16, ...contentStyle }}>{children}</main>
-          {withRail && <DesktopRightRail style={railStyle}>{rightRail}</DesktopRightRail>}
-        </div>
+        {info}
+        <main style={{ minWidth: 0, display: 'grid', gap: 16, ...contentStyle }}>{children}</main>
         {actionBar}
       </div>
     </div>
+  );
+}
+
+export function DesktopTopOverview({
+  activeSection = 'home',
+  navItems = [],
+  searchValue = '',
+  onSearchChange,
+  onSearchSubmit,
+  onSearchClear,
+  unreadCount = 0,
+  onOpenNotifications,
+  onOpenLoki,
+  onOpenProfile,
+  workspaceAction,
+  userName = 'Участник',
+  userSubtitle = 'АПГ',
+  avatarUrl = '',
+  initials = 'У',
+  profileBadge = '',
+  heroTitle = 'Пульс города сегодня',
+  heroSubtitle = 'Главный повод открыть АПГ',
+  heroKicker = 'Сегодня в АПГ',
+  heroImage = '',
+  heroActions = [],
+  stats = [],
+  progressTitle = '',
+  progressSubtitle = '',
+  progressValue = 0,
+  quickActions = [],
+  isOffline = false,
+  style,
+}) {
+  const [localSearch, setLocalSearch] = React.useState('');
+  const safeNav = asArray(navItems);
+  const safeStats = asArray(stats);
+  const safeHeroActions = asArray(heroActions);
+  const safeQuickActions = asArray(quickActions);
+  const actualSearchValue = onSearchChange ? searchValue : localSearch;
+  const safeProgress = Math.max(0, Math.min(100, Math.round(Number(progressValue) || 0)));
+  const runSearch = () => {
+    if (typeof onSearchSubmit === 'function') onSearchSubmit(actualSearchValue);
+  };
+  const navButtonStyle = item => ({
+    border: '1px solid',
+    borderColor: item.id === activeSection ? 'rgba(201,168,76,0.70)' : 'rgba(var(--apg2-glass-a,255,255,255),0.22)',
+    background: item.id === activeSection ? 'linear-gradient(145deg, rgba(201,168,76,0.26), rgba(201,168,76,0.08))' : 'rgba(var(--apg2-glass-a,255,255,255),0.08)',
+    color: item.id === activeSection ? APG2_PROFILE.gold : APG2_PROFILE.textSoft,
+    borderRadius: 999,
+    minHeight: 32,
+    padding: '0 12px',
+    fontSize: 11.7,
+    lineHeight: '16px',
+    fontWeight: 780,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  });
+  return (
+    <section style={{ display: 'grid', gap: 12, ...style }}>
+      {isOffline && (
+        <div style={{ padding: '10px 12px', borderRadius: 16, color: APG2_PROFILE.text, background: 'linear-gradient(145deg, rgba(230,70,70,0.18), rgba(var(--apg2-glass-a,255,255,255),0.06))', border: '1px solid rgba(230,70,70,0.34)', fontSize: 13, fontWeight: 720 }}>
+          Работа в офлайн-режиме: новые действия недоступны до восстановления сети.
+        </div>
+      )}
+      <header style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <picture>
+            <source srcSet="/logo.webp" type="image/webp" />
+            <img src="/logo.png" alt="АПГ" style={{ width: 40, height: 40, borderRadius: 16, objectFit: 'cover', boxShadow: '0 12px 30px rgba(0,0,0,0.22), 0 0 0 1px rgba(var(--apg2-glass-a,255,255,255),0.18)' }} />
+          </picture>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '19px', fontWeight: 880 }}>АПГ: ЗЕЛЕНОГРАД</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '13px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Альянс партнёров города</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+          {safeNav.map(item => (
+            <button key={item.id || item.label} type="button" onClick={item.onClick} style={navButtonStyle(item)} aria-current={item.id === activeSection ? 'page' : undefined}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ width: 'clamp(178px, 14.2vw, 246px)', height: 38, borderRadius: 999, display: 'grid', gridTemplateColumns: '18px 1fr auto', alignItems: 'center', gap: 7, padding: '0 10px 0 12px', boxSizing: 'border-box', color: APG2_PROFILE.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.20)' }}>
+            <span aria-hidden="true" style={{ fontSize: 13, lineHeight: '18px', opacity: 0.82 }}>⌕</span>
+            <input
+              type="search"
+              value={actualSearchValue}
+              onChange={event => {
+                if (onSearchChange) onSearchChange(event.target.value);
+                else setLocalSearch(event.target.value);
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  runSearch();
+                }
+              }}
+              placeholder="Поиск по АПГ..."
+              aria-label="Поиск по АПГ"
+              style={{ minWidth: 0, width: '100%', height: '100%', border: 0, outline: 0, background: 'transparent', color: APG2_PROFILE.text, fontSize: 12, lineHeight: '16px', fontWeight: 720 }}
+            />
+            {String(actualSearchValue || '').trim() ? (
+              <button type="button" aria-label="Очистить поиск" onClick={() => { if (onSearchClear) onSearchClear(); if (!onSearchChange) setLocalSearch(''); }} style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.20)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2_PROFILE.textMuted, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 12, padding: 0 }}>×</button>
+            ) : (
+              <button type="button" aria-label="Запустить поиск" onClick={runSearch} style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.10)', color: APG2_PROFILE.gold, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 11, padding: 0 }}>↵</button>
+            )}
+          </div>
+          <button type="button" onClick={onOpenNotifications} aria-label="Уведомления" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
+            🔔
+            {unreadCount > 0 && <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />}
+          </button>
+          {workspaceAction}
+        </div>
+      </header>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.58fr) minmax(320px, 0.82fr)', gap: 14, alignItems: 'stretch' }}>
+        <GlassCard style={{ borderRadius: 34, padding: 0, minHeight: 188, overflow: 'hidden', position: 'relative', cursor: safeHeroActions[0]?.onClick ? 'pointer' : 'default' }} onClick={safeHeroActions[0]?.onClick}>
+          <div style={{ position: 'absolute', inset: -18, pointerEvents: 'none' }}>
+            {heroImage ? <img src={heroImage} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.44, filter: 'saturate(1.12) contrast(1.04)' }} /> : <div style={{ width: '100%', height: '100%', background: 'radial-gradient(circle at 28% 18%, rgba(244,217,140,0.28), transparent 42%), linear-gradient(135deg, rgba(24,29,48,0.70), rgba(var(--apg2-glass-a,255,255,255),0.08) 46%, rgba(14,12,18,0.32))' }} />}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.24) 42%, rgba(12,12,14,0.74))' }} />
+          </div>
+          <div style={{ position: 'relative', zIndex: 1, minHeight: 188, padding: 16, display: 'grid', alignContent: 'center' }}>
+            <div style={{ color: APG2_PROFILE.gold, fontWeight: 820, fontSize: 10.5, letterSpacing: 0.8, marginBottom: 7 }}>{heroKicker.toUpperCase()}</div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 34, lineHeight: '37px', fontWeight: 900, letterSpacing: 0, maxWidth: 760 }}>{heroTitle}</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '19px', marginTop: 8, maxWidth: 680 }}>{heroSubtitle}</div>
+            {safeHeroActions.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                {safeHeroActions.slice(0, 3).map(action => <GlassButton key={action.id || action.label} onClick={(event) => { event.stopPropagation(); action.onClick?.(); }} tone={action.tone || 'glass'} style={{ minHeight: 30, borderRadius: 999, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text }}>{action.label}</GlassButton>)}
+              </div>
+            )}
+          </div>
+        </GlassCard>
+        <GlassCard style={{ borderRadius: 30, padding: 12, minHeight: 188, display: 'grid', gridTemplateRows: '42px auto 1fr auto', gap: 8, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 8, alignItems: 'center' }}>
+            <button type="button" aria-label="Открыть профиль" onClick={onOpenProfile} style={{ width: 40, height: 40, border: 'none', padding: 0, borderRadius: 16, overflow: 'hidden', background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 13.5, fontWeight: 900, cursor: 'pointer' }}>
+              {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={event => { event.currentTarget.style.display = 'none'; }} /> : initials}
+            </button>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: APG2_PROFILE.text, fontWeight: 880, fontSize: 14.2, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.2, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userSubtitle}</div>
+            </div>
+            {profileBadge && <div style={{ borderRadius: 999, padding: '5px 8px', fontSize: 9.8, fontWeight: 820, color: APG2_PROFILE.gold, border: '1px solid rgba(201,168,76,0.36)', background: 'rgba(201,168,76,0.12)', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileBadge}</div>}
+          </div>
+          {safeStats.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeStats.length, 6)}, minmax(0, 1fr))`, gap: 5 }}>
+              {safeStats.slice(0, 6).map(stat => (
+                <div key={stat.label} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 12, padding: '5px 4px', textAlign: 'center', overflow: 'hidden' }}>
+                  <div style={{ color: stat.accent || APG2_PROFILE.text, fontSize: 12.2, lineHeight: '13px', fontWeight: 900 }}>{stat.value}</div>
+                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 7.5, lineHeight: '9px', fontWeight: 720, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'grid', gap: 5, alignSelf: 'center', minHeight: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 11, lineHeight: '13px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progressTitle || 'Сегодня для вас'}</div>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 9, lineHeight: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progressSubtitle || 'Локи подготовил контекст'}</div>
+              </div>
+              <button type="button" onClick={onOpenLoki} style={{ border: '1px solid rgba(201,168,76,0.30)', background: 'rgba(201,168,76,0.12)', color: APG2_PROFILE.gold, borderRadius: 999, padding: '5px 8px', fontSize: 10.5, fontWeight: 820, cursor: 'pointer' }}>Локи</button>
+            </div>
+            <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.12)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
+              <div style={{ width: `${safeProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${APG2_PROFILE.gold}, #E8C97A)`, transition: 'width 0.3s ease' }} />
+            </div>
+          </div>
+          {safeQuickActions.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeQuickActions.length, 3)}, minmax(0, 1fr))`, gap: 5 }}>
+              {safeQuickActions.slice(0, 3).map(action => <GlassButton key={action.id || action.label} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 27, borderRadius: 999, padding: '0 8px', fontSize: 9.8, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text }}>{action.label}</GlassButton>)}
+            </div>
+          )}
+        </GlassCard>
+      </div>
+    </section>
   );
 }
 
@@ -79,14 +252,6 @@ export function DesktopKpiStrip({ items = [], columns, style }) {
 
 export function DesktopContentGrid({ children, min = 260, gap = 14, style }) {
   return <ContentGrid min={min} gap={gap} style={style}>{children}</ContentGrid>;
-}
-
-export function DesktopRightRail({ children, title, subtitle, actions, style }) {
-  return (
-    <aside style={{ minWidth: 0, position: 'sticky', top: 'calc(18px + var(--safe-top, 0px))', display: 'grid', gap: 12, ...style }}>
-      {(title || actions) ? <DesktopSidebarCard title={title} subtitle={subtitle} actions={actions}>{children}</DesktopSidebarCard> : children}
-    </aside>
-  );
 }
 
 export function DesktopSidebarCard({ title, subtitle, actions, children, tone = 'quiet', style }) {

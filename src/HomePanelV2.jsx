@@ -11,6 +11,7 @@ import { formatEventPrice } from './eventPrice.js';
 import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, getNewsPhotoItems, getNewsReactionsTotal, getNewsStats, getNewsText, getNewsTitle, getNewsViews, getReadingMinutes, hasNewsVideo, isFreshNews } from './newsUtils.js';
 import { buildAdaptiveHomeData } from './interestEngine.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
+import { DesktopTopOverview } from './components/DesktopUI.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
@@ -221,7 +222,7 @@ const GlassHero = {
 const DESKTOP_LAYOUT = {
   containerMax: 'min(1960px, calc(100vw - 28px))',
   pagePaddingX: 'clamp(10px, 1.45vw, 24px)',
-  rightRailColumn: 'minmax(316px, 386px)',
+  supportColumn: 'minmax(316px, 386px)',
   firstHeroColumns: 'minmax(0, 1.36fr) minmax(316px, 386px)',
   secondColumns: 'minmax(0, 1fr) minmax(300px, 380px)',
   highlightColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
@@ -247,7 +248,7 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(2260px, calc(100vw - 48px))',
       pagePaddingX: 'clamp(14px, 1.55vw, 30px)',
-      rightRailColumn: 'minmax(390px, 430px)',
+      supportColumn: 'minmax(390px, 430px)',
       firstHeroColumns: 'minmax(0, 1.58fr) minmax(390px, 430px)',
       secondColumns: 'minmax(0, 1fr) minmax(390px, 430px)',
       sectionGap: 20,
@@ -267,7 +268,7 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(2100px, calc(100vw - 40px))',
       pagePaddingX: 'clamp(12px, 1.55vw, 28px)',
-      rightRailColumn: 'minmax(370px, 410px)',
+      supportColumn: 'minmax(370px, 410px)',
       firstHeroColumns: 'minmax(0, 1.52fr) minmax(370px, 410px)',
       secondColumns: 'minmax(0, 1fr) minmax(370px, 410px)',
       sectionGap: 18,
@@ -287,7 +288,7 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(1880px, calc(100vw - 34px))',
       pagePaddingX: 'clamp(12px, 1.5vw, 26px)',
-      rightRailColumn: 'minmax(350px, 398px)',
+      supportColumn: 'minmax(350px, 398px)',
       firstHeroColumns: 'minmax(0, 1.46fr) minmax(350px, 398px)',
       secondColumns: 'minmax(0, 1fr) minmax(350px, 398px)',
       sectionGap: 16,
@@ -307,7 +308,7 @@ const getDesktopLayout = (rawWidth = 1280) => {
       ...DESKTOP_LAYOUT,
       containerMax: 'min(1660px, calc(100vw - 28px))',
       pagePaddingX: 'clamp(10px, 1.35vw, 22px)',
-      rightRailColumn: 'minmax(326px, 382px)',
+      supportColumn: 'minmax(326px, 382px)',
       firstHeroColumns: 'minmax(0, 1.38fr) minmax(326px, 382px)',
       secondColumns: 'minmax(0, 1fr) minmax(326px, 382px)',
       sectionGap: 16,
@@ -814,6 +815,57 @@ function V2FirstScreenDesktop({
     { title: 'Акция дня', value: offerPartner?.offer || 'Актуальные предложения', onClick: offerPartner ? () => onOpenPartner?.(offerPartner) : onOpenOffers, icon: '✦' },
     { title: 'Рядом', value: 'Найти место рядом', onClick: onOpenNearby, icon: '📍' },
   ];
+
+  return (
+    <section style={{ position: 'relative', minHeight: 'auto', boxSizing: 'border-box', padding: `${DESKTOP_LAYOUT.topPad} ${desktopLayout.pagePaddingX} 18px`, overflow: 'hidden', background: V2.pageBg }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: desktopLayout.containerMax, margin: '0 auto' }}>
+        <DesktopTopOverview
+          activeSection="home"
+          navItems={navItems.map(item => ({ ...item, id: item.label === 'Главная' ? 'home' : item.label.toLowerCase() }))}
+          searchValue={desktopSearchQuery}
+          onSearchChange={setDesktopSearchQuery}
+          onSearchSubmit={runDesktopSearch}
+          onSearchClear={() => setDesktopSearchQuery('')}
+          unreadCount={unreadCount}
+          onOpenNotifications={onOpenNotifications}
+          onOpenLoki={onOpenLoki}
+          onOpenProfile={onOpenProfile}
+          workspaceAction={desktopWorkspaceAvailable && typeof onSwitchAppMode === 'function' ? (
+            <button
+              type="button"
+              onClick={() => onSwitchAppMode(desktopWorkspaceMode === 'workspace' ? 'user' : 'workspace')}
+              style={{ ...GlassBadge, borderRadius: 999, background: 'linear-gradient(145deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))', borderColor: 'rgba(201,168,76,0.42)', color: V2.text, cursor: 'pointer', minHeight: 30, padding: '0 10px', fontWeight: 760, fontSize: 10.8 }}
+            >
+              {desktopWorkspaceMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
+            </button>
+          ) : null}
+          userName={fullName}
+          userSubtitle="Мой профиль"
+          avatarUrl={avatarUrl}
+          initials={initials}
+          profileBadge={level.label}
+          heroTitle={heroTitle}
+          heroSubtitle={heroMeta}
+          heroKicker={`${greeting} · Сегодня в АПГ`}
+          heroImage={heroImage}
+          heroActions={[
+            { id: 'events', label: 'Все мероприятия', onClick: () => onOpenEvents?.() },
+            { id: 'partner', label: 'Найти партнёра', tone: 'gold', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : onOpenOffers },
+          ]}
+          stats={profileStats}
+          progressTitle={nextAchievement?.title || `До уровня ${nextLevel.label}`}
+          progressSubtitle={nextAchievement ? 'Следующее достижение' : keysToNext > 0 ? `Осталось ${keysToNext} ключей` : 'Новый уровень открыт'}
+          progressValue={nextAchievementProgress}
+          quickActions={[
+            { id: 'profile', label: 'Профиль', tone: 'gold', onClick: onOpenProfile },
+            { id: 'tasks', label: 'Достижения', onClick: onOpenTasks },
+            { id: 'rewards', label: 'Награды', onClick: onOpenRewards },
+          ]}
+          isOffline={isOffline}
+        />
+      </div>
+    </section>
+  );
 
   return (
     <section style={{
@@ -1849,7 +1901,7 @@ function V2SecondScreenDesktop({
   const desktopSecondRowGap = Math.max(7, desktopLayout.compactGap - 3);
   const desktopContentGrid = {
     display: 'grid',
-    gridTemplateColumns: `minmax(0, 1fr) minmax(0, 1fr) ${desktopLayout.rightRailColumn || 'minmax(326px, 382px)'}`,
+    gridTemplateColumns: `minmax(0, 1fr) minmax(0, 1fr) ${desktopLayout.supportColumn || 'minmax(326px, 382px)'}`,
     gap: desktopLayout.sectionGap,
     alignItems: 'start',
     alignContent: 'start',

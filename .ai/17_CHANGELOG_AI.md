@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-14] refactor: Desktop Top Overview Architecture
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/HomePanelV2.jsx`, `src/NewsPage.jsx`, `src/EventsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-news-page-test.mjs`, `scripts/desktop-events-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** refactor
+**Что изменено:**
+- Добавлен общий `DesktopTopOverview` для публичной desktop-версии: навигация, поиск, уведомления, быстрые действия, Локи, профиль и краткая сводка в одном верхнем уровне.
+- `DesktopSectionShell` больше не строит постоянную правую колонку; News и Events получают встроенные информационные блоки через `info` и общий top overview из `UserApp`.
+- Главная desktop-страница подключена к тому же `DesktopTopOverview`; мобильная версия, API, маршрутизация и бизнес-логика не изменялись.
+**Почему:** публичная desktop-часть должна ощущаться единым приложением, где меняются header, toolbar и контент, а не каждый раздел получает свою постоянную правую панель.
+
 ## [2026-07-14] feat: Desktop Events Experience
 **Коммит:** `pending`
 **Файлы:** `src/EventsPage.jsx`, `src/UserApp.jsx`, `scripts/desktop-events-page-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

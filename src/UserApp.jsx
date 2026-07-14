@@ -3580,6 +3580,78 @@ export function UserApp() {
     recommendations,
   };
 
+  const desktopOverviewSearch = (raw = '') => {
+    const query = String(raw || '').trim().toLowerCase().replace(/ё/g, 'е');
+    if (!query) return;
+    if (query.includes('новост') || query.includes('публикац')) goPanel('news');
+    else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) goPanel('events');
+    else if (query.includes('партнер') || query.includes('партн') || query.includes('акци') || query.includes('скид')) goPanel('offers');
+    else if (query.includes('эксперт') || query.includes('консультац')) goPanel('experts');
+    else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) goPanel('rewards');
+    else if (query.includes('рядом') || query.includes('карт')) goPanel('nearby');
+    else goPanel('loki');
+  };
+  const desktopOverviewUserName = [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник';
+  const desktopOverviewInitials = desktopOverviewUserName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
+  const desktopOverviewHero = events.find(event => event?.title) || news.find(item => item?.title || item?.text) || enrichedPartners[0] || null;
+  const desktopOverviewHeroImage = desktopOverviewHero?.coverPhoto || desktopOverviewHero?.imageUrl || desktopOverviewHero?.photoUrl || desktopOverviewHero?.photo || desktopOverviewHero?.image || '';
+  const desktopOverview = {
+    navItems: [
+      { id: 'home', label: 'Главная', onClick: () => goPanel('home') },
+      { id: 'news', label: 'Новости', onClick: () => goPanel('news') },
+      { id: 'events', label: 'Мероприятия', onClick: () => goPanel('events') },
+      { id: 'partners', label: 'Партнёры', onClick: () => goPanel('offers') },
+      { id: 'experts', label: 'Эксперты', onClick: () => goPanel('experts') },
+      { id: 'offers', label: 'Акции', onClick: () => goPanel('offers') },
+      { id: 'rewards', label: 'Подарки', onClick: () => goPanel('rewards') },
+    ],
+    onSearchSubmit: desktopOverviewSearch,
+    onSearchClear: () => {},
+    unreadCount,
+    onOpenNotifications: openNotifications,
+    onOpenLoki: () => goPanel('loki'),
+    onOpenProfile: () => goPanel('profile'),
+    workspaceAction: desktopWorkspaceAvailable ? (
+      <button
+        type="button"
+        onClick={() => setAppModePersisted(resolvedAppMode === 'workspace' ? 'user' : 'workspace')}
+        style={{ border: '1px solid rgba(201,168,76,0.42)', borderRadius: 999, background: 'linear-gradient(145deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))', color: APG2_PROFILE.text, cursor: 'pointer', minHeight: 30, padding: '0 10px', fontWeight: 760, fontSize: 10.8, fontFamily: 'inherit' }}
+      >
+        {resolvedAppMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
+      </button>
+    ) : null,
+    userName: desktopOverviewUserName,
+    userSubtitle: 'Мой профиль',
+    avatarUrl: user?.photo_200 || user?.photo || user?.avatarUrl || '',
+    initials: desktopOverviewInitials,
+    profileBadge: `${userKeys} ключей`,
+    heroTitle: desktopOverviewHero?.title || desktopOverviewHero?.name || 'Пульс города сегодня',
+    heroSubtitle: desktopOverviewHero?.date || desktopOverviewHero?.offer || 'Поиск, уведомления, быстрые действия и Локи остаются на одном месте.',
+    heroKicker: 'Сегодня в АПГ',
+    heroImage: desktopOverviewHeroImage,
+    heroActions: [
+      { id: 'events', label: 'Все мероприятия', onClick: () => goPanel('events') },
+      { id: 'loki', label: 'Спросить Локи', tone: 'gold', onClick: () => goPanel('loki') },
+    ],
+    stats: [
+      { label: 'Ключи', value: userKeys, accent: APG2_PROFILE.gold },
+      { label: 'Событий', value: registeredEventIds.length },
+      { label: 'Новости', value: news.length },
+      { label: 'Партнёров', value: enrichedPartners.length },
+      { label: 'Экспертов', value: experts.length },
+      { label: 'Увед.', value: unreadCount },
+    ],
+    progressTitle: personalHomeContext?.nextAchievement?.title || 'Сегодня для вас',
+    progressSubtitle: personalHomeContext?.lokiTip || 'Локи держит контекст приложения рядом.',
+    progressValue: Math.min(100, Math.max(8, Math.round((registeredEventIds.length + Object.keys(scannedPartnerIds).length + savedNews.length) * 7))),
+    quickActions: [
+      { id: 'profile', label: 'Профиль', tone: 'gold', onClick: () => goPanel('profile') },
+      { id: 'loki', label: 'Локи', onClick: () => goPanel('loki') },
+      { id: 'notify', label: 'Уведомления', onClick: openNotifications },
+    ],
+    isOffline: !isOnline,
+  };
+
   return (
     <ConfigProvider appearance={appearance}>
       <AdaptivityProvider>
@@ -3705,6 +3777,7 @@ export function UserApp() {
                     onToast={showToast}
                     onOpenLoki={() => goPanel('loki')}
                     initialNewsTarget={pendingLokiNewsTarget}
+                    desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
                   />
                 </Suspense>
@@ -3827,6 +3900,7 @@ export function UserApp() {
                     appearance={appearance}
                     initialEventTarget={pendingLokiEventTarget}
                     registeredEventIds={registeredEventIds}
+                    desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
                     onEventRegister={handleEventRegister}
                     onEventOpen={(event) => {

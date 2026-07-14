@@ -12,6 +12,7 @@ import {
   DesktopSectionTitle,
   DesktopSidebarCard,
   DesktopSkeleton,
+  DesktopTopOverview,
   DesktopToolbar,
 } from './components/DesktopUI.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
@@ -1344,6 +1345,7 @@ export function NewsPage({
   onToast,
   onOpenLoki,
   initialNewsTarget = null,
+  desktopOverview = null,
   desktopMode = false,
 }) {
   const [category, setCategory] = useState('all');
@@ -1487,10 +1489,22 @@ export function NewsPage({
   if (desktopMode) {
     const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 138 };
     const desktopInputStyle = { ...inputStyle, height: 42, borderRadius: 18, fontSize: 14, padding: '0 14px' };
-    const railButtonStyle = { width: '100%', border: 'none', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 11, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gap: 4 };
+    const infoButtonStyle = { width: '100%', border: 'none', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 11, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gap: 4 };
+    const renderNewsList = (items, source, metaOf, actionSource) => (
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.slice(0, 4).map(item => (
+          <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, actionSource)} style={infoButtonStyle}>
+            <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 820 }}>{metaOf(item)}</span>
+            <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
+          </button>
+        ))}
+        {items.length === 0 && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '19px' }}>{source}</div>}
+      </div>
+    );
     return (
       <div ref={pageRef} data-apg-scroll-root="news-feed" onScroll={handlePageScroll} style={{ height: '100svh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', background: APG2_PROFILE.bg }}>
         <DesktopSectionShell
+          topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="news" /> : null}
           header={
             <DesktopHeader
               title="Новости"
@@ -1526,46 +1540,25 @@ export function NewsPage({
             />
           }
           kpi={<DesktopKpiStrip items={kpiItems} />}
-          rightRail={
-            <>
+          info={
+            <DesktopContentGrid min={260} gap={12}>
               <DesktopSidebarCard title="Популярное" subtitle="Самое читаемое">
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {popular.map(item => (
-                    <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'popular_rail')} style={railButtonStyle}>
-                      <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 820 }}>{getNewsViews(item)} просмотров</span>
-                      <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
-                    </button>
-                  ))}
-                </div>
+                {renderNewsList(popular, 'Популярные материалы появятся позже.', item => `${getNewsViews(item)} просмотров`, 'popular_inline')}
               </DesktopSidebarCard>
               {freshItems.length > 0 && (
                 <DesktopSidebarCard title="Новое" subtitle="Свежие публикации">
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {freshItems.map(item => (
-                      <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'fresh_rail')} style={railButtonStyle}>
-                        <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, fontWeight: 760 }}>{formatNewsDate(item)}</span>
-                        <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {renderNewsList(freshItems, 'Свежие публикации появятся позже.', formatNewsDate, 'fresh_inline')}
                 </DesktopSidebarCard>
               )}
               {savedItems.length > 0 && (
                 <DesktopSidebarCard title="Сохранённые" subtitle="Ваши материалы">
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {savedItems.map(item => (
-                      <button key={item.id || getNewsTitle(item)} type="button" onClick={() => openNewsItem(item, 'saved_rail')} style={railButtonStyle}>
-                        <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, fontWeight: 820 }}>Сохранено</span>
-                        <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{getNewsTitle(item)}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {renderNewsList(savedItems, 'Сохранённых материалов пока нет.', () => 'Сохранено', 'saved_inline')}
                 </DesktopSidebarCard>
               )}
               <DesktopSidebarCard title="Категории" subtitle="Быстрый фильтр">
                 <div style={{ display: 'grid', gap: 7 }}>
                   {categoryCounts.slice(0, 9).map(item => (
-                    <button key={item.id} type="button" onClick={() => { setCategory(item.id); setVisibleCount(12); scrollToTop(); }} style={{ ...railButtonStyle, gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'center', color: category === item.id ? APG2_PROFILE.gold : APG2_PROFILE.text }}>
+                    <button key={item.id} type="button" onClick={() => { setCategory(item.id); setVisibleCount(12); scrollToTop(); }} style={{ ...infoButtonStyle, gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'center', color: category === item.id ? APG2_PROFILE.gold : APG2_PROFILE.text }}>
                       <span style={{ fontSize: 13, fontWeight: 830 }}>{item.label}</span>
                       <span style={{ color: APG2_PROFILE.textMuted, fontSize: 12, fontWeight: 780 }}>{item.count}</span>
                     </button>
@@ -1577,7 +1570,7 @@ export function NewsPage({
                   Используйте поиск, категории и период в одной строке. Статья, комментарии и Локи открываются через существующий просмотр материала.
                 </div>
               </DesktopSidebarCard>
-            </>
+            </DesktopContentGrid>
           }
           actionBar={(newItemsCount > 0 || showTopButton) && (
             <DesktopActionBar

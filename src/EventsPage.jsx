@@ -13,6 +13,7 @@ import {
   DesktopSectionTitle,
   DesktopSidebarCard,
   DesktopSkeleton,
+  DesktopTopOverview,
   DesktopToolbar,
 } from './components/DesktopUI.jsx';
 import { EventDetailSheet } from './EventDetailSheet.jsx';
@@ -584,7 +585,7 @@ function EventsCalendarView({ events, selectedDay, onSelectDay, onOpenEvent }) {
   );
 }
 
-export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen, onAskQuestion, onCreateEvent, desktopMode = false }) {
+export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearance = 'dark', initialEventTarget = null, registeredEventIds = [], onEventRegister, onEventOpen, onAskQuestion, onCreateEvent, desktopOverview = null, desktopMode = false }) {
   const isDark = appearance === 'dark';
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [tab, setTab] = useState('upcoming');
@@ -767,11 +768,11 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
   if (variant === 'v2' && desktopMode) {
     const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 132 };
     const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box' };
-    const railButtonStyle = { width: '100%', border: 'none', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 11, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gap: 4 };
+    const infoButtonStyle = { width: '100%', border: 'none', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.text, padding: 11, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gap: 4 };
     const renderRailList = (items, source) => (
       <div style={{ display: 'grid', gap: 8 }}>
-        {items.map(event => (
-          <button key={event.id || event.title} type="button" onClick={() => openEventSheet(event)} style={railButtonStyle}>
+        {items.slice(0, 4).map(event => (
+          <button key={event.id || event.title} type="button" onClick={() => openEventSheet(event)} style={infoButtonStyle}>
             <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, fontWeight: 820 }}>{formatEventDate(event)}{formatEventTime(event) ? ` · ${formatEventTime(event)}` : ''}</span>
             <span style={{ fontSize: 13.5, lineHeight: '18px', fontWeight: 840, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Мероприятие АПГ'}</span>
             <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.partner || event.address || eventCategoryLabel(event)}</span>
@@ -783,7 +784,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
     return (
       <DesktopSectionShell
         maxWidth={1420}
-        railWidth={360}
+        topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="events" /> : null}
         header={
           <DesktopHeader
             title="Мероприятия"
@@ -829,8 +830,8 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
           />
         }
         kpi={<DesktopKpiStrip items={kpiItems} />}
-        rightRail={
-          <>
+        info={
+          <DesktopContentGrid min={260} gap={12}>
             <DesktopSidebarCard title="Сегодня" subtitle={`${todayEvents.length} событий`}>
               {renderRailList(todayEvents.slice(0, 5), 'На сегодня мероприятий нет.')}
             </DesktopSidebarCard>
@@ -860,7 +861,7 @@ export function EventsPage({ nav, variant = 'v2', events = [], onBack, appearanc
                 Используйте поиск и фильтры в одной строке. Детальная карточка, регистрация, вопросы организатору и маршрут открываются через существующий экран мероприятия.
               </div>
             </DesktopSidebarCard>
-          </>
+          </DesktopContentGrid>
         }
         actionBar={
           <DesktopActionBar

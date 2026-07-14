@@ -12,6 +12,7 @@ const requiredFrameworkComponents = [
   'DesktopToolbar',
   'DesktopKpiStrip',
   'DesktopContentGrid',
+  'DesktopTopOverview',
   'DesktopSidebarCard',
   'DesktopActionBar',
   'DesktopEmptyState',
@@ -29,12 +30,16 @@ if (!newsSource.includes("from './components/DesktopUI.jsx'")) {
   throw new Error('NewsPage must use the shared Desktop UI Framework.');
 }
 
-if (!desktopUiSource.includes('export function DesktopRightRail') || !desktopUiSource.includes('export function DesktopMetricCard')) {
-  throw new Error('Desktop UI Framework must provide DesktopRightRail and DesktopMetricCard for NewsPage composition.');
+if (!desktopUiSource.includes('export function DesktopTopOverview') || !desktopUiSource.includes('export function DesktopMetricCard')) {
+  throw new Error('Desktop UI Framework must provide DesktopTopOverview and DesktopMetricCard for NewsPage composition.');
 }
 
-if (!desktopUiSource.includes('<DesktopRightRail') || !desktopUiSource.includes('<DesktopMetricCard')) {
-  throw new Error('DesktopSectionShell/DesktopKpiStrip must compose right rail and metric cards.');
+if (desktopUiSource.includes('<DesktopRightRail') || newsSource.includes('rightRail=')) {
+  throw new Error('NewsPage desktop experience must not use a permanent right rail.');
+}
+
+if (!desktopUiSource.includes('<DesktopMetricCard')) {
+  throw new Error('DesktopKpiStrip must compose metric cards.');
 }
 
 if (!newsSource.includes('desktopMode = false') || !newsSource.includes('if (desktopMode)')) {
@@ -43,6 +48,10 @@ if (!newsSource.includes('desktopMode = false') || !newsSource.includes('if (des
 
 if (!userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktopMode from desktopDevice to NewsPage.');
+}
+
+if (!userAppSource.includes('desktopOverview={desktopOverview}')) {
+  throw new Error('UserApp must pass the shared DesktopTopOverview data to NewsPage.');
 }
 
 if (!newsSource.includes('data-apg-horizontal-scroll="true"')) {

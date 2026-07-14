@@ -11,7 +11,7 @@ const requiredExports = [
   'DesktopToolbar',
   'DesktopKpiStrip',
   'DesktopContentGrid',
-  'DesktopRightRail',
+  'DesktopTopOverview',
   'DesktopSidebarCard',
   'DesktopMetricCard',
   'DesktopEmptyState',
@@ -40,6 +40,10 @@ if (missingWorkspaceReuse.length) {
 
 if (!source.includes('../workspace/WorkspaceComponents.jsx')) {
   throw new Error('Desktop UI framework must reuse WorkspaceComponents instead of copying them.');
+}
+
+if (source.includes('<DesktopRightRail')) {
+  throw new Error('DesktopSectionShell must not compose a permanent right rail.');
 }
 
 console.log('desktop-ui-framework-test: ok');

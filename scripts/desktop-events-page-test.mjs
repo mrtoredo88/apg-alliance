@@ -12,6 +12,7 @@ const requiredFrameworkComponents = [
   'DesktopToolbar',
   'DesktopKpiStrip',
   'DesktopContentGrid',
+  'DesktopTopOverview',
   'DesktopSidebarCard',
   'DesktopActionBar',
   'DesktopEmptyState',
@@ -29,8 +30,12 @@ if (!eventsSource.includes("from './components/DesktopUI.jsx'")) {
   throw new Error('EventsPage must use the shared Desktop UI Framework.');
 }
 
-if (!desktopUiSource.includes('export function DesktopRightRail') || !desktopUiSource.includes('export function DesktopMetricCard')) {
-  throw new Error('Desktop UI Framework must provide DesktopRightRail and DesktopMetricCard for events composition.');
+if (!desktopUiSource.includes('export function DesktopTopOverview') || !desktopUiSource.includes('export function DesktopMetricCard')) {
+  throw new Error('Desktop UI Framework must provide DesktopTopOverview and DesktopMetricCard for events composition.');
+}
+
+if (desktopUiSource.includes('<DesktopRightRail') || eventsSource.includes('rightRail=')) {
+  throw new Error('EventsPage desktop experience must not use a permanent right rail.');
 }
 
 if (!eventsSource.includes('desktopMode = false') || !eventsSource.includes("variant === 'v2' && desktopMode")) {
@@ -39,6 +44,10 @@ if (!eventsSource.includes('desktopMode = false') || !eventsSource.includes("var
 
 if (!userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktopMode from desktopDevice to EventsPage.');
+}
+
+if (!userAppSource.includes('desktopOverview={desktopOverview}')) {
+  throw new Error('UserApp must pass the shared DesktopTopOverview data to EventsPage.');
 }
 
 if (!eventsSource.includes("variant === 'v2'") || !eventsSource.includes('overflowX')) {
