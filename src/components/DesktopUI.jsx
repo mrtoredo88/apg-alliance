@@ -673,6 +673,8 @@ export function DesktopCatalogEntityCard({
   const safeMeta = asArray(meta).filter(item => item?.value).slice(0, 4);
   const safeTags = asArray(tags).filter(item => item?.label || item).slice(0, 4);
   const safeActions = asArray(actions).slice(0, 4);
+  const metaSlots = Array.from({ length: 4 }, (_, index) => safeMeta[index] || null);
+  const tagSlots = Array.from({ length: 3 }, (_, index) => safeTags[index] || null);
   return (
     <DesktopCardHover active={active}>
       <GlassCard
@@ -684,15 +686,17 @@ export function DesktopCatalogEntityCard({
           borderRadius: 20,
           padding: 0,
           overflow: 'hidden',
-          minHeight: 268,
+          height: 316,
           cursor: onClick ? 'pointer' : 'default',
           border: selected ? '1px solid rgba(201,168,76,0.64)' : APG2_PROFILE.glass.border,
+          display: 'grid',
+          gridTemplateRows: '78px minmax(0, 1fr)',
           background: active ? 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.07))' : undefined,
           transition: motionTransition(['background', 'border-color'], 'base'),
           ...style,
         }}
       >
-        <div style={{ height: 92, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)' }}>
+        <div style={{ height: 78, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)' }}>
           {cover ? <img src={cover} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.86 }} /> : null}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.02), rgba(12,12,14,0.42))' }} />
           {safeBadges.length > 0 && (
@@ -706,39 +710,44 @@ export function DesktopCatalogEntityCard({
             </div>
           ) : null}
         </div>
-        <div style={{ position: 'relative', padding: '14px 14px 13px', display: 'grid', gap: 8, minWidth: 0 }}>
+        <div style={{ position: 'relative', padding: '12px 12px 11px', display: 'grid', gridTemplateRows: '38px 32px 42px 22px 36px 34px', gap: 7, minWidth: 0, minHeight: 0 }}>
           {avatar && (
-            <div style={{ position: 'absolute', left: 14, top: -28, width: 58, height: 58, borderRadius: 20, padding: 5, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.88)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.56)', boxShadow: '0 16px 34px rgba(0,0,0,0.18)' }}>
+            <div style={{ position: 'absolute', left: 12, top: -24, width: 54, height: 54, borderRadius: 18, padding: 5, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.88)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.56)', boxShadow: '0 16px 34px rgba(0,0,0,0.18)' }}>
               {avatar}
             </div>
           )}
-          <div style={{ paddingLeft: avatar ? 68 : 0, minHeight: 39, display: 'grid', alignContent: 'center', minWidth: 0 }}>
+          <div style={{ paddingLeft: avatar ? 64 : 0, display: 'grid', alignContent: 'center', minWidth: 0 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '19px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
             {subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.2, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
           </div>
-          {description && (
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', minHeight: 32, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</div>
-          )}
-          {safeMeta.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: safeMeta.length > 2 ? 'repeat(2, minmax(0, 1fr))' : `repeat(${safeMeta.length}, minmax(0, 1fr))`, gap: 6 }}>
-              {safeMeta.map(item => (
-                <div key={item.id || item.label} style={{ minWidth: 0, borderRadius: 12, padding: '6px 7px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description || ''}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
+            {metaSlots.map((item, index) => (
+              <div key={item?.id || item?.label || `meta-${index}`} style={{ minWidth: 0, borderRadius: 11, padding: '5px 7px', background: item ? 'rgba(var(--apg2-glass-a,255,255,255),0.06)' : 'transparent', border: item ? '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' : '1px solid transparent', overflow: 'hidden' }}>
+                {item ? (
+                  <>
                   <div style={{ color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.text, fontSize: 11.2, lineHeight: '13px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</div>
                   <div style={{ color: APG2_PROFILE.textMuted, fontSize: 8.8, lineHeight: '10px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {safeTags.length > 0 && <DesktopCardTags items={safeTags} style={{ minHeight: 22 }} />}
-          {(contact || offer) && (
-            <div style={{ display: 'grid', gap: 5 }}>
-              {contact && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.8, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact}</div>}
-              {offer && <div style={{ color: '#17120a', background: APG2_PROFILE.goldSoft, border: '1px solid rgba(201,168,76,0.30)', borderRadius: 12, padding: '6px 8px', fontSize: 10.8, lineHeight: '14px', fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offer}</div>}
-            </div>
-          )}
-          {safeActions.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: safeActions.length > 2 ? '1.12fr 1fr auto' : `repeat(${safeActions.length}, minmax(0, 1fr))`, gap: 7, alignItems: 'center' }}>
-              {safeActions.slice(0, 3).map(action => (
+                  </>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
+            {tagSlots.map((item, index) => (
+              item ? (
+                <span key={item.id || item.label || item} style={{ minWidth: 0, maxWidth: index === 0 ? '48%' : '28%', borderRadius: 999, padding: '3px 7px', color: APG2_PROFILE.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', fontSize: 10, lineHeight: '12px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.label || item}
+                </span>
+              ) : <span key={`tag-${index}`} style={{ width: index === 0 ? '48%' : '28%' }} />
+            ))}
+          </div>
+          <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact || ''}</div>
+            <div style={{ color: offer ? '#17120a' : 'transparent', background: offer ? APG2_PROFILE.goldSoft : 'transparent', border: offer ? '1px solid rgba(201,168,76,0.30)' : '1px solid transparent', borderRadius: 11, padding: '4px 7px', fontSize: 10.5, lineHeight: '13px', fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offer || ''}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: safeActions.length > 2 ? '1.12fr 1fr auto' : `repeat(${Math.max(safeActions.length, 1)}, minmax(0, 1fr))`, gap: 7, alignItems: 'center' }}>
+            {safeActions.slice(0, 3).map(action => (
                 <GlassButton
                   key={action.id || action.label}
                   disabled={action.disabled}
@@ -751,9 +760,8 @@ export function DesktopCatalogEntityCard({
                 >
                   {action.label}
                 </GlassButton>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       </GlassCard>
     </DesktopCardHover>

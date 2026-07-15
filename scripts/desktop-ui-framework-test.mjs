@@ -72,6 +72,10 @@ if (!source.includes('onMouseEnter') || !source.includes('translateY(-3px)') || 
   throw new Error('Desktop Catalog Framework must include desktop hover behavior and preview composition.');
 }
 
+if (!source.includes('height: 316') || !source.includes("gridTemplateRows: '78px minmax(0, 1fr)'")) {
+  throw new Error('Desktop Catalog Entity Card must enforce fixed height and a stable baseline grid.');
+}
+
 if (!source.includes('DesktopDetailShell') || !source.includes('DesktopDetailTabs') || !source.includes('DesktopHeroActions')) {
   throw new Error('Desktop Detail Framework must provide shared shell, tabs and hero actions for partner/expert cards.');
 }

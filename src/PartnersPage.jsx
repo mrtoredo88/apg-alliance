@@ -297,11 +297,12 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
   ].filter(Boolean);
   const relatedEvents = useMemo(() => selectedPartner ? events.filter(event => String(event?.partnerId || event?.partner?.id || event?.partnerName || event?.partner || '') === String(selectedPartner.id) || text(event?.partnerName || event?.partner).toLowerCase() === text(selectedPartner.name).toLowerCase()).slice(0, 3) : [], [events, selectedPartner]);
   const relatedNews = useMemo(() => selectedPartner ? news.filter(item => String(item?.partnerId || item?.partner?.id || '') === String(selectedPartner.id) || text(item?.partnerName || item?.partner).toLowerCase() === text(selectedPartner.name).toLowerCase()).slice(0, 3) : [], [news, selectedPartner]);
-  const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
-  const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2_PROFILE.textMuted };
+  const compactKpiItems = kpiItems.map(item => ({ ...item, style: { minHeight: 70, padding: '10px 44px 10px 12px', ...(item.style || {}) } }));
+  const selectStyle = { height: 36, borderRadius: 15, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.28)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 12.2, fontWeight: 760, padding: '0 10px', minWidth: 118 };
+  const searchStyle = { height: 36, borderRadius: 15, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.28)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 720, padding: '0 12px', minWidth: 220, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2_PROFILE.textMuted };
   const gridColumns = getCatalogColumns(viewportWidth);
-  const showCatalogRail = viewportWidth >= 1180 && view !== 'map';
-  const effectiveGridColumns = showCatalogRail ? Math.min(gridColumns, 3) : gridColumns;
+  const showCatalogRail = viewportWidth >= 1180 && view === 'split';
+  const effectiveGridColumns = showCatalogRail ? Math.min(gridColumns, 2) : gridColumns;
   const catalogGridStyle = view === 'list'
     ? { gridTemplateColumns: 'minmax(0, 1fr)' }
     : view === 'split'
@@ -340,6 +341,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
       }
       toolbar={
         <DesktopToolbar
+          style={{ padding: 7, borderRadius: 22 }}
           leading={<input type="search" ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск по названию, категории, адресу" aria-label="Поиск партнёров" style={searchStyle} />}
           trailing={
             <>
@@ -353,7 +355,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
           }
         />
       }
-      kpi={<DesktopKpiStrip items={kpiItems} />}
+      kpi={<DesktopKpiStrip items={compactKpiItems} style={{ gap: 8 }} />}
       actionBar={<DesktopActionBar actions={viewModes.map(([id, label]) => ({ id, label, tone: view === id ? 'gold' : undefined, onClick: () => setView(id) }))} />}
     >
       <div style={{ display: 'grid', gridTemplateColumns: showCatalogRail ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>

@@ -48,6 +48,10 @@ if (!expertsSource.includes('<DesktopCatalogGrid') || !expertsSource.includes('<
   throw new Error('ExpertsPage desktop cards must be assembled from Desktop Catalog Framework components.');
 }
 
+if (!expertsSource.includes("const showCatalogRail = viewportWidth >= 1180 && viewMode === 'split'")) {
+  throw new Error('ExpertsPage must keep Quick Preview out of the default Grid/List catalog.');
+}
+
 const expertCardStart = expertsSource.indexOf('function ExpertCatalogCard');
 const expertCardEnd = expertsSource.indexOf('function ExpertsMapPreview');
 const expertCardSource = expertsSource.slice(expertCardStart, expertCardEnd);

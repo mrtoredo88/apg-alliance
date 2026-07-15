@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] fix: Desktop Catalog Baseline Grid
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- `DesktopCatalogEntityCard` получил фиксированную высоту и фиксированные внутренние слоты: описание, мета, теги, адрес/акция и CTA больше не растягивают карточку.
+- Quick Preview убран из обычного Grid/List каталога партнёров и экспертов; правая панель остаётся только в Split-режиме.
+- KPI и toolbar каталогов стали компактнее, чтобы сетка была главным элементом первого экрана.
+**Почему:** каталог должен выглядеть как единая desktop-сетка с одинаковой высотой карточек, ровным baseline и CTA на одном уровне.
+
 ## [2026-07-15] feat: Desktop Catalog Card Redesign
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

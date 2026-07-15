@@ -1294,16 +1294,17 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
     topCount > 0 && { id: 'top', label: 'В топе', value: topCount, icon: '★' },
     newCount > 0 && { id: 'new', label: 'Новые', value: newCount, icon: '↗' },
   ].filter(Boolean);
+  const compactDesktopKpiItems = desktopKpiItems.map(item => ({ ...item, style: { minHeight: 70, padding: '10px 44px 10px 12px', ...(item.style || {}) } }));
   const desktopColumns = getDesktopCatalogColumns(viewportWidth);
-  const showCatalogRail = viewportWidth >= 1180 && viewMode !== 'map';
-  const effectiveDesktopColumns = showCatalogRail ? Math.min(desktopColumns, 3) : desktopColumns;
+  const showCatalogRail = viewportWidth >= 1180 && viewMode === 'split';
+  const effectiveDesktopColumns = showCatalogRail ? Math.min(desktopColumns, 2) : desktopColumns;
   const desktopGridStyle = viewMode === 'list'
     ? { gridTemplateColumns: 'minmax(0, 1fr)' }
     : viewMode === 'split'
       ? { gridTemplateColumns: `repeat(${Math.min(effectiveDesktopColumns, 2)}, minmax(0, 1fr))` }
       : { gridTemplateColumns: `repeat(${effectiveDesktopColumns}, minmax(0, 1fr))` };
-  const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
-  const desktopSearchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 240, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2.textMuted };
+  const selectStyle = { height: 36, borderRadius: 15, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.28)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 12.2, fontWeight: 760, padding: '0 10px', minWidth: 118 };
+  const desktopSearchStyle = { height: 36, borderRadius: 15, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.28)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 720, padding: '0 12px', minWidth: 240, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2.textMuted };
 
   useEffect(() => {
     if (!isActive && selected) setSelected(null);
@@ -1335,8 +1336,9 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           />
         }
         toolbar={
-          <DesktopToolbar
-            leading={<input type="search" ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Поиск по имени, специализации, категории" aria-label="Поиск экспертов" style={desktopSearchStyle} />}
+        <DesktopToolbar
+          style={{ padding: 7, borderRadius: 22 }}
+          leading={<input type="search" ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Поиск по имени, специализации, категории" aria-label="Поиск экспертов" style={desktopSearchStyle} />}
             trailing={
               <>
                 <select aria-label="Формат консультации" value={filter} onChange={event => setFilter(event.target.value)} style={selectStyle}>
@@ -1361,7 +1363,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             }
           />
         }
-        kpi={<DesktopKpiStrip items={desktopKpiItems} />}
+        kpi={<DesktopKpiStrip items={compactDesktopKpiItems} style={{ gap: 8 }} />}
         actionBar={<DesktopActionBar actions={EXPERT_VIEW_MODES.map(([id, label]) => ({ id, label, tone: viewMode === id ? 'gold' : undefined, onClick: () => setViewMode(id) }))} />}
       >
         <div style={{ display: 'grid', gridTemplateColumns: showCatalogRail ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>

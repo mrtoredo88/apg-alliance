@@ -77,6 +77,10 @@ if (!partnersSource.includes('<DesktopCatalogGrid') || !partnersSource.includes(
   throw new Error('PartnersPage desktop cards must be assembled from Desktop Catalog Framework components.');
 }
 
+if (!partnersSource.includes("const showCatalogRail = viewportWidth >= 1180 && view === 'split'")) {
+  throw new Error('PartnersPage must keep Quick Preview out of the default Grid/List catalog.');
+}
+
 const partnerCardStart = partnersSource.indexOf('function PartnerCatalogCard');
 const partnerCardEnd = partnersSource.indexOf('function PartnersMapPreview');
 const partnerCardSource = partnersSource.slice(partnerCardStart, partnerCardEnd);
