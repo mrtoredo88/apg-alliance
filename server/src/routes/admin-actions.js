@@ -9,8 +9,9 @@ import { ECONOMY_VERSION, economyMigrationPatch } from '../../../server-shared/e
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentTitle, getLifecycleAutoRecommendation, normalizeContentStatus, summarizeLifecycle } from '../../../server-shared/content-lifecycle.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
+import { buildApgNewsDistributionPatch } from '../../../server-shared/workspace-news.js';
 
-const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
+const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
   partners: { collection: 'partners', scope: 'partners', label: 'партнёр' },
   experts: { collection: 'experts', scope: 'experts', label: 'эксперт' },
@@ -501,6 +502,7 @@ async function handleLifecycleAction(db, request, actor) {
           reason,
           serverTimestamp: new Date().toISOString(),
         });
+        if (resource === 'news' && nextStatus === 'published') Object.assign(patch, buildApgNewsDistributionPatch());
         patch.updatedAt = FieldValue.serverTimestamp();
         await ref.set(patch, { merge: true });
         await writeAuditLog(db, request, actor, `${config.scope}:lifecycle:${nextStatus}`, config.collection, id, {
@@ -1576,7 +1578,7 @@ async function handleNewsAction(db, request, actor) {
         error.statusCode = 400;
         throw error;
       }
-      const data = { ...patch, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
+      const data = { ...buildApgNewsDistributionPatch(), ...patch, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
       const ref = await db.collection('news').add(data);
       await writeHistory(db, actor, ref.id, 'create', null, data);
       await writeAuditLog(db, request, actor, 'create', 'news', ref.id, { label: `Создана новость: ${patch.title}` });
@@ -1613,7 +1615,7 @@ async function handleNewsAction(db, request, actor) {
   if (action === 'news:publish') {
     await requireAdminPermission(request, 'news:publish');
     return runIdempotent(db, actor, idempotencyKey, async () => {
-      const patch = { active: true, status: 'published', publishedAt: before.publishedAt || FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
+      const patch = { ...buildApgNewsDistributionPatch(), active: true, status: 'published', publishedAt: before.publishedAt || FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
       await ref.update(patch);
       await writeHistory(db, actor, id, 'publish', before, patch);
       await writeAuditLog(db, request, actor, 'publish', 'news', id, { label: `Опубликована новость: ${before.title || id}` });

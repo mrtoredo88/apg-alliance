@@ -39,7 +39,10 @@ import {
 } from '../../../server-shared/workspace-bookings.js';
 import { sanitizeDialogWorkspaceNotes } from '../../../server-shared/workspace-dialogs.js';
 import {
+  buildApgNewsDistributionPatch,
+  buildProfileOnlyNewsPatch,
   buildWorkspaceNewsFromEvent,
+  isApgNewsPublication,
   sanitizeWorkspaceNewsPatch,
   workspaceNewsBelongsToProfile,
 } from '../../../server-shared/workspace-news.js';
@@ -1498,8 +1501,13 @@ async function actionWorkspaceNewsSave(db, req, actor) {
     const data = {
       ...workspaceNewsProfilePayload(profile, role),
       ...patch,
-      status: patch.status || 'draft',
-      active: patch.active === true,
+      ...buildProfileOnlyNewsPatch(),
+      status: 'published',
+      lifecycleStatus: 'published',
+      contentStatus: 'published',
+      active: true,
+      publishedAt: FieldValue.serverTimestamp(),
+      profilePublishedAt: FieldValue.serverTimestamp(),
       commentsEnabled: patch.commentsEnabled !== false,
       source: patch.source || 'workspace',
       createdByUserId: actor.userId,
@@ -1513,23 +1521,40 @@ async function actionWorkspaceNewsSave(db, req, actor) {
   }
   const { ref, news, profile } = await assertWorkspaceNewsAccess(db, req, actor);
   const currentStatus = normalizeContentStatus(news);
-  const lifecyclePatch = currentStatus === 'published' && req.body?.submit !== true
+  const lifecyclePatch = isApgNewsPublication(news) && currentStatus === 'published' && req.body?.submit !== true
     ? buildLifecyclePatch({ item: news, resource: 'news', nextStatus: 'moderation', actorId: actor.userId, reason: 'Редактирование опубликованной новости из Workspace' })
     : {};
   const data = {
     ...patch,
+    ...(isApgNewsPublication(news) ? {} : buildProfileOnlyNewsPatch()),
+    ...(isApgNewsPublication(news) ? {} : {
+      status: 'published',
+      lifecycleStatus: 'published',
+      contentStatus: 'published',
+      active: true,
+      profilePublishedAt: news.profilePublishedAt || FieldValue.serverTimestamp(),
+    }),
     ...lifecyclePatch,
     updatedByUserId: actor.userId,
     updatedAt: FieldValue.serverTimestamp(),
   };
   await ref.set(data, { merge: true });
   await audit(db, req, actor, 'workspaceNews:update', 'news', ref.id, 'success', { fields: Object.keys(patch), profileId: profile.id });
-  return { ok: true, id: ref.id, patch: { ...patch, lifecycleStatus: lifecyclePatch.lifecycleStatus || news.lifecycleStatus || '', contentStatus: lifecyclePatch.contentStatus || news.contentStatus || '' }, news: { ...news, ...patch, id: ref.id, lifecycleStatus: lifecyclePatch.lifecycleStatus || news.lifecycleStatus || '', contentStatus: lifecyclePatch.contentStatus || news.contentStatus || '', status: lifecyclePatch.contentStatus || patch.status || news.status, updatedAt: new Date().toISOString() } };
+  const responsePatch = {
+    ...patch,
+    ...(isApgNewsPublication(news) ? {} : buildProfileOnlyNewsPatch()),
+    lifecycleStatus: lifecyclePatch.lifecycleStatus || (isApgNewsPublication(news) ? news.lifecycleStatus || '' : 'published'),
+    contentStatus: lifecyclePatch.contentStatus || (isApgNewsPublication(news) ? news.contentStatus || '' : 'published'),
+    status: lifecyclePatch.contentStatus || (isApgNewsPublication(news) ? patch.status || news.status : 'published'),
+    active: lifecyclePatch.active ?? (isApgNewsPublication(news) ? patch.active ?? news.active : true),
+  };
+  return { ok: true, id: ref.id, patch: responsePatch, news: { ...news, ...responsePatch, id: ref.id, updatedAt: new Date().toISOString() } };
 }
 
 async function actionWorkspaceNewsSubmit(db, req, actor) {
   const { ref, news, profile } = await assertWorkspaceNewsAccess(db, req, actor);
   const patch = {
+    ...buildApgNewsDistributionPatch(),
     ...buildLifecyclePatch({ item: news, resource: 'news', nextStatus: 'moderation', actorId: actor.userId, reason: safeString(req.body?.reason || 'Отправлено на модерацию из Workspace', 500) }),
     submittedAt: FieldValue.serverTimestamp(),
     submittedByUserId: actor.userId,
@@ -1537,7 +1562,7 @@ async function actionWorkspaceNewsSubmit(db, req, actor) {
   };
   await ref.set(patch, { merge: true });
   await audit(db, req, actor, 'workspaceNews:submit', 'news', ref.id, 'success', { profileId: profile.id });
-  return { ok: true, id: ref.id, patch: { status: 'moderation', lifecycleStatus: 'moderation', contentStatus: 'moderation', active: false }, news: { ...news, id: ref.id, status: 'moderation', lifecycleStatus: 'moderation', contentStatus: 'moderation', active: false, updatedAt: new Date().toISOString() } };
+  return { ok: true, id: ref.id, patch: { ...buildApgNewsDistributionPatch(), status: 'moderation', lifecycleStatus: 'moderation', contentStatus: 'moderation', active: false }, news: { ...news, ...buildApgNewsDistributionPatch(), id: ref.id, status: 'moderation', lifecycleStatus: 'moderation', contentStatus: 'moderation', active: false, updatedAt: new Date().toISOString() } };
 }
 
 async function actionWorkspaceNewsArchive(db, req, actor) {
@@ -1563,6 +1588,13 @@ async function actionWorkspaceNewsFromEvent(db, req, actor) {
   const draft = {
     ...workspaceNewsProfilePayload(profile, role),
     ...buildWorkspaceNewsFromEvent(event, profile, role),
+    ...buildProfileOnlyNewsPatch(),
+    status: 'published',
+    lifecycleStatus: 'published',
+    contentStatus: 'published',
+    active: true,
+    publishedAt: FieldValue.serverTimestamp(),
+    profilePublishedAt: FieldValue.serverTimestamp(),
     createdByUserId: actor.userId,
     updatedByUserId: actor.userId,
     createdAt: FieldValue.serverTimestamp(),

@@ -30,6 +30,11 @@ export const WORKSPACE_NEWS_FIELDS = [
   'category',
   'publicationType',
   'timelineType',
+  'distributionMode',
+  'visibility',
+  'publishScope',
+  'apgPublication',
+  'profileOnly',
   'active',
   'status',
   'publishedAt',
@@ -43,6 +48,8 @@ export const WORKSPACE_NEWS_FIELDS = [
 ];
 
 const ARRAY_FIELDS = new Set(['tags', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs']);
+const APG_DISTRIBUTION_VALUES = new Set(['apg', 'city', 'public', 'global', 'apg_news']);
+const PROFILE_DISTRIBUTION_VALUES = new Set(['profile', 'profile_only', 'timeline', 'card', 'local']);
 
 function text(value, max = 400) {
   return String(value ?? '').trim().slice(0, max);
@@ -69,6 +76,50 @@ export function workspaceNewsBelongsToProfile(item = {}, profile = {}, role = 'p
     || (Array.isArray(item.partnerIds) && item.partnerIds.map(String).includes(profileId));
 }
 
+export function normalizeWorkspaceNewsDistribution(item = {}) {
+  const explicit = [
+    item.distributionMode,
+    item.visibility,
+    item.publishScope,
+    item.audience,
+  ].map(value => text(value, 80).toLowerCase()).find(Boolean);
+  if (item.profileOnly === true || PROFILE_DISTRIBUTION_VALUES.has(explicit)) return 'profile';
+  if (item.apgPublication === true || item.publishToApg === true || APG_DISTRIBUTION_VALUES.has(explicit)) return 'apg';
+  if (item.submittedAt || item.submittedByUserId || item.moderationRequestedAt) return 'apg';
+  const moderation = text(item.moderationStatus, 80).toLowerCase();
+  if (['pending_review', 'approved', 'published_to_apg'].includes(moderation)) return 'apg';
+  if ((item.ownerProfileId || item.profileId || item.submittedProfileId) && text(item.source, 80).toLowerCase() === 'workspace') return 'profile';
+  return 'apg';
+}
+
+export function isProfileOnlyNews(item = {}) {
+  return normalizeWorkspaceNewsDistribution(item) === 'profile';
+}
+
+export function isApgNewsPublication(item = {}) {
+  return normalizeWorkspaceNewsDistribution(item) === 'apg';
+}
+
+export function buildProfileOnlyNewsPatch() {
+  return {
+    distributionMode: 'profile',
+    visibility: 'profile',
+    publishScope: 'profile',
+    apgPublication: false,
+    profileOnly: true,
+  };
+}
+
+export function buildApgNewsDistributionPatch() {
+  return {
+    distributionMode: 'apg',
+    visibility: 'public',
+    publishScope: 'apg',
+    apgPublication: true,
+    profileOnly: false,
+  };
+}
+
 export function sanitizeWorkspaceNewsPatch(patch = {}) {
   const clean = {};
   for (const field of WORKSPACE_NEWS_FIELDS) {
@@ -76,7 +127,7 @@ export function sanitizeWorkspaceNewsPatch(patch = {}) {
     const value = patch[field];
     if (ARRAY_FIELDS.has(field)) clean[field] = Array.isArray(value) ? value.slice(0, field === 'tags' ? 24 : 40) : [];
     else if (field === 'priority') clean[field] = Math.max(0, Math.min(99, Number(value || 0)));
-    else if (field === 'active' || field === 'pinned' || field === 'isPinned' || field === 'commentsEnabled') clean[field] = value !== false;
+    else if (field === 'active' || field === 'pinned' || field === 'isPinned' || field === 'commentsEnabled' || field === 'apgPublication' || field === 'profileOnly') clean[field] = value !== false;
     else if (field === 'text' || field === 'fullText') clean[field] = text(value, 20000);
     else if (field === 'summary' || field === 'subtitle' || field === 'seoDescription') clean[field] = text(value, 1000);
     else if (field === 'publicationType' || field === 'timelineType') clean[field] = text(value, 80);
@@ -180,6 +231,7 @@ export function buildWorkspaceNewsFromEvent(event = {}, profile = {}, role = 'pa
     sourceName: text(profile.name || profile.title || 'Workspace', 200),
     status: 'draft',
     active: false,
+    ...buildProfileOnlyNewsPatch(),
     commentsEnabled: true,
     [role === 'expert' ? 'expertId' : 'partnerId']: text(profile.id, 160),
   };

@@ -28,6 +28,7 @@ import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
 import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './newsUtils.js';
+import { isApgNewsPublication } from '../server-shared/workspace-news.js';
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
 import { normalizeExpertRecord, registerCustomExpertCategories } from '../server-shared/expert-directory.js';
 import { profileOwnedByUser } from './utils/profileOwnership.js';
@@ -3215,10 +3216,12 @@ export function UserApp() {
     </div>
   );
 
+  const apgNews = useMemo(() => (Array.isArray(news) ? news.filter(isApgNewsPublication) : []), [news]);
+
   const adaptiveInterestProfile = useMemo(() => buildInterestProfile({
     profile: interestProfile,
-    appState: { partners: enrichedPartners, experts, events, news, bookings: userBookings, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
-  }), [enrichedPartners, events, experts, favorites, interestProfile, news, readLaterNews, registeredEventIds, savedNews, userBookings, userKeys]);
+    appState: { partners: enrichedPartners, experts, events, news: apgNews, bookings: userBookings, favorites, registeredEventIds, savedNews, readLaterNews, userKeys },
+  }), [apgNews, enrichedPartners, events, experts, favorites, interestProfile, readLaterNews, registeredEventIds, savedNews, userBookings, userKeys]);
 
   const aiContext = useMemo(() => buildAIContext({
     aiMemory: getAIMemorySnapshot(),
@@ -3229,7 +3232,7 @@ export function UserApp() {
     experts,
     events,
     bookings: userBookings,
-    news,
+    news: apgNews,
     favorites,
     notifications,
     rewards: [],
@@ -3247,7 +3250,7 @@ export function UserApp() {
     scanCount: Number(Object.keys(scannedPartnerIds || {}).length || 0),
     location: user?.location || null,
     source: platformSource,
-  }), [activePanel, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, joinedGroup, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userBookings, userKeys, adaptiveInterestProfile]);
+  }), [activePanel, apgNews, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, joinedGroup, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, scannedPartnerIds, savedNews, streak, user, userBookings, userKeys, adaptiveInterestProfile]);
 
   const intelligenceInput = useMemo(() => ({
     user,
@@ -3278,14 +3281,14 @@ export function UserApp() {
       experts,
       events,
       bookings: userBookings,
-      news,
+      news: apgNews,
       notifications,
       unreadCount,
       customTasks,
       source: platformSource,
       location: user?.location || null,
     },
-  }), [activePanel, aiContext, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, unreadCount, user, userBookings, userKeys]);
+  }), [activePanel, aiContext, apgNews, completedTasks, customTasks, enrichedPartners, events, experts, favorites, intelligenceTick, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, unreadCount, user, userBookings, userKeys]);
 
   const intelligenceService = useMemo(() => createIntelligenceService(intelligenceInput), [intelligenceInput]);
   const homeExperience = useMemo(() => intelligenceService.getHomeExperience(), [intelligenceService]);
@@ -3316,7 +3319,7 @@ export function UserApp() {
       experts,
       events,
       bookings: userBookings,
-      news,
+      news: apgNews,
       notifications,
       source: platformSource,
       aiMemory: getAIMemorySnapshot(),
@@ -3324,7 +3327,7 @@ export function UserApp() {
       analytics: getAnalyticsSnapshot(),
       interestModel: interestModelSnapshot,
     },
-  }), [completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, interestModelSnapshot, news, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userBookings, userKeys]);
+  }), [apgNews, completedTasks, customTasks, enrichedPartners, events, favorites, intelligenceTick, interestModelSnapshot, notifications, platformSource, readLaterNews, registeredEventIds, referralCount, savedNews, streak, user, userBookings, userKeys]);
 
   const lokiAppState = useMemo(() => ({
     activePanel,
@@ -3342,7 +3345,7 @@ export function UserApp() {
     partners: enrichedPartners,
     events,
     bookings: userBookings,
-    news,
+    news: apgNews,
     notifications,
     customTasks,
     lokiKnowledge,
@@ -3358,7 +3361,7 @@ export function UserApp() {
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
     workspace: { mode: workspaceMode },
-  }), [activePanel, adaptiveInterestProfile, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, news, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
+  }), [activePanel, adaptiveInterestProfile, apgNews, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -3499,7 +3502,7 @@ export function UserApp() {
     favorites,
     partners: enrichedPartners,
     events,
-    news,
+    news: apgNews,
     interestProfile: adaptiveInterestProfile,
     recentReviews,
     loading,
@@ -3633,8 +3636,8 @@ export function UserApp() {
     [desktopOverviewUserName],
   );
   const desktopOverviewHero = useMemo(() => (
-    events.find(event => event?.title) || news.find(item => item?.title || item?.text) || enrichedPartners[0] || null
-  ), [events, news, enrichedPartners]);
+    events.find(event => event?.title) || apgNews.find(item => item?.title || item?.text) || enrichedPartners[0] || null
+  ), [apgNews, events, enrichedPartners]);
   const desktopOverviewHeroImage = useMemo(() => (
     desktopOverviewHero?.coverPhoto || desktopOverviewHero?.imageUrl || desktopOverviewHero?.photoUrl || desktopOverviewHero?.photo || desktopOverviewHero?.image || ''
   ), [desktopOverviewHero]);
@@ -3679,7 +3682,7 @@ export function UserApp() {
     stats: [
       { label: 'Ключи', value: userKeys, accent: APG2_PROFILE.gold },
       { label: 'Событий', value: registeredEventIds.length },
-      { label: 'Новости', value: news.length },
+      { label: 'Новости', value: apgNews.length },
       { label: 'Партнёров', value: enrichedPartners.length },
       { label: 'Экспертов', value: experts.length },
       { label: 'Увед.', value: unreadCount },
@@ -3717,7 +3720,7 @@ export function UserApp() {
     desktopOverviewUserName,
     desktopWorkspaceAvailable,
     registeredEventIds.length,
-    news.length,
+    apgNews.length,
     enrichedPartners.length,
     experts.length,
     personalHomeContext?.lokiTip,
@@ -3848,7 +3851,7 @@ export function UserApp() {
               <Panel id="news">
                 <Suspense fallback={<LazyFallback />}>
                   <NewsPage
-                    news={news}
+                    news={apgNews}
                     user={user}
                     savedNews={savedNews}
                     readLaterNews={readLaterNews}
@@ -3942,7 +3945,7 @@ export function UserApp() {
                     user={user} userKeys={userKeys} favorites={favorites}
                     partners={enrichedPartners} events={events}
                     bookings={userBookings}
-                    news={news}
+                    news={apgNews}
                     savedNews={savedNews}
                     readLaterNews={readLaterNews}
                     registeredEventIds={registeredEventIds}
@@ -4267,7 +4270,7 @@ export function UserApp() {
                     partners={partners}
                     experts={experts}
                     events={events}
-                    news={news}
+                    news={apgNews}
                     customTasks={customTasks}
                     userCount={platformStats.userCount}
                     totalScans={platformStats.totalScans}

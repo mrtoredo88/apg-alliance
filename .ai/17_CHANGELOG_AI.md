@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] feat: Split profile and APG news publishing
+**Коммит:** `pending`
+**Файлы:** `server-shared/workspace-news.js`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `src/UserApp.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `scripts/workspace-news-distribution-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Публикации из Workspace по умолчанию сразу публикуются в личной ленте профиля без модерации, push и попадания в общую ленту.
+- Для общей ленты АПГ добавлен отдельный режим распространения: публикация отправляется на модерацию и становится городской только после существующего approval-flow.
+- Общие поверхности приложения получают только `apgNews`, а карточки партнёров/экспертов и Workspace сохраняют полный набор `news` для личного Timeline.
+**Почему:** личная лента партнёра/эксперта и общая новостная лента АПГ являются разными пользовательскими сценариями и не должны смешиваться.
+
 ## [2026-07-15] feat: Profile timeline experience
 **Коммит:** `pending`
 **Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`

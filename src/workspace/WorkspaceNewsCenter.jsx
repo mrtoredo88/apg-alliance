@@ -6,6 +6,7 @@ import { NEWS_CATEGORIES, getNewsCategoryLabel, getNewsImage, getNewsStats, getN
 import {
   buildWorkspaceNewsKpis,
   filterWorkspaceNews,
+  isApgNewsPublication,
   sanitizeWorkspaceNewsPatch,
   workspaceNewsStatus,
   workspaceNewsStatusLabel,
@@ -135,6 +136,7 @@ function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive }) {
   const stats = getNewsStats(item);
   const image = getNewsImage(item);
   const status = workspaceNewsStatus(item);
+  const apgPublication = isApgNewsPublication(item);
   const statusColor = status === 'published' ? UI.green : status === 'moderation' || status === 'scheduled' ? UI.gold : status === 'archived' ? UI.muted : UI.blue;
   const compact = view === 'table';
   return (
@@ -143,6 +145,7 @@ function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ color: statusColor, border: `1px solid ${statusColor}55`, background: `${statusColor}12`, borderRadius: 999, padding: '4px 7px', fontSize: 11, fontWeight: 850 }}>{workspaceNewsStatusLabel(item)}</span>
+          <span style={{ color: apgPublication ? UI.gold : UI.blue, border: `1px solid ${apgPublication ? 'rgba(200,155,60,0.30)' : 'rgba(91,143,219,0.30)'}`, background: apgPublication ? 'rgba(200,155,60,0.10)' : 'rgba(91,143,219,0.10)', borderRadius: 999, padding: '4px 7px', fontSize: 11, fontWeight: 850 }}>{apgPublication ? 'АПГ' : 'Только профиль'}</span>
           <span style={{ color: UI.gold, border: `1px solid rgba(200,155,60,0.26)`, background: 'rgba(200,155,60,0.10)', borderRadius: 999, padding: '4px 7px', fontSize: 11, fontWeight: 850 }}>{item.publicationType || 'Новость'}</span>
           <span style={{ color: UI.muted, fontSize: 11, fontWeight: 760 }}>{getNewsCategoryLabel(item)}</span>
           <span style={{ color: UI.muted, fontSize: 11, fontWeight: 760 }}>{item.source || 'workspace'}</span>
@@ -158,7 +161,7 @@ function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive }) {
         </div>
       </div>
       <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
-        {['draft', 'scheduled'].includes(status) && <span onClick={event => { event.stopPropagation(); onSubmit(item); }} style={button('primary', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>На модерацию</span>}
+        {!apgPublication && status !== 'archived' && <span onClick={event => { event.stopPropagation(); onSubmit(item); }} style={button('primary', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Опубликовать в АПГ</span>}
         {status !== 'archived' && <span onClick={event => { event.stopPropagation(); onArchive(item); }} style={button('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Архив</span>}
       </div>
     </button>
@@ -184,10 +187,15 @@ function defaultDraft(profile, role) {
     seoTitle: '',
     seoDescription: '',
     commentsEnabled: true,
-    status: 'draft',
-    active: false,
+    status: 'published',
+    active: true,
     author: profile?.name || profile?.title || '',
     sourceName: profile?.name || profile?.title || '',
+    distributionMode: 'profile',
+    visibility: 'profile',
+    publishScope: 'profile',
+    apgPublication: false,
+    profileOnly: true,
   };
 }
 
@@ -219,7 +227,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       onToast?.('Добавьте заголовок или текст.', 'error');
       return null;
     }
-    setStatus(submit ? 'Отправляем...' : 'Сохраняем...');
+    setStatus(submit ? 'Отправляем в АПГ...' : 'Публикуем в профиле...');
     let currentId = item?.id || draft.id || '';
     if (submit) {
       const created = await userAction('workspaceNews:save', { id: currentId, profileId: profile.id, role: role?.id, patch: clean });
@@ -231,9 +239,9 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       : { id: currentId, profileId: profile.id, role: role?.id, patch: clean });
     localStorage.removeItem(storageKey);
     dirtyRef.current = false;
-    setStatus(submit ? 'Отправлено на модерацию' : 'Сохранено');
+    setStatus(submit ? 'Отправлено на модерацию АПГ' : 'Опубликовано в профиле');
     onSaved(result.news || { ...draft, ...result.patch, id: result.id || draft.id });
-    if (!silent) onToast?.(submit ? 'Новость отправлена на модерацию.' : 'Новость сохранена.', 'success');
+    if (!silent) onToast?.(submit ? 'Публикация отправлена на модерацию АПГ.' : 'Публикация обновлена в профиле.', 'success');
     return result;
   };
 
@@ -279,6 +287,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
           <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Редактор публикации</div>
           <div style={{ color: UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 940, marginTop: 3 }}>{item?.id ? 'Редактирование публикации' : 'Новая публикация'}</div>
           <div style={{ color: UI.muted, fontSize: 12, marginTop: 3 }}>{status}</div>
+          <div style={{ color: UI.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 7 }}>Сохранение публикует запись в личной ленте профиля. Для общей новостной ленты АПГ отправьте её на модерацию отдельно.</div>
         </div>
         <button onClick={onClose} style={button('light', { minHeight: 32, padding: '6px 8px' })}>Закрыть</button>
       </div>
@@ -320,8 +329,8 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <button onClick={() => save()} style={button('light')}>Сохранить</button>
-        <button onClick={() => save({ submit: true })} style={button('primary')}>На модерацию</button>
+        <button onClick={() => save()} style={button('light')}>Опубликовать в профиле</button>
+        <button onClick={() => save({ submit: true })} style={button('primary')}>Опубликовать в АПГ</button>
       </div>
     </div>
   );
@@ -334,9 +343,10 @@ function Preview({ item }) {
     <div style={card({ padding: 14, display: 'grid', gap: 10 })}>
       <div style={{ height: 160, borderRadius: 8, overflow: 'hidden', background: 'rgba(200,155,60,0.12)', display: 'grid', placeItems: 'center', color: UI.gold, fontSize: 32 }}>{image ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '📰'}</div>
       <div style={{ color: UI.gold, fontSize: 12, fontWeight: 850 }}>{getNewsCategoryLabel(item)} · {workspaceNewsStatusLabel(item)}</div>
+      <div style={{ color: isApgNewsPublication(item) ? UI.gold : UI.blue, fontSize: 12, fontWeight: 850 }}>{isApgNewsPublication(item) ? 'Общая лента АПГ' : 'Личная лента профиля'}</div>
       <div style={{ color: UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 940 }}>{getNewsTitle(item)}</div>
       <div style={{ color: UI.soft, fontSize: 13, lineHeight: '20px', whiteSpace: 'pre-wrap' }}>{(item.summary || getNewsText(item)).slice(0, 700)}</div>
-      <div style={{ color: UI.muted, fontSize: 12 }}>Push: {item.pushStatus || 'через модерацию'} · VK: {item.vkPostId || item.postUrl ? 'связано' : 'не связано'}</div>
+      <div style={{ color: UI.muted, fontSize: 12 }}>Push: {isApgNewsPublication(item) ? (item.pushStatus || 'через модерацию') : 'не отправляется'} · VK: {item.vkPostId || item.postUrl ? 'связано' : 'не связано'}</div>
     </div>
   );
 }
@@ -401,7 +411,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
   const submit = async item => {
     const result = await userAction('workspaceNews:submit', { id: item.id, profileId: profile.id, role: role.id });
     upsert(result.news);
-    onToast?.('Новость отправлена на модерацию.', 'success');
+    onToast?.('Публикация отправлена на модерацию АПГ.', 'success');
   };
 
   const archive = async item => {
@@ -414,7 +424,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
   const createFromEvent = async eventId => {
     const result = await userAction('workspaceNews:fromEvent', { eventId, profileId: profile.id, role: role.id });
     upsert(result.news);
-    onToast?.('Черновик новости по мероприятию создан.', 'success');
+    onToast?.('Публикация по мероприятию опубликована в профиле.', 'success');
   };
 
   if (!profile?.id || !['partner', 'expert'].includes(role?.id)) {
