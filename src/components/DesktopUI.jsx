@@ -648,6 +648,118 @@ export function DesktopCard({
   );
 }
 
+export function DesktopCatalogEntityCard({
+  selected = false,
+  cover = '',
+  avatar,
+  badges = [],
+  title,
+  subtitle,
+  rating,
+  description,
+  meta = [],
+  tags = [],
+  contact,
+  offer,
+  actions = [],
+  onClick,
+  onMouseEnter,
+  onFocus,
+  style,
+}) {
+  const [hovered, setHovered] = React.useState(false);
+  const active = selected || hovered;
+  const safeBadges = asArray(badges).slice(0, 3);
+  const safeMeta = asArray(meta).filter(item => item?.value).slice(0, 4);
+  const safeTags = asArray(tags).filter(item => item?.label || item).slice(0, 4);
+  const safeActions = asArray(actions).slice(0, 4);
+  return (
+    <DesktopCardHover active={active}>
+      <GlassCard
+        onClick={onClick}
+        onMouseEnter={(event) => { setHovered(true); onMouseEnter?.(event); }}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={(event) => { setHovered(true); onFocus?.(event); }}
+        style={{
+          borderRadius: 20,
+          padding: 0,
+          overflow: 'hidden',
+          minHeight: 268,
+          cursor: onClick ? 'pointer' : 'default',
+          border: selected ? '1px solid rgba(201,168,76,0.64)' : APG2_PROFILE.glass.border,
+          background: active ? 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.07))' : undefined,
+          transition: motionTransition(['background', 'border-color'], 'base'),
+          ...style,
+        }}
+      >
+        <div style={{ height: 92, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)' }}>
+          {cover ? <img src={cover} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.86 }} /> : null}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.02), rgba(12,12,14,0.42))' }} />
+          {safeBadges.length > 0 && (
+            <div style={{ position: 'absolute', left: 10, top: 10, right: rating ? 56 : 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              <DesktopCardBadges items={safeBadges} />
+            </div>
+          )}
+          {rating ? (
+            <div style={{ position: 'absolute', right: 10, top: 10, minHeight: 24, borderRadius: 999, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', color: '#17120a', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(255,255,255,0.78)', boxShadow: '0 10px 24px rgba(0,0,0,0.14)', fontSize: 11.5, lineHeight: '14px', fontWeight: 900 }}>
+              ★ {rating}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ position: 'relative', padding: '14px 14px 13px', display: 'grid', gap: 8, minWidth: 0 }}>
+          {avatar && (
+            <div style={{ position: 'absolute', left: 14, top: -28, width: 58, height: 58, borderRadius: 20, padding: 5, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.88)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.56)', boxShadow: '0 16px 34px rgba(0,0,0,0.18)' }}>
+              {avatar}
+            </div>
+          )}
+          <div style={{ paddingLeft: avatar ? 68 : 0, minHeight: 39, display: 'grid', alignContent: 'center', minWidth: 0 }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '19px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+            {subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.2, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+          </div>
+          {description && (
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', minHeight: 32, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</div>
+          )}
+          {safeMeta.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: safeMeta.length > 2 ? 'repeat(2, minmax(0, 1fr))' : `repeat(${safeMeta.length}, minmax(0, 1fr))`, gap: 6 }}>
+              {safeMeta.map(item => (
+                <div key={item.id || item.label} style={{ minWidth: 0, borderRadius: 12, padding: '6px 7px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                  <div style={{ color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.text, fontSize: 11.2, lineHeight: '13px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</div>
+                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 8.8, lineHeight: '10px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {safeTags.length > 0 && <DesktopCardTags items={safeTags} style={{ minHeight: 22 }} />}
+          {(contact || offer) && (
+            <div style={{ display: 'grid', gap: 5 }}>
+              {contact && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.8, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact}</div>}
+              {offer && <div style={{ color: '#17120a', background: APG2_PROFILE.goldSoft, border: '1px solid rgba(201,168,76,0.30)', borderRadius: 12, padding: '6px 8px', fontSize: 10.8, lineHeight: '14px', fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offer}</div>}
+            </div>
+          )}
+          {safeActions.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: safeActions.length > 2 ? '1.12fr 1fr auto' : `repeat(${safeActions.length}, minmax(0, 1fr))`, gap: 7, alignItems: 'center' }}>
+              {safeActions.slice(0, 3).map(action => (
+                <GlassButton
+                  key={action.id || action.label}
+                  disabled={action.disabled}
+                  onClick={event => {
+                    event.stopPropagation();
+                    action.onClick?.(event);
+                  }}
+                  tone={action.tone || 'glass'}
+                  style={{ minHeight: 34, borderRadius: 13, padding: action.iconOnly ? '6px 8px' : '7px 9px', fontSize: 11, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...action.style }}
+                >
+                  {action.label}
+                </GlassButton>
+              ))}
+            </div>
+          )}
+        </div>
+      </GlassCard>
+    </DesktopCardHover>
+  );
+}
+
 export function DesktopSidebarCard({ title, subtitle, actions, children, tone = 'quiet', style }) {
   return (
     <WorkspacePanel title={title} subtitle={subtitle} actions={actions} style={{ borderRadius: 30, padding: 16, background: tone === 'quiet' ? APG2_PROFILE.quietSurface : undefined, ...style }}>

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] feat: Desktop Catalog Card Redesign
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлена общая desktop-карточка каталога `DesktopCatalogEntityCard` с широкой обложкой, наложенным логотипом/фото, компактной метой, услугами/контактами/акцией и действиями.
+- `Партнёры` и `Эксперты` переведены на новую плотную карточку и 3-колоночную сетку при правой панели, чтобы каталог был ближе к desktop-референсу.
+- Desktop regression-тесты обновлены на новый shared catalog card вместо прежней мобильной композиции `DesktopCard` + `DesktopCardPreview`.
+**Почему:** предыдущая версия улучшила сетку, но сами карточки всё ещё ощущались как мобильные карточки, растянутые на desktop.
+
 ## [2026-07-15] perf: stabilize ProfilePanel and desktop overview navigation
 **Коммит:** `pending`
 **Файлы:** `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`

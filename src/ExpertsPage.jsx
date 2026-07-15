@@ -29,8 +29,7 @@ import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import {
   DesktopActionBar,
-  DesktopCard,
-  DesktopCardPreview,
+  DesktopCatalogEntityCard,
   DesktopCatalogGrid,
   DesktopContentGrid,
   DesktopDetailShell,
@@ -1153,27 +1152,24 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
     { id: 'call', label: 'Позвонить', disabled: !canCall, onClick: () => { if (expert.telHref) openUrl(expert.telHref); } },
   ].filter(Boolean);
   return (
-    <DesktopCard
+    <DesktopCatalogEntityCard
       selected={selected}
-      compact={compact}
       onClick={() => onSelect?.(expert)}
       onMouseEnter={() => onSelect?.(expert)}
       onFocus={() => onSelect?.(expert)}
-      preview={<DesktopCardPreview image={cover} height={compact ? '100%' : 82} />}
-      layout={compact ? 'horizontal' : 'stacked'}
-      density="catalog"
-      metaMode="inline"
-      descriptionLines={compact ? 2 : 2}
-      avatar={<ExpertAvatar expert={expert} size={compact ? 42 : 48} />}
+      cover={cover}
+      avatar={<ExpertAvatar expert={expert} size={48} />}
       badges={badges}
       title={expert.name || 'Эксперт АПГ'}
       subtitle={expert.specialization || 'Консультации и услуги'}
-      side={rating > 0 ? `★ ${rating.toFixed(1)}` : ''}
+      rating={rating > 0 ? rating.toFixed(1) : ''}
       description={expert.description || expert.experience || expert.offer || 'Проверенный специалист в экосистеме АПГ.'}
       meta={meta}
       tags={tags}
       actions={actions}
-      footer={expert.offer ? `Акция: ${expert.offer}` : category ? `Категория: ${category.label}` : ''}
+      contact={expert.address || expertCity(expert)}
+      offer={expert.offer ? `Акция: ${expert.offer}` : category ? `Категория: ${category.label}` : ''}
+      style={compact ? { minHeight: 252 } : undefined}
     />
   );
 }
@@ -1299,12 +1295,13 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
     newCount > 0 && { id: 'new', label: 'Новые', value: newCount, icon: '↗' },
   ].filter(Boolean);
   const desktopColumns = getDesktopCatalogColumns(viewportWidth);
+  const showCatalogRail = viewportWidth >= 1180 && viewMode !== 'map';
+  const effectiveDesktopColumns = showCatalogRail ? Math.min(desktopColumns, 3) : desktopColumns;
   const desktopGridStyle = viewMode === 'list'
     ? { gridTemplateColumns: 'minmax(0, 1fr)' }
     : viewMode === 'split'
-      ? { gridTemplateColumns: `repeat(${Math.min(desktopColumns, 2)}, minmax(0, 1fr))` }
-      : { gridTemplateColumns: `repeat(${desktopColumns}, minmax(0, 1fr))` };
-  const showCatalogRail = viewportWidth >= 1180 && viewMode !== 'map';
+      ? { gridTemplateColumns: `repeat(${Math.min(effectiveDesktopColumns, 2)}, minmax(0, 1fr))` }
+      : { gridTemplateColumns: `repeat(${effectiveDesktopColumns}, minmax(0, 1fr))` };
   const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
   const desktopSearchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 240, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2.textMuted };
 
@@ -1377,7 +1374,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             ) : viewMode === 'map' ? (
               <ExpertsMapPreview experts={filtered} selected={desktopPreviewExpert} onSelect={setPreviewExpert} />
             ) : (
-              <DesktopCatalogGrid columns={viewMode === 'list' ? 1 : viewMode === 'split' ? Math.min(desktopColumns, 2) : desktopColumns} gap={12} style={desktopGridStyle}>
+              <DesktopCatalogGrid columns={viewMode === 'list' ? 1 : viewMode === 'split' ? Math.min(effectiveDesktopColumns, 2) : effectiveDesktopColumns} gap={12} style={desktopGridStyle}>
                 {filtered.map(expert => (
                   <ExpertCatalogCard
                     key={expert.id}

@@ -14,8 +14,7 @@ const requiredFrameworkComponents = [
   'DesktopToolbar',
   'DesktopKpiStrip',
   'DesktopCatalogGrid',
-  'DesktopCard',
-  'DesktopCardPreview',
+  'DesktopCatalogEntityCard',
   'DesktopActionBar',
   'DesktopMetricCard',
   'DesktopSidebarCard',
@@ -74,7 +73,7 @@ if (!partnersSource.includes('function getCatalogColumns') || !partnersSource.in
   throw new Error('PartnersPage desktop catalog must use explicit 4/3/2/1 responsive columns.');
 }
 
-if (!partnersSource.includes('<DesktopCatalogGrid') || !partnersSource.includes('<DesktopCard') || !partnersSource.includes('<DesktopCardPreview')) {
+if (!partnersSource.includes('<DesktopCatalogGrid') || !partnersSource.includes('<DesktopCatalogEntityCard')) {
   throw new Error('PartnersPage desktop cards must be assembled from Desktop Catalog Framework components.');
 }
 

@@ -3,8 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { APG2_PROFILE, GlassBadge, GlassButton } from './components/Apg2ProfileGlass.jsx';
 import {
   DesktopActionBar,
-  DesktopCard,
-  DesktopCardPreview,
+  DesktopCatalogEntityCard,
   DesktopCatalogGrid,
   DesktopContentGrid,
   DesktopEmptyState,
@@ -187,27 +186,24 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
     canBook && { id: 'book', label: 'Записаться', onClick: () => onBook?.(partner) },
   ].filter(Boolean);
   return (
-    <DesktopCard
+    <DesktopCatalogEntityCard
       selected={selected}
-      compact={compact}
       onClick={() => onSelect?.(partner)}
       onMouseEnter={() => onSelect?.(partner)}
       onFocus={() => onSelect?.(partner)}
-      preview={<DesktopCardPreview image={cover} height={compact ? '100%' : 82} />}
-      layout={compact ? 'horizontal' : 'stacked'}
-      density="catalog"
-      metaMode="inline"
-      descriptionLines={compact ? 2 : 2}
-      avatar={<PartnerLogo partner={partner} size={compact ? 42 : 48} />}
+      cover={cover}
+      avatar={<PartnerLogo partner={partner} size={48} />}
       badges={badges}
       title={partner?.name || 'Партнёр АПГ'}
       subtitle={`${category.label} · ${city}`}
-      side={rating > 0 ? `★ ${rating.toFixed(1)}` : ''}
+      rating={rating > 0 ? rating.toFixed(1) : ''}
       description={partner?.description || partner?.offer || partner?.address || 'Организация АПГ'}
       meta={meta}
       tags={tags}
+      contact={address || text(partner?.phone || partner?.contactPhone)}
       actions={actions}
-      footer={partner?.offer ? `Акция: ${partner.offer}` : services.length ? `Услуги: ${services.join(', ')}` : ''}
+      offer={partner?.offer ? `Акция: ${partner.offer}` : services.length ? `Услуги: ${services.join(', ')}` : ''}
+      style={compact ? { minHeight: 252 } : undefined}
     />
   );
 }
@@ -304,12 +300,13 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
   const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
   const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2_PROFILE.textMuted };
   const gridColumns = getCatalogColumns(viewportWidth);
+  const showCatalogRail = viewportWidth >= 1180 && view !== 'map';
+  const effectiveGridColumns = showCatalogRail ? Math.min(gridColumns, 3) : gridColumns;
   const catalogGridStyle = view === 'list'
     ? { gridTemplateColumns: 'minmax(0, 1fr)' }
     : view === 'split'
-      ? { gridTemplateColumns: `repeat(${Math.min(gridColumns, 2)}, minmax(0, 1fr))` }
-      : { gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))` };
-  const showCatalogRail = viewportWidth >= 1180 && view !== 'map';
+      ? { gridTemplateColumns: `repeat(${Math.min(effectiveGridColumns, 2)}, minmax(0, 1fr))` }
+      : { gridTemplateColumns: `repeat(${effectiveGridColumns}, minmax(0, 1fr))` };
 
   if (!desktopMode) {
     return (
@@ -369,7 +366,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
           ) : view === 'map' ? (
             <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />
           ) : (
-            <DesktopCatalogGrid columns={view === 'list' ? 1 : view === 'split' ? Math.min(gridColumns, 2) : gridColumns} gap={12} style={catalogGridStyle}>
+            <DesktopCatalogGrid columns={view === 'list' ? 1 : view === 'split' ? Math.min(effectiveGridColumns, 2) : effectiveGridColumns} gap={12} style={catalogGridStyle}>
               {filtered.map(partner => (
                 <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} />
               ))}

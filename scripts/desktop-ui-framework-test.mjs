@@ -19,6 +19,7 @@ const requiredExports = [
   'DesktopActionBar',
   'DesktopSectionTitle',
   'DesktopCatalogGrid',
+  'DesktopCatalogEntityCard',
   'DesktopCard',
   'DesktopCardHeader',
   'DesktopCardMeta',
