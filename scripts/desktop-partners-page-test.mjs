@@ -123,11 +123,11 @@ if (!partnerDetailSource.includes('desktopMode = false') || !partnerDetailSource
   throw new Error('PartnerPage desktop detail must be explicitly gated by desktopMode.');
 }
 
-if (!partnerDetailSource.includes("hasServices && { id: 'services'") || !partnerDetailSource.includes("partner.offer && { id: 'offer'") || !partnerDetailSource.includes("hasPhotos && { id: 'photos'")) {
+if (!partnerDetailSource.includes("hasServices && { id: 'services'") || !partnerDetailSource.includes("partner.offer && { id: 'offer'") || !partnerDetailSource.includes("hasGallery && { id: 'photos'") || !partnerDetailSource.includes("hasVideos && { id: 'video'")) {
   throw new Error('PartnerPage desktop tabs must be built from existing partner data only.');
 }
 
-for (const requiredPartnerField of ['partner.bookingUrl', 'partner.socialUrl', 'partner.maxCommunityUrl', 'partner.telegramCommunityUrl', 'stampTarget > 0']) {
+for (const requiredPartnerField of ['partner.bookingUrl', 'partner.socialUrl', 'partner.maxCommunityUrl', 'partner.telegramCommunityUrl', 'stampTarget > 0', "activeTab === 'video'", 'VideoSection videos={partner.videos}']) {
   if (!partnerDetailSource.includes(requiredPartnerField)) {
     throw new Error(`PartnerPage desktop detail must preserve mobile partner field/action: ${requiredPartnerField}`);
   }

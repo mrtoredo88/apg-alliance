@@ -413,7 +413,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const serviceCatalog = Array.isArray(partner.serviceCatalog) ? partner.serviceCatalog.filter(Boolean) : [];
       const servicesText = [partner.services, partner.serviceDescription].filter(Boolean).join('\n\n');
       const hasServices = Boolean(servicesText.trim() || serviceCatalog.length);
-      const hasPhotos = galleryItems.length > 0 || partner.videos?.length > 0;
+      const hasGallery = galleryItems.length > 0;
+      const hasVideos = partner.videos?.length > 0;
       const stamps = visitCounts[partner.id] ?? 0;
       const stampTarget = Number(partner.stampTarget) || 0;
       const filledStamps = stampTarget > 0 ? Math.min(Number(stamps) || 0, stampTarget) : 0;
@@ -421,7 +422,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         { id: 'about', label: 'О компании' },
         hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
         partner.offer && { id: 'offer', label: 'Акции', count: 1 },
-        hasPhotos && { id: 'photos', label: 'Фото', count: galleryItems.length },
+        hasGallery && { id: 'photos', label: 'Фото', count: galleryItems.length },
+        hasVideos && { id: 'video', label: 'Видео', count: partner.videos.length },
         { id: 'reviews', label: 'Отзывы', count: reviewCount },
       ].filter(Boolean);
       const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
@@ -431,6 +433,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         stampTarget > 0 && { id: 'stamps', label: 'Штампы', value: `${filledStamps}/${stampTarget}`, icon: '🎟️' },
         partner.keys && { id: 'keys', label: 'Ключей за визит', value: partner.keys, icon: '🗝️' },
         galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
+        hasVideos && { id: 'video', label: 'Видео', value: partner.videos.length, icon: '▶' },
       ].filter(Boolean);
       const heroActions = cta.slice(0, 6).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
       const stickyActions = [
@@ -546,10 +549,15 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               </DesktopSection>
             )}
 
-            {activeTab === 'photos' && hasPhotos && (
+            {activeTab === 'photos' && hasGallery && (
               <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
                 <DesktopGallery items={galleryItems} onOpen={gallery.length ? setLightboxIdx : null} />
-                {partner.videos?.length > 0 && <div style={{ marginTop: 12 }}><VideoSection videos={partner.videos} /></div>}
+              </DesktopSection>
+            )}
+
+            {activeTab === 'video' && hasVideos && (
+              <DesktopSection title="Видео" subtitle={`${partner.videos.length} материалов`}>
+                <VideoSection videos={partner.videos} />
               </DesktopSection>
             )}
 

@@ -102,11 +102,11 @@ if (!expertsSource.includes('desktopMode = false') || !expertsSource.includes('i
   throw new Error('Expert desktop detail must be explicitly gated by desktopMode.');
 }
 
-if (!expertsSource.includes("hasServices && { id: 'services'") || !expertsSource.includes("expert.offer && { id: 'offer'") || !expertsSource.includes("hasPhotos && { id: 'photos'")) {
+if (!expertsSource.includes("hasServices && { id: 'services'") || !expertsSource.includes("expert.offer && { id: 'offer'") || !expertsSource.includes("hasGallery && { id: 'photos'") || !expertsSource.includes("hasVideos && { id: 'video'")) {
   throw new Error('Expert desktop tabs must be built from existing expert data only.');
 }
 
-for (const requiredExpertField of ['expert.bookingUrl', 'expert.whatsappUrl', 'expert.maxUrl', 'expert.serviceCost']) {
+for (const requiredExpertField of ['expert.bookingUrl', 'expert.whatsappUrl', 'expert.maxUrl', 'expert.serviceCost', "activeTab === 'video'", 'VideoSection videos={expert.videos}']) {
   if (!expertsSource.includes(requiredExpertField)) {
     throw new Error(`Expert desktop detail must preserve mobile expert field/action: ${requiredExpertField}`);
   }

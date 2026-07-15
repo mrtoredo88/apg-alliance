@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] fix: Desktop detail video parity
+**Коммит:** `pending`
+**Файлы:** `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Desktop detail партнёра и эксперта получил отдельную вкладку `Видео`, построенную на существующем поле `videos` и общем `VideoSection`.
+- Вкладка `Фото` больше не смешивает фото и видео; счётчики фото и видео считаются отдельно.
+- Desktop regression-тесты теперь проверяют, что видео присутствует в desktop detail через отдельную вкладку и не теряется относительно мобильной карточки.
+**Почему:** в мобильной карточке видео отображалось отдельным блоком, а в desktop detail оно было спрятано внутри вкладки `Фото`, из-за чего desktop выглядел функционально беднее.
+
 ## [2026-07-15] fix: Desktop catalog cards visibility
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

@@ -384,13 +384,15 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       const serviceCatalog = Array.isArray(expert.serviceCatalog) ? expert.serviceCatalog.filter(Boolean) : [];
       const hasServices = Boolean(expert.services || expert.experience || expert.serviceCost || expert.formats?.length || serviceCatalog.length);
       const hasLocation = Boolean(expert.address || expert.hours || expert.latitude || expert.longitude);
-      const hasPhotos = galleryItems.length > 0 || expert.videos?.length > 0;
+      const hasGallery = galleryItems.length > 0;
+      const hasVideos = expert.videos?.length > 0;
       const detailTabs = [
         { id: 'about', label: 'О себе' },
         hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
         expert.offer && { id: 'offer', label: 'Акция', count: 1 },
         hasLocation && { id: 'location', label: 'Где и когда' },
-        hasPhotos && { id: 'photos', label: 'Фото', count: galleryItems.length },
+        hasGallery && { id: 'photos', label: 'Фото', count: galleryItems.length },
+        hasVideos && { id: 'video', label: 'Видео', count: expert.videos.length },
         { id: 'reviews', label: 'Отзывы', count: reviews.length || expert.reviewCount || 0 },
       ].filter(Boolean);
       const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
@@ -401,6 +403,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
         expert.experience && { id: 'experience', label: 'Опыт', value: expert.experience, icon: '🏅' },
         expert.formats?.length > 0 && { id: 'formats', label: 'Форматы', value: expert.formats.length, icon: '●' },
         galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
+        hasVideos && { id: 'video', label: 'Видео', value: expert.videos.length, icon: '▶' },
       ].filter(Boolean);
       const heroActions = cta.slice(0, 6).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
       const stickyActions = [
@@ -531,10 +534,15 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
                 </DesktopSection>
               )}
 
-              {activeTab === 'photos' && hasPhotos && (
+              {activeTab === 'photos' && hasGallery && (
                 <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
                   <DesktopGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
-                  {expert.videos?.length > 0 && <div style={{ marginTop: 12 }}><VideoSection videos={expert.videos} /></div>}
+                </DesktopSection>
+              )}
+
+              {activeTab === 'video' && hasVideos && (
+                <DesktopSection title="Видео" subtitle={`${expert.videos.length} материалов`}>
+                  <VideoSection videos={expert.videos} />
                 </DesktopSection>
               )}
 
