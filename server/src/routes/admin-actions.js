@@ -42,6 +42,9 @@ const LIFECYCLE_RESOURCE_CONFIG = Object.fromEntries(Object.entries(CONTENT_RESO
 }]));
 
 const LIST_CONFIG = {
+  partners: { orderBy: null, limit: 1000 },
+  experts: { orderBy: null, limit: 1000 },
+  events: { orderBy: null, limit: 1000 },
   users: { orderBy: null, limit: 1000 },
   prizeClaims: { orderBy: ['claimedAt', 'desc'], limit: 200 },
   banners: { orderBy: ['priority', 'asc'], limit: 200 },

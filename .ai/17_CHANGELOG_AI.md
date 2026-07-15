@@ -2942,6 +2942,15 @@
 - Карточки экспертов используют только реальные поля анкеты: фото/обложка, имя, специализация, категории, опыт, рейтинг, стоимость, форматы, акция и запись при наличии.
 - Toolbar полей поиска/фильтров в `Партнёры` и `Эксперты` получил контрастный desktop-вид через CSS-переменную placeholder без изменения мобильной версии.
 
+# 2026-07-15 — Admin Loading Pipeline P0 Hotfix
+
+- Исправлена общая причина production timeout `Партнёры/Эксперты/События: timeout 12000ms` в админке: bootstrap больше не читает эти крупные коллекции напрямую через client Firestore `getDocs`.
+- `partners`, `experts`, `events` переведены на существующий admin API `entity:list`, чтобы загрузка шла через backend Admin SDK, единые admin permissions и общий retry/timeout pipeline.
+- Backend `LIST_CONFIG` расширен для `partners`, `experts`, `events`; CRUD-логика и существующие формы не менялись.
+- В общий admin loader добавлены полезные timings (`durationMs`, `attempts`, `count`) для диагностики точки задержки без вывода секретов.
+- Добавлен короткий shared token cache для admin API requests, чтобы параллельный bootstrap не запускал лавину `getIdToken(true)`.
+- Добавлен regression-тест `scripts/admin-loading-test.mjs`, подключённый к `npm run test:core`, чтобы три ключевых admin-раздела не вернулись на прямой Firestore path.
+
 # 2026-07-15 — Public Desktop Theme Migration
 
 - Публичная desktop-часть переведена на общие APG2 theme tokens: добавлены public control/panel/track CSS-переменные для light/dark режимов.

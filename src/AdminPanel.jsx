@@ -3626,6 +3626,7 @@ export const AdminPanel = () => {
   const [loading, setLoading]       = useState(true);
   const [adminLoadIssues, setAdminLoadIssues] = useState([]);
   const [adminLoadInfo, setAdminLoadInfo] = useState({ lastLoadedAt: null, authUid: null, attempt: 0, authStatus: 'waiting' });
+  const adminTokenCacheRef = useRef({ uid: '', token: '', tokenResult: null, expiresAt: 0, promise: null });
   const [activeTab, setActiveTab]   = useState('dashboard');
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth || 1200);
 
@@ -4121,12 +4122,41 @@ export const AdminPanel = () => {
 
   const adminRequestHeaders = async (idempotencyKey = '') => {
     const user = await waitForAdminAuth(noteAdminAuthStage);
-    noteAdminAuthStage({ at: new Date().toISOString(), stage: 'token_request_started', uid: user.uid, email: user.email ?? null, isAnonymous: user.isAnonymous ?? null });
-    const token = await user.getIdToken(true);
-    const tokenResult = await user.getIdTokenResult(true).catch(() => null);
+    const now = Date.now();
+    const cached = adminTokenCacheRef.current;
+    if (cached.uid !== user.uid) {
+      adminTokenCacheRef.current = { uid: user.uid, token: '', tokenResult: null, expiresAt: 0, promise: null };
+    }
+    let tokenBundle = null;
+    const nextCached = adminTokenCacheRef.current;
+    if (nextCached.token && nextCached.expiresAt > now) {
+      tokenBundle = { token: nextCached.token, tokenResult: nextCached.tokenResult, cached: true };
+    } else {
+      if (!nextCached.promise) {
+        noteAdminAuthStage({ at: new Date().toISOString(), stage: 'token_request_started', uid: user.uid, email: user.email ?? null, isAnonymous: user.isAnonymous ?? null });
+        nextCached.promise = Promise.all([
+          user.getIdToken(true),
+          user.getIdTokenResult(true).catch(() => null),
+        ]).then(([token, tokenResult]) => {
+          adminTokenCacheRef.current = {
+            uid: user.uid,
+            token,
+            tokenResult,
+            expiresAt: Date.now() + 30000,
+            promise: null,
+          };
+          return { token, tokenResult, cached: false };
+        }).catch(error => {
+          adminTokenCacheRef.current = { uid: user.uid, token: '', tokenResult: null, expiresAt: 0, promise: null };
+          throw error;
+        });
+      }
+      tokenBundle = await nextCached.promise;
+    }
+    const { token, tokenResult } = tokenBundle;
     noteAdminAuthStage({
       at: new Date().toISOString(),
-      stage: 'token_received',
+      stage: tokenBundle.cached ? 'token_reused' : 'token_received',
       uid: user.uid,
       email: user.email ?? null,
       isAnonymous: user.isAnonymous ?? null,
@@ -4564,14 +4594,15 @@ export const AdminPanel = () => {
     let authDiagnostics = null;
     const readCollection = async ({ name, label, ref, load, optional = false }) => {
       let lastError = null;
+      const startedAt = performance.now();
       for (let attempt = 1; attempt <= ADMIN_LOAD_RETRIES + 1; attempt++) {
         try {
           if (load) {
             const docs = await withTimeout(load(), ADMIN_LOAD_TIMEOUT_MS, label);
-            return { name, label, optional, ok: true, docs, count: docs.length, attempts: attempt };
+            return { name, label, optional, ok: true, docs, count: docs.length, attempts: attempt, durationMs: Math.round(performance.now() - startedAt) };
           }
           const snap = await withTimeout(getDocs(ref()), ADMIN_LOAD_TIMEOUT_MS, label);
-          return { name, label, optional, ok: true, docs: docsToItems(snap), count: snap.docs.length, attempts: attempt };
+          return { name, label, optional, ok: true, docs: docsToItems(snap), count: snap.docs.length, attempts: attempt, durationMs: Math.round(performance.now() - startedAt) };
         } catch (error) {
           lastError = error;
           if (name !== 'errorLogs' && !isExpectedAdminAccessError(error)) {
@@ -4589,6 +4620,7 @@ export const AdminPanel = () => {
         docs: null,
         count: 0,
         attempts: ADMIN_LOAD_RETRIES + 1,
+        durationMs: Math.round(performance.now() - startedAt),
         error: formatAdminLoadError(lastError),
         details: adminLoadErrorDetails(lastError),
         diagnostic: buildAdminLoadDiagnostic(name, label, lastError, authDiagnostics),
@@ -4607,9 +4639,9 @@ export const AdminPanel = () => {
         isAnonymous: authDiagnostics?.isAnonymous ?? null,
       });
       const specs = [
-        { name: 'partners', label: 'Партнёры', ref: () => collection(db, 'partners') },
-        { name: 'experts', label: 'Эксперты', ref: () => collection(db, 'experts') },
-        { name: 'events', label: 'События', ref: () => collection(db, 'events') },
+        { name: 'partners', label: 'Партнёры', load: () => fetchAdminEntityList('partners', 1000) },
+        { name: 'experts', label: 'Эксперты', load: () => fetchAdminEntityList('experts', 1000) },
+        { name: 'events', label: 'События', load: () => fetchAdminEntityList('events', 1000) },
         { name: 'news', label: 'Новости', ref: () => query(collection(db, 'news'), orderBy('createdAt', 'desc')) },
         { name: 'notifications', label: 'Уведомления', ref: () => query(collection(db, 'notifications'), orderBy('createdAt', 'desc')) },
         { name: 'prizes', label: 'Призы', ref: () => query(collection(db, 'prizes'), orderBy('cost', 'asc')) },
@@ -4685,6 +4717,7 @@ export const AdminPanel = () => {
         diagnostic: item.diagnostic,
         optional: item.optional,
         attempts: item.attempts,
+        durationMs: item.durationMs,
       })));
       setAdminLoadInfo(prev => ({
         ...prev,
@@ -4696,6 +4729,7 @@ export const AdminPanel = () => {
         authIsAnonymous: authDiagnostics?.isAnonymous ?? null,
         firebase: FIREBASE_CLIENT_DIAGNOSTICS,
         counts: Object.fromEntries(allResults.filter(item => item.ok).map(item => [item.name, item.count])),
+        timings: Object.fromEntries(allResults.map(item => [item.name, { ok: item.ok, count: item.count, durationMs: item.durationMs, attempts: item.attempts }])),
       }));
     } catch (e) {
       logError(e, 'AdminPanel.fetchData.outer');
