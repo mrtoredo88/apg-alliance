@@ -215,25 +215,34 @@ export function SplashScreen({
           >
             <div style={{ position: 'absolute', inset: -28, borderRadius: '50%', background: 'radial-gradient(circle, rgba(123,85,255,0.28), rgba(201,168,76,0.12) 36%, transparent 68%)', filter: 'blur(20px)' }} />
             <div style={{ position: 'absolute', inset: -7, borderRadius: 34, background: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.03))', border: '1px solid rgba(255,255,255,0.18)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.34), 0 24px 80px rgba(0,0,0,0.42)' }} />
-            <img
+            <picture
               data-apg-splash-animated
-              src="/logo.png"
-              alt="АПГ"
-              width="96"
-              height="96"
               style={{
                 position: 'relative',
                 display: 'block',
                 width: 96,
                 height: 96,
-                objectFit: 'contain',
-                borderRadius: 26,
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                pointerEvents: 'none',
                 animation: 'apg-splash-logo-breathe 3300ms ease-in-out infinite',
               }}
-            />
+            >
+              <source srcSet="/logo.webp" type="image/webp" />
+              <img
+                src="/logo.png"
+                alt="АПГ"
+                width="96"
+                height="96"
+                style={{
+                  display: 'block',
+                  width: 96,
+                  height: 96,
+                  objectFit: 'contain',
+                  borderRadius: 26,
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  pointerEvents: 'none',
+                }}
+              />
+            </picture>
           </div>
 
           <div data-apg-splash-animated style={{ animation: 'apg-splash-title-in 720ms var(--motion-ease-soft, cubic-bezier(0.2,0,0,1)) 120ms both' }}>

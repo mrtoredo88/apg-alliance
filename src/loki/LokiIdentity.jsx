@@ -1,7 +1,7 @@
 import React from 'react';
 import { APG2_PROFILE } from '../components/Apg2ProfileGlass.jsx';
 
-export const LOKI_CANONICAL_ASSET = '/loki.png';
+export const LOKI_CANONICAL_ASSET = '/loki-512.png';
 export const LOKI_CANONICAL_CROP = {
   backgroundSize: '285%',
   backgroundPosition: '50% 23%',

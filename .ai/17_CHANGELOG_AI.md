@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] perf: Faster app startup
+**Коммит:** `pending`
+**Файлы:** `src/UserApp.jsx`, `src/SplashScreen.jsx`, `src/loki/LokiIdentity.jsx`, `public/loki-512.png`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** refactor
+**Что изменено:**
+- Bootstrap данных разделён на критическую и фоновую загрузку: главный экран больше не ждёт notifications, reviews, customTasks и lokiKnowledge.
+- QR Scanner, Booking Flow и Loki Assistant переведены в on-demand загрузку, чтобы не попадать в стартовый путь без пользовательского действия.
+- Splash использует `logo.webp`, а Loki Identity — оптимизированный asset `loki-512.png` вместо 2 МБ исходника.
+**Почему:** приложение должно быстрее показывать первый рабочий интерфейс без удаления функций, упрощения UI или изменения пользовательских сценариев.
+
 ## [2026-07-15] feat: Living Profile important tab
 **Коммит:** `pending`
 **Файлы:** `src/components/ProfileTimelineSection.jsx`, `src/profileTimeline.js`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

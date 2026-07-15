@@ -23,7 +23,6 @@ import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassToast } from './components/Apg2ProfileGlass.jsx';
 import { MOTION, motionTransition } from './motion.js';
 import { LokiProvider } from './loki/LokiProvider.jsx';
-import { LokiAssistant } from './loki/LokiAssistant.jsx';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
@@ -42,7 +41,6 @@ import { getRoleDiagnostics } from './roleEngine.js';
 import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
 import { buildAIContext } from './intelligence/AIContextService.js';
 import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
-import { BookingFlow } from './booking/BookingFlow.jsx';
 import { buildPostVisitMomentState } from '../server-shared/booking.js';
 import {
   APG_EVENT_TYPES,
@@ -65,6 +63,8 @@ const PartnerPage       = lazy(() => import('./PartnerPage.jsx').then(m => ({ de
 const Onboarding        = lazy(() => import('./Onboarding.jsx').then(m => ({ default: m.Onboarding })));
 const NotificationsPage = lazy(() => import('./NotificationsPage.jsx').then(m => ({ default: m.NotificationsPage })));
 const ContextDialogsPage = lazy(() => import('./contextDialogs/ContextDialogsPage.jsx').then(m => ({ default: m.ContextDialogsPage })));
+const BookingFlow = lazy(() => import('./booking/BookingFlow.jsx').then(m => ({ default: m.BookingFlow })));
+const LokiAssistant = lazy(() => import('./loki/LokiAssistant.jsx').then(m => ({ default: m.LokiAssistant })));
 
 // Lazy-loaded pages (рендерят <Panel> внутри себя)
 const EventsPage      = lazy(() => import('./EventsPage.jsx').then(m => ({ default: m.EventsPage })));
@@ -1320,21 +1320,23 @@ export function UserApp() {
       }
 
       const emptySnap = { docs: [] };
-      const _buildAll = () => Promise.all([
+      const _loadCritical = () => Promise.all([
         safeLoad('partners', () => loadPublicSnap('partners', () => getDocs(query(collection(db, 'partners'), limit(100)))), emptySnap),
         safeLoad('events', () => loadPublicSnap('events', () => getDocs(query(collection(db, 'events'), limit(100)))), emptySnap),
         safeLoad('news', () => loadPublicSnap('news', () => getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30)))), emptySnap),
-        safeLoad('notifications', () => loadPublicSnap('notifications', () => getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)))), emptySnap),
-        safeLoad('reviews', () => loadPublicSnap('reviews', () => getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(50)))), emptySnap),
-        safeLoad('customTasks', () => loadPublicSnap('customTasks', () => getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'), limit(50)))), emptySnap),
         safeLoad('vkNews', fetchVkNewsPosts, []),
         safeLoad('experts', () => loadPublicSnap('experts', () => getDocs(query(collection(db, 'experts'), limit(100)))), emptySnap),
         safeLoad('stats', () => loadPublicStats(() => getDoc(doc(db, 'stats', 'global'))), null),
+      ]);
+      const _loadSecondary = () => Promise.all([
+        safeLoad('notifications', () => loadPublicSnap('notifications', () => getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)))), emptySnap),
+        safeLoad('reviews', () => loadPublicSnap('reviews', () => getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(50)))), emptySnap),
+        safeLoad('customTasks', () => loadPublicSnap('customTasks', () => getDocs(query(collection(db, 'customTasks'), orderBy('createdAt', 'asc'), limit(50)))), emptySnap),
         safeLoad('lokiKnowledge', () => loadPublicSnap('lokiKnowledge', () => getDocs(query(collection(db, 'lokiKnowledge'), orderBy('priority', 'desc'), limit(120)))), emptySnap),
       ]);
 
-      const _loadResult = await _buildAll();
-      const [pSnap, eSnap, nSnap, notifSnap, reviewsSnap, ctSnap, vkPostsRaw, exSnap, statsSnap, lkSnap] = _loadResult;
+      const _loadResult = await _loadCritical();
+      const [pSnap, eSnap, nSnap, vkPostsRaw, exSnap, statsSnap] = _loadResult;
 
       if (!isMounted.current) return;
       const freshPartners = pSnap.docs
@@ -1395,8 +1397,6 @@ export function UserApp() {
       setNews(freshNews);
       writeCachedArray('apg_news_cache', freshNews);
 
-      setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
-      setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
       const freshExperts = exSnap.docs.map(d => normalizeExpertRecord({ id: d.id, ...d.data() })).filter(isNotArchived);
       if (isMounted.current) {
         setExperts(freshExperts);
@@ -1405,38 +1405,44 @@ export function UserApp() {
           setOwnedExpert(ownedEx ?? null);
         }
       }
-      if (isMounted.current) setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       if (isMounted.current && statsSnap?.exists?.()) {
         const sd = statsSnap.data();
         setPlatformStats({ userCount: sd.userCount ?? 0, totalScans: sd.totalScans ?? 0 });
       }
       const currentUserId = String(userData?.id || '');
-      const notifList = notifSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(item => {
-          const target = String(item.targetUserId || item.userId || '');
-          return !target || !currentUserId || target === currentUserId;
-        });
-      setNotifications(notifList);
-      writeCachedArray('apg_notif_cache', notifList);
 
       const nowTs = Date.now();
       try { localStorage.setItem('apg_cache_ts', String(nowTs)); } catch {}
       if (isMounted.current) setCacheTs(nowTs);
 
-      const lastSeen = localStorage.getItem('apg_notif_seen');
-      const lastSeenDate = lastSeen ? new Date(Number(lastSeen)) : null;
-      const unread = notifList.filter(d => {
-        if (d.isRead === true || d.read === true || d.seen === true) return false;
-        if (d.category === 'messages' || d.type === 'contextDialogMessage') return true;
-        if (!lastSeenDate) return true;
-        const ts = d.createdAt;
-        if (!ts) return false;
-        const date = ts.toDate ? ts.toDate() : new Date(ts);
-        return date > lastSeenDate;
-      }).length;
-      setUnreadCount(unread);
       if (isMounted.current) setLoading(false);
+
+      _loadSecondary().then(([notifSnap, reviewsSnap, ctSnap, lkSnap]) => {
+        if (!isMounted.current) return;
+        setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
+        setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
+        setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const notifList = notifSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(item => {
+            const target = String(item.targetUserId || item.userId || '');
+            return !target || !currentUserId || target === currentUserId;
+          });
+        setNotifications(notifList);
+        writeCachedArray('apg_notif_cache', notifList);
+        const lastSeen = localStorage.getItem('apg_notif_seen');
+        const lastSeenDate = lastSeen ? new Date(Number(lastSeen)) : null;
+        const unread = notifList.filter(d => {
+          if (d.isRead === true || d.read === true || d.seen === true) return false;
+          if (d.category === 'messages' || d.type === 'contextDialogMessage') return true;
+          if (!lastSeenDate) return true;
+          const ts = d.createdAt;
+          if (!ts) return false;
+          const date = ts.toDate ? ts.toDate() : new Date(ts);
+          return date > lastSeenDate;
+        }).length;
+        setUnreadCount(unread);
+      }).catch(e => logError(e, 'UserApp.secondaryData'));
 
       if (!isGuest) {
         void (async () => {
@@ -4287,14 +4293,16 @@ export function UserApp() {
 
           {showTabBar && !desktopWorkspaceActive && createPortal(tabBarEl, document.body)}
 
-          <Suspense fallback={null}>
-            <ScannerComponent
-              isOpen={isScannerOpen}
-              onClose={() => setIsScannerOpen(false)}
-              mapPlaces={partners}
-              onConfirm={handleConfirmScan}
-            />
-          </Suspense>
+          {isScannerOpen && (
+            <Suspense fallback={null}>
+              <ScannerComponent
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                mapPlaces={partners}
+                onConfirm={handleConfirmScan}
+              />
+            </Suspense>
+          )}
 
           <ScanSuccessModal
             result={scanSuccess}
@@ -4309,15 +4317,19 @@ export function UserApp() {
             }}
           />
 
-          <BookingFlow
-            open={!!bookingRequest}
-            provider={bookingRequest?.provider}
-            providerType={bookingRequest?.providerType}
-            user={user}
-            onClose={() => setBookingRequest(null)}
-            onCreated={handleBookingCreated}
-            onOpenDialog={openContextDialogById}
-          />
+          {bookingRequest && (
+            <Suspense fallback={null}>
+              <BookingFlow
+                open={!!bookingRequest}
+                provider={bookingRequest?.provider}
+                providerType={bookingRequest?.providerType}
+                user={user}
+                onClose={() => setBookingRequest(null)}
+                onCreated={handleBookingCreated}
+                onOpenDialog={openContextDialogById}
+              />
+            </Suspense>
+          )}
 
           <PostVisitMoment
             booking={postVisitMoment}
@@ -4459,7 +4471,11 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && <LokiAssistant desktopMode={desktopDevice} />}
+          {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
+            <Suspense fallback={null}>
+              <LokiAssistant desktopMode={desktopDevice} />
+            </Suspense>
+          )}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>
