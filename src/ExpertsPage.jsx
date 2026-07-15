@@ -1138,11 +1138,13 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
   const meta = [
     rating > 0 && { id: 'rating', label: 'Рейтинг', value: `★ ${rating.toFixed(1)}`, tone: 'gold' },
     expert.experience && { id: 'experience', label: 'Опыт', value: expert.experience },
-    { id: 'city', label: 'Город', value: expertCity(expert) },
+    expert.serviceCost && { id: 'cost', label: 'Стоимость', value: expert.serviceCost, tone: 'gold' },
+    expertCity(expert) && { id: 'city', label: 'Город', value: expertCity(expert) },
   ].filter(Boolean);
   const tags = [
     ...categoryLabels.map(item => ({ id: item.id, label: `${item.emoji} ${item.label}` })),
     ...(Array.isArray(expert.formats) ? expert.formats.slice(0, 2).map(format => ({ id: format, label: FORMAT_LABELS[format]?.label || format })) : []),
+    expert.serviceCost && { id: 'cost-tag', label: expert.serviceCost },
   ];
   const actions = [
     { id: 'open', label: 'Подробнее', tone: 'gold', onClick: () => onOpen?.(expert) },
@@ -1157,7 +1159,11 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
       onClick={() => onSelect?.(expert)}
       onMouseEnter={() => onSelect?.(expert)}
       onFocus={() => onSelect?.(expert)}
-      preview={<DesktopCardPreview image={cover} height={60} />}
+      preview={<DesktopCardPreview image={cover} height={compact ? '100%' : 82} />}
+      layout={compact ? 'horizontal' : 'stacked'}
+      density="catalog"
+      metaMode="inline"
+      descriptionLines={compact ? 2 : 2}
       avatar={<ExpertAvatar expert={expert} size={compact ? 42 : 48} />}
       badges={badges}
       title={expert.name || 'Эксперт АПГ'}
@@ -1167,7 +1173,7 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
       meta={meta}
       tags={tags}
       actions={actions}
-      footer={category ? `Категория: ${category.label}` : ''}
+      footer={expert.offer ? `Акция: ${expert.offer}` : category ? `Категория: ${category.label}` : ''}
     />
   );
 }
@@ -1298,8 +1304,9 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
     : viewMode === 'split'
       ? { gridTemplateColumns: `repeat(${Math.min(desktopColumns, 2)}, minmax(0, 1fr))` }
       : { gridTemplateColumns: `repeat(${desktopColumns}, minmax(0, 1fr))` };
-  const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
-  const desktopSearchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 240, width: '100%', boxSizing: 'border-box' };
+  const showCatalogRail = viewportWidth >= 1180 && viewMode !== 'map';
+  const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
+  const desktopSearchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 240, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2.textMuted };
 
   useEffect(() => {
     if (!isActive && selected) setSelected(null);
@@ -1314,7 +1321,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
   if (desktopMode) {
     return (
       <DesktopSectionShell
-        maxWidth={1460}
+        maxWidth={1580}
         topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="experts" /> : null}
         header={
           <DesktopHeader
@@ -1332,7 +1339,7 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
         }
         toolbar={
           <DesktopToolbar
-            leading={<input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Поиск по имени, специализации, категории" aria-label="Поиск экспертов" style={desktopSearchStyle} />}
+            leading={<input type="search" ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Поиск по имени, специализации, категории" aria-label="Поиск экспертов" style={desktopSearchStyle} />}
             trailing={
               <>
                 <select aria-label="Формат консультации" value={filter} onChange={event => setFilter(event.target.value)} style={selectStyle}>
@@ -1358,72 +1365,79 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           />
         }
         kpi={<DesktopKpiStrip items={desktopKpiItems} />}
-        info={
-          <DesktopContentGrid min={300} gap={12}>
-            <DesktopSidebarCard title="Quick Preview" subtitle={desktopPreviewExpert?.name || 'Выберите эксперта'}>
-              {desktopPreviewExpert ? (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
-                    <ExpertAvatar expert={desktopPreviewExpert} size={54} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ color: APG2.text, fontSize: 17, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{desktopPreviewExpert.name}</div>
-                      <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 3 }}>{desktopPreviewExpert.specialization || 'Консультации'} · {expertCity(desktopPreviewExpert)}</div>
-                    </div>
-                  </div>
-                  <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{desktopPreviewExpert.description || desktopPreviewExpert.experience || desktopPreviewExpert.offer || 'Проверенный специалист в экосистеме АПГ.'}</div>
-                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                    {desktopPreviewExpert.categories?.slice(0, 3).map(id => { const category = getExpertCategory(id); return category ? <GlassBadge key={id}>{category.emoji} {category.label}</GlassBadge> : null; })}
-                    {expertRating(desktopPreviewExpert) > 0 && <GlassBadge tone="gold">★ {expertRating(desktopPreviewExpert).toFixed(1)}</GlassBadge>}
-                    {hasExpertBooking(desktopPreviewExpert) && <GlassBadge>Есть запись</GlassBadge>}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: onAskQuestion ? '1fr 1fr 1fr' : '1fr 1fr', gap: 8 }}>
-                    <GlassButton onClick={() => openExpert(desktopPreviewExpert)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Подробнее</GlassButton>
-                    <GlassButton disabled={!hasExpertBooking(desktopPreviewExpert)} onClick={() => onBook?.(desktopPreviewExpert)} style={{ minHeight: 40, borderRadius: 16 }}>Записаться</GlassButton>
-                    {onAskQuestion && <GlassButton onClick={() => onAskQuestion(desktopPreviewExpert)} style={{ minHeight: 40, borderRadius: 16 }}>Написать</GlassButton>}
-                  </div>
-                </div>
-              ) : <div style={{ color: APG2.textMuted, fontSize: 13 }}>Выберите карточку, чтобы увидеть краткий обзор.</div>}
-            </DesktopSidebarCard>
-            {(viewMode === 'map' || viewMode === 'split') && <ExpertsMapPreview experts={filtered} selected={desktopPreviewExpert} onSelect={setPreviewExpert} />}
-            <DesktopSidebarCard title="Связано" subtitle="Существующие данные">
-              <div style={{ display: 'grid', gap: 8 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <DesktopMetricCard label="Категории" value={CATEGORY_FILTERS.length - 1} style={{ minHeight: 74 }} />
-                  <DesktopMetricCard label="Форматы" value={FILTERS.length - 1} style={{ minHeight: 74 }} />
-                </div>
-                <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
-                  Отзывы, публикации, события и свободные окна подтягиваются из существующей карточки эксперта без новых запросов.
-                </div>
-              </div>
-            </DesktopSidebarCard>
-          </DesktopContentGrid>
-        }
         actionBar={<DesktopActionBar actions={EXPERT_VIEW_MODES.map(([id, label]) => ({ id, label, tone: viewMode === id ? 'gold' : undefined, onClick: () => setViewMode(id) }))} />}
       >
-        <DesktopSectionTitle title={viewMode === 'map' ? 'Эксперты на карте' : `${filtered.length} специалистов`} subtitle={search.trim() ? `По запросу: ${search.trim()}` : 'Каталог экспертов, консультаций и профессиональных услуг'} />
-        {activeExperts.length === 0 ? (
-          <DesktopSkeleton rows={8} variant="grid" />
-        ) : filtered.length === 0 ? (
-          <DesktopEmptyState icon="🧑‍💼" title="Эксперты не найдены" text="Попробуйте изменить специализацию, формат, город, рейтинг или поисковый запрос." action={<GlassButton tone="gold" onClick={() => { setSearch(''); setFilter('all'); setActiveCategory('all'); setCityFilter('all'); setRatingFilter('all'); setAvailabilityFilter('all'); }} style={{ color: '#17120a' }}>Показать всех</GlassButton>} />
-        ) : viewMode === 'map' ? (
-          <ExpertsMapPreview experts={filtered} selected={desktopPreviewExpert} onSelect={setPreviewExpert} />
-        ) : (
-          <DesktopCatalogGrid columns={viewMode === 'list' ? 1 : viewMode === 'split' ? Math.min(desktopColumns, 2) : desktopColumns} gap={12} style={desktopGridStyle}>
-            {filtered.map(expert => (
-              <ExpertCatalogCard
-                key={expert.id}
-                expert={expert}
-                selected={desktopPreviewExpert?.id === expert.id}
-                compact={viewMode === 'list' || viewMode === 'split'}
-                isTop={topIds.has(expert.id)}
-                onSelect={setPreviewExpert}
-                onOpen={openExpert}
-                onAskQuestion={onAskQuestion}
-                onBook={onBook}
-              />
-            ))}
-          </DesktopCatalogGrid>
-        )}
+        <div style={{ display: 'grid', gridTemplateColumns: showCatalogRail ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
+            <DesktopSectionTitle title={viewMode === 'map' ? 'Эксперты на карте' : `${filtered.length} специалистов`} subtitle={search.trim() ? `По запросу: ${search.trim()}` : 'Каталог экспертов, консультаций и профессиональных услуг'} />
+            {activeExperts.length === 0 ? (
+              <DesktopSkeleton rows={8} variant="grid" />
+            ) : filtered.length === 0 ? (
+              <DesktopEmptyState icon="🧑‍💼" title="Эксперты не найдены" text="Попробуйте изменить специализацию, формат, город, рейтинг или поисковый запрос." action={<GlassButton tone="gold" onClick={() => { setSearch(''); setFilter('all'); setActiveCategory('all'); setCityFilter('all'); setRatingFilter('all'); setAvailabilityFilter('all'); }} style={{ color: '#17120a' }}>Показать всех</GlassButton>} />
+            ) : viewMode === 'map' ? (
+              <ExpertsMapPreview experts={filtered} selected={desktopPreviewExpert} onSelect={setPreviewExpert} />
+            ) : (
+              <DesktopCatalogGrid columns={viewMode === 'list' ? 1 : viewMode === 'split' ? Math.min(desktopColumns, 2) : desktopColumns} gap={12} style={desktopGridStyle}>
+                {filtered.map(expert => (
+                  <ExpertCatalogCard
+                    key={expert.id}
+                    expert={expert}
+                    selected={desktopPreviewExpert?.id === expert.id}
+                    compact={viewMode === 'list' || viewMode === 'split'}
+                    isTop={topIds.has(expert.id)}
+                    onSelect={setPreviewExpert}
+                    onOpen={openExpert}
+                    onAskQuestion={onAskQuestion}
+                    onBook={onBook}
+                  />
+                ))}
+              </DesktopCatalogGrid>
+            )}
+          </div>
+          {showCatalogRail && (
+            <aside style={{ display: 'grid', gap: 12, minWidth: 0, position: 'sticky', top: 'calc(14px + var(--safe-top, 0px))' }}>
+              <DesktopSidebarCard title="Quick Preview" subtitle={desktopPreviewExpert?.name || 'Выберите эксперта'}>
+                {desktopPreviewExpert ? (
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
+                      <ExpertAvatar expert={desktopPreviewExpert} size={54} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: APG2.text, fontSize: 17, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{desktopPreviewExpert.name}</div>
+                        <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 3 }}>{desktopPreviewExpert.specialization || 'Консультации'} · {expertCity(desktopPreviewExpert)}</div>
+                      </div>
+                    </div>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{desktopPreviewExpert.description || desktopPreviewExpert.experience || desktopPreviewExpert.offer || 'Проверенный специалист в экосистеме АПГ.'}</div>
+                    <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                      {desktopPreviewExpert.categories?.slice(0, 3).map(id => { const category = getExpertCategory(id); return category ? <GlassBadge key={id}>{category.emoji} {category.label}</GlassBadge> : null; })}
+                      {expertRating(desktopPreviewExpert) > 0 && <GlassBadge tone="gold">★ {expertRating(desktopPreviewExpert).toFixed(1)}</GlassBadge>}
+                      {desktopPreviewExpert.serviceCost && <GlassBadge tone="gold">{desktopPreviewExpert.serviceCost}</GlassBadge>}
+                      {desktopPreviewExpert.experience && <GlassBadge>{desktopPreviewExpert.experience}</GlassBadge>}
+                      {desktopPreviewExpert.formats?.slice(0, 2).map(format => <GlassBadge key={format}>{FORMAT_LABELS[format]?.label || format}</GlassBadge>)}
+                      {hasExpertBooking(desktopPreviewExpert) && <GlassBadge>Есть запись</GlassBadge>}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: onAskQuestion ? '1fr 1fr 1fr' : '1fr 1fr', gap: 8 }}>
+                      <GlassButton onClick={() => openExpert(desktopPreviewExpert)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Подробнее</GlassButton>
+                      <GlassButton disabled={!hasExpertBooking(desktopPreviewExpert)} onClick={() => onBook?.(desktopPreviewExpert)} style={{ minHeight: 40, borderRadius: 16 }}>Записаться</GlassButton>
+                      {onAskQuestion && <GlassButton onClick={() => onAskQuestion(desktopPreviewExpert)} style={{ minHeight: 40, borderRadius: 16 }}>Написать</GlassButton>}
+                    </div>
+                  </div>
+                ) : <div style={{ color: APG2.textMuted, fontSize: 13 }}>Выберите карточку, чтобы увидеть краткий обзор.</div>}
+              </DesktopSidebarCard>
+              {viewMode === 'split' && <ExpertsMapPreview experts={filtered} selected={desktopPreviewExpert} onSelect={setPreviewExpert} />}
+              <DesktopSidebarCard title="Связано" subtitle="Существующие данные">
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <DesktopMetricCard label="Категории" value={CATEGORY_FILTERS.length - 1} style={{ minHeight: 74 }} />
+                    <DesktopMetricCard label="Форматы" value={FILTERS.length - 1} style={{ minHeight: 74 }} />
+                  </div>
+                  <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                    Отзывы, публикации, события и свободные окна подтягиваются из существующей карточки эксперта без новых запросов.
+                  </div>
+                </div>
+              </DesktopSidebarCard>
+            </aside>
+          )}
+        </div>
         {selected && (
           <ExpertModal
             expert={selected}

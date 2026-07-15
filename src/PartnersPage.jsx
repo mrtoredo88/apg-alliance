@@ -82,6 +82,14 @@ function partnerFormat(partner) {
   return 'offline';
 }
 
+function partnerPrimaryServices(partner) {
+  const catalog = Array.isArray(partner?.serviceCatalog) ? partner.serviceCatalog : [];
+  const fromCatalog = catalog.map(item => text(item?.title || item?.name || item?.service)).filter(Boolean);
+  const fromArray = Array.isArray(partner?.services) ? partner.services.map(item => text(item?.title || item?.name || item)).filter(Boolean) : [];
+  const fromText = typeof partner?.services === 'string' ? partner.services.split(/[\n,;]+/).map(text).filter(Boolean) : [];
+  return [...new Set([...fromCatalog, ...fromArray, ...fromText])].slice(0, 3);
+}
+
 function partnerRating(partner) {
   const value = Number(partner?.avgRating ?? partner?.rating ?? partner?.stars ?? 0);
   return Number.isFinite(value) ? value : 0;
@@ -153,6 +161,7 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const canBook = Boolean(partner?.bookingEnabled || partner?.bookingUrl || partner?.services?.length || partner?.serviceCatalog?.length);
   const cover = partner?.coverPhoto || partner?.imageUrl || partner?.photoUrl || partner?.photo || partner?.image || '';
   const address = text(partner?.address);
+  const services = partnerPrimaryServices(partner);
   const isNew = (toDate(partner?.createdAt)?.getTime() || 0) >= Date.now() - 30 * 24 * 60 * 60 * 1000;
   const badges = [
     partner?.featured && { id: 'featured', label: 'Партнёр дня', tone: 'gold' },
@@ -164,10 +173,11 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const meta = [
     rating > 0 && { id: 'rating', label: 'Рейтинг', value: `★ ${rating.toFixed(1)}`, tone: 'gold' },
     address && { id: 'address', label: 'Адрес', value: address },
-    { id: 'city', label: 'Город', value: city },
+    city && { id: 'city', label: 'Город', value: city },
   ].filter(Boolean);
   const tags = [
     { id: 'category', label: category.label },
+    ...services.map(service => ({ id: `service-${service}`, label: service })),
     partnerFormat(partner) !== 'offline' && { id: 'format', label: partnerFormat(partner) === 'online' ? 'Онлайн' : 'Гибрид' },
   ].filter(Boolean);
   const actions = [
@@ -183,7 +193,11 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
       onClick={() => onSelect?.(partner)}
       onMouseEnter={() => onSelect?.(partner)}
       onFocus={() => onSelect?.(partner)}
-      preview={<DesktopCardPreview image={cover} height={66} />}
+      preview={<DesktopCardPreview image={cover} height={compact ? '100%' : 82} />}
+      layout={compact ? 'horizontal' : 'stacked'}
+      density="catalog"
+      metaMode="inline"
+      descriptionLines={compact ? 2 : 2}
       avatar={<PartnerLogo partner={partner} size={compact ? 42 : 48} />}
       badges={badges}
       title={partner?.name || 'Партнёр АПГ'}
@@ -193,7 +207,7 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
       meta={meta}
       tags={tags}
       actions={actions}
-      footer={partner?.offer ? `Акция: ${partner.offer}` : ''}
+      footer={partner?.offer ? `Акция: ${partner.offer}` : services.length ? `Услуги: ${services.join(', ')}` : ''}
     />
   );
 }
@@ -287,14 +301,15 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
   ].filter(Boolean);
   const relatedEvents = useMemo(() => selectedPartner ? events.filter(event => String(event?.partnerId || event?.partner?.id || event?.partnerName || event?.partner || '') === String(selectedPartner.id) || text(event?.partnerName || event?.partner).toLowerCase() === text(selectedPartner.name).toLowerCase()).slice(0, 3) : [], [events, selectedPartner]);
   const relatedNews = useMemo(() => selectedPartner ? news.filter(item => String(item?.partnerId || item?.partner?.id || '') === String(selectedPartner.id) || text(item?.partnerName || item?.partner).toLowerCase() === text(selectedPartner.name).toLowerCase()).slice(0, 3) : [], [news, selectedPartner]);
-  const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
-  const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box' };
+  const selectStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 760, padding: '0 12px', minWidth: 128 };
+  const searchStyle = { height: 42, borderRadius: 18, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.22)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.38)', color: APG2_PROFILE.text, outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 720, padding: '0 14px', minWidth: 220, width: '100%', boxSizing: 'border-box', '--apg-input-placeholder': APG2_PROFILE.textMuted };
   const gridColumns = getCatalogColumns(viewportWidth);
   const catalogGridStyle = view === 'list'
     ? { gridTemplateColumns: 'minmax(0, 1fr)' }
     : view === 'split'
       ? { gridTemplateColumns: `repeat(${Math.min(gridColumns, 2)}, minmax(0, 1fr))` }
       : { gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))` };
+  const showCatalogRail = viewportWidth >= 1180 && view !== 'map';
 
   if (!desktopMode) {
     return (
@@ -309,7 +324,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
 
   return (
     <DesktopSectionShell
-      maxWidth={1460}
+      maxWidth={1580}
       topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="partners" /> : null}
       header={
         <DesktopHeader
@@ -328,7 +343,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
       }
       toolbar={
         <DesktopToolbar
-          leading={<input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск по названию, категории, адресу" aria-label="Поиск партнёров" style={searchStyle} />}
+          leading={<input type="search" ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск по названию, категории, адресу" aria-label="Поиск партнёров" style={searchStyle} />}
           trailing={
             <>
               <select aria-label="Категория партнёра" value={category} onChange={event => setCategory(event.target.value)} style={selectStyle}>{categories.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
@@ -342,50 +357,62 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
         />
       }
       kpi={<DesktopKpiStrip items={kpiItems} />}
-      info={
-        <DesktopContentGrid min={300} gap={12}>
-          <DesktopSidebarCard title="Quick Preview" subtitle={selectedPartner?.name || 'Выберите партнёра'}>
-            {selectedPartner ? (
-              <div style={{ display: 'grid', gap: 12 }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><PartnerLogo partner={selectedPartner} size={52} /><div style={{ minWidth: 0 }}><div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedPartner.name}</div><div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 3 }}>{partnerCategory(selectedPartner).label} · {partnerCity(selectedPartner)}</div></div></div>
-                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedPartner.description || selectedPartner.offer || selectedPartner.address || 'Карточка партнёра АПГ'}</div>
-                {selectedPartner.offer && <GlassBadge tone="gold">Акция: {selectedPartner.offer}</GlassBadge>}
-                {relatedEvents[0] && <GlassBadge>Ближайшее событие: {relatedEvents[0].title}</GlassBadge>}
-                {relatedNews[0] && <GlassBadge>Новость: {relatedNews[0].title || relatedNews[0].text}</GlassBadge>}
-                <GlassButton onClick={() => onOpenPartner?.(selectedPartner)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Подробнее</GlassButton>
-              </div>
-            ) : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Выберите карточку, чтобы увидеть краткий обзор.</div>}
-          </DesktopSidebarCard>
-          {(view === 'map' || view === 'split') && <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />}
-          <DesktopSidebarCard title="Связано" subtitle="Существующие данные">
-            <div style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <DesktopMetricCard label="Новости" value={relatedNews.length} style={{ minHeight: 74 }} />
-                <DesktopMetricCard label="События" value={relatedEvents.length} style={{ minHeight: 74 }} />
-              </div>
-              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>
-                Акции: {filtered.filter(item => item.offer).length}. Карта и контакты открываются из карточек без новых данных.
-              </div>
-            </div>
-          </DesktopSidebarCard>
-        </DesktopContentGrid>
-      }
       actionBar={<DesktopActionBar actions={viewModes.map(([id, label]) => ({ id, label, tone: view === id ? 'gold' : undefined, onClick: () => setView(id) }))} />}
     >
-      <DesktopSectionTitle title={view === 'map' ? 'Партнёры на карте' : `${filtered.length} организаций`} subtitle={query.trim() ? `По запросу: ${query.trim()}` : 'Каталог партнёров, организаций и городских сервисов'} />
-      {visiblePartners.length === 0 ? (
-        <DesktopSkeleton rows={8} variant="grid" />
-      ) : filtered.length === 0 ? (
-        <DesktopEmptyState icon="🏢" title="Партнёры не найдены" text="Попробуйте изменить категорию, город, район, рейтинг или поисковый запрос." action={<GlassButton tone="gold" onClick={() => { setQuery(''); setCategory('all'); setCity('all'); setDistrict('all'); setFormat('all'); setRating('all'); }} style={{ color: '#17120a' }}>Показать всех</GlassButton>} />
-      ) : view === 'map' ? (
-        <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />
-      ) : (
-        <DesktopCatalogGrid columns={view === 'list' ? 1 : view === 'split' ? Math.min(gridColumns, 2) : gridColumns} gap={12} style={catalogGridStyle}>
-          {filtered.map(partner => (
-            <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} />
-          ))}
-        </DesktopCatalogGrid>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: showCatalogRail ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
+          <DesktopSectionTitle title={view === 'map' ? 'Партнёры на карте' : `${filtered.length} организаций`} subtitle={query.trim() ? `По запросу: ${query.trim()}` : 'Каталог партнёров, организаций и городских сервисов'} />
+          {visiblePartners.length === 0 ? (
+            <DesktopSkeleton rows={8} variant="grid" />
+          ) : filtered.length === 0 ? (
+            <DesktopEmptyState icon="🏢" title="Партнёры не найдены" text="Попробуйте изменить категорию, город, район, рейтинг или поисковый запрос." action={<GlassButton tone="gold" onClick={() => { setQuery(''); setCategory('all'); setCity('all'); setDistrict('all'); setFormat('all'); setRating('all'); }} style={{ color: '#17120a' }}>Показать всех</GlassButton>} />
+          ) : view === 'map' ? (
+            <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />
+          ) : (
+            <DesktopCatalogGrid columns={view === 'list' ? 1 : view === 'split' ? Math.min(gridColumns, 2) : gridColumns} gap={12} style={catalogGridStyle}>
+              {filtered.map(partner => (
+                <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} />
+              ))}
+            </DesktopCatalogGrid>
+          )}
+        </div>
+        {showCatalogRail && (
+          <aside style={{ display: 'grid', gap: 12, minWidth: 0, position: 'sticky', top: 'calc(14px + var(--safe-top, 0px))' }}>
+            <DesktopSidebarCard title="Quick Preview" subtitle={selectedPartner?.name || 'Выберите партнёра'}>
+              {selectedPartner ? (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><PartnerLogo partner={selectedPartner} size={52} /><div style={{ minWidth: 0 }}><div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedPartner.name}</div><div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 3 }}>{partnerCategory(selectedPartner).label} · {partnerCity(selectedPartner)}</div></div></div>
+                  <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedPartner.description || selectedPartner.offer || selectedPartner.address || 'Карточка партнёра АПГ'}</div>
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                    {selectedPartner.address && <GlassBadge>Адрес: {selectedPartner.address}</GlassBadge>}
+                    {(selectedPartner.phone || selectedPartner.contactPhone) && <GlassBadge>Телефон указан</GlassBadge>}
+                    {partnerPrimaryServices(selectedPartner).slice(0, 2).map(service => <GlassBadge key={service}>{service}</GlassBadge>)}
+                  </div>
+                  {selectedPartner.offer && <div style={{ color: '#17120a', background: APG2_PROFILE.goldSoft, border: '1px solid rgba(201,168,76,0.34)', borderRadius: 16, padding: '9px 10px', fontSize: 12, lineHeight: '16px', fontWeight: 820, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>Акция: {selectedPartner.offer}</div>}
+                  {relatedEvents[0] && <GlassBadge>Ближайшее событие: {relatedEvents[0].title}</GlassBadge>}
+                  {relatedNews[0] && <GlassBadge>Новость: {relatedNews[0].title || relatedNews[0].text}</GlassBadge>}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <GlassButton onClick={() => onOpenPartner?.(selectedPartner)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Подробнее</GlassButton>
+                    <GlassButton disabled={!selectedPartner.address} onClick={() => routeToPartner(selectedPartner)} style={{ minHeight: 40, borderRadius: 16 }}>Маршрут</GlassButton>
+                  </div>
+                </div>
+              ) : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Выберите карточку, чтобы увидеть краткий обзор.</div>}
+            </DesktopSidebarCard>
+            {view === 'split' && <PartnersMapPreview partners={filtered} selected={selectedPartner} onOpenMap={onOpenMap} onSelect={setSelected} />}
+            <DesktopSidebarCard title="Связано" subtitle="Существующие данные">
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <DesktopMetricCard label="Новости" value={relatedNews.length} style={{ minHeight: 74 }} />
+                  <DesktopMetricCard label="События" value={relatedEvents.length} style={{ minHeight: 74 }} />
+                </div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                  Акции: {filtered.filter(item => item.offer).length}. Карта и контакты открываются из карточек без новых данных.
+                </div>
+              </div>
+            </DesktopSidebarCard>
+          </aside>
+        )}
+      </div>
     </DesktopSectionShell>
   );
 }

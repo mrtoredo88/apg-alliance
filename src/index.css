@@ -360,7 +360,7 @@ html {
 
 input[type="search"]::placeholder,
 input::placeholder {
-  color: rgba(240, 240, 240, 0.55);
+  color: var(--apg-input-placeholder, rgba(240, 240, 240, 0.55));
 }
 
 /* Onboarding slide transitions */

@@ -509,9 +509,21 @@ export function DesktopCardTags({ items = [], style }) {
   );
 }
 
-export function DesktopCardMeta({ items = [], style }) {
+export function DesktopCardMeta({ items = [], mode = 'cards', style }) {
   const safeItems = asArray(items).filter(item => item?.value || item?.label);
   if (!safeItems.length) return null;
+  if (mode === 'inline') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', minWidth: 0, ...style }}>
+        {safeItems.slice(0, 4).map(item => (
+          <span key={item.id || item.label} style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: '100%', color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '14px', fontWeight: 760 }}>
+            <span style={{ width: 4, height: 4, borderRadius: '50%', background: item.tone === 'gold' ? APG2_PROFILE.gold : 'rgba(var(--apg2-glass-a,255,255,255),0.32)', flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value || item.label}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeItems.length, 3)}, minmax(0, 1fr))`, gap: 6, ...style }}>
       {safeItems.slice(0, 3).map(item => (
@@ -528,7 +540,7 @@ export function DesktopCardActions({ actions = [], style }) {
   const safeActions = asArray(actions);
   if (!safeActions.length) return null;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${safeActions.length}, minmax(0, 1fr))`, gap: 6, ...style }}>
+    <div style={{ display: 'grid', gridTemplateColumns: safeActions.length > 3 ? 'repeat(2, minmax(0, 1fr))' : `repeat(${safeActions.length}, minmax(72px, 1fr))`, gap: 6, ...style }}>
       {safeActions.map(action => (
         <GlassButton
           key={action.id || action.label}
@@ -538,7 +550,7 @@ export function DesktopCardActions({ actions = [], style }) {
             action.onClick?.(event);
           }}
           tone={action.tone || 'glass'}
-          style={{ minHeight: 32, borderRadius: 13, padding: '6px 7px', fontSize: 10.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}
+          style={{ minHeight: 32, borderRadius: 13, padding: '6px 7px', fontSize: 10.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...action.style }}
         >
           {action.label}
         </GlassButton>
@@ -549,7 +561,7 @@ export function DesktopCardActions({ actions = [], style }) {
 
 export function DesktopCardFooter({ children, style }) {
   if (!children) return null;
-  return <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', ...style }}>{children}</div>;
+  return <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', ...style }}>{children}</div>;
 }
 
 export function DesktopCardHeader({ avatar, badges, title, subtitle, side, compact = false, style }) {
@@ -582,12 +594,20 @@ export function DesktopCard({
   actions = [],
   footer,
   children,
+  layout = 'stacked',
+  density = 'regular',
+  metaMode = 'cards',
+  previewWidth = 112,
+  descriptionLines = 2,
   onMouseEnter,
   onFocus,
   style,
 }) {
   const [hovered, setHovered] = React.useState(false);
   const active = selected || hovered;
+  const catalog = density === 'catalog';
+  const horizontal = Boolean(preview && (layout === 'horizontal' || compact));
+  const previewRow = catalog ? '78px' : '70px';
   return (
     <DesktopCardHover active={active}>
       <GlassCard
@@ -599,23 +619,25 @@ export function DesktopCard({
           borderRadius: 24,
           padding: 0,
           overflow: 'hidden',
-          minHeight: compact ? 132 : 178,
+          minHeight: horizontal ? 150 : catalog ? 214 : compact ? 132 : 178,
           cursor: onClick ? 'pointer' : 'default',
           border: selected ? '1px solid rgba(201,168,76,0.64)' : APG2_PROFILE.glass.border,
           display: 'grid',
-          gridTemplateRows: preview && !compact ? '70px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+          gridTemplateColumns: horizontal ? `${previewWidth}px minmax(0, 1fr)` : undefined,
+          gridTemplateRows: preview && !horizontal ? `${previewRow} minmax(0, 1fr)` : 'minmax(0, 1fr)',
           background: active ? 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.06))' : undefined,
           transition: motionTransition(['background', 'border-color'], 'base'),
           ...style,
         }}
       >
-        {preview && !compact ? preview : null}
-        <div style={{ padding: compact ? 11 : 12, display: 'grid', gap: compact ? 8 : 9, alignContent: 'start', minWidth: 0 }}>
+        {preview && !horizontal ? preview : null}
+        {preview && horizontal ? <div style={{ minHeight: 150, height: '100%' }}>{React.cloneElement(preview, { height: '100%' })}</div> : null}
+        <div style={{ padding: catalog ? 11 : compact ? 11 : 12, display: 'grid', gap: catalog ? 7 : compact ? 8 : 9, alignContent: 'start', minWidth: 0 }}>
           <DesktopCardHeader avatar={compact ? avatar : avatar} badges={badges} title={title} subtitle={subtitle} side={side} compact={compact} />
-          {description && !compact ? (
-            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.8, lineHeight: '16px', minHeight: 32, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</div>
+          {description ? (
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: catalog ? 11.5 : 11.8, lineHeight: catalog ? '15px' : '16px', minHeight: compact || horizontal ? 0 : 30, display: '-webkit-box', WebkitLineClamp: descriptionLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</div>
           ) : null}
-          <DesktopCardMeta items={meta} />
+          <DesktopCardMeta items={meta} mode={metaMode} />
           <DesktopCardTags items={tags} />
           {children}
           <DesktopCardActions actions={actions} />
