@@ -29,21 +29,23 @@ import {
 } from '../../server-shared/booking.js';
 
 const WS = {
-  page: '#F8F1E4',
-  page2: '#FFF9EE',
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.10)',
+  page: 'var(--apg-workspace-page, #F8F1E4)',
+  page2: 'var(--apg-workspace-page-2, #FFF9EE)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.10))',
   gold: '#C89B3C',
   gold2: '#E8C56D',
   green: '#2EB36B',
   red: '#D95D54',
   blue: '#5B8FDB',
-  card: 'rgba(255,255,255,0.74)',
-  cardStrong: 'rgba(255,255,255,0.90)',
-  shadow: '0 24px 70px rgba(82,60,30,0.10)',
-  shadowSoft: '0 14px 44px rgba(82,60,30,0.075)',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.74))',
+  cardStrong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.90))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  header: 'var(--apg-workspace-header, rgba(255,249,238,0.88))',
+  shadow: 'var(--apg-workspace-shadow, 0 24px 70px rgba(82,60,30,0.10))',
+  shadowSoft: 'var(--apg-workspace-shadow-soft, 0 14px 44px rgba(82,60,30,0.075))',
 };
 
 const NAV_ITEMS = [
@@ -274,7 +276,7 @@ function buttonStyle(extra = {}) {
     borderRadius: 18,
     minHeight: 44,
     padding: '10px 14px',
-    background: 'rgba(255,255,255,0.72)',
+    background: WS.control,
     color: WS.text,
     fontFamily: 'inherit',
     fontSize: 13.5,
@@ -316,7 +318,7 @@ function Panel({ title, action, children, style }) {
 function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOpenNotifications }) {
   const links = ['Новости', 'Мероприятия', 'Партнёры', 'Эксперты', 'Акции', 'Подарки'];
   return (
-    <header data-workspace-v2-header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(255,249,238,0.88)', backdropFilter: 'blur(28px) saturate(1.25)', WebkitBackdropFilter: 'blur(28px) saturate(1.25)', borderBottom: `1px solid ${WS.line}` }}>
+    <header data-workspace-v2-header style={{ position: 'sticky', top: 0, zIndex: 30, background: WS.header, backdropFilter: 'blur(28px) saturate(1.25)', WebkitBackdropFilter: 'blur(28px) saturate(1.25)', borderBottom: `1px solid ${WS.line}` }}>
       <div style={{ maxWidth: 1760, margin: '0 auto', minHeight: 72, padding: '0 24px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr) auto', gap: 18, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <picture>
@@ -334,7 +336,7 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
           ))}
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-          <label style={{ width: 250, minHeight: 46, borderRadius: 19, background: 'rgba(255,255,255,0.78)', border: `1px solid ${WS.line}`, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.86)' }}>
+          <label style={{ width: 250, minHeight: 46, borderRadius: 19, background: WS.control, border: `1px solid ${WS.line}`, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.28)' }}>
             <span style={{ color: WS.muted, fontSize: 19 }}>⌕</span>
             <input value={query} onChange={event => onQueryChange(event.target.value)} placeholder="Поиск по АПГ..." style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: WS.text, fontFamily: 'inherit', fontSize: 14, fontWeight: 680 }} />
           </label>
@@ -1809,10 +1811,10 @@ export function DesktopWorkspace({
     <div
       data-workspace-version="2.2"
       data-workspace-v2-root
-      data-workspace-shell="light-saas"
+      data-workspace-shell="theme-aware-saas"
       style={{
         minHeight: '100dvh',
-        background: `radial-gradient(circle at 8% 0%, rgba(246,216,145,0.28), transparent 34%), radial-gradient(circle at 92% 8%, rgba(255,255,255,0.82), transparent 32%), linear-gradient(180deg, ${WS.page2}, ${WS.page})`,
+        background: 'var(--apg-workspace-root-bg)',
         color: WS.text,
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif',
         overflowX: 'hidden',
@@ -1822,7 +1824,7 @@ export function DesktopWorkspace({
         '--apg2-bg-top': WS.page2,
         '--apg2-bg-mid': WS.page,
         '--apg2-bg-bottom': WS.page,
-        '--apg2-elev-shadow': 'rgba(82,60,30,0.10)',
+        '--apg2-elev-shadow': 'var(--apg-workspace-elev-shadow, rgba(82,60,30,0.10))',
         '--apg2-glass-border': WS.line,
       }}
     >

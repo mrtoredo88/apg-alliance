@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] fix: Desktop theme switch regression
+**Коммит:** `pending`
+**Файлы:** `src/index.css`, `src/workspace/DesktopWorkspace.jsx`, `scripts/desktop-workspace-layout-regression.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Workspace получил theme-aware palette через общие CSS variables вместо принудительного `light-saas` shell.
+- `DesktopWorkspace` больше не переопределяет APG2-токены светлыми значениями при активной тёмной теме.
+- Regression-тест Workspace проверяет, что root использует theme tokens и не возвращается к light-only shell.
+**Почему:** после переключения темы публичные CSS variables менялись, но Workspace оставался светлым из-за локальной жёсткой палитры.
+
 ## [2026-07-15] fix: Desktop Catalog Baseline Grid
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

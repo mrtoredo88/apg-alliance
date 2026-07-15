@@ -52,6 +52,20 @@
   --apg2-hero-overlay: radial-gradient(circle at 18% 12%, rgba(255,240,184,0.26), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.46) 42%, rgba(255,255,255,0.86));
   --apg2-hero-text: #16140F;
   --apg2-hero-muted: rgba(22,20,15,0.68);
+  --apg-workspace-page: #F8F1E4;
+  --apg-workspace-page-2: #FFF9EE;
+  --apg-workspace-text: #1F1A14;
+  --apg-workspace-soft: rgba(31,26,20,0.64);
+  --apg-workspace-muted: rgba(31,26,20,0.46);
+  --apg-workspace-line: rgba(88,67,37,0.10);
+  --apg-workspace-card: rgba(255,255,255,0.74);
+  --apg-workspace-card-strong: rgba(255,255,255,0.90);
+  --apg-workspace-control: rgba(255,255,255,0.72);
+  --apg-workspace-header: rgba(255,249,238,0.88);
+  --apg-workspace-shadow: 0 24px 70px rgba(82,60,30,0.10);
+  --apg-workspace-shadow-soft: 0 14px 44px rgba(82,60,30,0.075);
+  --apg-workspace-elev-shadow: rgba(82,60,30,0.10);
+  --apg-workspace-root-bg: radial-gradient(circle at 8% 0%, rgba(246,216,145,0.28), transparent 34%), radial-gradient(circle at 92% 8%, rgba(255,255,255,0.82), transparent 32%), linear-gradient(180deg, var(--apg-workspace-page-2), var(--apg-workspace-page));
 
   --vkui--color_background_app:     transparent;
   --vkui--color_background:         transparent;
@@ -103,6 +117,20 @@
   --apg2-hero-overlay: radial-gradient(circle at 18% 12%, rgba(255,240,184,0.26), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.46) 42%, rgba(255,255,255,0.86));
   --apg2-hero-text: #16140F;
   --apg2-hero-muted: rgba(22,20,15,0.68);
+  --apg-workspace-page: #F8F1E4;
+  --apg-workspace-page-2: #FFF9EE;
+  --apg-workspace-text: #1F1A14;
+  --apg-workspace-soft: rgba(31,26,20,0.64);
+  --apg-workspace-muted: rgba(31,26,20,0.46);
+  --apg-workspace-line: rgba(88,67,37,0.10);
+  --apg-workspace-card: rgba(255,255,255,0.74);
+  --apg-workspace-card-strong: rgba(255,255,255,0.90);
+  --apg-workspace-control: rgba(255,255,255,0.72);
+  --apg-workspace-header: rgba(255,249,238,0.88);
+  --apg-workspace-shadow: 0 24px 70px rgba(82,60,30,0.10);
+  --apg-workspace-shadow-soft: 0 14px 44px rgba(82,60,30,0.075);
+  --apg-workspace-elev-shadow: rgba(82,60,30,0.10);
+  --apg-workspace-root-bg: radial-gradient(circle at 8% 0%, rgba(246,216,145,0.28), transparent 34%), radial-gradient(circle at 92% 8%, rgba(255,255,255,0.82), transparent 32%), linear-gradient(180deg, var(--apg-workspace-page-2), var(--apg-workspace-page));
 
   --vkui--color_text_primary:       #0D0D14;
   --vkui--color_background:         transparent;
@@ -148,6 +176,20 @@
   --apg2-hero-overlay: radial-gradient(circle at 18% 12%, rgba(255,240,184,0.20), transparent 34%), linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.24) 42%, rgba(12,12,14,0.74));
   --apg2-hero-text: #F7F1E6;
   --apg2-hero-muted: rgba(247,244,234,0.78);
+  --apg-workspace-page: #0F0F0F;
+  --apg-workspace-page-2: #171511;
+  --apg-workspace-text: #F7F1E6;
+  --apg-workspace-soft: rgba(247,241,230,0.72);
+  --apg-workspace-muted: rgba(247,241,230,0.48);
+  --apg-workspace-line: rgba(255,255,255,0.14);
+  --apg-workspace-card: rgba(255,255,255,0.08);
+  --apg-workspace-card-strong: rgba(255,255,255,0.12);
+  --apg-workspace-control: rgba(255,255,255,0.09);
+  --apg-workspace-header: rgba(18,17,15,0.88);
+  --apg-workspace-shadow: 0 24px 70px rgba(0,0,0,0.42);
+  --apg-workspace-shadow-soft: 0 14px 44px rgba(0,0,0,0.30);
+  --apg-workspace-elev-shadow: rgba(0,0,0,0.34);
+  --apg-workspace-root-bg: radial-gradient(circle at 8% 0%, rgba(219,187,111,0.16), transparent 34%), radial-gradient(circle at 92% 8%, rgba(255,244,214,0.05), transparent 32%), linear-gradient(180deg, var(--apg-workspace-page-2), var(--apg-workspace-page));
 
   --vkui--color_text_primary:       #f0f0f0;
   --vkui--color_background:         transparent;

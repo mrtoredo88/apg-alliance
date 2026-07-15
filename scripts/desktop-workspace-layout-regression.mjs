@@ -70,5 +70,11 @@ for (const file of visualLokiFiles) {
 const desktopWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/workspace/DesktopWorkspace.jsx'), 'utf8');
 assert.ok(desktopWorkspaceSource.includes('NewsCard'), 'Desktop Workspace must reuse NewsCard');
 assert.ok(desktopWorkspaceSource.includes('EventPosterCard'), 'Desktop Workspace must reuse EventPosterCard');
+assert.ok(desktopWorkspaceSource.includes('data-workspace-shell="theme-aware-saas"'), 'Desktop Workspace shell must be theme-aware');
+assert.ok(desktopWorkspaceSource.includes("background: 'var(--apg-workspace-root-bg)'"), 'Desktop Workspace root must use theme workspace background token');
+assert.ok(!desktopWorkspaceSource.includes('data-workspace-shell="light-saas"'), 'Desktop Workspace must not force the light shell');
+const indexCssSource = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+assert.ok(indexCssSource.includes('--apg-workspace-root-bg'), 'Theme CSS must expose Workspace background tokens');
+assert.ok(indexCssSource.includes('[data-theme="dark"]') && indexCssSource.includes('--apg-workspace-page: #0F0F0F'), 'Dark theme must define Workspace palette');
 
 console.log('Desktop Workspace layout regression smoke passed');
