@@ -160,8 +160,8 @@
   --apg2-text:       #F7F1E6;
   --apg2-text-soft:  rgba(247,241,230,0.72);
   --apg2-text-muted: rgba(247,241,230,0.48);
-  --apg2-glass-a:    255,255,255;
-  --apg2-glass-border: rgba(255,255,255,0.28);
+  --apg2-glass-a:    28,28,28;
+  --apg2-glass-border: rgba(255,255,255,0.18);
   --apg2-gold:       #D7B86A;
   --apg2-bg-color:   #101010;
   --apg2-elev-shadow: rgba(0,0,0,0.34);

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] fix: Desktop dark theme glass fallback
+**Коммит:** `pending`
+**Файлы:** `src/index.css`, `src/components/Apg2ProfileGlass.jsx`, `scripts/desktop-ui-framework-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Тёмная тема APG2 получила тёмную glass-базу `--apg2-glass-a`, чтобы Desktop Framework не рисовал светлые карточки поверх тёмного фона.
+- `GlassCard` теперь игнорирует `undefined`-значения из локального `style`, чтобы `background: undefined` не сбрасывал glass-background у карточек-кнопок до системного светлого фона браузера.
+- Desktop UI regression-тест фиксирует оба условия: dark APG2 glass base и защиту `GlassCard` от undefined-style fallback.
+**Почему:** в production `data-theme` и CSS variables переключались, но часть desktop-карточек оставалась светлой из-за белой APG2 glass-базы и браузерного fallback-фона `button`.
+
 ## [2026-07-15] fix: Desktop theme switch regression
 **Коммит:** `pending`
 **Файлы:** `src/index.css`, `src/workspace/DesktopWorkspace.jsx`, `scripts/desktop-workspace-layout-regression.mjs`, `.ai/17_CHANGELOG_AI.md`

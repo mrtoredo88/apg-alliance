@@ -67,7 +67,8 @@ export function GlassCard({ children, tone = 'glass', style, onClick, onPointerD
   const [pressed, setPressed] = useState(false);
   const gold = tone === 'gold';
   const Tag = onClick ? 'button' : 'div';
-  const baseTransform = style?.transform;
+  const safeStyle = Object.fromEntries(Object.entries(style || {}).filter(([, value]) => value !== undefined));
+  const baseTransform = safeStyle.transform;
   return (
     <Tag
       {...(onClick ? { type: 'button' } : {})}
@@ -76,7 +77,7 @@ export function GlassCard({ children, tone = 'glass', style, onClick, onPointerD
       onPointerUp={(e) => { setPressed(false); onPointerUp?.(e); }}
       onPointerLeave={(e) => { setPressed(false); onPointerLeave?.(e); }}
       onPointerCancel={(e) => { setPressed(false); onPointerCancel?.(e); }}
-      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), borderRadius: APG2_PROFILE.radius.card, padding: 16, color: APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', WebkitTapHighlightColor: 'transparent', touchAction: onClick ? 'manipulation' : undefined, transition: `${motionTransition(['transform', 'opacity'], 'fast')}, box-shadow var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))`, ...style, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(${MOTION.press.card})` : baseTransform }}
+      style={{ ...(gold ? APG2_PROFILE.goldGlass : APG2_PROFILE.glass), borderRadius: APG2_PROFILE.radius.card, padding: 16, color: APG2_PROFILE.text, border: gold ? APG2_PROFILE.goldGlass.border : APG2_PROFILE.glass.border, cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit', appearance: 'none', WebkitAppearance: 'none', WebkitTapHighlightColor: 'transparent', touchAction: onClick ? 'manipulation' : undefined, transition: `${motionTransition(['transform', 'opacity'], 'fast')}, box-shadow var(--motion-base, 240ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1))`, ...safeStyle, transform: pressed ? `${baseTransform ? `${baseTransform} ` : ''}scale(${MOTION.press.card})` : baseTransform }}
       {...rest}
     >
       {children}

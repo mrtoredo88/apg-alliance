@@ -4,6 +4,8 @@ import path from 'node:path';
 const root = process.cwd();
 const filePath = path.join(root, 'src/components/DesktopUI.jsx');
 const source = fs.readFileSync(filePath, 'utf8');
+const glassSource = fs.readFileSync(path.join(root, 'src/components/Apg2ProfileGlass.jsx'), 'utf8');
+const themeSource = fs.readFileSync(path.join(root, 'src/index.css'), 'utf8');
 
 const requiredExports = [
   'DesktopSectionShell',
@@ -78,6 +80,21 @@ if (!source.includes('height: 316') || !source.includes("gridTemplateRows: '78px
 
 if (!source.includes('DesktopDetailShell') || !source.includes('DesktopDetailTabs') || !source.includes('DesktopHeroActions')) {
   throw new Error('Desktop Detail Framework must provide shared shell, tabs and hero actions for partner/expert cards.');
+}
+
+const darkThemeMatch = themeSource.match(/\[data-theme="dark"\]\s*{([\s\S]*?)\n}/);
+if (!darkThemeMatch) {
+  throw new Error('Theme CSS must define a dark theme block.');
+}
+if (darkThemeMatch[1].includes('--apg2-glass-a:    255,255,255')) {
+  throw new Error('Dark theme must not use a white APG2 glass base.');
+}
+if (!darkThemeMatch[1].includes('--apg2-glass-a:    28,28,28')) {
+  throw new Error('Dark theme must define the dark APG2 glass base used by Desktop UI cards.');
+}
+
+if (!glassSource.includes('safeStyle') || !glassSource.includes('value !== undefined')) {
+  throw new Error('GlassCard must ignore undefined local style values so buttons do not fall back to browser light backgrounds.');
 }
 
 console.log('desktop-ui-framework-test: ok');
