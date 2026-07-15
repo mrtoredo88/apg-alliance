@@ -819,12 +819,20 @@ export function UserApp() {
   const [notifications, setNotifications]       = useState([]);
   const [customTasks, setCustomTasks]           = useState([]);
   const [lokiKnowledge, setLokiKnowledge]       = useState([]);
+  const isManualLogoutFromStorage = () => {
+    try {
+      return localStorage.getItem('manualLogout') === 'true';
+    } catch {
+      return false;
+    }
+  };
+
   const [loading, setLoading]                   = useState(true);
   const [error, setError]                       = useState(null);
   const [networkError, setNetworkError]         = useState(false);
   const [reportSent, setReportSent]             = useState(false);
   const [reportSending, setReportSending]       = useState(false);
-  const [loggedOut, setLoggedOut]               = useState(false);
+  const [loggedOut, setLoggedOut]               = useState(isManualLogoutFromStorage());
   const [consentRequest, setConsentRequest]         = useState(null);
   const [consentSaving, setConsentSaving]       = useState(false);
   const [consentError, setConsentError]         = useState('');
@@ -1163,7 +1171,7 @@ export function UserApp() {
       if (isMounted.current) setLoading(false);
       return;
     }
-    if (localStorage.getItem('manualLogout') === 'true') {
+    if (isManualLogoutFromStorage()) {
       if (isMounted.current) { setLoading(false); setLoggedOut(true); }
       return;
     }
@@ -2627,6 +2635,16 @@ export function UserApp() {
 
   const handleLogout = useCallback(async () => {
     localStorage.setItem('manualLogout', 'true');
+    setUser(null);
+    setLoggedOut(true);
+    setLoading(false);
+    setPartners([]);
+    setExperts([]);
+    setEvents([]);
+    setNews([]);
+    setNotifications([]);
+    setLokiKnowledge([]);
+    setUserBookings([]);
     clearUserAuthStorage();
     try { await signOut(auth); } catch {}
     window.location.reload();
