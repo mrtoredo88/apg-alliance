@@ -3,11 +3,12 @@ import React from 'react';
 const LINK_INTENT_KEY = 'apg.workspace.linkIntent';
 
 const UI = {
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.12)',
-  card: 'rgba(255,255,255,0.78)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.12))',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.78))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
   gold: '#C89B3C',
   green: '#2EB36B',
   red: '#D95D54',

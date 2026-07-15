@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] fix: Workspace dark theme surfaces
+**Коммит:** `pending`
+**Файлы:** `src/index.css`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceAnalyticsCenter.jsx`, `src/workspace/WorkspaceDialogsCRM.jsx`, `src/workspace/WorkspaceEventsManager.jsx`, `src/workspace/WorkspaceGiftsCenter.jsx`, `src/workspace/WorkspaceLinks.jsx`, `src/workspace/WorkspaceMeetingsCRM.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `src/workspace/WorkspacePromotionsCenter.jsx`, `scripts/desktop-ui-framework-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Workspace получил отдельные theme-aware токены для control/panel/profile/track поверхностей в светлой и тёмной теме.
+- Основной рабочий стол и Workspace-центры переведены с жёстких `rgba(255,255,255,...)` на общие workspace-токены.
+- Desktop UI regression-тест теперь проверяет наличие dark workspace tokens и использование ключевых поверхностей в `DesktopWorkspace`.
+**Почему:** после первого исправления публичные desktop-каталоги темнели, но Workspace всё ещё сохранял светлые панели и контролы.
+
 ## [2026-07-15] fix: Desktop dark theme glass fallback
 **Коммит:** `pending`
 **Файлы:** `src/index.css`, `src/components/Apg2ProfileGlass.jsx`, `scripts/desktop-ui-framework-test.mjs`, `.ai/17_CHANGELOG_AI.md`

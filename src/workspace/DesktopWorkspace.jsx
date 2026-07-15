@@ -43,6 +43,12 @@ const WS = {
   card: 'var(--apg-workspace-card, rgba(255,255,255,0.74))',
   cardStrong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.90))',
   control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  controlStrong: 'var(--apg-workspace-control-strong, rgba(255,255,255,0.88))',
+  controlSoft: 'var(--apg-workspace-control-soft, rgba(255,255,255,0.64))',
+  panelAccent: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,232,0.86)))',
+  panelSoft: 'var(--apg-workspace-panel-soft, rgba(255,255,255,0.78))',
+  profileCard: 'var(--apg-workspace-profile-card, rgba(255,252,245,0.86))',
+  track: 'var(--apg-workspace-track, rgba(88,67,37,0.10))',
   header: 'var(--apg-workspace-header, rgba(255,249,238,0.88))',
   shadow: 'var(--apg-workspace-shadow, 0 24px 70px rgba(82,60,30,0.10))',
   shadowSoft: 'var(--apg-workspace-shadow-soft, 0 14px 44px rgba(82,60,30,0.075))',
@@ -332,7 +338,7 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
         </div>
         <nav style={{ display: 'flex', justifyContent: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
           {links.map((link, index) => (
-            <button key={link} type="button" style={buttonStyle({ minHeight: 38, padding: '8px 14px', background: index === 0 ? 'rgba(255,255,255,0.92)' : 'transparent', boxShadow: index === 0 ? '0 10px 26px rgba(82,60,30,0.07)' : 'none', whiteSpace: 'nowrap', fontSize: 13 })}>{link}</button>
+            <button key={link} type="button" style={buttonStyle({ minHeight: 38, padding: '8px 14px', background: index === 0 ? WS.controlStrong : 'transparent', boxShadow: index === 0 ? WS.shadowSoft : 'none', whiteSpace: 'nowrap', fontSize: 13 })}>{link}</button>
           ))}
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
@@ -366,7 +372,7 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
             {availableViews.map(view => {
               const active = activeViewId === view.id;
               return (
-                <button key={view.id} type="button" onClick={() => onViewChange(view.id)} style={{ border: 0, flex: 1, minHeight: 28, borderRadius: 11, background: active ? 'rgba(255,255,255,0.88)' : 'transparent', color: active ? '#8A6422' : WS.soft, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 860, cursor: 'pointer', boxShadow: active ? '0 8px 18px rgba(82,60,30,0.08)' : 'none' }}>
+                <button key={view.id} type="button" onClick={() => onViewChange(view.id)} style={{ border: 0, flex: 1, minHeight: 28, borderRadius: 11, background: active ? WS.controlStrong : 'transparent', color: active ? WS.gold : WS.soft, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 860, cursor: 'pointer', boxShadow: active ? WS.shadowSoft : 'none' }}>
                   {view.label}
                 </button>
               );
@@ -398,7 +404,7 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
       </div>
       </div>
       <div style={{ marginTop: 'auto', padding: 14, display: 'grid', gap: 8 }}>
-        <div style={cardStyle({ padding: 10, borderRadius: 16, background: 'rgba(255,252,245,0.86)', boxShadow: 'none' })}>
+        <div style={cardStyle({ padding: 10, borderRadius: 16, background: WS.profileCard, boxShadow: 'none' })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 38, height: 38, borderRadius: 14, background: 'linear-gradient(135deg,#100B32,#4A327F)', color: '#F5D77E', display: 'grid', placeItems: 'center', fontWeight: 950 }}>{initial}</div>
             <div style={{ minWidth: 0 }}>
@@ -410,11 +416,11 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
             <span style={{ color: '#8A6422', fontSize: 12.5, fontWeight: 850 }}>Уровень 18</span>
             <span style={{ color: WS.muted, fontSize: 12, fontWeight: 800 }}>18%</span>
           </div>
-          <div style={{ height: 6, borderRadius: 999, background: 'rgba(88,67,37,0.10)', overflow: 'hidden', marginTop: 7 }}>
+          <div style={{ height: 6, borderRadius: 999, background: WS.track, overflow: 'hidden', marginTop: 7 }}>
             <div style={{ width: '18%', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#E9C66B,#C89B3C)' }} />
           </div>
         </div>
-        <WorkspaceButton onClick={() => onModeChange?.('user')} style={{ minHeight: 42, borderRadius: 16, background: 'rgba(255,255,255,0.82)' }}>☷ Режим пользователя</WorkspaceButton>
+        <WorkspaceButton onClick={() => onModeChange?.('user')} style={{ minHeight: 42, borderRadius: 16, background: WS.controlStrong }}>☷ Режим пользователя</WorkspaceButton>
       </div>
     </aside>
   );
@@ -478,7 +484,7 @@ function DashboardHero({ data, profileStatus, workspaceView, actions }) {
 
 function MetricTile({ label, value, delta }) {
   return (
-    <div style={{ borderRadius: 15, background: 'rgba(255,255,255,0.78)', border: `1px solid ${WS.line}`, padding: '10px 9px', textAlign: 'center', minWidth: 0 }}>
+    <div style={{ borderRadius: 15, background: WS.panelSoft, border: `1px solid ${WS.line}`, padding: '10px 9px', textAlign: 'center', minWidth: 0 }}>
       <div style={{ color: WS.text, fontSize: 21, lineHeight: '24px', fontWeight: 950 }}>{value}</div>
       <div style={{ color: WS.soft, fontSize: 12, lineHeight: '15px', marginTop: 4 }}>{label}</div>
       <div style={{ color: WS.green, fontSize: 12, lineHeight: '15px', fontWeight: 880, marginTop: 5 }}>↗ {delta}</div>
@@ -763,7 +769,7 @@ function WorkspaceProfileSection({ role, profile, events = [], roleState, action
 
   return (
     <div data-workspace-profile-editor style={{ display: 'grid', gap: 14 }}>
-      <Panel title="Мой профиль" style={{ padding: 18, background: 'rgba(255,255,255,0.82)' }}>
+      <Panel title="Мой профиль" style={{ padding: 18, background: WS.panelSoft }}>
         <div style={{ display: 'grid', gridTemplateColumns: roleState?.hasMultipleRoles ? 'minmax(0,1fr) auto' : 'minmax(0,1fr)', gap: 14, alignItems: 'center' }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>{role.id === 'expert' ? 'Профиль эксперта' : 'Профиль партнёра'}</div>
@@ -773,7 +779,7 @@ function WorkspaceProfileSection({ role, profile, events = [], roleState, action
           {roleState?.hasMultipleRoles && (
             <div style={{ display: 'flex', gap: 6, padding: 5, borderRadius: 18, background: 'rgba(88,67,37,0.06)' }}>
               {roleState.roles.filter(item => ['partner', 'expert'].includes(item.id)).map(item => (
-                <button key={item.id} type="button" onClick={() => onRoleChange?.(item.id)} style={buttonStyle({ minHeight: 38, borderRadius: 15, padding: '8px 12px', background: item.id === role.id ? 'linear-gradient(135deg,#F6D891,#D0A14C)' : 'rgba(255,255,255,0.62)', color: item.id === role.id ? '#24190B' : WS.text })}>
+                <button key={item.id} type="button" onClick={() => onRoleChange?.(item.id)} style={buttonStyle({ minHeight: 38, borderRadius: 15, padding: '8px 12px', background: item.id === role.id ? 'linear-gradient(135deg,#F6D891,#D0A14C)' : WS.controlSoft, color: item.id === role.id ? '#24190B' : WS.text })}>
                   {item.id === 'expert' ? 'Профиль эксперта' : 'Профиль партнёра'}
                 </button>
               ))}
@@ -833,17 +839,17 @@ function WorkspaceIntelligenceDashboard({ plan, actions, data, workspaceName }) 
   ];
   return (
     <section data-workspace-intelligence-dashboard style={{ display: 'grid', gap: 14 }}>
-      <div style={cardStyle({ padding: 18, borderRadius: 26, background: 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,232,0.86))', boxShadow: '0 18px 54px rgba(82,60,30,0.10)' })}>
+      <div style={cardStyle({ padding: 18, borderRadius: 26, background: WS.panelAccent, boxShadow: WS.shadowSoft })}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'center' }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Рабочий день</div>
             <h1 style={{ margin: '6px 0 0', color: WS.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, letterSpacing: 0 }}>{plan.greeting || `${getDayGreeting()}, ${workspaceName}.`}</h1>
           </div>
-          <button type="button" onClick={actions.openLoki} style={buttonStyle({ minHeight: 38, borderRadius: 16, padding: '8px 13px', background: 'rgba(255,255,255,0.72)', color: WS.text, boxShadow: 'inset 0 0 0 1px rgba(88,67,37,0.09)' })}>Спросить Локи</button>
+          <button type="button" onClick={actions.openLoki} style={buttonStyle({ minHeight: 38, borderRadius: 16, padding: '8px 13px', background: WS.control, color: WS.text, boxShadow: `inset 0 0 0 1px ${WS.line}` })}>Спросить Локи</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 9, marginTop: 14 }}>
           {summary.map(item => (
-            <button key={item.id} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${WS.line}`, borderRadius: 17, background: 'rgba(255,255,255,0.66)', padding: 11, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button key={item.id} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${WS.line}`, borderRadius: 17, background: WS.controlSoft, padding: 11, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
               <span style={{ display: 'block', color: item.tone, fontSize: 23, lineHeight: '25px', fontWeight: 950 }}>{item.value}</span>
               <span style={{ display: 'block', color: WS.soft, fontSize: 12.4, lineHeight: '16px', marginTop: 4, fontWeight: 780, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
             </button>
@@ -852,14 +858,14 @@ function WorkspaceIntelligenceDashboard({ plan, actions, data, workspaceName }) 
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(360px,0.95fr)', gap: 14, alignItems: 'stretch' }}>
-        <Panel title="Центр рабочего дня" style={{ padding: 18, boxShadow: 'none', background: 'rgba(255,255,255,0.78)' }}>
+        <Panel title="Центр рабочего дня" style={{ padding: 18, boxShadow: 'none', background: WS.panelSoft }}>
           <div style={{ display: 'grid' }}>
             {queue.length ? queue.map(item => <IntelligenceTaskRow key={item.id} item={item} actions={actions} />) : (
               <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px' }}>Срочных действий нет. Можно перейти к росту, контенту или аналитике.</div>
             )}
           </div>
         </Panel>
-        <Panel title="План на сегодня" style={{ padding: 18, boxShadow: 'none', background: 'rgba(255,255,255,0.78)' }}>
+        <Panel title="План на сегодня" style={{ padding: 18, boxShadow: 'none', background: WS.panelSoft }}>
           <div style={{ display: 'grid' }}>
             {todayPlan.length ? todayPlan.slice(0, 6).map(item => <IntelligenceTaskRow key={item.id} item={item} actions={actions} compact />) : (
               <div style={{ color: WS.soft, fontSize: 14, lineHeight: '20px' }}>На сегодня нет обязательных задач из реальных данных Workspace.</div>
@@ -916,7 +922,7 @@ function WorkspaceIntelligenceDashboard({ plan, actions, data, workspaceName }) 
                     <span>{item.label}</span>
                     <span>{item.value}</span>
                   </div>
-                  <div style={{ height: 6, borderRadius: 999, background: 'rgba(88,67,37,0.08)', overflow: 'hidden' }}>
+                  <div style={{ height: 6, borderRadius: 999, background: WS.track, overflow: 'hidden' }}>
                     <div style={{ width: `${width}%`, height: '100%', borderRadius: 999, background: item.label === 'Конверсия' ? WS.green : WS.blue }} />
                   </div>
                   <div style={{ color: WS.muted, fontSize: 10.8, lineHeight: '13px' }}>{item.delta || 'текущий период'}</div>
@@ -931,7 +937,7 @@ function WorkspaceIntelligenceDashboard({ plan, actions, data, workspaceName }) 
         <Panel title="Быстрые действия" style={{ padding: 16, boxShadow: 'none' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 8 }}>
             {quickActions.map(item => (
-              <button key={item.label} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.72)', borderRadius: 15, padding: '10px 9px', color: WS.text, fontSize: 12.6, lineHeight: '16px', fontWeight: 870, textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit', minHeight: 54 }}>{item.label}</button>
+              <button key={item.label} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${WS.line}`, background: WS.control, borderRadius: 15, padding: '10px 9px', color: WS.text, fontSize: 12.6, lineHeight: '16px', fontWeight: 870, textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit', minHeight: 54 }}>{item.label}</button>
             ))}
           </div>
         </Panel>
@@ -1014,7 +1020,7 @@ function WorkspaceDashboard({ data, actions, workspaceView, intelligence, dayPla
               { label: 'Создать контент', onClick: actions.openNews },
               { label: 'Проверить аналитику', onClick: actions.openAnalytics },
             ].map(item => (
-              <button key={item.label} type="button" onClick={item.onClick} style={{ border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.68)', borderRadius: 15, padding: '10px 12px', color: WS.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 860, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>{item.label}</button>
+              <button key={item.label} type="button" onClick={item.onClick} style={{ border: `1px solid ${WS.line}`, background: WS.controlSoft, borderRadius: 15, padding: '10px 12px', color: WS.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 860, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>{item.label}</button>
             ))}
           </div>
         </Panel>
@@ -1090,7 +1096,7 @@ function MeetingSheet({ item, onClose, onAction, onOpenDialog }) {
   const canComplete = [BOOKING_STATUSES.confirmed, BOOKING_STATUSES.rescheduled].includes(item.status);
   const canCancel = item.isActive;
   return (
-    <section data-workspace-meeting-sheet style={cardStyle({ padding: 18, borderRadius: 26, background: 'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,250,239,0.88))', display: 'grid', gap: 14 })}>
+    <section data-workspace-meeting-sheet style={cardStyle({ padding: 18, borderRadius: 26, background: WS.panelAccent, display: 'grid', gap: 14 })}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Карточка встречи</div>
@@ -1106,7 +1112,7 @@ function MeetingSheet({ item, onClose, onAction, onOpenDialog }) {
           ['Телефон', item.userPhone || '—'],
           ['Диалог', item.dialogId ? 'есть' : 'нет'],
         ].map(([label, value]) => (
-          <div key={label} style={{ borderRadius: 16, background: 'rgba(255,255,255,0.72)', border: `1px solid ${WS.line}`, padding: 10, minWidth: 0 }}>
+          <div key={label} style={{ borderRadius: 16, background: WS.control, border: `1px solid ${WS.line}`, padding: 10, minWidth: 0 }}>
             <div style={{ color: WS.muted, fontSize: 11.5, lineHeight: '14px', fontWeight: 800 }}>{label}</div>
             <div style={{ color: WS.text, fontSize: 13.5, lineHeight: '17px', fontWeight: 900, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
           </div>
@@ -1244,7 +1250,7 @@ function WorkspaceMeetings({ role, profile, actions, onOpenDialog }) {
 
   return (
     <div data-workspace-meetings style={{ display: 'grid', gap: 14 }}>
-      <section style={cardStyle({ padding: 18, borderRadius: 28, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))' })}>
+      <section style={cardStyle({ padding: 18, borderRadius: 28, background: WS.panelAccent })}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 14, alignItems: 'start' }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ color: WS.gold, fontSize: 12, lineHeight: '15px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: 0.6 }}>Встречи</div>
@@ -1262,7 +1268,7 @@ function WorkspaceMeetings({ role, profile, actions, onOpenDialog }) {
             ['Завершены', stats.completed, WS.green],
             ['Неявка', stats.noShow, WS.red],
           ].map(([label, value, tone]) => (
-            <div key={label} style={{ borderRadius: 18, background: 'rgba(255,255,255,0.74)', border: `1px solid ${WS.line}`, padding: 12 }}>
+            <div key={label} style={{ borderRadius: 18, background: WS.control, border: `1px solid ${WS.line}`, padding: 12 }}>
               <div style={{ color: tone, fontSize: 22, lineHeight: '25px', fontWeight: 950 }}>{value}</div>
               <div style={{ color: WS.soft, fontSize: 12.4, lineHeight: '16px', marginTop: 4, fontWeight: 760 }}>{label}</div>
             </div>
@@ -1273,27 +1279,27 @@ function WorkspaceMeetings({ role, profile, actions, onOpenDialog }) {
       {error && <div style={cardStyle({ padding: 12, borderRadius: 18, background: 'rgba(217,93,84,0.10)', color: WS.red, boxShadow: 'none', fontSize: 13.5, fontWeight: 820 })}>{error}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 360px', gap: 14, alignItems: 'start' }}>
-        <Panel title="Календарь" action={<div style={{ display: 'flex', gap: 6 }}>{['day', 'week', 'month'].map(mode => <button key={mode} type="button" onClick={() => setCalendarMode(mode)} style={buttonStyle({ minHeight: 32, borderRadius: 13, padding: '6px 10px', background: calendarMode === mode ? 'linear-gradient(135deg,#F6D891,#D0A14C)' : 'rgba(255,255,255,0.68)', color: calendarMode === mode ? '#24190B' : WS.text })}>{mode === 'day' ? 'День' : mode === 'week' ? 'Неделя' : 'Месяц'}</button>)}</div>}>
+        <Panel title="Календарь" action={<div style={{ display: 'flex', gap: 6 }}>{['day', 'week', 'month'].map(mode => <button key={mode} type="button" onClick={() => setCalendarMode(mode)} style={buttonStyle({ minHeight: 32, borderRadius: 13, padding: '6px 10px', background: calendarMode === mode ? 'linear-gradient(135deg,#F6D891,#D0A14C)' : WS.controlSoft, color: calendarMode === mode ? '#24190B' : WS.text })}>{mode === 'day' ? 'День' : mode === 'week' ? 'Неделя' : 'Месяц'}</button>)}</div>}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 220px', gap: 10, marginBottom: 12 }}>
-            <label style={{ minHeight: 42, borderRadius: 16, background: 'rgba(255,255,255,0.72)', border: `1px solid ${WS.line}`, display: 'flex', alignItems: 'center', gap: 9, padding: '0 12px' }}>
+            <label style={{ minHeight: 42, borderRadius: 16, background: WS.control, border: `1px solid ${WS.line}`, display: 'flex', alignItems: 'center', gap: 9, padding: '0 12px' }}>
               <span style={{ color: WS.muted, fontSize: 17 }}>⌕</span>
               <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Клиент, телефон, услуга, дата" style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: WS.text, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 680 }} />
             </label>
-            <select value={specialistFilter} onChange={event => setSpecialistFilter(event.target.value)} style={{ minHeight: 42, borderRadius: 16, border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.72)', color: WS.text, padding: '0 10px', fontFamily: 'inherit', fontWeight: 780 }}>
+            <select value={specialistFilter} onChange={event => setSpecialistFilter(event.target.value)} style={{ minHeight: 42, borderRadius: 16, border: `1px solid ${WS.line}`, background: WS.control, color: WS.text, padding: '0 10px', fontFamily: 'inherit', fontWeight: 780 }}>
               <option value="">Все специалисты</option>
               {bookingProfile.specialists.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
             {filterButtons.map(([id, label]) => (
-              <button key={id} type="button" onClick={() => setStatusFilter(id)} style={buttonStyle({ minHeight: 32, borderRadius: 999, padding: '6px 10px', background: statusFilter === id ? 'rgba(201,155,60,0.18)' : 'rgba(255,255,255,0.66)', color: statusFilter === id ? '#8A6422' : WS.soft, boxShadow: `inset 0 0 0 1px ${statusFilter === id ? 'rgba(201,155,60,0.18)' : 'rgba(88,67,37,0.06)'}` })}>{label}</button>
+              <button key={id} type="button" onClick={() => setStatusFilter(id)} style={buttonStyle({ minHeight: 32, borderRadius: 999, padding: '6px 10px', background: statusFilter === id ? 'rgba(201,155,60,0.18)' : WS.controlSoft, color: statusFilter === id ? '#8A6422' : WS.soft, boxShadow: `inset 0 0 0 1px ${statusFilter === id ? 'rgba(201,155,60,0.18)' : WS.line}` })}>{label}</button>
             ))}
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {!calendarItems.length ? <EmptyWidget text="Встреч на выбранный период нет. Свободные интервалы остаются доступными в карточке партнёра или эксперта." /> : calendarItems.map(item => {
               const time = item.time || toDate(item.startAt)?.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) || '—';
               return (
-                <button key={item.id || item.bookingId} type="button" onClick={() => setSelectedBooking(item)} style={{ border: `1px solid ${WS.line}`, background: 'rgba(255,255,255,0.70)', borderRadius: 18, padding: 12, display: 'grid', gridTemplateColumns: '86px minmax(0,1fr) auto', gap: 12, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <button key={item.id || item.bookingId} type="button" onClick={() => setSelectedBooking(item)} style={{ border: `1px solid ${WS.line}`, background: WS.control, borderRadius: 18, padding: 12, display: 'grid', gridTemplateColumns: '86px minmax(0,1fr) auto', gap: 12, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
                   <span style={{ minHeight: 52, borderRadius: 16, background: `${bookingStatusTone(item.status)}14`, color: bookingStatusTone(item.status), display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 950 }}>{time}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', color: WS.text, fontSize: 15, lineHeight: '19px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bookingDayText(item)} · {item.userName || 'Клиент'}</span>

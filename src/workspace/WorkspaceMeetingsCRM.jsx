@@ -21,17 +21,19 @@ import {
 import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const CRM = {
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.12)',
-  card: 'rgba(255,255,255,0.78)',
-  strong: 'rgba(255,255,255,0.94)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.12))',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.78))',
+  strong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.94))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  controlSoft: 'var(--apg-workspace-control-soft, rgba(255,255,255,0.64))',
   gold: '#C89B3C',
   green: '#2EB36B',
   red: '#D95D54',
   blue: '#5B8FDB',
-  shadow: '0 22px 62px rgba(82,60,30,0.10)',
+  shadow: 'var(--apg-workspace-shadow-soft, 0 22px 62px rgba(82,60,30,0.10))',
 };
 
 const STATUS_COLORS = {
@@ -65,7 +67,7 @@ function button(tone = 'light', extra = {}) {
   const danger = tone === 'danger';
   return {
     border: `1px solid ${primary ? 'rgba(200,155,60,0.46)' : danger ? 'rgba(217,93,84,0.34)' : CRM.line}`,
-    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : 'rgba(255,255,255,0.64)',
+    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : CRM.controlSoft,
     color: primary ? '#241807' : danger ? CRM.red : CRM.text,
     borderRadius: 8,
     padding: '9px 11px',
@@ -288,7 +290,7 @@ function MeetingCrmSheet({ item, bookings, events, actions, profile, onClose, on
         {tab === 'notes' && (
           <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
             <div style={{ color: CRM.soft, fontSize: 12.5 }}>{status}. Эти заметки видит только владелец встречи.</div>
-            <textarea value={notes} onChange={event => setNotes(event.target.value)} placeholder="Внутренние заметки, договорённости, что важно помнить..." style={{ width: '100%', minHeight: 180, borderRadius: 8, border: `1px solid ${CRM.line}`, background: 'rgba(255,255,255,0.72)', color: CRM.text, padding: 12, fontSize: 14, lineHeight: '20px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }} />
+            <textarea value={notes} onChange={event => setNotes(event.target.value)} placeholder="Внутренние заметки, договорённости, что важно помнить..." style={{ width: '100%', minHeight: 180, borderRadius: 8, border: `1px solid ${CRM.line}`, background: CRM.control, color: CRM.text, padding: 12, fontSize: 14, lineHeight: '20px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }} />
           </div>
         )}
         {tab === 'links' && (
@@ -355,7 +357,7 @@ function ManualBookingModal({ profile, providerType, bookingProfile, bookings, o
   const duration = Number(service.durationMinutes || 60);
   const endAt = form.startAt ? new Date(new Date(form.startAt).getTime() + duration * 60000).toISOString() : '';
   const conflicts = form.startAt ? bookings.filter(item => item.providerId === profile.id && item.specialistId === form.specialistId && item.isActive && new Date(item.startAt).getTime() < new Date(endAt).getTime() && new Date(form.startAt).getTime() < new Date(item.endAt).getTime()) : [];
-  const input = { width: '100%', minHeight: 42, borderRadius: 8, border: `1px solid ${CRM.line}`, background: 'rgba(255,255,255,0.76)', color: CRM.text, padding: '9px 11px', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
+  const input = { width: '100%', minHeight: 42, borderRadius: 8, border: `1px solid ${CRM.line}`, background: CRM.control, color: CRM.text, padding: '9px 11px', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
   const label = { color: CRM.soft, fontSize: 12, fontWeight: 780, margin: '8px 0 5px', display: 'block' };
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -531,7 +533,7 @@ export function WorkspaceMeetingsCRM({ role, profile, events = [], actions, onOp
 
   return (
     <div data-workspace-meetings-crm style={{ display: 'grid', gap: 14 }}>
-      <section style={card({ padding: 18, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))' })}>
+      <section style={card({ padding: 18, background: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
         <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 260 }}>
             <div style={{ color: CRM.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>Встречи CRM</div>
@@ -561,7 +563,7 @@ export function WorkspaceMeetingsCRM({ role, profile, events = [], actions, onOp
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={card({ padding: 12 })}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
-              <input value={query} onChange={event => setQuery(event.target.value)} placeholder="ФИО, телефон, Telegram, услуга, дата" style={{ minHeight: 40, borderRadius: 8, border: `1px solid ${CRM.line}`, padding: '0 11px', background: 'rgba(255,255,255,0.72)', color: CRM.text, outline: 'none' }} />
+              <input value={query} onChange={event => setQuery(event.target.value)} placeholder="ФИО, телефон, Telegram, услуга, дата" style={{ minHeight: 40, borderRadius: 8, border: `1px solid ${CRM.line}`, padding: '0 11px', background: CRM.control, color: CRM.text, outline: 'none' }} />
               <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} style={button('light')}><option value="active">Активные</option><option value="today">Сегодня</option><option value="tomorrow">Завтра</option><option value="pending">Ожидают</option><option value="confirmed">Подтверждённые</option><option value="completed">Завершённые</option><option value="cancelled">Отменённые</option><option value="archived">Архив</option><option value="all">Все</option></select>
               <select value={specialistFilter} onChange={event => setSpecialistFilter(event.target.value)} style={button('light')}><option value="">Все специалисты</option>{bookingProfile.specialists.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
               <select value={calendarMode} onChange={event => setCalendarMode(event.target.value)} style={button('light')}><option value="day">День</option><option value="week">Неделя</option><option value="month">Месяц</option></select>

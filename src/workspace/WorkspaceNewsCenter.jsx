@@ -13,17 +13,19 @@ import {
 import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.12)',
-  card: 'rgba(255,255,255,0.78)',
-  strong: 'rgba(255,255,255,0.94)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.12))',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.78))',
+  strong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.94))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  controlSoft: 'var(--apg-workspace-control-soft, rgba(255,255,255,0.64))',
   gold: '#C89B3C',
   green: '#2EB36B',
   red: '#D95D54',
   blue: '#5B8FDB',
-  shadow: '0 22px 62px rgba(82,60,30,0.10)',
+  shadow: 'var(--apg-workspace-shadow-soft, 0 22px 62px rgba(82,60,30,0.10))',
 };
 
 const STATUS_FILTERS = [
@@ -60,7 +62,7 @@ function button(tone = 'light', extra = {}) {
   const danger = tone === 'danger';
   return {
     border: `1px solid ${primary ? 'rgba(200,155,60,0.48)' : danger ? 'rgba(217,93,84,0.34)' : UI.line}`,
-    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : 'rgba(255,255,255,0.64)',
+    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : UI.controlSoft,
     color: primary ? '#241807' : danger ? UI.red : UI.text,
     borderRadius: 8,
     padding: '9px 11px',
@@ -78,7 +80,7 @@ function input(extra = {}) {
     minHeight: 40,
     borderRadius: 8,
     border: `1px solid ${UI.line}`,
-    background: 'rgba(255,255,255,0.72)',
+    background: UI.control,
     color: UI.text,
     outline: 'none',
     padding: '0 11px',
@@ -267,8 +269,8 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
         <button onClick={onClose} style={button('light', { minHeight: 32, padding: '6px 8px' })}>Закрыть</button>
       </div>
 
-      <PhotoUpload value={draft.coverPhoto || draft.imageUrl || ''} onChange={value => patch({ coverPhoto: value, imageUrl: value })} folder="news" label="Обложка новости" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.62)', border: UI.line, textSec: UI.soft, gold: UI.gold }} />
-      <GalleryUpload value={Array.isArray(draft.gallery) ? draft.gallery : []} onChange={value => patch({ gallery: value, photos: value })} folder="news" max={8} theme={{ chipBg: 'rgba(255,255,255,0.62)', border: UI.line, textSec: UI.soft, gold: UI.gold }} />
+      <PhotoUpload value={draft.coverPhoto || draft.imageUrl || ''} onChange={value => patch({ coverPhoto: value, imageUrl: value })} folder="news" label="Обложка новости" shape="cover" theme={{ chipBg: UI.controlSoft, border: UI.line, textSec: UI.soft, gold: UI.gold }} />
+      <GalleryUpload value={Array.isArray(draft.gallery) ? draft.gallery : []} onChange={value => patch({ gallery: value, photos: value })} folder="news" max={8} theme={{ chipBg: UI.controlSoft, border: UI.line, textSec: UI.soft, gold: UI.gold }} />
 
       <input value={draft.title || ''} onChange={event => patch({ title: event.target.value })} placeholder="Заголовок" style={input({ fontSize: 18, fontWeight: 850 })} />
       <input value={draft.subtitle || ''} onChange={event => patch({ subtitle: event.target.value })} placeholder="Подзаголовок" style={input()} />
@@ -406,7 +408,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
 
   return (
     <div data-workspace-news-center style={{ display: 'grid', gap: 14 }}>
-      <section style={card({ padding: 18, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))' })}>
+      <section style={card({ padding: 18, background: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
         <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 260 }}>
             <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>Контент-центр</div>

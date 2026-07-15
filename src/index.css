@@ -61,6 +61,12 @@
   --apg-workspace-card: rgba(255,255,255,0.74);
   --apg-workspace-card-strong: rgba(255,255,255,0.90);
   --apg-workspace-control: rgba(255,255,255,0.72);
+  --apg-workspace-control-strong: rgba(255,255,255,0.88);
+  --apg-workspace-control-soft: rgba(255,255,255,0.64);
+  --apg-workspace-panel-accent: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,232,0.86));
+  --apg-workspace-panel-soft: rgba(255,255,255,0.78);
+  --apg-workspace-profile-card: rgba(255,252,245,0.86);
+  --apg-workspace-track: rgba(88,67,37,0.10);
   --apg-workspace-header: rgba(255,249,238,0.88);
   --apg-workspace-shadow: 0 24px 70px rgba(82,60,30,0.10);
   --apg-workspace-shadow-soft: 0 14px 44px rgba(82,60,30,0.075);
@@ -126,6 +132,12 @@
   --apg-workspace-card: rgba(255,255,255,0.74);
   --apg-workspace-card-strong: rgba(255,255,255,0.90);
   --apg-workspace-control: rgba(255,255,255,0.72);
+  --apg-workspace-control-strong: rgba(255,255,255,0.88);
+  --apg-workspace-control-soft: rgba(255,255,255,0.64);
+  --apg-workspace-panel-accent: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,232,0.86));
+  --apg-workspace-panel-soft: rgba(255,255,255,0.78);
+  --apg-workspace-profile-card: rgba(255,252,245,0.86);
+  --apg-workspace-track: rgba(88,67,37,0.10);
   --apg-workspace-header: rgba(255,249,238,0.88);
   --apg-workspace-shadow: 0 24px 70px rgba(82,60,30,0.10);
   --apg-workspace-shadow-soft: 0 14px 44px rgba(82,60,30,0.075);
@@ -185,6 +197,12 @@
   --apg-workspace-card: rgba(255,255,255,0.08);
   --apg-workspace-card-strong: rgba(255,255,255,0.12);
   --apg-workspace-control: rgba(255,255,255,0.09);
+  --apg-workspace-control-strong: rgba(255,255,255,0.13);
+  --apg-workspace-control-soft: rgba(255,255,255,0.08);
+  --apg-workspace-panel-accent: linear-gradient(135deg, rgba(255,255,255,0.11), rgba(255,244,214,0.055));
+  --apg-workspace-panel-soft: rgba(255,255,255,0.08);
+  --apg-workspace-profile-card: rgba(255,255,255,0.09);
+  --apg-workspace-track: rgba(255,255,255,0.10);
   --apg-workspace-header: rgba(18,17,15,0.88);
   --apg-workspace-shadow: 0 24px 70px rgba(0,0,0,0.42);
   --apg-workspace-shadow-soft: 0 14px 44px rgba(0,0,0,0.30);

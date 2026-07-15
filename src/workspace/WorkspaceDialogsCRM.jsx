@@ -14,17 +14,19 @@ import {
 import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.12)',
-  card: 'rgba(255,255,255,0.78)',
-  strong: 'rgba(255,255,255,0.94)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.12))',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.78))',
+  strong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.94))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  controlSoft: 'var(--apg-workspace-control-soft, rgba(255,255,255,0.64))',
   gold: '#C89B3C',
   green: '#2EB36B',
   red: '#D95D54',
   blue: '#5B8FDB',
-  shadow: '0 22px 62px rgba(82,60,30,0.10)',
+  shadow: 'var(--apg-workspace-shadow-soft, 0 22px 62px rgba(82,60,30,0.10))',
 };
 
 const FILTERS = [
@@ -58,7 +60,7 @@ function button(tone = 'light', extra = {}) {
   const danger = tone === 'danger';
   return {
     border: `1px solid ${primary ? 'rgba(200,155,60,0.48)' : danger ? 'rgba(217,93,84,0.34)' : UI.line}`,
-    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : 'rgba(255,255,255,0.64)',
+    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : UI.controlSoft,
     color: primary ? '#241807' : danger ? UI.red : UI.text,
     borderRadius: 8,
     padding: '9px 11px',
@@ -76,7 +78,7 @@ function input(extra = {}) {
     minHeight: 40,
     borderRadius: 8,
     border: `1px solid ${UI.line}`,
-    background: 'rgba(255,255,255,0.72)',
+    background: UI.control,
     color: UI.text,
     outline: 'none',
     padding: '0 11px',
@@ -194,7 +196,7 @@ function MessageBubble({ message, own }) {
   const loki = message.senderRole === 'loki';
   return (
     <div style={{ display: 'flex', justifyContent: own ? 'flex-end' : 'flex-start' }}>
-      <div style={{ maxWidth: '78%', borderRadius: 8, padding: 12, background: loki ? 'rgba(200,155,60,0.16)' : own ? 'rgba(200,155,60,0.18)' : 'rgba(255,255,255,0.72)', border: `1px solid ${loki ? 'rgba(200,155,60,0.34)' : UI.line}`, color: UI.text }}>
+      <div style={{ maxWidth: '78%', borderRadius: 8, padding: 12, background: loki ? 'rgba(200,155,60,0.16)' : own ? 'rgba(200,155,60,0.18)' : UI.control, border: `1px solid ${loki ? 'rgba(200,155,60,0.34)' : UI.line}`, color: UI.text }}>
         <div style={{ color: loki ? UI.gold : UI.muted, fontSize: 10.5, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 4 }}>{loki ? 'Локи' : message.senderName || 'Участник'}</div>
         {message.text && <div style={{ fontSize: 14, lineHeight: '20px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{message.text}</div>}
         {message.attachments?.length > 0 && (
@@ -450,7 +452,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
 
   return (
     <div data-workspace-dialogs-crm style={{ display: 'grid', gap: 14 }}>
-      <section style={card({ padding: 18, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82))' })}>
+      <section style={card({ padding: 18, background: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
         <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 260 }}>
             <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>Диалоги CRM</div>

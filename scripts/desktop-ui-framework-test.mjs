@@ -6,6 +6,7 @@ const filePath = path.join(root, 'src/components/DesktopUI.jsx');
 const source = fs.readFileSync(filePath, 'utf8');
 const glassSource = fs.readFileSync(path.join(root, 'src/components/Apg2ProfileGlass.jsx'), 'utf8');
 const themeSource = fs.readFileSync(path.join(root, 'src/index.css'), 'utf8');
+const workspaceSource = fs.readFileSync(path.join(root, 'src/workspace/DesktopWorkspace.jsx'), 'utf8');
 
 const requiredExports = [
   'DesktopSectionShell',
@@ -92,9 +93,21 @@ if (darkThemeMatch[1].includes('--apg2-glass-a:    255,255,255')) {
 if (!darkThemeMatch[1].includes('--apg2-glass-a:    28,28,28')) {
   throw new Error('Dark theme must define the dark APG2 glass base used by Desktop UI cards.');
 }
+if (!darkThemeMatch[1].includes('--apg-workspace-panel-accent:')) {
+  throw new Error('Dark theme must define workspace panel accent tokens.');
+}
+if (!darkThemeMatch[1].includes('--apg-workspace-control-strong:')) {
+  throw new Error('Dark theme must define workspace control tokens.');
+}
 
 if (!glassSource.includes('safeStyle') || !glassSource.includes('value !== undefined')) {
   throw new Error('GlassCard must ignore undefined local style values so buttons do not fall back to browser light backgrounds.');
 }
+
+['WS.panelAccent', 'WS.panelSoft', 'WS.controlStrong', 'WS.profileCard', 'WS.track'].forEach(token => {
+  if (!workspaceSource.includes(token)) {
+    throw new Error(`DesktopWorkspace must render theme-aware workspace surface token: ${token}`);
+  }
+});
 
 console.log('desktop-ui-framework-test: ok');

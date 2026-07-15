@@ -13,17 +13,19 @@ import {
 import { WorkspaceRelatedLinks, buildWorkspaceRelatedLinks, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const WSE = {
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.12)',
-  card: 'rgba(255,255,255,0.78)',
-  strong: 'rgba(255,255,255,0.92)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.12))',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.78))',
+  strong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.92))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  controlSoft: 'var(--apg-workspace-control-soft, rgba(255,255,255,0.64))',
   gold: '#C89B3C',
   green: '#2EB36B',
   red: '#D95D54',
   blue: '#5B8FDB',
-  shadow: '0 22px 62px rgba(82,60,30,0.10)',
+  shadow: 'var(--apg-workspace-shadow-soft, 0 22px 62px rgba(82,60,30,0.10))',
 };
 
 const EVENT_CATEGORIES = [
@@ -65,7 +67,7 @@ function buttonStyle(tone = 'light', extra = {}) {
   const danger = tone === 'danger';
   return {
     border: `1px solid ${primary ? 'rgba(200,155,60,0.42)' : danger ? 'rgba(217,93,84,0.32)' : WSE.line}`,
-    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : 'rgba(255,255,255,0.64)',
+    background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : WSE.controlSoft,
     color: primary ? '#241807' : danger ? WSE.red : WSE.text,
     borderRadius: 8,
     padding: '10px 12px',
@@ -193,7 +195,7 @@ function WorkspaceEventCalendar({ events, mode, selectedDate, onSelectDate, onOp
         {slots.map(slot => (
           <div key={slot.hour} style={{ display: 'grid', gridTemplateColumns: '54px 1fr', gap: 10, minHeight: 42, alignItems: 'stretch' }}>
             <div style={{ color: WSE.muted, fontSize: 12, fontWeight: 760 }}>{String(slot.hour).padStart(2, '0')}:00</div>
-            <div style={{ borderRadius: 8, border: `1px solid ${slot.state === 'free' ? WSE.line : 'rgba(200,155,60,0.28)'}`, background: slot.state === 'free' ? 'rgba(255,255,255,0.42)' : 'rgba(200,155,60,0.10)', padding: 8, display: 'grid', gap: 6 }}>
+            <div style={{ borderRadius: 8, border: `1px solid ${slot.state === 'free' ? WSE.line : 'rgba(200,155,60,0.28)'}`, background: slot.state === 'free' ? WSE.controlSoft : 'rgba(200,155,60,0.10)', padding: 8, display: 'grid', gap: 6 }}>
               {!slot.events.length ? <span style={{ color: WSE.muted, fontSize: 12 }}>Свободно</span> : slot.events.map(event => (
                 <button key={event.id} onClick={() => onOpen(event)} style={{ ...buttonStyle('light', { textAlign: 'left', minHeight: 32, padding: '6px 8px', borderColor: statusTone(event), color: WSE.text }) }}>{event.title || 'Мероприятие'}</button>
               ))}
@@ -216,11 +218,11 @@ function WorkspaceEventCalendar({ events, mode, selectedDate, onSelectDate, onOp
           const matches = events.filter(event => toDate(eventStart(event))?.toISOString().slice(0, 10) === key);
           const isSelected = key === base.toISOString().slice(0, 10);
           return (
-            <button key={key} onClick={() => onSelectDate(date)} style={{ border: `1px solid ${isSelected ? 'rgba(200,155,60,0.55)' : WSE.line}`, background: isSelected ? 'rgba(200,155,60,0.16)' : 'rgba(255,255,255,0.42)', borderRadius: 8, minHeight: mode === 'week' ? 108 : 86, padding: 8, textAlign: 'left', cursor: 'pointer', overflow: 'hidden' }}>
+            <button key={key} onClick={() => onSelectDate(date)} style={{ border: `1px solid ${isSelected ? 'rgba(200,155,60,0.55)' : WSE.line}`, background: isSelected ? 'rgba(200,155,60,0.16)' : WSE.controlSoft, borderRadius: 8, minHeight: mode === 'week' ? 108 : 86, padding: 8, textAlign: 'left', cursor: 'pointer', overflow: 'hidden' }}>
               <div style={{ color: WSE.text, fontSize: 13, fontWeight: 860, marginBottom: 6 }}>{day}</div>
               <div style={{ display: 'grid', gap: 4 }}>
                 {matches.slice(0, mode === 'week' ? 4 : 2).map(event => (
-                  <div key={event.id} onClick={e => { e.stopPropagation(); onOpen(event); }} style={{ color: WSE.text, borderLeft: `3px solid ${statusTone(event)}`, background: 'rgba(255,255,255,0.66)', borderRadius: 6, padding: '4px 6px', fontSize: 11, lineHeight: '14px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div key={event.id} onClick={e => { e.stopPropagation(); onOpen(event); }} style={{ color: WSE.text, borderLeft: `3px solid ${statusTone(event)}`, background: WSE.control, borderRadius: 6, padding: '4px 6px', fontSize: 11, lineHeight: '14px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {formatDate(eventStart(event)).split(',').pop()} {event.title}
                   </div>
                 ))}
@@ -300,7 +302,7 @@ function WorkspaceEventEditor({ event, events, profileType, profile, onClose, on
   });
 
   const set = (key, value) => setDraft(prev => ({ ...prev, [key]: value }));
-  const input = { width: '100%', minHeight: 44, borderRadius: 8, border: `1px solid ${WSE.line}`, background: 'rgba(255,255,255,0.72)', color: WSE.text, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
+  const input = { width: '100%', minHeight: 44, borderRadius: 8, border: `1px solid ${WSE.line}`, background: WSE.control, color: WSE.text, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
   const label = { display: 'block', color: WSE.soft, fontSize: 12, fontWeight: 780, margin: '10px 0 6px' };
 
   async function saveNow() {
@@ -377,7 +379,7 @@ function WorkspaceEventEditor({ event, events, profileType, profile, onClose, on
 
           <div>
             <label style={label}>Обложка</label>
-            <PhotoUpload value={draft.coverPhoto} onChange={url => set('coverPhoto', url)} folder="events" label="Загрузить обложку" shape="cover" theme={{ chipBg: 'rgba(255,255,255,0.68)', border: WSE.line, textSec: WSE.soft, gold: WSE.gold }} />
+            <PhotoUpload value={draft.coverPhoto} onChange={url => set('coverPhoto', url)} folder="events" label="Загрузить обложку" shape="cover" theme={{ chipBg: WSE.controlSoft, border: WSE.line, textSec: WSE.soft, gold: WSE.gold }} />
             {draft.coverPhoto && <img src={draft.coverPhoto} alt="" loading="lazy" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, marginTop: 8 }} onError={e => { e.currentTarget.style.display = 'none'; }} />}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div><label style={label}>Эмодзи</label><input style={input} value={draft.emoji} onChange={e => set('emoji', e.target.value.slice(0, 4))} /></div>
@@ -425,7 +427,7 @@ function EventCard({ event, events, profile, actions: workspaceActions, onEdit, 
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={{ color: statusTone(event), background: 'rgba(255,255,255,0.62)', border: `1px solid ${statusTone(event)}55`, borderRadius: 999, padding: '4px 8px', fontSize: 11, fontWeight: 840 }}>{workspaceEventStatusLabel(event)}</span>
+          <span style={{ color: statusTone(event), background: WSE.controlSoft, border: `1px solid ${statusTone(event)}55`, borderRadius: 999, padding: '4px 8px', fontSize: 11, fontWeight: 840 }}>{workspaceEventStatusLabel(event)}</span>
           <span style={{ color: WSE.muted, fontSize: 11, fontWeight: 760 }}>{formatDate(eventStart(event))}</span>
           <span style={{ color: WSE.muted, fontSize: 11, fontWeight: 760 }}>{eventPrice(event)}</span>
         </div>
@@ -597,7 +599,7 @@ export function WorkspaceEventsManager({ role, profile, roleViews = [], activeVi
           <KpiCard label="Регистрации" value={kpi.registrations} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по названию, месту, описанию" style={{ minHeight: 42, borderRadius: 8, border: `1px solid ${WSE.line}`, padding: '0 12px', background: 'rgba(255,255,255,0.72)', color: WSE.text, outline: 'none' }} />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по названию, месту, описанию" style={{ minHeight: 42, borderRadius: 8, border: `1px solid ${WSE.line}`, padding: '0 12px', background: WSE.control, color: WSE.text, outline: 'none' }} />
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={buttonStyle('light')}><option value="active">Активные</option><option value="all">Все</option><option value="draft">Черновики</option><option value="pending_review">Модерация</option><option value="published">Опубликовано</option><option value="completed">Завершено</option><option value="archived">Архив</option></select>
           <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={buttonStyle('light')}><option value="all">Все даты</option><option value="upcoming">Будущие</option><option value="past">Прошедшие</option></select>
           <select value={viewMode} onChange={e => setViewMode(e.target.value)} style={buttonStyle('light')}><option value="list">Список</option><option value="calendar">Календарь</option></select>

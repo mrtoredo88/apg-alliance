@@ -8,17 +8,19 @@ import {
 import { openWorkspaceLink, readWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.46)',
-  line: 'rgba(88,67,37,0.12)',
-  card: 'rgba(255,255,255,0.78)',
-  strong: 'rgba(255,255,255,0.94)',
+  text: 'var(--apg-workspace-text, #1F1A14)',
+  soft: 'var(--apg-workspace-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg-workspace-muted, rgba(31,26,20,0.46))',
+  line: 'var(--apg-workspace-line, rgba(88,67,37,0.12))',
+  card: 'var(--apg-workspace-card, rgba(255,255,255,0.78))',
+  strong: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.94))',
+  control: 'var(--apg-workspace-control, rgba(255,255,255,0.72))',
+  controlSoft: 'var(--apg-workspace-control-soft, rgba(255,255,255,0.64))',
   gold: '#C89B3C',
   green: '#2EB36B',
   red: '#D95D54',
   blue: '#5B8FDB',
-  shadow: '0 22px 62px rgba(82,60,30,0.10)',
+  shadow: 'var(--apg-workspace-shadow-soft, 0 22px 62px rgba(82,60,30,0.10))',
 };
 
 const KPI_LABELS = {
@@ -53,7 +55,7 @@ function button(active = false, extra = {}) {
   return {
     minHeight: 38,
     border: active ? '1px solid rgba(200,155,60,0.52)' : `1px solid ${UI.line}`,
-    background: active ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : 'rgba(255,255,255,0.64)',
+    background: active ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : UI.controlSoft,
     color: active ? '#241807' : UI.text,
     borderRadius: 8,
     padding: '8px 11px',
@@ -70,7 +72,7 @@ function input(extra = {}) {
     minHeight: 38,
     borderRadius: 8,
     border: `1px solid ${UI.line}`,
-    background: 'rgba(255,255,255,0.72)',
+    background: UI.control,
     color: UI.text,
     outline: 'none',
     padding: '0 10px',
@@ -139,7 +141,7 @@ function Empty({ onRetry }) {
 function Skeleton() {
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      {[1, 2, 3].map(row => <div key={row} style={card({ height: row === 1 ? 118 : 220, opacity: 0.72, background: 'linear-gradient(90deg, rgba(255,255,255,0.52), rgba(255,255,255,0.86), rgba(255,255,255,0.52))' })} />)}
+      {[1, 2, 3].map(row => <div key={row} style={card({ height: row === 1 ? 118 : 220, opacity: 0.72, background: 'linear-gradient(90deg, var(--apg-workspace-control-soft, rgba(255,255,255,0.52)), var(--apg-workspace-control-strong, rgba(255,255,255,0.86)), var(--apg-workspace-control-soft, rgba(255,255,255,0.52)))' })} />)}
     </div>
   );
 }
@@ -188,7 +190,7 @@ function PairGrid({ rows, actions, target }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
       {rows.map(row => (
-        <button key={row.label} type="button" onClick={() => target && openWorkspaceLink(actions, target, { filter: row.filter, query: row.query || '' })} style={{ border: `1px solid ${UI.line}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.50)', textAlign: 'left', cursor: target ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+        <button key={row.label} type="button" onClick={() => target && openWorkspaceLink(actions, target, { filter: row.filter, query: row.query || '' })} style={{ border: `1px solid ${UI.line}`, borderRadius: 8, padding: 10, background: UI.controlSoft, textAlign: 'left', cursor: target ? 'pointer' : 'default', fontFamily: 'inherit' }}>
           <div style={{ color: UI.muted, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>{row.label}</div>
           <div style={{ color: row.color || UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 930, marginTop: 3 }}>{row.value}</div>
         </button>
@@ -291,7 +293,7 @@ export function WorkspaceAnalyticsCenter({ role, profile, actions, onOpenPanel, 
 
       {loading && <Skeleton />}
       {!loading && error && (
-        <div style={card({ padding: 18, border: '1px solid rgba(217,93,84,0.34)', background: 'rgba(255,255,255,0.92)' })}>
+        <div style={card({ padding: 18, border: '1px solid rgba(217,93,84,0.34)', background: UI.strong })}>
           <div style={{ color: UI.red, fontSize: 17, fontWeight: 920 }}>Не удалось загрузить аналитику</div>
           <div style={{ color: UI.soft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>{error}</div>
           <button type="button" onClick={load} style={button(true, { marginTop: 12 })}>Повторить</button>
@@ -313,7 +315,7 @@ export function WorkspaceAnalyticsCenter({ role, profile, actions, onOpenPanel, 
             <Section title="Рекомендации" subtitle="Выводы строятся только из текущих показателей.">
               <div style={{ display: 'grid', gap: 9 }}>
                 {(snapshot.recommendations || []).map(item => (
-                  <div key={item.id} style={{ border: `1px solid ${UI.line}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.52)' }}>
+                  <div key={item.id} style={{ border: `1px solid ${UI.line}`, borderRadius: 8, padding: 10, background: UI.controlSoft }}>
                     <div style={{ color: UI.text, fontSize: 14, fontWeight: 900 }}>{item.title}</div>
                     <div style={{ color: UI.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{item.reason}</div>
                   </div>
