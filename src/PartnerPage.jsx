@@ -428,8 +428,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const filledStamps = stampTarget > 0 ? Math.min(Number(stamps) || 0, stampTarget) : 0;
       const detailTabs = [
         { id: 'feed', label: 'Лента' },
+        { id: 'important', label: 'Что сейчас важно' },
         { id: 'about', label: 'О компании' },
-        hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
         partner.offer && { id: 'offer', label: 'Акции', count: 1 },
         hasGallery && { id: 'photos', label: 'Фото', count: galleryItems.length },
         hasVideos && { id: 'video', label: 'Видео', count: partner.videos.length },
@@ -541,6 +541,26 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   onOpenEvent={onOpenEvent}
                   onOpenTab={setDesktopTab}
                   onOpenBooking={() => onBook?.(partner)}
+                  mode="feed"
+                />
+              </DesktopSection>
+            )}
+
+            {activeTab === 'important' && (
+              <DesktopSection title="Что сейчас важно" subtitle="Самые актуальные события профиля">
+                <ProfileTimelineSection
+                  profile={partner}
+                  role="partner"
+                  news={news}
+                  events={events}
+                  reviews={reviews}
+                  desktop
+                  isOwner={isProfileOwner}
+                  onOpenNews={onOpenNews}
+                  onOpenEvent={onOpenEvent}
+                  onOpenTab={setDesktopTab}
+                  onOpenBooking={() => onBook?.(partner)}
+                  mode="important"
                 />
               </DesktopSection>
             )}

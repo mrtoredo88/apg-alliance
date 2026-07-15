@@ -30,6 +30,8 @@ const timeline = buildProfileTimeline({
   role: 'partner',
   news: [
     { id: 'n1', partnerId: 'partner-1', title: 'Новое меню', summary: 'Запустили летние напитки '.repeat(18), status: 'published', active: true, publicationType: 'Новость', publishedAt: '2026-07-14T10:00:00.000Z', pinned: true, stats: { comments: 3 } },
+    { id: 'n4', partnerId: 'partner-1', title: 'Сегодня новое', status: 'published', active: true, publishedAt: '2026-07-15T11:00:00.000Z' },
+    { id: 'n5', partnerId: 'partner-1', title: 'Сегодня старое', status: 'published', active: true, publishedAt: '2026-07-15T08:00:00.000Z' },
     { id: 'n2', partnerId: 'partner-1', title: 'Черновик', status: 'draft', active: false, publishedAt: '2026-07-15T10:00:00.000Z' },
     { id: 'n3', partnerId: 'other', title: 'Чужая новость', status: 'published', active: true, publishedAt: '2026-07-15T10:00:00.000Z' },
   ],
@@ -139,7 +141,9 @@ assert.equal(timeline[0].title, 'Новое меню', 'pinned publication must 
 assert.equal(timeline[0].pinned, true, 'timeline item must expose pinned state');
 
 const publicationItems = filterProfileTimelineItems(timeline, 'publication');
-assert.equal(publicationItems.length, 1, 'publication filter must keep only news entries');
+assert.equal(publicationItems.length, 3, 'publication filter must keep only news entries');
+assert.equal(publicationItems[1].title, 'Сегодня новое', 'newer unpinned publication must stay above older publication');
+assert.equal(publicationItems[2].title, 'Сегодня старое', 'older unpinned publication must stay below newer publication');
 assert.ok(TIMELINE_FILTERS.some(filter => filter.id === 'video' && filter.label === 'Видео'), 'timeline filters must include video source');
 
 const periodLabel = getTimelinePeriodLabel('2026-07-15T09:00:00.000Z', new Date('2026-07-15T12:00:00.000Z').getTime());
@@ -147,6 +151,10 @@ assert.equal(periodLabel, 'Сегодня', 'timeline period helper must group t
 const groups = groupProfileTimelineItems(timeline, new Date('2026-07-15T12:00:00.000Z').getTime());
 assert.equal(groups[0].label, 'Закреплено', 'timeline must expose pinned group before chronology');
 assert.ok(groups.some(group => group.label === 'Сегодня'), 'timeline must group regular items by human period labels');
+const todayGroup = groups.find(group => group.label === 'Сегодня');
+const todayPublications = todayGroup.items.filter(item => item.type === 'publication');
+assert.equal(todayPublications[0].title, 'Сегодня новое', 'timeline groups must sort newest publication first');
+assert.equal(todayPublications[1].title, 'Сегодня старое', 'timeline groups must keep older publication after newer publication');
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timeline source through existing backend endpoint');

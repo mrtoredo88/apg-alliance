@@ -123,8 +123,18 @@ if (!partnerDetailSource.includes('desktopMode = false') || !partnerDetailSource
   throw new Error('PartnerPage desktop detail must be explicitly gated by desktopMode.');
 }
 
-if (!partnerDetailSource.includes("hasServices && { id: 'services'") || !partnerDetailSource.includes("partner.offer && { id: 'offer'") || !partnerDetailSource.includes("hasGallery && { id: 'photos'") || !partnerDetailSource.includes("hasVideos && { id: 'video'")) {
-  throw new Error('PartnerPage desktop tabs must be built from existing partner data only.');
+if (!partnerDetailSource.includes("{ id: 'feed', label: 'Лента' }")
+  || !partnerDetailSource.includes("{ id: 'important', label: 'Что сейчас важно' }")
+  || !partnerDetailSource.includes("{ id: 'about', label: 'О компании' }")
+  || !partnerDetailSource.includes("partner.offer && { id: 'offer'")
+  || !partnerDetailSource.includes("hasGallery && { id: 'photos'")
+  || !partnerDetailSource.includes("hasVideos && { id: 'video'")
+  || !partnerDetailSource.includes("{ id: 'reviews', label: 'Отзывы'")) {
+  throw new Error('PartnerPage desktop tabs must follow Living Profile order and use existing partner data only.');
+}
+
+if (!partnerDetailSource.includes('mode="feed"') || !partnerDetailSource.includes('mode="important"') || !partnerDetailSource.includes("activeTab === 'important'")) {
+  throw new Error('PartnerPage desktop detail must render important profile events as a separate tab.');
 }
 
 for (const requiredPartnerField of ['partner.bookingUrl', 'partner.socialUrl', 'partner.maxCommunityUrl', 'partner.telegramCommunityUrl', 'stampTarget > 0', "activeTab === 'video'", 'VideoSection videos={partner.videos}']) {

@@ -244,7 +244,12 @@ function buildOfferItems({ profile = {} }) {
 }
 
 function buildVideoItems({ profile = {} }) {
-  return (Array.isArray(profile.videos) ? profile.videos : []).filter(Boolean).slice(0, 4).map((video, index) => ({
+  return (Array.isArray(profile.videos) ? profile.videos : [])
+    .filter(Boolean)
+    .slice()
+    .sort((a, b) => toMillis(b.createdAt || b.updatedAt || profile.profileUpdatedAt || profile.updatedAt) - toMillis(a.createdAt || a.updatedAt || profile.profileUpdatedAt || profile.updatedAt))
+    .slice(0, 4)
+    .map((video, index) => ({
     id: timelineId('video', video.id || video.url || video.videoId, index),
     type: 'video',
     label: 'Видео',
@@ -283,7 +288,11 @@ function buildPhotoItems({ profile = {} }) {
 }
 
 function buildReviewItems({ reviews = [], profile = {} }) {
-  return (Array.isArray(reviews) ? reviews : []).slice(0, 5).map((review, index) => ({
+  return (Array.isArray(reviews) ? reviews : [])
+    .slice()
+    .sort((a, b) => toMillis(b.createdAt || b.updatedAt) - toMillis(a.createdAt || a.updatedAt))
+    .slice(0, 5)
+    .map((review, index) => ({
     id: timelineId('review', review.id || review.userId, index),
     type: 'review',
     label: 'Отзыв',
@@ -622,5 +631,7 @@ export function groupProfileTimelineItems(items = [], nowValue = Date.now()) {
     }
     group.items.push(item);
   }
-  return pinned.length ? [{ id: 'pinned', label: 'Закреплено', items: pinned }, ...groups] : groups;
+  const byNewest = (a, b) => (b.ts || 0) - (a.ts || 0);
+  const sortedGroups = groups.map(group => ({ ...group, items: group.items.slice().sort(byNewest) }));
+  return pinned.length ? [{ id: 'pinned', label: 'Закреплено', items: pinned.slice().sort(byNewest) }, ...sortedGroups] : sortedGroups;
 }

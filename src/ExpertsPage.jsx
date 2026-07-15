@@ -397,10 +397,9 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       const hasVideos = expert.videos?.length > 0;
       const detailTabs = [
         { id: 'feed', label: 'Лента' },
+        { id: 'important', label: 'Что сейчас важно' },
         { id: 'about', label: 'О себе' },
-        hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
-        expert.offer && { id: 'offer', label: 'Акция', count: 1 },
-        hasLocation && { id: 'location', label: 'Где и когда' },
+        expert.offer && { id: 'offer', label: 'Акции', count: 1 },
         hasGallery && { id: 'photos', label: 'Фото', count: galleryItems.length },
         hasVideos && { id: 'video', label: 'Видео', count: expert.videos.length },
         { id: 'reviews', label: 'Отзывы', count: reviews.length || expert.reviewCount || 0 },
@@ -501,6 +500,26 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                     onOpenEvent={onOpenEvent}
                     onOpenTab={setDesktopTab}
                     onOpenBooking={() => onBook?.(expert)}
+                    mode="feed"
+                  />
+                </DesktopSection>
+              )}
+
+              {activeTab === 'important' && (
+                <DesktopSection title="Что сейчас важно" subtitle="Самые актуальные события профиля">
+                  <ProfileTimelineSection
+                    profile={expert}
+                    role="expert"
+                    news={news}
+                    events={events}
+                    reviews={reviews}
+                    desktop
+                    isOwner={isProfileOwner}
+                    onOpenNews={onOpenNews}
+                    onOpenEvent={onOpenEvent}
+                    onOpenTab={setDesktopTab}
+                    onOpenBooking={() => onBook?.(expert)}
+                    mode="important"
                   />
                 </DesktopSection>
               )}

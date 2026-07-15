@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] feat: Living Profile important tab
+**Коммит:** `pending`
+**Файлы:** `src/components/ProfileTimelineSection.jsx`, `src/profileTimeline.js`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Блок `Что сейчас важно` вынесен в отдельную desktop-вкладку партнёров и экспертов через существующий `DesktopDetailTabs`.
+- Вкладка `Лента` теперь показывает Timeline без конкурирующего important-блока, mobile-режим оставлен в прежнем полном составе.
+- Сортировка Timeline усилена: закреплённые записи остаются сверху, остальные группы и публикации идут от новых к старым.
+**Почему:** структура Living Profile должна разделять оперативные сигналы и хронологию активности, не смешивая их в одной вкладке.
+
 ## [2026-07-15] feat: Split profile and APG news publishing
 **Коммит:** `pending`
 **Файлы:** `server-shared/workspace-news.js`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `src/UserApp.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `scripts/workspace-news-distribution-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

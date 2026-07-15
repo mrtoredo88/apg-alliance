@@ -102,8 +102,18 @@ if (!expertsSource.includes('desktopMode = false') || !expertsSource.includes('i
   throw new Error('Expert desktop detail must be explicitly gated by desktopMode.');
 }
 
-if (!expertsSource.includes("hasServices && { id: 'services'") || !expertsSource.includes("expert.offer && { id: 'offer'") || !expertsSource.includes("hasGallery && { id: 'photos'") || !expertsSource.includes("hasVideos && { id: 'video'")) {
-  throw new Error('Expert desktop tabs must be built from existing expert data only.');
+if (!expertsSource.includes("{ id: 'feed', label: 'Лента' }")
+  || !expertsSource.includes("{ id: 'important', label: 'Что сейчас важно' }")
+  || !expertsSource.includes("{ id: 'about', label: 'О себе' }")
+  || !expertsSource.includes("expert.offer && { id: 'offer'")
+  || !expertsSource.includes("hasGallery && { id: 'photos'")
+  || !expertsSource.includes("hasVideos && { id: 'video'")
+  || !expertsSource.includes("{ id: 'reviews', label: 'Отзывы'")) {
+  throw new Error('Expert desktop tabs must follow Living Profile order and use existing expert data only.');
+}
+
+if (!expertsSource.includes('mode="feed"') || !expertsSource.includes('mode="important"') || !expertsSource.includes("activeTab === 'important'")) {
+  throw new Error('Expert desktop detail must render important profile events as a separate tab.');
 }
 
 for (const requiredExpertField of ['expert.bookingUrl', 'expert.whatsappUrl', 'expert.maxUrl', 'expert.serviceCost', "activeTab === 'video'", 'VideoSection videos={expert.videos}']) {

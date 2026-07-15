@@ -80,6 +80,44 @@ function formatNowCardAction(item = {}) {
   return [item.value, item.details].filter(Boolean).join(' • ');
 }
 
+function NowPriorityGrid({
+  items = [],
+  desktop = false,
+  role = 'partner',
+  onOpenNews,
+  onOpenEvent,
+  onOpenTab,
+  onOpenBooking,
+}) {
+  const hasItems = items.length > 0;
+  return (
+    <section style={{ display: 'grid', gap: 10 }}>
+      <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Что сейчас важно</div>
+      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: desktop ? 'repeat(2, minmax(0, 1fr))' : '1fr' }}>
+        {hasItems ? items.slice(0, 6).map(item => (
+          <LivingMetricCard
+            key={item.id}
+            icon={
+              item.type === 'offer' ? '🎁' :
+              item.type === 'event' ? '🎉' :
+              item.type === 'booking' ? '🗓' :
+              item.type === 'publication' ? '📰' :
+              item.type === 'video' ? '▶' :
+              item.type === 'review' ? '⭐' :
+              item.type === 'photo' ? '📸' : '💬'
+            }
+            title={item.title}
+            text={formatNowCardAction(item)}
+            onOpen={() => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking })}
+          />
+        )) : (
+          <LivingMetricCard icon="•" title="Нет актуальных событий" text={`${role === 'expert' ? 'У эксперта' : 'У партнёра'} пока нет свежих активностей`} />
+        )}
+      </div>
+    </section>
+  );
+}
+
 async function shareTimelineItem(item) {
   const text = [item.title, item.text].filter(Boolean).join('\n');
   const url = item.url || (typeof window !== 'undefined' ? window.location?.href : '') || '';
@@ -197,6 +235,7 @@ export function ProfileTimelineSection({
   onOpenBooking,
   isOwner = false,
   onCreatePublication,
+  mode = 'full',
 }) {
   const communityUrl = getCommunityFeedSource(profile, role);
   const [vkState, setVkState] = useState({ loading: Boolean(communityUrl), posts: [], error: '' });
@@ -275,35 +314,26 @@ export function ProfileTimelineSection({
   const toggleExpanded = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
   const showTimelineList = listItems.length > 0;
-  const hasNowPriority = nowPriorityItems.length > 0;
   const hasPinnedItems = pinnedItems.length > 0;
+  const showImportantOnly = mode === 'important';
+  const showNowPriority = mode === 'full' || mode === 'important';
 
     return (
       <div style={{ display: 'grid', gap: desktop ? 14 : 12 }}>
-        <section style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Что сейчас важно</div>
-          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: desktop ? 'repeat(2, minmax(0, 1fr))' : '1fr' }}>
-            {hasNowPriority ? nowPriorityItems.slice(0, 6).map(item => (
-              <LivingMetricCard
-                key={item.id}
-                icon={
-                  item.type === 'offer' ? '🎁' :
-                item.type === 'event' ? '🎉' :
-                item.type === 'booking' ? '🗓' :
-                item.type === 'publication' ? '📰' :
-                item.type === 'video' ? '▶' :
-                item.type === 'review' ? '⭐' :
-                item.type === 'photo' ? '📸' : '💬'
-              }
-              title={item.title}
-              text={formatNowCardAction(item)}
-              onOpen={() => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking })}
-            />
-          )) : (
-            <LivingMetricCard icon="•" title="Нет актуальных событий" text="У партнера пока нет свежих активностей" />
-          )}
-          </div>
-        </section>
+        {showNowPriority && (
+          <NowPriorityGrid
+            items={nowPriorityItems}
+            desktop={desktop}
+            role={role}
+            onOpenNews={onOpenNews}
+            onOpenEvent={onOpenEvent}
+            onOpenTab={onOpenTab}
+            onOpenBooking={onOpenBooking}
+          />
+        )}
+
+        {showImportantOnly ? null : (
+        <>
 
         {hasPinnedItems ? (
         <section style={{ display: 'grid', gap: 10 }}>
@@ -431,6 +461,8 @@ export function ProfileTimelineSection({
           <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px' }}>
             VK-источник временно недоступен, остальные события ленты показаны.
           </div>
+        )}
+        </>
         )}
       </div>
     );
