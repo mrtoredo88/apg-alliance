@@ -3880,6 +3880,8 @@ export function UserApp() {
                     onToggleFavorite={toggleFavorite}
                     onOpenPartner={openPartner}
                     partners={enrichedPartners}
+                    news={news}
+                    events={events}
                     user={user}
                     scannedPartnerIds={scannedPartnerIds}
                     visitCounts={visitCounts}
@@ -3887,6 +3889,11 @@ export function UserApp() {
                     onScan={() => openScanner('partner')}
                     onAskQuestion={(partner) => openContextDialog('partner', partner, 'partner-card')}
                     onBook={(partner) => openBookingFlow('partner', partner)}
+                    onOpenNews={(itemOrId) => homePanelProps.onOpenNewsItem(itemOrId)}
+                    onOpenEvent={(event) => {
+                      if (event?.id) setPendingLokiEventTarget({ id: String(event.id), nonce: Date.now() });
+                      goPanel('events');
+                    }}
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
                     reviewPromptBookingId={reviewPromptBookingId}
                     onReviewPromptHandled={() => { setReviewPromptPartnerId(null); setReviewPromptBookingId(''); }}
@@ -4167,6 +4174,8 @@ export function UserApp() {
                     nav="experts"
                     variant="v2"
                     experts={experts}
+                    news={news}
+                    events={events}
                     user={user}
                     scannedExperts={scannedExperts}
                     onBack={goBackPanel}
@@ -4185,6 +4194,11 @@ export function UserApp() {
                     }}
                     onAskQuestion={(expert) => openContextDialog('expert', expert, 'expert-card')}
                     onBook={(expert) => openBookingFlow('expert', expert)}
+                    onOpenNews={(itemOrId) => homePanelProps.onOpenNewsItem(itemOrId)}
+                    onOpenEvent={(event) => {
+                      if (event?.id) setPendingLokiEventTarget({ id: String(event.id), nonce: Date.now() });
+                      goPanel('events');
+                    }}
                     onScan={() => openScanner('expert')}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}

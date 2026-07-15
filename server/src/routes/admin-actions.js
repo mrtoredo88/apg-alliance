@@ -10,7 +10,7 @@ import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentT
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 
-const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
+const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
   partners: { collection: 'partners', scope: 'partners', label: 'партнёр' },
   experts: { collection: 'experts', scope: 'experts', label: 'эксперт' },

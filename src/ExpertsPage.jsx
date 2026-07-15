@@ -20,7 +20,7 @@ function getISOWeekKey(date = new Date()) {
 import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
-import { CommunityFeedSection, getCommunityFeedSource } from './components/CommunityFeedSection.jsx';
+import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
@@ -188,7 +188,7 @@ function PhotoLightbox({ photos, startIndex, onClose }) {
   );
 }
 
-function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', onScan, onAskQuestion, onBook, desktopMode = false }) {
+function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onClose, variant = 'v2', onScan, onAskQuestion, onBook, onOpenNews, onOpenEvent, desktopMode = false }) {
   expert = normalizeExpertRecord(expert);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [shareToast, setShareToast] = useState('');
@@ -297,7 +297,6 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
   const [submitDone, setSubmitDone] = useState(false);
   const [desktopTab, setDesktopTab] = useState('about');
   const mountedRef = useRef(true);
-  const communityFeedUrl = getCommunityFeedSource(expert, 'expert');
 
   useEffect(() => {
     mountedRef.current = true;
@@ -306,7 +305,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
   useEffect(() => {
     if (!expert?.id) return;
-    setDesktopTab(communityFeedUrl ? 'feed' : 'about');
+    setDesktopTab('feed');
     let cancelled = false;
     setReviewsLoading(true);
     getDocs(query(collection(db, 'expertReviews'), where('expertId', '==', expert.id)))
@@ -323,7 +322,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       .catch(() => {})
       .finally(() => { if (!cancelled) setReviewsLoading(false); });
     return () => { cancelled = true; };
-  }, [expert?.id, communityFeedUrl]);
+  }, [expert?.id]);
 
   const handleSubmitReview = async () => {
     if (!user || !myRating || submitting) return;
@@ -389,7 +388,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       const hasGallery = galleryItems.length > 0;
       const hasVideos = expert.videos?.length > 0;
       const detailTabs = [
-        communityFeedUrl && { id: 'feed', label: 'Лента', count: 0 },
+        { id: 'feed', label: 'Лента' },
         { id: 'about', label: 'О себе' },
         hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
         expert.offer && { id: 'offer', label: 'Акция', count: 1 },
@@ -480,9 +479,19 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
               <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={setDesktopTab} />
 
-              {activeTab === 'feed' && communityFeedUrl && (
-                <DesktopSection title="Лента" subtitle="Последние публикации сообщества">
-                  <CommunityFeedSection communityUrl={communityFeedUrl} desktop />
+              {activeTab === 'feed' && (
+                <DesktopSection title="Лента" subtitle="Хронология публичной активности">
+                  <ProfileTimelineSection
+                    profile={expert}
+                    role="expert"
+                    news={news}
+                    events={events}
+                    reviews={reviews}
+                    desktop
+                    onOpenNews={onOpenNews}
+                    onOpenEvent={onOpenEvent}
+                    onOpenTab={setDesktopTab}
+                  />
                 </DesktopSection>
               )}
 
@@ -621,12 +630,19 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
               description={expert.offer || expert.description || 'Проверенный специалист в экосистеме АПГ.'}
             />
 
-            {communityFeedUrl && (
-              <GlassSection title="Лента" action={<GlassButton onClick={() => openExpertContact(communityFeedUrl, 'vk', { platform: 'vk' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Открыть</GlassButton>}>
-                <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Последние публикации сообщества</div>
-                <CommunityFeedSection communityUrl={communityFeedUrl} />
-              </GlassSection>
-            )}
+            <GlassSection title="Лента">
+              <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Публикации, акции, мероприятия, медиа, отзывы и VK в одном потоке.</div>
+              <ProfileTimelineSection
+                profile={expert}
+                role="expert"
+                news={news}
+                events={events}
+                reviews={reviews}
+                onOpenNews={onOpenNews}
+                onOpenEvent={onOpenEvent}
+                onOpenTab={setDesktopTab}
+              />
+            </GlassSection>
 
             <GlassSection title="Действия">
               {cta.length > 0 ? (
@@ -1220,7 +1236,7 @@ function ExpertsMapPreview({ experts, selected, onSelect }) {
   );
 }
 
-export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen, onAskQuestion, onBook, desktopOverview = null, desktopMode = false }) {
+export function ExpertsPage({ nav, variant = 'v2', experts = [], news = [], events = [], user, scannedExperts = {}, onBack, isActive, initialExpertId = null, onScan, onExpertOpen, onAskQuestion, onBook, onOpenNews, onOpenEvent, desktopOverview = null, desktopMode = false }) {
   const [filter, setFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -1470,11 +1486,15 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             expert={selected}
             user={user}
             scannedExperts={scannedExperts}
+            news={news}
+            events={events}
             onClose={() => setSelected(null)}
             variant={variant}
             onScan={onScan}
             onAskQuestion={onAskQuestion}
             onBook={onBook}
+            onOpenNews={onOpenNews}
+            onOpenEvent={onOpenEvent}
             desktopMode={desktopMode}
           />
         )}
@@ -1549,11 +1569,15 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
             expert={selected}
             user={user}
             scannedExperts={scannedExperts}
+            news={news}
+            events={events}
             onClose={() => setSelected(null)}
             variant={variant}
             onScan={onScan}
             onAskQuestion={onAskQuestion}
             onBook={onBook}
+            onOpenNews={onOpenNews}
+            onOpenEvent={onOpenEvent}
             desktopMode={desktopMode}
           />
         )}
@@ -1650,11 +1674,15 @@ export function ExpertsPage({ nav, variant = 'v2', experts = [], user, scannedEx
           expert={selected}
           user={user}
           scannedExperts={scannedExperts}
+          news={news}
+          events={events}
           onClose={() => setSelected(null)}
           variant={variant}
           onScan={onScan}
           onAskQuestion={onAskQuestion}
           onBook={onBook}
+          onOpenNews={onOpenNews}
+          onOpenEvent={onOpenEvent}
           desktopMode={desktopMode}
         />
       )}

@@ -811,7 +811,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
                   <React.Fragment key={item.key}>
                     <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>{item.label}</label>
                     <input value={form[item.key]} onChange={e => updateForm({ [item.key]: e.target.value })} placeholder={item.placeholder} style={{ ...v2InputStyle, marginTop: 6 }} />
-                    {item.key === 'vkUrl' && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: -6, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки.</div>}
+                    {item.key === 'vkUrl' && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: -6, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты” вашей карточки.</div>}
                   </React.Fragment>
                 ))}
               </GlassCard>
@@ -1083,7 +1083,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
             <label style={labelStyle}>🔵 Сообщество для ленты VK</label>
             <input style={inputStyle} placeholder="https://vk.com/..." value={fVk} onChange={e => setFVk(e.target.value)} />
-            <div style={{ color: T.textSec, fontSize: 11.5, lineHeight: '17px', margin: '-6px 0 10px' }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента”.</div>
+            <div style={{ color: T.textSec, fontSize: 11.5, lineHeight: '17px', margin: '-6px 0 10px' }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты”.</div>
 
             <label style={labelStyle}>✈️ Telegram</label>
             <input style={inputStyle} placeholder="https://telegram.me/..." value={fTelegram} onChange={e => setFTelegram(e.target.value)} />

@@ -45,6 +45,17 @@ const PERIODS = [
   ['month', 'Месяц'],
 ];
 
+const PUBLICATION_TYPES = [
+  ['Новость', 'Новость'],
+  ['Фото', 'Фото'],
+  ['Видео', 'Видео'],
+  ['Совет', 'Совет'],
+  ['История', 'История'],
+  ['Кейс', 'Кейс'],
+  ['Анонс', 'Анонс'],
+  ['Обновление', 'Обновление'],
+];
+
 function card(extra = {}) {
   return {
     background: UI.card,
@@ -132,6 +143,7 @@ function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ color: statusColor, border: `1px solid ${statusColor}55`, background: `${statusColor}12`, borderRadius: 999, padding: '4px 7px', fontSize: 11, fontWeight: 850 }}>{workspaceNewsStatusLabel(item)}</span>
+          <span style={{ color: UI.gold, border: `1px solid rgba(200,155,60,0.26)`, background: 'rgba(200,155,60,0.10)', borderRadius: 999, padding: '4px 7px', fontSize: 11, fontWeight: 850 }}>{item.publicationType || 'Новость'}</span>
           <span style={{ color: UI.muted, fontSize: 11, fontWeight: 760 }}>{getNewsCategoryLabel(item)}</span>
           <span style={{ color: UI.muted, fontSize: 11, fontWeight: 760 }}>{item.source || 'workspace'}</span>
         </div>
@@ -160,6 +172,8 @@ function defaultDraft(profile, role) {
     summary: '',
     text: '',
     category: role === 'expert' ? 'experts' : 'partners',
+    publicationType: 'Новость',
+    timelineType: 'publication',
     coverPhoto: '',
     gallery: [],
     tags: [],
@@ -263,7 +277,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
         <div>
           <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Редактор публикации</div>
-          <div style={{ color: UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 940, marginTop: 3 }}>{item?.id ? 'Редактирование новости' : 'Новая публикация'}</div>
+          <div style={{ color: UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 940, marginTop: 3 }}>{item?.id ? 'Редактирование публикации' : 'Новая публикация'}</div>
           <div style={{ color: UI.muted, fontSize: 12, marginTop: 3 }}>{status}</div>
         </div>
         <button onClick={onClose} style={button('light', { minHeight: 32, padding: '6px 8px' })}>Закрыть</button>
@@ -279,6 +293,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
         <select value={draft.category || 'partners'} onChange={event => patch({ category: event.target.value })} style={button('light')}>{NEWS_CATEGORIES.filter(item => item.id !== 'all').map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <select value={draft.publicationType || 'Новость'} onChange={event => patch({ publicationType: event.target.value, timelineType: event.target.value.toLowerCase() })} style={button('light')}>{PUBLICATION_TYPES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
         <input value={(draft.tags || []).join(', ')} onChange={event => patch({ tags: event.target.value.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="Теги через запятую" style={input()} />
         <input value={draft.linkUrl || ''} onChange={event => patch({ linkUrl: event.target.value })} placeholder="Ссылка" style={input()} />
         <input value={draft.linkLabel || ''} onChange={event => patch({ linkLabel: event.target.value })} placeholder="Текст кнопки" style={input()} />
@@ -412,12 +427,12 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
         <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 260 }}>
             <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>Контент-центр</div>
-            <h1 style={{ margin: '5px 0 0', color: UI.text, fontSize: 30, lineHeight: '36px', fontWeight: 940 }}>Новости как инструмент привлечения</h1>
-            <div style={{ color: UI.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 5 }}>{profile.name || profile.title}: публикации, черновики, модерация, комментарии, статистика и планирование.</div>
+            <h1 style={{ margin: '5px 0 0', color: UI.text, fontSize: 30, lineHeight: '36px', fontWeight: 940 }}>Лента и публикации</h1>
+            <div style={{ color: UI.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 5 }}>{profile.name || profile.title}: новости, фото, видео, советы, истории, кейсы, черновики, модерация и статистика.</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={load} style={button('light')}>{loading ? 'Обновляем...' : 'Обновить'}</button>
-            <button onClick={() => setSelected({ ...defaultDraft(profile, role.id), id: '' })} style={button('primary')}>Новая публикация</button>
+            <button onClick={() => setSelected({ ...defaultDraft(profile, role.id), id: '' })} style={button('primary')}>Создать публикацию</button>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(118px,1fr))', gap: 10, marginTop: 16 }}>

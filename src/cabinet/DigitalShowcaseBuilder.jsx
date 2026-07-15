@@ -201,7 +201,7 @@ function ContactsTab({ draft, update }) {
         </div>
         <Field label="Сообщество для ленты VK">
           <GlassInput value={draft.vkUrl} onChange={e => update({ vkUrl: e.target.value })} inputMode="url" style={inputStyle} placeholder="https://vk.com/..." />
-          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: 6 }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки.</div>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: 6 }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты” вашей карточки.</div>
         </Field>
         <GlassCard style={{ borderRadius: 28 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>

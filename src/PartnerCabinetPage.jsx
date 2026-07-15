@@ -827,7 +827,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
                 <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Сообщество для ленты VK / соцсеть</label>
                 <input value={fSocial} onChange={e => setFSocial(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} placeholder="https://vk.com/mypage" />
-                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: -6, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки.</div>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: -6, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты” вашей карточки.</div>
 
                 <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
                   {saving ? 'Сохраняем...' : saved ? '✓ Сохранено' : 'Сохранить изменения'}
@@ -1065,7 +1065,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
             <label style={labelStyle}>🔗 Сообщество для ленты VK / соцсеть</label>
             <input style={inputStyle} placeholder="https://vk.com/mypage" value={fSocial} onChange={e => setFSocial(e.target.value)} />
-            <div style={{ color: T.textSec, fontSize: 11.5, lineHeight: '17px', margin: '-6px 0 10px' }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента”.</div>
+            <div style={{ color: T.textSec, fontSize: 11.5, lineHeight: '17px', margin: '-6px 0 10px' }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты”.</div>
 
             <button
               onClick={handleSave}

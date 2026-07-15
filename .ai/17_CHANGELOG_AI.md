@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] feat: Unified profile timeline
+**Коммит:** `pending`
+**Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `server-shared/workspace-news.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/components/PartnerQuestionnaire.jsx`, `scripts/community-feed-test.mjs`, `scripts/profile-timeline-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Вкладка `Лента` в карточках партнёров и экспертов переведена с VK-only вывода на общий Timeline публичной активности.
+- Timeline собирается поверх существующих `news`, `events`, профиля, `videos`, `gallery`, отзывов и VK-постов без дублирования сущностей.
+- Workspace получил действие `Создать публикацию` и тип публикации в существующем редакторе новостей, сохранив текущий pipeline черновиков и модерации.
+**Почему:** карточка должна показывать единую хронологию активности профиля, где VK является только одним источником, а не отдельной системой ленты.
+
 ## [2026-07-15] feat: Community feed tab for profile details
 **Коммит:** `pending`
 **Файлы:** `server-shared/vk-community.js`, `server/src/routes/vk-news.js`, `server/src/routes/user-actions.js`, `server/src/routes/public-submit.js`, `server/src/server.js`, `src/components/CommunityFeedSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/utils/externalUrls.js`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/components/PartnerQuestionnaire.jsx`, `src/expertProfileForm.js`, `scripts/community-feed-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

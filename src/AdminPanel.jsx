@@ -7403,7 +7403,7 @@ export const AdminPanel = () => {
 
                 <label style={s.label}>Сообщество для ленты VK</label>
                 <input style={s.input} placeholder="https://vk.com/..." value={exVkUrl} onChange={e => setExVkUrl(e.target.value)} />
-                <div style={{ color: A.muted, fontSize: 12, lineHeight: '18px', marginTop: -8, marginBottom: 10 }}>Укажите ссылку на сообщество VK. Последние публикации появятся во вкладке “Лента” карточки эксперта.</div>
+                <div style={{ color: A.muted, fontSize: 12, lineHeight: '18px', marginTop: -8, marginBottom: 10 }}>Укажите ссылку на сообщество VK. Записи VK станут частью общей “Ленты” карточки эксперта.</div>
 
                 <label style={s.label}>Ссылка для записи</label>
                 <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
@@ -7740,7 +7740,7 @@ export const AdminPanel = () => {
 
                 <label style={s.label}>Сообщество для ленты VK</label>
                 <input style={s.input} placeholder="https://vk.com/..." value={pVkGroup} onChange={e => setPVkGroup(e.target.value)} />
-                <div style={{ color: A.muted, fontSize: 12, lineHeight: '18px', marginTop: -8, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки.</div>
+                <div style={{ color: A.muted, fontSize: 12, lineHeight: '18px', marginTop: -8, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты” карточки.</div>
 
                 <label style={s.label}>Соцсеть / сайт (другие)</label>
                 <input style={s.input} placeholder="https://..." value={pSocial} onChange={e => setPSocial(e.target.value)} />

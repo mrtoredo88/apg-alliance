@@ -28,6 +28,8 @@ export const WORKSPACE_NEWS_FIELDS = [
   'linkLabel',
   'priority',
   'category',
+  'publicationType',
+  'timelineType',
   'active',
   'status',
   'publishedAt',
@@ -77,6 +79,7 @@ export function sanitizeWorkspaceNewsPatch(patch = {}) {
     else if (field === 'active' || field === 'pinned' || field === 'isPinned' || field === 'commentsEnabled') clean[field] = value !== false;
     else if (field === 'text' || field === 'fullText') clean[field] = text(value, 20000);
     else if (field === 'summary' || field === 'subtitle' || field === 'seoDescription') clean[field] = text(value, 1000);
+    else if (field === 'publicationType' || field === 'timelineType') clean[field] = text(value, 80);
     else clean[field] = text(value, 1200);
   }
   return clean;
@@ -164,6 +167,8 @@ export function buildWorkspaceNewsFromEvent(event = {}, profile = {}, role = 'pa
     summary: text(event.description || event.shortDescription || '', 500),
     text: body || title,
     category: 'events',
+    publicationType: 'Анонс',
+    timelineType: 'event-announcement',
     coverPhoto: text(event.coverPhoto || event.imageUrl || event.photo || '', 1200),
     imageUrl: text(event.coverPhoto || event.imageUrl || event.photo || '', 1200),
     gallery: Array.isArray(event.gallery) ? event.gallery : [],

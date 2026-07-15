@@ -32,16 +32,18 @@ assert.doesNotMatch(serverRoute.slice(serverRoute.indexOf("fastify.get('/api/com
 const partnerPage = read('src/PartnerPage.jsx');
 const expertsPage = read('src/ExpertsPage.jsx');
 for (const [name, source] of [['PartnerPage', partnerPage], ['ExpertsPage', expertsPage]]) {
-  assert.match(source, /CommunityFeedSection/, `${name} must render CommunityFeedSection`);
+  assert.match(source, /ProfileTimelineSection/, `${name} must render unified profile timeline`);
   assert.match(source, /id: 'feed', label: 'Лента'/, `${name} must expose first feed tab`);
-  assert.match(source, /setDesktopTab\(communityFeedUrl \? 'feed' : 'about'\)/, `${name} must open feed by default only when community exists`);
-  assert.match(source, /Последние публикации сообщества/, `${name} must use user-facing feed subtitle`);
+  assert.match(source, /setDesktopTab\('feed'\)/, `${name} must open unified timeline by default`);
+  assert.match(source, /Хронология публичной активности/, `${name} must describe feed as profile activity timeline`);
+  assert.doesNotMatch(source, /Последние публикации сообщества/, `${name} must not expose VK as a separate feed`);
 }
 
 const frontendSources = [
   read('src/PartnerPage.jsx'),
   read('src/ExpertsPage.jsx'),
   read('src/components/CommunityFeedSection.jsx'),
+  read('src/components/ProfileTimelineSection.jsx'),
   read('src/utils/externalUrls.js'),
 ].join('\n');
 assert.doesNotMatch(frontendSources, /VK_(SERVICE|USER|GROUP)_TOKEN|access_token/i, 'VK tokens must not appear in frontend feed code');
