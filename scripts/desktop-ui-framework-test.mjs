@@ -7,6 +7,7 @@ const source = fs.readFileSync(filePath, 'utf8');
 const glassSource = fs.readFileSync(path.join(root, 'src/components/Apg2ProfileGlass.jsx'), 'utf8');
 const themeSource = fs.readFileSync(path.join(root, 'src/index.css'), 'utf8');
 const workspaceSource = fs.readFileSync(path.join(root, 'src/workspace/DesktopWorkspace.jsx'), 'utf8');
+const homeSource = fs.readFileSync(path.join(root, 'src/HomePanelV2.jsx'), 'utf8');
 
 const requiredExports = [
   'DesktopSectionShell',
@@ -93,6 +94,12 @@ if (darkThemeMatch[1].includes('--apg2-glass-a:    255,255,255')) {
 if (!darkThemeMatch[1].includes('--apg2-glass-a:    28,28,28')) {
   throw new Error('Dark theme must define the dark APG2 glass base used by Desktop UI cards.');
 }
+if (!darkThemeMatch[1].includes('--apg2-control:')) {
+  throw new Error('Dark theme must define public APG2 control tokens.');
+}
+if (!darkThemeMatch[1].includes('--apg2-panel-strong:')) {
+  throw new Error('Dark theme must define public APG2 panel tokens.');
+}
 if (!darkThemeMatch[1].includes('--apg-workspace-panel-accent:')) {
   throw new Error('Dark theme must define workspace panel accent tokens.');
 }
@@ -109,5 +116,17 @@ if (!glassSource.includes('safeStyle') || !glassSource.includes('value !== undef
     throw new Error(`DesktopWorkspace must render theme-aware workspace surface token: ${token}`);
   }
 });
+
+['--apg2-control', '--apg2-control-soft', '--apg2-control-strong'].forEach(token => {
+  if (!homeSource.includes(token) && !source.includes(token)) {
+    throw new Error(`Public Desktop must render theme-aware APG2 token: ${token}`);
+  }
+});
+if (source.includes("background: 'rgba(255,255,255,0.92)'")) {
+  throw new Error('Desktop Catalog rating badges must not use fixed light backgrounds.');
+}
+if (!glassSource.includes("interactiveAs = 'button'") || !source.includes('interactiveAs="div"')) {
+  throw new Error('Desktop catalog cards with nested actions must render interactive cards as div, not nested buttons.');
+}
 
 console.log('desktop-ui-framework-test: ok');

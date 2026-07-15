@@ -45,6 +45,12 @@
   --apg2-island-bg2: rgba(246,243,235,0.86);
   --apg2-header-bg-strong: rgba(246,244,238,0.92);
   --apg2-header-bg-soft: rgba(246,244,238,0.62);
+  --apg2-control: rgba(255,255,255,0.62);
+  --apg2-control-soft: rgba(255,255,255,0.46);
+  --apg2-control-strong: rgba(255,255,255,0.82);
+  --apg2-panel-soft: rgba(255,255,255,0.72);
+  --apg2-panel-strong: rgba(255,255,255,0.94);
+  --apg2-track: rgba(35,32,24,0.08);
   --apg2-image-shade: radial-gradient(circle at 22% 8%, rgba(244,217,140,0.14), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.42) 42%, rgba(255,255,255,0.88));
   --apg2-image-shade-soft: linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.84));
   --apg2-ticket-shade: radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,0.68) 58%, rgba(255,255,255,0.38));
@@ -116,6 +122,12 @@
   --apg2-island-bg2: rgba(246,243,235,0.86);
   --apg2-header-bg-strong: rgba(246,244,238,0.92);
   --apg2-header-bg-soft: rgba(246,244,238,0.62);
+  --apg2-control: rgba(255,255,255,0.62);
+  --apg2-control-soft: rgba(255,255,255,0.46);
+  --apg2-control-strong: rgba(255,255,255,0.82);
+  --apg2-panel-soft: rgba(255,255,255,0.72);
+  --apg2-panel-strong: rgba(255,255,255,0.94);
+  --apg2-track: rgba(35,32,24,0.08);
   --apg2-image-shade: radial-gradient(circle at 22% 8%, rgba(244,217,140,0.14), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.42) 42%, rgba(255,255,255,0.88));
   --apg2-image-shade-soft: linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.84));
   --apg2-ticket-shade: radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,0.68) 58%, rgba(255,255,255,0.38));
@@ -181,6 +193,12 @@
   --apg2-island-bg2: rgba(15,15,16,0.46);
   --apg2-header-bg-strong: rgba(18,17,15,0.96);
   --apg2-header-bg-soft: rgba(18,17,15,0.80);
+  --apg2-control: rgba(255,255,255,0.09);
+  --apg2-control-soft: rgba(255,255,255,0.07);
+  --apg2-control-strong: rgba(255,255,255,0.13);
+  --apg2-panel-soft: rgba(255,255,255,0.08);
+  --apg2-panel-strong: rgba(255,255,255,0.12);
+  --apg2-track: rgba(255,255,255,0.10);
   --apg2-image-shade: radial-gradient(circle at 22% 8%, rgba(244,217,140,0.14), transparent 34%), linear-gradient(180deg, rgba(14,14,16,0.04), rgba(14,14,16,0.28) 42%, rgba(14,14,16,0.88));
   --apg2-image-shade-soft: linear-gradient(180deg, rgba(14,14,16,0.28), rgba(14,14,16,0.84));
   --apg2-ticket-shade: radial-gradient(circle at 16% 8%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(90deg, rgba(14,14,16,0.90), rgba(14,14,16,0.52) 58%, rgba(14,14,16,0.26));

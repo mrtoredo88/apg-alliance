@@ -203,19 +203,23 @@ function AccountMethodRow({ icon, title, subtitle, status, accent = APG2.gold })
 }
 
 const DP = {
-  bg: 'linear-gradient(180deg,#f8f4ec 0%,#f4eee4 100%)',
-  card: 'rgba(255,255,255,0.78)',
-  strong: 'rgba(255,255,255,0.94)',
-  border: 'rgba(112,84,42,0.13)',
-  text: '#1F1A14',
-  soft: 'rgba(31,26,20,0.64)',
-  muted: 'rgba(31,26,20,0.44)',
-  gold: '#C89B3C',
+  bg: 'var(--apg2-bg, linear-gradient(180deg,#f8f4ec 0%,#f4eee4 100%))',
+  card: 'var(--apg2-panel-soft, rgba(255,255,255,0.78))',
+  strong: 'var(--apg2-panel-strong, rgba(255,255,255,0.94))',
+  control: 'var(--apg2-control, rgba(255,255,255,0.62))',
+  controlSoft: 'var(--apg2-control-soft, rgba(255,255,255,0.46))',
+  controlStrong: 'var(--apg2-control-strong, rgba(255,255,255,0.82))',
+  track: 'var(--apg2-track, rgba(31,26,20,0.08))',
+  border: 'var(--apg2-glass-border, rgba(112,84,42,0.13))',
+  text: 'var(--apg2-text, #1F1A14)',
+  soft: 'var(--apg2-text-soft, rgba(31,26,20,0.64))',
+  muted: 'var(--apg2-text-muted, rgba(31,26,20,0.44))',
+  gold: 'var(--apg2-gold, #C89B3C)',
   goldSoft: 'rgba(200,155,60,0.13)',
   red: '#D95D54',
   green: '#2EB36B',
   blue: '#4A90D9',
-  shadow: '0 22px 62px rgba(86,62,30,0.09)',
+  shadow: '0 22px 62px var(--apg2-elev-shadow, rgba(86,62,30,0.09))',
 };
 
 function dpCard(extra = {}) {
@@ -237,7 +241,7 @@ function dpButton(tone = 'light', extra = {}) {
     minHeight: 38,
     borderRadius: 8,
     border: `1px solid ${primary ? 'rgba(200,155,60,0.48)' : danger ? 'rgba(217,93,84,0.32)' : DP.border}`,
-    background: primary ? 'linear-gradient(135deg,#F2D58A,#C89B3C)' : danger ? 'rgba(217,93,84,0.09)' : 'rgba(255,255,255,0.62)',
+    background: primary ? 'linear-gradient(135deg,#F2D58A,#C89B3C)' : danger ? 'rgba(217,93,84,0.09)' : DP.control,
     color: primary ? '#241807' : danger ? DP.red : DP.text,
     padding: '8px 12px',
     fontSize: 13,
@@ -286,7 +290,7 @@ function DesktopSection({ title, icon, action, children, style }) {
 
 function DesktopEmpty({ title, text }) {
   return (
-    <div style={{ borderRadius: 8, border: `1px dashed ${DP.border}`, background: 'rgba(255,255,255,0.42)', padding: 16, textAlign: 'center' }}>
+    <div style={{ borderRadius: 8, border: `1px dashed ${DP.border}`, background: DP.controlSoft, padding: 16, textAlign: 'center' }}>
       <div style={{ color: DP.text, fontSize: 14, fontWeight: 860 }}>{title}</div>
       {text && <div style={{ color: DP.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{text}</div>}
     </div>
@@ -295,7 +299,7 @@ function DesktopEmpty({ title, text }) {
 
 function DesktopKpi({ icon, label, value, sub }) {
   return (
-    <div style={dpCard({ padding: 13, minHeight: 82, boxShadow: '0 12px 30px rgba(86,62,30,0.055)', display: 'grid', alignContent: 'center', justifyItems: 'center', textAlign: 'center' })}>
+    <div style={dpCard({ padding: 13, minHeight: 82, boxShadow: '0 12px 30px var(--apg2-elev-shadow, rgba(86,62,30,0.055))', display: 'grid', alignContent: 'center', justifyItems: 'center', textAlign: 'center' })}>
       <div style={{ color: DP.gold, fontSize: 20, lineHeight: '22px' }}>{icon}</div>
       <div style={{ color: DP.text, fontSize: 22, lineHeight: '27px', fontWeight: 940, marginTop: 4 }}>{value}</div>
       <div style={{ color: DP.soft, fontSize: 12, lineHeight: '15px', marginTop: 1 }}>{label}</div>
@@ -306,7 +310,7 @@ function DesktopKpi({ icon, label, value, sub }) {
 
 function DesktopProgress({ value, color = DP.gold }) {
   return (
-    <div style={{ height: 8, borderRadius: 999, background: 'rgba(88,67,37,0.13)', overflow: 'hidden' }}>
+    <div style={{ height: 8, borderRadius: 999, background: DP.track, overflow: 'hidden' }}>
       <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, Number(value) || 0))}%`, borderRadius: 999, background: `linear-gradient(90deg, ${color}, #E8C97A)`, transition: 'width 0.4s ease' }} />
     </div>
   );
@@ -316,7 +320,7 @@ const DesktopBookingRow = memo(function DesktopBookingRow({ item, onDialog, onRe
   const active = item?.isActive;
   const completed = item?.status === 'completed';
   return (
-    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.52)', padding: 11, display: 'grid', gap: 9 }}>
+    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.controlSoft, padding: 11, display: 'grid', gap: 9 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ color: DP.text, fontSize: 14, lineHeight: '18px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item?.providerName || 'Запись АПГ'}</div>
@@ -350,7 +354,7 @@ const DesktopFavoriteRow = memo(function DesktopFavoriteRow({ item, onOpen }) {
 
 const DesktopNewsRow = memo(function DesktopNewsRow({ item, onOpen }) {
   return (
-    <button onClick={() => onOpen?.(item)} style={{ border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.46)', borderRadius: 8, padding: '9px 10px', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+    <button onClick={() => onOpen?.(item)} style={{ border: `1px solid ${DP.border}`, background: DP.controlSoft, borderRadius: 8, padding: '9px 10px', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
       <span style={{ display: 'block', color: DP.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getNewsTitle(item)}</span>
       <span style={{ display: 'block', color: DP.soft, fontSize: 11.5, lineHeight: '15px', marginTop: 3 }}>{formatNewsDate(item)}</span>
     </button>
@@ -389,7 +393,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
       setSaving(false);
     }
   };
-  const inputStyle = { width: '100%', minHeight: 42, borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.72)', color: DP.text, outline: 'none', padding: '0 11px', fontFamily: 'inherit', fontSize: 13.5, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', minHeight: 42, borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.control, color: DP.text, outline: 'none', padding: '0 11px', fontFamily: 'inherit', fontSize: 13.5, boxSizing: 'border-box' };
   return (
     <ApgModal title="Редактировать профиль" subtitle="Личные данные обычного профиля АПГ." onClose={onClose} maxWidth={520}>
       <div style={{ display: 'grid', gap: 11 }}>
@@ -1180,7 +1184,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
           <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gap: 16 }}>
             {desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="profile" /> : null}
-            <header style={dpCard({ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.72)' })}>
+            <header style={dpCard({ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, background: DP.control })}>
               <button type="button" onClick={() => onBack?.()} style={{ ...dpButton('light', { minHeight: 36, background: 'transparent', borderColor: 'transparent' }) }}>← Назад в приложение</button>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: DP.text, fontSize: 18, lineHeight: '23px', fontWeight: 940 }}>Мой профиль</div>
@@ -1195,9 +1199,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <div style={{ position: 'relative', width: 124, height: 124 }}>
                   {safeUser.photo_200
                     ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(200,155,60,0.32)', boxShadow: '0 18px 42px rgba(31,26,20,0.16)' }} />
-                    : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'linear-gradient(135deg,rgba(200,155,60,0.22),rgba(255,255,255,0.72))', border: '3px solid rgba(200,155,60,0.24)', display: 'grid', placeItems: 'center', color: DP.gold, fontSize: 42, fontWeight: 950 }}>{displayName[0] || 'А'}</div>
+                    : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'linear-gradient(135deg,rgba(200,155,60,0.22),var(--apg2-control-strong, rgba(255,255,255,0.72)))', border: '3px solid rgba(200,155,60,0.24)', display: 'grid', placeItems: 'center', color: DP.gold, fontSize: 42, fontWeight: 950 }}>{displayName[0] || 'А'}</div>
                   }
-                  <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Изменить профиль" style={{ position: 'absolute', right: -2, bottom: 5, width: 38, height: 38, borderRadius: '50%', border: `1px solid ${DP.border}`, background: '#fff', color: DP.text, boxShadow: '0 10px 24px rgba(31,26,20,0.12)', cursor: 'pointer', fontSize: 15 }}>✎</button>
+                  <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Изменить профиль" style={{ position: 'absolute', right: -2, bottom: 5, width: 38, height: 38, borderRadius: '50%', border: `1px solid ${DP.border}`, background: DP.controlStrong, color: DP.text, boxShadow: '0 10px 24px var(--apg2-elev-shadow, rgba(31,26,20,0.12))', cursor: 'pointer', fontSize: 15 }}>✎</button>
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1206,7 +1210,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   </div>
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 8 }}>
                     <span style={{ borderRadius: 999, background: DP.goldSoft, color: DP.gold, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 850 }}>{roleLabel}</span>
-                    <span style={{ borderRadius: 999, background: 'rgba(31,26,20,0.05)', color: DP.soft, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 760 }}>{level.emoji} {level.label}</span>
+                    <span style={{ borderRadius: 999, background: DP.controlSoft, color: DP.soft, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 760 }}>{level.emoji} {level.label}</span>
                   </div>
                   <div style={{ color: DP.soft, fontSize: 14, lineHeight: '20px', marginTop: 10 }}>{profileAbout || 'Краткое описание пока не заполнено.'}</div>
                   <div style={{ display: 'grid', gap: 5, marginTop: 12, color: DP.muted, fontSize: 12.5, lineHeight: '17px' }}>
@@ -1299,13 +1303,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <aside style={{ display: 'grid', gap: 16 }}>
                 <DesktopSection title="Ключи и достижения" icon="🗝">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.48)', padding: 12 }}>
+                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.controlSoft, padding: 12 }}>
                       <div style={{ color: DP.soft, fontSize: 12, fontWeight: 820 }}>Ключи</div>
                       <div style={{ color: DP.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, marginTop: 6 }}>{userKeys}</div>
                       <DesktopProgress value={pct} color={level.color || DP.gold} />
                       <div style={{ color: DP.muted, fontSize: 11.5, lineHeight: '16px', marginTop: 6 }}>{nextLevel ? `До следующего уровня: ${toNext} ключей` : 'Максимальный уровень'}</div>
                     </div>
-                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: 'rgba(255,255,255,0.48)', padding: 12 }}>
+                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.controlSoft, padding: 12 }}>
                       <div style={{ color: DP.soft, fontSize: 12, fontWeight: 820 }}>Достижения</div>
                       <div style={{ color: DP.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, marginTop: 6 }}>{unlockedCount}/{achievements.length}</div>
                       <DesktopProgress value={achievements.length ? unlockedCount / achievements.length * 100 : 0} />
@@ -1315,7 +1319,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     {(unlockedPreview.length ? unlockedPreview : achievements.slice(0, 3)).map(item => (
                       <div key={item.id} style={{ width: 70, display: 'grid', gap: 6, justifyItems: 'center', opacity: item.unlocked ? 1 : 0.42, filter: item.unlocked ? 'none' : 'grayscale(1)' }}>
-                        <div style={{ width: 48, height: 48, borderRadius: 8, background: item.unlocked ? `${item.color}22` : 'rgba(31,26,20,0.06)', border: `1px solid ${item.unlocked ? `${item.color}55` : DP.border}`, display: 'grid', placeItems: 'center', fontSize: 21 }}>{item.emoji}</div>
+                        <div style={{ width: 48, height: 48, borderRadius: 8, background: item.unlocked ? `${item.color}22` : DP.controlSoft, border: `1px solid ${item.unlocked ? `${item.color}55` : DP.border}`, display: 'grid', placeItems: 'center', fontSize: 21 }}>{item.emoji}</div>
                         <div style={{ color: item.unlocked ? DP.text : DP.muted, fontSize: 11, lineHeight: '14px', textAlign: 'center', fontWeight: 760 }}>{item.title}</div>
                       </div>
                     ))}

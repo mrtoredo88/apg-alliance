@@ -137,7 +137,7 @@ const V2 = {
     ...APG2_PROFILE.glass,
     background: APG2_PROFILE.heroSurface,
     border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.34))',
-    boxShadow: '0 42px 104px var(--apg2-elev-shadow, rgba(0,0,0,0.30)), 0 0 74px rgba(216,184,103,0.12), inset 0 2px 0 rgba(255,255,255,0.42), inset 0 -42px 86px rgba(255,255,255,0.07)',
+    boxShadow: '0 42px 104px var(--apg2-elev-shadow, rgba(0,0,0,0.30)), 0 0 74px rgba(216,184,103,0.12), inset 0 2px 0 rgba(var(--apg2-glass-a,255,255,255),0.42), inset 0 -42px 86px rgba(var(--apg2-glass-a,255,255,255),0.07)',
   },
   goldGlass: {
     ...APG2_PROFILE.goldGlass,
@@ -170,14 +170,14 @@ const GlassButton = {
   minHeight: 48,
   padding: '0 23px',
   borderRadius: 999,
-  background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.40), transparent 56%), linear-gradient(145deg, rgba(255,255,255,0.38), rgba(255,255,255,0.18))',
-  border: '1px solid rgba(255,255,255,0.32)',
+  background: 'radial-gradient(circle at 50% 0%, rgba(var(--apg2-glass-a,255,255,255),0.40), transparent 56%), linear-gradient(145deg, var(--apg2-control, rgba(255,255,255,0.38)), var(--apg2-control-soft, rgba(255,255,255,0.18)))',
+  border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.32))',
   color: V2.text,
   fontSize: 14,
   fontWeight: 760,
   backdropFilter: V2.glass.backdropFilter,
   WebkitBackdropFilter: V2.glass.WebkitBackdropFilter,
-  boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.40), inset 0 -14px 28px rgba(255,255,255,0.06), 0 14px 34px var(--apg2-elev-shadow, rgba(0,0,0,0.18))',
+  boxShadow: 'inset 0 1.5px 0 rgba(var(--apg2-glass-a,255,255,255),0.40), inset 0 -14px 28px rgba(var(--apg2-glass-a,255,255,255),0.06), 0 14px 34px var(--apg2-elev-shadow, rgba(0,0,0,0.18))',
   transition: motionTransition(['transform', 'box-shadow'], 'base'),
 };
 
@@ -189,7 +189,7 @@ const revealMotion = (index = 0, duration = 'panel') => ({
 const GlassIsland = {
   ...V2.glass,
   borderRadius: 42,
-  boxShadow: '0 28px 76px var(--apg2-elev-shadow, rgba(0,0,0,0.34)), 0 0 58px rgba(216,184,103,0.10), inset 0 2px 0 rgba(255,255,255,0.25), inset 0 -26px 52px rgba(255,255,255,0.045)',
+  boxShadow: '0 28px 76px var(--apg2-elev-shadow, rgba(0,0,0,0.34)), 0 0 58px rgba(216,184,103,0.10), inset 0 2px 0 rgba(var(--apg2-glass-a,255,255,255),0.25), inset 0 -26px 52px rgba(var(--apg2-glass-a,255,255,255),0.045)',
 };
 
 const GlassBadge = {
@@ -198,11 +198,11 @@ const GlassBadge = {
   color: V2.text,
   fontSize: 11,
   fontWeight: 720,
-  background: 'radial-gradient(circle at 35% 0%, rgba(255,255,255,0.36), transparent 58%), rgba(255,255,255,0.24)',
-  border: '1px solid rgba(255,255,255,0.28)',
+  background: 'radial-gradient(circle at 35% 0%, rgba(var(--apg2-glass-a,255,255,255),0.36), transparent 58%), var(--apg2-control-soft, rgba(255,255,255,0.24))',
+  border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.28))',
   backdropFilter: V2.glass.backdropFilter,
   WebkitBackdropFilter: V2.glass.WebkitBackdropFilter,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.36), 0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))',
+  boxShadow: 'inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.36), 0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))',
 };
 
 const GlassSection = {

@@ -312,7 +312,7 @@ export function DesktopTopOverview({
         </div>
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.58fr) minmax(320px, 0.82fr)', gap: 14, alignItems: 'stretch' }}>
-        <GlassCard style={{ borderRadius: 34, padding: 0, minHeight: 188, overflow: 'hidden', position: 'relative', cursor: safeHeroActions[0]?.onClick ? 'pointer' : 'default' }} onClick={safeHeroActions[0]?.onClick}>
+        <GlassCard style={{ borderRadius: 34, padding: 0, minHeight: 188, overflow: 'hidden', position: 'relative' }}>
           <div style={{ position: 'absolute', inset: -18, pointerEvents: 'none' }}>
             {heroImage ? <img src={heroImage} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.44, filter: 'saturate(1.12) contrast(1.04)' }} /> : <div style={{ width: '100%', height: '100%', background: 'radial-gradient(circle at 28% 18%, rgba(244,217,140,0.28), transparent 42%), linear-gradient(135deg, rgba(24,29,48,0.70), rgba(var(--apg2-glass-a,255,255,255),0.08) 46%, rgba(14,12,18,0.32))' }} />}
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,15,18,0.03), rgba(14,15,18,0.24) 42%, rgba(12,12,14,0.74))' }} />
@@ -611,6 +611,7 @@ export function DesktopCard({
   return (
     <DesktopCardHover active={active}>
       <GlassCard
+        interactiveAs="div"
         onClick={onClick}
         onMouseEnter={(event) => { setHovered(true); onMouseEnter?.(event); }}
         onMouseLeave={() => setHovered(false)}
@@ -678,6 +679,7 @@ export function DesktopCatalogEntityCard({
   return (
     <DesktopCardHover active={active}>
       <GlassCard
+        interactiveAs="div"
         onClick={onClick}
         onMouseEnter={(event) => { setHovered(true); onMouseEnter?.(event); }}
         onMouseLeave={() => setHovered(false)}
@@ -705,7 +707,7 @@ export function DesktopCatalogEntityCard({
             </div>
           )}
           {rating ? (
-            <div style={{ position: 'absolute', right: 10, top: 10, minHeight: 24, borderRadius: 999, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', color: '#17120a', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(255,255,255,0.78)', boxShadow: '0 10px 24px rgba(0,0,0,0.14)', fontSize: 11.5, lineHeight: '14px', fontWeight: 900 }}>
+            <div style={{ position: 'absolute', right: 10, top: 10, minHeight: 24, borderRadius: 999, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', color: APG2_PROFILE.text, background: 'var(--apg2-control-strong, rgba(255,255,255,0.92))', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.78))', boxShadow: '0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))', fontSize: 11.5, lineHeight: '14px', fontWeight: 900 }}>
               ★ {rating}
             </div>
           ) : null}

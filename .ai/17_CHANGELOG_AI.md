@@ -2942,6 +2942,14 @@
 - Карточки экспертов используют только реальные поля анкеты: фото/обложка, имя, специализация, категории, опыт, рейтинг, стоимость, форматы, акция и запись при наличии.
 - Toolbar полей поиска/фильтров в `Партнёры` и `Эксперты` получил контрастный desktop-вид через CSS-переменную placeholder без изменения мобильной версии.
 
+# 2026-07-15 — Public Desktop Theme Migration
+
+- Публичная desktop-часть переведена на общие APG2 theme tokens: добавлены public control/panel/track CSS-переменные для light/dark режимов.
+- `HomePanelV2` больше не использует фиксированные белые glass-кнопки, бейджи и inset-света; публичный Home теперь реагирует на `data-theme="dark"`.
+- Desktop-профиль получил theme-aware палитру `DP` поверх `--apg2-*` переменных вместо отдельного светлого набора цветов.
+- Desktop Catalog rating badges и карточки перешли на theme tokens, а интерактивные карточки с вложенными action-кнопками больше не рендерятся как `<button>` внутри `<button>`.
+- Regression-тесты `desktop-ui-framework-test` и `desktop-profile-test` расширены проверками public dark tokens и запретом старых light-only поверхностей.
+
 # 2026-07-14 — Desktop Production Audit Fixes
 
 - Исправлена проводка верхней desktop-навигации Home: `Партнёры` теперь получает `onOpenPartners` из `UserApp`, а не уходит fallback-ом в `Акции`.

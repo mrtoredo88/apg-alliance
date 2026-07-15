@@ -63,16 +63,26 @@ export function GlassBadge({ children, tone = 'glass', style }) {
   );
 }
 
-export function GlassCard({ children, tone = 'glass', style, onClick, onPointerDown, onPointerUp, onPointerLeave, onPointerCancel, ...rest }) {
+export function GlassCard({ children, tone = 'glass', style, onClick, onPointerDown, onPointerUp, onPointerLeave, onPointerCancel, interactiveAs = 'button', onKeyDown, ...rest }) {
   const [pressed, setPressed] = useState(false);
   const gold = tone === 'gold';
-  const Tag = onClick ? 'button' : 'div';
+  const Tag = onClick && interactiveAs !== 'div' ? 'button' : 'div';
   const safeStyle = Object.fromEntries(Object.entries(style || {}).filter(([, value]) => value !== undefined));
   const baseTransform = safeStyle.transform;
+  const handleKeyDown = (e) => {
+    onKeyDown?.(e);
+    if (!onClick || Tag !== 'div' || e.defaultPrevented) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(e);
+    }
+  };
   return (
     <Tag
-      {...(onClick ? { type: 'button' } : {})}
+      {...(Tag === 'button' ? { type: 'button' } : {})}
+      {...(onClick && Tag === 'div' ? { role: 'button', tabIndex: 0 } : {})}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       onPointerDown={(e) => { if (onClick) setPressed(true); onPointerDown?.(e); }}
       onPointerUp={(e) => { setPressed(false); onPointerUp?.(e); }}
       onPointerLeave={(e) => { setPressed(false); onPointerLeave?.(e); }}

@@ -22,5 +22,10 @@ assert.ok(!profileSource.includes('WorkspaceRelatedLinks'), 'user profile must n
 assert.ok(!profileSource.includes('WorkspaceDialogsCRM'), 'user profile must not embed Workspace CRM dialogs');
 assert.ok(!profileSource.includes('DesktopWorkspace'), 'user profile must not embed Desktop Workspace');
 assert.ok(!desktopBranch.includes('NAV_ITEMS'), 'desktop profile must not add a left Workspace navigation');
+assert.ok(profileSource.includes("bg: 'var(--apg2-bg"), 'desktop profile background must use the public APG2 theme token');
+assert.ok(profileSource.includes("card: 'var(--apg2-panel-soft"), 'desktop profile cards must use public APG2 panel tokens');
+assert.ok(profileSource.includes("control: 'var(--apg2-control"), 'desktop profile controls must use public APG2 control tokens');
+assert.ok(!profileSource.includes("bg: 'linear-gradient(180deg,#f8f4ec"), 'desktop profile must not keep the old light-only DP background');
+assert.ok(!desktopBranch.includes("background: '#fff'"), 'desktop profile must not use fixed white action buttons');
 
 console.log('Desktop Profile regression test passed');
