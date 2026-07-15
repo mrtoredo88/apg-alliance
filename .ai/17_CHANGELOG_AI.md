@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] feat: Profile timeline experience
+**Коммит:** `pending`
+**Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Timeline профиля получил закреплённые записи, фильтры по типам, группировку по периодам и progressive-показ без новых моделей данных.
+- Введена единая карточка `ProfileTimelineCard` для новостей, мероприятий, акций, видео, фото, отзывов и VK-постов.
+- Длинные записи раскрываются через `Показать полностью`, а пустое состояние учитывает владельца профиля.
+**Почему:** вкладка `Лента` должна выглядеть как публичная страница жизни партнёра или эксперта, а не как плоский список разных источников.
+
 ## [2026-07-15] feat: Unified profile timeline
 **Коммит:** `pending`
 **Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `server-shared/workspace-news.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/components/PartnerQuestionnaire.jsx`, `scripts/community-feed-test.mjs`, `scripts/profile-timeline-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

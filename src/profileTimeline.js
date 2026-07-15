@@ -40,6 +40,44 @@ function timelineId(type, id, index = 0) {
   return `${type}:${id || index}`;
 }
 
+export const TIMELINE_FILTERS = [
+  { id: 'all', label: 'Все' },
+  { id: 'publication', label: 'Новости' },
+  { id: 'event', label: 'Мероприятия' },
+  { id: 'offer', label: 'Акции' },
+  { id: 'video', label: 'Видео' },
+  { id: 'photo', label: 'Фото' },
+  { id: 'review', label: 'Отзывы' },
+  { id: 'vk', label: 'VK' },
+];
+
+export const TIMELINE_SOURCE_META = {
+  publication: { label: 'Новость', source: 'news' },
+  event: { label: 'Мероприятие', source: 'events' },
+  offer: { label: 'Акция', source: 'profile' },
+  video: { label: 'Видео', source: 'profile' },
+  photo: { label: 'Фото', source: 'profile' },
+  review: { label: 'Отзыв', source: 'reviews' },
+  vk: { label: 'VK', source: 'vk' },
+};
+
+function isPinnedRecord(item = {}, profile = {}) {
+  const pinnedIds = [
+    profile.pinnedTimelineId,
+    profile.pinnedPostId,
+    profile.pinnedNewsId,
+    profile.pinnedPublicationId,
+  ].map(value => String(value || '')).filter(Boolean);
+  const itemIds = [
+    item.id,
+    item.newsId,
+    item.eventId,
+    item.publicationId,
+    item.url,
+  ].map(value => String(value || '')).filter(Boolean);
+  return Boolean(item.pinned || item.isPinned || item.timelinePinned || item.pinToProfile || itemIds.some(id => pinnedIds.includes(id)));
+}
+
 function publicationKind(item = {}) {
   const type = String(item.publicationType || item.timelineType || '').trim();
   if (type) return type;
@@ -64,10 +102,11 @@ function buildNewsItems({ news = [], profile, role }) {
       date: item.publishedAt || item.updatedAt || item.createdAt,
       ts: toMillis(item.publishedAt || item.updatedAt || item.createdAt),
       author: item.author || item.sourceName || profile?.name || profile?.title || '',
-      source: 'news',
-      entity: item,
-      action: 'openNews',
-    }));
+	      source: 'news',
+	      entity: item,
+	      action: 'openNews',
+	      pinned: isPinnedRecord(item, profile),
+	    }));
 }
 
 function buildEventItems({ events = [], profile, role }) {
@@ -83,10 +122,11 @@ function buildEventItems({ events = [], profile, role }) {
       date: item.publishedAt || item.startAt || item.eventDate || item.date || item.createdAt,
       ts: toMillis(item.publishedAt || item.startAt || item.eventDate || item.date || item.createdAt),
       author: profile?.name || profile?.title || '',
-      source: 'events',
-      entity: item,
-      action: 'openEvent',
-    }));
+	      source: 'events',
+	      entity: item,
+	      action: 'openEvent',
+	      pinned: isPinnedRecord(item, profile),
+	    }));
 }
 
 function buildOfferItems({ profile = {} }) {
@@ -102,10 +142,11 @@ function buildOfferItems({ profile = {} }) {
     date: profile.offerUpdatedAt || profile.promotionUpdatedAt || profile.profileUpdatedAt || profile.updatedAt,
     ts: toMillis(profile.offerUpdatedAt || profile.promotionUpdatedAt || profile.profileUpdatedAt || profile.updatedAt) || profileDate(profile),
     author: profile.name || profile.title || '',
-    source: 'profile',
-    entity: profile,
-    action: 'openOffer',
-  }];
+	    source: 'profile',
+	    entity: profile,
+	    action: 'openOffer',
+	    pinned: Boolean(profile.offerPinned || profile.pinnedOffer || profile.pinnedTimelineType === 'offer'),
+	  }];
 }
 
 function buildVideoItems({ profile = {} }) {
@@ -119,10 +160,11 @@ function buildVideoItems({ profile = {} }) {
     date: video.createdAt || video.updatedAt || profile.profileUpdatedAt || profile.updatedAt,
     ts: toMillis(video.createdAt || video.updatedAt || profile.profileUpdatedAt || profile.updatedAt) || profileDate(profile) - index,
     author: profile.name || profile.title || '',
-    source: 'profile',
-    entity: video,
-    action: 'openVideo',
-  }));
+	    source: 'profile',
+	    entity: video,
+	    action: 'openVideo',
+	    pinned: isPinnedRecord(video, profile) || (profile.pinnedTimelineType === 'video' && index === 0),
+	  }));
 }
 
 function buildPhotoItems({ profile = {} }) {
@@ -138,10 +180,11 @@ function buildPhotoItems({ profile = {} }) {
     date: profile.galleryUpdatedAt || profile.profileUpdatedAt || profile.updatedAt,
     ts: toMillis(profile.galleryUpdatedAt || profile.profileUpdatedAt || profile.updatedAt) || profileDate(profile) - 1000,
     author: profile.name || profile.title || '',
-    source: 'profile',
-    entity: { gallery },
-    action: 'openPhotos',
-  }];
+	    source: 'profile',
+	    entity: { gallery },
+	    action: 'openPhotos',
+	    pinned: Boolean(profile.galleryPinned || profile.photosPinned || profile.pinnedTimelineType === 'photo'),
+	  }];
 }
 
 function buildReviewItems({ reviews = [], profile = {} }) {
@@ -155,10 +198,11 @@ function buildReviewItems({ reviews = [], profile = {} }) {
     date: review.createdAt || review.updatedAt,
     ts: toMillis(review.createdAt || review.updatedAt) || profileDate(profile) - 2000 - index,
     author: review.userName || 'Участник АПГ',
-    source: 'reviews',
-    entity: review,
-    action: 'openReviews',
-  }));
+	    source: 'reviews',
+	    entity: review,
+	    action: 'openReviews',
+	    pinned: isPinnedRecord(review, profile),
+	  }));
 }
 
 export function buildProfileTimeline({ profile = {}, role = 'partner', news = [], events = [], reviews = [], vkPosts = [] } = {}) {
@@ -172,13 +216,14 @@ export function buildProfileTimeline({ profile = {}, role = 'partner', news = []
     date: post.date || post.publishedAt || post.createdAt,
     ts: toMillis(post.date || post.publishedAt || post.createdAt) || Date.now() - index,
     author: profile.name || profile.title || '',
-    source: 'vk',
-    entity: post,
-    action: 'openExternal',
-    url: post.url,
-  }));
+	    source: 'vk',
+	    entity: post,
+	    action: 'openExternal',
+	    url: post.url,
+	    pinned: isPinnedRecord(post, profile),
+	  }));
 
-  return [
+	  return [
     ...buildNewsItems({ news, profile, role }),
     ...buildEventItems({ events, profile, role }),
     ...buildOfferItems({ profile }),
@@ -186,12 +231,54 @@ export function buildProfileTimeline({ profile = {}, role = 'partner', news = []
     ...buildPhotoItems({ profile }),
     ...buildReviewItems({ reviews, profile }),
     ...vkItems,
-  ]
-    .filter(item => item.title || item.text || item.image)
-    .sort((a, b) => (b.ts || 0) - (a.ts || 0))
-    .slice(0, 16);
+	  ]
+	    .filter(item => item.title || item.text || item.image)
+	    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || (b.ts || 0) - (a.ts || 0))
+	    .slice(0, 24);
 }
 
 export function getProfileTimelineSourceTypes(items = []) {
   return Array.from(new Set((Array.isArray(items) ? items : []).map(item => item.type).filter(Boolean)));
+}
+
+export function filterProfileTimelineItems(items = [], filterId = 'all') {
+  const list = Array.isArray(items) ? items : [];
+  if (!filterId || filterId === 'all') return list;
+  return list.filter(item => item.type === filterId);
+}
+
+export function getTimelinePeriodLabel(value, nowValue = Date.now()) {
+  const ms = toMillis(value);
+  if (!ms) return 'Раньше';
+  const date = new Date(ms);
+  const now = new Date(nowValue);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  if (day >= startOfToday) return 'Сегодня';
+  if (day >= startOfYesterday) return 'Вчера';
+  const startOfWeek = startOfToday - ((now.getDay() + 6) % 7) * 24 * 60 * 60 * 1000;
+  if (day >= startOfWeek) return 'Эта неделя';
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  if (day >= startOfMonth) return 'Этот месяц';
+  return 'Раньше';
+}
+
+export function groupProfileTimelineItems(items = [], nowValue = Date.now()) {
+  const groups = [];
+  const pinned = [];
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.pinned) {
+      pinned.push(item);
+      continue;
+    }
+    const label = getTimelinePeriodLabel(item?.date || item?.ts, nowValue);
+    let group = groups.find(entry => entry.label === label);
+    if (!group) {
+      group = { id: `period-${groups.length}-${label}`, label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+  return pinned.length ? [{ id: 'pinned', label: 'Закреплено', items: pinned }, ...groups] : groups;
 }

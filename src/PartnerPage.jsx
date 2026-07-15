@@ -176,6 +176,13 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
   const myReview = userId ? reviews.find(r => r.id === userId) : null;
+  const isProfileOwner = Boolean(userId && [
+    partner?.ownerId,
+    partner?.userId,
+    partner?.createdByUserId,
+    partner?.submittedByUserId,
+    partner?.managerUserId,
+  ].map(value => String(value || '')).includes(userId));
 
   // Считаем просмотр карточки (один раз при открытии каждого партнёра)
   useEffect(() => {
@@ -529,6 +536,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   events={events}
                   reviews={reviews}
                   desktop
+                  isOwner={isProfileOwner}
                   onOpenNews={onOpenNews}
                   onOpenEvent={onOpenEvent}
                   onOpenTab={setDesktopTab}
@@ -661,6 +669,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 news={news}
                 events={events}
                 reviews={reviews}
+                isOwner={isProfileOwner}
                 onOpenNews={onOpenNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}

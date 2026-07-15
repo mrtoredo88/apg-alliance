@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildProfileTimeline, getProfileTimelineSourceTypes } from '../src/profileTimeline.js';
+import {
+  TIMELINE_FILTERS,
+  buildProfileTimeline,
+  filterProfileTimelineItems,
+  getProfileTimelineSourceTypes,
+  getTimelinePeriodLabel,
+  groupProfileTimelineItems,
+} from '../src/profileTimeline.js';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
@@ -19,7 +26,7 @@ const timeline = buildProfileTimeline({
   profile,
   role: 'partner',
   news: [
-    { id: 'n1', partnerId: 'partner-1', title: 'Новое меню', summary: 'Запустили летние напитки', status: 'published', active: true, publicationType: 'Новость', publishedAt: '2026-07-14T10:00:00.000Z' },
+    { id: 'n1', partnerId: 'partner-1', title: 'Новое меню', summary: 'Запустили летние напитки '.repeat(18), status: 'published', active: true, publicationType: 'Новость', publishedAt: '2026-07-14T10:00:00.000Z', pinned: true, stats: { comments: 3 } },
     { id: 'n2', partnerId: 'partner-1', title: 'Черновик', status: 'draft', active: false, publishedAt: '2026-07-15T10:00:00.000Z' },
     { id: 'n3', partnerId: 'other', title: 'Чужая новость', status: 'published', active: true, publishedAt: '2026-07-15T10:00:00.000Z' },
   ],
@@ -40,11 +47,28 @@ for (const type of ['publication', 'event', 'offer', 'video', 'photo', 'review',
 }
 assert.equal(timeline.some(item => item.title === 'Черновик'), false, 'draft news must not appear in public timeline');
 assert.equal(timeline.some(item => item.title === 'Чужая новость'), false, 'foreign profile news must not appear in timeline');
-assert.deepEqual([...timeline].sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(item => item.id), timeline.map(item => item.id), 'timeline must be sorted by time desc');
+assert.equal(timeline[0].title, 'Новое меню', 'pinned publication must appear first');
+assert.equal(timeline[0].pinned, true, 'timeline item must expose pinned state');
+
+const publicationItems = filterProfileTimelineItems(timeline, 'publication');
+assert.equal(publicationItems.length, 1, 'publication filter must keep only news entries');
+assert.ok(TIMELINE_FILTERS.some(filter => filter.id === 'video' && filter.label === 'Видео'), 'timeline filters must include video source');
+
+const periodLabel = getTimelinePeriodLabel('2026-07-15T09:00:00.000Z', new Date('2026-07-15T12:00:00.000Z').getTime());
+assert.equal(periodLabel, 'Сегодня', 'timeline period helper must group today entries');
+const groups = groupProfileTimelineItems(timeline, new Date('2026-07-15T12:00:00.000Z').getTime());
+assert.equal(groups[0].label, 'Закреплено', 'timeline must expose pinned group before chronology');
+assert.ok(groups.some(group => group.label === 'Сегодня'), 'timeline must group regular items by human period labels');
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timeline source through existing backend endpoint');
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
+assert.match(timelineComponent, /ProfileTimelineCard/, 'timeline UI must use one shared profile timeline card component');
+assert.match(timelineComponent, /TIMELINE_FILTERS/, 'timeline UI must render shared source filters');
+assert.match(timelineComponent, /groupProfileTimelineItems/, 'timeline UI must group items by period');
+assert.match(timelineComponent, /Показать полностью/, 'long timeline entries must be expandable');
+assert.match(timelineComponent, /Показать ещё/, 'timeline must use progressive pagination');
+assert.match(timelineComponent, /Закреплено/, 'pinned timeline item must be visible in UI');
 assert.match(timelineComponent, /VK-источник временно недоступен, остальные события ленты показаны/, 'VK failure must not break the full timeline');
 
 const workspaceNews = read('src/workspace/WorkspaceNewsCenter.jsx');

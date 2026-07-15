@@ -213,6 +213,14 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
     clearTimeout(shareToastRef.current);
     shareToastRef.current = setTimeout(() => setShareToast(''), 2500);
   };
+  const userId = user?.id ? String(user.id) : null;
+  const isProfileOwner = Boolean(userId && [
+    expert?.ownerId,
+    expert?.userId,
+    expert?.createdByUserId,
+    expert?.submittedByUserId,
+    expert?.managerUserId,
+  ].map(value => String(value || '')).includes(userId));
 
   const handleShare = () => {
     const deepLink = shareLink('expert', expert.id);
@@ -488,6 +496,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                     events={events}
                     reviews={reviews}
                     desktop
+                    isOwner={isProfileOwner}
                     onOpenNews={onOpenNews}
                     onOpenEvent={onOpenEvent}
                     onOpenTab={setDesktopTab}
@@ -638,6 +647,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 news={news}
                 events={events}
                 reviews={reviews}
+                isOwner={isProfileOwner}
                 onOpenNews={onOpenNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}
