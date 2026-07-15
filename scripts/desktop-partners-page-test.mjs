@@ -92,6 +92,14 @@ if (!partnerCardSource.includes('onMouseEnter={() => onSelect?.(partner)}') || !
   throw new Error('PartnersPage desktop cards must update Quick Preview on hover/focus.');
 }
 
+if (!partnerCardSource.includes("onAskQuestion && { id: 'message'") || partnerCardSource.includes('disabled: !canCall') || partnerCardSource.includes('disabled: !canRoute')) {
+  throw new Error('PartnersPage desktop cards must show only available actions and expose contextual dialogs when available.');
+}
+
+if (!partnerCardSource.includes('style={compact ? { height: 360 } : undefined}')) {
+  throw new Error('PartnersPage compact desktop cards must keep a fixed readable height.');
+}
+
 const requiredDetailComponents = [
   'DesktopDetailShell',
   'DesktopHero',

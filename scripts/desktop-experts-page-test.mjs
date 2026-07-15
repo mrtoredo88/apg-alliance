@@ -63,6 +63,14 @@ if (!expertCardSource.includes('onMouseEnter={() => onSelect?.(expert)}') || !ex
   throw new Error('ExpertsPage desktop cards must update Quick Preview on hover/focus.');
 }
 
+if (!expertCardSource.includes("onAskQuestion && { id: 'message'") || expertCardSource.includes('disabled: !canBookExpert') || expertCardSource.includes('disabled: !canCall')) {
+  throw new Error('ExpertsPage desktop cards must show only available actions and expose contextual dialogs when available.');
+}
+
+if (!expertCardSource.includes('style={compact ? { height: 360 } : undefined}')) {
+  throw new Error('ExpertsPage compact desktop cards must keep a fixed readable height.');
+}
+
 if (!expertsSource.includes('DesktopToolbar') || !expertsSource.includes('value={activeCategory}') || !expertsSource.includes('value={availabilityFilter}')) {
   throw new Error('ExpertsPage desktop toolbar must expose category and availability filters.');
 }

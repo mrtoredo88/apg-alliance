@@ -672,10 +672,9 @@ export function DesktopCatalogEntityCard({
   const active = selected || hovered;
   const safeBadges = asArray(badges).slice(0, 3);
   const safeMeta = asArray(meta).filter(item => item?.value).slice(0, 4);
-  const safeTags = asArray(tags).filter(item => item?.label || item).slice(0, 4);
-  const safeActions = asArray(actions).slice(0, 4);
-  const metaSlots = Array.from({ length: 4 }, (_, index) => safeMeta[index] || null);
-  const tagSlots = Array.from({ length: 3 }, (_, index) => safeTags[index] || null);
+  const safeTags = asArray(tags).filter(item => item?.label || item).slice(0, 5);
+  const safeActions = asArray(actions).filter(action => !action?.disabled).slice(0, 3);
+  const clamp = lines => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' });
   return (
     <DesktopCardHover active={active}>
       <GlassCard
@@ -688,82 +687,81 @@ export function DesktopCatalogEntityCard({
           borderRadius: 20,
           padding: 0,
           overflow: 'hidden',
-          height: 316,
+          height: 388,
           cursor: onClick ? 'pointer' : 'default',
           border: selected ? '1px solid rgba(201,168,76,0.64)' : APG2_PROFILE.glass.border,
           display: 'grid',
-          gridTemplateRows: '78px minmax(0, 1fr)',
+          gridTemplateRows: '112px minmax(0, 1fr)',
           background: active ? 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.07))' : undefined,
           transition: motionTransition(['background', 'border-color'], 'base'),
           ...style,
         }}
       >
-        <div style={{ height: 78, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)' }}>
+        <div style={{ height: 112, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)' }}>
           {cover ? <img src={cover} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.86 }} /> : null}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.02), rgba(12,12,14,0.42))' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.04), rgba(12,12,14,0.54))' }} />
           {safeBadges.length > 0 && (
-            <div style={{ position: 'absolute', left: 10, top: 10, right: rating ? 56 : 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            <div style={{ position: 'absolute', left: 12, top: 12, right: rating ? 68 : 12, display: 'flex', gap: 5, flexWrap: 'wrap', maxHeight: 48, overflow: 'hidden' }}>
               <DesktopCardBadges items={safeBadges} />
             </div>
           )}
           {rating ? (
-            <div style={{ position: 'absolute', right: 10, top: 10, minHeight: 24, borderRadius: 999, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', color: APG2_PROFILE.text, background: 'var(--apg2-control-strong, rgba(255,255,255,0.92))', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.78))', boxShadow: '0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))', fontSize: 11.5, lineHeight: '14px', fontWeight: 900 }}>
+            <div style={{ position: 'absolute', right: 12, top: 12, minHeight: 26, borderRadius: 999, padding: '5px 9px', display: 'inline-flex', alignItems: 'center', color: APG2_PROFILE.text, background: 'var(--apg2-control-strong, rgba(255,255,255,0.92))', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.78))', boxShadow: '0 10px 24px var(--apg2-elev-shadow, rgba(0,0,0,0.14))', fontSize: 11.5, lineHeight: '14px', fontWeight: 900 }}>
               ★ {rating}
             </div>
           ) : null}
         </div>
-        <div style={{ position: 'relative', padding: '12px 12px 11px', display: 'grid', gridTemplateRows: '38px 32px 42px 22px 36px 34px', gap: 7, minWidth: 0, minHeight: 0 }}>
+        <div style={{ position: 'relative', padding: '15px 14px 13px', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
           {avatar && (
-            <div style={{ position: 'absolute', left: 12, top: -24, width: 54, height: 54, borderRadius: 18, padding: 5, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.88)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.56)', boxShadow: '0 16px 34px rgba(0,0,0,0.18)' }}>
+            <div style={{ position: 'absolute', left: 14, top: -30, width: 60, height: 60, borderRadius: 20, padding: 5, display: 'grid', placeItems: 'center', background: 'var(--apg2-control-strong, rgba(255,255,255,0.88))', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.56))', boxShadow: '0 16px 34px rgba(0,0,0,0.18)' }}>
               {avatar}
             </div>
           )}
-          <div style={{ paddingLeft: avatar ? 64 : 0, display: 'grid', alignContent: 'center', minWidth: 0 }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 15.5, lineHeight: '19px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-            {subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.2, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+          <div style={{ paddingLeft: avatar ? 72 : 0, minHeight: 48, display: 'grid', alignContent: 'center', minWidth: 0 }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 16.2, lineHeight: '20px', fontWeight: 900, letterSpacing: 0, ...clamp(2) }}>{title}</div>
+            {subtitle && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
           </div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description || ''}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
-            {metaSlots.map((item, index) => (
-              <div key={item?.id || item?.label || `meta-${index}`} style={{ minWidth: 0, borderRadius: 11, padding: '5px 7px', background: item ? 'rgba(var(--apg2-glass-a,255,255,255),0.06)' : 'transparent', border: item ? '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' : '1px solid transparent', overflow: 'hidden' }}>
-                {item ? (
-                  <>
-                  <div style={{ color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.text, fontSize: 11.2, lineHeight: '13px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</div>
-                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 8.8, lineHeight: '10px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
-                  </>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 5, alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
-            {tagSlots.map((item, index) => (
-              item ? (
-                <span key={item.id || item.label || item} style={{ minWidth: 0, maxWidth: index === 0 ? '48%' : '28%', borderRadius: 999, padding: '3px 7px', color: APG2_PROFILE.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', fontSize: 10, lineHeight: '12px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {description ? <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.2, lineHeight: '17px', minHeight: 34, ...clamp(2) }}>{description}</div> : null}
+          {safeMeta.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxHeight: 42, overflow: 'hidden', minWidth: 0 }}>
+              {safeMeta.map(item => (
+                <span key={item.id || item.label} style={{ maxWidth: '100%', minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 999, padding: '4px 8px', color: item.tone === 'gold' ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)', fontSize: 10.8, lineHeight: '13px', fontWeight: 760 }}>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: item.tone === 'gold' ? APG2_PROFILE.gold : 'rgba(var(--apg2-glass-a,255,255,255),0.34)', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          {safeTags.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', maxHeight: 46, overflow: 'hidden', minWidth: 0 }}>
+              {safeTags.map(item => (
+                <span key={item.id || item.label || item} style={{ maxWidth: '100%', minWidth: 0, borderRadius: 999, padding: '4px 8px', color: APG2_PROFILE.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', fontSize: 10.5, lineHeight: '13px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.label || item}
                 </span>
-              ) : <span key={`tag-${index}`} style={{ width: index === 0 ? '48%' : '28%' }} />
-            ))}
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'grid', gap: 5, minWidth: 0, marginTop: 1 }}>
+            {contact ? <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '14px', ...clamp(1) }}>{contact}</div> : null}
+            {offer ? <div style={{ color: APG2_PROFILE.gold, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.26)', borderRadius: 12, padding: '5px 8px', fontSize: 10.8, lineHeight: '14px', fontWeight: 820, ...clamp(1) }}>{offer}</div> : null}
           </div>
-          <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact || ''}</div>
-            <div style={{ color: offer ? '#17120a' : 'transparent', background: offer ? APG2_PROFILE.goldSoft : 'transparent', border: offer ? '1px solid rgba(201,168,76,0.30)' : '1px solid transparent', borderRadius: 11, padding: '4px 7px', fontSize: 10.5, lineHeight: '13px', fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offer || ''}</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: safeActions.length > 2 ? '1.12fr 1fr auto' : `repeat(${Math.max(safeActions.length, 1)}, minmax(0, 1fr))`, gap: 7, alignItems: 'center' }}>
-            {safeActions.slice(0, 3).map(action => (
+          {safeActions.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${safeActions.length}, minmax(0, 1fr))`, gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
+              {safeActions.map(action => (
                 <GlassButton
                   key={action.id || action.label}
-                  disabled={action.disabled}
                   onClick={event => {
                     event.stopPropagation();
                     action.onClick?.(event);
                   }}
                   tone={action.tone || 'glass'}
-                  style={{ minHeight: 34, borderRadius: 13, padding: action.iconOnly ? '6px 8px' : '7px 9px', fontSize: 11, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...action.style }}
+                  style={{ minHeight: 40, borderRadius: 14, padding: '8px 10px', fontSize: 11.6, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...action.style }}
                 >
                   {action.label}
                 </GlassButton>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </GlassCard>
     </DesktopCardHover>

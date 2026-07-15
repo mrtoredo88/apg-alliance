@@ -151,7 +151,7 @@ function PartnerLogo({ partner, size = 46 }) {
   );
 }
 
-function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOpen, onBook }) {
+function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOpen, onBook, onAskQuestion }) {
   const category = partnerCategory(partner);
   const city = partnerCity(partner);
   const rating = partnerRating(partner);
@@ -179,11 +179,17 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
     ...services.map(service => ({ id: `service-${service}`, label: service })),
     partnerFormat(partner) !== 'offline' && { id: 'format', label: partnerFormat(partner) === 'online' ? 'Онлайн' : 'Гибрид' },
   ].filter(Boolean);
+  const secondaryAction = canBook
+    ? { id: 'book', label: 'Записаться', onClick: () => onBook?.(partner) }
+    : canCall
+      ? { id: 'call', label: 'Позвонить', onClick: () => callPartner(partner) }
+      : canRoute
+        ? { id: 'route', label: 'Маршрут', onClick: () => routeToPartner(partner) }
+        : null;
   const actions = [
     { id: 'open', label: 'Подробнее', tone: 'gold', onClick: () => onOpen?.(partner) },
-    { id: 'call', label: 'Позвонить', disabled: !canCall, onClick: () => callPartner(partner) },
-    { id: 'route', label: 'Маршрут', disabled: !canRoute, onClick: () => routeToPartner(partner) },
-    canBook && { id: 'book', label: 'Записаться', onClick: () => onBook?.(partner) },
+    secondaryAction,
+    onAskQuestion && { id: 'message', label: 'Написать', onClick: () => onAskQuestion?.(partner) },
   ].filter(Boolean);
   return (
     <DesktopCatalogEntityCard
@@ -203,7 +209,7 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
       contact={address || text(partner?.phone || partner?.contactPhone)}
       actions={actions}
       offer={partner?.offer ? `Акция: ${partner.offer}` : services.length ? `Услуги: ${services.join(', ')}` : ''}
-      style={compact ? { minHeight: 252 } : undefined}
+      style={compact ? { height: 360 } : undefined}
     />
   );
 }
@@ -370,7 +376,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
           ) : (
             <DesktopCatalogGrid columns={view === 'list' ? 1 : view === 'split' ? Math.min(effectiveGridColumns, 2) : effectiveGridColumns} gap={12} style={catalogGridStyle}>
               {filtered.map(partner => (
-                <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} />
+                <PartnerCatalogCard key={partner.id || partner.name} partner={partner} selected={selectedPartner?.id === partner.id} compact={view === 'list' || view === 'split'} onSelect={setSelected} onOpen={onOpenPartner} onBook={onBook} onAskQuestion={onAskQuestion} />
               ))}
             </DesktopCatalogGrid>
           )}

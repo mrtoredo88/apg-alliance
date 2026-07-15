@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] fix: Desktop catalog cards visibility
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Общая карточка `DesktopCatalogEntityCard` увеличена до полноценного desktop-размера, получила большую обложку, clamped-текст и нижнюю CTA-зону, закреплённую через `marginTop: auto`.
+- Карточки партнёров и экспертов больше не показывают недоступные disabled-действия; кнопки собираются в одну видимую строку из реально доступных действий.
+- Desktop regression-тесты теперь фиксируют высоту карточки, line-clamp, скрытие недоступных кнопок и фиксированную высоту compact-режима.
+**Почему:** production-каталоги партнёров и экспертов выглядели перегруженными, кнопки частично обрезались, а текст и акции ломали единую сетку карточек.
+
 ## [2026-07-15] fix: Workspace dark theme surfaces
 **Коммит:** `pending`
 **Файлы:** `src/index.css`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceAnalyticsCenter.jsx`, `src/workspace/WorkspaceDialogsCRM.jsx`, `src/workspace/WorkspaceEventsManager.jsx`, `src/workspace/WorkspaceGiftsCenter.jsx`, `src/workspace/WorkspaceLinks.jsx`, `src/workspace/WorkspaceMeetingsCRM.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `src/workspace/WorkspacePromotionsCenter.jsx`, `scripts/desktop-ui-framework-test.mjs`, `.ai/17_CHANGELOG_AI.md`

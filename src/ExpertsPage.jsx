@@ -1145,11 +1145,15 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
     ...(Array.isArray(expert.formats) ? expert.formats.slice(0, 2).map(format => ({ id: format, label: FORMAT_LABELS[format]?.label || format })) : []),
     expert.serviceCost && { id: 'cost-tag', label: expert.serviceCost },
   ];
+  const secondaryAction = canBookExpert
+    ? { id: 'book', label: 'Записаться', onClick: () => onBook?.(expert) }
+    : canCall
+      ? { id: 'call', label: 'Позвонить', onClick: () => { if (expert.telHref) openUrl(expert.telHref); } }
+      : null;
   const actions = [
     { id: 'open', label: 'Подробнее', tone: 'gold', onClick: () => onOpen?.(expert) },
-    { id: 'book', label: 'Записаться', disabled: !canBookExpert, onClick: () => onBook?.(expert) },
+    secondaryAction,
     onAskQuestion && { id: 'message', label: 'Написать', onClick: () => onAskQuestion?.(expert) },
-    { id: 'call', label: 'Позвонить', disabled: !canCall, onClick: () => { if (expert.telHref) openUrl(expert.telHref); } },
   ].filter(Boolean);
   return (
     <DesktopCatalogEntityCard
@@ -1169,7 +1173,7 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
       actions={actions}
       contact={expert.address || expertCity(expert)}
       offer={expert.offer ? `Акция: ${expert.offer}` : category ? `Категория: ${category.label}` : ''}
-      style={compact ? { minHeight: 252 } : undefined}
+      style={compact ? { height: 360 } : undefined}
     />
   );
 }

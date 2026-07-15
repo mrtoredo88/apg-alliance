@@ -76,8 +76,12 @@ if (!source.includes('onMouseEnter') || !source.includes('translateY(-3px)') || 
   throw new Error('Desktop Catalog Framework must include desktop hover behavior and preview composition.');
 }
 
-if (!source.includes('height: 316') || !source.includes("gridTemplateRows: '78px minmax(0, 1fr)'")) {
-  throw new Error('Desktop Catalog Entity Card must enforce fixed height and a stable baseline grid.');
+if (!source.includes('height: 388') || !source.includes("gridTemplateRows: '112px minmax(0, 1fr)'")) {
+  throw new Error('Desktop Catalog Entity Card must enforce full-size fixed height and a stable desktop grid.');
+}
+
+if (!source.includes("marginTop: 'auto'") || !source.includes('WebkitLineClamp') || !source.includes('filter(action => !action?.disabled).slice(0, 3)')) {
+  throw new Error('Desktop Catalog Entity Card must clamp text, keep actions visible, and hide unavailable buttons.');
 }
 
 if (!source.includes('DesktopDetailShell') || !source.includes('DesktopDetailTabs') || !source.includes('DesktopHeroActions')) {
