@@ -5,6 +5,7 @@ import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { T, GLASS } from './design.js';
 import { logError } from './errorLogger.js';
 import { APG2_PROFILE, EmptyStateV2, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { formatDayLabel, formatRelativeTime } from './utils/time.js';
 
 const TYPE_COLORS = {
   scan:           '#C9A84C',
@@ -14,36 +15,11 @@ const TYPE_COLORS = {
   prize:          '#9B59B6',
 };
 
-function relativeTime(ts) {
-  if (!ts) return '';
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  const diff = Date.now() - date.getTime();
-  const mins  = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days  = Math.floor(diff / 86400000);
-  if (mins  < 1)  return 'только что';
-  if (mins  < 60) return `${mins} мин назад`;
-  if (hours < 24) return `${hours} ч назад`;
-  if (days  === 1) return 'вчера';
-  if (days  < 7)  return `${days} дн назад`;
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-}
-
-function dayLabel(ts) {
-  if (!ts) return '';
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  const today = new Date();
-  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString())     return 'Сегодня';
-  if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-}
-
 function groupByDay(items) {
   const groups = [];
   let lastLabel = null;
   items.forEach(item => {
-    const label = dayLabel(item.ts);
+    const label = formatDayLabel(item.ts);
     if (label !== lastLabel) {
       groups.push({ label, items: [] });
       lastLabel = label;
@@ -80,7 +56,7 @@ function ActivityItem({ item, index }) {
           {item.text}
         </div>
         <div style={{ fontSize: 11, color: T.textSec, marginTop: 2 }}>
-          {relativeTime(item.ts)}
+          {formatRelativeTime(item.ts)}
         </div>
       </div>
 
@@ -145,8 +121,8 @@ export function ActivityPage({ nav, variant = 'v2', userId, onBack }) {
             {groups.map(group => (
               <GlassSection key={group.label} title={group.label}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {group.items.map((item, i) => (
-                    <GlassListItem key={item.id} icon={item.icon ?? '✦'} title={item.text ?? 'Действие АПГ'} subtitle={relativeTime(item.ts)} accent={TYPE_COLORS[item.type] ?? APG2_PROFILE.gold} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />
+                    {group.items.map((item, i) => (
+                    <GlassListItem key={item.id} icon={item.icon ?? '✦'} title={item.text ?? 'Действие АПГ'} subtitle={formatRelativeTime(item.ts)} accent={TYPE_COLORS[item.type] ?? APG2_PROFILE.gold} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />
                   ))}
                 </div>
               </GlassSection>

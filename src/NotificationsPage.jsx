@@ -6,6 +6,7 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { formatRelativeTime } from './utils/time.js';
 
 const NOTIFICATION_CATEGORIES = [
   ['news', 'Новости'],
@@ -26,20 +27,6 @@ const NOTIFICATION_CATEGORIES = [
 ];
 
 const DEFAULT_NOTIFICATION_PREFERENCES = Object.fromEntries(NOTIFICATION_CATEGORIES.map(([id]) => [id, true]));
-
-function timeAgo(ts) {
-  if (!ts) return '';
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'только что';
-  if (diffMin < 60) return `${diffMin} мин назад`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH} ч назад`;
-  const diffD = Math.floor(diffH / 24);
-  if (diffD < 7) return `${diffD} дн назад`;
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-}
 
 function matchesTarget(notif, userKeys, lastScanDate) {
   const type = notif.targetType ?? 'all';
@@ -211,8 +198,8 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
                   key={n.id ?? i}
                   icon={n.emoji ?? '🔔'}
                   title={n.title ?? 'Уведомление АПГ'}
-                  subtitle={n.body ?? n.text ?? n.preview ?? timeAgo(n.createdAt)}
-                  meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : timeAgo(n.createdAt)}
+                  subtitle={n.body ?? n.text ?? n.preview ?? formatRelativeTime(n.createdAt)}
+                  meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : formatRelativeTime(n.createdAt)}
                   accent={unread ? APG2_PROFILE.gold : undefined}
                   onClick={() => openNotification(n)}
                   style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }}
@@ -305,7 +292,7 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
                       {unread && <div style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: T.gold, marginTop: 5 }} />}
                     </div>
                     {(n.body || n.text || n.preview) && <div style={{ fontSize: 12, color: T.textSec, lineHeight: '17px', marginBottom: 6 }}>{n.body || n.text || n.preview}</div>}
-                    <div style={{ fontSize: 11, color: T.textSec, opacity: 0.7 }}>{timeAgo(n.createdAt)}</div>
+                    <div style={{ fontSize: 11, color: T.textSec, opacity: 0.7 }}>{formatRelativeTime(n.createdAt)}</div>
                   </div>
                 </div>
               );

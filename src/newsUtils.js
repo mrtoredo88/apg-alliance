@@ -137,6 +137,8 @@ export function getNewsLinks(item) {
   return [...links, { type: 'link', url, title: item?.linkLabel || 'Источник' }];
 }
 
+import { formatRelativeTime, toDate as normalizeDate } from './utils/time.js';
+
 export function getNewsDocs(item) {
   return Array.isArray(item?.docs) ? item.docs : [];
 }
@@ -151,11 +153,7 @@ export function getNewsTitle(item) {
 
 export function getNewsDate(item) {
   const raw = item?.publishedAt ?? item?.createdAt ?? item?.date ?? item?.timestamp ?? null;
-  if (!raw) return null;
-  if (raw.toDate) return raw.toDate();
-  if (raw.seconds) return new Date(raw.seconds * 1000);
-  const date = raw instanceof Date ? raw : new Date(raw);
-  return Number.isFinite(date.getTime()) ? date : null;
+  return normalizeDate(raw);
 }
 
 export function getNewsCategory(item) {
@@ -185,11 +183,7 @@ export function getNewsTimestamp(item) {
 
 export function formatNewsDate(item) {
   const date = getNewsDate(item);
-  if (!date) return 'Недавно';
-  const diff = Date.now() - date.getTime();
-  if (diff < 60 * 60 * 1000) return 'только что';
-  if (diff < 24 * 60 * 60 * 1000) return `${Math.max(1, Math.round(diff / 3600000))} ч назад`;
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  return date ? formatRelativeTime(date) : 'Недавно';
 }
 
 export function isFreshNews(item) {

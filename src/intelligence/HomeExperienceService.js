@@ -113,18 +113,19 @@ export function buildHomeExperience({
   const mainNews = recommendations.news[0] || null;
   const bestPartner = recommendations.partners[0] || null;
   const nextTask = taskRecommendations[0] || null;
-  const lokiAdvice = top
-    ? `Локи советует: ${entityTitle(top)}`
-    : 'Локи готовит рекомендации по вашей активности.';
+  const lokiAdvice = top ? `Локи советует: ${entityTitle(top)}` : null;
 
   const dynamicSections = buildDynamicSections({ aiContext: context, continueExperience, recommendations: { ...recommendations, feed }, appState });
   const insightCards = [
     upcomingEvents.length ? `Сегодня рядом проходит ${upcomingEvents.length} мероприятий` : '',
-    favoritePartnerNews.length ? 'У избранных партнёров появились новости' : '',
-    favoritePartner?.offer ? `У ${favoritePartner.name} есть новая акция` : '',
-    achievementGap ? `До нового достижения осталось ${achievementGap} ключей` : 'Следующее достижение уже близко',
+    favoritePartnerNews.length ? `У любимых партнёров есть ${favoritePartnerNews.length} новостей.` : '',
+    favoritePartner?.offer ? `У ${favoritePartner.name || 'партнёра'}` : '',
+    achievementGap ? `До следующего достижения осталось ${achievementGap} ключей` : '',
     lokiAdvice,
-  ].filter(Boolean);
+  ].map(item => {
+    const value = String(item || '').trim();
+    return value;
+  }).filter(Boolean);
 
   return {
     version: 1,
@@ -145,9 +146,9 @@ export function buildHomeExperience({
     smartContext: {
       welcome: 'Добро пожаловать',
       mainRecommendation: top ? { ...top, title: entityTitle(top), explanation: top.explain || [] } : null,
-      bestNearbyEvent: bestEvent ? { ...bestEvent, title: entityTitle(bestEvent), explanation: bestEvent.explain || ['Ближайшее актуальное мероприятие.'] } : null,
-      mainNews: mainNews ? { ...mainNews, title: entityTitle(mainNews), explanation: mainNews.explain || ['Свежая новость для вашей ленты.'] } : null,
-      bestPartner: bestPartner ? { ...bestPartner, title: entityTitle(bestPartner), explanation: bestPartner.explain || ['Партнёр соответствует вашим интересам.'] } : null,
+      bestNearbyEvent: bestEvent ? { ...bestEvent, title: entityTitle(bestEvent), explanation: bestEvent.explain || [] } : null,
+      mainNews: mainNews ? { ...mainNews, title: entityTitle(mainNews), explanation: mainNews.explain || [] } : null,
+      bestPartner: bestPartner ? { ...bestPartner, title: entityTitle(bestPartner), explanation: bestPartner.explain || [] } : null,
       nextAchievement: { keysLeft: achievementGap, task: nextTask || null },
       lokiAdvice,
     },
@@ -160,4 +161,3 @@ export function buildHomeExperience({
     },
   };
 }
-

@@ -31,6 +31,7 @@ import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
 import { normalizeExpertRecord, registerCustomExpertCategories } from '../server-shared/expert-directory.js';
 import { profileOwnedByUser } from './utils/profileOwnership.js';
+import { formatRelativeTime } from './utils/time.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
@@ -356,15 +357,6 @@ function PostVisitMoment({ booking, provider, user, userKeys, onClose, onSubmitR
     </div>,
     document.body,
   );
-}
-
-function formatCacheAge(ts) {
-  const mins = Math.round((Date.now() - ts) / 60000);
-  if (mins < 1)  return 'только что';
-  if (mins < 60) return `${mins} мин назад`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24)  return `${hrs} ч назад`;
-  return `${Math.round(hrs / 24)} д назад`;
 }
 
 initErrorLogger();
@@ -3825,7 +3817,7 @@ export function UserApp() {
             {/* Offline-баннер */}
             {!isOnline && (
               <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: 'rgba(230,70,70,0.95)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', backdropFilter: 'blur(12px)' }}>
-                📵 Нет интернета{cacheTs ? ` — данные от ${formatCacheAge(cacheTs)}` : ' — данные могут быть устаревшими'}
+                📵 Нет интернета{cacheTs ? ` — данные от ${formatRelativeTime(cacheTs)}` : ' — данные могут быть устаревшими'}
               </div>
             )}
 

@@ -19,6 +19,7 @@ import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
+import { formatRelativeTime } from './utils/time.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
@@ -124,19 +125,6 @@ function SimilarCard({ partner, onOpen }) {
 // ─── Карточка отзыва ──────────────────────────────────────────────────────────
 
 function ReviewCard({ review, isOwn }) {
-  function timeAgo(ts) {
-    if (!ts) return '';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    const m = Math.floor((Date.now() - d) / 60000);
-    if (m < 1) return 'только что';
-    if (m < 60) return `${m} мин назад`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h} ч назад`;
-    const days = Math.floor(h / 24);
-    if (days < 7) return `${days} дн назад`;
-    return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
-  }
-
   return (
     <div style={{ padding:'14px 16px', borderBottom:`1px solid ${T.border}`, animation:'fadeInUp 0.3s ease both' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
@@ -153,7 +141,7 @@ function ReviewCard({ review, isOwn }) {
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:2 }}>
             <span style={{ fontSize:12, color:'#FFD700', letterSpacing:1 }}>{'★'.repeat(review.stars)}{'☆'.repeat(5-review.stars)}</span>
-            <span style={{ fontSize:10, color:T.textSec }}>{timeAgo(review.createdAt)}</span>
+            <span style={{ fontSize:10, color:T.textSec }}>{formatRelativeTime(review.createdAt)}</span>
           </div>
         </div>
       </div>

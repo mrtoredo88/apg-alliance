@@ -24,6 +24,7 @@ import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
+import { formatRelativeTime } from './utils/time.js';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import {
@@ -141,16 +142,6 @@ function FormatChip({ format }) {
 }
 
 function ReviewCard({ review }) {
-  function timeAgo(ts) {
-    if (!ts) return '';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    const m = Math.floor((Date.now() - d) / 60000);
-    if (m < 1) return 'только что';
-    if (m < 60) return `${m} мин назад`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h} ч назад`;
-    return `${Math.floor(h / 24)} дн назад`;
-  }
   return (
     <div style={{ ...GLASS, borderRadius: 16, padding: '14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -160,7 +151,7 @@ function ReviewCard({ review }) {
         }
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: T.textPri }}>{review.userName || 'Участник'}</div>
-          <div style={{ fontSize: 11, color: T.textSec }}>{timeAgo(review.createdAt)}</div>
+          <div style={{ fontSize: 11, color: T.textSec }}>{formatRelativeTime(review.createdAt)}</div>
         </div>
         <StarDisplay value={review.rating} size={12} />
       </div>

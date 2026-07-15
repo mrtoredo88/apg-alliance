@@ -78,10 +78,10 @@ export function buildPersonalHomeContext({
     headline: 'Сегодня в АПГ',
     userId: String(user?.id || user?.uid || ''),
     activeToday: [
-      `Сегодня в вашем городе ${newsRecommendations.length ? `${newsRecommendations.length} свежих новостей` : 'есть новости для проверки'}.`,
-      `Ближайшие события: ${eventRecommendations.length} предложений с датами.`,
-      `Активные пары: ${partnerRecommendations.length} новых карточек партнёров.`,
-      `Эксперты: ${expertRecommendations.length} рекомендаций.`,
+      ...[newsRecommendations.length ? `Сейчас в ленте ${newsRecommendations.length} новостей по вашей теме.` : '',
+        eventRecommendations.length ? `Подходящих событий: ${eventRecommendations.length}.` : '',
+        partnerRecommendations.length ? `Рекомендаций партнёров: ${partnerRecommendations.length}.` : '',
+        expertRecommendations.length ? `Рекомендаций экспертов: ${expertRecommendations.length}.` : ''],
     ],
     focusCards: {
       news: newsRecommendations.slice(0, 4),
@@ -114,7 +114,7 @@ export function buildPersonalHomeContext({
       eventsNearbyToday: nearbyTodayEvents.length,
       favoritePartnerNews: favoritePartnerNews.length,
       keysToNextAchievement: nextAchievementGap,
-      lokiPreparedRecommendations: eventRecommendations.length + partnerRecommendations.length + expertRecommendations.length + newsRecommendations.length,
+      activeRecommendations: eventRecommendations.length + partnerRecommendations.length + expertRecommendations.length + newsRecommendations.length,
     },
   };
 }
