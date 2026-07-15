@@ -25,6 +25,16 @@
 - Длинные записи раскрываются через `Показать полностью`, а пустое состояние учитывает владельца профиля.
 **Почему:** вкладка `Лента` должна выглядеть как публичная страница жизни партнёра или эксперта, а не как плоский список разных источников.
 
+## [2026-07-15] feat: Living profile timeline blocks
+**Коммит:** `pending`
+**Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`
+**Тип:** feat
+**Что изменено:**
+- Добавлены блоки `Что сейчас важно`, `История` и `Smart Summary (30 дней)` в ленту профиля без изменения backend и новых сущностей.
+- `ProfileTimelineSection` теперь использует `buildProfileNowPriority`, `buildProfileHistory`, `buildProfileSmartSummary`, поддерживает открытие записей и переход к записи через общий `onOpenBooking`.
+- Расширены тесты `profile-timeline-test` новыми проверками новых блоков и пустых входов, сохранив обратную совместимость.
+**Почему:** профиль нужно превратить в “живой” интерфейс, где пользователь сразу понимает текущие приоритеты и историю активности.
+
 ## [2026-07-15] feat: Unified profile timeline
 **Коммит:** `pending`
 **Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/UserApp.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `server-shared/workspace-news.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/components/PartnerQuestionnaire.jsx`, `scripts/community-feed-test.mjs`, `scripts/profile-timeline-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

@@ -3,7 +3,10 @@ import { API_BASE_URL } from '../constants.js';
 import { openUrl } from '../vk.js';
 import {
   TIMELINE_FILTERS,
+  buildProfileHistory,
   buildProfileTimeline,
+  buildProfileNowPriority,
+  buildProfileSmartSummary,
   filterProfileTimelineItems,
   groupProfileTimelineItems,
 } from '../profileTimeline.js';
@@ -33,10 +36,16 @@ function getActionLabel(item = {}) {
   if (item.action === 'openPhotos') return 'Фото';
   if (item.action === 'openReviews') return 'Отзывы';
   if (item.action === 'openOffer') return 'Акция';
+  if (item.action === 'openBooking') return 'Записаться';
   return 'Открыть';
 }
 
-function openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab }) {
+function openTimelineItem(item, {
+  onOpenNews,
+  onOpenEvent,
+  onOpenTab,
+  onOpenBooking,
+}) {
   if (item.action === 'openNews' && onOpenNews) return onOpenNews(item.entity);
   if (item.action === 'openEvent' && onOpenEvent) return onOpenEvent(item.entity);
   if (item.action === 'openExternal' && item.url) return openUrl(item.url);
@@ -44,7 +53,31 @@ function openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab }) {
   if (item.action === 'openPhotos') return onOpenTab?.('photos');
   if (item.action === 'openReviews') return onOpenTab?.('reviews');
   if (item.action === 'openOffer') return onOpenTab?.('offer');
+  if (item.action === 'openBooking') return onOpenBooking?.() || item.onOpen?.();
   return undefined;
+}
+
+function LivingMetricCard({ icon, title, text, onOpen, tone = APG2.gold, compact = false }) {
+  return (
+    <div style={{
+      borderRadius: compact ? 16 : 18,
+      border: `1px solid ${tone}44`,
+      background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)',
+      padding: compact ? 10 : 12,
+      display: 'grid',
+      gap: compact ? 4 : 6,
+      minWidth: 0,
+    }}>
+      <div style={{ color: APG2.gold, fontSize: compact ? 11 : 12, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0.2 }}>{title}</div>
+      <div style={{ color: APG2.text, fontSize: compact ? 13 : 14, fontWeight: 820, lineHeight: '20px', minHeight: compact ? 36 : 42, display: 'flex', alignItems: compact ? 'flex-start' : 'center' }}>{icon} {text}</div>
+      {onOpen && <button type="button" onClick={onOpen} style={{ border: 0, background: 'transparent', color: APG2.gold, fontSize: 12, fontWeight: 820, padding: 0, justifySelf: 'start', cursor: 'pointer' }}>Открыть</button>}
+    </div>
+  );
+}
+
+function formatNowCardAction(item = {}) {
+  if (!item) return '-';
+  return [item.value, item.details].filter(Boolean).join(' • ');
 }
 
 async function shareTimelineItem(item) {
@@ -70,6 +103,7 @@ export function ProfileTimelineCard({
   onOpenNews,
   onOpenEvent,
   onOpenTab,
+  onOpenBooking,
 }) {
   const meta = TYPE_META[item.type] || TYPE_META.publication;
   const image = item.image || '';
@@ -77,7 +111,7 @@ export function ProfileTimelineCard({
   const canExpand = text.length > (desktop ? 220 : 150);
   const commentsCount = getCommentsCount(item);
   const actionLabel = getActionLabel(item);
-  const open = () => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab });
+  const open = () => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking });
   const commonButton = { minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 };
   return (
     <article style={{
@@ -160,6 +194,7 @@ export function ProfileTimelineSection({
   onOpenNews,
   onOpenEvent,
   onOpenTab,
+  onOpenBooking,
   isOwner = false,
   onCreatePublication,
 }) {
@@ -199,16 +234,36 @@ export function ProfileTimelineSection({
       clearTimeout(timer);
       controller.abort();
     };
-	  }, [communityUrl]);
+    }, [communityUrl]);
 
-	  const items = useMemo(() => buildProfileTimeline({ profile, role, news, events, reviews, vkPosts: vkState.posts }), [profile, role, news, events, reviews, vkState.posts]);
+  const nowPriorityItems = useMemo(() => buildProfileNowPriority({
+    profile,
+    role,
+    news,
+    events,
+    reviews,
+    vkPosts: vkState.posts,
+    nowValue: Date.now(),
+  }), [profile, role, news, events, reviews, vkState.posts]);
+  const timelineItems = useMemo(() => buildProfileTimeline({ profile, role, news, events, reviews, vkPosts: vkState.posts }), [profile, role, news, events, reviews, vkState.posts]);
+  const pinnedItems = useMemo(() => timelineItems.filter(item => item.pinned), [timelineItems]);
+  const listItems = useMemo(() => timelineItems.filter(item => !item.pinned), [timelineItems]);
+  const profileHistory = useMemo(() => buildProfileHistory({
+    profile,
+    role,
+    news,
+    events,
+    reviews,
+    vkPosts: vkState.posts,
+  }), [profile, role, news, events, reviews, vkState.posts]);
+  const smartSummary = useMemo(() => buildProfileSmartSummary({ news, events, reviews, nowValue: Date.now() }), [news, events, reviews]);
   const filters = useMemo(() => {
-    const counts = items.reduce((acc, item) => ({ ...acc, [item.type]: (acc[item.type] || 0) + 1 }), { all: items.length });
+    const counts = listItems.reduce((acc, item) => ({ ...acc, [item.type]: (acc[item.type] || 0) + 1 }), { all: listItems.length });
     return TIMELINE_FILTERS
       .map(filter => ({ ...filter, count: counts[filter.id] || 0 }))
       .filter(filter => filter.id === 'all' || filter.count > 0);
-  }, [items]);
-  const filteredItems = useMemo(() => filterProfileTimelineItems(items, activeFilter), [items, activeFilter]);
+  }, [listItems]);
+  const filteredItems = useMemo(() => filterProfileTimelineItems(listItems, activeFilter), [listItems, activeFilter]);
   const visibleItems = filteredItems.slice(0, visibleCount);
   const groups = useMemo(() => groupProfileTimelineItems(visibleItems), [visibleItems]);
   useEffect(() => {
@@ -219,93 +274,166 @@ export function ProfileTimelineSection({
   }, [activeFilter, desktop, profile?.id]);
   const toggleExpanded = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-	  if (!items.length && vkState.loading) {
+  const showTimelineList = listItems.length > 0;
+  const hasNowPriority = nowPriorityItems.length > 0;
+  const hasPinnedItems = pinnedItems.length > 0;
+
     return (
-      <div style={{ display: 'grid', gap: 10 }}>
-        {[0, 1, 2].map(index => <div key={index} style={{ height: desktop ? 120 : 96, borderRadius: desktop ? 20 : 24, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }} />)}
+      <div style={{ display: 'grid', gap: desktop ? 14 : 12 }}>
+        <section style={{ display: 'grid', gap: 10 }}>
+          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Что сейчас важно</div>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: desktop ? 'repeat(2, minmax(0, 1fr))' : '1fr' }}>
+            {hasNowPriority ? nowPriorityItems.slice(0, 6).map(item => (
+              <LivingMetricCard
+                key={item.id}
+                icon={
+                  item.type === 'offer' ? '🎁' :
+                item.type === 'event' ? '🎉' :
+                item.type === 'booking' ? '🗓' :
+                item.type === 'publication' ? '📰' :
+                item.type === 'video' ? '▶' :
+                item.type === 'review' ? '⭐' :
+                item.type === 'photo' ? '📸' : '💬'
+              }
+              title={item.title}
+              text={formatNowCardAction(item)}
+              onOpen={() => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking })}
+            />
+          )) : (
+            <LivingMetricCard icon="•" title="Нет актуальных событий" text="У партнера пока нет свежих активностей" />
+          )}
+          </div>
+        </section>
+
+        {hasPinnedItems ? (
+        <section style={{ display: 'grid', gap: 10 }}>
+          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Закреплено</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {pinnedItems.map(item => (
+              <ProfileTimelineCard
+                key={item.id}
+                item={item}
+                desktop={desktop}
+                expanded={Boolean(expanded[item.id])}
+                onToggleExpanded={toggleExpanded}
+                onOpenNews={onOpenNews}
+                onOpenEvent={onOpenEvent}
+                onOpenTab={onOpenTab}
+                onOpenBooking={onOpenBooking}
+              />
+            ))}
+          </div>
+        </section>
+        ) : null}
+
+        <section style={{ display: 'grid', gap: 10 }}>
+          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Smart Summary (30 дней)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            <LivingMetricCard compact title="Публикации" text={`${smartSummary.publications} шт`} />
+            <LivingMetricCard compact title="Мероприятия" text={`${smartSummary.events} шт`} />
+            <LivingMetricCard compact title="Отзывы" text={`${smartSummary.reviews} шт`} />
+          </div>
+        </section>
+
+        <section style={{ display: 'grid', gap: 10 }}>
+          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>История</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {profileHistory.length ? profileHistory.map(item => (
+              <div key={item.id} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.045)', padding: '10px 12px', borderRadius: 16, display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
+                <div style={{ color: APG2.text, fontSize: 13, lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                <div style={{ color: APG2.textSoft, fontSize: 11, whiteSpace: 'nowrap' }}>{formatRelativeTime(item.date)}</div>
+              </div>
+            )) : <div style={{ color: APG2.textMuted, fontSize: 13 }}>История пока не заполнена.</div>}
+          </div>
+        </section>
+
+        {vkState.loading && !showTimelineList && (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {[0, 1, 2].map(index => <div key={index} style={{ height: desktop ? 112 : 96, borderRadius: desktop ? 20 : 24, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }} />)}
+          </div>
+        )}
+
+        {!vkState.loading && !showTimelineList && (
+          <div style={{ display: 'grid', gap: 10 }}>
+            <DesktopEmptyState
+              icon="✦"
+              title="Лента пока собирается"
+              text={isOwner ? 'Создайте первую публикацию, добавьте фото или привяжите VK-сообщество, чтобы профиль выглядел живым.' : 'Здесь появятся публикации, акции, мероприятия, фото, видео, отзывы и записи VK-сообщества.'}
+            />
+            {isOwner && onCreatePublication && (
+              <GlassButton onClick={onCreatePublication} style={{ justifySelf: 'center', minHeight: 38, borderRadius: 16, padding: '8px 14px' }}>Создать первую публикацию</GlassButton>
+            )}
+          </div>
+        )}
+
+        {!showTimelineList ? null : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {filters.map(filter => {
+            const active = filter.id === activeFilter;
+            return (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => setActiveFilter(filter.id)}
+                style={{
+                  border: `1px solid ${active ? `${APG2.gold}66` : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`,
+                  background: active ? `${APG2.gold}1F` : 'rgba(var(--apg2-glass-a,255,255,255),0.055)',
+                  color: active ? APG2.text : APG2.textSoft,
+                  minHeight: 32,
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  fontSize: 12,
+                  fontWeight: active ? 840 : 720,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span>{filter.label}</span>
+                <span style={{ color: active ? APG2.gold : APG2.textMuted, fontSize: 11 }}>{filter.count}</span>
+              </button>
+            );
+          })}
+        </div>
+        )}
+
+        {showTimelineList && groups.map(group => (
+          <section key={group.id} style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ color: group.id === 'pinned' ? APG2.gold : APG2.textMuted, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>{group.label}</div>
+              <div style={{ height: 1, flex: 1, background: 'rgba(var(--apg2-glass-a,255,255,255),0.11)' }} />
+            </div>
+            {group.items.map(item => (
+              <ProfileTimelineCard
+                key={item.id}
+                item={item}
+                desktop={desktop}
+                expanded={Boolean(expanded[item.id])}
+                onToggleExpanded={toggleExpanded}
+                onOpenNews={onOpenNews}
+                onOpenEvent={onOpenEvent}
+                onOpenTab={onOpenTab}
+                onOpenBooking={onOpenBooking}
+              />
+            ))}
+          </section>
+        ))}
+
+        {showTimelineList && visibleCount < filteredItems.length && (
+          <GlassButton onClick={() => setVisibleCount(count => count + (desktop ? 8 : 6))} style={{ justifySelf: 'center', minHeight: 38, borderRadius: 16, padding: '8px 14px' }}>
+            Показать ещё
+          </GlassButton>
+        )}
+
+        {vkState.error && (
+          <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px' }}>
+            VK-источник временно недоступен, остальные события ленты показаны.
+          </div>
+        )}
       </div>
     );
-  }
-
-	  if (!items.length) {
-	    return (
-	      <div style={{ display: 'grid', gap: 10 }}>
-	        <DesktopEmptyState
-	          icon="✦"
-	          title="Лента пока собирается"
-	          text={isOwner ? 'Создайте первую публикацию, добавьте фото или привяжите VK-сообщество, чтобы профиль выглядел живым.' : 'Здесь появятся публикации, акции, мероприятия, фото, видео, отзывы и записи VK-сообщества.'}
-	        />
-	        {isOwner && onCreatePublication && (
-	          <GlassButton onClick={onCreatePublication} style={{ justifySelf: 'center', minHeight: 38, borderRadius: 16, padding: '8px 14px' }}>Создать первую публикацию</GlassButton>
-	        )}
-	      </div>
-	    );
-	  }
-
-	  return (
-	    <div style={{ display: 'grid', gap: desktop ? 14 : 12 }}>
-	      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-	        {filters.map(filter => {
-	          const active = filter.id === activeFilter;
-	          return (
-	            <button
-	              key={filter.id}
-	              type="button"
-	              onClick={() => setActiveFilter(filter.id)}
-	              style={{
-	                border: `1px solid ${active ? `${APG2.gold}66` : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`,
-	                background: active ? `${APG2.gold}1F` : 'rgba(var(--apg2-glass-a,255,255,255),0.055)',
-	                color: active ? APG2.text : APG2.textSoft,
-	                minHeight: 32,
-	                borderRadius: 999,
-	                padding: '6px 10px',
-	                display: 'inline-flex',
-	                alignItems: 'center',
-	                gap: 7,
-	                fontSize: 12,
-	                fontWeight: active ? 840 : 720,
-	                cursor: 'pointer',
-	                fontFamily: 'inherit',
-	              }}
-	            >
-	              <span>{filter.label}</span>
-	              <span style={{ color: active ? APG2.gold : APG2.textMuted, fontSize: 11 }}>{filter.count}</span>
-	            </button>
-	          );
-	        })}
-	      </div>
-	      {groups.map(group => (
-	        <section key={group.id} style={{ display: 'grid', gap: 10 }}>
-	          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-	            <div style={{ color: group.id === 'pinned' ? APG2.gold : APG2.textMuted, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>{group.label}</div>
-	            <div style={{ height: 1, flex: 1, background: 'rgba(var(--apg2-glass-a,255,255,255),0.11)' }} />
-	          </div>
-	          {group.items.map(item => (
-	            <ProfileTimelineCard
-	              key={item.id}
-	              item={item}
-	              desktop={desktop}
-	              expanded={Boolean(expanded[item.id])}
-	              onToggleExpanded={toggleExpanded}
-	              onOpenNews={onOpenNews}
-	              onOpenEvent={onOpenEvent}
-	              onOpenTab={onOpenTab}
-	            />
-	          ))}
-	        </section>
-	      ))}
-	      {visibleCount < filteredItems.length && (
-	        <GlassButton onClick={() => setVisibleCount(count => count + (desktop ? 8 : 6))} style={{ justifySelf: 'center', minHeight: 38, borderRadius: 16, padding: '8px 14px' }}>
-	          Показать ещё
-	        </GlassButton>
-	      )}
-	      {vkState.error && (
-	        <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px' }}>
-          VK-источник временно недоступен, остальные события ленты показаны.
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default ProfileTimelineSection;

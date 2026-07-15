@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import {
   TIMELINE_FILTERS,
   buildProfileTimeline,
+  buildProfileHistory,
+  buildProfileNowPriority,
+  buildProfileSmartSummary,
   filterProfileTimelineItems,
   getProfileTimelineSourceTypes,
   getTimelinePeriodLabel,
@@ -40,6 +43,91 @@ const timeline = buildProfileTimeline({
     { id: 'vk1', text: 'Пост из сообщества', date: '2026-07-15T08:00:00.000Z', url: 'https://vk.com/wall-1_1' },
   ],
 });
+
+const nowValue = Date.now();
+const oneDayMs = 24 * 60 * 60 * 1000;
+const timelineEvents = [
+  { id: 'e1', partnerId: 'partner-1', title: 'Кофейный вечер', status: 'published', active: true, startAt: '2026-07-16T18:00:00.000Z' },
+];
+const timelineReviews = [
+  { id: 'r1', userName: 'Анна', text: 'Было вкусно', stars: 5, createdAt: '2026-07-15T09:00:00.000Z' },
+];
+
+const nowPriority = buildProfileNowPriority({
+  profile,
+  role: 'partner',
+  news: [
+    { id: 'n1', partnerId: 'partner-1', title: 'Новое меню', publishedAt: '2026-07-14T10:00:00.000Z', status: 'published', active: true },
+  ],
+  events: timelineEvents,
+  reviews: timelineReviews,
+  vkPosts: [
+    { id: 'vk1', text: 'Новый пост', date: '2026-07-14T12:00:00.000Z' },
+  ],
+  nowValue: new Date('2026-07-14T20:00:00.000Z').getTime(),
+});
+assert.ok(nowPriority.length > 0, 'now priority should return at least one item when partner has active content');
+assert.ok(nowPriority.every(item => item.value && item.title), 'now priority items should have display text');
+
+const history = buildProfileHistory({
+  profile,
+  role: 'partner',
+  news: [
+    { id: 'n1', partnerId: 'partner-1', title: 'Новое меню', publishedAt: '2026-07-14T10:00:00.000Z', status: 'published', active: true },
+  ],
+  events: timelineEvents,
+  reviews: timelineReviews,
+  vkPosts: [],
+});
+assert.ok(Array.isArray(history), 'history must be an array');
+assert.ok(history.length > 0, 'history must contain at least one milestone for populated profile');
+
+const summary = buildProfileSmartSummary({
+  news: [
+    { id: 'n1', partnerId: 'partner-1', publishedAt: new Date(nowValue - 2 * oneDayMs).toISOString(), status: 'published', active: true },
+    { id: 'n2', partnerId: 'partner-1', publishedAt: new Date(nowValue - 40 * oneDayMs).toISOString(), status: 'published', active: true },
+  ],
+  events: [
+    { id: 'e1', partnerId: 'partner-1', title: 'Кофейный вечер', status: 'published', active: true, publishedAt: new Date(nowValue - 5 * oneDayMs).toISOString() },
+  ],
+  reviews: [
+    { id: 'r1', userName: 'Анна', createdAt: new Date(nowValue - 10 * oneDayMs).toISOString() },
+  ],
+  nowValue,
+});
+assert.equal(summary.publications, 1, 'smart summary must count publications inside 30 days');
+assert.equal(summary.events, 1, 'smart summary must count events inside 30 days');
+assert.equal(summary.reviews, 1, 'smart summary must count reviews inside 30 days');
+
+const summaryOld = buildProfileSmartSummary({
+  news: [
+    { id: 'n3', partnerId: 'partner-1', publishedAt: new Date(nowValue - 40 * oneDayMs).toISOString(), status: 'published', active: true },
+  ],
+  events: [
+    { id: 'e2', partnerId: 'partner-1', title: 'Мастер-класс', status: 'published', active: true, publishedAt: new Date(nowValue - 90 * oneDayMs).toISOString() },
+  ],
+  reviews: [
+    { id: 'r2', userName: 'Оля', createdAt: new Date(nowValue - 50 * oneDayMs).toISOString() },
+  ],
+  nowValue,
+});
+assert.equal(summaryOld.publications, 0, 'smart summary must ignore items older than 30 days');
+assert.equal(summaryOld.events, 0, 'smart summary must ignore old events');
+assert.equal(summaryOld.reviews, 0, 'smart summary must ignore old reviews');
+
+const emptySmart = buildProfileSmartSummary({
+  news: [],
+  events: [],
+  reviews: [],
+});
+assert.equal(emptySmart.publications + emptySmart.events + emptySmart.reviews, 0, 'summary should be zero for empty input');
+const emptyPriority = buildProfileNowPriority({ profile: {}, role: 'partner', news: [], events: [], reviews: [], vkPosts: [], nowValue: new Date('2026-07-15T12:00:00.000Z').getTime() });
+assert.equal(Array.isArray(emptyPriority), true, 'now priority should work for empty profile');
+assert.equal(emptyPriority.length, 0, 'now priority should be empty if no trigger content');
+const emptyTimeline = buildProfileTimeline({ profile: {}, news: [], events: [], reviews: [], vkPosts: [] });
+assert.equal(emptyTimeline.length, 0, 'timeline should be empty for empty profile data');
+const historyEmpty = buildProfileHistory({ profile: {}, news: [], events: [], reviews: [] });
+assert.equal(historyEmpty.length, 0, 'history should be empty for empty profile');
 
 const types = getProfileTimelineSourceTypes(timeline);
 for (const type of ['publication', 'event', 'offer', 'video', 'photo', 'review', 'vk']) {

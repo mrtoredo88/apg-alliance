@@ -540,6 +540,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   onOpenNews={onOpenNews}
                   onOpenEvent={onOpenEvent}
                   onOpenTab={setDesktopTab}
+                  onOpenBooking={() => onBook?.(partner)}
                 />
               </DesktopSection>
             )}
@@ -673,6 +674,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 onOpenNews={onOpenNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}
+                onOpenBooking={() => onBook?.(partner)}
               />
             </GlassSection>
 

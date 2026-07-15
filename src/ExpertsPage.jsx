@@ -500,6 +500,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                     onOpenNews={onOpenNews}
                     onOpenEvent={onOpenEvent}
                     onOpenTab={setDesktopTab}
+                    onOpenBooking={() => onBook?.(expert)}
                   />
                 </DesktopSection>
               )}
@@ -651,6 +652,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 onOpenNews={onOpenNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}
+                onOpenBooking={() => onBook?.(expert)}
               />
             </GlassSection>
 
