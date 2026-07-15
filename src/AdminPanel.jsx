@@ -7401,8 +7401,9 @@ export const AdminPanel = () => {
                 <label style={s.label}>Часы работы</label>
                 <input style={s.input} value={exHours} onChange={e => setExHours(e.target.value)} placeholder="Пн-Пт 10:00-19:00" />
 
-                <label style={s.label}>ВКонтакте (URL)</label>
+                <label style={s.label}>Сообщество для ленты VK</label>
                 <input style={s.input} placeholder="https://vk.com/..." value={exVkUrl} onChange={e => setExVkUrl(e.target.value)} />
+                <div style={{ color: A.muted, fontSize: 12, lineHeight: '18px', marginTop: -8, marginBottom: 10 }}>Укажите ссылку на сообщество VK. Последние публикации появятся во вкладке “Лента” карточки эксперта.</div>
 
                 <label style={s.label}>Ссылка для записи</label>
                 <input style={s.input} placeholder="https://..." value={exBooking} onChange={e => setExBooking(e.target.value)} />
@@ -7737,8 +7738,9 @@ export const AdminPanel = () => {
                 <label style={s.label}>Часы работы</label>
                 <input style={s.input} placeholder="Пн-Пт 10:00-20:00, Сб-Вс 11:00-18:00" value={pHours} onChange={e => setPHours(e.target.value)} />
 
-                <label style={s.label}>ВКонтакте (сообщество)</label>
+                <label style={s.label}>Сообщество для ленты VK</label>
                 <input style={s.input} placeholder="https://vk.com/..." value={pVkGroup} onChange={e => setPVkGroup(e.target.value)} />
+                <div style={{ color: A.muted, fontSize: 12, lineHeight: '18px', marginTop: -8, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки.</div>
 
                 <label style={s.label}>Соцсеть / сайт (другие)</label>
                 <input style={s.input} placeholder="https://..." value={pSocial} onChange={e => setPSocial(e.target.value)} />

@@ -60,6 +60,7 @@ import {
 } from '../../../server-shared/workspace-analytics.js';
 import { buildLifecyclePatch, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
+import { normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 import {
   buildWorkspaceEventBase,
   buildWorkspaceEventDuplicate,
@@ -95,6 +96,7 @@ function normalizeProfileUrl(value, platform = '') {
   const raw = safeString(value, 1000).normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
   if (!raw) return '';
   if (platform === 'telegram' || /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:www\.)?(?:telegram\.me|t[.]me)\//i.test(raw)) return normalizeTelegramUrl(raw);
+  if (platform === 'vk') return normalizeVkCommunityUrl(raw);
   const hostMap = { vk: 'vk.com', max: 'max.ru', whatsapp: 'wa.me' };
   if (platform && hostMap[platform]) {
     const extraHosts = {

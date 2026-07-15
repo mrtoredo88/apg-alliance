@@ -1,8 +1,11 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
+import { getVkCommunityScreenName, normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 
 const GROUP_ID = 229980067;
 const API_VERSION = '5.199';
+const COMMUNITY_FEED_TTL_MS = 10 * 60 * 1000;
+const communityFeedCache = new Map();
 
 function pickBestPhotoSize(sizes = []) {
   return [...sizes]
@@ -99,7 +102,15 @@ function buildTitle(text = '', attachments = []) {
   return 'Новость АПГ';
 }
 
-function mapPost(post) {
+function getPostOwnerId(post) {
+  return Number(post.owner_id || -GROUP_ID);
+}
+
+function buildWallUrl(ownerId, postId) {
+  return `https://vk.com/wall${ownerId}_${postId}`;
+}
+
+function mapPost(post, options = {}) {
   const attachments = (post.attachments || []).map(normalizeAttachment).filter(Boolean);
   const photoItems = attachments.filter(a => a.type === 'photo');
   const photos = photoItems.map(a => a.url);
@@ -107,7 +118,8 @@ function mapPost(post) {
   const links = attachments.filter(a => a.type === 'link');
   const docs = attachments.filter(a => a.type === 'doc');
   const text = String(post.text || '').trim();
-  const postUrl = `https://vk.com/wall-${GROUP_ID}_${post.id}`;
+  const ownerId = options.ownerId || getPostOwnerId(post);
+  const postUrl = buildWallUrl(ownerId, post.id);
   const isPinned = Boolean(post.is_pinned);
 
   return {
@@ -149,6 +161,17 @@ function mapPost(post) {
     },
     views: Number(post.views?.count) || 0,
     syncedAt: Date.now(),
+  };
+}
+
+function mapCommunityPost(post, ownerId) {
+  const item = mapPost(post, { ownerId });
+  return {
+    ...item,
+    id: `vk_feed_${ownerId}_${post.id}`,
+    source: 'vk-community',
+    sourceName: 'ВКонтакте',
+    linkLabel: 'Открыть публикацию',
   };
 }
 
@@ -208,7 +231,117 @@ async function cachePosts(posts, request = null) {
   }
 }
 
+function cachedCommunityFeed(screenName) {
+  const cached = communityFeedCache.get(screenName);
+  if (!cached) return null;
+  if (Date.now() - cached.ts <= COMMUNITY_FEED_TTL_MS) return { ...cached, fresh: true };
+  return { ...cached, fresh: false };
+}
+
+function saveCommunityFeedCache(screenName, payload) {
+  communityFeedCache.set(screenName, { ...payload, ts: Date.now() });
+  if (communityFeedCache.size > 120) {
+    const oldest = [...communityFeedCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0]?.[0];
+    if (oldest) communityFeedCache.delete(oldest);
+  }
+}
+
+async function resolveCommunityOwnerId(screenName, token) {
+  if (/^-?\d+$/.test(screenName)) return Number(screenName);
+  if (/^club\d+$/i.test(screenName)) return -Number(screenName.replace(/\D/g, ''));
+  if (/^public\d+$/i.test(screenName)) return -Number(screenName.replace(/\D/g, ''));
+  if (/^id\d+$/i.test(screenName)) return Number(screenName.replace(/\D/g, ''));
+
+  const url = new URL('https://api.vk.com/method/utils.resolveScreenName');
+  url.searchParams.set('screen_name', screenName);
+  url.searchParams.set('access_token', token);
+  url.searchParams.set('v', API_VERSION);
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (data.error) {
+    const error = new Error(data.error.error_msg || 'VK resolve failed');
+    error.code = data.error.error_code;
+    throw error;
+  }
+  const object = data.response;
+  if (!object?.object_id || !object?.type) {
+    const error = new Error('community_not_found');
+    error.code = 'community_not_found';
+    throw error;
+  }
+  if (object.type === 'group' || object.type === 'page') return -Number(object.object_id);
+  if (object.type === 'user') return Number(object.object_id);
+  const error = new Error('unsupported_vk_object');
+  error.code = 'unsupported_vk_object';
+  throw error;
+}
+
+async function loadCommunityFeed({ screenName, count, token, request }) {
+  const ownerId = await resolveCommunityOwnerId(screenName, token);
+  const apiUrl = new URL('https://api.vk.com/method/wall.get');
+  apiUrl.searchParams.set('owner_id', String(ownerId));
+  apiUrl.searchParams.set('count', String(count));
+  apiUrl.searchParams.set('filter', 'owner');
+  apiUrl.searchParams.set('extended', '0');
+  apiUrl.searchParams.set('access_token', token);
+  apiUrl.searchParams.set('v', API_VERSION);
+
+  const response = await fetch(apiUrl.toString());
+  const data = await response.json();
+  if (data.error) {
+    const error = new Error(data.error.error_msg || 'VK wall failed');
+    error.code = data.error.error_code;
+    throw error;
+  }
+  const posts = (data.response?.items ?? [])
+    .filter(p => !p.marked_as_ads && (p.text?.trim() || p.attachments?.length))
+    .map(post => mapCommunityPost(post, ownerId));
+  const payload = {
+    posts,
+    cached: false,
+    source: 'vk-community',
+    community: normalizeVkCommunityUrl(screenName),
+    screenName,
+    ownerId,
+    syncedAt: Date.now(),
+  };
+  saveCommunityFeedCache(screenName, payload);
+  logVkNews(request, 'info', { event: 'community_feed_live_ok', screenName, ownerId, postsCount: posts.length });
+  return payload;
+}
+
 export default async function vkNewsRoutes(fastify) {
+  fastify.get('/api/community-feed', async (request, reply) => {
+    reply.header('Cache-Control', 's-maxage=300, stale-while-revalidate=900');
+
+    const count = Math.min(5, Math.max(1, Number(request.query.count) || 3));
+    const screenName = getVkCommunityScreenName(request.query.community || request.query.url || request.query.screenName || '');
+    if (!screenName) {
+      reply.code(400);
+      return { posts: [], ok: false, error: 'invalid_vk_community', reason: 'Некорректная ссылка на сообщество VK.' };
+    }
+
+    const cached = cachedCommunityFeed(screenName);
+    if (cached?.fresh) {
+      return { ...cached, cached: true, stale: false, ttlMs: COMMUNITY_FEED_TTL_MS };
+    }
+
+    const { token, source: tokenSource } = getVkToken();
+    logVkNews(request, 'info', { event: 'community_feed_start', tokenFound: Boolean(token), tokenSource, screenName, count });
+    if (!token) {
+      if (cached) return { ...cached, cached: true, stale: true, unavailable: true, reason: 'token_missing' };
+      return { posts: [], cached: false, unavailable: true, reason: 'token_missing' };
+    }
+
+    try {
+      return await loadCommunityFeed({ screenName, count, token, request });
+    } catch (e) {
+      logVkNews(request, 'warn', { event: 'community_feed_failed', screenName, reason: e.message, code: e.code || null });
+      if (cached) return { ...cached, cached: true, stale: true, unavailable: true, reason: e.message, code: e.code || null };
+      return { posts: [], cached: false, unavailable: true, reason: e.message, code: e.code || null };
+    }
+  });
+
   fastify.get('/api/vk-news', async (request, reply) => {
     if (request.query.health !== undefined) {
       reply.header('Cache-Control', 'no-store');

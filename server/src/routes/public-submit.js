@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { EXPERT_CATEGORIES, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../../../server-shared/expert-directory.js';
 import { TELEGRAM_HOST, normalizeTelegramUrl } from '../../../server-shared/telegram.js';
+import { normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 
 async function loadCustomExpertCategories(db) {
   const snap = await db.collection('config').doc('expertCategories').get().catch(() => null);
@@ -97,6 +98,7 @@ function normalizeUrl(value, platform = '') {
   if (!raw) return '';
   const hosts = { vk: 'vk.com', telegram: TELEGRAM_HOST, max: 'max.ru', whatsapp: 'wa.me' };
   if (!platform && /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:www\.)?(?:telegram\.me|t[.]me)\//i.test(raw)) return normalizeTelegramUrl(raw);
+  if (platform === 'vk') return normalizeVkCommunityUrl(raw);
   if (platform && hosts[platform]) {
     const hostPattern = platform === 'vk' ? '(?:vk\\.com|vk\\.me|vkontakte\\.ru)' : platform === 'telegram' ? '(?:t[.]me|telegram\\.me)' : platform === 'whatsapp' ? '(?:wa\\.me|whatsapp\\.com)' : hosts[platform].replace('.', '\\.');
     let path = raw

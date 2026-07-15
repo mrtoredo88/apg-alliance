@@ -20,6 +20,7 @@ function getISOWeekKey(date = new Date()) {
 import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
+import { CommunityFeedSection, getCommunityFeedSource } from './components/CommunityFeedSection.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
@@ -296,6 +297,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
   const [submitDone, setSubmitDone] = useState(false);
   const [desktopTab, setDesktopTab] = useState('about');
   const mountedRef = useRef(true);
+  const communityFeedUrl = getCommunityFeedSource(expert, 'expert');
 
   useEffect(() => {
     mountedRef.current = true;
@@ -304,7 +306,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
 
   useEffect(() => {
     if (!expert?.id) return;
-    setDesktopTab('about');
+    setDesktopTab(communityFeedUrl ? 'feed' : 'about');
     let cancelled = false;
     setReviewsLoading(true);
     getDocs(query(collection(db, 'expertReviews'), where('expertId', '==', expert.id)))
@@ -321,7 +323,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       .catch(() => {})
       .finally(() => { if (!cancelled) setReviewsLoading(false); });
     return () => { cancelled = true; };
-  }, [expert?.id]);
+  }, [expert?.id, communityFeedUrl]);
 
   const handleSubmitReview = async () => {
     if (!user || !myRating || submitting) return;
@@ -387,6 +389,7 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
       const hasGallery = galleryItems.length > 0;
       const hasVideos = expert.videos?.length > 0;
       const detailTabs = [
+        communityFeedUrl && { id: 'feed', label: 'Лента', count: 0 },
         { id: 'about', label: 'О себе' },
         hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
         expert.offer && { id: 'offer', label: 'Акция', count: 1 },
@@ -476,6 +479,12 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
               />
 
               <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={setDesktopTab} />
+
+              {activeTab === 'feed' && communityFeedUrl && (
+                <DesktopSection title="Лента" subtitle="Последние публикации сообщества">
+                  <CommunityFeedSection communityUrl={communityFeedUrl} desktop />
+                </DesktopSection>
+              )}
 
               {activeTab === 'about' && (
                 <DesktopSection title="О себе" subtitle="Описание и направления работы">
@@ -611,6 +620,13 @@ function ExpertModal({ expert, user, scannedExperts, onClose, variant = 'v2', on
               badges={heroBadges}
               description={expert.offer || expert.description || 'Проверенный специалист в экосистеме АПГ.'}
             />
+
+            {communityFeedUrl && (
+              <GlassSection title="Лента" action={<GlassButton onClick={() => openExpertContact(communityFeedUrl, 'vk', { platform: 'vk' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Открыть</GlassButton>}>
+                <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Последние публикации сообщества</div>
+                <CommunityFeedSection communityUrl={communityFeedUrl} />
+              </GlassSection>
+            )}
 
             <GlassSection title="Действия">
               {cta.length > 0 ? (

@@ -199,7 +199,10 @@ function ContactsTab({ draft, update }) {
           <Field label="Telegram"><GlassInput value={draft.telegramUrl} onChange={e => update({ telegramUrl: e.target.value })} style={inputStyle} /></Field>
           <Field label="WhatsApp"><GlassInput value={draft.whatsappUrl} onChange={e => update({ whatsappUrl: e.target.value })} style={inputStyle} /></Field>
         </div>
-        <Field label="VK"><GlassInput value={draft.vkUrl} onChange={e => update({ vkUrl: e.target.value })} inputMode="url" style={inputStyle} /></Field>
+        <Field label="Сообщество для ленты VK">
+          <GlassInput value={draft.vkUrl} onChange={e => update({ vkUrl: e.target.value })} inputMode="url" style={inputStyle} placeholder="https://vk.com/..." />
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: 6 }}>Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки.</div>
+        </Field>
         <GlassCard style={{ borderRadius: 28 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 880 }}>Дополнительные ссылки</div>

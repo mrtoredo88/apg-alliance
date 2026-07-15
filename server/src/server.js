@@ -31,6 +31,7 @@ const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 await fastify.register(cors, {
   origin: [
     'https://myapg.ru',
+    'https://apg-alliance.vercel.app',
     /^http:\/\/localhost(:\d+)?$/,
     /^http:\/\/127\.0\.0\.1(:\d+)?$/,
     /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,

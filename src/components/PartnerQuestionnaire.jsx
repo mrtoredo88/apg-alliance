@@ -120,7 +120,8 @@ export function PartnerQuestionnaire({ fields, files, onField, onFiles, onRemove
       <Field label="График работы"><input style={inputStyle()} value={fields.hours || ''} onChange={e => onField('hours', e.target.value)} /></Field>
       <Field label="Сайт" error={fieldErrors.website}><input style={inputStyle(!!fieldErrors.website)} value={fields.website || ''} onChange={e => onField('website', e.target.value)} placeholder="https://..." /></Field>
       {alliance && <Field label="Онлайн-запись" hint="Отдельная ссылка, не объединяем с сайтом." error={fieldErrors.bookingUrl}><input style={inputStyle(!!fieldErrors.bookingUrl)} value={fields.bookingUrl || ''} onChange={e => onField('bookingUrl', e.target.value)} placeholder="https://..." /></Field>}
-      {[['vk', 'VK'], ['telegram', 'Telegram'], ['max', 'MAX']].map(([key, label]) => <Field key={key} label={label}><input style={inputStyle()} value={fields[key] || ''} onChange={e => onField(key, e.target.value)} placeholder="https://..." /></Field>)}
+      <Field label="Сообщество для ленты VK" hint="Укажите ссылку на ваше сообщество VK. Последние публикации появятся во вкладке “Лента” вашей карточки."><input style={inputStyle()} value={fields.vk || ''} onChange={e => onField('vk', e.target.value)} placeholder="https://vk.com/..." /></Field>
+      {[['telegram', 'Telegram'], ['max', 'MAX']].map(([key, label]) => <Field key={key} label={label}><input style={inputStyle()} value={fields[key] || ''} onChange={e => onField(key, e.target.value)} placeholder="https://..." /></Field>)}
     </Section>
 
     {premium && <Section id="premium" title="6. Возможности Премиум" subtitle="Контент, мероприятия и будущий юридический профиль" open={open.premium} onToggle={toggle}>

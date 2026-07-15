@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-15] feat: Community feed tab for profile details
+**Коммит:** `pending`
+**Файлы:** `server-shared/vk-community.js`, `server/src/routes/vk-news.js`, `server/src/routes/user-actions.js`, `server/src/routes/public-submit.js`, `server/src/server.js`, `src/components/CommunityFeedSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/utils/externalUrls.js`, `src/AdminPanel.jsx`, `src/PartnerCabinetPage.jsx`, `src/ExpertCabinetPage.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/components/PartnerQuestionnaire.jsx`, `src/expertProfileForm.js`, `scripts/community-feed-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- В карточках партнёров и экспертов добавлена первая вкладка `Лента`, которая лениво загружает последние публикации привязанного VK-сообщества через backend.
+- Существующие VK-поля `vkGroupUrl`/`vkUrl` переиспользуются как “Сообщество для ленты VK” во всех основных редакторах без новой модели данных.
+- Добавлены безопасная нормализация VK community URL, серверный cache ленты и regression-тест `test:community-feed`.
+**Почему:** desktop/mobile detail должен показывать живую внешнюю витрину сообщества, не смешивая её с внутренними новостями АПГ и не раскрывая VK-токены на frontend.
+
 ## [2026-07-15] fix: Desktop detail video parity
 **Коммит:** `pending`
 **Файлы:** `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

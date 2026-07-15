@@ -1,4 +1,5 @@
 import { TELEGRAM_HOST, normalizeTelegramUrl } from '../../server-shared/telegram.js';
+import { normalizeVkCommunityUrl } from '../../server-shared/vk-community.js';
 
 const SOCIAL_HOSTS = {
   vk: 'vk.com',
@@ -72,6 +73,7 @@ export function normalizeExternalUrl(value, options = {}) {
 
   const platform = options.platform || detectExternalUrlPlatform(raw);
   if (platform && SOCIAL_HOSTS[platform]) {
+    if (platform === 'vk') return normalizeVkCommunityUrl(raw);
     let path = normalizeSocialPath(stripKnownHost(raw, platform));
     if (platform === 'whatsapp' && !/[/?]/.test(path)) {
       path = path.replace(/[^\d]/g, '');

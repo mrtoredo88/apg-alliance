@@ -22,6 +22,7 @@ import { shareLink } from './utils/shareLink.js';
 import { formatRelativeTime } from './utils/time.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
+import { CommunityFeedSection, getCommunityFeedSource } from './components/CommunityFeedSection.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import {
@@ -175,6 +176,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
   const myReview = userId ? reviews.find(r => r.id === userId) : null;
+  const communityFeedUrl = getCommunityFeedSource(partner, 'partner');
 
   // Считаем просмотр карточки (один раз при открытии каждого партнёра)
   useEffect(() => {
@@ -188,8 +190,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   }, [variant, partner?.id]);
 
   useEffect(() => {
-    setDesktopTab('about');
-  }, [partner?.id]);
+    setDesktopTab(communityFeedUrl ? 'feed' : 'about');
+  }, [partner?.id, communityFeedUrl]);
 
   useEffect(() => {
     if (!partner) return;
@@ -419,6 +421,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const stampTarget = Number(partner.stampTarget) || 0;
       const filledStamps = stampTarget > 0 ? Math.min(Number(stamps) || 0, stampTarget) : 0;
       const detailTabs = [
+        communityFeedUrl && { id: 'feed', label: 'Лента', count: 0 },
         { id: 'about', label: 'О компании' },
         hasServices && { id: 'services', label: 'Услуги', count: serviceCatalog.length },
         partner.offer && { id: 'offer', label: 'Акции', count: 1 },
@@ -517,6 +520,12 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             />
 
             <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={setDesktopTab} />
+
+            {activeTab === 'feed' && communityFeedUrl && (
+              <DesktopSection title="Лента" subtitle="Последние публикации сообщества">
+                <CommunityFeedSection communityUrl={communityFeedUrl} desktop />
+              </DesktopSection>
+            )}
 
             {activeTab === 'about' && (
               <DesktopSection title="О компании" subtitle="Описание и основная информация">
@@ -634,6 +643,13 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               badges={heroBadges}
               description={partner.offer || partner.description || partner.address || 'Проверенное место в экосистеме АПГ.'}
             />
+
+            {communityFeedUrl && (
+              <GlassSection title="Лента" action={<GlassButton onClick={() => openPartnerUrl(communityFeedUrl, 'vk', { platform: 'vk' })} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Открыть</GlassButton>}>
+                <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Последние публикации сообщества</div>
+                <CommunityFeedSection communityUrl={communityFeedUrl} />
+              </GlassSection>
+            )}
 
             <GlassSection title="Действия">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
