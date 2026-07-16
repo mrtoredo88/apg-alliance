@@ -460,6 +460,12 @@ function V2FirstScreen({
     <V2FirstScreenMobile
       user={user}
       userKeys={userKeys}
+      streak={streak}
+      completedTasks={completedTasks}
+      referralCount={referralCount}
+      scannedCount={scannedCount}
+      registeredEventIds={registeredEventIds}
+      favorites={favorites}
       events={events}
       featuredPartner={featuredPartner}
       partnerOfMonth={partnerOfMonth}
@@ -481,6 +487,12 @@ function V2FirstScreen({
 function V2FirstScreenMobile({
   user,
   userKeys,
+  streak = 0,
+  completedTasks = [],
+  referralCount = 0,
+  scannedCount = 0,
+  registeredEventIds = [],
+  favorites = [],
   events,
   featuredPartner,
   partnerOfMonth,
@@ -508,6 +520,27 @@ function V2FirstScreenMobile({
   const fullName = [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник';
   const initials = fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У';
   const avatarUrl = user?.photo_200 || user?.photo || user?.avatarUrl || '';
+  const level = getLevel(userKeys);
+  const nextLevel = getNextLevel(userKeys);
+  const keysToNext = getKeysToNext(userKeys);
+  const levelProgress = getLevelProgress(userKeys);
+  const nextAchievement = TASKS
+    .map(task => ({
+      ...task,
+      done: completedTasks.includes(task.id),
+      progressValue: task.progress ? task.progress(userKeys, favorites.length, referralCount, streak, scannedCount) : 0,
+    }))
+    .filter(task => !task.done)
+    .sort((a, b) => (b.progressValue || 0) - (a.progressValue || 0))[0] || null;
+  const profileProgress = Math.max(0, Math.min(100, Math.round(nextAchievement?.progressValue || levelProgress || 0)));
+  const eventsTodayCount = events.filter(isTodayEntity).length;
+  const todayForYou = unreadCount > 0
+    ? 'есть новые уведомления'
+    : eventsTodayCount > 0
+      ? `${eventsTodayCount} событ. сегодня`
+      : keysToNext > 0
+        ? `до уровня ${keysToNext} ключей`
+        : 'новый уровень уже открыт';
 
   useEffect(() => {
     const el = heroMediaRef.current;
@@ -661,6 +694,60 @@ function V2FirstScreenMobile({
           </div>
         </button>
 
+        <button
+          type="button"
+          onClick={onOpenTasks}
+          {...pressMotion}
+          style={{
+            width: '100%',
+            marginTop: desktopMode ? 0 : 'clamp(10px, 1.9svh, 16px)',
+            border: '1px solid rgba(244,217,140,0.22)',
+            borderRadius: 30,
+            padding: 'clamp(10px, 1.8svh, 13px)',
+            textAlign: 'left',
+            cursor: 'pointer',
+            color: V2.text,
+            background: 'radial-gradient(circle at 18% 0%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.105), rgba(255,255,255,0.034))',
+            boxShadow: '0 18px 48px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.13)',
+            display: 'grid',
+            gap: 9,
+            ...revealMotion(2, 'splash'),
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+            <span style={{ width: 52, height: 52, borderRadius: 21, overflow: 'hidden', background: V2.goldMetal, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 920, boxShadow: '0 12px 30px rgba(216,184,103,0.14)' }}>
+              {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
+              <span style={{ display: 'block', color: V2.textSoft, fontSize: 11.3, lineHeight: '14px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{level.label} · {todayForYou}</span>
+            </span>
+            <span style={{ borderRadius: 999, padding: '6px 9px', background: 'rgba(244,217,140,0.14)', border: '1px solid rgba(244,217,140,0.28)', color: V2.gold, fontSize: 10.2, lineHeight: '12px', fontWeight: 880 }}>Кабинет</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+            {[
+              ['Ключи', userKeys, '🗝️'],
+              ['Серия', streak, '🔥'],
+              ['События', Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, '📅'],
+              ['Партнёры', scannedCount, '🏙️'],
+            ].map(([label, value, icon]) => (
+              <span key={label} style={{ minHeight: 41, borderRadius: 16, padding: '6px 5px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', overflow: 'hidden' }}>
+                <span style={{ display: 'flex', justifyContent: 'space-between', gap: 3, color: V2.gold, fontSize: 12, lineHeight: '14px', fontWeight: 900 }}><span>{icon}</span><span>{value}</span></span>
+                <span style={{ display: 'block', color: V2.textMuted, fontSize: 8.6, lineHeight: '10px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{label}</span>
+              </span>
+            ))}
+          </div>
+          <span style={{ display: 'grid', gap: 5 }}>
+            <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: V2.textSoft, fontSize: 10.5, lineHeight: '13px', fontWeight: 760 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextAchievement?.title || (nextLevel ? `До уровня ${nextLevel.label}` : 'Максимальный уровень')}</span>
+              <span style={{ color: V2.gold, fontWeight: 900 }}>{profileProgress}%</span>
+            </span>
+            <span style={{ height: 7, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <span style={{ display: 'block', width: `${profileProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${level.color || V2.gold}, #E8C97A)`, transition: 'width 0.65s ease' }} />
+            </span>
+          </span>
+        </button>
+
         <div style={{ marginTop: desktopMode ? 0 : 'clamp(10px, 1.9svh, 16px)', ...revealMotion(2, 'splash') }}>
           <div style={{ color: V2.text, fontSize: 'clamp(15px, 2.5svh, 17px)', lineHeight: 'clamp(18px, 3svh, 21px)', fontWeight: 850, marginBottom: 'clamp(7px, 1.4svh, 10px)', opacity: 0.92 }}>
             Что важно сейчас
@@ -764,13 +851,32 @@ function V2FirstScreenDesktop({
     .filter(task => !task.done)
     .sort((a, b) => (b.progressValue || 0) - (a.progressValue || 0))[0] || null;
   const nextAchievementProgress = Math.max(0, Math.min(100, Math.round(nextAchievement?.progressValue || levelProgress || 0)));
+  const eventsTodayCount = events.filter(isTodayEntity).length;
+  const todayForYou = unreadCount > 0
+    ? 'проверьте новые уведомления'
+    : eventsTodayCount > 0
+      ? `${eventsTodayCount} мероприятие сегодня`
+      : offerPartner?.offer
+        ? `акция: ${offerPartner.offer}`
+        : keysToNext > 0
+          ? `до нового уровня осталось ${keysToNext} ключей`
+          : 'новый уровень уже открыт';
+  const latestActivity = completedTasks.length > 0
+    ? `Последнее: ${completedTasks.length} достиж. в профиле`
+    : scannedCount > 0
+      ? `Последнее: посещено партнёров ${scannedCount}`
+      : registeredEventIds.length > 0
+        ? `Последнее: запись на событие`
+        : userKeys > 0
+          ? `Последнее: баланс ${userKeys} ключей`
+          : '';
   const profileStats = [
-    { label: 'Ключи', value: userKeys, accent: V2.gold },
-    { label: 'Серия', value: streak, accent: '#FF8C42' },
-    { label: 'Достижений', value: completedTasks.length },
-    { label: 'Партнёров', value: scannedCount },
-    { label: 'Событий', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0 },
-    { label: 'Друзей', value: referralCount },
+    { label: 'Ключи', value: counterPulse ? `+${userKeys}` : userKeys, accent: V2.gold, icon: '🗝️' },
+    { label: 'События', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, accent: '#8EC5FF', icon: '📅' },
+    { label: 'Партнёры', value: scannedCount, accent: '#7EE0B8', icon: '🏙️' },
+    { label: 'Достиж.', value: completedTasks.length, accent: '#E8C97A', icon: '🏆' },
+    { label: 'Серия', value: streak, accent: '#FF8C42', icon: '🔥' },
+    { label: 'Друзья', value: referralCount, icon: '👥' },
   ];
   const navItems = [
     { label: 'Главная', isActive: true, onClick: () => {} },
@@ -852,6 +958,10 @@ function V2FirstScreenDesktop({
           avatarUrl={avatarUrl}
           initials={initials}
           profileBadge={level.label}
+          profileRole="Личный городской кабинет"
+          profileToday={todayForYou}
+          profileLatestActivity={latestActivity}
+          profileProgressColor={level.color}
           heroTitle={heroTitle}
           heroSubtitle={heroMeta}
           heroKicker={`${greeting} · Сегодня в АПГ`}
@@ -861,7 +971,7 @@ function V2FirstScreenDesktop({
             { id: 'partner', label: 'Найти партнёра', tone: 'gold', onClick: heroPartner ? () => onOpenPartner?.(heroPartner) : handleOpenPartners },
           ]}
           stats={profileStats}
-          progressTitle={nextAchievement?.title || `До уровня ${nextLevel.label}`}
+          progressTitle={nextAchievement?.title || (nextLevel ? `До уровня ${nextLevel.label}` : 'Максимальный уровень')}
           progressSubtitle={nextAchievement ? 'Следующее достижение' : keysToNext > 0 ? `Осталось ${keysToNext} ключей` : 'Новый уровень открыт'}
           progressValue={nextAchievementProgress}
           quickActions={[

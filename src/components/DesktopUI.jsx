@@ -335,6 +335,10 @@ export function DesktopTopOverview({
   progressTitle = '',
   progressSubtitle = '',
   progressValue = 0,
+  profileRole = '',
+  profileToday = '',
+  profileLatestActivity = null,
+  profileProgressColor = '',
   quickActions = [],
   isOffline = false,
   style,
@@ -344,8 +348,10 @@ export function DesktopTopOverview({
   const safeStats = asArray(stats);
   const safeHeroActions = asArray(heroActions);
   const safeQuickActions = asArray(quickActions);
+  const primaryStats = safeStats.slice(0, 4);
   const actualSearchValue = onSearchChange ? searchValue : localSearch;
   const safeProgress = Math.max(0, Math.min(100, Math.round(Number(progressValue) || 0)));
+  const progressColor = profileProgressColor || APG2_PROFILE.gold;
   const runSearch = () => {
     if (typeof onSearchSubmit === 'function') onSearchSubmit(actualSearchValue);
   };
@@ -439,41 +445,57 @@ export function DesktopTopOverview({
             )}
           </div>
         </GlassCard>
-        <GlassCard style={{ borderRadius: 30, padding: 12, minHeight: 188, display: 'grid', gridTemplateRows: '42px auto 1fr auto', gap: 8, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 8, alignItems: 'center' }}>
-            <button type="button" aria-label="Открыть профиль" onClick={onOpenProfile} style={{ width: 40, height: 40, border: 'none', padding: 0, borderRadius: 16, overflow: 'hidden', background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 13.5, fontWeight: 900, cursor: 'pointer' }}>
+        <GlassCard style={{ borderRadius: 30, padding: 12, minHeight: 188, display: 'grid', gridTemplateRows: 'auto auto 1fr auto', gap: 7, overflow: 'hidden', position: 'relative', background: 'radial-gradient(circle at 16% 2%, rgba(201,168,76,0.24), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.16), rgba(var(--apg2-glass-a,255,255,255),0.06))', boxShadow: '0 20px 58px rgba(0,0,0,0.20), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.16)' }}>
+          <div style={{ position: 'absolute', inset: 'auto -42px -54px auto', width: 132, height: 132, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.20), transparent 62%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '58px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+            <button type="button" aria-label="Открыть профиль" onClick={onOpenProfile} style={{ width: 58, height: 58, border: '1px solid rgba(201,168,76,0.36)', padding: 0, borderRadius: 22, overflow: 'hidden', background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 17, fontWeight: 920, cursor: 'pointer', boxShadow: '0 13px 34px rgba(201,168,76,0.14), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.20)' }}>
               {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={event => { event.currentTarget.style.display = 'none'; }} /> : initials}
             </button>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: APG2_PROFILE.text, fontWeight: 880, fontSize: 14.2, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
-              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.2, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userSubtitle}</div>
+              <div style={{ color: APG2_PROFILE.text, fontWeight: 930, fontSize: 17, lineHeight: '19px', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 11.3, lineHeight: '14px', fontWeight: 720, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profileRole || userSubtitle}</div>
             </div>
-            {profileBadge && <div style={{ borderRadius: 999, padding: '5px 8px', fontSize: 9.8, fontWeight: 820, color: APG2_PROFILE.gold, border: '1px solid rgba(201,168,76,0.36)', background: 'rgba(201,168,76,0.12)', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileBadge}</div>}
+            {profileBadge && <div style={{ borderRadius: 999, padding: '6px 9px', fontSize: 10.2, lineHeight: '12px', fontWeight: 880, color: APG2_PROFILE.gold, border: '1px solid rgba(201,168,76,0.38)', background: 'linear-gradient(145deg, rgba(201,168,76,0.20), rgba(201,168,76,0.08))', maxWidth: 116, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileBadge}</div>}
           </div>
-          {safeStats.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeStats.length, 6)}, minmax(0, 1fr))`, gap: 5 }}>
-              {safeStats.slice(0, 6).map(stat => (
-                <div key={stat.label} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 12, padding: '5px 4px', textAlign: 'center', overflow: 'hidden' }}>
-                  <div style={{ color: stat.accent || APG2_PROFILE.text, fontSize: 12.2, lineHeight: '13px', fontWeight: 900 }}>{stat.value}</div>
-                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 7.5, lineHeight: '9px', fontWeight: 720, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stat.label}</div>
+          {profileToday && (
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '18px minmax(0, 1fr)', alignItems: 'center', gap: 7, minHeight: 26, padding: '0 9px', borderRadius: 14, background: 'rgba(201,168,76,0.11)', border: '1px solid rgba(201,168,76,0.22)', color: APG2_PROFILE.textSoft, fontSize: 10.8, lineHeight: '13px', fontWeight: 760, overflow: 'hidden' }}>
+              <span aria-hidden="true" style={{ color: APG2_PROFILE.gold, fontSize: 12 }}>✦</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><b style={{ color: APG2_PROFILE.text }}>Сегодня для вас:</b> {profileToday}</span>
+            </div>
+          )}
+          {primaryStats.length > 0 && (
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${Math.min(primaryStats.length, 4)}, minmax(0, 1fr))`, gap: 5 }}>
+              {primaryStats.map(stat => (
+                <div key={stat.label} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.075)', borderRadius: 13, padding: '6px 5px', textAlign: 'left', overflow: 'hidden', minHeight: 42 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                    <span aria-hidden="true" style={{ color: stat.accent || APG2_PROFILE.gold, fontSize: 11, lineHeight: '13px' }}>{stat.icon || '•'}</span>
+                    <span style={{ color: stat.accent || APG2_PROFILE.text, fontSize: 13.2, lineHeight: '14px', fontWeight: 930 }}>{stat.value}</span>
+                  </div>
+                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 8.5, lineHeight: '10px', fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 3 }}>{stat.label}</div>
                 </div>
               ))}
             </div>
           )}
-          <div style={{ display: 'grid', gap: 5, alignSelf: 'center', minHeight: 0 }}>
+          <div style={{ position: 'relative', display: 'grid', gap: 6, alignSelf: 'center', minHeight: 0, padding: '7px 8px', borderRadius: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ color: APG2_PROFILE.text, fontSize: 11, lineHeight: '13px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progressTitle || 'Сегодня для вас'}</div>
-                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 9, lineHeight: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progressSubtitle || 'Локи подготовил контекст'}</div>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 11.6, lineHeight: '14px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progressTitle || 'Следующая цель'}</div>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 9.5, lineHeight: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progressSubtitle || 'Продолжайте собирать прогресс'}</div>
               </div>
-              <button type="button" onClick={onOpenLoki} style={{ border: '1px solid rgba(201,168,76,0.30)', background: 'rgba(201,168,76,0.12)', color: APG2_PROFILE.gold, borderRadius: 999, padding: '5px 8px', fontSize: 10.5, fontWeight: 820, cursor: 'pointer' }}>Локи</button>
+              <span style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '13px', fontWeight: 920 }}>{safeProgress}%</span>
             </div>
-            <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.12)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
-              <div style={{ width: `${safeProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${APG2_PROFILE.gold}, #E8C97A)`, transition: 'width 0.3s ease' }} />
+            <div style={{ height: 7, borderRadius: 999, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.12)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
+              <div style={{ width: `${safeProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${progressColor}, #E8C97A)`, transition: 'width 0.65s ease', boxShadow: '0 0 22px rgba(201,168,76,0.22)' }} />
             </div>
+            {profileLatestActivity && (
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center', color: APG2_PROFILE.textMuted, fontSize: 9.4, lineHeight: '12px', fontWeight: 720, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                <span aria-hidden="true" style={{ color: APG2_PROFILE.gold }}>•</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{profileLatestActivity}</span>
+              </div>
+            )}
           </div>
           {safeQuickActions.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeQuickActions.length, 3)}, minmax(0, 1fr))`, gap: 5 }}>
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${Math.min(safeQuickActions.length, 3)}, minmax(0, 1fr))`, gap: 5 }}>
               {safeQuickActions.slice(0, 3).map(action => <GlassButton key={action.id || action.label} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 27, borderRadius: 999, padding: '0 8px', fontSize: 9.8, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text }}>{action.label}</GlassButton>)}
             </div>
           )}

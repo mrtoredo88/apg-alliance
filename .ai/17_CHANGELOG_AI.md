@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] feat: My Profile Dashboard v2
+**Коммит:** `pending`
+**Файлы:** `src/HomePanelV2.jsx`, `src/components/DesktopUI.jsx`, `scripts/home-profile-dashboard-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Карточка профиля на главной превращена в компактный личный городской кабинет с крупной идентичностью, статусом, KPI, прогрессом цели и строкой `Сегодня для вас`.
+- Desktop использует расширенный `DesktopTopOverview`, mobile получил компактную версию того же dashboard без новых источников данных.
+- Добавлен regression-тест `home-profile-dashboard-test`, включённый в `test:core`.
+**Почему:** профиль на главной должен быть не маленьким информером, а сильной персональной точкой входа в АПГ без изменения бизнес-логики.
+
+---
+
 ## [2026-07-16] feat: Living Profile v5 visual finish
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/components/FeedFramework.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
