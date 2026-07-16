@@ -996,7 +996,7 @@ function buildPartnerReadiness(partner = {}) {
     { key: 'address', label: 'Указать адрес', ok: Boolean(String(partner.address || '').trim()), action: 'edit_contacts' },
     { key: 'phone', label: 'Указать телефон', ok: Boolean(String(partner.phone || '').trim()), action: 'edit_contacts' },
     { key: 'hours', label: 'Настроить график работы', ok: Boolean(String(partner.hours || '').trim()), action: 'edit_contacts' },
-    { key: 'links', label: 'Добавить хотя бы одну соцсеть или сайт', ok: Boolean(partner.websiteUrl || partner.vkGroupUrl || partner.socialUrl || partner.telegramCommunityUrl), action: 'edit_links' },
+    { key: 'links', label: 'Добавить хотя бы одну соцсеть или сайт', ok: Boolean(partner.websiteUrl || partner.vkGroupUrl || partner.vkUrl || partner.socialUrl || partner.telegramCommunityUrl || partner.telegramUrl || partner.maxCommunityUrl || partner.maxUrl), action: 'edit_links' },
     { key: 'offer', label: 'Добавить первую акцию', ok: Boolean(String(partner.offer || '').trim()), action: 'edit_offer' },
     { key: 'coordinates', label: 'Поставить координаты на карте', ok: partner.latitude != null && partner.longitude != null, action: 'edit_map' },
     { key: 'publicationConsent', label: 'Подтвердить согласие на публикацию', ok: Boolean(partner.publicationConsentAccepted), action: 'edit_publication' },

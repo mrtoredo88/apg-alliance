@@ -329,7 +329,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       entityId: partner.id,
       payload: { partnerId: partner.id, title: partner.name, target: 'vk' },
     });
-    openNormalizedUrl(openUrl, partner.vkGroupUrl, { platform: 'vk' });
+    openNormalizedUrl(openUrl, partner.vkGroupUrl || partner.vkUrl || partner.socialUrl, { platform: 'vk' });
   };
   const handlePhone = () => {
     if (!partner.phone) return;
@@ -430,6 +430,10 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
   const ratingLabel = avg => avg >= 4.7 ? 'Отлично' : avg >= 4.0 ? 'Хорошо' : avg >= 3.0 ? 'Неплохо' : avg >= 2.0 ? 'Так себе' : 'Плохо';
   const canUseApgBooking = canOpenBookingFlow(partner, 'partner') && typeof onBook === 'function';
+  const partnerVkUrl = partner.vkGroupUrl || partner.vkUrl || '';
+  const partnerTelegramUrl = partner.telegramCommunityUrl || partner.telegramUrl || '';
+  const partnerMaxUrl = partner.maxCommunityUrl || partner.maxUrl || '';
+  const isDuplicatePartnerSocial = value => [partnerVkUrl, partnerTelegramUrl, partnerMaxUrl, partner.websiteUrl].filter(Boolean).includes(value);
 
   if (variant === 'v2') {
     const heroImage = getProfileImage(partner);
@@ -446,7 +450,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(partner), tone: 'gold' },
       !canUseApgBooking && !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
       !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
-      partner.vkGroupUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
+      partnerVkUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
       onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(partner), tone: 'gold' },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
@@ -503,10 +507,10 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const socialItems = [
         !canUseApgBooking && !isVK() && partner.bookingUrl && { id: 'booking', label: 'Запись', value: partner.bookingUrl, icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking') },
         partner.websiteUrl && !isVK() && { id: 'site', label: 'Сайт', value: partner.websiteUrl, icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
-        partner.vkGroupUrl && { id: 'vk', label: 'VK', value: partner.vkGroupUrl, icon: '🔵', onClick: openVkGroup },
-        partner.telegramCommunityUrl && !isVK() && { id: 'telegram', label: 'Telegram', value: partner.telegramCommunityUrl, icon: '✈️', onClick: () => openPartnerUrl(partner.telegramCommunityUrl, 'telegram', { platform: 'telegram' }) },
-        !isVK() && partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && partner.socialUrl !== partner.websiteUrl && { id: 'social', label: /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? 'ВКонтакте' : 'Соцсеть', value: partner.socialUrl, icon: /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? '🔵' : '🌐', onClick: () => openPartnerUrl(partner.socialUrl, /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? 'vk' : 'social', /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? { platform: 'vk' } : undefined) },
-        !isVK() && partner.maxCommunityUrl && { id: 'max', label: 'MAX', value: partner.maxCommunityUrl, icon: '💬', onClick: () => openPartnerUrl(partner.maxCommunityUrl, 'max', { platform: 'max' }) },
+        partnerVkUrl && { id: 'vk', label: 'VK', value: partnerVkUrl, icon: '🔵', onClick: openVkGroup },
+        partnerTelegramUrl && { id: 'telegram', label: 'Telegram', value: partnerTelegramUrl, icon: '✈️', onClick: () => openPartnerUrl(partnerTelegramUrl, 'telegram', { platform: 'telegram' }) },
+        !isVK() && partner.socialUrl && !isDuplicatePartnerSocial(partner.socialUrl) && { id: 'social', label: /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? 'ВКонтакте' : 'Соцсеть', value: partner.socialUrl, icon: /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? '🔵' : '🌐', onClick: () => openPartnerUrl(partner.socialUrl, /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? 'vk' : 'social', /vk\.com|vkontakte\.ru/i.test(partner.socialUrl) ? { platform: 'vk' } : undefined) },
+        partnerMaxUrl && { id: 'max', label: 'MAX', value: partnerMaxUrl, icon: '💬', onClick: () => openPartnerUrl(partnerMaxUrl, 'max', { platform: 'max' }) },
       ].filter(Boolean);
       const relatedItems = similar.map(item => ({ id: item.id, name: item.name, subtitle: item.categoryLabel || item.address, categoryLabel: item.categoryLabel || 'Партнёр' }));
 
@@ -1231,30 +1235,30 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             </button>
           )}
           {partner.address && <button onClick={handleMap} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
-          {!isVK() && partner.websiteUrl && partner.websiteUrl !== partner.vkGroupUrl && (() => {
+          {!isVK() && partner.websiteUrl && partner.websiteUrl !== partnerVkUrl && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.websiteUrl);
             return isVkLink
               ? <button onClick={() => openPartnerUrl(partner.websiteUrl, 'vk', { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
               : <button onClick={() => openPartnerUrl(partner.websiteUrl, 'website')} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
           })()}
-          {partner.vkGroupUrl && (
+          {partnerVkUrl && (
             <button onClick={openVkGroup} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               🔵 ВКонтакте
             </button>
           )}
-          {!isVK() && partner.telegramCommunityUrl && (
-            <button onClick={() => openPartnerUrl(partner.telegramCommunityUrl, 'telegram', { platform: 'telegram' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+          {partnerTelegramUrl && (
+            <button onClick={() => openPartnerUrl(partnerTelegramUrl, 'telegram', { platform: 'telegram' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#2AABEE,#1D8EC4)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               ✈️ Telegram
             </button>
           )}
-          {!isVK() && partner.socialUrl && partner.socialUrl !== partner.vkGroupUrl && partner.socialUrl !== partner.websiteUrl && (() => {
+          {!isVK() && partner.socialUrl && !isDuplicatePartnerSocial(partner.socialUrl) && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.socialUrl);
             return isVkLink
               ? <button onClick={() => openPartnerUrl(partner.socialUrl, 'vk', { platform: 'vk' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:`linear-gradient(135deg,#4A76A8,#2D5F8A)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🔵 ВКонтакте</button>
               : <button onClick={() => openPartnerUrl(partner.socialUrl, 'social')} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:T.textPri, fontSize:15, fontWeight:700, cursor:'pointer' }}>🌐 Сайт</button>;
           })()}
-          {!isVK() && partner.maxCommunityUrl && (
-            <button onClick={() => openPartnerUrl(partner.maxCommunityUrl, 'max', { platform: 'max' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+          {partnerMaxUrl && (
+            <button onClick={() => openPartnerUrl(partnerMaxUrl, 'max', { platform: 'max' })} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#7B5EA7,#5B3F87)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               💬 Max
             </button>
           )}

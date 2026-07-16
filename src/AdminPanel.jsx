@@ -4901,7 +4901,7 @@ export const AdminPanel = () => {
     setPOwnerEmail(p.ownerEmail ?? '');
     setPPublicationConsent(Boolean(p.publicationConsentAccepted));
     setPBooking(p.bookingUrl ?? ''); setPWebsite(p.websiteUrl ?? '');
-    setPTelegramCom(p.telegramCommunityUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? '');
+    setPTelegramCom(p.telegramCommunityUrl ?? p.telegramUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? p.maxUrl ?? '');
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
     setPVideos(p.videos ?? []);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
@@ -5075,7 +5075,7 @@ export const AdminPanel = () => {
       emoji: pEmoji, logoUrl: pLogo.trim(),
       categoryLabel: CATEGORIES.find(c => c.id === pCategory)?.label ?? '',
       phone: pPhone.trim(), address: pAddress.trim(),
-      tier: pTier, hours: pHours.trim(), socialUrl: normalizeUrl(pSocial), vkGroupUrl: normalizeUrl(pVkGroup, 'vk'), offer: pOffer.trim(),
+      tier: pTier, hours: pHours.trim(), socialUrl: normalizeUrl(pSocial), vkGroupUrl: normalizeUrl(pVkGroup, 'vk'), vkUrl: normalizeUrl(pVkGroup, 'vk'), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
       publicationConsentAccepted: pPublicationConsent,
@@ -5083,7 +5083,9 @@ export const AdminPanel = () => {
       bookingUrl: normalizeUrl(pBooking),
       websiteUrl: normalizeUrl(pWebsite),
       telegramCommunityUrl: normalizeUrl(pTelegramCom, 'telegram'),
+      telegramUrl: normalizeUrl(pTelegramCom, 'telegram'),
       maxCommunityUrl: normalizeUrl(pMaxCom, 'max'),
+      maxUrl: normalizeUrl(pMaxCom, 'max'),
       coverPhoto: pCoverPhoto.trim(),
       gallery: pGallery,
       videos: finalVideos,
@@ -8063,10 +8065,10 @@ export const AdminPanel = () => {
                 const pLinks = [
                   [p.websiteUrl,            '🌐', 'Сайт'],
                   [p.bookingUrl,            '📅', 'Запись'],
-                  [p.vkGroupUrl,            '💙', 'VK'],
+                  [p.vkGroupUrl || p.vkUrl, '💙', 'VK'],
                   [p.socialUrl,             '🔗', 'Соцсеть'],
-                  [p.telegramCommunityUrl,  '✈️', 'Telegram'],
-                  [p.maxCommunityUrl,       '⚡', 'Max'],
+                  [p.telegramCommunityUrl || p.telegramUrl, '✈️', 'Telegram'],
+                  [p.maxCommunityUrl || p.maxUrl,           '⚡', 'Max'],
                 ];
                 return (
                   <div key={p.id} style={{ borderBottom: `1px solid ${A.rowBrd}` }}>

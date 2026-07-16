@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: Partner social links from Admin Panel
+**Коммит:** `pending`
+**Файлы:** `src/AdminPanel.jsx`, `src/PartnerPage.jsx`, `server/src/routes/admin-actions.js`, `scripts/partner-social-links-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Admin Panel теперь при сохранении партнёра записывает Telegram/MAX и в исторические поля `telegramCommunityUrl`/`maxCommunityUrl`, и в canonical aliases `telegramUrl`/`maxUrl`.
+- Публичная карточка партнёра читает оба набора полей и показывает Telegram/MAX в блоке ссылок и mobile actions без скрытия в VK/WebView.
+- Добавлен regression-тест `partner-social-links-test` в `test:core`.
+**Почему:** у партнёра “Самарины” поля Telegram/MAX сохранялись в Firestore, но публичная карточка могла их не показывать из-за расхождения alias-полей и UI-фильтра `!isVK()`.
+
+---
+
 ## [2026-07-16] fix: QR Scanner camera diagnostics
 **Коммит:** `pending`
 **Файлы:** `src/Scanner.jsx`, `src/UserApp.jsx`, `scripts/scanner-camera-diagnostics-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
