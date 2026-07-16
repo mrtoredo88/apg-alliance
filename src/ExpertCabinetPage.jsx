@@ -3,7 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { T, GLASS, GLASS_GOLD } from './design.js';
-import { AiProfileSection, Stars, StatCard } from './PartnerCabinetPage.jsx';
+import { AiProfileSection, ProfileAutosaveNotice, Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import { CabinetEventsBlock } from './EventProposalTools.jsx';
@@ -14,6 +14,7 @@ import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.
 import { shareLink } from './utils/shareLink.js';
 import { buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
+import { useProfileAutosave } from './hooks/useProfileAutosave.js';
 import {
   EXPERT_CATEGORIES,
   EXPERT_SOCIAL_FIELDS,
@@ -69,6 +70,48 @@ function buildExpertForm(expert = {}) {
   };
 }
 
+function buildExpertSaveData(form = {}, expert = {}) {
+  const fullName = [form.lastName, form.firstName, form.middleName].map(v => String(v || '').trim()).filter(Boolean).join(' ');
+  const primaryCategory = EXPERT_CATEGORIES.find(c => c.id === form.primaryCategory);
+  return {
+    name:             fullName || expert.name,
+    lastName:         String(form.lastName || '').trim(),
+    firstName:        String(form.firstName || '').trim(),
+    middleName:       String(form.middleName || '').trim(),
+    category:         form.primaryCategory || '',
+    categoryLabel:    primaryCategory?.label || '',
+    primaryCategory:  form.primaryCategory || '',
+    secondaryCategories: Array.isArray(form.secondaryCategories) ? form.secondaryCategories : [],
+    specialization:   String(form.shortDescription || '').trim().slice(0, 120),
+    shortDescription: String(form.shortDescription || '').trim().slice(0, 120),
+    description:      String(form.description || '').trim(),
+    workFormats:      Array.isArray(form.workFormats) ? form.workFormats : [],
+    formats:          Array.isArray(form.workFormats) ? form.workFormats : [],
+    offer:            String(form.offer || '').trim(),
+    tariff:           form.tariff || 'basic',
+    contactName:      String(form.contactName || '').trim(),
+    phone:            String(form.phone || '').trim(),
+    email:            String(form.email || '').trim(),
+    inn:              hasPremiumExpertAccess(form.tariff) ? String(form.inn || '').trim() : '',
+    city:             String(form.city || '').trim(),
+    websiteUrl:       normalizeExternalUrl(form.websiteUrl),
+    bookingUrl:       normalizeExternalUrl(form.bookingUrl),
+    vkUrl:            normalizeExternalUrl(form.vkUrl, { platform: 'vk' }),
+    telegramUrl:      normalizeExternalUrl(form.telegramUrl, { platform: 'telegram' }),
+    maxUrl:           normalizeExternalUrl(form.maxUrl, { platform: 'max' }),
+    instagramUrl:     normalizeExternalUrl(form.instagramUrl),
+    youtubeUrl:       normalizeExternalUrl(form.youtubeUrl),
+    rutubeUrl:        normalizeExternalUrl(form.rutubeUrl),
+    comment:          String(form.comment || '').trim(),
+    photo:            String(form.photo || '').trim(),
+    logoUrl:          String(form.logoUrl || '').trim(),
+    coverPhoto:       String(form.coverPhoto || '').trim(),
+    gallery:          Array.isArray(form.gallery) ? form.gallery.filter(Boolean) : [],
+    videos:           Array.isArray(form.videos) ? form.videos.filter(Boolean) : [],
+    servicesDraftReady: true,
+  };
+}
+
 function getExpertReadyState(expert = {}) {
   const galleryCount = (Array.isArray(expert.gallery) ? expert.gallery : []).filter(Boolean).length;
   const videosCount  = (Array.isArray(expert.videos)  ? expert.videos  : []).filter(Boolean).length;
@@ -91,8 +134,6 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState('start');
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
   const [uploading, setUploading] = useState(false);
   const photoInputRef             = useRef(null);
   const logoInputRef              = useRef(null);
@@ -112,14 +153,13 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
   const [form, setForm]           = useState(() => buildExpertForm(initialExpert || {}));
   const [videoUrl, setVideoUrl]   = useState('');
   const [videoTitle, setVideoTitle] = useState('');
-  const [draftRestored, setDraftRestored] = useState(false);
 
   const updateForm = (patch) => {
     setForm(prev => ({ ...prev, ...patch }));
   };
 
-  useEffect(() => {
-    if (!initialExpert?.id) return;
+	  useEffect(() => {
+	    if (!initialExpert?.id) return;
     setLoading(true);
 
     Promise.all([
@@ -130,18 +170,10 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
         orderBy('createdAt', 'desc'),
         limit(20),
       )).catch(() => ({ docs: [] })),
-    ]).then(([eSnap, rSnap]) => {
-      const e = eSnap.exists() ? { id: eSnap.id, ...eSnap.data() } : initialExpert;
-      const draftKey = `apg_expert_form_draft_${initialExpert.id}`;
-      let nextForm = buildExpertForm(e);
-      try {
-        const raw = localStorage.getItem(draftKey);
-        if (raw) {
-          nextForm = { ...nextForm, ...JSON.parse(raw) };
-          setDraftRestored(true);
-        }
-      } catch {}
-      setExpert(e);
+	    ]).then(([eSnap, rSnap]) => {
+	      const e = eSnap.exists() ? { id: eSnap.id, ...eSnap.data() } : initialExpert;
+	      let nextForm = buildExpertForm(e);
+	      setExpert(e);
       setFDesc(e.description ?? '');
       setFOffer(e.offer ?? '');
       setFPhone(e.phone ?? '');
@@ -155,18 +187,56 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       setFAiProfile(sanitizeAiProfile(e.aiProfile || buildAiProfileDraft(e, 'expert')));
       setReviews(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [initialExpert?.id]);
+	    }).catch(() => setLoading(false));
+	  }, [initialExpert?.id]);
 
-  useEffect(() => {
-    if (!expert?.id) return;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(`apg_expert_form_draft_${expert.id}`, JSON.stringify(form));
-      } catch {}
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [expert?.id, form]);
+	  const selectExpertSaveData = useCallback((source = {}) => buildExpertSaveData(buildExpertForm(source), source), []);
+	  const expertSaveData = useMemo(() => buildExpertSaveData(form, expert || {}), [form, expert]);
+	  const applyExpertDraft = useCallback((draft = {}) => {
+	    const nextForm = buildExpertForm({ ...(expert || {}), ...draft });
+	    setForm(nextForm);
+	    setFDesc(nextForm.description);
+	    setFOffer(nextForm.offer);
+	    setFPhone(nextForm.phone);
+	    setFBooking(nextForm.bookingUrl);
+	    setFWebsite(nextForm.websiteUrl);
+	    setFVk(nextForm.vkUrl);
+	    setFTelegram(nextForm.telegramUrl);
+	    setFMax(nextForm.maxUrl);
+	    setFPhoto(nextForm.photo);
+	  }, [expert]);
+	  const validateExpertSave = useCallback((data = {}) => {
+	    const phone = String(data.phone || '').trim();
+	    if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) return 'Некорректный номер телефона. Пример: +7 (499) 123-45-67';
+	    const urlFields = [
+	      ['Запись', data.bookingUrl, ''],
+	      ['Сайт', data.websiteUrl, ''],
+	      ...EXPERT_SOCIAL_FIELDS.map(item => [item.label, data[item.key], item.platform]),
+	    ];
+	    for (const [label, value, platform] of urlFields) {
+	      const result = validateExternalUrl(value, platform ? { platform } : {});
+	      if (!result.ok) return `${label}: ${result.error}`;
+	    }
+	    return '';
+	  }, []);
+	  const autosave = useProfileAutosave({
+	    id: expert?.id,
+	    collectionName: 'experts',
+	    action: 'expert:profileUpdate',
+	    data: expertSaveData,
+	    profile: expert,
+	    selectData: selectExpertSaveData,
+	    validate: validateExpertSave,
+	    onApplyDraft: applyExpertDraft,
+	    onSaved: (updated) => {
+	      setExpert(updated);
+	      onExpertUpdate?.(updated);
+	    },
+	    onToast,
+	  });
+	  const saving = autosave.state === 'saving';
+	  const saved = autosave.savedPulse;
+	  const saveButtonLabel = saving ? 'Сохранение...' : saved ? '✓ Сохранено' : autosave.dirty ? 'Сохранить сейчас' : 'Все сохранено';
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -208,88 +278,9 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
     }
   };
 
-  const handleSave = async () => {
-    if (!expert?.id) return;
-    const phone = form.phone.trim();
-    if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) {
-      onToast?.('Некорректный номер телефона. Пример: +7 (499) 123-45-67', 'error');
-      return;
-    }
-    const urlFields = [
-      ['Запись', form.bookingUrl, ''],
-      ['Сайт', form.websiteUrl, ''],
-      ...EXPERT_SOCIAL_FIELDS.map(item => [item.label, form[item.key], item.platform]),
-    ];
-    for (const [label, value, platform] of urlFields) {
-      const result = validateExternalUrl(value, platform ? { platform } : {});
-      if (!result.ok) {
-        onToast?.(`${label}: ${result.error}`, 'error');
-        return;
-      }
-    }
-    setSaving(true);
-    try {
-      const fullName = [form.lastName, form.firstName, form.middleName].map(v => String(v || '').trim()).filter(Boolean).join(' ');
-      const primaryCategory = EXPERT_CATEGORIES.find(c => c.id === form.primaryCategory);
-      const data = {
-        name:             fullName || expert.name,
-        lastName:         form.lastName.trim(),
-        firstName:        form.firstName.trim(),
-        middleName:       form.middleName.trim(),
-        category:         form.primaryCategory,
-        categoryLabel:    primaryCategory?.label || '',
-        primaryCategory:  form.primaryCategory,
-        secondaryCategories: form.secondaryCategories,
-        specialization:   form.shortDescription.trim().slice(0, 120),
-        shortDescription: form.shortDescription.trim().slice(0, 120),
-        description:      form.description.trim(),
-        workFormats:      form.workFormats,
-        formats:          form.workFormats,
-        offer:            form.offer.trim(),
-        tariff:           form.tariff,
-        contactName:      form.contactName.trim(),
-        phone:            phone,
-        email:            form.email.trim(),
-        inn:              hasPremiumExpertAccess(form.tariff) ? form.inn.trim() : '',
-        city:             form.city.trim(),
-        websiteUrl:       normalizeExternalUrl(form.websiteUrl),
-        bookingUrl:       normalizeExternalUrl(form.bookingUrl),
-        vkUrl:            normalizeExternalUrl(form.vkUrl, { platform: 'vk' }),
-        telegramUrl:      normalizeExternalUrl(form.telegramUrl, { platform: 'telegram' }),
-        maxUrl:           normalizeExternalUrl(form.maxUrl, { platform: 'max' }),
-        instagramUrl:     normalizeExternalUrl(form.instagramUrl),
-        youtubeUrl:       normalizeExternalUrl(form.youtubeUrl),
-        rutubeUrl:        normalizeExternalUrl(form.rutubeUrl),
-        comment:          form.comment.trim(),
-        photo:            form.photo.trim(),
-        logoUrl:          form.logoUrl.trim(),
-        coverPhoto:       form.coverPhoto.trim(),
-        gallery:          form.gallery.filter(Boolean),
-        videos:           form.videos.filter(Boolean),
-        servicesDraftReady: true,
-      };
-      await userAction('expert:profileUpdate', { id: expert.id, patch: data });
-      const updated = { ...expert, ...data };
-      setExpert(updated);
-      setFDesc(data.description);
-      setFOffer(data.offer);
-      setFPhone(data.phone);
-      setFBooking(data.bookingUrl);
-      setFWebsite(data.websiteUrl);
-      setFVk(data.vkUrl);
-      setFTelegram(data.telegramUrl);
-      setFMax(data.maxUrl);
-      setFPhoto(data.photo);
-      onExpertUpdate?.(updated);
-      try { localStorage.removeItem(`apg_expert_form_draft_${expert.id}`); } catch {}
-      setDraftRestored(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch (error) {
-      onToast?.(error?.message || 'Ошибка сохранения. Попробуйте ещё раз.', 'error');
-    }
-    setSaving(false);
-  };
+	  const handleSave = async () => {
+	    await autosave.saveNow();
+	  };
 
   const handleAiProfileSave = async (aiProfile) => {
     if (!expert?.id) return;
@@ -691,18 +682,19 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
           {/* ── КАРТОЧКА ── */}
           {activeTab === 'edit' && (
             <GlassSection title="Анкета эксперта">
-              <GlassCard tone="gold" style={{ borderRadius: 32, marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ color: '#17120a', fontSize: 20, fontWeight: 930 }}>Заполнено: {formCompletion}%</div>
-                    <div style={{ color: 'rgba(23,18,10,0.62)', fontSize: 12, marginTop: 4 }}>{draftRestored ? 'Черновик восстановлен автоматически.' : 'Черновик сохраняется автоматически на устройстве.'}</div>
-                  </div>
-                  <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{EXPERT_TARIFFS.find(t => t.id === form.tariff)?.label || 'Базовый'}</GlassBadge>
-                </div>
-                <div style={{ height: 8, borderRadius: 999, background: 'rgba(23,18,10,0.15)', overflow: 'hidden' }}>
-                  <div style={{ width: `${formCompletion}%`, height: '100%', borderRadius: 999, background: '#17120a', transition: 'width 0.35s ease' }} />
-                </div>
-              </GlassCard>
+	              <GlassCard tone="gold" style={{ borderRadius: 32, marginBottom: 12 }}>
+	                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', marginBottom: 12 }}>
+	                  <div>
+	                    <div style={{ color: '#17120a', fontSize: 20, fontWeight: 930 }}>Заполнено: {formCompletion}%</div>
+	                    <div style={{ color: 'rgba(23,18,10,0.62)', fontSize: 12, marginTop: 4 }}>Черновик сохраняется на устройстве и отправляется автоматически.</div>
+	                  </div>
+	                  <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{EXPERT_TARIFFS.find(t => t.id === form.tariff)?.label || 'Базовый'}</GlassBadge>
+	                </div>
+	                <div style={{ height: 8, borderRadius: 999, background: 'rgba(23,18,10,0.15)', overflow: 'hidden' }}>
+	                  <div style={{ width: `${formCompletion}%`, height: '100%', borderRadius: 999, background: '#17120a', transition: 'width 0.35s ease' }} />
+	                </div>
+	              </GlassCard>
+	              <ProfileAutosaveNotice autosave={autosave} />
 
               <GlassCard style={{ borderRadius: 32, marginBottom: 12 }}>
                 <GlassBadge tone="gold" style={{ marginBottom: 12 }}>1. Основная информация</GlassBadge>
@@ -891,9 +883,9 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
                 <GlassButton onClick={() => updateForm({ description: aiSuggestions.improvedDescription, shortDescription: aiSuggestions.shortDescription })} style={{ width: '100%', marginTop: 12 }}>Улучшить описание AI</GlassButton>
               </GlassCard>
 
-              <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
-                {saving ? 'Сохраняем...' : saved ? '✓ Сохранено' : 'Сохранить анкету'}
-              </GlassButton>
+	              <GlassButton onClick={handleSave} disabled={saving} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
+	                {saveButtonLabel}
+	              </GlassButton>
             </GlassSection>
           )}
 
@@ -1040,10 +1032,11 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
         )}
 
         {/* ── РЕДАКТИРОВАНИЕ ── */}
-        {activeTab === 'edit' && (
-          <>
-            {/* Фото */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
+	        {activeTab === 'edit' && (
+	          <>
+	            {/* Фото */}
+	            <ProfileAutosaveNotice autosave={autosave} />
+	            <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
               <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, flexShrink: 0, overflow: 'hidden' }}>
                 {fPhoto
                   ? <img src={fPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
@@ -1058,7 +1051,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
                     {uploading ? 'Загрузка...' : '📷 Загрузить фото'}
                   </button>
                   {fPhoto && (
-                    <button onClick={() => setFPhoto('')} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(230,70,70,0.3)', background: 'rgba(230,70,70,0.08)', color: '#E64646', fontSize: 11, cursor: 'pointer' }}>
+	                    <button onClick={() => { setFPhoto(''); updateForm({ photo: '' }); }} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(230,70,70,0.3)', background: 'rgba(230,70,70,0.08)', color: '#E64646', fontSize: 11, cursor: 'pointer' }}>
                       Удалить
                     </button>
                   )}
@@ -1066,32 +1059,32 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
               </div>
             </div>
 
-            <label style={labelStyle}>О себе</label>
-            <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
-              placeholder="Расскажите о своей деятельности, опыте, подходе к работе..."
-              value={fDesc} onChange={e => setFDesc(e.target.value)} />
+	            <label style={labelStyle}>О себе</label>
+	            <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+	              placeholder="Расскажите о своей деятельности, опыте, подходе к работе..."
+	              value={fDesc} onChange={e => { setFDesc(e.target.value); updateForm({ description: e.target.value }); }} />
 
-            <label style={labelStyle}>🎁 Спецпредложение для участников АПГ</label>
-            <input style={inputStyle} placeholder="Скидка 10% на первую консультацию" value={fOffer} onChange={e => setFOffer(e.target.value)} />
+	            <label style={labelStyle}>🎁 Спецпредложение для участников АПГ</label>
+	            <input style={inputStyle} placeholder="Скидка 10% на первую консультацию" value={fOffer} onChange={e => { setFOffer(e.target.value); updateForm({ offer: e.target.value }); }} />
 
-            <label style={labelStyle}>📞 Телефон</label>
-            <input style={inputStyle} placeholder="+7 (499) 123-45-67" value={fPhone} onChange={e => setFPhone(e.target.value)} />
+	            <label style={labelStyle}>📞 Телефон</label>
+	            <input style={inputStyle} placeholder="+7 (499) 123-45-67" value={fPhone} onChange={e => { setFPhone(e.target.value); updateForm({ phone: e.target.value }); }} />
 
-            <label style={labelStyle}>📅 Ссылка для записи</label>
-            <input style={inputStyle} placeholder="https://..." value={fBooking} onChange={e => setFBooking(e.target.value)} />
+	            <label style={labelStyle}>📅 Ссылка для записи</label>
+	            <input style={inputStyle} placeholder="https://..." value={fBooking} onChange={e => { setFBooking(e.target.value); updateForm({ bookingUrl: e.target.value }); }} />
 
-            <label style={labelStyle}>🌐 Сайт</label>
-            <input style={inputStyle} placeholder="https://..." value={fWebsite} onChange={e => setFWebsite(e.target.value)} />
+	            <label style={labelStyle}>🌐 Сайт</label>
+	            <input style={inputStyle} placeholder="https://..." value={fWebsite} onChange={e => { setFWebsite(e.target.value); updateForm({ websiteUrl: e.target.value }); }} />
 
-            <label style={labelStyle}>🔵 Сообщество для ленты VK</label>
-            <input style={inputStyle} placeholder="https://vk.com/..." value={fVk} onChange={e => setFVk(e.target.value)} />
+	            <label style={labelStyle}>🔵 Сообщество для ленты VK</label>
+	            <input style={inputStyle} placeholder="https://vk.com/..." value={fVk} onChange={e => { setFVk(e.target.value); updateForm({ vkUrl: e.target.value }); }} />
             <div style={{ color: T.textSec, fontSize: 11.5, lineHeight: '17px', margin: '-6px 0 10px' }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты”.</div>
 
-            <label style={labelStyle}>✈️ Telegram</label>
-            <input style={inputStyle} placeholder="https://telegram.me/..." value={fTelegram} onChange={e => setFTelegram(e.target.value)} />
+	            <label style={labelStyle}>✈️ Telegram</label>
+	            <input style={inputStyle} placeholder="https://telegram.me/..." value={fTelegram} onChange={e => { setFTelegram(e.target.value); updateForm({ telegramUrl: e.target.value }); }} />
 
-            <label style={labelStyle}>💬 Max</label>
-            <input style={inputStyle} placeholder="https://..." value={fMax} onChange={e => setFMax(e.target.value)} />
+	            <label style={labelStyle}>💬 Max</label>
+	            <input style={inputStyle} placeholder="https://..." value={fMax} onChange={e => { setFMax(e.target.value); updateForm({ maxUrl: e.target.value }); }} />
 
             <button onClick={handleSave} disabled={saving} style={{
               width: '100%', padding: '15px 0', borderRadius: 16, border: 'none',
@@ -1101,8 +1094,8 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
               opacity: saving ? 0.7 : 1, transition: 'all 0.25s',
               outline: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
             }}>
-              {saving ? 'Сохраняем...' : saved ? '✓ Сохранено!' : 'Сохранить изменения'}
-            </button>
+	              {saveButtonLabel}
+	            </button>
 
             <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: 12 }}>
               <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px' }}>

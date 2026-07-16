@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
@@ -14,6 +14,7 @@ import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.
 import { shareLink } from './utils/shareLink.js';
 import { aiProfileListToText, buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
+import { useProfileAutosave } from './hooks/useProfileAutosave.js';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -31,6 +32,45 @@ export function StatCard({ icon, label, value, sub, color }) {
       <div style={{ fontSize: 24, fontWeight: 900, color: color ?? T.gold, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: 10, color: T.textSec, marginTop: 3, lineHeight: '14px' }}>{label}</div>
       {sub && <div style={{ fontSize: 9, color: color ?? T.gold, fontWeight: 700, marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+export function ProfileAutosaveNotice({ autosave, compact = false }) {
+  const view = {
+    dirty: ['🟡', 'Есть несохранённые изменения', 'rgba(215,184,106,0.13)', 'rgba(215,184,106,0.28)'],
+    saving: ['🔵', 'Выполняется сохранение...', 'rgba(91,149,255,0.13)', 'rgba(91,149,255,0.28)'],
+    saved: ['🟢', 'Все изменения сохранены', 'rgba(75,179,75,0.12)', 'rgba(75,179,75,0.28)'],
+    error: ['🔴', 'Ошибка сохранения', 'rgba(230,70,70,0.12)', 'rgba(230,70,70,0.28)'],
+    offline: ['🔴', 'Нет соединения. Черновик сохранён', 'rgba(230,70,70,0.12)', 'rgba(230,70,70,0.28)'],
+    conflict: ['🔴', 'Профиль изменён на другом устройстве', 'rgba(230,70,70,0.12)', 'rgba(230,70,70,0.28)'],
+    recovered: ['🟡', 'Найден локальный черновик', 'rgba(215,184,106,0.13)', 'rgba(215,184,106,0.28)'],
+    idle: ['🟢', 'Все изменения сохранены', 'rgba(75,179,75,0.12)', 'rgba(75,179,75,0.28)'],
+  }[autosave.state || 'idle'];
+  const [icon, title, background, border] = view;
+  const details = autosave.message && autosave.message !== title ? autosave.message : '';
+  const showRecovery = autosave.state === 'recovered';
+  const showConflict = autosave.state === 'conflict';
+  return (
+    <div style={{ margin: compact ? '0 0 10px' : '0 0 12px', padding: compact ? '9px 11px' : '11px 12px', borderRadius: compact ? 16 : 20, background, border: `1px solid ${border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: APG2_PROFILE.text, fontSize: compact ? 12 : 13, fontWeight: 820 }}>
+        <span>{icon}</span>
+        <span>{title}</span>
+      </div>
+      {details && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 4 }}>{details}</div>}
+      {showConflict && autosave.conflictFields?.length > 0 && (
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 4 }}>
+          Конфликтующие поля: {autosave.conflictFields.join(', ')}
+        </div>
+      )}
+      {(showRecovery || showConflict) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          {showRecovery && <GlassButton onClick={autosave.restoreDraft} style={{ minHeight: 34, padding: '6px 10px', borderRadius: 14 }}>Восстановить</GlassButton>}
+          {showRecovery && <GlassButton onClick={autosave.discardDraft} style={{ minHeight: 34, padding: '6px 10px', borderRadius: 14 }}>Оставить серверную</GlassButton>}
+          {showConflict && <GlassButton onClick={autosave.reloadServer} style={{ minHeight: 34, padding: '6px 10px', borderRadius: 14 }}>Обновить</GlassButton>}
+          {showConflict && <GlassButton tone="gold" onClick={autosave.keepLocalChanges} style={{ minHeight: 34, padding: '6px 10px', borderRadius: 14, color: '#17120a' }}>Оставить мои изменения</GlassButton>}
+        </div>
+      )}
     </div>
   );
 }
@@ -280,8 +320,6 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState('launch');
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
   const [uploading, setUploading] = useState(false);
   const logoInputRef              = useRef(null);
 
@@ -320,6 +358,61 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     }).catch(() => setLoading(false));
   }, [initialPartner?.id]);
 
+  const selectPartnerSaveData = useCallback((source = {}) => ({
+    description: String(source.description || '').trim(),
+    offer: String(source.offer || '').trim(),
+    phone: String(source.phone || '').trim(),
+    hours: String(source.hours || '').trim(),
+    socialUrl: normalizeExternalUrl(source.socialUrl || ''),
+    logoUrl: String(source.logoUrl || '').trim(),
+  }), []);
+
+  const partnerSaveData = useMemo(() => ({
+    description: fDesc.trim(),
+    offer: fOffer.trim(),
+    phone: fPhone.trim(),
+    hours: fHours.trim(),
+    socialUrl: normalizeExternalUrl(fSocial),
+    logoUrl: fLogo.trim(),
+  }), [fDesc, fOffer, fPhone, fHours, fSocial, fLogo]);
+
+  const applyPartnerDraft = useCallback((draft = {}) => {
+    setFDesc(draft.description ?? '');
+    setFOffer(draft.offer ?? '');
+    setFPhone(draft.phone ?? '');
+    setFHours(draft.hours ?? '');
+    setFSocial(draft.socialUrl ?? '');
+    setFLogo(draft.logoUrl ?? '');
+  }, []);
+
+  const validatePartnerSave = useCallback((data = {}) => {
+    const phone = String(data.phone || '').trim();
+    if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) return 'Некорректный номер телефона. Пример: +7 (999) 123-45-67';
+    const socialResult = validateExternalUrl(data.socialUrl);
+    if (!socialResult.ok) return `Соцсеть: ${socialResult.error}`;
+    return '';
+  }, []);
+
+  const autosave = useProfileAutosave({
+    id: partner?.id,
+    collectionName: 'partners',
+    action: 'partner:profileUpdate',
+    data: partnerSaveData,
+    profile: partner,
+    selectData: selectPartnerSaveData,
+    validate: validatePartnerSave,
+    onApplyDraft: applyPartnerDraft,
+    onSaved: (updated, patch) => {
+      setPartner(updated);
+      onPartnerUpdate?.(updated.id, patch && Object.keys(patch).length ? patch : updated);
+    },
+    onToast,
+  });
+
+  const saving = autosave.state === 'saving';
+  const saved = autosave.savedPulse;
+  const saveButtonLabel = saving ? 'Сохранение...' : saved ? '✓ Сохранено' : autosave.dirty ? 'Сохранить сейчас' : 'Все сохранено';
+
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -337,47 +430,17 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   };
 
   const handleSave = async () => {
-    if (!partner?.id) return;
-    const phone = fPhone.trim();
-    if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) {
-      onToast?.('Некорректный номер телефона. Пример: +7 (999) 123-45-67', 'error');
-      return;
-    }
-    const socialResult = validateExternalUrl(fSocial);
-    if (!socialResult.ok) {
-      onToast?.(`Соцсеть: ${socialResult.error}`, 'error');
-      return;
-    }
-    setSaving(true);
-    try {
-      const data = {
-        description:      fDesc.trim(),
-        offer:            fOffer.trim(),
-        phone:            fPhone.trim(),
-        hours:            fHours.trim(),
-        socialUrl:        normalizeExternalUrl(fSocial),
-        logoUrl:          fLogo.trim(),
-      };
-      await userAction('partner:profileUpdate', { id: partner.id, patch: data });
-      const updated = { ...partner, ...data };
-      setPartner(updated);
-      onPartnerUpdate?.(updated);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch (error) {
-      onToast?.(error?.message || 'Ошибка сохранения. Попробуйте ещё раз.', 'error');
-    }
-    setSaving(false);
+    await autosave.saveNow();
   };
 
   const handleAiProfileSave = async (aiProfile) => {
     if (!partner?.id) return;
     await userAction('partner:profileUpdate', { id: partner.id, patch: { aiProfile } });
-    const updated = { ...partner, aiProfile };
-    setPartner(updated);
-    setFAiProfile(aiProfile);
-    onPartnerUpdate?.(updated);
-  };
+	    const updated = { ...partner, aiProfile };
+	    setPartner(updated);
+	    setFAiProfile(aiProfile);
+	    onPartnerUpdate?.(updated.id, { aiProfile });
+	  };
 
   if (!partner) return null;
 
@@ -804,9 +867,10 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* ── Карточка ── */}
           {activeTab === 'edit' && (
-            <GlassSection title="Карточка партнера">
-              <GlassCard style={{ borderRadius: 32 }}>
-                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Логотип</label>
+	            <GlassSection title="Карточка партнера">
+	              <GlassCard style={{ borderRadius: 32 }}>
+	                <ProfileAutosaveNotice autosave={autosave} compact />
+	                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Логотип</label>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '8px 0 14px' }}>
                   <div style={{ width: 64, height: 64, borderRadius: 24, background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {fLogo ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (partner.emoji ?? '🏪')}
@@ -831,9 +895,9 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                 <input value={fSocial} onChange={e => setFSocial(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} placeholder="https://vk.com/mypage" />
                 <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: -6, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты” вашей карточки.</div>
 
-                <GlassButton onClick={handleSave} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
-                  {saving ? 'Сохраняем...' : saved ? '✓ Сохранено' : 'Сохранить изменения'}
-                </GlassButton>
+	                <GlassButton onClick={handleSave} disabled={saving} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
+	                  {saveButtonLabel}
+	                </GlassButton>
 
                 <div style={{ marginTop: 10, padding: '10px 12px', background: 'rgba(215,184,106,0.07)', border: '1px solid rgba(215,184,106,0.18)', borderRadius: 16 }}>
                   <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, lineHeight: '17px' }}>
@@ -1021,9 +1085,10 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
         {/* ── РЕДАКТИРОВАНИЕ ── */}
         {activeTab === 'edit' && (
-          <>
-            {/* Логотип */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
+	          <>
+	            {/* Логотип */}
+	            <ProfileAutosaveNotice autosave={autosave} />
+	            <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
               <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                 {fLogo
                   ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
@@ -1083,8 +1148,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                 outline: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
               }}
             >
-              {saving ? 'Сохраняем...' : saved ? '✓ Сохранено!' : 'Сохранить изменения'}
-            </button>
+	              {saveButtonLabel}
+	            </button>
 
             <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: 12 }}>
               <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px' }}>
