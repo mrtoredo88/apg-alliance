@@ -184,15 +184,23 @@ const feedFramework = read('src/components/FeedFramework.jsx');
 assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timeline source through existing backend endpoint');
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
 assert.match(timelineComponent, /UniversalFeed/, 'timeline UI must render the shared universal Feed Framework');
+assert.doesNotMatch(timelineComponent, /buildProfileHistory/, 'profile feed UI must not render the old History block');
+assert.doesNotMatch(timelineComponent, /Smart Summary/, 'profile feed UI must not render summary cards before the feed');
+assert.doesNotMatch(timelineComponent, />История</, 'profile feed UI must not render the History section');
 assert.doesNotMatch(timelineComponent, /TIMELINE_FILTERS/, 'timeline UI must not render old source filter tabs');
 assert.doesNotMatch(timelineComponent, /filter\.label/, 'timeline UI must not render the old All/News source pills');
 assert.match(timelineComponent, /groupProfileTimelineItems/, 'timeline UI must group items by period');
 assert.match(feedFramework, /Показать полностью/, 'long feed entries must be expandable');
 assert.match(timelineComponent, /Показать ещё/, 'timeline must use progressive pagination');
-assert.match(timelineComponent, /Закреплено/, 'pinned timeline item must be visible in UI');
+assert.match(feedFramework, /Закреплено/, 'pinned timeline item must be visible in the shared Feed Framework UI');
 assert.match(timelineComponent, /VK-источник временно недоступен, остальные события ленты показаны/, 'VK failure must not break the full timeline');
 assert.match(feedFramework, /export function UniversalFeedCard/, 'Feed Framework must expose one reusable feed card');
 assert.match(feedFramework, /export function UniversalFeed/, 'Feed Framework must expose the reusable feed list');
+assert.match(feedFramework, /FEED_ACTIVITY_TYPES/, 'Feed Framework must expose the universal activity type model');
+for (const type of ['NEWS', 'EVENT', 'PROMOTION', 'PHOTO', 'VIDEO', 'REVIEW', 'ACHIEVEMENT', 'ANNOUNCEMENT']) {
+  assert.match(feedFramework, new RegExp(type), `Feed Framework must support ${type} activity type`);
+}
+assert.match(feedFramework, /getFeedTypeMeta/, 'Feed Framework must normalize current source aliases to activity badges');
 assert.match(feedFramework, /MediaPreview/, 'Feed Framework must use Smart Media Framework for images, galleries and video');
 assert.match(feedFramework, /item\.feedTimestamp \|\| item\.publishDate \|\| item\.publishedAt \|\| item\.createdAt \|\| item\.created/, 'Feed Framework must sort by normalized feedTimestamp before existing publication date fields');
 assert.match(feedFramework, /likesCount|commentCount|commentsCount/, 'Feed card must preserve social counters when existing data provides them');

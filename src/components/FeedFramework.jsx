@@ -4,17 +4,50 @@ import { formatRelativeTime } from '../utils/time.js';
 import { APG2_PROFILE as APG2, GlassButton } from './Apg2ProfileGlass.jsx';
 import { MediaPreview } from './DesktopUI.jsx';
 
-const FEED_TYPE_META = {
-  publication: { icon: '📰', label: 'Публикация', tone: 'rgba(91,143,219,0.16)', accent: '#5b8fdb' },
-  event: { icon: '🎉', label: 'Мероприятие', tone: 'rgba(201,168,76,0.16)', accent: APG2.gold },
-  offer: { icon: '🎁', label: 'Акция', tone: 'rgba(232,197,109,0.20)', accent: '#e8c56d' },
-  video: { icon: '▶', label: 'Видео', tone: 'rgba(217,93,84,0.16)', accent: '#d95d54' },
-  photo: { icon: '▣', label: 'Фото', tone: 'rgba(75,179,75,0.15)', accent: '#4bb34b' },
-  review: { icon: '⭐', label: 'Отзыв', tone: 'rgba(255,215,0,0.15)', accent: '#ffd76a' },
-  vk: { icon: 'VK', label: 'VK', tone: 'rgba(74,118,168,0.16)', accent: '#4a76a8' },
-  achievement: { icon: '🏆', label: 'Достижение', tone: 'rgba(201,168,76,0.16)', accent: APG2.gold },
-  announcement: { icon: '✦', label: 'Объявление', tone: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', accent: APG2.gold },
+export const FEED_ACTIVITY_TYPES = {
+  NEWS: 'NEWS',
+  EVENT: 'EVENT',
+  PROMOTION: 'PROMOTION',
+  PHOTO: 'PHOTO',
+  VIDEO: 'VIDEO',
+  REVIEW: 'REVIEW',
+  ACHIEVEMENT: 'ACHIEVEMENT',
+  ANNOUNCEMENT: 'ANNOUNCEMENT',
 };
+
+const FEED_TYPE_ALIASES = {
+  publication: FEED_ACTIVITY_TYPES.NEWS,
+  news: FEED_ACTIVITY_TYPES.NEWS,
+  event: FEED_ACTIVITY_TYPES.EVENT,
+  offer: FEED_ACTIVITY_TYPES.PROMOTION,
+  promotion: FEED_ACTIVITY_TYPES.PROMOTION,
+  promo: FEED_ACTIVITY_TYPES.PROMOTION,
+  photo: FEED_ACTIVITY_TYPES.PHOTO,
+  photos: FEED_ACTIVITY_TYPES.PHOTO,
+  video: FEED_ACTIVITY_TYPES.VIDEO,
+  review: FEED_ACTIVITY_TYPES.REVIEW,
+  achievement: FEED_ACTIVITY_TYPES.ACHIEVEMENT,
+  announcement: FEED_ACTIVITY_TYPES.ANNOUNCEMENT,
+  vk: FEED_ACTIVITY_TYPES.NEWS,
+};
+
+const FEED_TYPE_META = {
+  [FEED_ACTIVITY_TYPES.NEWS]: { icon: '📰', label: 'Новость', tone: 'rgba(91,143,219,0.16)', accent: '#5b8fdb' },
+  [FEED_ACTIVITY_TYPES.EVENT]: { icon: '📅', label: 'Мероприятие', tone: 'rgba(201,168,76,0.16)', accent: APG2.gold },
+  [FEED_ACTIVITY_TYPES.PROMOTION]: { icon: '🎁', label: 'Акция', tone: 'rgba(232,197,109,0.20)', accent: '#e8c56d' },
+  [FEED_ACTIVITY_TYPES.PHOTO]: { icon: '📸', label: 'Фото', tone: 'rgba(75,179,75,0.15)', accent: '#4bb34b' },
+  [FEED_ACTIVITY_TYPES.VIDEO]: { icon: '🎥', label: 'Видео', tone: 'rgba(217,93,84,0.16)', accent: '#d95d54' },
+  [FEED_ACTIVITY_TYPES.REVIEW]: { icon: '⭐', label: 'Отзыв', tone: 'rgba(255,215,0,0.15)', accent: '#ffd76a' },
+  [FEED_ACTIVITY_TYPES.ACHIEVEMENT]: { icon: '🏆', label: 'Достижение', tone: 'rgba(201,168,76,0.16)', accent: APG2.gold },
+  [FEED_ACTIVITY_TYPES.ANNOUNCEMENT]: { icon: '✦', label: 'Объявление', tone: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', accent: APG2.gold },
+};
+
+function getFeedTypeMeta(type) {
+  const key = String(type || '').trim();
+  if (!key) return null;
+  const normalized = FEED_ACTIVITY_TYPES[key.toUpperCase()] || FEED_TYPE_ALIASES[key.toLowerCase()] || '';
+  return normalized ? FEED_TYPE_META[normalized] : null;
+}
 
 function asArray(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -109,7 +142,9 @@ export function UniversalFeedCard({
   onShare = shareFeedItem,
 }) {
   if (!item) return null;
-  const meta = FEED_TYPE_META[item.type] || FEED_TYPE_META.publication;
+  const meta = getFeedTypeMeta(item.type);
+  const tone = meta?.tone || 'rgba(var(--apg2-glass-a,255,255,255),0.10)';
+  const accent = meta?.accent || APG2.gold;
   const media = getFeedMedia(item);
   const text = String(item.text || '').trim();
   const canExpand = text.length > (desktop ? 260 : 160);
@@ -137,7 +172,7 @@ export function UniversalFeedCard({
       transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease',
     }}>
       <header style={{ display: 'grid', gridTemplateColumns: '42px minmax(0, 1fr) auto', gap: 10, alignItems: 'center', minWidth: 0 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 16, overflow: 'hidden', display: 'grid', placeItems: 'center', color: APG2.gold, background: meta.tone, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', fontSize: 16, fontWeight: 900 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 16, overflow: 'hidden', display: 'grid', placeItems: 'center', color: APG2.gold, background: tone, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', fontSize: 16, fontWeight: 900 }}>
           {authorLogo ? <img src={authorLogo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={event => { event.currentTarget.style.display = 'none'; }} /> : authorInitial}
         </div>
         <div style={{ minWidth: 0 }}>
@@ -146,12 +181,12 @@ export function UniversalFeedCard({
             {item.pinned && <span style={{ color: APG2.gold, fontSize: 10.5, fontWeight: 840, border: `1px solid ${APG2.gold}55`, borderRadius: 999, padding: '2px 7px', whiteSpace: 'nowrap' }}>Закреплено</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3, minWidth: 0, color: APG2.textMuted, fontSize: 11.2, lineHeight: '14px' }}>
-            <span style={{ color: meta.accent, fontWeight: 820 }}>{item.label || meta.label}</span>
-            <span>·</span>
+            {meta && <span style={{ color: accent, fontWeight: 820 }}>{meta.icon} {meta.label}</span>}
+            {meta && <span>·</span>}
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatRelativeTime(item.feedTimestamp || item.date || item.ts)}</span>
           </div>
         </div>
-        <span style={{ minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: meta.icon === 'VK' ? '0 7px' : 0, background: meta.tone, color: meta.accent, fontSize: meta.icon === 'VK' ? 10 : 14, fontWeight: 900 }}>{meta.icon}</span>
+        {meta ? <span style={{ minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: tone, color: accent, fontSize: 14, fontWeight: 900 }}>{meta.icon}</span> : <span />}
       </header>
 
       <button type="button" onClick={open} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 18 : 16, lineHeight: desktop ? '23px' : '21px', fontWeight: 890, overflowWrap: 'anywhere', cursor: 'pointer', fontFamily: 'inherit' }}>

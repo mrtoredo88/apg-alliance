@@ -2,13 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { openUrl } from '../vk.js';
 import {
-  buildProfileHistory,
   buildProfileTimeline,
   buildProfileNowPriority,
-  buildProfileSmartSummary,
   groupProfileTimelineItems,
 } from '../profileTimeline.js';
-import { formatRelativeTime } from '../utils/time.js';
 import { normalizeExternalUrl } from '../utils/externalUrls.js';
 import { APG2_PROFILE as APG2, GlassButton } from './Apg2ProfileGlass.jsx';
 import { DesktopEmptyState } from './DesktopUI.jsx';
@@ -155,18 +152,7 @@ export function ProfileTimelineSection({
     nowValue: Date.now(),
   }), [profile, role, news, events, reviews, vkState.posts]);
   const timelineItems = useMemo(() => buildProfileTimeline({ profile, role, news, events, reviews, vkPosts: vkState.posts }), [profile, role, news, events, reviews, vkState.posts]);
-  const pinnedItems = useMemo(() => timelineItems.filter(item => item.pinned), [timelineItems]);
-  const listItems = useMemo(() => timelineItems.filter(item => !item.pinned), [timelineItems]);
-  const profileHistory = useMemo(() => buildProfileHistory({
-    profile,
-    role,
-    news,
-    events,
-    reviews,
-    vkPosts: vkState.posts,
-  }), [profile, role, news, events, reviews, vkState.posts]);
-  const smartSummary = useMemo(() => buildProfileSmartSummary({ news, events, reviews, nowValue: Date.now() }), [news, events, reviews]);
-  const filteredItems = listItems;
+  const filteredItems = timelineItems;
   const visibleItems = filteredItems.slice(0, visibleCount);
   const groups = useMemo(() => groupProfileTimelineItems(visibleItems), [visibleItems]);
   useEffect(() => {
@@ -174,8 +160,7 @@ export function ProfileTimelineSection({
   }, [desktop, profile?.id]);
   const toggleExpanded = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const showTimelineList = listItems.length > 0;
-  const hasPinnedItems = pinnedItems.length > 0;
+  const showTimelineList = timelineItems.length > 0;
   const showImportantOnly = mode === 'important';
   const showNowPriority = mode === 'full' || mode === 'important';
 
@@ -195,43 +180,6 @@ export function ProfileTimelineSection({
 
         {showImportantOnly ? null : (
         <>
-
-        {hasPinnedItems ? (
-        <section style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Закреплено</div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            <UniversalFeed
-              groups={[{ id: 'pinned', label: '', items: pinnedItems }]}
-              desktop={desktop}
-              expanded={expanded}
-              onToggleExpanded={toggleExpanded}
-              onOpen={item => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking })}
-            />
-          </div>
-        </section>
-        ) : null}
-
-        <section style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Smart Summary (30 дней)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-            <LivingMetricCard compact title="Публикации" text={`${smartSummary.publications} шт`} />
-            <LivingMetricCard compact title="Мероприятия" text={`${smartSummary.events} шт`} />
-            <LivingMetricCard compact title="Отзывы" text={`${smartSummary.reviews} шт`} />
-          </div>
-        </section>
-
-        <section style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>История</div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {profileHistory.length ? profileHistory.map(item => (
-              <div key={item.id} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.045)', padding: '10px 12px', borderRadius: 16, display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
-                <div style={{ color: APG2.text, fontSize: 13, lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                <div style={{ color: APG2.textSoft, fontSize: 11, whiteSpace: 'nowrap' }}>{formatRelativeTime(item.date)}</div>
-              </div>
-            )) : <div style={{ color: APG2.textMuted, fontSize: 13 }}>История пока не заполнена.</div>}
-          </div>
-        </section>
-
         {vkState.loading && !showTimelineList && (
           <div style={{ display: 'grid', gap: 10 }}>
             {[0, 1, 2].map(index => <div key={index} style={{ height: desktop ? 112 : 96, borderRadius: desktop ? 20 : 24, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }} />)}

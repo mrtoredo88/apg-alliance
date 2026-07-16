@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-16] feat: Feed Experience v2
+**Коммит:** `pending`
+**Файлы:** `src/components/ProfileTimelineSection.jsx`, `src/components/FeedFramework.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Из основной вкладки `Лента` удалены промежуточные блоки `История` и `Smart Summary`, чтобы профиль сразу переходил от информации к живой ленте.
+- Закреплённые публикации теперь идут через общий feed/grouping-поток и остаются первыми без отдельного ручного блока.
+- Feed Framework получил универсальную activity-модель `NEWS`, `EVENT`, `PROMOTION`, `PHOTO`, `VIDEO`, `REVIEW`, `ACHIEVEMENT`, `ANNOUNCEMENT` с aliases для существующих типов.
+- Бейджи типов публикации стали явными (`Новость`, `Мероприятие`, `Акция`, `Видео`, `Фото`, `Отзыв`, `Достижение`, `Объявление`); неизвестный тип не показывает бейдж.
+**Почему:** профиль партнёра и эксперта должен ощущаться как современный социальный профиль: информация сверху и сразу живая лента активности без лишних промежуточных секций.
+
+---
+
 ## [2026-07-16] fix: Feed Framework sorting hotfix
 **Коммит:** `pending`
 **Файлы:** `src/profileTimeline.js`, `src/components/FeedFramework.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
