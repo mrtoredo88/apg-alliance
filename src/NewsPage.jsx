@@ -1001,7 +1001,7 @@ export function NewsCard({ item, index = 0, onOpen = () => {}, onShare = () => {
   );
 }
 
-function ArticleView({
+export function ArticleView({
   item,
   related,
   previousItem,

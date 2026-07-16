@@ -22,6 +22,7 @@ import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
 import { buildLivingProfileTabs } from './profileTimeline.js';
+import { ArticleView } from './NewsPage.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
@@ -305,6 +306,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
   const [submitting, setSubmitting] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
   const [desktopTab, setDesktopTab] = useState('about');
+  const [selectedProfileNews, setSelectedProfileNews] = useState(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -315,6 +317,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
   useEffect(() => {
     if (!expert?.id) return;
     setDesktopTab('feed');
+    setSelectedProfileNews(null);
     let cancelled = false;
     setReviewsLoading(true);
     getDocs(query(collection(db, 'expertReviews'), where('expertId', '==', expert.id)))
@@ -332,6 +335,23 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       .finally(() => { if (!cancelled) setReviewsLoading(false); });
     return () => { cancelled = true; };
   }, [expert?.id]);
+
+  const handleOpenProfileNews = (item) => {
+    if (!item) return;
+    setSelectedProfileNews(item);
+  };
+  const selectedProfileArticle = selectedProfileNews && (
+    <ArticleView
+      item={selectedProfileNews}
+      related={[]}
+      previousItem={null}
+      nextItem={null}
+      onClose={(next) => next?.id ? setSelectedProfileNews(next) : setSelectedProfileNews(null)}
+      onNavigate={setSelectedProfileNews}
+      user={user}
+      desktopMode={desktopMode}
+    />
+  );
 
   const handleSubmitReview = async () => {
     if (!user || !myRating || submitting) return;
@@ -502,7 +522,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                     reviews={reviews}
                     desktop
                     isOwner={isProfileOwner}
-                    onOpenNews={onOpenNews}
+                    onOpenNews={handleOpenProfileNews}
                     onOpenEvent={onOpenEvent}
                     onOpenTab={setDesktopTab}
                     onOpenBooking={() => onBook?.(expert)}
@@ -613,6 +633,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
           {lightboxIdx !== null && expert.gallery?.length > 0 && (
             <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
           )}
+          {selectedProfileArticle}
         </>,
         document.body,
       );
@@ -680,7 +701,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 events={events}
                 reviews={reviews}
                 isOwner={isProfileOwner}
-                onOpenNews={onOpenNews}
+                onOpenNews={handleOpenProfileNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}
                 onOpenBooking={() => onBook?.(expert)}
@@ -805,6 +826,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
         {lightboxIdx !== null && expert.gallery?.length > 0 && (
           <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
         )}
+        {selectedProfileArticle}
       </>,
       document.body,
     );

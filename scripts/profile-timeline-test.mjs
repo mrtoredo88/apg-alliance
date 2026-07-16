@@ -198,9 +198,22 @@ assert.equal(todayPublications[2].title, 'Сегодня старое', 'timelin
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 const feedFramework = read('src/components/FeedFramework.jsx');
+const partnerPage = read('src/PartnerPage.jsx');
+const expertsPage = read('src/ExpertsPage.jsx');
+const newsPage = read('src/NewsPage.jsx');
 assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timeline source through existing backend endpoint');
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
 assert.match(timelineComponent, /UniversalFeed/, 'timeline UI must render the shared universal Feed Framework');
+assert.match(timelineComponent, /onOpen=\{item => openTimelineItem\(item/, 'profile feed must delegate item opening through a container callback');
+assert.doesNotMatch(feedFramework, /navigate\(/, 'Feed Framework must not hard-code router navigation');
+assert.doesNotMatch(feedFramework, /openNews\(/, 'Feed Framework must not call global news opening directly');
+assert.match(newsPage, /export function ArticleView/, 'ArticleView must be reusable by contextual profile feeds');
+assert.match(partnerPage, /selectedProfileNews/, 'Partner profile must keep selected feed publication in local state');
+assert.match(partnerPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Partner profile feed must open publications locally instead of global news');
+assert.match(partnerPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Partner profile must render contextual ArticleView inside the profile flow');
+assert.match(expertsPage, /selectedProfileNews/, 'Expert profile must keep selected feed publication in local state');
+assert.match(expertsPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Expert profile feed must open publications locally instead of global news');
+assert.match(expertsPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Expert profile must render contextual ArticleView inside the profile flow');
 assert.doesNotMatch(timelineComponent, /buildProfileHistory/, 'profile feed UI must not render the old History block');
 assert.doesNotMatch(timelineComponent, /buildProfileNowPriority/, 'profile feed UI must not render the old What matters now block');
 assert.doesNotMatch(timelineComponent, /Smart Summary/, 'profile feed UI must not render summary cards before the feed');

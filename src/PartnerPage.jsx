@@ -24,6 +24,7 @@ import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
 import { buildLivingProfileTabs } from './profileTimeline.js';
+import { ArticleView } from './NewsPage.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import {
@@ -169,6 +170,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const [phoneCopied, setPhoneCopied]     = useState(false);
   const [shareToast, setShareToast]       = useState('');
   const [desktopTab, setDesktopTab]       = useState('about');
+  const [selectedProfileNews, setSelectedProfileNews] = useState(null);
   const phoneCopyTimerRef                 = useRef(null);
   const shareToastRef                     = useRef(null);
   const mountedRef                        = useRef(true);
@@ -198,7 +200,25 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
   useEffect(() => {
     setDesktopTab('feed');
+    setSelectedProfileNews(null);
   }, [partner?.id]);
+
+  const handleOpenProfileNews = useCallback((item) => {
+    if (!item) return;
+    setSelectedProfileNews(item);
+  }, []);
+  const selectedProfileArticle = selectedProfileNews && (
+    <ArticleView
+      item={selectedProfileNews}
+      related={[]}
+      previousItem={null}
+      nextItem={null}
+      onClose={(next) => next?.id ? setSelectedProfileNews(next) : setSelectedProfileNews(null)}
+      onNavigate={setSelectedProfileNews}
+      user={user}
+      desktopMode={desktopMode}
+    />
+  );
 
   useEffect(() => {
     if (!partner) return;
@@ -543,7 +563,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   reviews={reviews}
                   desktop
                   isOwner={isProfileOwner}
-                  onOpenNews={onOpenNews}
+                  onOpenNews={handleOpenProfileNews}
                   onOpenEvent={onOpenEvent}
                   onOpenTab={setDesktopTab}
                   onOpenBooking={() => onBook?.(partner)}
@@ -702,7 +722,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 events={events}
                 reviews={reviews}
                 isOwner={isProfileOwner}
-                onOpenNews={onOpenNews}
+                onOpenNews={handleOpenProfileNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}
                 onOpenBooking={() => onBook?.(partner)}
@@ -832,12 +852,13 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
           </main>
         </div>
 
-        {lightboxIdx !== null && gallery.length > 0 && (
-          <PhotoLightbox photos={gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
-        )}
-      </>
-    );
-  }
+          {lightboxIdx !== null && gallery.length > 0 && (
+            <PhotoLightbox photos={gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+          )}
+          {selectedProfileArticle}
+        </>
+      );
+    }
 
   return (
     <>
@@ -1182,6 +1203,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       {lightboxIdx !== null && (
         <PhotoLightbox photos={gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
+      {selectedProfileArticle}
     </>
   );
 }

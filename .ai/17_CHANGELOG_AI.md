@@ -3117,6 +3117,13 @@
 - Desktop Catalog rating badges и карточки перешли на theme tokens, а интерактивные карточки с вложенными action-кнопками больше не рендерятся как `<button>` внутри `<button>`.
 - Regression-тесты `desktop-ui-framework-test` и `desktop-profile-test` расширены проверками public dark tokens и запретом старых light-only поверхностей.
 
+# 2026-07-16 — Living Profile Feed Navigation Hotfix
+
+- Исправлена потеря контекста при открытии публикации из вкладки `Лента` внутри профиля партнёра или эксперта.
+- `ArticleView` экспортирован как переиспользуемый detail-компонент; профильные ленты открывают публикации через локальное состояние `selectedProfileNews`, а не через глобальный `onOpenNews`.
+- После закрытия публикации пользователь остаётся внутри текущего профиля, на вкладке `Лента`; DOM профиля не размонтируется, поэтому позиция скролла сохраняется.
+- `scripts/profile-timeline-test.mjs` расширен regression-contract: Feed Framework не должен выполнять route/navigation напрямую, а профили обязаны открывать публикации контекстно.
+
 # 2026-07-14 — Desktop Production Audit Fixes
 
 - Исправлена проводка верхней desktop-навигации Home: `Партнёры` теперь получает `onOpenPartners` из `UserApp`, а не уходит fallback-ом в `Акции`.
