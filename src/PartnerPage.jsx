@@ -27,7 +27,7 @@ import { buildLivingProfileTabs } from './profileTimeline.js';
 import { getCanonicalNewsId } from './newsUtils.js';
 import { ArticleView } from './NewsPage.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
-import { APG2_PROFILE as APG2, ContactCard, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE as APG2, ContactCard, GlassBadge, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { ProfilePhotoGrid, ProfilePhotoViewer, ProfileVideoGrid, ProfileVideoViewer } from './components/ProfileMediaViewer.jsx';
 import {
   DesktopDetailShell,
@@ -580,12 +580,30 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
             {activeTab === 'about' && (
               <DesktopSection title="О компании" subtitle="Описание и основная информация">
-                {partner.description ? (
-                  <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(partner.description) : partner.description}</RichText>
-                ) : (
-                  <div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>Описание пока готовится, но карточка уже доступна для посещений и избранного.</div>
-                )}
-                {infoRows.length > 0 && <DesktopMeta items={infoRows.map(row => ({ id: row.label, label: row.label, value: row.value, icon: row.icon, onClick: row.onClick }))} style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} />}
+                <div style={{ display: 'grid', gridTemplateColumns: contactItems.length > 0 ? 'minmax(0, 1.05fr) minmax(280px, 0.95fr)' : '1fr', gap: 14, alignItems: 'start' }}>
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
+                      {partner.description ? (
+                        <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(partner.description) : partner.description}</RichText>
+                      ) : (
+                        <div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>Описание пока готовится, но карточка уже доступна для посещений и избранного.</div>
+                      )}
+                    </div>
+                    {heroBadges.length > 0 && (
+                      <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                        <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 860, marginBottom: 10 }}>Категории и статусы</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                          {heroBadges.map(label => <GlassBadge key={label} tone={String(label).includes('★') ? 'gold' : 'glass'}>{label}</GlassBadge>)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {contactItems.length > 0 && (
+                    <div style={{ borderRadius: 22, padding: 14, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                      <DesktopMeta items={contactItems} />
+                    </div>
+                  )}
+                </div>
               </DesktopSection>
             )}
 
@@ -603,9 +621,17 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             {activeTab === 'offer' && (
               <DesktopSection title="Акция" subtitle="Актуальное предложение">
                 {partner.offer ? (
-                  <div style={{ ...APG2.goldGlass, borderRadius: 22, padding: 16, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
-                    <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontSize: 24 }}>🎁</div>
-                    <div style={{ fontSize: 15, lineHeight: '22px', fontWeight: 820 }}>{partner.offer}</div>
+                  <div style={{ position: 'relative', minHeight: 220, borderRadius: 24, overflow: 'hidden', color: '#fff', background: 'rgba(201,168,76,0.18)' }}>
+                    {heroImage && <img src={heroImage} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(1.05) contrast(1.04)' }} />}
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(9,9,12,0.82), rgba(9,9,12,0.52), rgba(9,9,12,0.20)), linear-gradient(180deg, rgba(9,9,12,0.08), rgba(9,9,12,0.68))' }} />
+                    <div style={{ position: 'relative', zIndex: 1, minHeight: 220, padding: 20, display: 'grid', alignContent: 'end', gap: 12, maxWidth: 560 }}>
+                      <div style={{ justifySelf: 'start', borderRadius: 999, padding: '6px 10px', color: '#17120a', background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)', fontSize: 11, lineHeight: '14px', fontWeight: 900 }}>Акция</div>
+                      <div style={{ fontSize: 24, lineHeight: '29px', fontWeight: 930 }}>{partner.offer}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {canUseApgBooking && <GlassButton onClick={() => onBook(partner)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
+                        {onAskQuestion && <GlassButton onClick={() => onAskQuestion(partner)} style={{ minHeight: 40, borderRadius: 16, color: '#fff', background: 'rgba(255,255,255,0.16)' }}>Написать</GlassButton>}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <DesktopEmptyState icon="🎁" title="Акций пока нет" text="Когда партнёр добавит предложение для участников АПГ, оно появится здесь." />
@@ -631,6 +657,18 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 subtitle="Отзывы участников АПГ"
                 action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
               >
+                {reviewCount > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)', gap: 12, marginBottom: 2 }}>
+                    <div style={{ borderRadius: 22, padding: 16, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.26)' }}>
+                      <div style={{ color: APG2.gold, fontSize: 32, lineHeight: '36px', fontWeight: 940 }}>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</div>
+                      <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1, marginTop: 4 }}>{avgRating > 0 ? '★'.repeat(Math.round(avgRating)) : '★★★★★'}</div>
+                      <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 6 }}>{reviewCount} отзывов</div>
+                    </div>
+                    <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                      Отзывы помогают другим участникам АПГ понять качество места и выбрать подходящий сценарий визита.
+                    </div>
+                  </div>
+                )}
                 {!canReview && !reviewsLoading && (
                   <div style={{ borderRadius: 18, padding: 12, color: APG2.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', fontSize: 13, lineHeight: '18px', marginBottom: 10 }}>
                     Оставить отзыв можно после посещения и скана QR-кода.

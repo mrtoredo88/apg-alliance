@@ -148,6 +148,23 @@ if (!partnerDetailSource.includes("activeTab === 'feed'")
   throw new Error('PartnerPage desktop tabs must follow Living Profile v4 order.');
 }
 
+if (!partnerDetailSource.includes("gridTemplateColumns: contactItems.length > 0 ? 'minmax(0, 1.05fr) minmax(280px, 0.95fr)' : '1fr'")
+  || !partnerDetailSource.includes('Категории и статусы')
+  || !partnerDetailSource.includes('<DesktopMeta items={contactItems} />')) {
+  throw new Error('PartnerPage about tab must use the Living Profile v5 desktop card composition.');
+}
+
+if (!partnerDetailSource.includes("position: 'relative', minHeight: 220")
+  || !partnerDetailSource.includes("filter: 'saturate(1.05) contrast(1.04)'")
+  || !partnerDetailSource.includes("background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)'")) {
+  throw new Error('PartnerPage offer tab must use the Living Profile v5 covered promo card.');
+}
+
+if (!partnerDetailSource.includes('Отзывы помогают другим участникам АПГ')
+  || !partnerDetailSource.includes("gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)'")) {
+  throw new Error('PartnerPage reviews tab must include the Living Profile v5 rating summary.');
+}
+
 for (const requiredPartnerField of ['partner.bookingUrl', 'partner.socialUrl', 'partner.maxCommunityUrl', 'partner.telegramCommunityUrl', 'stampTarget > 0', "activeTab === 'video'", 'VideoSection videos={partner.videos}']) {
   if (!partnerDetailSource.includes(requiredPartnerField)) {
     throw new Error(`PartnerPage desktop detail must preserve mobile partner field/action: ${requiredPartnerField}`);

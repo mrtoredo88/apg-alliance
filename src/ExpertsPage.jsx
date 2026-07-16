@@ -539,16 +539,31 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
               {activeTab === 'about' && (
                 <DesktopSection title="О компании" subtitle="Описание и направления работы">
-                  {expert.description ? (
-                    <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
-                  ) : (
-                    <div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>Описание эксперта пока готовится.</div>
-                  )}
-                  {categoryLabels.length > 0 && (
-                    <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 13 }}>
-                      {categoryLabels.map(item => <GlassBadge key={item.id}>{item.emoji} {item.label}</GlassBadge>)}
+                  <div style={{ display: 'grid', gridTemplateColumns: contactItems.length > 0 ? 'minmax(0, 1.05fr) minmax(280px, 0.95fr)' : '1fr', gap: 14, alignItems: 'start' }}>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
+                        {expert.description ? (
+                          <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
+                        ) : (
+                          <div style={{ color: APG2.textSoft, fontSize: 14, lineHeight: '21px' }}>Описание эксперта пока готовится.</div>
+                        )}
+                      </div>
+                      {(categoryLabels.length > 0 || expert.formats?.length > 0) && (
+                        <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                          <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 860, marginBottom: 10 }}>Категории и форматы</div>
+                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                            {categoryLabels.map(item => <GlassBadge key={item.id}>{item.emoji} {item.label}</GlassBadge>)}
+                            {expert.formats?.map(f => <FormatChip key={f} format={f} />)}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {contactItems.length > 0 && (
+                      <div style={{ borderRadius: 22, padding: 14, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                        <DesktopMeta items={contactItems} />
+                      </div>
+                    )}
+                  </div>
                 </DesktopSection>
               )}
 
@@ -579,9 +594,17 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               {activeTab === 'offer' && (
                 <DesktopSection title="Акция" subtitle="Предложение эксперта">
                   {expert.offer ? (
-                    <div style={{ ...APG2.goldGlass, borderRadius: 22, padding: 16, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
-                      <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontSize: 24 }}>🎁</div>
-                      <div style={{ fontSize: 15, lineHeight: '22px', fontWeight: 820 }}>{expert.offer}</div>
+                    <div style={{ position: 'relative', minHeight: 220, borderRadius: 24, overflow: 'hidden', color: '#fff', background: 'rgba(201,168,76,0.18)' }}>
+                      {heroImage && <img src={heroImage} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(1.05) contrast(1.04)' }} />}
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(9,9,12,0.82), rgba(9,9,12,0.52), rgba(9,9,12,0.20)), linear-gradient(180deg, rgba(9,9,12,0.08), rgba(9,9,12,0.68))' }} />
+                      <div style={{ position: 'relative', zIndex: 1, minHeight: 220, padding: 20, display: 'grid', alignContent: 'end', gap: 12, maxWidth: 560 }}>
+                        <div style={{ justifySelf: 'start', borderRadius: 999, padding: '6px 10px', color: '#17120a', background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)', fontSize: 11, lineHeight: '14px', fontWeight: 900 }}>Акция</div>
+                        <div style={{ fontSize: 24, lineHeight: '29px', fontWeight: 930 }}>{expert.offer}</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {canUseApgBooking && <GlassButton onClick={() => onBook(expert)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
+                          {onAskQuestion && <GlassButton onClick={() => onAskQuestion(expert)} style={{ minHeight: 40, borderRadius: 16, color: '#fff', background: 'rgba(255,255,255,0.16)' }}>Написать</GlassButton>}
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <DesktopEmptyState icon="🎁" title="Акций пока нет" text="Когда эксперт добавит предложение для участников АПГ, оно появится здесь." />
@@ -612,6 +635,18 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
               {activeTab === 'reviews' && (
                 <DesktopSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`} subtitle="Отзывы участников АПГ">
+                  {(expert.reviewCount ?? reviews.length) > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)', gap: 12, marginBottom: 12 }}>
+                      <div style={{ borderRadius: 22, padding: 16, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.26)' }}>
+                        <div style={{ color: APG2.gold, fontSize: 32, lineHeight: '36px', fontWeight: 940 }}>{(expert.avgRating ?? 0) > 0 ? expert.avgRating.toFixed(1) : '—'}</div>
+                        <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1, marginTop: 4 }}>{(expert.avgRating ?? 0) > 0 ? '★'.repeat(Math.round(expert.avgRating)) : '★★★★★'}</div>
+                        <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 6 }}>{expert.reviewCount ?? reviews.length} отзывов</div>
+                      </div>
+                      <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                        Отзывы помогают выбрать специалиста и понять, какой опыт консультации получили участники АПГ.
+                      </div>
+                    </div>
+                  )}
                   {user && !String(user.id).startsWith('guest_') && !submitDone && (
                     <div style={{ borderRadius: 22, padding: 16, marginBottom: 12, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)' }}>
                       <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780, marginBottom: 10 }}>Оставить отзыв</div>

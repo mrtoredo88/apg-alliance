@@ -127,6 +127,23 @@ if (!expertsSource.includes("activeTab === 'feed'")
   throw new Error('Expert desktop tabs must follow Living Profile v4 order.');
 }
 
+if (!expertsSource.includes("gridTemplateColumns: contactItems.length > 0 ? 'minmax(0, 1.05fr) minmax(280px, 0.95fr)' : '1fr'")
+  || !expertsSource.includes('Категории и форматы')
+  || !expertsSource.includes('<DesktopMeta items={contactItems} />')) {
+  throw new Error('Expert about tab must use the Living Profile v5 desktop card composition.');
+}
+
+if (!expertsSource.includes("position: 'relative', minHeight: 220")
+  || !expertsSource.includes("filter: 'saturate(1.05) contrast(1.04)'")
+  || !expertsSource.includes("background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)'")) {
+  throw new Error('Expert offer tab must use the Living Profile v5 covered promo card.');
+}
+
+if (!expertsSource.includes('Отзывы помогают выбрать специалиста')
+  || !expertsSource.includes("gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)'")) {
+  throw new Error('Expert reviews tab must include the Living Profile v5 rating summary.');
+}
+
 for (const requiredExpertField of ['expert.bookingUrl', 'expert.whatsappUrl', 'expert.maxUrl', 'expert.serviceCost', "activeTab === 'video'", 'VideoSection videos={expert.videos}']) {
   if (!expertsSource.includes(requiredExpertField)) {
     throw new Error(`Expert desktop detail must preserve mobile expert field/action: ${requiredExpertField}`);

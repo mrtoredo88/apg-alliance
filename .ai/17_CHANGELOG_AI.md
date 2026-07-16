@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] feat: Living Profile v5 visual finish
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/components/FeedFramework.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Desktop Detail hero партнёров и экспертов переведён на компактную cinematic-композицию с обложкой, аватаром, CTA и метриками в одном первом экране.
+- Вкладки Living Profile получили sticky-поведение и более сильный активный индикатор; Feed-карточки стали визуально плотнее и ближе к современному профилю.
+- Вкладки `О компании`, `Акции` и `Отзывы` у партнёров и экспертов получили единую desktop-композицию без изменения источников данных и бизнес-логики.
+**Почему:** Living Profile должен визуально соответствовать дизайн-референсу и ощущаться как цельная production-страница, а не набор отдельных блоков.
+
+---
+
 ## [2026-07-16] fix: Feed detail opening and Living Profile media viewer
 **Коммит:** `pending`
 **Файлы:** `src/newsUtils.js`, `src/profileTimeline.js`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/components/ProfileMediaViewer.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`

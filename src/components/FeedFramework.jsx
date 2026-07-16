@@ -161,15 +161,15 @@ export function UniversalFeedCard({
   return (
     <article style={{
       display: 'grid',
-      gap: desktop ? 13 : 11,
-      padding: desktop ? 16 : 13,
-      borderRadius: desktop ? 22 : 24,
+      gap: desktop ? 15 : 12,
+      padding: desktop ? 18 : 14,
+      borderRadius: desktop ? 24 : 24,
       border: item.pinned ? `1px solid ${APG2.gold}66` : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)',
-      background: item.pinned ? `linear-gradient(145deg, ${APG2.gold}17, rgba(var(--apg2-glass-a,255,255,255),0.06))` : 'rgba(var(--apg2-glass-a,255,255,255),0.065)',
-      boxShadow: desktop ? '0 14px 36px var(--apg2-elev-shadow, rgba(0,0,0,0.10))' : 'none',
+      background: item.pinned ? `linear-gradient(145deg, ${APG2.gold}18, rgba(var(--apg2-glass-a,255,255,255),0.08))` : 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.105), rgba(var(--apg2-glass-a,255,255,255),0.052))',
+      boxShadow: desktop ? '0 18px 42px var(--apg2-elev-shadow, rgba(0,0,0,0.12))' : '0 12px 28px var(--apg2-elev-shadow, rgba(0,0,0,0.08))',
       minWidth: 0,
       position: 'relative',
-      transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease',
+      transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease',
     }}>
       <header style={{ display: 'grid', gridTemplateColumns: '42px minmax(0, 1fr) auto', gap: 10, alignItems: 'center', minWidth: 0 }}>
         <div style={{ width: 42, height: 42, borderRadius: 16, overflow: 'hidden', display: 'grid', placeItems: 'center', color: APG2.gold, background: tone, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.13)', fontSize: 16, fontWeight: 900 }}>
@@ -189,15 +189,15 @@ export function UniversalFeedCard({
         {meta ? <span style={{ minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: tone, color: accent, fontSize: 14, fontWeight: 900 }}>{meta.icon}</span> : <span />}
       </header>
 
-      <button type="button" onClick={open} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 18 : 16, lineHeight: desktop ? '23px' : '21px', fontWeight: 890, overflowWrap: 'anywhere', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <button type="button" onClick={open} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 20 : 17, lineHeight: desktop ? '25px' : '22px', fontWeight: 910, overflowWrap: 'anywhere', cursor: 'pointer', fontFamily: 'inherit' }}>
         {item.title}
       </button>
 
       {text && (
         <div style={{
           color: APG2.textSoft,
-          fontSize: desktop ? 14 : 13,
-          lineHeight: desktop ? '21px' : '19px',
+          fontSize: desktop ? 14.5 : 13,
+          lineHeight: desktop ? '22px' : '19px',
           display: expanded ? 'block' : '-webkit-box',
           WebkitLineClamp: expanded ? 'unset' : (desktop ? 4 : 3),
           WebkitBoxOrient: 'vertical',
@@ -213,19 +213,19 @@ export function UniversalFeedCard({
       )}
 
       {media.hasMedia && (
-        <button type="button" onClick={open} style={{ border: 0, padding: 0, background: 'transparent', borderRadius: desktop ? 20 : 18, overflow: 'hidden', cursor: 'pointer', minWidth: 0 }}>
+        <button type="button" onClick={open} style={{ border: 0, padding: 0, background: 'transparent', borderRadius: desktop ? 20 : 18, overflow: 'hidden', cursor: 'pointer', minWidth: 0, boxShadow: '0 12px 30px rgba(0,0,0,0.12)' }}>
           <MediaPreview
             source={media.source}
             image={media.image}
             gallery={media.gallery}
             videos={media.videos}
             title={item.title}
-            height={desktop ? 220 : 172}
+            height={desktop ? 238 : 178}
           />
         </button>
       )}
 
-      <footer style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', minWidth: 0, flexWrap: desktop ? 'nowrap' : 'wrap' }}>
+      <footer style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', minWidth: 0, flexWrap: desktop ? 'nowrap' : 'wrap', paddingTop: 2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, color: APG2.textMuted, fontSize: 11.5 }}>
           <span style={{ whiteSpace: 'nowrap' }}>♡ {likesCount}</span>
           <span style={{ whiteSpace: 'nowrap' }}>💬 {commentsCount}</span>

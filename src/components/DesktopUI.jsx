@@ -144,23 +144,27 @@ export function DesktopDetailShell({ children, aside, stickyActions, onBack, tit
 export function DesktopHero({ image, avatar, kicker, title, subtitle, status, badges = [], description, actions, meta, style }) {
   const safeBadges = asArray(badges);
   return (
-    <GlassCard style={{ borderRadius: 34, padding: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: 'minmax(320px, 0.96fr) minmax(360px, 1.04fr)', minHeight: 310, ...style }}>
-      <div style={{ minHeight: 310, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 24% 20%, rgba(201,168,76,0.20), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.06)' }}>
-        {image ? <img src={image} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', minHeight: 310, objectFit: 'cover', display: 'block' }} /> : null}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.02), rgba(12,12,14,0.42) 68%, rgba(12,12,14,0.72))' }} />
-        {avatar && <div style={{ position: 'absolute', left: 22, bottom: 22, width: 94, height: 94, borderRadius: 28, padding: 8, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.78)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.48)', boxShadow: '0 20px 46px rgba(0,0,0,0.24)' }}>{avatar}</div>}
+    <GlassCard style={{ borderRadius: 34, padding: 0, overflow: 'hidden', minHeight: 276, position: 'relative', isolation: 'isolate', ...style }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 18% 10%, rgba(201,168,76,0.24), transparent 38%), rgba(var(--apg2-glass-a,255,255,255),0.06)' }}>
+        {image ? <img src={image} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.04) contrast(1.02)' }} /> : null}
       </div>
-      <div style={{ padding: 22, display: 'grid', alignContent: 'center', gap: 14, minWidth: 0 }}>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {status && <div style={{ justifySelf: 'start', borderRadius: 999, padding: '5px 10px', color: APG2_PROFILE.gold, background: 'rgba(201,168,76,0.13)', border: '1px solid rgba(201,168,76,0.28)', fontSize: 11, lineHeight: '14px', fontWeight: 820 }}>{status}</div>}
-          {kicker && <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 840, letterSpacing: 0.8, textTransform: 'uppercase' }}>{kicker}</div>}
-          <div style={{ color: APG2_PROFILE.text, fontSize: 34, lineHeight: '38px', fontWeight: 930, letterSpacing: 0 }}>{title}</div>
-          {subtitle && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 15, lineHeight: '21px', fontWeight: 760 }}>{subtitle}</div>}
-          {safeBadges.length > 0 && <DesktopCardBadges items={safeBadges} />}
-          {description && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', maxWidth: 620 }}>{description}</div>}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(90deg, rgba(8,10,14,0.82) 0%, rgba(8,10,14,0.66) 42%, rgba(8,10,14,0.34) 66%, rgba(8,10,14,0.52) 100%), linear-gradient(180deg, rgba(8,10,14,0.12), rgba(8,10,14,0.74))' }} />
+      <div style={{ position: 'relative', zIndex: 2, minHeight: 276, padding: 24, display: 'grid', gridTemplateColumns: '138px minmax(0, 1fr) minmax(280px, 0.76fr)', gap: 22, alignItems: 'center' }}>
+        {avatar && <div style={{ width: 132, height: 132, borderRadius: 32, padding: 9, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.58)', boxShadow: '0 24px 60px rgba(0,0,0,0.34)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>{avatar}</div>}
+        <div style={{ display: 'grid', gap: 9, minWidth: 0, alignContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {status && <div style={{ borderRadius: 999, padding: '5px 10px', color: '#17120a', background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)', border: '1px solid rgba(255,232,165,0.62)', fontSize: 11, lineHeight: '14px', fontWeight: 860 }}>{status}</div>}
+            {kicker && <div style={{ color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: '14px', fontWeight: 840, letterSpacing: 0.8, textTransform: 'uppercase' }}>{kicker}</div>}
+          </div>
+          <div style={{ color: '#fff', fontSize: 34, lineHeight: '38px', fontWeight: 940, letterSpacing: 0, textShadow: '0 12px 34px rgba(0,0,0,0.36)', overflowWrap: 'anywhere' }}>{title}</div>
+          {subtitle && <div style={{ color: 'rgba(255,255,255,0.82)', fontSize: 15, lineHeight: '21px', fontWeight: 760 }}>{subtitle}</div>}
+          {safeBadges.length > 0 && <DesktopCardBadges items={safeBadges} style={{ marginTop: 3 }} />}
+          {description && <div style={{ color: 'rgba(255,255,255,0.78)', fontSize: 14, lineHeight: '21px', maxWidth: 640, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</div>}
         </div>
-        {meta}
-        {actions}
+        <div style={{ display: 'grid', gap: 12, alignContent: 'center', minWidth: 0 }}>
+          {actions}
+          {meta}
+        </div>
       </div>
     </GlassCard>
   );
@@ -294,10 +298,11 @@ export function DesktopDetailTabs({ items = [], activeId, onChange, style }) {
     onChange?.(safeItems[nextIndex].id);
   };
   return (
-    <GlassCard role="tablist" aria-label="Разделы детальной карточки" style={{ borderRadius: 26, padding: 7, display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', ...style }}>
+    <GlassCard role="tablist" aria-label="Разделы детальной карточки" style={{ borderRadius: 26, padding: 7, display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', position: 'sticky', top: 'calc(70px + var(--safe-top, 0px))', zIndex: 18, ...style }}>
       {safeItems.map((item, index) => (
-        <button key={item.id} role="tab" aria-selected={item.id === activeId} tabIndex={item.id === activeId ? 0 : -1} type="button" onClick={() => onChange?.(item.id)} onKeyDown={event => handleKeyDown(event, index)} style={{ minHeight: 34, borderRadius: 999, border: item.id === activeId ? '1px solid rgba(201,168,76,0.62)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: item.id === activeId ? 'rgba(201,168,76,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: item.id === activeId ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, padding: '7px 12px', fontSize: 11.5, lineHeight: '15px', fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          {item.label}{Number(item.count) > 0 ? ` ${item.count}` : ''}
+        <button key={item.id} role="tab" aria-selected={item.id === activeId} tabIndex={item.id === activeId ? 0 : -1} type="button" onClick={() => onChange?.(item.id)} onKeyDown={event => handleKeyDown(event, index)} style={{ minHeight: 38, borderRadius: 999, border: item.id === activeId ? '1px solid rgba(201,168,76,0.62)' : '1px solid transparent', background: item.id === activeId ? 'rgba(201,168,76,0.16)' : 'transparent', color: item.id === activeId ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, padding: '8px 13px', fontSize: 12, lineHeight: '15px', fontWeight: 860, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', position: 'relative', transition: motionTransition(['background', 'border-color', 'color'], 'base') }}>
+          {item.label}{Number(item.count) > 0 ? <span style={{ marginLeft: 5, color: item.id === activeId ? APG2_PROFILE.gold : APG2_PROFILE.textMuted }}>{item.count}</span> : null}
+          {item.id === activeId && <span style={{ position: 'absolute', left: 14, right: 14, bottom: 3, height: 2, borderRadius: 999, background: APG2_PROFILE.gold }} />}
         </button>
       ))}
     </GlassCard>

@@ -108,6 +108,11 @@ if (!source.includes("marginTop: 'auto'") || !source.includes('WebkitLineClamp')
 if (!source.includes('DesktopDetailShell') || !source.includes('DesktopDetailTabs') || !source.includes('DesktopHeroActions')) {
   throw new Error('Desktop Detail Framework must provide shared shell, tabs and hero actions for partner/expert cards.');
 }
+if (!source.includes("gridTemplateColumns: '138px minmax(0, 1fr) minmax(280px, 0.76fr)'")
+  || !source.includes("minHeight: 276")
+  || !source.includes("filter: 'saturate(1.04) contrast(1.02)'")) {
+  throw new Error('DesktopHero must use the compact cinematic Living Profile v5 composition.');
+}
 if (!source.includes('window.addEventListener(\'keydown\', handleKeyDown)') || !source.includes("event.key !== 'Escape'")) {
   throw new Error('Desktop Detail Framework must close through the shared Escape keyboard handler.');
 }
@@ -116,6 +121,11 @@ if (!source.includes('role="dialog"') || !source.includes('aria-modal="true"') |
 }
 if (!source.includes('role="tablist"') || !source.includes('role="tab"') || !source.includes("event.key === 'ArrowRight'") || !source.includes("event.key === 'Home'")) {
   throw new Error('Desktop Detail tabs must support shared keyboard navigation.');
+}
+if (!source.includes("top: 'calc(70px + var(--safe-top, 0px))'")
+  || !source.includes("bottom: 3")
+  || !source.includes("transition: motionTransition(['background', 'border-color', 'color'], 'base')")) {
+  throw new Error('Desktop Detail tabs must use the stronger sticky Living Profile v5 indicator.');
 }
 if (!source.includes('aria-label={`Открыть фото ${index + 1}`}') || !source.includes("typeof item === 'string' ? { url: item")) {
   throw new Error('Desktop Gallery must expose accessible photo controls and support normalized media items.');
