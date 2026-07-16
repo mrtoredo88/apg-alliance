@@ -10,10 +10,91 @@ import {
   WorkspacePanel,
 } from '../workspace/WorkspaceComponents.jsx';
 import { motionTransition } from '../motion.js';
+import { parseVideoUrl } from '../utils/parseVideoUrl.js';
 
 const asArray = value => Array.isArray(value) ? value.filter(Boolean) : [];
+const MEDIA_PREVIEW_LIVE_EVENT = 'apg:media-preview-live';
+const DIRECT_VIDEO_RE = /\.(mp4|webm)(\?|#|$)/i;
 
 export const DESKTOP_PUBLIC_SECTIONS = ['news', 'events', 'partners', 'experts', 'offers', 'rewards'];
+
+function toMediaUrl(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  return String(value.url || value.src || value.image || value.photo || value.photoUrl || value.imageUrl || value.thumbnailUrl || value.cover || '').trim();
+}
+
+function firstMediaUrl(...sources) {
+  for (const source of sources) {
+    if (!source) continue;
+    if (Array.isArray(source)) {
+      const match = source.map(toMediaUrl).find(Boolean);
+      if (match) return match;
+      continue;
+    }
+    const url = toMediaUrl(source);
+    if (url) return url;
+  }
+  return '';
+}
+
+function normalizeMediaVideo(raw) {
+  if (!raw) return null;
+  const url = typeof raw === 'string' ? raw.trim() : String(raw.url || raw.videoUrl || raw.src || raw.link || '').trim();
+  if (!url) return null;
+  const parsed = parseVideoUrl(url);
+  const direct = DIRECT_VIDEO_RE.test(url);
+  const platform = raw.platform || parsed?.platform || (direct ? 'direct' : 'video');
+  const platformLabel = raw.platformLabel || {
+    youtube: 'YouTube',
+    vk: 'VK Видео',
+    rutube: 'Rutube',
+    vimeo: 'Vimeo',
+    direct: 'Видео',
+  }[platform] || 'Видео';
+  return {
+    url,
+    direct,
+    platform,
+    platformLabel,
+    duration: raw.duration || raw.durationLabel || '',
+    title: raw.title || '',
+    thumbnailUrl: raw.thumbnailUrl || raw.thumbUrl || raw.previewUrl || parsed?.thumbnailUrl || '',
+  };
+}
+
+function mediaPreviewSupportsLive() {
+  if (typeof window === 'undefined') return false;
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (connection?.saveData) return false;
+  if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) return false;
+  if (!window.matchMedia?.('(hover: hover) and (pointer: fine)')?.matches) return false;
+  return true;
+}
+
+function collectMediaVideos(source, videos) {
+  return [
+    ...asArray(videos),
+    ...asArray(source?.videos),
+    source?.video,
+    source?.videoUrl,
+    source?.youtubeUrl,
+    source?.vkVideoUrl,
+    source?.rutubeUrl,
+    source?.mp4Url,
+    source?.webmUrl,
+  ].map(normalizeMediaVideo).filter(Boolean);
+}
+
+function collectMediaGallery(source, gallery) {
+  return [
+    ...asArray(gallery),
+    ...asArray(source?.gallery),
+    ...asArray(source?.photos),
+    ...asArray(source?.images),
+    ...asArray(source?.media),
+  ];
+}
 
 export function DesktopSectionShell({ children, topOverview, header, toolbar, kpi, info, actionBar, maxWidth = 1360, style, contentStyle }) {
   return (
@@ -473,13 +554,112 @@ export function DesktopCardHover({ active = false, children, style }) {
   );
 }
 
-export function DesktopCardPreview({ image, children, height = 70, style }) {
+export function MediaPreview({
+  source,
+  image = '',
+  gallery = [],
+  videos = [],
+  title = '',
+  height = 112,
+  children,
+  style,
+}) {
+  const liveId = React.useId();
+  const hoverTimer = React.useRef(null);
+  const [live, setLive] = React.useState(false);
+  const safeVideos = React.useMemo(() => collectMediaVideos(source, videos), [source, videos]);
+  const safeGallery = React.useMemo(() => collectMediaGallery(source, gallery), [source, gallery]);
+  const video = safeVideos[0] || null;
+  const cover = firstMediaUrl(
+    video?.thumbnailUrl,
+    image,
+    source?.coverPhoto,
+    source?.cover,
+    source?.banner,
+    source?.imageUrl,
+    source?.photoUrl,
+    source?.photo,
+    source?.image,
+    source?.logoUrl,
+    source?.avatarUrl,
+    safeGallery,
+  );
+  const canLivePreview = Boolean(video?.direct && mediaPreviewSupportsLive());
+
+  React.useEffect(() => {
+    const handleLivePreview = event => {
+      if (event.detail !== liveId) setLive(false);
+    };
+    window.addEventListener(MEDIA_PREVIEW_LIVE_EVENT, handleLivePreview);
+    return () => {
+      window.removeEventListener(MEDIA_PREVIEW_LIVE_EVENT, handleLivePreview);
+      if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    };
+  }, [liveId]);
+
+  const startLivePreview = () => {
+    if (!canLivePreview) return;
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(MEDIA_PREVIEW_LIVE_EVENT, { detail: liveId }));
+      setLive(true);
+    }, 350);
+  };
+  const stopLivePreview = () => {
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    setLive(false);
+  };
+  const showVideoBadge = Boolean(video);
+  const label = video ? `Видео: ${title || video.title || video.platformLabel}` : title || 'Медиа';
   return (
-    <div style={{ height, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 20% 20%, rgba(201,168,76,0.20), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.06)', ...style }}>
-      {image ? <img src={image} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.78 }} /> : null}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.00), rgba(12,12,14,0.42))' }} />
+    <div
+      role="img"
+      aria-label={label}
+      onMouseEnter={startLivePreview}
+      onMouseLeave={stopLivePreview}
+      style={{ height, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)', ...style }}
+    >
+      {cover ? (
+        <img src={cover} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.88, filter: video ? 'saturate(1.08) contrast(1.04)' : undefined }} />
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, fontSize: 26, fontWeight: 900, background: 'radial-gradient(circle at 30% 24%, rgba(201,168,76,0.24), transparent 38%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.10), rgba(var(--apg2-glass-a,255,255,255),0.04))' }}>
+          АПГ
+        </div>
+      )}
+      {live && video?.direct ? (
+        <video
+          src={video.url}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="none"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : null}
+      <div style={{ position: 'absolute', inset: 0, background: video ? 'linear-gradient(180deg, rgba(12,12,14,0.14), rgba(12,12,14,0.58)), radial-gradient(circle at 50% 50%, rgba(0,0,0,0.04), rgba(0,0,0,0.20))' : 'linear-gradient(180deg, rgba(12,12,14,0.04), rgba(12,12,14,0.54))', backdropFilter: video && !cover ? 'blur(10px)' : undefined, WebkitBackdropFilter: video && !cover ? 'blur(10px)' : undefined }} />
+      {showVideoBadge ? (
+        <>
+          <div style={{ position: 'absolute', left: '50%', top: '50%', width: 40, height: 40, borderRadius: 20, transform: 'translate(-50%, -50%)', display: 'grid', placeItems: 'center', color: APG2_PROFILE.text, background: 'var(--apg2-control-strong, rgba(var(--apg2-glass-a,255,255,255),0.92))', boxShadow: '0 16px 36px rgba(0,0,0,0.30)', fontSize: 15, lineHeight: '20px', fontWeight: 900 }}>
+            ▶
+          </div>
+          <div style={{ position: 'absolute', right: 10, bottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 'calc(100% - 20px)', borderRadius: 999, padding: '5px 8px', color: '#fff', background: 'rgba(10,10,14,0.58)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', fontSize: 10.5, lineHeight: '13px', fontWeight: 820 }}>
+            <span>Видео</span>
+            <span style={{ opacity: 0.74 }}>·</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.duration || video.platformLabel}</span>
+          </div>
+        </>
+      ) : null}
       {children}
     </div>
+  );
+}
+
+export function DesktopCardPreview({ image, children, height = 70, style }) {
+  return (
+    <MediaPreview image={image} height={height} style={{ background: 'radial-gradient(circle at 20% 20%, rgba(201,168,76,0.20), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.06)', ...style }}>
+      {children}
+    </MediaPreview>
   );
 }
 
@@ -677,6 +857,9 @@ export function DesktopCard({
 export function DesktopCatalogEntityCard({
   selected = false,
   cover = '',
+  media,
+  gallery = [],
+  videos = [],
   avatar,
   badges = [],
   title,
@@ -722,9 +905,14 @@ export function DesktopCatalogEntityCard({
           ...style,
         }}
       >
-        <div style={{ height: 112, position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at 18% 18%, rgba(201,168,76,0.22), transparent 42%), rgba(var(--apg2-glass-a,255,255,255),0.08)' }}>
-          {cover ? <img src={cover} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.86 }} /> : null}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(12,12,14,0.04), rgba(12,12,14,0.54))' }} />
+        <MediaPreview
+          source={media}
+          image={cover}
+          gallery={gallery}
+          videos={videos}
+          title={title}
+          height={112}
+        >
           {safeBadges.length > 0 && (
             <div style={{ position: 'absolute', left: 12, top: 12, right: rating ? 68 : 12, display: 'flex', gap: 5, flexWrap: 'wrap', maxHeight: 48, overflow: 'hidden' }}>
               <DesktopCardBadges items={safeBadges} />
@@ -735,7 +923,7 @@ export function DesktopCatalogEntityCard({
               ★ {rating}
             </div>
           ) : null}
-        </div>
+        </MediaPreview>
         <div style={{ position: 'relative', padding: '15px 14px 13px', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
           {avatar && (
             <div style={{ position: 'absolute', left: 14, top: -30, width: 60, height: 60, borderRadius: 20, padding: 5, display: 'grid', placeItems: 'center', background: 'var(--apg2-control-strong, rgba(255,255,255,0.88))', border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.56))', boxShadow: '0 16px 34px rgba(0,0,0,0.18)' }}>

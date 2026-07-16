@@ -59,6 +59,10 @@ if (expertCardSource.includes('<GlassCard')) {
   throw new Error('ExpertsPage desktop catalog must not use the old local mobile-like GlassCard layout.');
 }
 
+if (!expertCardSource.includes('media={expert}') || !expertCardSource.includes('videos={expert.videos}') || !expertCardSource.includes('gallery={gallery}')) {
+  throw new Error('ExpertsPage desktop catalog cards must pass existing profile media into the shared MediaPreview framework.');
+}
+
 if (!expertCardSource.includes('onMouseEnter={() => onSelect?.(expert)}') || !expertCardSource.includes('onFocus={() => onSelect?.(expert)}')) {
   throw new Error('ExpertsPage desktop cards must update Quick Preview on hover/focus.');
 }

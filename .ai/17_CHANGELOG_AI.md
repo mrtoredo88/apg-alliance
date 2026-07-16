@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-16] feat: Smart media previews for desktop catalogs
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- В Desktop UI Framework добавлен общий `MediaPreview` для изображений, галерей и видео-превью без ранней загрузки iframe/video.
+- Desktop-карточки партнёров и экспертов теперь передают существующие `videos`, `gallery/photos/images` в общий media-слой.
+- Regression-тесты закрепляют single-preview hover delay, запрет preload и подключение media-framework к catalog-card.
+**Почему:** desktop-каталоги должны одинаково и безопасно отображать существующие медиа, не меняя бизнес-логику и не ухудшая startup performance.
+
 ## [2026-07-16] fix: Desktop detail finish
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/NewsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-news-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

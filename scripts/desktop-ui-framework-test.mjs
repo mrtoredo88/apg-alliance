@@ -33,6 +33,7 @@ const requiredExports = [
   'DesktopCardBadges',
   'DesktopCardPreview',
   'DesktopCardHover',
+  'MediaPreview',
   'DesktopDetailShell',
   'DesktopHero',
   'DesktopHeroInfo',
@@ -78,6 +79,26 @@ if (!source.includes('onMouseEnter') || !source.includes('translateY(-3px)') || 
 
 if (!source.includes('height: 388') || !source.includes("gridTemplateRows: '112px minmax(0, 1fr)'")) {
   throw new Error('Desktop Catalog Entity Card must enforce full-size fixed height and a stable desktop grid.');
+}
+
+if (!source.includes('import { parseVideoUrl }') || !source.includes('export function MediaPreview')) {
+  throw new Error('Desktop UI Framework must expose a shared Smart Media Preview with existing video parsing.');
+}
+
+if (!source.includes('<MediaPreview') || !source.includes('videos={videos}') || !source.includes('gallery={gallery}')) {
+  throw new Error('Desktop Catalog Entity Card must render media through the shared MediaPreview framework.');
+}
+
+if (!source.includes('MEDIA_PREVIEW_LIVE_EVENT') || !source.includes('setTimeout') || !source.includes('}, 350)')) {
+  throw new Error('MediaPreview must protect desktop live preview with a shared single-preview hover delay.');
+}
+
+if (!source.includes('preload="none"') || !source.includes('playsInline') || !source.includes('muted') || !source.includes('loop')) {
+  throw new Error('MediaPreview must not preload catalog video and must use muted inline preview only after hover.');
+}
+
+if (!source.includes("matchMedia?.('(hover: hover) and (pointer: fine)'") || !source.includes('connection?.saveData') || !source.includes('hardwareConcurrency')) {
+  throw new Error('MediaPreview live preview must be disabled on mobile/tablet, data saver and low-performance devices.');
 }
 
 if (!source.includes("marginTop: 'auto'") || !source.includes('WebkitLineClamp') || !source.includes('filter(action => !action?.disabled).slice(0, 3)')) {

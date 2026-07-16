@@ -1189,6 +1189,11 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
   const canBookExpert = hasExpertBooking(expert);
   const canCall = Boolean(expert.telHref);
   const cover = expert.coverPhoto || expert.imageUrl || expert.photoUrl || expert.photo || expert.avatarUrl || '';
+  const gallery = [
+    ...(Array.isArray(expert.gallery) ? expert.gallery : []),
+    ...(Array.isArray(expert.photos) ? expert.photos : []),
+    ...(Array.isArray(expert.images) ? expert.images : []),
+  ];
   const isNew = (() => {
     const raw = expert.createdAt?.toDate ? expert.createdAt.toDate() : expert.createdAt;
     const date = raw ? new Date(raw) : null;
@@ -1233,6 +1238,9 @@ function ExpertCatalogCard({ expert, selected, compact = false, isTop, onSelect,
       onMouseEnter={() => onSelect?.(expert)}
       onFocus={() => onSelect?.(expert)}
       cover={cover}
+      media={expert}
+      gallery={gallery}
+      videos={expert.videos}
       avatar={<ExpertAvatar expert={expert} size={48} />}
       badges={badges}
       title={expert.name || 'Эксперт АПГ'}

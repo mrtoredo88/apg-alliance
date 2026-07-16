@@ -159,6 +159,11 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const canCall = Boolean(text(partner?.phone || partner?.contactPhone));
   const canBook = Boolean(partner?.bookingEnabled || partner?.bookingUrl || partner?.services?.length || partner?.serviceCatalog?.length);
   const cover = partner?.coverPhoto || partner?.imageUrl || partner?.photoUrl || partner?.photo || partner?.image || '';
+  const gallery = [
+    ...(Array.isArray(partner?.gallery) ? partner.gallery : []),
+    ...(Array.isArray(partner?.photos) ? partner.photos : []),
+    ...(Array.isArray(partner?.images) ? partner.images : []),
+  ];
   const address = text(partner?.address);
   const services = partnerPrimaryServices(partner);
   const isNew = (toDate(partner?.createdAt)?.getTime() || 0) >= Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -198,6 +203,9 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
       onMouseEnter={() => onSelect?.(partner)}
       onFocus={() => onSelect?.(partner)}
       cover={cover}
+      media={partner}
+      gallery={gallery}
+      videos={partner?.videos}
       avatar={<PartnerLogo partner={partner} size={48} />}
       badges={badges}
       title={partner?.name || 'Партнёр АПГ'}
