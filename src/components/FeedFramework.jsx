@@ -153,7 +153,6 @@ export function UniversalFeedCard({
   const commentsCount = getCommentsCount(item);
   const likesCount = getLikesCount(item);
   const open = () => {
-    if (inlineRead) return undefined;
     if (item.action === 'openExternal' && item.url && !onOpen) return openUrl(item.url);
     return onOpen?.(item);
   };
@@ -161,6 +160,7 @@ export function UniversalFeedCard({
   const authorLogo = getAuthorLogo(item);
   const authorInitial = String(item.author || item.title || 'А').trim().slice(0, 1).toUpperCase();
   const commonButton = { minHeight: 34, borderRadius: 14, padding: '7px 11px', fontSize: 12 };
+  const inlineMetaButton = { border: 0, background: 'transparent', padding: 0, margin: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', minWidth: 0 };
   return (
     <article style={{
       display: 'grid',
@@ -184,15 +184,15 @@ export function UniversalFeedCard({
             {item.pinned && <span style={{ color: APG2.gold, fontSize: 10.5, fontWeight: 840, border: `1px solid ${APG2.gold}55`, borderRadius: 999, padding: '2px 7px', whiteSpace: 'nowrap' }}>Закреплено</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3, minWidth: 0, color: APG2.textMuted, fontSize: 11.2, lineHeight: '14px' }}>
-            {meta && <span style={{ color: accent, fontWeight: 820 }}>{meta.icon} {meta.label}</span>}
+            {meta && <button type="button" onClick={open} style={{ ...inlineMetaButton, color: accent, fontWeight: 820 }}>{meta.icon} {meta.label}</button>}
             {meta && <span>·</span>}
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatRelativeTime(item.feedTimestamp || item.date || item.ts)}</span>
+            <button type="button" onClick={open} style={{ ...inlineMetaButton, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatRelativeTime(item.feedTimestamp || item.date || item.ts)}</button>
           </div>
         </div>
-        {meta ? <span style={{ minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: tone, color: accent, fontSize: 14, fontWeight: 900 }}>{meta.icon}</span> : <span />}
+        {meta ? <button type="button" onClick={open} style={{ border: 0, minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: tone, color: accent, fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}>{meta.icon}</button> : <span />}
       </header>
 
-      <button type="button" onClick={open} disabled={inlineRead} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 20 : 17, lineHeight: desktop ? '25px' : '22px', fontWeight: 910, overflowWrap: 'anywhere', cursor: inlineRead ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+      <button type="button" onClick={open} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 20 : 17, lineHeight: desktop ? '25px' : '22px', fontWeight: 910, overflowWrap: 'anywhere', cursor: 'pointer', fontFamily: 'inherit' }}>
         {item.title}
       </button>
 
@@ -224,7 +224,7 @@ export function UniversalFeedCard({
       )}
 
       {media.hasMedia && (
-        <button type="button" onClick={open} disabled={inlineRead} style={{ border: 0, padding: 0, background: 'transparent', borderRadius: desktop ? 20 : 18, overflow: 'hidden', cursor: inlineRead ? 'default' : 'pointer', minWidth: 0, boxShadow: '0 12px 30px rgba(0,0,0,0.12)' }}>
+        <button type="button" onClick={open} style={{ border: 0, padding: 0, background: 'transparent', borderRadius: desktop ? 20 : 18, overflow: 'hidden', cursor: 'pointer', minWidth: 0, boxShadow: '0 12px 30px rgba(0,0,0,0.12)' }}>
           <MediaPreview
             source={media.source}
             image={media.image}

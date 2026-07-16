@@ -281,6 +281,9 @@ assert.match(feedFramework, /Скрыть/, 'expanded profile feed entries must 
 assert.match(feedFramework, /Открыть статью/, 'very long profile feed entries must keep an explicit ArticleView action');
 assert.match(feedFramework, /profileReading && item\.action === 'openNews'/, 'inline reading must be limited to profile news publications');
 assert.match(feedFramework, /max-height 260ms ease/, 'inline feed expansion must animate smoothly');
+assert.doesNotMatch(feedFramework, /if \(inlineRead\) return undefined/, 'profile reading must not block ArticleView opening from title/media/meta');
+assert.doesNotMatch(feedFramework, /disabled=\{inlineRead\}/, 'profile reading must not disable title or media ArticleView actions');
+assert.match(feedFramework, /const inlineMetaButton/, 'feed meta and date controls must remain clickable');
 assert.match(timelineComponent, /Показать ещё/, 'timeline must use progressive pagination');
 assert.match(feedFramework, /Закреплено/, 'pinned timeline item must be visible in the shared Feed Framework UI');
 assert.match(timelineComponent, /VK-источник временно недоступен, остальные события ленты показаны/, 'VK failure must not break the full timeline');

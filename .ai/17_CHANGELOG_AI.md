@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: Feed reading keeps article opening
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/components/FeedFramework.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- В профильной Ленте заголовок, медиа, дата и бейдж публикации снова открывают локальный ArticleView.
+- `Прочитать полностью` и `Скрыть` оставлены отдельными действиями только для раскрытия текста в карточке.
+- Regression-тест фиксирует, что `profileReading` не блокирует открытие статьи и не отключает интерактивные зоны карточки.
+**Почему:** после Feed Reading Experience режим `inlineRead` отключал `open()` для заголовка и медиа, из-за чего публикации перестали открываться как полноценные статьи.
+
+---
+
 ## [2026-07-16] feat: Feed Reading Experience
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/components/FeedFramework.jsx`, `src/components/ProfileTimelineSection.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
