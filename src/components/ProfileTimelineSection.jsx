@@ -118,6 +118,7 @@ export function ProfileTimelineSection({
             expanded={expanded}
             onToggleExpanded={toggleExpanded}
             onOpen={item => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking })}
+            profileReading
           />
         )}
 

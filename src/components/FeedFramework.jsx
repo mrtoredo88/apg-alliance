@@ -42,6 +42,12 @@ const FEED_TYPE_META = {
   [FEED_ACTIVITY_TYPES.ANNOUNCEMENT]: { icon: '✦', label: 'Объявление', tone: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', accent: APG2.gold },
 };
 
+const FEED_TEXT_LIMIT = {
+  desktop: 520,
+  mobile: 320,
+  article: 1800,
+};
+
 function getFeedTypeMeta(type) {
   const key = String(type || '').trim();
   if (!key) return null;
@@ -131,6 +137,7 @@ export function UniversalFeedCard({
   onToggleExpanded,
   onOpen,
   onShare = shareFeedItem,
+  profileReading = false,
 }) {
   if (!item) return null;
   const meta = getFeedTypeMeta(item.type);
@@ -138,13 +145,19 @@ export function UniversalFeedCard({
   const accent = meta?.accent || APG2.gold;
   const media = getFeedMedia(item);
   const text = String(item.text || '').trim();
-  const canExpand = text.length > (desktop ? 260 : 160);
+  const readLimit = desktop ? FEED_TEXT_LIMIT.desktop : FEED_TEXT_LIMIT.mobile;
+  const canExpand = text.length > readLimit;
+  const veryLong = text.length > FEED_TEXT_LIMIT.article;
+  const textExpanded = expanded || !canExpand;
+  const inlineRead = profileReading && item.action === 'openNews';
   const commentsCount = getCommentsCount(item);
   const likesCount = getLikesCount(item);
   const open = () => {
+    if (inlineRead) return undefined;
     if (item.action === 'openExternal' && item.url && !onOpen) return openUrl(item.url);
     return onOpen?.(item);
   };
+  const openArticle = () => onOpen?.(item);
   const authorLogo = getAuthorLogo(item);
   const authorInitial = String(item.author || item.title || 'А').trim().slice(0, 1).toUpperCase();
   const commonButton = { minHeight: 34, borderRadius: 14, padding: '7px 11px', fontSize: 12 };
@@ -179,7 +192,7 @@ export function UniversalFeedCard({
         {meta ? <span style={{ minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: tone, color: accent, fontSize: 14, fontWeight: 900 }}>{meta.icon}</span> : <span />}
       </header>
 
-      <button type="button" onClick={open} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 20 : 17, lineHeight: desktop ? '25px' : '22px', fontWeight: 910, overflowWrap: 'anywhere', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <button type="button" onClick={open} disabled={inlineRead} style={{ border: 0, background: 'transparent', padding: 0, textAlign: 'left', color: APG2.text, fontSize: desktop ? 20 : 17, lineHeight: desktop ? '25px' : '22px', fontWeight: 910, overflowWrap: 'anywhere', cursor: inlineRead ? 'default' : 'pointer', fontFamily: 'inherit' }}>
         {item.title}
       </button>
 
@@ -188,22 +201,30 @@ export function UniversalFeedCard({
           color: APG2.textSoft,
           fontSize: desktop ? 14.5 : 13,
           lineHeight: desktop ? '22px' : '19px',
-          display: expanded ? 'block' : '-webkit-box',
-          WebkitLineClamp: expanded ? 'unset' : (desktop ? 4 : 3),
+          display: textExpanded ? 'block' : '-webkit-box',
+          WebkitLineClamp: textExpanded ? undefined : (desktop ? 5 : 4),
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
           overflowWrap: 'anywhere',
+          maxHeight: textExpanded ? (veryLong ? 1800 : 980) : (desktop ? 112 : 82),
+          transition: 'max-height 260ms ease, opacity 180ms ease',
         }}>{text}</div>
       )}
 
       {canExpand && (
         <button type="button" onClick={() => onToggleExpanded?.(item.id)} style={{ border: 0, background: 'transparent', padding: 0, margin: 0, justifySelf: 'start', color: APG2.gold, fontSize: 12, fontWeight: 820, cursor: 'pointer', fontFamily: 'inherit' }}>
-          {expanded ? 'Свернуть' : 'Показать полностью'}
+          {expanded ? 'Скрыть' : 'Прочитать полностью'}
         </button>
       )}
 
+      {inlineRead && expanded && veryLong && (
+        <GlassButton onClick={openArticle} style={{ justifySelf: 'start', minHeight: 34, borderRadius: 14, padding: '7px 11px', fontSize: 12 }}>
+          Открыть статью
+        </GlassButton>
+      )}
+
       {media.hasMedia && (
-        <button type="button" onClick={open} style={{ border: 0, padding: 0, background: 'transparent', borderRadius: desktop ? 20 : 18, overflow: 'hidden', cursor: 'pointer', minWidth: 0, boxShadow: '0 12px 30px rgba(0,0,0,0.12)' }}>
+        <button type="button" onClick={open} disabled={inlineRead} style={{ border: 0, padding: 0, background: 'transparent', borderRadius: desktop ? 20 : 18, overflow: 'hidden', cursor: inlineRead ? 'default' : 'pointer', minWidth: 0, boxShadow: '0 12px 30px rgba(0,0,0,0.12)' }}>
           <MediaPreview
             source={media.source}
             image={media.image}
@@ -236,6 +257,7 @@ export function UniversalFeed({
   onToggleExpanded,
   onOpen,
   onShare,
+  profileReading = false,
 }) {
   const safeGroups = asArray(groups);
   if (!safeGroups.length) return null;
@@ -259,6 +281,7 @@ export function UniversalFeed({
                 onToggleExpanded={onToggleExpanded}
                 onOpen={onOpen}
                 onShare={onShare}
+                profileReading={profileReading}
               />
             ))}
           </div>

@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] feat: Feed Reading Experience
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/components/FeedFramework.jsx`, `src/components/ProfileTimelineSection.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Профильная Лента партнёров и экспертов теперь читает обычные публикации прямо внутри карточки без перехода в ArticleView.
+- Длинные публикации раскрываются по кнопке `Прочитать полностью`, плавно разворачиваются и показывают `Скрыть`; очень длинные материалы дополнительно получают явное действие `Открыть статью`.
+- Regression-тест фиксирует inline-reading режим, лимиты текста и отсутствие жёсткой навигации внутри Feed Framework.
+**Почему:** большинство публикаций в Living Profile удобнее читать как VK-ленту без потери контекста профиля и позиции скролла.
+
+---
+
 ## [2026-07-16] fix: Partner catalog cover priority
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

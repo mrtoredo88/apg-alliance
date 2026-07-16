@@ -240,6 +240,7 @@ assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timel
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
 assert.match(timelineComponent, /UniversalFeed/, 'timeline UI must render the shared universal Feed Framework');
 assert.match(timelineComponent, /onOpen=\{item => openTimelineItem\(item/, 'profile feed must delegate item opening through a container callback');
+assert.match(timelineComponent, /profileReading/, 'profile feed must read regular publications inline without leaving the profile');
 assert.doesNotMatch(feedFramework, /navigate\(/, 'Feed Framework must not hard-code router navigation');
 assert.doesNotMatch(feedFramework, /openNews\(/, 'Feed Framework must not call global news opening directly');
 assert.match(newsPage, /export function ArticleView/, 'ArticleView must be reusable by contextual profile feeds');
@@ -274,7 +275,12 @@ assert.doesNotMatch(timelineComponent, /Что сейчас важно/, 'profil
 assert.doesNotMatch(timelineComponent, /TIMELINE_FILTERS/, 'timeline UI must not render old source filter tabs');
 assert.doesNotMatch(timelineComponent, /filter\.label/, 'timeline UI must not render the old All/News source pills');
 assert.match(timelineComponent, /groupProfileTimelineItems/, 'timeline UI must group items by period');
-assert.match(feedFramework, /Показать полностью/, 'long feed entries must be expandable');
+assert.match(feedFramework, /FEED_TEXT_LIMIT/, 'Feed Framework must use explicit reading limits');
+assert.match(feedFramework, /Прочитать полностью/, 'long profile feed entries must expand inline');
+assert.match(feedFramework, /Скрыть/, 'expanded profile feed entries must collapse inline');
+assert.match(feedFramework, /Открыть статью/, 'very long profile feed entries must keep an explicit ArticleView action');
+assert.match(feedFramework, /profileReading && item\.action === 'openNews'/, 'inline reading must be limited to profile news publications');
+assert.match(feedFramework, /max-height 260ms ease/, 'inline feed expansion must animate smoothly');
 assert.match(timelineComponent, /Показать ещё/, 'timeline must use progressive pagination');
 assert.match(feedFramework, /Закреплено/, 'pinned timeline item must be visible in the shared Feed Framework UI');
 assert.match(timelineComponent, /VK-источник временно недоступен, остальные события ленты показаны/, 'VK failure must not break the full timeline');
