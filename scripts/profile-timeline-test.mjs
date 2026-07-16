@@ -36,6 +36,7 @@ const timeline = buildProfileTimeline({
     { id: 'n6', partnerId: 'partner-1', title: 'Самая новая publishDate', status: 'published', active: true, publishDate: { seconds: 1784116800, nanoseconds: 0 } },
     { id: 'n4', partnerId: 'partner-1', title: 'Сегодня новое', status: 'published', active: true, publishedAt: '2026-07-15T11:00:00.000Z' },
     { id: 'n5', partnerId: 'partner-1', title: 'Сегодня старое', status: 'published', active: true, publishedAt: '2026-07-15T08:00:00.000Z' },
+    { id: 'n7', partnerId: 'partner-1', title: 'Длинная публикация', summary: 'Подробный текст публикации для проверки раскрытия в профильной ленте. '.repeat(14), status: 'published', active: true, publishedAt: '2026-07-13T10:00:00.000Z' },
     { id: 'n2', partnerId: 'partner-1', title: 'Черновик', status: 'draft', active: false, publishedAt: '2026-07-15T10:00:00.000Z' },
     { id: 'n3', partnerId: 'other', title: 'Чужая новость', status: 'published', active: true, publishedAt: '2026-07-15T10:00:00.000Z' },
   ],
@@ -161,11 +162,12 @@ assert.equal(timeline[0].title, 'Новое меню', 'pinned publication must 
 assert.equal(timeline[0].pinned, true, 'timeline item must expose pinned state');
 
 const publicationItems = filterProfileTimelineItems(timeline, 'publication');
-assert.equal(publicationItems.length, 4, 'publication filter must keep only news entries');
+assert.equal(publicationItems.length, 5, 'publication filter must keep only news entries');
 assert.equal(publicationItems[1].title, 'Самая новая publishDate', 'publishDate Timestamp publication must stay above older publication');
 assert.equal(publicationItems[1].feedTimestamp, 1784116800000, 'timeline item must expose normalized feedTimestamp');
 assert.equal(publicationItems[2].title, 'Сегодня новое', 'newer unpinned publication must stay above older publication');
 assert.equal(publicationItems[3].title, 'Сегодня старое', 'older unpinned publication must stay below newer publication');
+assert.equal(publicationItems[4].title, 'Длинная публикация', 'longer older publication must stay below newer publication');
 assert.deepEqual(TIMELINE_FILTERS, [{ id: 'feed', label: 'Лента' }], 'timeline must expose one unified Feed tab instead of old source tabs');
 assert.equal(filterProfileTimelineItems(timeline, 'feed').length, timeline.length, 'Feed filter must keep all source types in one list');
 assert.equal(getProfileFeedTimestamp({ seconds: 1784116800, nanoseconds: 0 }), 1784116800000, 'feed timestamp helper must support Firestore Timestamp-like objects');
@@ -229,6 +231,14 @@ const todayPublications = todayGroup.items.filter(item => item.type === 'publica
 assert.equal(todayPublications[0].title, 'Самая новая publishDate', 'timeline groups must sort newest publication first');
 assert.equal(todayPublications[1].title, 'Сегодня новое', 'timeline groups must keep second newest publication after newest publication');
 assert.equal(todayPublications[2].title, 'Сегодня старое', 'timeline groups must keep older publication after newer publication');
+const timelinePublications = timeline.filter(item => item.action === 'openNews');
+assert.ok(timelinePublications.length >= 3, 'timeline fixture must cover first, middle and last publication opening');
+for (const item of timelinePublications) {
+  assert.ok(item.entity, `feed item ${item.title} must keep the original news entity`);
+  assert.ok(getCanonicalNewsId(item.entity), `feed item ${item.title} must keep a canonical news id for ArticleView`);
+}
+assert.ok(timelinePublications.some(item => String(item.text || '').length > 520), 'timeline fixture must cover long publication inline reading');
+assert.ok(timelinePublications.some(item => String(item.text || '').length <= 320), 'timeline fixture must cover short publication direct ArticleView opening');
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 const feedFramework = read('src/components/FeedFramework.jsx');
@@ -247,6 +257,7 @@ assert.match(newsPage, /export function ArticleView/, 'ArticleView must be reusa
 assert.match(partnerPage, /selectedProfileNews/, 'Partner profile must keep selected feed publication in local state');
 assert.match(partnerPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Partner profile feed must open publications locally instead of global news');
 assert.match(partnerPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Partner profile must render contextual ArticleView inside the profile flow');
+assert.match(partnerPage, /if \(desktopMode\)[\s\S]*<ProfileVideoViewer videos=\{partner\.videos\}[\s\S]*\{selectedProfileArticle\}[\s\S]*return \(/, 'Partner desktop profile must mount selected ArticleView after a feed click');
 assert.match(partnerPage, /getCanonicalNewsId/, 'Partner profile must keep contextual ArticleView open for news entities without plain id');
 assert.match(partnerPage, /ProfilePhotoGrid/, 'Partner profile must use the shared Living Profile photo grid');
 assert.match(partnerPage, /ProfileVideoGrid/, 'Partner profile must use the shared Living Profile video grid');

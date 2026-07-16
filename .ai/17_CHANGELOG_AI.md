@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: Partner desktop profile feed article mount
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/PartnerPage.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Desktop-профиль партнёра теперь монтирует `selectedProfileArticle` после клика по публикации в Ленте.
+- Regression-тест проверяет сохранение полной `entity` с canonical id для первой/средней/последней, длинной и короткой публикации.
+- Regression-тест отдельно фиксирует, что desktop-ветка партнёра содержит локальный ArticleView, как уже было у эксперта.
+**Почему:** `selectedProfileNews` мог создаваться, но в desktop-ветке партнёра `selectedProfileArticle` не рендерился, поэтому статья не появлялась.
+
+---
+
 ## [2026-07-16] fix: Feed reading keeps article opening
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/components/FeedFramework.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`

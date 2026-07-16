@@ -734,6 +734,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
           <ProfilePhotoViewer items={galleryItems} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
           <ProfileVideoViewer videos={partner.videos} startIndex={videoViewerIdx} onClose={() => setVideoViewerIdx(null)} />
+          {selectedProfileArticle}
         </>
       );
     }
