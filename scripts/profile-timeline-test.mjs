@@ -7,6 +7,7 @@ import {
   buildProfileNowPriority,
   buildProfileSmartSummary,
   filterProfileTimelineItems,
+  getProfileFeedTimestamp,
   getProfileTimelineSourceTypes,
   getTimelinePeriodLabel,
   groupProfileTimelineItems,
@@ -30,6 +31,7 @@ const timeline = buildProfileTimeline({
   role: 'partner',
   news: [
     { id: 'n1', partnerId: 'partner-1', title: 'Новое меню', summary: 'Запустили летние напитки '.repeat(18), status: 'published', active: true, publicationType: 'Новость', publishedAt: '2026-07-14T10:00:00.000Z', pinned: true, stats: { comments: 3 } },
+    { id: 'n6', partnerId: 'partner-1', title: 'Самая новая publishDate', status: 'published', active: true, publishDate: { seconds: 1784116800, nanoseconds: 0 } },
     { id: 'n4', partnerId: 'partner-1', title: 'Сегодня новое', status: 'published', active: true, publishedAt: '2026-07-15T11:00:00.000Z' },
     { id: 'n5', partnerId: 'partner-1', title: 'Сегодня старое', status: 'published', active: true, publishedAt: '2026-07-15T08:00:00.000Z' },
     { id: 'n2', partnerId: 'partner-1', title: 'Черновик', status: 'draft', active: false, publishedAt: '2026-07-15T10:00:00.000Z' },
@@ -141,11 +143,30 @@ assert.equal(timeline[0].title, 'Новое меню', 'pinned publication must 
 assert.equal(timeline[0].pinned, true, 'timeline item must expose pinned state');
 
 const publicationItems = filterProfileTimelineItems(timeline, 'publication');
-assert.equal(publicationItems.length, 3, 'publication filter must keep only news entries');
-assert.equal(publicationItems[1].title, 'Сегодня новое', 'newer unpinned publication must stay above older publication');
-assert.equal(publicationItems[2].title, 'Сегодня старое', 'older unpinned publication must stay below newer publication');
+assert.equal(publicationItems.length, 4, 'publication filter must keep only news entries');
+assert.equal(publicationItems[1].title, 'Самая новая publishDate', 'publishDate Timestamp publication must stay above older publication');
+assert.equal(publicationItems[1].feedTimestamp, 1784116800000, 'timeline item must expose normalized feedTimestamp');
+assert.equal(publicationItems[2].title, 'Сегодня новое', 'newer unpinned publication must stay above older publication');
+assert.equal(publicationItems[3].title, 'Сегодня старое', 'older unpinned publication must stay below newer publication');
 assert.deepEqual(TIMELINE_FILTERS, [{ id: 'feed', label: 'Лента' }], 'timeline must expose one unified Feed tab instead of old source tabs');
 assert.equal(filterProfileTimelineItems(timeline, 'feed').length, timeline.length, 'Feed filter must keep all source types in one list');
+assert.equal(getProfileFeedTimestamp({ seconds: 1784116800, nanoseconds: 0 }), 1784116800000, 'feed timestamp helper must support Firestore Timestamp-like objects');
+assert.equal(getProfileFeedTimestamp(new Date('2026-07-15T10:00:00.000Z')), new Date('2026-07-15T10:00:00.000Z').getTime(), 'feed timestamp helper must support Date objects');
+assert.equal(getProfileFeedTimestamp('2026-07-15T10:00:00.000Z'), new Date('2026-07-15T10:00:00.000Z').getTime(), 'feed timestamp helper must support date strings');
+const mixedDateTimeline = buildProfileTimeline({
+  profile,
+  role: 'partner',
+  news: [
+    { id: 'm1', partnerId: 'partner-1', title: 'created older', status: 'published', active: true, created: '2026-07-12T10:00:00.000Z' },
+    { id: 'm2', partnerId: 'partner-1', title: 'date middle', status: 'published', active: true, date: '2026-07-13T10:00:00.000Z' },
+    { id: 'm3', partnerId: 'partner-1', title: 'publishDate newest', status: 'published', active: true, publishDate: '2026-07-16T10:00:00.000Z' },
+    { id: 'm4', partnerId: 'partner-1', title: 'publishedAt second', status: 'published', active: true, publishedAt: '2026-07-15T10:00:00.000Z' },
+  ],
+  events: [],
+  reviews: [],
+  vkPosts: [],
+}).filter(item => item.type === 'publication');
+assert.deepEqual(mixedDateTimeline.map(item => item.title), ['publishDate newest', 'publishedAt second', 'date middle', 'created older'], 'mixed date fields must be normalized before DESC feed sorting');
 
 const periodLabel = getTimelinePeriodLabel('2026-07-15T09:00:00.000Z', new Date('2026-07-15T12:00:00.000Z').getTime());
 assert.equal(periodLabel, 'Сегодня', 'timeline period helper must group today entries');
@@ -154,8 +175,9 @@ assert.equal(groups[0].label, 'Закреплено', 'timeline must expose pinn
 assert.ok(groups.some(group => group.label === 'Сегодня'), 'timeline must group regular items by human period labels');
 const todayGroup = groups.find(group => group.label === 'Сегодня');
 const todayPublications = todayGroup.items.filter(item => item.type === 'publication');
-assert.equal(todayPublications[0].title, 'Сегодня новое', 'timeline groups must sort newest publication first');
-assert.equal(todayPublications[1].title, 'Сегодня старое', 'timeline groups must keep older publication after newer publication');
+assert.equal(todayPublications[0].title, 'Самая новая publishDate', 'timeline groups must sort newest publication first');
+assert.equal(todayPublications[1].title, 'Сегодня новое', 'timeline groups must keep second newest publication after newest publication');
+assert.equal(todayPublications[2].title, 'Сегодня старое', 'timeline groups must keep older publication after newer publication');
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 const feedFramework = read('src/components/FeedFramework.jsx');
@@ -172,7 +194,7 @@ assert.match(timelineComponent, /VK-источник временно недос
 assert.match(feedFramework, /export function UniversalFeedCard/, 'Feed Framework must expose one reusable feed card');
 assert.match(feedFramework, /export function UniversalFeed/, 'Feed Framework must expose the reusable feed list');
 assert.match(feedFramework, /MediaPreview/, 'Feed Framework must use Smart Media Framework for images, galleries and video');
-assert.match(feedFramework, /item\.publishDate \|\| item\.publishedAt \|\| item\.createdAt \|\| item\.created/, 'Feed Framework must sort by existing publication date fields');
+assert.match(feedFramework, /item\.feedTimestamp \|\| item\.publishDate \|\| item\.publishedAt \|\| item\.createdAt \|\| item\.created/, 'Feed Framework must sort by normalized feedTimestamp before existing publication date fields');
 assert.match(feedFramework, /likesCount|commentCount|commentsCount/, 'Feed card must preserve social counters when existing data provides them');
 
 const workspaceNews = read('src/workspace/WorkspaceNewsCenter.jsx');

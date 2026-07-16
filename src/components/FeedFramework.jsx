@@ -21,9 +21,9 @@ function asArray(value) {
 }
 
 function feedDateValue(item = {}) {
-  const value = item.publishDate || item.publishedAt || item.createdAt || item.created || item.date || item.updatedAt || item.ts;
+  const value = item.feedTimestamp || item.publishDate || item.publishedAt || item.createdAt || item.created || item.date || item.updatedAt || item.ts;
   if (value && typeof value.toMillis === 'function') return value.toMillis();
-  if (value && typeof value.seconds === 'number') return value.seconds * 1000;
+  if (value && typeof value.seconds === 'number') return value.seconds * 1000 + Math.floor((Number(value.nanoseconds) || 0) / 1000000);
   return Number(value) || new Date(value || 0).getTime() || 0;
 }
 
@@ -148,7 +148,7 @@ export function UniversalFeedCard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3, minWidth: 0, color: APG2.textMuted, fontSize: 11.2, lineHeight: '14px' }}>
             <span style={{ color: meta.accent, fontWeight: 820 }}>{item.label || meta.label}</span>
             <span>·</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatRelativeTime(item.date || item.ts)}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatRelativeTime(item.feedTimestamp || item.date || item.ts)}</span>
           </div>
         </div>
         <span style={{ minWidth: 28, height: 28, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: meta.icon === 'VK' ? '0 7px' : 0, background: meta.tone, color: meta.accent, fontSize: meta.icon === 'VK' ? 10 : 14, fontWeight: 900 }}>{meta.icon}</span>

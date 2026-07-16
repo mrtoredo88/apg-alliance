@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-16] fix: Feed Framework sorting hotfix
+**Коммит:** `pending`
+**Файлы:** `src/profileTimeline.js`, `src/components/FeedFramework.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Добавлено единое вычисляемое поле `feedTimestamp` при построении элементов профильной ленты.
+- Сортировка Profile Timeline, групп ленты и `UniversalFeed` переведена на нормализованный timestamp.
+- Нормализатор даты теперь поддерживает `publishDate`, `publishedAt`, `createdAt`, `created`, `date`, `updatedAt`, `ts`, `Date`, number, string и Firestore Timestamp-like `{ seconds, nanoseconds }`.
+- Добавлен regression-тест на смешанные поля дат, чтобы новая публикация всегда отображалась выше старых.
+**Почему:** у части новостей дата публикации приходила не в `publishedAt`, поэтому `ts` становился `0`, и новая запись могла уходить вниз ленты.
+
+---
+
 ## [2026-07-16] feat: Feed Framework v1
 **Коммит:** `pending`
 **Файлы:** `src/components/FeedFramework.jsx`, `src/components/ProfileTimelineSection.jsx`, `src/profileTimeline.js`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`

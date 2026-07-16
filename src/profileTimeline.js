@@ -6,8 +6,22 @@ function toMillis(value) {
   if (typeof value === 'number') return value;
   if (value?.toMillis) return value.toMillis();
   if (value?.toDate) return value.toDate().getTime();
+  if (typeof value?.seconds === 'number') return value.seconds * 1000 + Math.floor((Number(value.nanoseconds) || 0) / 1000000);
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? ms : 0;
+}
+
+export function getProfileFeedTimestamp(...values) {
+  for (const value of values) {
+    const ts = toMillis(value);
+    if (ts) return ts;
+  }
+  return 0;
+}
+
+function withFeedTimestamp(item, ...values) {
+  const feedTimestamp = getProfileFeedTimestamp(...values, item?.feedTimestamp, item?.ts, item?.date);
+  return { ...item, feedTimestamp, ts: item?.ts || feedTimestamp };
 }
 
 function firstText(...values) {
@@ -179,47 +193,61 @@ function publicationKind(item = {}) {
 function buildNewsItems({ news = [], profile, role }) {
   return (Array.isArray(news) ? news : [])
     .filter(item => sameProfile(item, profile, role) && isPublic(item))
-    .map((item, index) => ({
+    .map((item, index) => withFeedTimestamp({
       id: timelineId('news', item.id, index),
       type: 'publication',
       label: publicationKind(item),
       title: getNewsTitle(item) || 'Публикация',
       text: firstText(item.summary, item.subtitle, getNewsText(item)),
       image: getNewsImage(item),
-      date: item.publishedAt || item.updatedAt || item.createdAt,
-      ts: toMillis(item.publishedAt || item.updatedAt || item.createdAt),
+      date: item.publishDate || item.publishedAt || item.createdAt || item.created || item.date || item.updatedAt,
       author: item.author || item.sourceName || profile?.name || profile?.title || '',
         source: 'news',
         entity: item,
         action: 'openNews',
         pinned: isPinnedRecord(item, profile),
-      }));
+      },
+      item.publishDate,
+      item.publishedAt,
+      item.createdAt,
+      item.created,
+      item.date,
+      item.updatedAt,
+    ));
 }
 
 function buildEventItems({ events = [], profile, role }) {
   return (Array.isArray(events) ? events : [])
     .filter(item => sameProfile(item, profile, role) && isPublic(item))
-    .map((item, index) => ({
+    .map((item, index) => withFeedTimestamp({
       id: timelineId('event', item.id, index),
       type: 'event',
       label: 'Мероприятие',
       title: item.title || item.name || 'Мероприятие',
       text: firstText(item.shortDescription, item.description, item.address, item.location),
       image: item.coverPhoto || item.imageUrl || item.photo || '',
-      date: item.publishedAt || item.startAt || item.eventDate || item.date || item.createdAt,
-      ts: toMillis(item.publishedAt || item.startAt || item.eventDate || item.date || item.createdAt),
+      date: item.publishDate || item.publishedAt || item.createdAt || item.created || item.date || item.startAt || item.eventDate || item.updatedAt,
       author: profile?.name || profile?.title || '',
         source: 'events',
         entity: item,
         action: 'openEvent',
         pinned: isPinnedRecord(item, profile),
-      }));
+      },
+      item.publishDate,
+      item.publishedAt,
+      item.createdAt,
+      item.created,
+      item.date,
+      item.startAt,
+      item.eventDate,
+      item.updatedAt,
+    ));
 }
 
 function buildOfferItems({ profile = {} }) {
   const offer = firstText(profile.offer, profile.promotionTitle, profile.promo, profile.discount);
   if (!isActiveOffer(profile)) return [];
-  return [{
+  return [withFeedTimestamp({
     id: timelineId('offer', profile.id || profile.name),
     type: 'offer',
     label: 'Акция',
@@ -227,13 +255,18 @@ function buildOfferItems({ profile = {} }) {
     text: offer,
     image: profile.coverPhoto || profile.logoUrl || profile.photo || '',
     date: profile.offerUpdatedAt || profile.promotionUpdatedAt || profile.profileUpdatedAt || profile.updatedAt,
-    ts: toMillis(profile.offerUpdatedAt || profile.promotionUpdatedAt || profile.profileUpdatedAt || profile.updatedAt) || profileDate(profile),
     author: profile.name || profile.title || '',
       source: 'profile',
       entity: profile,
       action: 'openOffer',
       pinned: Boolean(profile.offerPinned || profile.pinnedOffer || profile.pinnedTimelineType === 'offer'),
-    }];
+    },
+    profile.offerUpdatedAt,
+    profile.promotionUpdatedAt,
+    profile.profileUpdatedAt,
+    profile.updatedAt,
+    profileDate(profile),
+  )];
 }
 
 function buildVideoItems({ profile = {} }) {
@@ -242,7 +275,7 @@ function buildVideoItems({ profile = {} }) {
     .slice()
     .sort((a, b) => toMillis(b.createdAt || b.updatedAt || profile.profileUpdatedAt || profile.updatedAt) - toMillis(a.createdAt || a.updatedAt || profile.profileUpdatedAt || profile.updatedAt))
     .slice(0, 4)
-    .map((video, index) => ({
+    .map((video, index) => withFeedTimestamp({
     id: timelineId('video', video.id || video.url || video.videoId, index),
     type: 'video',
     label: 'Видео',
@@ -250,19 +283,24 @@ function buildVideoItems({ profile = {} }) {
     text: video.description || video.url || '',
     image: video.thumbnailUrl || profile.coverPhoto || profile.logoUrl || profile.photo || '',
     date: video.createdAt || video.updatedAt || profile.profileUpdatedAt || profile.updatedAt,
-    ts: toMillis(video.createdAt || video.updatedAt || profile.profileUpdatedAt || profile.updatedAt) || profileDate(profile) - index,
     author: profile.name || profile.title || '',
       source: 'profile',
       entity: video,
       action: 'openVideo',
       pinned: isPinnedRecord(video, profile) || (profile.pinnedTimelineType === 'video' && index === 0),
-    }));
+    },
+    video.createdAt,
+    video.updatedAt,
+    profile.profileUpdatedAt,
+    profile.updatedAt,
+    profileDate(profile) - index,
+  ));
 }
 
 function buildPhotoItems({ profile = {} }) {
   const gallery = Array.isArray(profile.gallery) ? profile.gallery : Array.isArray(profile.photos) ? profile.photos : [];
   if (!gallery.length) return [];
-  return [{
+  return [withFeedTimestamp({
     id: timelineId('photos', profile.id || profile.name),
     type: 'photo',
     label: 'Фото',
@@ -270,14 +308,18 @@ function buildPhotoItems({ profile = {} }) {
     text: `${gallery.length} фото в карточке`,
     image: typeof gallery[0] === 'string' ? gallery[0] : gallery[0]?.url || '',
     date: profile.galleryUpdatedAt || profile.profileUpdatedAt || profile.updatedAt,
-    ts: toMillis(profile.galleryUpdatedAt || profile.profileUpdatedAt || profile.updatedAt) || profileDate(profile) - 1000,
     author: profile.name || profile.title || '',
 
     source: 'profile',
     entity: { gallery },
     action: 'openPhotos',
     pinned: Boolean(profile.galleryPinned || profile.photosPinned || profile.pinnedTimelineType === 'photo'),
-  }];
+  },
+  profile.galleryUpdatedAt,
+  profile.profileUpdatedAt,
+  profile.updatedAt,
+  profileDate(profile) - 1000,
+  )];
 }
 
 function buildReviewItems({ reviews = [], profile = {} }) {
@@ -285,7 +327,7 @@ function buildReviewItems({ reviews = [], profile = {} }) {
     .slice()
     .sort((a, b) => toMillis(b.createdAt || b.updatedAt) - toMillis(a.createdAt || a.updatedAt))
     .slice(0, 5)
-    .map((review, index) => ({
+    .map((review, index) => withFeedTimestamp({
     id: timelineId('review', review.id || review.userId, index),
     type: 'review',
     label: 'Отзыв',
@@ -293,32 +335,42 @@ function buildReviewItems({ reviews = [], profile = {} }) {
     text: firstText(review.text, review.comment, review.stars || review.rating ? `Оценка: ${review.stars || review.rating}/5` : ''),
     image: review.userPhoto || '',
     date: review.createdAt || review.updatedAt,
-    ts: toMillis(review.createdAt || review.updatedAt) || profileDate(profile) - 2000 - index,
     author: review.userName || 'Участник АПГ',
       source: 'reviews',
       entity: review,
       action: 'openReviews',
       pinned: isPinnedRecord(review, profile),
-    }));
+    },
+    review.createdAt,
+    review.updatedAt,
+    profileDate(profile) - 2000 - index,
+  ));
 }
 
 export function buildProfileTimeline({ profile = {}, role = 'partner', news = [], events = [], reviews = [], vkPosts = [] } = {}) {
-  const vkItems = (Array.isArray(vkPosts) ? vkPosts : []).map((post, index) => ({
+  const vkItems = (Array.isArray(vkPosts) ? vkPosts : []).map((post, index) => withFeedTimestamp({
     id: timelineId('vk', post.id || post.url, index),
     type: 'vk',
     label: 'VK',
     title: post.title || 'Публикация сообщества',
     text: firstText(post.text, post.summary),
     image: post.image || post.photo || '',
-    date: post.date || post.publishedAt || post.createdAt,
-    ts: toMillis(post.date || post.publishedAt || post.createdAt) || Date.now() - index,
+    date: post.publishDate || post.publishedAt || post.createdAt || post.created || post.date || post.updatedAt,
     author: profile.name || profile.title || '',
       source: 'vk',
       entity: post,
       action: 'openExternal',
       url: post.url,
       pinned: isPinnedRecord(post, profile),
-    }));
+    },
+    post.publishDate,
+    post.publishedAt,
+    post.createdAt,
+    post.created,
+    post.date,
+    post.updatedAt,
+    Date.now() - index,
+  ));
 
   return [
     ...buildNewsItems({ news, profile, role }),
@@ -330,7 +382,7 @@ export function buildProfileTimeline({ profile = {}, role = 'partner', news = []
     ...vkItems,
   ]
     .filter(item => item.title || item.text || item.image)
-    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || (b.ts || 0) - (a.ts || 0))
+    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || (b.feedTimestamp || 0) - (a.feedTimestamp || 0))
     .slice(0, 24);
 }
 
@@ -624,7 +676,7 @@ export function groupProfileTimelineItems(items = [], nowValue = Date.now()) {
     }
     group.items.push(item);
   }
-  const byNewest = (a, b) => (b.ts || 0) - (a.ts || 0);
+  const byNewest = (a, b) => (b.feedTimestamp || b.ts || 0) - (a.feedTimestamp || a.ts || 0);
   const sortedGroups = groups.map(group => ({ ...group, items: group.items.slice().sort(byNewest) }));
   return pinned.length ? [{ id: 'pinned', label: 'Закреплено', items: pinned.slice().sort(byNewest) }, ...sortedGroups] : sortedGroups;
 }
