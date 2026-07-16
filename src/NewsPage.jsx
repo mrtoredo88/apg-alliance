@@ -26,6 +26,7 @@ import {
   DesktopToolbar,
 } from './components/DesktopUI.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
+import { ArticleContentRenderer } from './components/ArticleContentRenderer.jsx';
 import { openUrl } from './vk.js';
 import { API_BASE_URL } from './constants.js';
 import { logError } from './errorLogger.js';
@@ -182,7 +183,7 @@ function getSmartBadges(item) {
   return badges.slice(0, 3);
 }
 
-async function shareNewsItem(item, onToast) {
+export async function shareNewsItem(item, onToast) {
   const title = getNewsTitle(item);
   const url = getNewsDeepLink(item);
   try {
@@ -662,7 +663,7 @@ function CommentRow({ comment, user, onDelete, onLike, onEdit, onReply, onPin, o
   );
 }
 
-function CommentsPanel({ item, user, onToast }) {
+export function CommentsPanel({ item, user, onToast }) {
   const newsId = getCanonicalNewsId(item);
   const legacyIds = useMemo(() => getNewsLegacyIds(item).filter(id => id !== newsId), [item, newsId]);
   const legacyKey = legacyIds.join('|');
@@ -1200,15 +1201,6 @@ export function ArticleView({
     ];
     const sourceLabel = item.source === 'apg' ? 'АПГ' : item.source === 'vk' ? 'VK' : item.source || 'АПГ';
 
-    const renderArticleSummary = (
-      <DesktopSection title="Содержание" subtitle={sourceLabel}>
-        <RichText color="var(--apg-news-article-text)" fontSize={15} lineHeight="24px">
-          {text || 'Полный текст новости появляется здесь после публикации.'}
-        </RichText>
-        <ContentBlocks blocks={item.contentBlocks} />
-      </DesktopSection>
-    );
-
     const articleShell = (
       <DesktopDetailShell
         title={title}
@@ -1254,32 +1246,7 @@ export function ArticleView({
 
         {activeTab === 'content' && (
           <div style={{ display: 'grid', gap: 14 }}>
-            {renderArticleSummary}
-            <DesktopSection title="Медиа" subtitle="Фото и видео">
-              <div style={{ display: 'grid', gap: 12 }}>
-                {photos.length > 0 && <PhotoCarousel photos={photos} onOpen={setLightboxIndex} />}
-                {videos.length > 0 && <VideoSection videos={videos} />}
-                {(links.length > 0 || docs.length > 0) && (
-                  <GlassCard style={{ borderRadius: 28, padding: 16 }}>
-                    <div style={{ color: APG2_PROFILE.text, fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Вложения</div>
-                    <div style={{ display: 'grid', gap: 10 }}>
-                      {links.map((link, index) => (
-                        <button key={`${link.url}-${index}`} type="button" onClick={() => openUrl(link.url)} style={{ display: 'grid', gridTemplateColumns: link.imageUrl ? '56px 1fr' : '1fr', gap: 12, alignItems: 'center', border: '1px solid rgba(247,241,230,0.10)', background: 'rgba(247,241,230,0.04)', borderRadius: 18, padding: 10, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
-                          {link.imageUrl && <img src={link.imageUrl} alt="" loading="lazy" style={{ width: 56, height: 48, borderRadius: 13, objectFit: 'cover' }} />}
-                          <span style={{ minWidth: 0 }}><span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title || link.url}</span>{link.description && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.description}</span>}</span>
-                        </button>
-                      ))}
-                      {docs.map((doc, index) => (
-                        <button key={`${doc.url}-${index}`} type="button" onClick={() => openUrl(doc.url)} style={{ border: '1px solid rgba(247,241,230,0.10)', background: 'rgba(247,241,230,0.04)', borderRadius: 18, padding: 12, textAlign: 'left', color: APG2_PROFILE.text, fontFamily: 'inherit' }}>
-                          <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 820 }}>📎 {doc.title}</span>
-                          {doc.ext && <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 4 }}>{doc.ext.toUpperCase()}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </GlassCard>
-                )}
-              </div>
-            </DesktopSection>
+            <ArticleContentRenderer item={item} desktop />
             <DesktopSection title="Рекомендации" subtitle="Что открыть дальше">
               {!!related.length && <DesktopRelated items={relatedItems} onOpen={(relatedItem) => onClose(relatedItem)} />}
             </DesktopSection>

@@ -23,7 +23,7 @@ import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
 import { buildLivingProfileTabs } from './profileTimeline.js';
 import { getCanonicalNewsId } from './newsUtils.js';
-import { ArticleView } from './NewsPage.jsx';
+import { LivingFeedArticleSheet } from './components/LivingFeedArticleSheet.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
@@ -353,13 +353,9 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
     else setSelectedProfileNews(null);
   }, []);
   const selectedProfileArticle = selectedProfileNews && (
-    <ArticleView
+    <LivingFeedArticleSheet
       item={selectedProfileNews}
-      related={[]}
-      previousItem={null}
-      nextItem={null}
       onClose={handleCloseProfileArticle}
-      onNavigate={setSelectedProfileNews}
       user={user}
       desktopMode={desktopMode}
     />

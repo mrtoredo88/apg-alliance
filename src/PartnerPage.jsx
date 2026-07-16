@@ -30,7 +30,7 @@ import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
 import { buildLivingProfileTabs } from './profileTimeline.js';
 import { getCanonicalNewsId } from './newsUtils.js';
-import { ArticleView } from './NewsPage.jsx';
+import { LivingFeedArticleSheet } from './components/LivingFeedArticleSheet.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, ContactCard, GlassBadge, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { ProfilePhotoGrid, ProfilePhotoViewer, ProfileVideoGrid, ProfileVideoViewer } from './components/ProfileMediaViewer.jsx';
@@ -221,13 +221,9 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     else setSelectedProfileNews(null);
   }, []);
   const selectedProfileArticle = selectedProfileNews && (
-    <ArticleView
+    <LivingFeedArticleSheet
       item={selectedProfileNews}
-      related={[]}
-      previousItem={null}
-      nextItem={null}
       onClose={handleCloseProfileArticle}
-      onNavigate={setSelectedProfileNews}
       user={user}
       desktopMode={desktopMode}
     />

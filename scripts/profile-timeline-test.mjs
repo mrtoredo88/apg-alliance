@@ -204,7 +204,7 @@ assert.deepEqual(openableNewsTimeline.map(item => item.title), ['Последн�
 for (const item of openableNewsTimeline) {
   assert.equal(item.action, 'openNews', 'profile publication must keep contextual open action');
   assert.ok(item.entity, 'profile publication must carry full source news entity');
-  assert.ok(getCanonicalNewsId(item.entity), 'profile publication entity must expose a canonical id for ArticleView');
+  assert.ok(getCanonicalNewsId(item.entity), 'profile publication entity must expose a canonical id for LivingFeedArticleSheet');
   assert.ok(item.entity.id, 'profile publication entity must be normalized with id');
   assert.ok(item.id.includes(getCanonicalNewsId(item.entity)), 'feed item id must be based on the same canonical news id');
 }
@@ -235,10 +235,10 @@ const timelinePublications = timeline.filter(item => item.action === 'openNews')
 assert.ok(timelinePublications.length >= 3, 'timeline fixture must cover first, middle and last publication opening');
 for (const item of timelinePublications) {
   assert.ok(item.entity, `feed item ${item.title} must keep the original news entity`);
-  assert.ok(getCanonicalNewsId(item.entity), `feed item ${item.title} must keep a canonical news id for ArticleView`);
+  assert.ok(getCanonicalNewsId(item.entity), `feed item ${item.title} must keep a canonical news id for LivingFeedArticleSheet`);
 }
 assert.ok(timelinePublications.some(item => String(item.text || '').length > 520), 'timeline fixture must cover long publication inline reading');
-assert.ok(timelinePublications.some(item => String(item.text || '').length <= 320), 'timeline fixture must cover short publication direct ArticleView opening');
+assert.ok(timelinePublications.some(item => String(item.text || '').length <= 320), 'timeline fixture must cover short publication sheet opening');
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 const feedFramework = read('src/components/FeedFramework.jsx');
@@ -253,20 +253,25 @@ assert.match(timelineComponent, /onOpen=\{item => openTimelineItem\(item/, 'prof
 assert.match(timelineComponent, /profileReading/, 'profile feed must read regular publications inline without leaving the profile');
 assert.doesNotMatch(feedFramework, /navigate\(/, 'Feed Framework must not hard-code router navigation');
 assert.doesNotMatch(feedFramework, /openNews\(/, 'Feed Framework must not call global news opening directly');
-assert.match(newsPage, /export function ArticleView/, 'ArticleView must be reusable by contextual profile feeds');
+assert.match(newsPage, /export function ArticleView/, 'News ArticleView must remain available for the global News section');
+assert.match(newsPage, /ArticleContentRenderer/, 'News ArticleView must use the shared article content renderer');
+assert.match(read('src/components/ArticleContentRenderer.jsx'), /export function ArticleContentRenderer/, 'Shared article renderer must be a standalone component');
+assert.match(read('src/components/LivingFeedArticleSheet.jsx'), /export function LivingFeedArticleSheet/, 'Living Profile must use its own feed article overlay');
 assert.match(partnerPage, /selectedProfileNews/, 'Partner profile must keep selected feed publication in local state');
 assert.match(partnerPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Partner profile feed must open publications locally instead of global news');
-assert.match(partnerPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Partner profile must render contextual ArticleView inside the profile flow');
-assert.match(partnerPage, /if \(desktopMode\)[\s\S]*<ProfileVideoViewer videos=\{partner\.videos\}[\s\S]*\{selectedProfileArticle\}[\s\S]*return \(/, 'Partner desktop profile must mount selected ArticleView after a feed click');
-assert.match(partnerPage, /getCanonicalNewsId/, 'Partner profile must keep contextual ArticleView open for news entities without plain id');
+assert.doesNotMatch(partnerPage, /import \{ ArticleView \} from '\.\/NewsPage\.jsx'/, 'Partner profile must not import the global News ArticleView');
+assert.match(partnerPage, /<LivingFeedArticleSheet[\s\S]*item=\{selectedProfileNews\}/, 'Partner profile must render contextual LivingFeedArticleSheet inside the profile flow');
+assert.match(partnerPage, /if \(desktopMode\)[\s\S]*<ProfileVideoViewer videos=\{partner\.videos\}[\s\S]*\{selectedProfileArticle\}[\s\S]*return \(/, 'Partner desktop profile must mount selected LivingFeedArticleSheet after a feed click');
+assert.match(partnerPage, /getCanonicalNewsId/, 'Partner profile must keep contextual sheet open for news entities without plain id');
 assert.match(partnerPage, /ProfilePhotoGrid/, 'Partner profile must use the shared Living Profile photo grid');
 assert.match(partnerPage, /ProfileVideoGrid/, 'Partner profile must use the shared Living Profile video grid');
 assert.match(partnerPage, /ProfilePhotoViewer/, 'Partner profile must open photos over the current profile');
 assert.match(partnerPage, /ProfileVideoViewer/, 'Partner profile must open videos over the current profile');
 assert.match(expertsPage, /selectedProfileNews/, 'Expert profile must keep selected feed publication in local state');
 assert.match(expertsPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Expert profile feed must open publications locally instead of global news');
-assert.match(expertsPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Expert profile must render contextual ArticleView inside the profile flow');
-assert.match(expertsPage, /getCanonicalNewsId/, 'Expert profile must keep contextual ArticleView open for news entities without plain id');
+assert.doesNotMatch(expertsPage, /import \{ ArticleView \} from '\.\/NewsPage\.jsx'/, 'Expert profile must not import the global News ArticleView');
+assert.match(expertsPage, /<LivingFeedArticleSheet[\s\S]*item=\{selectedProfileNews\}/, 'Expert profile must render contextual LivingFeedArticleSheet inside the profile flow');
+assert.match(expertsPage, /getCanonicalNewsId/, 'Expert profile must keep contextual sheet open for news entities without plain id');
 assert.match(expertsPage, /ProfilePhotoGrid/, 'Expert profile must use the shared Living Profile photo grid');
 assert.match(expertsPage, /ProfileVideoGrid/, 'Expert profile must use the shared Living Profile video grid');
 assert.match(expertsPage, /ProfilePhotoViewer/, 'Expert profile must open photos over the current profile');
@@ -289,11 +294,11 @@ assert.match(timelineComponent, /groupProfileTimelineItems/, 'timeline UI must g
 assert.match(feedFramework, /FEED_TEXT_LIMIT/, 'Feed Framework must use explicit reading limits');
 assert.match(feedFramework, /Прочитать полностью/, 'long profile feed entries must expand inline');
 assert.match(feedFramework, /Скрыть/, 'expanded profile feed entries must collapse inline');
-assert.match(feedFramework, /Открыть статью/, 'very long profile feed entries must keep an explicit ArticleView action');
+assert.match(feedFramework, /Открыть статью/, 'very long profile feed entries must keep an explicit sheet opening action');
 assert.match(feedFramework, /profileReading && item\.action === 'openNews'/, 'inline reading must be limited to profile news publications');
 assert.match(feedFramework, /max-height 260ms ease/, 'inline feed expansion must animate smoothly');
-assert.doesNotMatch(feedFramework, /if \(inlineRead\) return undefined/, 'profile reading must not block ArticleView opening from title/media/meta');
-assert.doesNotMatch(feedFramework, /disabled=\{inlineRead\}/, 'profile reading must not disable title or media ArticleView actions');
+assert.doesNotMatch(feedFramework, /if \(inlineRead\) return undefined/, 'profile reading must not block sheet opening from title/media/meta');
+assert.doesNotMatch(feedFramework, /disabled=\{inlineRead\}/, 'profile reading must not disable title or media sheet actions');
 assert.match(feedFramework, /const inlineMetaButton/, 'feed meta and date controls must remain clickable');
 assert.match(timelineComponent, /Показать ещё/, 'timeline must use progressive pagination');
 assert.match(feedFramework, /Закреплено/, 'pinned timeline item must be visible in the shared Feed Framework UI');

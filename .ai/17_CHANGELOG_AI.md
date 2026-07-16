@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] feat: Living Feed Article Sheet
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/components/ArticleContentRenderer.jsx`, `src/components/LivingFeedArticleSheet.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/NewsPage.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Для Living Profile добавлен `LivingFeedArticleSheet`, который открывает публикации поверх Ленты без перехода в раздел Новости.
+- Контент статьи вынесен в общий `ArticleContentRenderer`, который используется и в `News ArticleView`, и в Living Sheet.
+- Regression-тест запрещает партнёру/эксперту снова импортировать глобальный `ArticleView` из `NewsPage`.
+**Почему:** `ArticleView` является экраном раздела Новости; публикации профиля должны открываться как часть контекста карточки партнёра/эксперта.
+
+---
+
 ## [2026-07-16] fix: Partner desktop profile feed article mount
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/PartnerPage.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
