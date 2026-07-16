@@ -2,15 +2,18 @@
 
 Дата фиксации: 2026-07-16
 
-Foundation tag: `v1.0-foundation`
+Foundation tags:
 
-Production commit: `acf1149dc5f96b7350f7241893e237cf78de82cc`
+- `v1.0-foundation`
+- `v1.1-production`
 
-Production version: `acf1149d`
+Production commit: `8cb55af7be6d431c15c54590e7d660ada31261ca`
+
+Production version: `8cb55af7`
 
 ## Purpose
 
-This document defines the APG foundation principles after the completion of Desktop Experience, Living Profile, Feed Framework, Smart Media, Workspace, PWA, performance, and production stabilization work.
+This document defines the APG foundation principles after the completion of Desktop Experience, Living Profile, Feed Framework, Feed Reading, LivingFeedArticleSheet, Smart Media, Workspace, PWA, Scanner Reliability, Content Studio, performance, and production stabilization work.
 
 It is not a feature backlog. It is the decision layer for future development.
 
@@ -50,23 +53,27 @@ Partner and expert profiles are living digital profiles, not static cards. They 
 
 New activity streams must use or extend Feed Framework. Do not create parallel feed implementations for profile posts, news, events, media, offers, or future activity types.
 
-7. Smart Media Framework is the single media display model.
+7. Living Feed Article Sheet owns profile feed reading.
+
+`ArticleView` belongs to the global News section. Partner and expert Living Profile publications must open through `LivingFeedArticleSheet` over the current profile context. Shared article body/media rendering should live in `ArticleContentRenderer` or its future direct successor, not in duplicated JSX.
+
+8. Smart Media Framework is the single media display model.
 
 Photos, video, galleries, thumbnails, preview states, and viewers should use the existing Smart Media / Profile Media Viewer path. Do not introduce one-off iframe galleries or separate media renderers.
 
-8. Workspace is the daily work surface.
+9. Workspace is the daily work surface.
 
 Partner and expert operational flows should integrate into Workspace centers instead of adding disconnected admin-like screens.
 
-9. Loki is the intelligence entry point.
+10. Loki is the intelligence entry point.
 
 Intelligence should be surfaced through Loki or context-aware assistant blocks. Avoid scattering AI recommendations into unrelated thematic cards.
 
-10. Context Dialogs are contextual by design.
+11. Context Dialogs are contextual by design.
 
 Messaging must remain tied to a partner, expert, event, offer, booking, review, or future object. APG should not become a generic messenger.
 
-11. Production domains must stay synchronized.
+12. Production domains must stay synchronized.
 
 Every release must keep:
 
@@ -75,11 +82,11 @@ Every release must keep:
 
 on the same production version.
 
-12. Recovery points must be protected.
+13. Recovery points must be protected.
 
-The `v1.0-foundation` tag is a stable recovery point. It must not be moved or rewritten.
+The `v1.0-foundation` and `v1.1-production` tags are stable recovery points. They must not be moved or rewritten.
 
-13. No duplicate architecture.
+14. No duplicate architecture.
 
 Future features should integrate into the existing foundation:
 
@@ -95,11 +102,11 @@ Future features should integrate into the existing foundation:
 
 Parallel implementations are allowed only after an explicit architecture decision.
 
-14. Business logic and UX are separate concerns.
+15. Business logic and UX are separate concerns.
 
 Visual polish must not change Firestore models, API contracts, permissions, moderation, rewards, bookings, notifications, or auth behavior unless the task explicitly requires it.
 
-15. Production stability outranks feature velocity.
+16. Production stability outranks feature velocity.
 
 If a P0 regression appears in auth, production loading, PWA startup, QR, booking, notifications, dialogs, or public navigation, feature work pauses until the critical path is stable again.
 
@@ -122,6 +129,8 @@ For production-bound work:
 
 - Do not create a second desktop framework.
 - Do not create another feed renderer.
+- Do not use global News `ArticleView` as the Living Profile article overlay.
+- Do not duplicate article body/media JSX between News and Living Profile.
 - Do not create another media viewer.
 - Do not make desktop detail pages weaker than mobile.
 - Do not add intelligence UI randomly into unrelated cards.
@@ -137,8 +146,16 @@ For production-bound work:
 - Desktop Detail Framework
 - Living Profile
 - Feed Framework
+- Feed Reading
+- LivingFeedArticleSheet
 - Smart Media Framework
 - Media Viewer
+- Profile Dashboard v3
+- Content Studio
+- Autosave
+- Draft Recovery
+- Scanner Reliability
+- Partner Social Links
 - Workspace v1
 - Workspace Intelligence
 - PWA
