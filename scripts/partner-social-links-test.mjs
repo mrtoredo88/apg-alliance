@@ -9,6 +9,8 @@ for (const token of [
   'partner.telegramCommunityUrl || partner.telegramUrl',
   'partner.maxCommunityUrl || partner.maxUrl',
   'partner.vkGroupUrl || partner.vkUrl',
+  "partnerTelegramUrl && { label: 'Telegram'",
+  "partnerMaxUrl && { label: 'MAX'",
   "partnerTelegramUrl && { id: 'telegram'",
   "partnerMaxUrl && { id: 'max'",
   '{partnerTelegramUrl && (',

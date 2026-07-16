@@ -451,6 +451,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       !canUseApgBooking && !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
       !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
       partnerVkUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
+      partnerTelegramUrl && { label: 'Telegram', icon: '✈️', onClick: () => openPartnerUrl(partnerTelegramUrl, 'telegram', { platform: 'telegram' }) },
+      partnerMaxUrl && { label: 'MAX', icon: '💬', onClick: () => openPartnerUrl(partnerMaxUrl, 'max', { platform: 'max' }) },
       onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(partner), tone: 'gold' },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
