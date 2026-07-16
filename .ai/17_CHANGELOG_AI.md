@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-16] feat: Feed Framework v1
+**Коммит:** `pending`
+**Файлы:** `src/components/FeedFramework.jsx`, `src/components/ProfileTimelineSection.jsx`, `src/profileTimeline.js`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен универсальный `FeedFramework` для ленты партнёров и экспертов с поддержкой текста, медиа, автора, даты, действий, лайков и комментариев.
+- Профильная Timeline переведена на `UniversalFeed` и `MediaPreview`; старые source-вкладки `Все` / `Новости` больше не рендерятся.
+- `TIMELINE_FILTERS` теперь фиксирует единую вкладку `Лента`, а сортировка сохраняет новые публикации сверху через существующие date-поля.
+**Почему:** вкладка профиля должна ощущаться как современная единая социальная лента и оставаться готовой к будущим типам записей без новой модели данных.
+
 ## [2026-07-16] feat: Smart media previews for desktop catalogs
 **Коммит:** `pending`
 **Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `src/ExpertsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

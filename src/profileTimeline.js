@@ -135,14 +135,7 @@ function timelineId(type, id, index = 0) {
 }
 
 export const TIMELINE_FILTERS = [
-  { id: 'all', label: 'Все' },
-  { id: 'publication', label: 'Новости' },
-  { id: 'event', label: 'Мероприятия' },
-  { id: 'offer', label: 'Акции' },
-  { id: 'video', label: 'Видео' },
-  { id: 'photo', label: 'Фото' },
-  { id: 'review', label: 'Отзывы' },
-  { id: 'vk', label: 'VK' },
+  { id: 'feed', label: 'Лента' },
 ];
 
 export const TIMELINE_SOURCE_META = {
@@ -594,7 +587,7 @@ export function getProfileTimelineSourceTypes(items = []) {
 
 export function filterProfileTimelineItems(items = [], filterId = 'all') {
   const list = Array.isArray(items) ? items : [];
-  if (!filterId || filterId === 'all') return list;
+  if (!filterId || filterId === 'all' || filterId === 'feed') return list;
   return list.filter(item => item.type === filterId);
 }
 

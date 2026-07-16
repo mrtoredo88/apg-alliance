@@ -144,7 +144,8 @@ const publicationItems = filterProfileTimelineItems(timeline, 'publication');
 assert.equal(publicationItems.length, 3, 'publication filter must keep only news entries');
 assert.equal(publicationItems[1].title, 'Сегодня новое', 'newer unpinned publication must stay above older publication');
 assert.equal(publicationItems[2].title, 'Сегодня старое', 'older unpinned publication must stay below newer publication');
-assert.ok(TIMELINE_FILTERS.some(filter => filter.id === 'video' && filter.label === 'Видео'), 'timeline filters must include video source');
+assert.deepEqual(TIMELINE_FILTERS, [{ id: 'feed', label: 'Лента' }], 'timeline must expose one unified Feed tab instead of old source tabs');
+assert.equal(filterProfileTimelineItems(timeline, 'feed').length, timeline.length, 'Feed filter must keep all source types in one list');
 
 const periodLabel = getTimelinePeriodLabel('2026-07-15T09:00:00.000Z', new Date('2026-07-15T12:00:00.000Z').getTime());
 assert.equal(periodLabel, 'Сегодня', 'timeline period helper must group today entries');
@@ -157,15 +158,22 @@ assert.equal(todayPublications[0].title, 'Сегодня новое', 'timeline 
 assert.equal(todayPublications[1].title, 'Сегодня старое', 'timeline groups must keep older publication after newer publication');
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
+const feedFramework = read('src/components/FeedFramework.jsx');
 assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timeline source through existing backend endpoint');
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
-assert.match(timelineComponent, /ProfileTimelineCard/, 'timeline UI must use one shared profile timeline card component');
-assert.match(timelineComponent, /TIMELINE_FILTERS/, 'timeline UI must render shared source filters');
+assert.match(timelineComponent, /UniversalFeed/, 'timeline UI must render the shared universal Feed Framework');
+assert.doesNotMatch(timelineComponent, /TIMELINE_FILTERS/, 'timeline UI must not render old source filter tabs');
+assert.doesNotMatch(timelineComponent, /filter\.label/, 'timeline UI must not render the old All/News source pills');
 assert.match(timelineComponent, /groupProfileTimelineItems/, 'timeline UI must group items by period');
-assert.match(timelineComponent, /Показать полностью/, 'long timeline entries must be expandable');
+assert.match(feedFramework, /Показать полностью/, 'long feed entries must be expandable');
 assert.match(timelineComponent, /Показать ещё/, 'timeline must use progressive pagination');
 assert.match(timelineComponent, /Закреплено/, 'pinned timeline item must be visible in UI');
 assert.match(timelineComponent, /VK-источник временно недоступен, остальные события ленты показаны/, 'VK failure must not break the full timeline');
+assert.match(feedFramework, /export function UniversalFeedCard/, 'Feed Framework must expose one reusable feed card');
+assert.match(feedFramework, /export function UniversalFeed/, 'Feed Framework must expose the reusable feed list');
+assert.match(feedFramework, /MediaPreview/, 'Feed Framework must use Smart Media Framework for images, galleries and video');
+assert.match(feedFramework, /item\.publishDate \|\| item\.publishedAt \|\| item\.createdAt \|\| item\.created/, 'Feed Framework must sort by existing publication date fields');
+assert.match(feedFramework, /likesCount|commentCount|commentsCount/, 'Feed card must preserve social counters when existing data provides them');
 
 const workspaceNews = read('src/workspace/WorkspaceNewsCenter.jsx');
 assert.match(workspaceNews, /Создать публикацию/, 'Workspace must expose create publication action');
