@@ -102,8 +102,8 @@ export function ProfileTimelineSection({
           <div style={{ display: 'grid', gap: 10 }}>
             <DesktopEmptyState
               icon="✦"
-              title="Лента пока собирается"
-              text={isOwner ? 'Создайте первую публикацию, добавьте фото или привяжите VK-сообщество, чтобы профиль выглядел живым.' : 'Здесь появятся публикации, акции, мероприятия, фото, видео, отзывы и записи VK-сообщества.'}
+              title="В ленте пока тихо"
+              text={isOwner ? 'Добавьте первую публикацию или фото, чтобы профиль начал рассказывать о вас.' : 'Новые публикации, фото и события появятся здесь.'}
             />
             {isOwner && onCreatePublication && (
               <GlassButton onClick={onCreatePublication} style={{ justifySelf: 'center', minHeight: 38, borderRadius: 16, padding: '8px 14px' }}>Создать первую публикацию</GlassButton>

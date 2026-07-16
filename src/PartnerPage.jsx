@@ -10,6 +10,11 @@ function sanitizeForVK(text) {
     .replace(/\b(t\.me|telegram|tg|instagram|inst|whatsapp|youtube|youtu\.be|tiktok|rutube|max\.ru|yclients|dikidi)\S*/gi, '[скрыто]')
     .replace(/@\S+/g, '[скрыто]');
 }
+
+function formatProfileDate(value) {
+  const date = toDate(value);
+  return date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
+}
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
@@ -19,7 +24,7 @@ import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
-import { formatRelativeTime } from './utils/time.js';
+import { formatRelativeTime, toDate } from './utils/time.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
@@ -33,10 +38,11 @@ import {
   DesktopDetailShell,
   DesktopDetailTabs,
   DesktopGallery,
+  DesktopInfoGrid,
   DesktopEmptyState,
   DesktopHero,
   DesktopHeroActions,
-  DesktopInfoGrid,
+  DesktopKpiStrip,
   DesktopMeta,
   DesktopRelated,
   DesktopSection,
@@ -468,6 +474,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const stamps = visitCounts[partner.id] ?? 0;
       const stampTarget = Number(partner.stampTarget) || 0;
       const filledStamps = stampTarget > 0 ? Math.min(Number(stamps) || 0, stampTarget) : 0;
+      const offerEndLabel = formatProfileDate(partner.offerUntil || partner.promoUntil || partner.discountUntil || partner.endsAt);
       const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
       const kpiItems = [
         avgRating > 0 && { id: 'rating', label: 'Рейтинг', value: avgRating.toFixed(1), icon: '★', tone: 'gold' },
@@ -477,7 +484,12 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
         hasVideos && { id: 'video', label: 'Видео', value: partner.videos.length, icon: '▶' },
       ].filter(Boolean);
-      const heroActions = cta.slice(0, 6).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
+      const heroActions = [
+        partner.phone && { label: 'Позвонить', icon: '📞', onClick: handlePhone, tone: 'gold' },
+        canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(partner), tone: 'gold' },
+        !canUseApgBooking && !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
+        onAskQuestion && { label: 'Написать', icon: '💬', onClick: () => onAskQuestion(partner), tone: 'gold' },
+      ].filter(Boolean).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
       const stickyActions = [
         partner.phone && { id: 'call', label: phoneCopied ? 'Скопировано' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', tone: 'gold', onClick: handlePhone },
         onAskQuestion && { id: 'question', label: 'Написать', icon: '💬', onClick: () => onAskQuestion(partner) },
@@ -487,6 +499,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         partner.phone && { id: 'phone', label: 'Телефон', value: partner.phone, icon: '📞', onClick: handlePhone },
         partner.address && { id: 'address', label: 'Адрес', value: partner.address, icon: '📍', onClick: handleMap },
         partner.hours && { id: 'hours', label: 'График', value: partner.hours, icon: '🕐' },
+      ].filter(Boolean);
+      const socialItems = [
         !canUseApgBooking && !isVK() && partner.bookingUrl && { id: 'booking', label: 'Запись', value: partner.bookingUrl, icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking') },
         partner.websiteUrl && !isVK() && { id: 'site', label: 'Сайт', value: partner.websiteUrl, icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
         partner.vkGroupUrl && { id: 'vk', label: 'VK', value: partner.vkGroupUrl, icon: '🔵', onClick: openVkGroup },
@@ -554,14 +568,14 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               subtitle={partner.categoryLabel || partner.address || 'Партнёр АПГ'}
               badges={heroBadges.map(label => ({ id: label, label, tone: String(label).includes('★') ? 'gold' : undefined }))}
               description={partner.offer || partner.description || partner.address || 'Проверенное место в экосистеме АПГ.'}
-              meta={<DesktopInfoGrid items={kpiItems} />}
-              actions={<DesktopHeroActions actions={heroActions} />}
+              meta={<DesktopInfoGrid columns="repeat(auto-fit, minmax(118px, 1fr))" items={kpiItems.map(item => ({ ...item, style: { minHeight: 54, padding: 11 } }))} />}
+              actions={<DesktopHeroActions actions={heroActions} style={{ marginBottom: 4 }} />}
             />
 
             <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={handleProfileTabChange} />
 
             {activeTab === 'feed' && (
-              <DesktopSection title="Лента" subtitle="Хронология публичной активности">
+              <DesktopSection title="Лента">
                 <ProfileTimelineSection
                   profile={partner}
                   role="partner"
@@ -579,7 +593,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             )}
 
             {activeTab === 'about' && (
-              <DesktopSection title="О компании" subtitle="Описание и основная информация">
+              <DesktopSection title="О компании">
                 <div style={{ display: 'grid', gridTemplateColumns: contactItems.length > 0 ? 'minmax(0, 1.05fr) minmax(280px, 0.95fr)' : '1fr', gap: 14, alignItems: 'start' }}>
                   <div style={{ display: 'grid', gap: 12 }}>
                     <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
@@ -603,12 +617,18 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                       <DesktopMeta items={contactItems} />
                     </div>
                   )}
+                  {socialItems.length > 0 && (
+                    <div style={{ borderRadius: 22, padding: 14, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                      <div style={{ color: APG2.text, fontSize: 12, lineHeight: '16px', marginBottom: 8, fontWeight: 860, letterSpacing: 0.1 }}>Ссылки</div>
+                      <DesktopMeta items={socialItems} />
+                    </div>
+                  )}
                 </div>
               </DesktopSection>
             )}
 
             {activeTab === 'services' && hasServices && (
-              <DesktopSection title="Услуги" subtitle="Данные из анкеты партнёра">
+              <DesktopSection title="Услуги">
                 <div style={{ display: 'grid', gap: 12 }}>
                   {servicesText.trim() && <RichText color={APG2.textSoft} fontSize={14}>{servicesText}</RichText>}
                   {serviceCatalog.length > 0 && (
@@ -619,7 +639,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             )}
 
             {activeTab === 'offer' && (
-              <DesktopSection title="Акция" subtitle="Актуальное предложение">
+              <DesktopSection title="Акция">
                 {partner.offer ? (
                   <div style={{ position: 'relative', minHeight: 220, borderRadius: 24, overflow: 'hidden', color: '#fff', background: 'rgba(201,168,76,0.18)' }}>
                     {heroImage && <img src={heroImage} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(1.05) contrast(1.04)' }} />}
@@ -627,6 +647,10 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                     <div style={{ position: 'relative', zIndex: 1, minHeight: 220, padding: 20, display: 'grid', alignContent: 'end', gap: 12, maxWidth: 560 }}>
                       <div style={{ justifySelf: 'start', borderRadius: 999, padding: '6px 10px', color: '#17120a', background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)', fontSize: 11, lineHeight: '14px', fontWeight: 900 }}>Акция</div>
                       <div style={{ fontSize: 24, lineHeight: '29px', fontWeight: 930 }}>{partner.offer}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'rgba(255,255,255,0.82)', fontSize: 12, lineHeight: '16px', fontWeight: 800 }}>
+                        <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>Активна</span>
+                        {offerEndLabel && <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>До {offerEndLabel}</span>}
+                      </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {canUseApgBooking && <GlassButton onClick={() => onBook(partner)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
                         {onAskQuestion && <GlassButton onClick={() => onAskQuestion(partner)} style={{ minHeight: 40, borderRadius: 16, color: '#fff', background: 'rgba(255,255,255,0.16)' }}>Написать</GlassButton>}
@@ -640,13 +664,13 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             )}
 
             {activeTab === 'photos' && (
-              <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
+              <DesktopSection title="Фото">
                 {hasGallery ? <ProfilePhotoGrid items={galleryItems} desktop onOpen={setLightboxIdx} /> : <DesktopEmptyState icon="▣" title="Фото пока нет" text="Фотографии появятся после обновления карточки." />}
               </DesktopSection>
             )}
 
             {activeTab === 'video' && (
-              <DesktopSection title="Видео" subtitle={`${partner.videos?.length || 0} материалов`}>
+              <DesktopSection title="Видео">
                 {hasVideos ? <ProfileVideoGrid videos={partner.videos} desktop onOpen={setVideoViewerIdx} /> : <DesktopEmptyState icon="▶" title="Видео пока нет" text="Видеоматериалы появятся после добавления в анкету." />}
               </DesktopSection>
             )}
@@ -654,7 +678,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             {activeTab === 'reviews' && (
               <DesktopSection
                 title={`Отзывы${reviewCount > 0 ? ` · ${reviewCount}` : ''}`}
-                subtitle="Отзывы участников АПГ"
                 action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
               >
                 {reviewCount > 0 && (
@@ -758,7 +781,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
             <div id="partner-profile-feed" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title="Лента">
-              <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Публикации, акции, мероприятия, медиа, отзывы и VK в одном потоке.</div>
               <ProfileTimelineSection
                 profile={partner}
                 role="partner"
@@ -818,6 +840,10 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
                     <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{partner.offer}</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, fontSize: 11, lineHeight: '14px', fontWeight: 820 }}>
+                      <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>Активна</span>
+                      {formatProfileDate(partner.offerUntil || partner.promoUntil || partner.discountUntil || partner.endsAt) && <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>До {formatProfileDate(partner.offerUntil || partner.promoUntil || partner.discountUntil || partner.endsAt)}</span>}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -849,6 +875,15 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               title={`Отзывы${reviewCount > 0 ? ` · ${reviewCount}` : ''}`}
               action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
             >
+              {reviewCount > 0 && (
+                <div style={{ ...APG2.glass, borderRadius: 28, padding: 15, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 22, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 20, fontWeight: 920 }}>{avgRating > 0 ? avgRating.toFixed(1) : '★'}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1 }}>{avgRating > 0 ? '★'.repeat(Math.round(avgRating)) : '★★★★★'}</div>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 3 }}>На основе {reviewCount} отзывов</div>
+                  </div>
+                </div>
+              )}
               {!canReview && !reviewsLoading && (
                 <div style={{ ...APG2.glass, borderRadius: 24, padding: 13, color: APG2.textMuted, fontSize: 13, lineHeight: '18px', marginBottom: 10 }}>
                   Оставить отзыв можно после посещения и скана QR-кода.

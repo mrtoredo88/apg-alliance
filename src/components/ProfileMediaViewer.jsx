@@ -116,11 +116,21 @@ export function ProfileVideoGrid({ videos = [], onOpen, desktop = false }) {
       gap: desktop ? 12 : 10,
     }}>
       {items.map((video, index) => (
-        <GridButton key={video.id} label={`Открыть видео ${index + 1}`} onClick={() => onOpen?.(index)} style={{ display: 'grid', gap: 0 }}>
-          <MediaPreview source={video} videos={[video]} title={video.title} height={desktop ? 150 : 190} />
+        <GridButton key={video.id} label={`Открыть видео ${index + 1}`} onClick={() => onOpen?.(index)} style={{ display: 'grid', gap: 0, borderRadius: desktop ? 22 : 24 }}>
+          <div style={{ position: 'relative', minHeight: desktop ? 150 : 190, overflow: 'hidden' }}>
+            <MediaPreview image={video.thumbnailUrl} source={{ ...video, embedUrl: '', url: video.thumbnailUrl || video.url }} title={video.title} height={desktop ? 150 : 190} />
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'linear-gradient(180deg, rgba(5,5,8,0.08), rgba(5,5,8,0.38))', pointerEvents: 'none' }}>
+              <div style={{ width: desktop ? 54 : 58, height: desktop ? 54 : 58, borderRadius: 999, display: 'grid', placeItems: 'center', color: '#17120a', background: 'linear-gradient(135deg,#FFF1BD,#D8B762)', boxShadow: '0 16px 40px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.5)', fontSize: desktop ? 19 : 21, paddingLeft: 3 }}>
+                ▶
+              </div>
+            </div>
+            <div style={{ position: 'absolute', left: 10, top: 10, borderRadius: 999, padding: '5px 8px', color: '#fff', background: 'rgba(10,10,14,0.58)', border: '1px solid rgba(255,255,255,0.16)', fontSize: 11, fontWeight: 820 }}>
+              Видео {index + 1}/{items.length}
+            </div>
+          </div>
           <div style={{ padding: '10px 12px 12px', color: APG2.text }}>
             <div style={{ fontSize: 14, fontWeight: 840, lineHeight: '18px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{video.title || 'Видео'}</div>
-            <div style={{ marginTop: 4, fontSize: 11, color: APG2.textMuted, fontWeight: 760 }}>Нажмите, чтобы открыть</div>
+            <div style={{ marginTop: 4, fontSize: 11, color: APG2.textMuted, fontWeight: 760 }}>Откроется поверх профиля</div>
           </div>
         </GridButton>
       ))}

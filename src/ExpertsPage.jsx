@@ -28,7 +28,7 @@ import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
 import { shareLink } from './utils/shareLink.js';
-import { formatRelativeTime } from './utils/time.js';
+import { formatRelativeTime, toDate } from './utils/time.js';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { ProfilePhotoGrid, ProfilePhotoViewer, ProfileVideoGrid, ProfileVideoViewer } from './components/ProfileMediaViewer.jsx';
@@ -67,6 +67,11 @@ function sanitizeForVK(text) {
     .replace(/https?:\/\/\S+/gi, '[ссылка скрыта]')
     .replace(/\b(t\.me|telegram|tg|instagram|inst|whatsapp|youtube|youtu\.be|tiktok|rutube|max\.ru|yclients|dikidi)\S*/gi, '[скрыто]')
     .replace(/@\S+/g, '[скрыто]');
+}
+
+function formatProfileDate(value) {
+  const date = toDate(value);
+  return date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
 }
 
 const FORMAT_LABELS = {
@@ -439,6 +444,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       const hasVideos = expert.videos?.length > 0;
       const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
       const categoryLabels = expert.categories.map(value => getExpertCategory(value)).filter(Boolean);
+      const offerEndLabel = formatProfileDate(expert.offerUntil || expert.promoUntil || expert.discountUntil || expert.endsAt);
       const kpiItems = [
         (expert.avgRating ?? 0) > 0 && { id: 'rating', label: 'Рейтинг', value: expert.avgRating.toFixed(1), icon: '★', tone: 'gold' },
         (expert.reviewCount ?? reviews.length) > 0 && { id: 'reviews', label: 'Отзывы', value: expert.reviewCount ?? reviews.length, icon: '💬' },
@@ -447,7 +453,12 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
         galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
         hasVideos && { id: 'video', label: 'Видео', value: expert.videos.length, icon: '▶' },
       ].filter(Boolean);
-      const heroActions = cta.slice(0, 6).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
+      const heroActions = [
+        expert.telHref && { label: 'Позвонить', icon: '📞', onClick: callExpert, tone: 'gold' },
+        canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(expert), tone: 'gold' },
+        !canUseApgBooking && expert.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openExpertContact(expert.bookingUrl, 'booking'), tone: 'gold' },
+        onAskQuestion && { label: 'Написать', icon: '💬', onClick: () => onAskQuestion(expert) },
+      ].filter(Boolean).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
       const stickyActions = [
         expert.telHref && { id: 'call', label: 'Позвонить', icon: '📞', tone: 'gold', onClick: callExpert },
         canUseApgBooking && { id: 'book', label: 'Записаться', icon: '📅', tone: 'gold', onClick: () => onBook(expert) },
@@ -459,6 +470,8 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
         expert.email && { id: 'email', label: 'Email', value: expert.email, icon: '✉️', onClick: () => openExpertContact(`mailto:${expert.email}`, 'email') },
         expert.address && { id: 'address', label: 'Адрес', value: expert.address, icon: '📍', onClick: openExpertMap },
         expert.hours && { id: 'hours', label: 'График', value: expert.hours, icon: '🕐' },
+      ].filter(Boolean);
+      const socialItems = [
         !canUseApgBooking && expert.bookingUrl && { id: 'booking', label: 'Запись', value: expert.bookingUrl, icon: '📅', onClick: () => openExpertContact(expert.bookingUrl, 'booking') },
         expert.whatsappUrl && { id: 'whatsapp', label: 'WhatsApp', value: expert.whatsappUrl, icon: '🟢', onClick: () => openExpertContact(expert.whatsappUrl, 'whatsapp', { platform: 'whatsapp' }) },
         expert.websiteUrl && { id: 'site', label: 'Сайт', value: expert.websiteUrl, icon: '🌐', onClick: () => openExpertContact(expert.websiteUrl, 'website') },
@@ -513,14 +526,14 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 subtitle={expert.specialization || 'Эксперт города'}
                 badges={heroBadges.map(label => ({ id: label, label, tone: String(label).includes('★') ? 'gold' : undefined }))}
                 description={expert.offer || expert.description || 'Проверенный специалист в экосистеме АПГ.'}
-                meta={<DesktopInfoGrid items={kpiItems} />}
-                actions={<DesktopHeroActions actions={heroActions} />}
+                meta={<DesktopInfoGrid columns="repeat(auto-fit, minmax(118px, 1fr))" items={kpiItems.map(item => ({ ...item, style: { minHeight: 54, padding: 11 } }))} />}
+                actions={<DesktopHeroActions actions={heroActions} style={{ marginBottom: 4 }} />}
               />
 
               <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={handleProfileTabChange} />
 
               {activeTab === 'feed' && (
-                <DesktopSection title="Лента" subtitle="Хронология публичной активности">
+                <DesktopSection title="Лента">
                   <ProfileTimelineSection
                     profile={expert}
                     role="expert"
@@ -538,7 +551,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               )}
 
               {activeTab === 'about' && (
-                <DesktopSection title="О компании" subtitle="Описание и направления работы">
+                <DesktopSection title="О компании">
                   <div style={{ display: 'grid', gridTemplateColumns: contactItems.length > 0 ? 'minmax(0, 1.05fr) minmax(280px, 0.95fr)' : '1fr', gap: 14, alignItems: 'start' }}>
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }}>
@@ -563,12 +576,18 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                         <DesktopMeta items={contactItems} />
                       </div>
                     )}
+                    {socialItems.length > 0 && (
+                      <div style={{ borderRadius: 22, padding: 14, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                        <div style={{ color: APG2.text, fontSize: 12, lineHeight: '16px', marginBottom: 8, fontWeight: 860, letterSpacing: 0.1 }}>Ссылки</div>
+                        <DesktopMeta items={socialItems} />
+                      </div>
+                    )}
                   </div>
                 </DesktopSection>
               )}
 
               {activeTab === 'services' && hasServices && (
-                <DesktopSection title="Услуги" subtitle="Данные из анкеты эксперта">
+                <DesktopSection title="Услуги">
                   <div style={{ display: 'grid', gap: 12 }}>
                     {expert.services && <RichText color={APG2.textSoft} fontSize={14}>{expert.services}</RichText>}
                     {expert.experience && (
@@ -592,7 +611,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               )}
 
               {activeTab === 'offer' && (
-                <DesktopSection title="Акция" subtitle="Предложение эксперта">
+                <DesktopSection title="Акция">
                   {expert.offer ? (
                     <div style={{ position: 'relative', minHeight: 220, borderRadius: 24, overflow: 'hidden', color: '#fff', background: 'rgba(201,168,76,0.18)' }}>
                       {heroImage && <img src={heroImage} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(1.05) contrast(1.04)' }} />}
@@ -600,6 +619,10 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                       <div style={{ position: 'relative', zIndex: 1, minHeight: 220, padding: 20, display: 'grid', alignContent: 'end', gap: 12, maxWidth: 560 }}>
                         <div style={{ justifySelf: 'start', borderRadius: 999, padding: '6px 10px', color: '#17120a', background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)', fontSize: 11, lineHeight: '14px', fontWeight: 900 }}>Акция</div>
                         <div style={{ fontSize: 24, lineHeight: '29px', fontWeight: 930 }}>{expert.offer}</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'rgba(255,255,255,0.82)', fontSize: 12, lineHeight: '16px', fontWeight: 800 }}>
+                          <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>Активна</span>
+                          {offerEndLabel && <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>До {offerEndLabel}</span>}
+                        </div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {canUseApgBooking && <GlassButton onClick={() => onBook(expert)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
                           {onAskQuestion && <GlassButton onClick={() => onAskQuestion(expert)} style={{ minHeight: 40, borderRadius: 16, color: '#fff', background: 'rgba(255,255,255,0.16)' }}>Написать</GlassButton>}
@@ -613,7 +636,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               )}
 
               {activeTab === 'location' && hasLocation && (
-                <DesktopSection title="Где и когда" subtitle="Адрес и график">
+                <DesktopSection title="Где и когда">
                   <DesktopMeta items={[
                     expert.address && { id: 'address', label: 'Адрес', value: expert.address, icon: '📍', onClick: openExpertMap },
                     expert.hours && { id: 'hours', label: 'График', value: expert.hours, icon: '🕐' },
@@ -622,19 +645,19 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               )}
 
               {activeTab === 'photos' && (
-                <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
+                <DesktopSection title="Фото">
                   {hasGallery ? <ProfilePhotoGrid items={galleryItems} desktop onOpen={setLightboxIdx} /> : <DesktopEmptyState icon="▣" title="Фото пока нет" text="Фотографии появятся после обновления профиля." />}
                 </DesktopSection>
               )}
 
               {activeTab === 'video' && (
-                <DesktopSection title="Видео" subtitle={`${expert.videos?.length || 0} материалов`}>
+                <DesktopSection title="Видео">
                   {hasVideos ? <ProfileVideoGrid videos={expert.videos} desktop onOpen={setVideoViewerIdx} /> : <DesktopEmptyState icon="▶" title="Видео пока нет" text="Видеоматериалы появятся после добавления в анкету." />}
                 </DesktopSection>
               )}
 
               {activeTab === 'reviews' && (
-                <DesktopSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`} subtitle="Отзывы участников АПГ">
+                <DesktopSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`}>
                   {(expert.reviewCount ?? reviews.length) > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)', gap: 12, marginBottom: 12 }}>
                       <div style={{ borderRadius: 22, padding: 16, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.26)' }}>
@@ -734,7 +757,6 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
             <div id="expert-profile-feed" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title="Лента">
-              <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Публикации, акции, мероприятия, медиа, отзывы и VK в одном потоке.</div>
               <ProfileTimelineSection
                 profile={expert}
                 role="expert"
@@ -785,6 +807,10 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
                     <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{expert.offer}</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, fontSize: 11, lineHeight: '14px', fontWeight: 820 }}>
+                      <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>Активна</span>
+                      {formatProfileDate(expert.offerUntil || expert.promoUntil || expert.discountUntil || expert.endsAt) && <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>До {formatProfileDate(expert.offerUntil || expert.promoUntil || expert.discountUntil || expert.endsAt)}</span>}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -840,6 +866,15 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
             <div id="expert-profile-reviews" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`}>
+              {(expert.reviewCount ?? reviews.length) > 0 && (
+                <div style={{ ...APG2.glass, borderRadius: 28, padding: 15, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 22, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 20, fontWeight: 920 }}>{(expert.avgRating ?? 0) > 0 ? expert.avgRating.toFixed(1) : '★'}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1 }}>{(expert.avgRating ?? 0) > 0 ? '★'.repeat(Math.round(expert.avgRating)) : '★★★★★'}</div>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 3 }}>На основе {expert.reviewCount ?? reviews.length} отзывов</div>
+                  </div>
+                </div>
+              )}
               {user && !String(user.id).startsWith('guest_') && !submitDone && (
                 <div style={{ ...APG2.glass, borderRadius: 30, padding: 16, marginBottom: 12 }}>
                   <div style={{ color: APG2.text, fontSize: 15, fontWeight: 780, marginBottom: 10 }}>Оставить отзыв</div>

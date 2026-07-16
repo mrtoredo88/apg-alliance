@@ -75,15 +75,6 @@ function getLikesCount(item = {}) {
   return getCount(entity.stats?.likes, entity.likesCount, entity.likeCount, entity.likes, item.likesCount, item.likeCount);
 }
 
-function getFeedActionLabel(item = {}) {
-  if (item.action === 'openVideo') return 'Видео';
-  if (item.action === 'openPhotos') return 'Фото';
-  if (item.action === 'openReviews') return 'Отзывы';
-  if (item.action === 'openOffer') return 'Акция';
-  if (item.action === 'openBooking') return 'Записаться';
-  return 'Открыть';
-}
-
 function getAuthorLogo(item = {}) {
   const entity = item.entity || {};
   return item.authorLogo || item.logoUrl || entity.authorLogo || entity.logoUrl || entity.avatarUrl || entity.photoUrl || entity.photo || '';
@@ -150,7 +141,6 @@ export function UniversalFeedCard({
   const canExpand = text.length > (desktop ? 260 : 160);
   const commentsCount = getCommentsCount(item);
   const likesCount = getLikesCount(item);
-  const actionLabel = getFeedActionLabel(item);
   const open = () => {
     if (item.action === 'openExternal' && item.url && !onOpen) return openUrl(item.url);
     return onOpen?.(item);
@@ -226,18 +216,17 @@ export function UniversalFeedCard({
       )}
 
       <footer style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', minWidth: 0, flexWrap: desktop ? 'nowrap' : 'wrap', paddingTop: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, color: APG2.textMuted, fontSize: 11.5 }}>
-          <span style={{ whiteSpace: 'nowrap' }}>♡ {likesCount}</span>
-          <span style={{ whiteSpace: 'nowrap' }}>💬 {commentsCount}</span>
-          {media.gallery.length > 1 && <span style={{ whiteSpace: 'nowrap' }}>▣ {media.gallery.length}</span>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-          <GlassButton onClick={() => onShare(item)} style={{ ...commonButton, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>Поделиться</GlassButton>
-          <GlassButton onClick={open} style={commonButton}>{actionLabel}</GlassButton>
-        </div>
-      </footer>
-    </article>
-  );
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, color: APG2.textMuted, fontSize: 11.5 }}>
+        <span style={{ whiteSpace: 'nowrap' }}>♡ {likesCount}</span>
+        <span style={{ whiteSpace: 'nowrap' }}>💬 {commentsCount}</span>
+        {media.gallery.length > 1 && <span style={{ whiteSpace: 'nowrap' }}>▣ {media.gallery.length}</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+        <GlassButton onClick={() => onShare(item)} style={{ ...commonButton, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>Поделиться</GlassButton>
+      </div>
+    </footer>
+  </article>
+);
 }
 
 export function UniversalFeed({
@@ -254,9 +243,9 @@ export function UniversalFeed({
     <div style={{ display: 'grid', gap: desktop ? 16 : 13 }}>
       {safeGroups.map(group => (
         <section key={group.id || group.label} style={{ display: 'grid', gap: 10 }}>
-          {group.label && (
+          {group.label && group.id !== 'older' && group.label !== 'Без даты' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ color: group.id === 'pinned' ? APG2.gold : APG2.textMuted, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>{group.label}</div>
+              <div style={{ color: group.id === 'pinned' ? APG2.gold : APG2.textMuted, fontSize: 12, fontWeight: 900, letterSpacing: 0 }}>{group.label}</div>
               <div style={{ height: 1, flex: 1, background: 'rgba(var(--apg2-glass-a,255,255,255),0.11)' }} />
             </div>
           )}

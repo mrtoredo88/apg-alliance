@@ -689,8 +689,9 @@ export function filterProfileTimelineItems(items = [], filterId = 'all') {
 
 export function getTimelinePeriodLabel(value, nowValue = Date.now()) {
   const ms = toMillis(value);
-  if (!ms) return 'Раньше';
+  if (!ms) return 'Без даты';
   const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return 'Без даты';
   const now = new Date(nowValue);
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
@@ -701,7 +702,7 @@ export function getTimelinePeriodLabel(value, nowValue = Date.now()) {
   if (day >= startOfWeek) return 'Эта неделя';
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   if (day >= startOfMonth) return 'Этот месяц';
-  return 'Раньше';
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(date);
 }
 
 export function groupProfileTimelineItems(items = [], nowValue = Date.now()) {

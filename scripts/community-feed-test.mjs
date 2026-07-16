@@ -43,7 +43,7 @@ for (const [name, source] of [['PartnerPage', partnerPage], ['ExpertsPage', expe
   assert.match(source, /ProfileTimelineSection/, `${name} must render unified profile timeline`);
   assert.match(source, /buildLivingProfileTabs/, `${name} must use shared Living Profile tabs`);
   assert.match(source, /setDesktopTab\('feed'\)/, `${name} must open unified timeline by default`);
-  assert.match(source, /Хронология публичной активности/, `${name} must describe feed as profile activity timeline`);
+  assert.doesNotMatch(source, /Хронология публичной активности|Публикации, акции, мероприятия, медиа, отзывы и VK в одном потоке/, `${name} must not expose technical feed subtitles`);
   assert.doesNotMatch(source, /Последние публикации сообщества/, `${name} must not expose VK as a separate feed`);
 }
 
