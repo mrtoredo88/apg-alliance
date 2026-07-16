@@ -15,6 +15,7 @@ import { shareLink } from './utils/shareLink.js';
 import { aiProfileListToText, buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { useProfileAutosave } from './hooks/useProfileAutosave.js';
+import { ContentStudio } from './components/ContentStudio.jsx';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -799,42 +800,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* ── Контент ── */}
           {activeTab === 'publications' && (
-            <GlassSection title="Контент">
-              <div style={{ display: 'grid', gap: 10 }}>
-                {[
-                  { icon: '📰', title: 'Новости',      text: 'Расскажите о запуске, обновлении услуг или важном событии.', done: Boolean(partner.firstNewsCreatedAt) },
-                  { icon: '🎁', title: 'Акции',        text: 'Добавьте специальное предложение для участников АПГ.',       done: Boolean(String(partner.offer || '').trim()) },
-                  { icon: '📅', title: 'Мероприятия',  text: 'Пригласите пользователей на встречу или мастер-класс.',       done: Boolean(partner.firstEventCreatedAt) },
-                  { icon: '🏆', title: 'Призы',        text: 'Подготовьте бонус для активности пользователей.',             done: false },
-                ].map(({ icon, title, text, done }) => (
-                  <GlassCard key={title} style={{ borderRadius: 24, display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 18, flexShrink: 0,
-                      background: done ? 'rgba(75,179,75,0.18)' : APG2_PROFILE.goldSoft,
-                      border: done ? '1px solid rgba(75,179,75,0.34)' : '1px solid rgba(215,184,106,0.25)',
-                      display: 'grid', placeItems: 'center', fontSize: 22,
-                    }}>
-                      {done ? '✓' : icon}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 850 }}>{title}</div>
-                      <div style={{ color: done ? 'rgba(75,179,75,0.88)' : APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', marginTop: 3 }}>
-                        {done ? 'Выполнено ✓' : text}
-                      </div>
-                    </div>
-                  </GlassCard>
-                ))}
-              </div>
-              <GlassCard style={{ borderRadius: 24, marginTop: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <LokiIdentity size={26} state="ready" showText={false} style={{ placeItems: 'center', flexShrink: 0 }} />
-                  <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Совет Локи</span>
-                </div>
-                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px' }}>
-                  Контент создаётся совместно с командой АПГ. Сообщите нам о ваших событиях или акциях — мы оформим публикацию и разместим её в ленте.
-                </div>
-              </GlassCard>
-            </GlassSection>
+            <ContentStudio profile={partner} role="partner" events={events} onToast={onToast} />
           )}
 
           {/* ── Отзывы ── */}

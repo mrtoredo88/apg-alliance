@@ -100,6 +100,7 @@ export function PhotoUpload({ value, onChange, folder, label = 'Загрузит
 export function GalleryUpload({ value = [], onChange, folder, max = 6, theme }) {
   const inputRef = useRef();
   const [progresses, setProgresses] = useState({});
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState(null);
   const accRef = useRef(null);
 
@@ -147,7 +148,10 @@ export function GalleryUpload({ value = [], onChange, folder, max = 6, theme }) 
         {value.length + uploading < max && (
           <div
             onClick={() => inputRef.current.click()}
-            style={{ aspectRatio: '1', borderRadius: 10, border: `2px dashed ${T.border}`, background: T.chipBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 4 }}
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={e => { e.preventDefault(); setDragging(false); uploadMany(e.dataTransfer.files); }}
+            style={{ aspectRatio: '1', borderRadius: 10, border: `2px dashed ${dragging ? T.gold : T.border}`, background: dragging ? `${T.gold}11` : T.chipBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 4 }}
           >
             <div style={{ fontSize: 22 }}>＋</div>
             <div style={{ fontSize: 10, color: T.textSec }}>{value.length}/{max}</div>

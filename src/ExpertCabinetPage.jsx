@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
@@ -15,6 +15,7 @@ import { shareLink } from './utils/shareLink.js';
 import { buildAiProfileDraft, sanitizeAiProfile } from './aiProfile.js';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { useProfileAutosave } from './hooks/useProfileAutosave.js';
+import { ContentStudio } from './components/ContentStudio.jsx';
 import {
   EXPERT_CATEGORIES,
   EXPERT_SOCIAL_FIELDS,
@@ -595,58 +596,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 
           {/* ── КОНТЕНТ ── */}
           {activeTab === 'content' && (
-            <GlassSection title="Контент">
-              <div style={{ display: 'grid', gap: 10 }}>
-                {[
-                  { icon: '📸', title: 'Фото в галерее',   count: galleryCount, unit: 'фото',   done: galleryCount >= 1 },
-                  { icon: '🎬', title: 'Видео',            count: videosCount,  unit: 'видео',  done: videosCount  >= 1 },
-                  { icon: '📋', title: 'Форматы работы',   count: (Array.isArray(expert.formats) ? expert.formats : []).length, unit: 'формата', done: (Array.isArray(expert.formats) ? expert.formats : []).length > 0 },
-                ].map(({ icon, title, count, unit, done }) => (
-                  <GlassCard key={title} style={{ borderRadius: 24, display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{
-                      width: 50, height: 50, borderRadius: 18, flexShrink: 0,
-                      background: done ? 'rgba(75,179,75,0.18)' : APG2_PROFILE.goldSoft,
-                      border: done ? '1px solid rgba(75,179,75,0.34)' : '1px solid rgba(215,184,106,0.25)',
-                      display: 'grid', placeItems: 'center', fontSize: 24,
-                    }}>
-                      {done ? '✓' : icon}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 850 }}>{title}</div>
-                      <div style={{ color: done ? 'rgba(75,179,75,0.88)' : APG2_PROFILE.textSoft, fontSize: 12, marginTop: 3 }}>
-                        {count > 0 ? `${count} ${unit}` : 'Не добавлено'}
-                      </div>
-                    </div>
-                    {count > 0 && (
-                      <div style={{ background: APG2_PROFILE.goldSoft, borderRadius: 12, padding: '4px 10px', color: APG2_PROFILE.gold, fontSize: 14, fontWeight: 900, flexShrink: 0 }}>{count}</div>
-                    )}
-                  </GlassCard>
-                ))}
-
-                {galleryCount > 0 && (
-                  <GlassCard style={{ borderRadius: 24 }}>
-                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginBottom: 10 }}>Фото</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
-                      {expert.gallery.filter(Boolean).slice(0, 6).map((url, i) => (
-                        <div key={i} style={{ aspectRatio: '1', borderRadius: 14, overflow: 'hidden', background: APG2_PROFILE.goldSoft }}>
-                          <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none'; }} />
-                        </div>
-                      ))}
-                    </div>
-                  </GlassCard>
-                )}
-              </div>
-
-              <GlassCard style={{ borderRadius: 24, marginTop: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <LokiIdentity size={26} state="ready" showText={false} style={{ placeItems: 'center', flexShrink: 0 }} />
-                  <span style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, letterSpacing: 0.8, textTransform: 'uppercase' }}>Совет Локи</span>
-                </div>
-                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '20px' }}>
-                  Галерея, видео и форматы работы добавляются совместно с командой АПГ. Пришлите нам материалы, и мы их оформим и разместим.
-                </div>
-              </GlassCard>
-            </GlassSection>
+            <ContentStudio profile={expert} role="expert" events={events} onToast={onToast} />
           )}
 
           {/* ── QR ── */}
