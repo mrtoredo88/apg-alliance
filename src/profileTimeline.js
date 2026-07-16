@@ -162,6 +162,37 @@ export const TIMELINE_SOURCE_META = {
   vk: { label: 'VK', source: 'vk' },
 };
 
+export const LIVING_PROFILE_TAB_IDS = ['feed', 'about', 'offer', 'photos', 'video', 'reviews'];
+
+function positiveCount(value) {
+  const count = Number(value) || 0;
+  return count > 0 ? count : undefined;
+}
+
+export function buildLivingProfileTabs({
+  profile = {},
+  galleryItems,
+  videos,
+  reviews,
+  reviewCount,
+} = {}) {
+  const galleryCount = Array.isArray(galleryItems)
+    ? galleryItems.filter(Boolean).length
+    : (Array.isArray(profile.gallery) ? profile.gallery.length : Array.isArray(profile.photos) ? profile.photos.length : 0);
+  const videoCount = Array.isArray(videos)
+    ? videos.filter(Boolean).length
+    : (Array.isArray(profile.videos) ? profile.videos.length : 0);
+  const reviewsCount = Number(reviewCount ?? (Array.isArray(reviews) ? reviews.length : profile.reviewCount)) || 0;
+  return [
+    { id: 'feed', label: 'Лента' },
+    { id: 'about', label: 'О компании' },
+    { id: 'offer', label: 'Акции', count: isActiveOffer(profile) ? 1 : undefined },
+    { id: 'photos', label: 'Фото', count: positiveCount(galleryCount) },
+    { id: 'video', label: 'Видео', count: positiveCount(videoCount) },
+    { id: 'reviews', label: 'Отзывы', count: positiveCount(reviewsCount) },
+  ];
+}
+
 function isPinnedRecord(item = {}, profile = {}) {
   const pinnedIds = [
     profile.pinnedTimelineId,

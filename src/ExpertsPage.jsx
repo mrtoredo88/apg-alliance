@@ -21,6 +21,7 @@ import { T, GLASS, GLASS_STRONG } from './design.js';
 import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
+import { buildLivingProfileTabs } from './profileTimeline.js';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
@@ -388,6 +389,20 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       onAskQuestion && { label: 'Задать вопрос', icon: '💬', onClick: () => onAskQuestion(expert), tone: 'gold' },
       { label: 'Поделиться', icon: '↗', onClick: handleShare },
     ].filter(Boolean);
+    const detailTabs = buildLivingProfileTabs({
+      profile: expert,
+      galleryItems,
+      videos: expert.videos,
+      reviews,
+      reviewCount: expert.reviewCount ?? reviews.length,
+    });
+    const handleProfileTabChange = (id) => {
+      setDesktopTab(id);
+      if (desktopMode) return;
+      requestAnimationFrame(() => {
+        document.getElementById(`expert-profile-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
 
     if (desktopMode) {
       const serviceCatalog = Array.isArray(expert.serviceCatalog) ? expert.serviceCatalog.filter(Boolean) : [];
@@ -395,15 +410,6 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       const hasLocation = Boolean(expert.address || expert.hours || expert.latitude || expert.longitude);
       const hasGallery = galleryItems.length > 0;
       const hasVideos = expert.videos?.length > 0;
-      const detailTabs = [
-        { id: 'feed', label: 'Лента' },
-        { id: 'important', label: 'Что сейчас важно' },
-        { id: 'about', label: 'О себе' },
-        expert.offer && { id: 'offer', label: 'Акции', count: 1 },
-        hasGallery && { id: 'photos', label: 'Фото', count: galleryItems.length },
-        hasVideos && { id: 'video', label: 'Видео', count: expert.videos.length },
-        { id: 'reviews', label: 'Отзывы', count: reviews.length || expert.reviewCount || 0 },
-      ].filter(Boolean);
       const activeTab = detailTabs.some(tab => tab.id === desktopTab) ? desktopTab : detailTabs[0]?.id || 'about';
       const categoryLabels = expert.categories.map(value => getExpertCategory(value)).filter(Boolean);
       const kpiItems = [
@@ -484,7 +490,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 actions={<DesktopHeroActions actions={heroActions} />}
               />
 
-              <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={setDesktopTab} />
+              <DesktopDetailTabs items={detailTabs} activeId={activeTab} onChange={handleProfileTabChange} />
 
               {activeTab === 'feed' && (
                 <DesktopSection title="Лента" subtitle="Хронология публичной активности">
@@ -500,32 +506,12 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                     onOpenEvent={onOpenEvent}
                     onOpenTab={setDesktopTab}
                     onOpenBooking={() => onBook?.(expert)}
-                    mode="feed"
-                  />
-                </DesktopSection>
-              )}
-
-              {activeTab === 'important' && (
-                <DesktopSection title="Что сейчас важно" subtitle="Самые актуальные события профиля">
-                  <ProfileTimelineSection
-                    profile={expert}
-                    role="expert"
-                    news={news}
-                    events={events}
-                    reviews={reviews}
-                    desktop
-                    isOwner={isProfileOwner}
-                    onOpenNews={onOpenNews}
-                    onOpenEvent={onOpenEvent}
-                    onOpenTab={setDesktopTab}
-                    onOpenBooking={() => onBook?.(expert)}
-                    mode="important"
                   />
                 </DesktopSection>
               )}
 
               {activeTab === 'about' && (
-                <DesktopSection title="О себе" subtitle="Описание и направления работы">
+                <DesktopSection title="О компании" subtitle="Описание и направления работы">
                   {expert.description ? (
                     <RichText color={APG2.textSoft} fontSize={14}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
                   ) : (
@@ -563,12 +549,16 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 </DesktopSection>
               )}
 
-              {activeTab === 'offer' && expert.offer && (
+              {activeTab === 'offer' && (
                 <DesktopSection title="Акция" subtitle="Предложение эксперта">
-                  <div style={{ ...APG2.goldGlass, borderRadius: 22, padding: 16, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
-                    <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontSize: 24 }}>🎁</div>
-                    <div style={{ fontSize: 15, lineHeight: '22px', fontWeight: 820 }}>{expert.offer}</div>
-                  </div>
+                  {expert.offer ? (
+                    <div style={{ ...APG2.goldGlass, borderRadius: 22, padding: 16, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
+                      <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontSize: 24 }}>🎁</div>
+                      <div style={{ fontSize: 15, lineHeight: '22px', fontWeight: 820 }}>{expert.offer}</div>
+                    </div>
+                  ) : (
+                    <DesktopEmptyState icon="🎁" title="Акций пока нет" text="Когда эксперт добавит предложение для участников АПГ, оно появится здесь." />
+                  )}
                 </DesktopSection>
               )}
 
@@ -581,15 +571,15 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 </DesktopSection>
               )}
 
-              {activeTab === 'photos' && hasGallery && (
+              {activeTab === 'photos' && (
                 <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
-                  <DesktopGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
+                  {hasGallery ? <DesktopGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} /> : <DesktopEmptyState icon="▣" title="Фото пока нет" text="Фотографии появятся после обновления профиля." />}
                 </DesktopSection>
               )}
 
-              {activeTab === 'video' && hasVideos && (
-                <DesktopSection title="Видео" subtitle={`${expert.videos.length} материалов`}>
-                  <VideoSection videos={expert.videos} />
+              {activeTab === 'video' && (
+                <DesktopSection title="Видео" subtitle={`${expert.videos?.length || 0} материалов`}>
+                  {hasVideos ? <VideoSection videos={expert.videos} /> : <DesktopEmptyState icon="▶" title="Видео пока нет" text="Видеоматериалы появятся после добавления в анкету." />}
                 </DesktopSection>
               )}
 
@@ -659,6 +649,28 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               description={expert.offer || expert.description || 'Проверенный специалист в экосистеме АПГ.'}
             />
 
+            <GlassSection title="Действия">
+              {cta.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {cta.map(item => (
+                    <GlassButton key={item.label} onClick={item.onClick} tone={item.tone}>
+                      <span>{item.icon}</span><span>{item.label}</span>
+                    </GlassButton>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ ...APG2.glass, borderRadius: 30, padding: 22, color: APG2.textSoft, textAlign: 'center' }}>Контакты скоро появятся.</div>
+              )}
+            </GlassSection>
+
+            <DesktopDetailTabs
+              items={detailTabs}
+              activeId={desktopTab}
+              onChange={handleProfileTabChange}
+              style={{ position: 'sticky', top: 'calc(58px + var(--safe-top, 0px))', zIndex: 42, margin: '0 0 14px' }}
+            />
+
+            <div id="expert-profile-feed" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title="Лента">
               <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>Публикации, акции, мероприятия, медиа, отзывы и VK в одном потоке.</div>
               <ProfileTimelineSection
@@ -674,34 +686,10 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 onOpenBooking={() => onBook?.(expert)}
               />
             </GlassSection>
+            </div>
 
-            <GlassSection title="Действия">
-              {cta.length > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {cta.map(item => (
-                    <GlassButton key={item.label} onClick={item.onClick} tone={item.tone}>
-                      <span>{item.icon}</span><span>{item.label}</span>
-                    </GlassButton>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ ...APG2.glass, borderRadius: 30, padding: 22, color: APG2.textSoft, textAlign: 'center' }}>Контакты скоро появятся.</div>
-              )}
-            </GlassSection>
-
-            {expert.offer && (
-              <GlassSection title="Акция">
-                <div style={{ ...APG2.goldGlass, borderRadius: 34, padding: 18, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
-                  <div style={{ width: 54, height: 54, borderRadius: 20, background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎁</div>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
-                    <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{expert.offer}</div>
-                  </div>
-                </div>
-              </GlassSection>
-            )}
-
-            <GlassSection title="Описание">
+            <div id="expert-profile-about" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
+            <GlassSection title="О компании">
               <div style={{ ...APG2.glass, borderRadius: 34, padding: 18 }}>
                 {expert.description ? (
                   <RichText color={APG2.textSoft} fontSize={15}>{isVK() ? sanitizeForVK(expert.description) : expert.description}</RichText>
@@ -715,6 +703,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 )}
               </div>
             </GlassSection>
+            </div>
 
             {(expert.services || expert.experience || expert.serviceCost) && (
               <GlassSection title="Профессиональная информация">
@@ -726,24 +715,46 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               </GlassSection>
             )}
 
+            <div id="expert-profile-offer" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
+            <GlassSection title="Акции">
+              {expert.offer ? (
+                <div style={{ ...APG2.goldGlass, borderRadius: 34, padding: 18, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
+                  <div style={{ width: 54, height: 54, borderRadius: 20, background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎁</div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
+                    <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{expert.offer}</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 24, color: APG2.textMuted, textAlign: 'center', fontSize: 14, lineHeight: '20px' }}>Акций пока нет.</div>
+              )}
+            </GlassSection>
+            </div>
+
+            <div id="expert-profile-photos" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
+            <GlassSection title="Фото">
+              <ProfileGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
+            </GlassSection>
+            </div>
+
+            <div id="expert-profile-video" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
+            <GlassSection title="Видео">
+              {expert.videos?.length > 0 ? (
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 14, overflow: 'hidden' }}>
+                  <VideoSection videos={expert.videos} />
+                </div>
+              ) : (
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 24, color: APG2.textMuted, textAlign: 'center', fontSize: 14, lineHeight: '20px' }}>Видео пока нет.</div>
+              )}
+            </GlassSection>
+            </div>
+
             {(expert.address || expert.hours) && (
               <GlassSection title="Где и когда">
                 <div style={{ ...APG2.glass, borderRadius: 34, padding: 18, display: 'grid', gap: 10, color: APG2.textSoft, fontSize: 14, lineHeight: '20px' }}>
                   {expert.address && <div>📍 {expert.address}</div>}
                   {expert.hours && <div>🕒 {expert.hours}</div>}
                   {(expert.latitude && expert.longitude || expert.address) && <GlassButton onClick={openExpertMap}>Открыть на карте</GlassButton>}
-                </div>
-              </GlassSection>
-            )}
-
-            <GlassSection title="Фото">
-              <ProfileGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
-            </GlassSection>
-
-            {expert.videos?.length > 0 && (
-              <GlassSection title="Видео">
-                <div style={{ ...APG2.glass, borderRadius: 34, padding: 14, overflow: 'hidden' }}>
-                  <VideoSection videos={expert.videos} />
                 </div>
               </GlassSection>
             )}
@@ -765,6 +776,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               </div>
             </GlassSection>
 
+            <div id="expert-profile-reviews" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`}>
               {user && !String(user.id).startsWith('guest_') && !submitDone && (
                 <div style={{ ...APG2.glass, borderRadius: 30, padding: 16, marginBottom: 12 }}>
@@ -787,6 +799,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
                 </div>
               )}
             </GlassSection>
+            </div>
           </main>
         </div>
         {lightboxIdx !== null && expert.gallery?.length > 0 && (

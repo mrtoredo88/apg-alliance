@@ -106,18 +106,25 @@ if (!expertsSource.includes('desktopMode = false') || !expertsSource.includes('i
   throw new Error('Expert desktop detail must be explicitly gated by desktopMode.');
 }
 
-if (!expertsSource.includes("{ id: 'feed', label: 'Лента' }")
-  || !expertsSource.includes("{ id: 'important', label: 'Что сейчас важно' }")
-  || !expertsSource.includes("{ id: 'about', label: 'О себе' }")
-  || !expertsSource.includes("expert.offer && { id: 'offer'")
-  || !expertsSource.includes("hasGallery && { id: 'photos'")
-  || !expertsSource.includes("hasVideos && { id: 'video'")
-  || !expertsSource.includes("{ id: 'reviews', label: 'Отзывы'")) {
-  throw new Error('Expert desktop tabs must follow Living Profile order and use existing expert data only.');
+if (!expertsSource.includes('buildLivingProfileTabs')
+  || !expertsSource.includes('galleryItems')
+  || !expertsSource.includes('expert.reviewCount ?? reviews.length')) {
+  throw new Error('Expert detail must use the shared Living Profile tab model with live counters.');
 }
 
-if (!expertsSource.includes('mode="feed"') || !expertsSource.includes('mode="important"') || !expertsSource.includes("activeTab === 'important'")) {
-  throw new Error('Expert desktop detail must render important profile events as a separate tab.');
+if (expertsSource.includes("{ id: 'important', label: 'Что сейчас важно' }")
+  || expertsSource.includes('mode="important"')
+  || expertsSource.includes("activeTab === 'important'")) {
+  throw new Error('Expert detail must not render the removed What matters now tab.');
+}
+
+if (!expertsSource.includes("activeTab === 'feed'")
+  || !expertsSource.includes("activeTab === 'about'")
+  || !expertsSource.includes("activeTab === 'offer'")
+  || !expertsSource.includes("activeTab === 'photos'")
+  || !expertsSource.includes("activeTab === 'video'")
+  || !expertsSource.includes("activeTab === 'reviews'")) {
+  throw new Error('Expert desktop tabs must follow Living Profile v4 order.');
 }
 
 for (const requiredExpertField of ['expert.bookingUrl', 'expert.whatsappUrl', 'expert.maxUrl', 'expert.serviceCost', "activeTab === 'video'", 'VideoSection videos={expert.videos}']) {

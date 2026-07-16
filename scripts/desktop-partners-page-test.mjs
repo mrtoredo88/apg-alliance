@@ -127,18 +127,25 @@ if (!partnerDetailSource.includes('desktopMode = false') || !partnerDetailSource
   throw new Error('PartnerPage desktop detail must be explicitly gated by desktopMode.');
 }
 
-if (!partnerDetailSource.includes("{ id: 'feed', label: 'Лента' }")
-  || !partnerDetailSource.includes("{ id: 'important', label: 'Что сейчас важно' }")
-  || !partnerDetailSource.includes("{ id: 'about', label: 'О компании' }")
-  || !partnerDetailSource.includes("partner.offer && { id: 'offer'")
-  || !partnerDetailSource.includes("hasGallery && { id: 'photos'")
-  || !partnerDetailSource.includes("hasVideos && { id: 'video'")
-  || !partnerDetailSource.includes("{ id: 'reviews', label: 'Отзывы'")) {
-  throw new Error('PartnerPage desktop tabs must follow Living Profile order and use existing partner data only.');
+if (!partnerDetailSource.includes('buildLivingProfileTabs')
+  || !partnerDetailSource.includes('galleryItems')
+  || !partnerDetailSource.includes('reviewCount')) {
+  throw new Error('PartnerPage must use the shared Living Profile tab model with live counters.');
 }
 
-if (!partnerDetailSource.includes('mode="feed"') || !partnerDetailSource.includes('mode="important"') || !partnerDetailSource.includes("activeTab === 'important'")) {
-  throw new Error('PartnerPage desktop detail must render important profile events as a separate tab.');
+if (partnerDetailSource.includes("{ id: 'important', label: 'Что сейчас важно' }")
+  || partnerDetailSource.includes('mode="important"')
+  || partnerDetailSource.includes("activeTab === 'important'")) {
+  throw new Error('PartnerPage must not render the removed What matters now tab.');
+}
+
+if (!partnerDetailSource.includes("activeTab === 'feed'")
+  || !partnerDetailSource.includes("activeTab === 'about'")
+  || !partnerDetailSource.includes("activeTab === 'offer'")
+  || !partnerDetailSource.includes("activeTab === 'photos'")
+  || !partnerDetailSource.includes("activeTab === 'video'")
+  || !partnerDetailSource.includes("activeTab === 'reviews'")) {
+  throw new Error('PartnerPage desktop tabs must follow Living Profile v4 order.');
 }
 
 for (const requiredPartnerField of ['partner.bookingUrl', 'partner.socialUrl', 'partner.maxCommunityUrl', 'partner.telegramCommunityUrl', 'stampTarget > 0', "activeTab === 'video'", 'VideoSection videos={partner.videos}']) {

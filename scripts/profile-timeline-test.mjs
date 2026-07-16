@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   TIMELINE_FILTERS,
+  buildLivingProfileTabs,
   buildProfileTimeline,
   buildProfileHistory,
   buildProfileNowPriority,
@@ -133,6 +134,22 @@ assert.equal(emptyTimeline.length, 0, 'timeline should be empty for empty profil
 const historyEmpty = buildProfileHistory({ profile: {}, news: [], events: [], reviews: [] });
 assert.equal(historyEmpty.length, 0, 'history should be empty for empty profile');
 
+const livingTabs = buildLivingProfileTabs({
+  profile,
+  galleryItems: ['g1.jpg', 'g2.jpg', 'cover.jpg'],
+  videos: profile.videos,
+  reviews: timelineReviews,
+  reviewCount: 8,
+});
+assert.deepEqual(livingTabs.map(item => item.id), ['feed', 'about', 'offer', 'photos', 'video', 'reviews'], 'Living Profile tabs must use one unified order');
+assert.deepEqual(livingTabs.map(item => item.label), ['Лента', 'О компании', 'Акции', 'Фото', 'Видео', 'Отзывы'], 'Living Profile tabs must use one shared menu vocabulary');
+assert.equal(livingTabs.find(item => item.id === 'offer').count, 1, 'offer tab must show live count when profile has an active offer');
+assert.equal(livingTabs.find(item => item.id === 'photos').count, 3, 'photos tab must show live gallery count');
+assert.equal(livingTabs.find(item => item.id === 'video').count, 1, 'video tab must show live video count');
+assert.equal(livingTabs.find(item => item.id === 'reviews').count, 8, 'reviews tab must prefer live review count');
+const emptyLivingTabs = buildLivingProfileTabs({ profile: {}, galleryItems: [], videos: [], reviews: [], reviewCount: 0 });
+assert.deepEqual(emptyLivingTabs.map(item => item.count), [undefined, undefined, undefined, undefined, undefined, undefined], 'Living Profile tabs must not display zero counters');
+
 const types = getProfileTimelineSourceTypes(timeline);
 for (const type of ['publication', 'event', 'offer', 'video', 'photo', 'review', 'vk']) {
   assert.ok(types.includes(type), `timeline must include ${type}`);
@@ -185,8 +202,10 @@ assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timel
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
 assert.match(timelineComponent, /UniversalFeed/, 'timeline UI must render the shared universal Feed Framework');
 assert.doesNotMatch(timelineComponent, /buildProfileHistory/, 'profile feed UI must not render the old History block');
+assert.doesNotMatch(timelineComponent, /buildProfileNowPriority/, 'profile feed UI must not render the old What matters now block');
 assert.doesNotMatch(timelineComponent, /Smart Summary/, 'profile feed UI must not render summary cards before the feed');
 assert.doesNotMatch(timelineComponent, />История</, 'profile feed UI must not render the History section');
+assert.doesNotMatch(timelineComponent, /Что сейчас важно/, 'profile feed UI must not render the removed What matters now section');
 assert.doesNotMatch(timelineComponent, /TIMELINE_FILTERS/, 'timeline UI must not render old source filter tabs');
 assert.doesNotMatch(timelineComponent, /filter\.label/, 'timeline UI must not render the old All/News source pills');
 assert.match(timelineComponent, /groupProfileTimelineItems/, 'timeline UI must group items by period');

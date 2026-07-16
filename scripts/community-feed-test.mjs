@@ -31,9 +31,17 @@ assert.doesNotMatch(serverRoute.slice(serverRoute.indexOf("fastify.get('/api/com
 
 const partnerPage = read('src/PartnerPage.jsx');
 const expertsPage = read('src/ExpertsPage.jsx');
+const profileTimeline = read('src/profileTimeline.js');
+assert.match(profileTimeline, /buildLivingProfileTabs/, 'profile timeline must expose shared Living Profile tabs');
+assert.match(profileTimeline, /id: 'feed', label: 'Лента'/, 'shared Living Profile tabs must start with feed');
+assert.match(profileTimeline, /id: 'about', label: 'О компании'/, 'shared Living Profile tabs must include about');
+assert.match(profileTimeline, /id: 'offer', label: 'Акции'/, 'shared Living Profile tabs must include offers');
+assert.match(profileTimeline, /id: 'photos', label: 'Фото'/, 'shared Living Profile tabs must include photos');
+assert.match(profileTimeline, /id: 'video', label: 'Видео'/, 'shared Living Profile tabs must include video');
+assert.match(profileTimeline, /id: 'reviews', label: 'Отзывы'/, 'shared Living Profile tabs must include reviews');
 for (const [name, source] of [['PartnerPage', partnerPage], ['ExpertsPage', expertsPage]]) {
   assert.match(source, /ProfileTimelineSection/, `${name} must render unified profile timeline`);
-  assert.match(source, /id: 'feed', label: 'Лента'/, `${name} must expose first feed tab`);
+  assert.match(source, /buildLivingProfileTabs/, `${name} must use shared Living Profile tabs`);
   assert.match(source, /setDesktopTab\('feed'\)/, `${name} must open unified timeline by default`);
   assert.match(source, /Хронология публичной активности/, `${name} must describe feed as profile activity timeline`);
   assert.doesNotMatch(source, /Последние публикации сообщества/, `${name} must not expose VK as a separate feed`);

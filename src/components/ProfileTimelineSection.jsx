@@ -3,7 +3,6 @@ import { API_BASE_URL } from '../constants.js';
 import { openUrl } from '../vk.js';
 import {
   buildProfileTimeline,
-  buildProfileNowPriority,
   groupProfileTimelineItems,
 } from '../profileTimeline.js';
 import { normalizeExternalUrl } from '../utils/externalUrls.js';
@@ -29,67 +28,6 @@ function openTimelineItem(item, {
   return undefined;
 }
 
-function LivingMetricCard({ icon, title, text, onOpen, tone = APG2.gold, compact = false }) {
-  return (
-    <div style={{
-      borderRadius: compact ? 16 : 18,
-      border: `1px solid ${tone}44`,
-      background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)',
-      padding: compact ? 10 : 12,
-      display: 'grid',
-      gap: compact ? 4 : 6,
-      minWidth: 0,
-    }}>
-      <div style={{ color: APG2.gold, fontSize: compact ? 11 : 12, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0.2 }}>{title}</div>
-      <div style={{ color: APG2.text, fontSize: compact ? 13 : 14, fontWeight: 820, lineHeight: '20px', minHeight: compact ? 36 : 42, display: 'flex', alignItems: compact ? 'flex-start' : 'center' }}>{icon} {text}</div>
-      {onOpen && <button type="button" onClick={onOpen} style={{ border: 0, background: 'transparent', color: APG2.gold, fontSize: 12, fontWeight: 820, padding: 0, justifySelf: 'start', cursor: 'pointer' }}>Открыть</button>}
-    </div>
-  );
-}
-
-function formatNowCardAction(item = {}) {
-  if (!item) return '-';
-  return [item.value, item.details].filter(Boolean).join(' • ');
-}
-
-function NowPriorityGrid({
-  items = [],
-  desktop = false,
-  role = 'partner',
-  onOpenNews,
-  onOpenEvent,
-  onOpenTab,
-  onOpenBooking,
-}) {
-  const hasItems = items.length > 0;
-  return (
-    <section style={{ display: 'grid', gap: 10 }}>
-      <div style={{ color: APG2.textSoft, fontSize: 11, fontWeight: 860, textTransform: 'uppercase', letterSpacing: 0 }}>Что сейчас важно</div>
-      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: desktop ? 'repeat(2, minmax(0, 1fr))' : '1fr' }}>
-        {hasItems ? items.slice(0, 6).map(item => (
-          <LivingMetricCard
-            key={item.id}
-            icon={
-              item.type === 'offer' ? '🎁' :
-              item.type === 'event' ? '🎉' :
-              item.type === 'booking' ? '🗓' :
-              item.type === 'publication' ? '📰' :
-              item.type === 'video' ? '▶' :
-              item.type === 'review' ? '⭐' :
-              item.type === 'photo' ? '📸' : '💬'
-            }
-            title={item.title}
-            text={formatNowCardAction(item)}
-            onOpen={() => openTimelineItem(item, { onOpenNews, onOpenEvent, onOpenTab, onOpenBooking })}
-          />
-        )) : (
-          <LivingMetricCard icon="•" title="Нет актуальных событий" text={`${role === 'expert' ? 'У эксперта' : 'У партнёра'} пока нет свежих активностей`} />
-        )}
-      </div>
-    </section>
-  );
-}
-
 export function ProfileTimelineSection({
   profile,
   role = 'partner',
@@ -103,7 +41,6 @@ export function ProfileTimelineSection({
   onOpenBooking,
   isOwner = false,
   onCreatePublication,
-  mode = 'full',
 }) {
   const communityUrl = getCommunityFeedSource(profile, role);
   const [vkState, setVkState] = useState({ loading: Boolean(communityUrl), posts: [], error: '' });
@@ -142,15 +79,6 @@ export function ProfileTimelineSection({
     };
     }, [communityUrl]);
 
-  const nowPriorityItems = useMemo(() => buildProfileNowPriority({
-    profile,
-    role,
-    news,
-    events,
-    reviews,
-    vkPosts: vkState.posts,
-    nowValue: Date.now(),
-  }), [profile, role, news, events, reviews, vkState.posts]);
   const timelineItems = useMemo(() => buildProfileTimeline({ profile, role, news, events, reviews, vkPosts: vkState.posts }), [profile, role, news, events, reviews, vkState.posts]);
   const filteredItems = timelineItems;
   const visibleItems = filteredItems.slice(0, visibleCount);
@@ -161,25 +89,9 @@ export function ProfileTimelineSection({
   const toggleExpanded = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
   const showTimelineList = timelineItems.length > 0;
-  const showImportantOnly = mode === 'important';
-  const showNowPriority = mode === 'full' || mode === 'important';
 
     return (
       <div style={{ display: 'grid', gap: desktop ? 14 : 12 }}>
-        {showNowPriority && (
-          <NowPriorityGrid
-            items={nowPriorityItems}
-            desktop={desktop}
-            role={role}
-            onOpenNews={onOpenNews}
-            onOpenEvent={onOpenEvent}
-            onOpenTab={onOpenTab}
-            onOpenBooking={onOpenBooking}
-          />
-        )}
-
-        {showImportantOnly ? null : (
-        <>
         {vkState.loading && !showTimelineList && (
           <div style={{ display: 'grid', gap: 10 }}>
             {[0, 1, 2].map(index => <div key={index} style={{ height: desktop ? 112 : 96, borderRadius: desktop ? 20 : 24, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' }} />)}
@@ -219,8 +131,6 @@ export function ProfileTimelineSection({
           <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px' }}>
             VK-источник временно недоступен, остальные события ленты показаны.
           </div>
-        )}
-        </>
         )}
       </div>
     );

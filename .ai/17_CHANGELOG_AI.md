@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] feat: Living Profile v4
+**Коммит:** `pending`
+**Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Удалён UI-блок и desktop-вкладка `Что сейчас важно` из Living Profile партнёров и экспертов.
+- Добавлена единая модель меню профиля `Лента`, `О компании`, `Акции`, `Фото`, `Видео`, `Отзывы` с живыми счётчиками без отображения нулей.
+- Desktop и mobile v2 теперь используют один порядок разделов; mobile получил sticky-меню с плавным скроллом к секциям.
+**Почему:** профиль партнёра и эксперта должен иметь одну логичную структуру на Desktop и Mobile без дублирующих блоков между карточкой, лентой, акциями, медиа и отзывами.
+
+---
+
 ## [2026-07-16] feat: Feed Experience v2
 **Коммит:** `pending`
 **Файлы:** `src/components/ProfileTimelineSection.jsx`, `src/components/FeedFramework.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
