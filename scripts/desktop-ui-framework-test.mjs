@@ -87,6 +87,18 @@ if (!source.includes("marginTop: 'auto'") || !source.includes('WebkitLineClamp')
 if (!source.includes('DesktopDetailShell') || !source.includes('DesktopDetailTabs') || !source.includes('DesktopHeroActions')) {
   throw new Error('Desktop Detail Framework must provide shared shell, tabs and hero actions for partner/expert cards.');
 }
+if (!source.includes('window.addEventListener(\'keydown\', handleKeyDown)') || !source.includes("event.key !== 'Escape'")) {
+  throw new Error('Desktop Detail Framework must close through the shared Escape keyboard handler.');
+}
+if (!source.includes('role="dialog"') || !source.includes('aria-modal="true"') || !source.includes("position: 'sticky'")) {
+  throw new Error('Desktop Detail Framework must provide dialog semantics and a sticky detail header.');
+}
+if (!source.includes('role="tablist"') || !source.includes('role="tab"') || !source.includes("event.key === 'ArrowRight'") || !source.includes("event.key === 'Home'")) {
+  throw new Error('Desktop Detail tabs must support shared keyboard navigation.');
+}
+if (!source.includes('aria-label={`Открыть фото ${index + 1}`}') || !source.includes("typeof item === 'string' ? { url: item")) {
+  throw new Error('Desktop Gallery must expose accessible photo controls and support normalized media items.');
+}
 
 const darkThemeMatch = themeSource.match(/\[data-theme="dark"\]\s*{([\s\S]*?)\n}/);
 if (!darkThemeMatch) {

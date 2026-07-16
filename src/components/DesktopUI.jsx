@@ -32,11 +32,22 @@ export function DesktopSectionShell({ children, topOverview, header, toolbar, kp
 }
 
 export function DesktopDetailShell({ children, aside, stickyActions, onBack, title, maxWidth = 1440, style, contentStyle }) {
+  React.useEffect(() => {
+    if (typeof onBack !== 'function') return undefined;
+    const handleKeyDown = event => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onBack();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onBack]);
+
   return (
-    <div style={{ minHeight: '100svh', width: '100%', boxSizing: 'border-box', padding: 'calc(16px + var(--safe-top, 0px)) 24px 34px', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, ...style }}>
+    <div role="dialog" aria-modal="true" aria-label={title || 'Детальная карточка'} style={{ minHeight: '100svh', width: '100%', boxSizing: 'border-box', padding: 'calc(16px + var(--safe-top, 0px)) 24px 34px', background: APG2_PROFILE.bg, color: APG2_PROFILE.text, ...style }}>
       <div style={{ width: '100%', maxWidth, margin: '0 auto', display: 'grid', gap: 14 }}>
-        <GlassCard style={{ borderRadius: 26, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: 10 }}>
-          <GlassButton onClick={onBack} style={{ width: 42, minHeight: 42, borderRadius: 16, padding: 0, fontSize: 18 }}>‹</GlassButton>
+        <GlassCard style={{ borderRadius: 26, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: 10, position: 'sticky', top: 'calc(10px + var(--safe-top, 0px))', zIndex: 20, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)' }}>
+          <GlassButton onClick={onBack} aria-label="Закрыть детальную карточку" style={{ width: 42, minHeight: 42, borderRadius: 16, padding: 0, fontSize: 18 }}>‹</GlassButton>
           <div style={{ minWidth: 0, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '17px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
           {stickyActions}
         </GlassCard>
@@ -123,13 +134,15 @@ export function DesktopMeta({ items = [], style }) {
 }
 
 export function DesktopGallery({ items = [], onOpen, style }) {
-  const safeItems = asArray(items);
+  const safeItems = asArray(items)
+    .map(item => typeof item === 'string' ? { url: item, alt: '' } : { ...item, url: item?.url || item?.src || item?.image || item?.photo || item?.thumbnailUrl || '' })
+    .filter(item => item.url);
   if (!safeItems.length) return null;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: safeItems.length === 1 ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 8, ...style }}>
-      {safeItems.slice(0, 6).map((url, index) => (
-        <button key={`${url}_${index}`} type="button" onClick={() => onOpen?.(index)} style={{ padding: 0, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 17, overflow: 'hidden', cursor: onOpen ? 'pointer' : 'default', aspectRatio: index === 0 && safeItems.length > 2 ? '1.5' : '1' }}>
-          <img src={url} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      {safeItems.slice(0, 6).map((item, index) => (
+        <button key={`${item.url}_${index}`} type="button" aria-label={`Открыть фото ${index + 1}`} onClick={() => onOpen?.(index)} style={{ padding: 0, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 17, overflow: 'hidden', cursor: onOpen ? 'pointer' : 'default', aspectRatio: index === 0 && safeItems.length > 2 ? '1.5' : '1' }}>
+          <img src={item.url} alt={item.alt || item.title || ''} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </button>
       ))}
     </div>
@@ -176,7 +189,7 @@ export function DesktopStickyActions({ actions = [], style }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7, ...style }}>
       {safeActions.map(action => (
-        <GlassButton key={action.id || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 11.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}>
+        <GlassButton key={action.id || action.label} aria-label={action.ariaLabel || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 11.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}>
           {action.icon && <span>{action.icon}</span>}<span>{action.label}</span>
         </GlassButton>
       ))}
@@ -187,10 +200,22 @@ export function DesktopStickyActions({ actions = [], style }) {
 export function DesktopDetailTabs({ items = [], activeId, onChange, style }) {
   const safeItems = asArray(items);
   if (!safeItems.length) return null;
+  const handleKeyDown = (event, index) => {
+    const lastIndex = safeItems.length - 1;
+    const nextIndex =
+      event.key === 'ArrowRight' ? Math.min(index + 1, lastIndex) :
+      event.key === 'ArrowLeft' ? Math.max(index - 1, 0) :
+      event.key === 'Home' ? 0 :
+      event.key === 'End' ? lastIndex :
+      -1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    onChange?.(safeItems[nextIndex].id);
+  };
   return (
-    <GlassCard style={{ borderRadius: 26, padding: 7, display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', ...style }}>
-      {safeItems.map(item => (
-        <button key={item.id} type="button" onClick={() => onChange?.(item.id)} style={{ minHeight: 34, borderRadius: 999, border: item.id === activeId ? '1px solid rgba(201,168,76,0.62)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: item.id === activeId ? 'rgba(201,168,76,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: item.id === activeId ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, padding: '7px 12px', fontSize: 11.5, lineHeight: '15px', fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+    <GlassCard role="tablist" aria-label="Разделы детальной карточки" style={{ borderRadius: 26, padding: 7, display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', ...style }}>
+      {safeItems.map((item, index) => (
+        <button key={item.id} role="tab" aria-selected={item.id === activeId} tabIndex={item.id === activeId ? 0 : -1} type="button" onClick={() => onChange?.(item.id)} onKeyDown={event => handleKeyDown(event, index)} style={{ minHeight: 34, borderRadius: 999, border: item.id === activeId ? '1px solid rgba(201,168,76,0.62)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: item.id === activeId ? 'rgba(201,168,76,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: item.id === activeId ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, padding: '7px 12px', fontSize: 11.5, lineHeight: '15px', fontWeight: 820, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
           {item.label}{Number(item.count) > 0 ? ` ${item.count}` : ''}
         </button>
       ))}

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-16] fix: Desktop detail finish
+**Коммит:** `pending`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/NewsPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-news-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Общий `DesktopDetailShell` получил sticky header, ESC-close и dialog semantics для всех desktop detail экранов на Shared Desktop Detail Framework.
+- `DesktopGallery` нормализует media items, сохраняет lazy images и открывает выбранный индекс; мини-галерея News Detail больше не сбрасывается на первое фото.
+- `DesktopDetailTabs` получил единый keyboard navigation через Arrow/Home/End, а regression-тесты закрепляют это поведение.
+**Почему:** Desktop Detail должен быть production-quality слоем без разрозненных патчей в отдельных карточках и без ухудшения startup performance.
+
 ## [2026-07-15] perf: Faster app startup
 **Коммит:** `pending`
 **Файлы:** `src/UserApp.jsx`, `src/SplashScreen.jsx`, `src/loki/LokiIdentity.jsx`, `public/loki-512.png`, `.ai/17_CHANGELOG_AI.md`

@@ -1221,7 +1221,7 @@ function ArticleView({
             </DesktopSidebarCard>
             {photos.length > 0 && (
               <DesktopSidebarCard title="Мини-галерея" subtitle="Фотографии новости">
-                <DesktopGallery items={photos} onOpen={() => setLightboxIndex(0)} />
+                <DesktopGallery items={photos} onOpen={setLightboxIndex} />
               </DesktopSidebarCard>
             )}
             <DesktopSidebarCard title="Связанные" subtitle="Еще материалы">

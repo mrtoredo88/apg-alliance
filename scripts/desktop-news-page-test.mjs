@@ -46,6 +46,10 @@ if (!newsSource.includes('desktopMode = false') || !newsSource.includes('if (des
   throw new Error('NewsPage must keep desktop rendering behind the desktopMode flag.');
 }
 
+if (!newsSource.includes('<DesktopGallery items={photos} onOpen={setLightboxIndex} />')) {
+  throw new Error('NewsPage desktop detail mini-gallery must open the clicked photo index.');
+}
+
 if (!userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktopMode from desktopDevice to NewsPage.');
 }
