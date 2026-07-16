@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] feat: My Profile Dashboard v3
+**Коммит:** `pending`
+**Файлы:** `src/HomePanelV2.jsx`, `src/components/DesktopUI.jsx`, `scripts/home-profile-dashboard-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Карточка профиля на главной усилена по V3-референсу: progress-ring вокруг аватара, премиальный hero профиля, отдельный совет `Сегодня для вас`.
+- KPI получили контекстные подписи из существующих данных; прогресс и быстрые действия стали частью единой dashboard-композиции.
+- Mobile-версия карточки получила тот же progress-ring и KPI-контекст без изменения API, Firestore и бизнес-логики.
+**Почему:** профиль должен быть эмоциональным центром главной страницы и показывать пользователю его прогресс, статус и ближайшую цель.
+
+---
+
 ## [2026-07-16] feat: My Profile Dashboard v2
 **Коммит:** `pending`
 **Файлы:** `src/HomePanelV2.jsx`, `src/components/DesktopUI.jsx`, `scripts/home-profile-dashboard-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

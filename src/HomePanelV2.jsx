@@ -714,9 +714,11 @@ function V2FirstScreenMobile({
             ...revealMotion(2, 'splash'),
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
-            <span style={{ width: 52, height: 52, borderRadius: 21, overflow: 'hidden', background: V2.goldMetal, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 920, boxShadow: '0 12px 30px rgba(216,184,103,0.14)' }}>
-              {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+          <div style={{ display: 'grid', gridTemplateColumns: '58px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+            <span style={{ width: 58, height: 58, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 920, boxShadow: '0 12px 30px rgba(216,184,103,0.14)' }}>
+              <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: V2.goldMetal, display: 'grid', placeItems: 'center' }}>
+                {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+              </span>
             </span>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: 'block', color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
@@ -726,14 +728,15 @@ function V2FirstScreenMobile({
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
             {[
-              ['Ключи', userKeys, '🗝️'],
-              ['Серия', streak, '🔥'],
-              ['События', Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, '📅'],
-              ['Партнёры', scannedCount, '🏙️'],
-            ].map(([label, value, icon]) => (
+              ['Ключи', userKeys, '🗝️', keysToNext > 0 ? `ещё ${keysToNext}` : 'уровень'],
+              ['Серия', streak, '🔥', streak > 0 ? 'дней' : 'старт'],
+              ['События', Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, '📅', eventsTodayCount > 0 ? 'сегодня' : 'афиша'],
+              ['Партнёры', scannedCount, '🏙️', scannedCount > 0 ? 'визиты' : 'рядом'],
+            ].map(([label, value, icon, sub]) => (
               <span key={label} style={{ minHeight: 41, borderRadius: 16, padding: '6px 5px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', overflow: 'hidden' }}>
                 <span style={{ display: 'flex', justifyContent: 'space-between', gap: 3, color: V2.gold, fontSize: 12, lineHeight: '14px', fontWeight: 900 }}><span>{icon}</span><span>{value}</span></span>
                 <span style={{ display: 'block', color: V2.textMuted, fontSize: 8.6, lineHeight: '10px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{label}</span>
+                <span style={{ display: 'block', color: V2.gold, fontSize: 8.1, lineHeight: '10px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{sub}</span>
               </span>
             ))}
           </div>
@@ -871,12 +874,12 @@ function V2FirstScreenDesktop({
           ? `Последнее: баланс ${userKeys} ключей`
           : '';
   const profileStats = [
-    { label: 'Ключи', value: counterPulse ? `+${userKeys}` : userKeys, accent: V2.gold, icon: '🗝️' },
-    { label: 'События', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, accent: '#8EC5FF', icon: '📅' },
-    { label: 'Партнёры', value: scannedCount, accent: '#7EE0B8', icon: '🏙️' },
-    { label: 'Достиж.', value: completedTasks.length, accent: '#E8C97A', icon: '🏆' },
-    { label: 'Серия', value: streak, accent: '#FF8C42', icon: '🔥' },
-    { label: 'Друзья', value: referralCount, icon: '👥' },
+    { label: 'Ключи', value: counterPulse ? `+${userKeys}` : userKeys, accent: V2.gold, icon: '🗝️', sub: keysToNext > 0 ? `ещё ${keysToNext}` : 'уровень' },
+    { label: 'События', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, accent: '#8EC5FF', icon: '📅', sub: eventsTodayCount > 0 ? `${eventsTodayCount} сегодня` : 'афиша' },
+    { label: 'Партнёры', value: scannedCount, accent: '#7EE0B8', icon: '🏙️', sub: scannedCount > 0 ? 'посещено' : 'начните' },
+    { label: 'Достиж.', value: completedTasks.length, accent: '#E8C97A', icon: '🏆', sub: nextAchievement ? 'цель рядом' : 'готово' },
+    { label: 'Серия', value: streak, accent: '#FF8C42', icon: '🔥', sub: streak > 0 ? 'дней' : 'начните' },
+    { label: 'Друзья', value: referralCount, icon: '👥', sub: referralCount > 0 ? 'приглашено' : 'пригласить' },
   ];
   const navItems = [
     { label: 'Главная', isActive: true, onClick: () => {} },
@@ -975,9 +978,9 @@ function V2FirstScreenDesktop({
           progressSubtitle={nextAchievement ? 'Следующее достижение' : keysToNext > 0 ? `Осталось ${keysToNext} ключей` : 'Новый уровень открыт'}
           progressValue={nextAchievementProgress}
           quickActions={[
-            { id: 'profile', label: 'Профиль', tone: 'gold', onClick: onOpenProfile },
-            { id: 'tasks', label: 'Достижения', onClick: onOpenTasks },
-            { id: 'rewards', label: 'Награды', onClick: onOpenRewards },
+            { id: 'profile', label: 'Профиль', icon: '👤', tone: 'gold', onClick: onOpenProfile },
+            { id: 'tasks', label: 'Достижения', icon: '☆', onClick: onOpenTasks },
+            { id: 'rewards', label: 'Награды', icon: '🎁', onClick: onOpenRewards },
           ]}
           isOffline={isOffline}
         />

@@ -18,12 +18,16 @@ if (missingDesktopProps.length) {
   throw new Error(`Home profile dashboard is missing desktop profile signals: ${missingDesktopProps.join(', ')}`);
 }
 
-if (!desktopSource.includes("gridTemplateColumns: '58px minmax(0, 1fr) auto'")) {
-  throw new Error('DesktopTopOverview must render the larger profile dashboard header with avatar, identity and status.');
+if (!desktopSource.includes("gridTemplateColumns: '72px minmax(0, 1fr) auto'") || !desktopSource.includes('conic-gradient(${progressColor}')) {
+  throw new Error('DesktopTopOverview must render the V3 profile dashboard hero with a real progress-ring avatar.');
 }
 
 if (!desktopSource.includes('primaryStats') || !desktopSource.includes('safeStats.slice(0, 4)')) {
   throw new Error('Desktop profile dashboard must promote a compact four-KPI strip.');
+}
+
+if (!desktopSource.includes('stat.sub') || !homeSource.includes('sub: keysToNext > 0')) {
+  throw new Error('Desktop profile dashboard KPIs must include short contextual hints from existing data.');
 }
 
 if (!homeSource.includes('eventsTodayCount') || !homeSource.includes('todayForYou')) {
