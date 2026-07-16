@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
 import { motionTransition } from './motion.js';
 import { sendDiagReport } from './diagnostics.js';
+import { CAMERA_WATCHDOG_MS, buildCameraAttemptDiag, getCameraRecoveryReason, isCameraFrameReady, shouldAutoRecoverCamera } from './scannerReliability.js';
 
 const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
-const CAMERA_BLACK_FRAME_ERROR = 'Не удалось получить изображение с камеры. Попробуйте закрыть сканер и открыть его снова.';
+const CAMERA_BLACK_FRAME_ERROR = 'Не удалось запустить камеру. Попробуйте перезапустить её прямо здесь.';
 const SCANNER_DIAG_KEY = 'apg_scanner_camera_diagnostics';
 
 const safeDeviceId = (value = '') => {
@@ -52,7 +53,9 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
   const diagnosticUserRef = useRef(diagnosticUser);
   const dragStartYRef   = useRef(0);
   const diagSeqRef      = useRef(0);
+  const [restartNonce, setRestartNonce] = useState(0);
   const [err, setErr]           = useState(null);
+  const [recovering, setRecovering] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn]   = useState(false);
   const [dragY, setDragY]       = useState(0);
@@ -66,8 +69,7 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
       stage,
       seq: ++diagSeqRef.current,
       at: new Date().toISOString(),
-      userId: activeUser?.id || activeUser?.uid || null,
-      emailHashHint: activeUser?.email ? `${String(activeUser.email).slice(0, 2)}…${String(activeUser.email).split('@')[1] || ''}` : null,
+      userContext: activeUser ? 'present' : 'guest',
       displayMode: window.matchMedia?.('(display-mode: standalone)')?.matches ? 'standalone' : 'browser',
       standalone: Boolean(window.navigator?.standalone),
       permission: details.permission || null,
@@ -82,7 +84,6 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
       sendDiagReport({
         checks: { scannerCamera: payload },
         errorText: `scanner_camera_${stage}`,
-        userId: payload.userId,
         manual: false,
       });
     }
@@ -102,6 +103,7 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
     if (!isOpen) {
       doneRef.current = false;
       setErr(null);
+      setRecovering(false);
       setTorchOn(false);
       setHasTorch(false);
       return;
@@ -110,25 +112,33 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
     let active = true;
     let frameTimer = 0;
     let permission = 'unknown';
+    let attempt = 0;
+    let trackCleanup = () => {};
     const videoEvents = ['loadedmetadata', 'canplay', 'playing', 'pause', 'stalled', 'suspend', 'emptied'];
     const handleVideoEvent = (event) => {
       if (!active) return;
       logCameraDiag(`video_${event.type}`, summarizeStream(videoRef.current));
     };
+    const clearFrameTimer = () => {
+      if (frameTimer) {
+        clearTimeout(frameTimer);
+        frameTimer = 0;
+      }
+    };
 
-    // Wait for video element to mount
-    const timer = setTimeout(async () => {
-      if (!videoRef.current || !active) return;
-      try {
-        const status = await navigator.permissions?.query?.({ name: 'camera' });
-        permission = status?.state || 'unknown';
-      } catch {}
-      logCameraDiag('register_start', {
-        permission,
-        hasMediaDevices: Boolean(navigator.mediaDevices),
-        hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
-      });
-      videoEvents.forEach(name => videoRef.current?.addEventListener(name, handleVideoEvent));
+    const startScannerAttempt = async (reason = 'initial') => {
+      if (!active || !videoRef.current) return;
+      attempt += 1;
+      const currentAttempt = attempt;
+      const startedAt = Date.now();
+      clearFrameTimer();
+      trackCleanup();
+      trackCleanup = () => {};
+      stopScanner();
+      setHasTorch(false);
+      setTorchOn(false);
+      if (currentAttempt === 1) setErr(null);
+      logCameraDiag('start_attempt', { attempt: currentAttempt, reason, permission, startedAt });
 
       const scanner = new QrScanner(
         videoRef.current,
@@ -148,42 +158,105 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
 
       scannerRef.current = scanner;
 
-      scanner.start()
-        .then(async () => {
-          if (!active) return;
-          const video = videoRef.current;
-          logCameraDiag('stream_created', { permission, ...summarizeStream(video) });
-          try {
-            await video?.play?.();
-            logCameraDiag('video_play_success', summarizeStream(video));
-          } catch (error) {
-            logCameraDiag('play_error', { permission, error: String(error?.message || error), ...summarizeStream(video) });
-            if (active) setErr(CAMERA_BLACK_FRAME_ERROR);
+      try {
+        await scanner.start();
+        if (!active || currentAttempt !== attempt) return;
+        const video = videoRef.current;
+        const streamSnapshot = summarizeStream(video);
+        logCameraDiag('stream_created', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason, snapshot: { permission, ...streamSnapshot } }));
+        const tracks = typeof video?.srcObject?.getVideoTracks === 'function' ? video.srcObject.getVideoTracks() : [];
+        const handleTrackEnded = () => {
+          if (!active || currentAttempt !== attempt) return;
+          const snapshot = summarizeStream(videoRef.current);
+          const recoveryReason = getCameraRecoveryReason(snapshot) || 'track_ended';
+          logCameraDiag('track_ended', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason: recoveryReason, snapshot: { permission, ...snapshot } }));
+          if (shouldAutoRecoverCamera(snapshot, currentAttempt)) {
+            setRecovering(true);
+            startScannerAttempt(recoveryReason);
+          } else {
+            setRecovering(false);
+            setErr(CAMERA_BLACK_FRAME_ERROR);
+          }
+        };
+        tracks.forEach(track => {
+          try { track.addEventListener?.('ended', handleTrackEnded, { once: true }); } catch {}
+        });
+        trackCleanup = () => tracks.forEach(track => {
+          try { track.removeEventListener?.('ended', handleTrackEnded); } catch {}
+        });
+        try {
+          await video?.play?.();
+          logCameraDiag('video_play_success', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason, snapshot: { permission, ...summarizeStream(video) } }));
+        } catch (error) {
+          const snapshot = summarizeStream(video);
+          logCameraDiag('play_error', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason: 'play_error', error: error?.name || error?.message || error, snapshot: { permission, ...snapshot } }));
+          if (shouldAutoRecoverCamera(snapshot, currentAttempt)) {
+            setRecovering(true);
+            startScannerAttempt('play_error');
+          } else {
+            setRecovering(false);
+            setErr(CAMERA_BLACK_FRAME_ERROR);
+          }
+          return;
+        }
+        frameTimer = window.setTimeout(() => {
+          if (!active || currentAttempt !== attempt) return;
+          const snapshot = summarizeStream(videoRef.current);
+          const hasFrame = isCameraFrameReady(snapshot);
+          const recoveryReason = getCameraRecoveryReason(snapshot);
+          logCameraDiag(hasFrame ? 'frame_ready' : 'stream_timeout', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason: recoveryReason || reason, snapshot: { permission, ...snapshot } }));
+          if (hasFrame) {
+            setRecovering(false);
+            scanner.hasFlash().then(has => { if (active && currentAttempt === attempt) setHasTorch(has); });
             return;
           }
-          frameTimer = window.setTimeout(() => {
-            if (!active) return;
-            const snapshot = summarizeStream(videoRef.current);
-            const hasFrame = snapshot.videoWidth > 0 && snapshot.videoHeight > 0 && snapshot.trackReadyState === 'live';
-            logCameraDiag(hasFrame ? 'frame_ready' : 'stream_timeout', { permission, ...snapshot });
-            if (!hasFrame) setErr(CAMERA_BLACK_FRAME_ERROR);
-          }, 2200);
-          scanner.hasFlash().then(has => { if (active) setHasTorch(has); });
-        })
-        .catch((error) => {
-          logCameraDiag('start_error', { permission, error: String(error?.message || error), ...summarizeStream(videoRef.current) });
-          if (active) setErr('Нет доступа к камере. Разрешите его в настройках браузера.');
-        });
+          if (shouldAutoRecoverCamera(snapshot, currentAttempt)) {
+            setRecovering(true);
+            logCameraDiag('auto_recovery_start', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason: recoveryReason, snapshot: { permission, ...snapshot } }));
+            startScannerAttempt(recoveryReason || 'empty_video_frame');
+            return;
+          }
+          setRecovering(false);
+          setErr(CAMERA_BLACK_FRAME_ERROR);
+        }, CAMERA_WATCHDOG_MS);
+      } catch (error) {
+        const snapshot = summarizeStream(videoRef.current);
+        logCameraDiag('start_error', buildCameraAttemptDiag({ attempt: currentAttempt, startedAt, reason: 'start_error', error: error?.name || error?.message || error, snapshot: { permission, ...snapshot } }));
+        if (shouldAutoRecoverCamera(snapshot, currentAttempt)) {
+          setRecovering(true);
+          startScannerAttempt('start_error');
+        } else {
+          setRecovering(false);
+          setErr('Нет доступа к камере или камера не отвечает.');
+        }
+      }
+    };
+
+    // Wait for video element to mount
+    const timer = setTimeout(async () => {
+      if (!videoRef.current || !active) return;
+      try {
+        const status = await navigator.permissions?.query?.({ name: 'camera' });
+        permission = status?.state || 'unknown';
+      } catch {}
+      logCameraDiag('register_start', {
+        permission,
+        hasMediaDevices: Boolean(navigator.mediaDevices),
+        hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+      });
+      videoEvents.forEach(name => videoRef.current?.addEventListener(name, handleVideoEvent));
+      startScannerAttempt('initial');
     }, 50);
 
     return () => {
       active = false;
       clearTimeout(timer);
-      if (frameTimer) clearTimeout(frameTimer);
+      clearFrameTimer();
+      trackCleanup();
       videoEvents.forEach(name => videoRef.current?.removeEventListener(name, handleVideoEvent));
       stopScanner();
     };
-  }, [isOpen, stopScanner, logCameraDiag]);
+  }, [isOpen, restartNonce, stopScanner, logCameraDiag]);
 
   const handleClose = useCallback(() => {
     stopScanner();
@@ -197,6 +270,15 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
     setTorchOn(next);
     scannerRef.current.toggleFlash();
   }, [torchOn]);
+
+  const restartCamera = useCallback(() => {
+    setErr(null);
+    setRecovering(false);
+    setHasTorch(false);
+    setTorchOn(false);
+    logCameraDiag('manual_restart_requested', summarizeStream(videoRef.current));
+    setRestartNonce(value => value + 1);
+  }, [logCameraDiag]);
 
   if (!isOpen) return null;
 
@@ -286,7 +368,15 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
             maxWidth: 280, lineHeight: '20px',
             backdropFilter: 'blur(12px)',
           }}>
-            {err}
+            <div>{err}</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={restartCamera} style={{ border: 'none', borderRadius: 12, padding: '10px 14px', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#111', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+                🔄 Перезапустить камеру
+              </button>
+              <button onClick={handleClose} style={{ border: '1px solid rgba(255,255,255,0.18)', borderRadius: 12, padding: '10px 14px', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                Закрыть
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -324,7 +414,7 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
             </div>
 
             <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', lineHeight: '20px' }}>
-              Наведите камеру на QR-код партнёра
+              {recovering ? 'Восстанавливаем камеру…' : 'Наведите камеру на QR-код партнёра'}
             </div>
           </>
         )}

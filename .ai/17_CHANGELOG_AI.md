@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: Scanner Reliability v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/Scanner.jsx`, `src/scannerReliability.js`, `scripts/scanner-camera-diagnostics-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Scanner получил camera watchdog: после запуска проверяет живой `MediaStream`, `VideoTrack`, `video.play()`, события video и реальные размеры кадра.
+- Если через 2 секунды кадр не появился, Scanner останавливает старые tracks и автоматически создаёт новый поток; после повторного отказа показывает понятную ошибку с кнопками перезапуска камеры и закрытия.
+- Production diagnostics теперь пишет номер попытки, причину восстановления, длительность и код ошибки без персональных данных; regression-тест покрывает пустой stream, ended track, zero-size video, auto recovery и manual restart.
+**Почему:** после production-инцидента Scanner не должен оставлять пользователя на чёрном экране; большинство сбоев камеры должны восстанавливаться без действий пользователя.
+
+---
+
 ## [2026-07-16] fix: Partner social links from Admin Panel
 **Коммит:** `pending`
 **Файлы:** `src/AdminPanel.jsx`, `src/PartnerPage.jsx`, `server/src/routes/admin-actions.js`, `scripts/partner-social-links-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
