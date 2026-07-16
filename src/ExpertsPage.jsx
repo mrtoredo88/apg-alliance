@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import { EXPERT_CATEGORIES } from './constants.js';
@@ -22,6 +22,7 @@ import { RichText } from './components/RichText.jsx';
 import { VideoSection } from './components/VideoSection.jsx';
 import { ProfileTimelineSection } from './components/ProfileTimelineSection.jsx';
 import { buildLivingProfileTabs } from './profileTimeline.js';
+import { getCanonicalNewsId } from './newsUtils.js';
 import { ArticleView } from './NewsPage.jsx';
 import vkBridge, { openUrl, isVK } from './vk.js';
 import { logError } from './errorLogger.js';
@@ -30,6 +31,7 @@ import { shareLink } from './utils/shareLink.js';
 import { formatRelativeTime } from './utils/time.js';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
 import { APG2_PROFILE as APG2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
+import { ProfilePhotoGrid, ProfilePhotoViewer, ProfileVideoGrid, ProfileVideoViewer } from './components/ProfileMediaViewer.jsx';
 import {
   DesktopActionBar,
   DesktopCatalogEntityCard,
@@ -307,6 +309,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
   const [submitDone, setSubmitDone] = useState(false);
   const [desktopTab, setDesktopTab] = useState('about');
   const [selectedProfileNews, setSelectedProfileNews] = useState(null);
+  const [videoViewerIdx, setVideoViewerIdx] = useState(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -336,17 +339,21 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
     return () => { cancelled = true; };
   }, [expert?.id]);
 
-  const handleOpenProfileNews = (item) => {
+  const handleOpenProfileNews = useCallback((item) => {
     if (!item) return;
     setSelectedProfileNews(item);
-  };
+  }, []);
+  const handleCloseProfileArticle = useCallback((next) => {
+    if (getCanonicalNewsId(next)) setSelectedProfileNews(next);
+    else setSelectedProfileNews(null);
+  }, []);
   const selectedProfileArticle = selectedProfileNews && (
     <ArticleView
       item={selectedProfileNews}
       related={[]}
       previousItem={null}
       nextItem={null}
-      onClose={(next) => next?.id ? setSelectedProfileNews(next) : setSelectedProfileNews(null)}
+      onClose={handleCloseProfileArticle}
       onNavigate={setSelectedProfileNews}
       user={user}
       desktopMode={desktopMode}
@@ -593,13 +600,13 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
               {activeTab === 'photos' && (
                 <DesktopSection title="Фото" subtitle={`${galleryItems.length} материалов`}>
-                  {hasGallery ? <DesktopGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} /> : <DesktopEmptyState icon="▣" title="Фото пока нет" text="Фотографии появятся после обновления профиля." />}
+                  {hasGallery ? <ProfilePhotoGrid items={galleryItems} desktop onOpen={setLightboxIdx} /> : <DesktopEmptyState icon="▣" title="Фото пока нет" text="Фотографии появятся после обновления профиля." />}
                 </DesktopSection>
               )}
 
               {activeTab === 'video' && (
                 <DesktopSection title="Видео" subtitle={`${expert.videos?.length || 0} материалов`}>
-                  {hasVideos ? <VideoSection videos={expert.videos} /> : <DesktopEmptyState icon="▶" title="Видео пока нет" text="Видеоматериалы появятся после добавления в анкету." />}
+                  {hasVideos ? <ProfileVideoGrid videos={expert.videos} desktop onOpen={setVideoViewerIdx} /> : <DesktopEmptyState icon="▶" title="Видео пока нет" text="Видеоматериалы появятся после добавления в анкету." />}
                 </DesktopSection>
               )}
 
@@ -630,9 +637,8 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
               )}
             </DesktopDetailShell>
           </div>
-          {lightboxIdx !== null && expert.gallery?.length > 0 && (
-            <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
-          )}
+          <ProfilePhotoViewer items={galleryItems} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+          <ProfileVideoViewer videos={expert.videos} startIndex={videoViewerIdx} onClose={() => setVideoViewerIdx(null)} />
           {selectedProfileArticle}
         </>,
         document.body,
@@ -754,15 +760,15 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
             <div id="expert-profile-photos" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title="Фото">
-              <ProfileGallery items={galleryItems} onOpen={expert.gallery?.length ? setLightboxIdx : null} />
+              <ProfilePhotoGrid items={galleryItems} onOpen={setLightboxIdx} />
             </GlassSection>
             </div>
 
             <div id="expert-profile-video" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title="Видео">
               {expert.videos?.length > 0 ? (
-                <div style={{ ...APG2.glass, borderRadius: 34, padding: 14, overflow: 'hidden' }}>
-                  <VideoSection videos={expert.videos} />
+                <div style={{ ...APG2.glass, borderRadius: 34, padding: 14 }}>
+                  <ProfileVideoGrid videos={expert.videos} onOpen={setVideoViewerIdx} />
                 </div>
               ) : (
                 <div style={{ ...APG2.glass, borderRadius: 34, padding: 24, color: APG2.textMuted, textAlign: 'center', fontSize: 14, lineHeight: '20px' }}>Видео пока нет.</div>
@@ -823,9 +829,8 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
             </div>
           </main>
         </div>
-        {lightboxIdx !== null && expert.gallery?.length > 0 && (
-          <PhotoLightbox photos={expert.gallery} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
-        )}
+        <ProfilePhotoViewer items={galleryItems} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+        <ProfileVideoViewer videos={expert.videos} startIndex={videoViewerIdx} onClose={() => setVideoViewerIdx(null)} />
         {selectedProfileArticle}
       </>,
       document.body,

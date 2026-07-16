@@ -13,6 +13,7 @@ import {
   getTimelinePeriodLabel,
   groupProfileTimelineItems,
 } from '../src/profileTimeline.js';
+import { getCanonicalNewsId } from '../src/newsUtils.js';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
@@ -185,6 +186,39 @@ const mixedDateTimeline = buildProfileTimeline({
 }).filter(item => item.type === 'publication');
 assert.deepEqual(mixedDateTimeline.map(item => item.title), ['publishDate newest', 'publishedAt second', 'date middle', 'created older'], 'mixed date fields must be normalized before DESC feed sorting');
 
+const openableNewsTimeline = buildProfileTimeline({
+  profile,
+  role: 'partner',
+  news: [
+    { newsId: 'first-news-id', partnerId: 'partner-1', title: 'Первая публикация', status: 'published', active: true, publishedAt: '2026-07-12T10:00:00.000Z' },
+    { documentId: 'middle-doc-id', partnerId: 'partner-1', title: 'Средняя публикация', status: 'published', active: true, publishedAt: '2026-07-13T10:00:00.000Z' },
+    { articleId: 'latest-article-id', partnerId: 'partner-1', title: 'Последняя публикация', status: 'published', active: true, publishedAt: '2026-07-16T10:00:00.000Z' },
+  ],
+  events: [],
+  reviews: [],
+  vkPosts: [],
+}).filter(item => item.type === 'publication');
+assert.deepEqual(openableNewsTimeline.map(item => item.title), ['Последняя публикация', 'Средняя публикация', 'Первая публикация'], 'profile feed must keep newest publication first before opening');
+for (const item of openableNewsTimeline) {
+  assert.equal(item.action, 'openNews', 'profile publication must keep contextual open action');
+  assert.ok(item.entity, 'profile publication must carry full source news entity');
+  assert.ok(getCanonicalNewsId(item.entity), 'profile publication entity must expose a canonical id for ArticleView');
+  assert.ok(item.entity.id, 'profile publication entity must be normalized with id');
+  assert.ok(item.id.includes(getCanonicalNewsId(item.entity)), 'feed item id must be based on the same canonical news id');
+}
+const onlyPublicationTimeline = buildProfileTimeline({
+  profile,
+  role: 'partner',
+  news: [
+    { slug: 'only-slug-publication', partnerId: 'partner-1', title: 'Единственная публикация', status: 'published', active: true, date: '2026-07-17T10:00:00.000Z' },
+  ],
+  events: [],
+  reviews: [],
+  vkPosts: [],
+}).filter(item => item.type === 'publication');
+assert.equal(onlyPublicationTimeline.length, 1, 'single profile publication must remain openable');
+assert.equal(getCanonicalNewsId(onlyPublicationTimeline[0].entity), 'only-slug-publication', 'single profile publication must preserve slug as canonical id');
+
 const periodLabel = getTimelinePeriodLabel('2026-07-15T09:00:00.000Z', new Date('2026-07-15T12:00:00.000Z').getTime());
 assert.equal(periodLabel, 'Сегодня', 'timeline period helper must group today entries');
 const groups = groupProfileTimelineItems(timeline, new Date('2026-07-15T12:00:00.000Z').getTime());
@@ -198,6 +232,7 @@ assert.equal(todayPublications[2].title, 'Сегодня старое', 'timelin
 
 const timelineComponent = read('src/components/ProfileTimelineSection.jsx');
 const feedFramework = read('src/components/FeedFramework.jsx');
+const profileMediaViewer = read('src/components/ProfileMediaViewer.jsx');
 const partnerPage = read('src/PartnerPage.jsx');
 const expertsPage = read('src/ExpertsPage.jsx');
 const newsPage = read('src/NewsPage.jsx');
@@ -211,9 +246,26 @@ assert.match(newsPage, /export function ArticleView/, 'ArticleView must be reusa
 assert.match(partnerPage, /selectedProfileNews/, 'Partner profile must keep selected feed publication in local state');
 assert.match(partnerPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Partner profile feed must open publications locally instead of global news');
 assert.match(partnerPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Partner profile must render contextual ArticleView inside the profile flow');
+assert.match(partnerPage, /getCanonicalNewsId/, 'Partner profile must keep contextual ArticleView open for news entities without plain id');
+assert.match(partnerPage, /ProfilePhotoGrid/, 'Partner profile must use the shared Living Profile photo grid');
+assert.match(partnerPage, /ProfileVideoGrid/, 'Partner profile must use the shared Living Profile video grid');
+assert.match(partnerPage, /ProfilePhotoViewer/, 'Partner profile must open photos over the current profile');
+assert.match(partnerPage, /ProfileVideoViewer/, 'Partner profile must open videos over the current profile');
 assert.match(expertsPage, /selectedProfileNews/, 'Expert profile must keep selected feed publication in local state');
 assert.match(expertsPage, /onOpenNews=\{handleOpenProfileNews\}/, 'Expert profile feed must open publications locally instead of global news');
 assert.match(expertsPage, /<ArticleView[\s\S]*item=\{selectedProfileNews\}/, 'Expert profile must render contextual ArticleView inside the profile flow');
+assert.match(expertsPage, /getCanonicalNewsId/, 'Expert profile must keep contextual ArticleView open for news entities without plain id');
+assert.match(expertsPage, /ProfilePhotoGrid/, 'Expert profile must use the shared Living Profile photo grid');
+assert.match(expertsPage, /ProfileVideoGrid/, 'Expert profile must use the shared Living Profile video grid');
+assert.match(expertsPage, /ProfilePhotoViewer/, 'Expert profile must open photos over the current profile');
+assert.match(expertsPage, /ProfileVideoViewer/, 'Expert profile must open videos over the current profile');
+assert.match(profileMediaViewer, /MediaPreview/, 'Living Profile gallery must use Smart Media Framework previews');
+assert.match(profileMediaViewer, /createPortal/, 'Living Profile media viewer must open above the profile without unmounting it');
+assert.match(profileMediaViewer, /Escape/, 'Living Profile media viewer must support ESC close');
+assert.match(profileMediaViewer, /ArrowLeft/, 'Living Profile media viewer must support previous keyboard navigation');
+assert.match(profileMediaViewer, /ArrowRight/, 'Living Profile media viewer must support next keyboard navigation');
+assert.match(profileMediaViewer, /onTouchStart/, 'Living Profile media viewer must support swipe gestures');
+assert.doesNotMatch(profileMediaViewer, /autoPlay/, 'Living Profile video viewer must not autoplay videos');
 assert.doesNotMatch(timelineComponent, /buildProfileHistory/, 'profile feed UI must not render the old History block');
 assert.doesNotMatch(timelineComponent, /buildProfileNowPriority/, 'profile feed UI must not render the old What matters now block');
 assert.doesNotMatch(timelineComponent, /Smart Summary/, 'profile feed UI must not render summary cards before the feed');

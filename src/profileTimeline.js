@@ -1,5 +1,5 @@
 import { workspaceNewsBelongsToProfile } from '../server-shared/workspace-news.js';
-import { getNewsImage, getNewsText, getNewsTitle } from './newsUtils.js';
+import { getCanonicalNewsId, getNewsImage, getNewsText, getNewsTitle } from './newsUtils.js';
 
 function toMillis(value) {
   if (!value) return 0;
@@ -221,30 +221,43 @@ function publicationKind(item = {}) {
   return 'Новость';
 }
 
+function normalizeNewsEntity(item = {}, index = 0) {
+  const canonicalId = getCanonicalNewsId(item) || String(index);
+  return {
+    ...item,
+    id: item.id || canonicalId,
+    canonicalId: item.canonicalId || canonicalId,
+    newsId: item.newsId || canonicalId,
+  };
+}
+
 function buildNewsItems({ news = [], profile, role }) {
   return (Array.isArray(news) ? news : [])
     .filter(item => sameProfile(item, profile, role) && isPublic(item))
-    .map((item, index) => withFeedTimestamp({
-      id: timelineId('news', item.id, index),
-      type: 'publication',
-      label: publicationKind(item),
-      title: getNewsTitle(item) || 'Публикация',
-      text: firstText(item.summary, item.subtitle, getNewsText(item)),
-      image: getNewsImage(item),
-      date: item.publishDate || item.publishedAt || item.createdAt || item.created || item.date || item.updatedAt,
-      author: item.author || item.sourceName || profile?.name || profile?.title || '',
+    .map((item, index) => {
+      const entity = normalizeNewsEntity(item, index);
+      return withFeedTimestamp({
+        id: timelineId('news', getCanonicalNewsId(entity), index),
+        type: 'publication',
+        label: publicationKind(entity),
+        title: getNewsTitle(entity) || 'Публикация',
+        text: firstText(entity.summary, entity.subtitle, getNewsText(entity)),
+        image: getNewsImage(entity),
+        date: entity.publishDate || entity.publishedAt || entity.createdAt || entity.created || entity.date || entity.updatedAt,
+        author: entity.author || entity.sourceName || profile?.name || profile?.title || '',
         source: 'news',
-        entity: item,
+        entity,
         action: 'openNews',
-        pinned: isPinnedRecord(item, profile),
+        pinned: isPinnedRecord(entity, profile),
       },
-      item.publishDate,
-      item.publishedAt,
-      item.createdAt,
-      item.created,
-      item.date,
-      item.updatedAt,
-    ));
+      entity.publishDate,
+      entity.publishedAt,
+      entity.createdAt,
+      entity.created,
+      entity.date,
+      entity.updatedAt,
+      );
+    });
 }
 
 function buildEventItems({ events = [], profile, role }) {

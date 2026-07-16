@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: Feed detail opening and Living Profile media viewer
+**Коммит:** `pending`
+**Файлы:** `src/newsUtils.js`, `src/profileTimeline.js`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/components/ProfileMediaViewer.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Профильная лента нормализует id публикаций через `id`, `newsId`, `articleId`, `publicationId`, `documentId`, `docId`, `firestoreId`, `slug` и передаёт в `ArticleView` полную сущность новости.
+- Добавлен общий viewer для фото и видео Living Profile с адаптивной сеткой, lazy-превью через `MediaPreview`, overlay, ESC, стрелками, swipe и счётчиком.
+- Партнёры и эксперты используют общий viewer в Desktop и Mobile v2 без размонтирования профиля и без ранней загрузки iframe/video.
+**Почему:** последняя публикация могла не открываться, если у неё не было plain `id`, а разделы `Фото` и `Видео` должны работать как полноценная галерея поверх текущего профиля.
+
+---
+
 ## [2026-07-16] feat: Living Profile v4
 **Коммит:** `pending`
 **Файлы:** `src/profileTimeline.js`, `src/components/ProfileTimelineSection.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `scripts/profile-timeline-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `scripts/desktop-experts-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`

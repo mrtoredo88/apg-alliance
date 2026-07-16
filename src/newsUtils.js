@@ -59,7 +59,17 @@ function cleanNewsId(value) {
 }
 
 export function getCanonicalNewsId(item) {
-  const direct = cleanNewsId(item?.id || item?.canonicalId || item?.docId || item?.firestoreId);
+  const direct = cleanNewsId(
+    item?.id
+    || item?.canonicalId
+    || item?.newsId
+    || item?.articleId
+    || item?.publicationId
+    || item?.documentId
+    || item?.docId
+    || item?.firestoreId
+    || item?.slug
+  );
   if (direct) return direct;
   const source = cleanNewsId(item?.source || item?.sourceType || 'news').toLowerCase();
   const externalId = cleanNewsId(item?.externalId || item?.external_id || item?.postId || item?.vkPostId);
@@ -73,9 +83,14 @@ export function getNewsLegacyIds(item) {
   return [
     getCanonicalNewsId(item),
     cleanNewsId(item?.canonicalId),
+    cleanNewsId(item?.newsId),
+    cleanNewsId(item?.articleId),
+    cleanNewsId(item?.publicationId),
+    cleanNewsId(item?.documentId),
     cleanNewsId(item?.docId),
     cleanNewsId(item?.firestoreId),
     cleanNewsId(item?.id),
+    cleanNewsId(item?.slug),
     source && externalId ? `${source}_${externalId}` : '',
     externalId,
   ].filter((id, index, arr) => id && arr.indexOf(id) === index);
