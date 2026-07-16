@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: Partner catalog cover priority
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/components/DesktopUI.jsx`, `src/PartnersPage.jsx`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-partners-page-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Для карточек Desktop Catalog включён режим `photo-first`, чтобы video thumbnail не заменял основную фотографию/обложку.
+- Каталог партнёров получил явный порядок выбора cover: `cover`/`coverPhoto` → `heroImage` → `coverImage` → `mainPhoto` → `photo` → `gallery` → `images` → `logo` → `videoPreview`.
+- Regression-тесты фиксируют, что video preview остаётся доступным в Smart Media Framework, но не перебивает фотографии в каталоге.
+**Почему:** после Video Preview Framework превью VK Video стало первым кандидатом в `MediaPreview`, из-за чего карточки партнёров с реальными обложками могли показывать видео вместо фотографии.
+
+---
+
 ## [2026-07-16] fix: Scanner Reliability v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/Scanner.jsx`, `src/scannerReliability.js`, `scripts/scanner-camera-diagnostics-test.mjs`, `.ai/17_CHANGELOG_AI.md`

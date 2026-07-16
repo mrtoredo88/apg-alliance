@@ -108,6 +108,38 @@ function partnerSearchText(partner) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function firstCatalogMediaUrl(...sources) {
+  for (const source of sources) {
+    if (!source) continue;
+    if (Array.isArray(source)) {
+      const match = source.map(item => typeof item === 'string' ? item.trim() : text(item?.url || item?.src || item?.image || item?.photo || item?.photoUrl || item?.imageUrl)).find(Boolean);
+      if (match) return match;
+      continue;
+    }
+    const url = typeof source === 'string' ? source.trim() : text(source?.url || source?.src || source?.image || source?.photo || source?.photoUrl || source?.imageUrl);
+    if (url) return url;
+  }
+  return '';
+}
+
+function partnerCatalogCover(partner, gallery = []) {
+  return firstCatalogMediaUrl(
+    partner?.cover,
+    partner?.coverPhoto,
+    partner?.heroImage,
+    partner?.coverImage,
+    partner?.mainPhoto,
+    partner?.photo,
+    gallery,
+    partner?.images,
+    partner?.logo,
+    partner?.logoUrl,
+    partner?.videoPreview,
+    partner?.videoPreviewUrl,
+    partner?.videoThumbnailUrl,
+  );
+}
+
 function routeToPartner(partner) {
   const address = text(partner?.address);
   if (!address) return;
@@ -158,12 +190,12 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const canRoute = Boolean(text(partner?.address));
   const canCall = Boolean(text(partner?.phone || partner?.contactPhone));
   const canBook = Boolean(partner?.bookingEnabled || partner?.bookingUrl || partner?.services?.length || partner?.serviceCatalog?.length);
-  const cover = partner?.coverPhoto || partner?.imageUrl || partner?.photoUrl || partner?.photo || partner?.image || '';
   const gallery = [
     ...(Array.isArray(partner?.gallery) ? partner.gallery : []),
     ...(Array.isArray(partner?.photos) ? partner.photos : []),
     ...(Array.isArray(partner?.images) ? partner.images : []),
   ];
+  const cover = partnerCatalogCover(partner, gallery);
   const address = text(partner?.address);
   const services = partnerPrimaryServices(partner);
   const isNew = (toDate(partner?.createdAt)?.getTime() || 0) >= Date.now() - 30 * 24 * 60 * 60 * 1000;

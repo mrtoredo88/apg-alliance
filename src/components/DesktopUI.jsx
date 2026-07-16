@@ -599,6 +599,7 @@ export function MediaPreview({
   image = '',
   gallery = [],
   videos = [],
+  mediaPriority = 'video-first',
   title = '',
   height = 112,
   children,
@@ -610,20 +611,39 @@ export function MediaPreview({
   const safeVideos = React.useMemo(() => collectMediaVideos(source, videos), [source, videos]);
   const safeGallery = React.useMemo(() => collectMediaGallery(source, gallery), [source, gallery]);
   const video = safeVideos[0] || null;
-  const cover = firstMediaUrl(
-    video?.thumbnailUrl,
-    image,
-    source?.coverPhoto,
-    source?.cover,
-    source?.banner,
-    source?.imageUrl,
-    source?.photoUrl,
-    source?.photo,
-    source?.image,
-    source?.logoUrl,
-    source?.avatarUrl,
-    safeGallery,
-  );
+  const cover = mediaPriority === 'photo-first'
+    ? firstMediaUrl(
+      image,
+      source?.cover,
+      source?.coverPhoto,
+      source?.heroImage,
+      source?.coverImage,
+      source?.mainPhoto,
+      source?.photo,
+      safeGallery,
+      source?.images,
+      source?.logo,
+      source?.logoUrl,
+      source?.avatarUrl,
+      source?.videoPreview,
+      source?.videoPreviewUrl,
+      source?.videoThumbnailUrl,
+      video?.thumbnailUrl,
+    )
+    : firstMediaUrl(
+      video?.thumbnailUrl,
+      image,
+      source?.coverPhoto,
+      source?.cover,
+      source?.banner,
+      source?.imageUrl,
+      source?.photoUrl,
+      source?.photo,
+      source?.image,
+      source?.logoUrl,
+      source?.avatarUrl,
+      safeGallery,
+    );
   const canLivePreview = Boolean(video?.direct && mediaPreviewSupportsLive());
 
   React.useEffect(() => {
@@ -649,7 +669,7 @@ export function MediaPreview({
     if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
     setLive(false);
   };
-  const showVideoBadge = Boolean(video);
+  const showVideoBadge = Boolean(video) && (mediaPriority !== 'photo-first' || cover === video.thumbnailUrl);
   const label = video ? `Видео: ${title || video.title || video.platformLabel}` : title || 'Медиа';
   return (
     <div
@@ -950,6 +970,7 @@ export function DesktopCatalogEntityCard({
           image={cover}
           gallery={gallery}
           videos={videos}
+          mediaPriority="photo-first"
           title={title}
           height={112}
         >

@@ -92,6 +92,18 @@ if (!partnerCardSource.includes('media={partner}') || !partnerCardSource.include
   throw new Error('PartnersPage desktop catalog cards must pass existing profile media into the shared MediaPreview framework.');
 }
 
+if (!partnersSource.includes('function partnerCatalogCover') || !partnersSource.includes('partner?.cover') || !partnersSource.includes('partner?.heroImage') || !partnersSource.includes('partner?.coverImage') || !partnersSource.includes('partner?.mainPhoto') || !partnersSource.includes('partner?.photo') || !partnersSource.includes('partner?.logo') || !partnersSource.includes('partner?.videoPreview')) {
+  throw new Error('PartnersPage must keep an explicit photo-first catalog cover strategy before video previews.');
+}
+
+const coverPrioritySource = partnersSource.slice(partnersSource.indexOf('function partnerCatalogCover'), partnersSource.indexOf('function routeToPartner'));
+const coverPriority = ['partner?.cover', 'partner?.heroImage', 'partner?.coverImage', 'partner?.mainPhoto', 'partner?.photo', '\n    gallery,', 'partner?.images', 'partner?.logo', 'partner?.videoPreview'];
+for (let index = 1; index < coverPriority.length; index += 1) {
+  if (coverPrioritySource.indexOf(coverPriority[index - 1]) > coverPrioritySource.indexOf(coverPriority[index])) {
+    throw new Error(`Partner catalog cover priority is wrong: ${coverPriority[index - 1]} must be before ${coverPriority[index]}.`);
+  }
+}
+
 if (!partnerCardSource.includes('onMouseEnter={() => onSelect?.(partner)}') || !partnerCardSource.includes('onFocus={() => onSelect?.(partner)}')) {
   throw new Error('PartnersPage desktop cards must update Quick Preview on hover/focus.');
 }

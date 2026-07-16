@@ -89,6 +89,14 @@ if (!source.includes('<MediaPreview') || !source.includes('videos={videos}') || 
   throw new Error('Desktop Catalog Entity Card must render media through the shared MediaPreview framework.');
 }
 
+if (!source.includes('mediaPriority="photo-first"')) {
+  throw new Error('Desktop Catalog Entity Card must use photo-first media priority so video previews cannot replace catalog covers.');
+}
+
+if (!source.includes("mediaPriority = 'video-first'") || !source.includes("mediaPriority === 'photo-first'")) {
+  throw new Error('MediaPreview must keep default video-first behavior while supporting photo-first catalog cards.');
+}
+
 if (!source.includes('MEDIA_PREVIEW_LIVE_EVENT') || !source.includes('setTimeout') || !source.includes('}, 350)')) {
   throw new Error('MediaPreview must protect desktop live preview with a shared single-preview hover delay.');
 }
