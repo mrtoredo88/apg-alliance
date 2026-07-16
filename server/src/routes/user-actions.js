@@ -64,6 +64,7 @@ import {
 import { buildLifecyclePatch, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import { normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
+import { actorOwnsEditableProfile } from '../../../server-shared/profile-access.js';
 import {
   buildWorkspaceEventBase,
   buildWorkspaceEventDuplicate,
@@ -744,16 +745,8 @@ function sanitizeAiProfile(input = {}) {
   };
 }
 
-function actorOwnsProfile(data, actor) {
-  const actorIds = [actor.userId, actor.uid].map(item => safeString(item, 220)).filter(Boolean);
-  const actorEmail = safeString(actor.user?.email || actor.user?.linkedEmail, 200).toLowerCase();
-  const ownerUserIds = safeStringList(data.ownerUserIds);
-  const ownerEmails = safeStringList(data.ownerEmails).map(item => item.toLowerCase());
-  return actorIds.some(id => data.ownerId === id || String(data.vkOwnerId || '') === id || ownerUserIds.includes(id))
-    || (actorEmail && (
-      safeString(data.ownerEmail || data.connectionEmail, 200).toLowerCase() === actorEmail
-      || ownerEmails.includes(actorEmail)
-    ));
+function actorOwnsProfile(data, actor, type = '') {
+  return actorOwnsEditableProfile(data, actor, type);
 }
 
 async function assertOwnedProfile(db, actor, type = 'partner', id = '') {
@@ -763,7 +756,7 @@ async function assertOwnedProfile(db, actor, type = 'partner', id = '') {
   const snap = await db.collection(collection).doc(profileId).get();
   if (!snap.exists) throw Object.assign(new Error('Профиль не найден.'), { statusCode: 404, code: 'PROFILE_NOT_FOUND' });
   const profile = { id: snap.id, ...(snap.data() || {}) };
-  if (!actorOwnsProfile(profile, actor) && !hasRole(actor.user || {}, ROLES.admin) && !hasRole(actor.user || {}, ROLES.owner)) {
+  if (!actorOwnsProfile(profile, actor, type) && !hasRole(actor.user || {}, ROLES.admin) && !hasRole(actor.user || {}, ROLES.owner)) {
     throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403, code: 'PROFILE_FORBIDDEN' });
   }
   return profile;
@@ -1428,10 +1421,7 @@ async function actionOwnerProfileUpdate(db, req, actor, type) {
   const collection = type === 'expert' ? 'experts' : 'partners';
   if (!id) throw Object.assign(new Error('Не указан профиль.'), { statusCode: 400 });
   const ref = db.collection(collection).doc(id);
-  const snap = await ref.get();
-  if (!snap.exists) throw Object.assign(new Error('Профиль не найден.'), { statusCode: 404 });
-  const data = snap.data() || {};
-  if (!actorOwnsProfile(data, actor)) throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403 });
+  await assertOwnedProfile(db, actor, type, id);
   const allowedFields = type === 'expert'
     ? new Set(['name', 'lastName', 'firstName', 'middleName', 'category', 'categoryLabel', 'primaryCategory', 'secondaryCategories', 'specialization', 'shortDescription', 'description', 'slogan', 'workFormats', 'formats', 'offer', 'tariff', 'contactName', 'phone', 'whatsappUrl', 'email', 'inn', 'city', 'district', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'bookingEnabled', 'onlineBookingEnabled', 'bookingMode', 'bookingServices', 'bookingSpecialists', 'bookingSchedule', 'bookingSlotTimes', 'bookingSettings', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'tiktokUrl', 'dzenUrl', 'yandexMapsUrl', 'twoGisUrl', 'socialLinks', 'comment', 'photo', 'logoUrl', 'coverPhoto', 'gallery', 'videos', 'services', 'serviceDescription', 'serviceCost', 'directions', 'advantages', 'prices', 'paymentMethods', 'parking', 'delivery', 'booking', 'features', 'faq', 'customerNotes', 'education', 'experience', 'certificates', 'consultationPrice', 'workFormat', 'servicesDraftReady', 'aiProfile'])
     : new Set(['name', 'category', 'categoryLabel', 'shortDescription', 'description', 'slogan', 'offer', 'phone', 'whatsappUrl', 'email', 'city', 'district', 'address', 'hours', 'workingHours', 'websiteUrl', 'bookingUrl', 'bookingEnabled', 'onlineBookingEnabled', 'bookingMode', 'bookingServices', 'bookingSpecialists', 'bookingSchedule', 'bookingSlotTimes', 'bookingSettings', 'vkUrl', 'telegramUrl', 'maxUrl', 'instagramUrl', 'youtubeUrl', 'rutubeUrl', 'tiktokUrl', 'dzenUrl', 'yandexMapsUrl', 'twoGisUrl', 'socialLinks', 'socialUrl', 'logoUrl', 'photo', 'coverPhoto', 'gallery', 'photos', 'videos', 'services', 'serviceDescription', 'directions', 'advantages', 'prices', 'paymentMethods', 'parking', 'delivery', 'booking', 'features', 'faq', 'customerNotes', 'aiProfile']);
@@ -2106,7 +2096,7 @@ async function actionBookingManualCreate(db, req, actor) {
   const providerSnap = await db.collection(providerCollection).doc(providerId).get();
   if (!providerSnap.exists) throw Object.assign(new Error('Профиль для встречи не найден.'), { statusCode: 404, code: 'BOOKING_PROVIDER_NOT_FOUND' });
   const provider = { id: providerSnap.id, ...(providerSnap.data() || {}) };
-  if (!actorOwnsProfile(provider, actor) && !hasRole(actor.user || {}, ROLES.owner) && !hasRole(actor.user || {}, ROLES.admin)) {
+  if (!actorOwnsProfile(provider, actor, providerType) && !hasRole(actor.user || {}, ROLES.owner) && !hasRole(actor.user || {}, ROLES.admin)) {
     throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
   }
   const bookingProfile = buildBookingProfile(provider, providerType);
@@ -2215,7 +2205,7 @@ async function assertBookingAccess(db, booking, actor, required = 'any') {
   if (role) return role;
   const collectionName = booking.providerType === 'expert' ? 'experts' : 'partners';
   const providerSnap = booking.providerId ? await db.collection(collectionName).doc(String(booking.providerId)).get().catch(() => null) : null;
-  if (providerSnap?.exists && actorOwnsProfile(providerSnap.data() || {}, actor)) return 'provider';
+  if (providerSnap?.exists && actorOwnsProfile({ id: providerSnap.id, ...(providerSnap.data() || {}) }, actor, booking.providerType)) return 'provider';
   if (required === 'user' || required === 'provider') {
     throw Object.assign(new Error('Нет доступа к этой встрече.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
   }
@@ -2759,7 +2749,7 @@ async function actionBookingList(db, req, actor, calendar = false) {
   if (providerId) {
     const snap = await db.collection(providerType === 'expert' ? 'experts' : 'partners').doc(providerId).get();
     const adminAccess = hasRole(actor.user || {}, ROLES.owner) || hasRole(actor.user || {}, ROLES.admin);
-    if (!snap.exists || (!adminAccess && !actorOwnsProfile(snap.data() || {}, actor))) throw Object.assign(new Error('Нет доступа к календарю.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
+    if (!snap.exists || (!adminAccess && !actorOwnsProfile({ id: snap.id, ...(snap.data() || {}) }, actor, providerType))) throw Object.assign(new Error('Нет доступа к календарю.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
     const bookingsSnap = await db.collection('bookings').where('providerId', '==', providerId).get();
     rows = bookingsSnap.docs.map(doc => normalizeBooking({ id: doc.id, ...(doc.data() || {}) }));
   } else {

@@ -3156,6 +3156,14 @@
 - Desktop-разделы `Акции` и `Подарки` получили общий `DesktopSectionShell` и `DesktopTopOverview` в `desktopMode` без изменения бизнес-логики и мобильных веток.
 - Desktop-профиль получил общий `DesktopTopOverview` поверх существующей desktop-композиции без изменения внутренних сценариев профиля.
 
+# 2026-07-16 — Partner Profile Save Recovery
+
+- Восстановлено сохранение карточек партнёров и экспертов из личного кабинета: серверный ownership guard теперь учитывает современные привязки `partnerId`, `expertId`, `partnerCabinetIds`, `expertCabinetIds`, а не только legacy `ownerUserIds/ownerEmail`.
+- `partner:profileUpdate` и `expert:profileUpdate` переведены на общий `assertOwnedProfile`, поэтому `partner`, `expert`, `owner` и `admin` проходят единый серверный доступ без отдельной ручной проверки.
+- Те же правила владения применены к соседним кабинетным сценариям встреч и календаря, чтобы linked-профили не получали 403 в рабочих действиях.
+- Фронтовая диагностика владения профилем теперь распознаёт прямые `partnerId/expertId`, а ошибки сохранения больше не скрываются за общей фразой: пользователь видит реальную причину отказа API.
+- Добавлен regression-тест `scripts/profile-save-access-test.mjs`, подключённый к `npm run test:core`, чтобы сохранение linked-профиля без legacy owner-полей больше не ломалось.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

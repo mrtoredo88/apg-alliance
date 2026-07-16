@@ -364,7 +364,9 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
       onPartnerUpdate?.(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
+    } catch (error) {
+      onToast?.(error?.message || 'Ошибка сохранения. Попробуйте ещё раз.', 'error');
+    }
     setSaving(false);
   };
 

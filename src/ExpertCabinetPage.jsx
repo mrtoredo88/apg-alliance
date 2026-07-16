@@ -285,7 +285,9 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
       setDraftRestored(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { onToast?.('Ошибка сохранения. Попробуйте ещё раз.', 'error'); }
+    } catch (error) {
+      onToast?.(error?.message || 'Ошибка сохранения. Попробуйте ещё раз.', 'error');
+    }
     setSaving(false);
   };
 

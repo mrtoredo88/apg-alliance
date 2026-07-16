@@ -31,7 +31,12 @@ export function profileOwnedByUser(profile, userData, fallbackEmail = '') {
   const emails = collectUserEmails(userData, fallbackEmail);
   const ownerUserIds = safeStringList(profile.ownerUserIds);
   const ownerEmails = safeStringList(profile.ownerEmails).map(item => item.toLowerCase());
-  const userCabinetIds = [...safeStringList(userData.partnerCabinetIds), ...safeStringList(userData.expertCabinetIds)];
+  const userCabinetIds = [
+    String(userData.partnerId || ''),
+    ...safeStringList(userData.partnerCabinetIds),
+    String(userData.expertId || ''),
+    ...safeStringList(userData.expertCabinetIds),
+  ].filter(Boolean);
   return userIds.some(id => (
     String(profile.ownerId || '') === id
     || String(profile.vkOwnerId || '') === id
