@@ -1,29 +1,102 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
 import { motionTransition } from './motion.js';
+import { sendDiagReport } from './diagnostics.js';
 
 const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
+const CAMERA_BLACK_FRAME_ERROR = 'Не удалось получить изображение с камеры. Попробуйте закрыть сканер и открыть его снова.';
+const SCANNER_DIAG_KEY = 'apg_scanner_camera_diagnostics';
 
-export default function Scanner({ isOpen, onClose, onConfirm }) {
+const safeDeviceId = (value = '') => {
+  const text = String(value || '');
+  if (!text) return '';
+  return `${text.slice(0, 5)}…${text.slice(-4)}`;
+};
+
+const summarizeStream = (video) => {
+  const stream = video?.srcObject;
+  const tracks = typeof stream?.getVideoTracks === 'function' ? stream.getVideoTracks() : [];
+  const track = tracks[0] || null;
+  const settings = typeof track?.getSettings === 'function' ? track.getSettings() : {};
+  return {
+    hasSrcObject: Boolean(stream),
+    trackCount: tracks.length,
+    trackReadyState: track?.readyState || null,
+    trackEnabled: track?.enabled ?? null,
+    videoWidth: video?.videoWidth || 0,
+    videoHeight: video?.videoHeight || 0,
+    paused: video?.paused ?? null,
+    cameraDeviceId: safeDeviceId(settings.deviceId),
+    facingMode: settings.facingMode || null,
+  };
+};
+
+const stopVideoTracks = (video) => {
+  const stream = video?.srcObject;
+  const tracks = typeof stream?.getTracks === 'function' ? stream.getTracks() : [];
+  tracks.forEach(track => {
+    try { track.stop(); } catch {}
+  });
+  if (video) {
+    try { video.pause?.(); } catch {}
+    try { video.srcObject = null; } catch {}
+  }
+  return tracks.length;
+};
+
+export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = null }) {
   const videoRef       = useRef(null);
   const scannerRef     = useRef(null);
   const doneRef        = useRef(false);
   const onConfirmRef   = useRef(onConfirm);
+  const diagnosticUserRef = useRef(diagnosticUser);
   const dragStartYRef   = useRef(0);
+  const diagSeqRef      = useRef(0);
   const [err, setErr]           = useState(null);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn]   = useState(false);
   const [dragY, setDragY]       = useState(0);
 
   useEffect(() => { onConfirmRef.current = onConfirm; }, [onConfirm]);
+  useEffect(() => { diagnosticUserRef.current = diagnosticUser; }, [diagnosticUser]);
+
+  const logCameraDiag = useCallback((stage, details = {}) => {
+    const activeUser = diagnosticUserRef.current;
+    const payload = {
+      stage,
+      seq: ++diagSeqRef.current,
+      at: new Date().toISOString(),
+      userId: activeUser?.id || activeUser?.uid || null,
+      emailHashHint: activeUser?.email ? `${String(activeUser.email).slice(0, 2)}…${String(activeUser.email).split('@')[1] || ''}` : null,
+      displayMode: window.matchMedia?.('(display-mode: standalone)')?.matches ? 'standalone' : 'browser',
+      standalone: Boolean(window.navigator?.standalone),
+      permission: details.permission || null,
+      ...details,
+    };
+    try {
+      const previous = JSON.parse(localStorage.getItem(SCANNER_DIAG_KEY) || '[]');
+      localStorage.setItem(SCANNER_DIAG_KEY, JSON.stringify([...previous, payload].slice(-40)));
+    } catch {}
+    try { console.info('[APG Scanner]', payload); } catch {}
+    if (['stream_timeout', 'play_error', 'start_error', 'track_stopped', 'closed'].includes(stage)) {
+      sendDiagReport({
+        checks: { scannerCamera: payload },
+        errorText: `scanner_camera_${stage}`,
+        userId: payload.userId,
+        manual: false,
+      });
+    }
+  }, []);
 
   const stopScanner = useCallback(() => {
     if (scannerRef.current) {
-      scannerRef.current.stop();
-      scannerRef.current.destroy();
+      try { scannerRef.current.stop(); } catch {}
+      try { scannerRef.current.destroy(); } catch {}
       scannerRef.current = null;
     }
-  }, []);
+    const stoppedTracks = stopVideoTracks(videoRef.current);
+    if (stoppedTracks > 0) logCameraDiag('track_stopped', { stoppedTracks });
+  }, [logCameraDiag]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -35,10 +108,27 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
     }
 
     let active = true;
+    let frameTimer = 0;
+    let permission = 'unknown';
+    const videoEvents = ['loadedmetadata', 'canplay', 'playing', 'pause', 'stalled', 'suspend', 'emptied'];
+    const handleVideoEvent = (event) => {
+      if (!active) return;
+      logCameraDiag(`video_${event.type}`, summarizeStream(videoRef.current));
+    };
 
     // Wait for video element to mount
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (!videoRef.current || !active) return;
+      try {
+        const status = await navigator.permissions?.query?.({ name: 'camera' });
+        permission = status?.state || 'unknown';
+      } catch {}
+      logCameraDiag('register_start', {
+        permission,
+        hasMediaDevices: Boolean(navigator.mediaDevices),
+        hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+      });
+      videoEvents.forEach(name => videoRef.current?.addEventListener(name, handleVideoEvent));
 
       const scanner = new QrScanner(
         videoRef.current,
@@ -59,10 +149,29 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
       scannerRef.current = scanner;
 
       scanner.start()
-        .then(() => {
+        .then(async () => {
+          if (!active) return;
+          const video = videoRef.current;
+          logCameraDiag('stream_created', { permission, ...summarizeStream(video) });
+          try {
+            await video?.play?.();
+            logCameraDiag('video_play_success', summarizeStream(video));
+          } catch (error) {
+            logCameraDiag('play_error', { permission, error: String(error?.message || error), ...summarizeStream(video) });
+            if (active) setErr(CAMERA_BLACK_FRAME_ERROR);
+            return;
+          }
+          frameTimer = window.setTimeout(() => {
+            if (!active) return;
+            const snapshot = summarizeStream(videoRef.current);
+            const hasFrame = snapshot.videoWidth > 0 && snapshot.videoHeight > 0 && snapshot.trackReadyState === 'live';
+            logCameraDiag(hasFrame ? 'frame_ready' : 'stream_timeout', { permission, ...snapshot });
+            if (!hasFrame) setErr(CAMERA_BLACK_FRAME_ERROR);
+          }, 2200);
           scanner.hasFlash().then(has => { if (active) setHasTorch(has); });
         })
-        .catch(() => {
+        .catch((error) => {
+          logCameraDiag('start_error', { permission, error: String(error?.message || error), ...summarizeStream(videoRef.current) });
           if (active) setErr('Нет доступа к камере. Разрешите его в настройках браузера.');
         });
     }, 50);
@@ -70,9 +179,11 @@ export default function Scanner({ isOpen, onClose, onConfirm }) {
     return () => {
       active = false;
       clearTimeout(timer);
+      if (frameTimer) clearTimeout(frameTimer);
+      videoEvents.forEach(name => videoRef.current?.removeEventListener(name, handleVideoEvent));
       stopScanner();
     };
-  }, [isOpen, stopScanner]);
+  }, [isOpen, stopScanner, logCameraDiag]);
 
   const handleClose = useCallback(() => {
     stopScanner();

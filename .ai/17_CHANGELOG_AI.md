@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-16] fix: QR Scanner camera diagnostics
+**Коммит:** `pending`
+**Файлы:** `src/Scanner.jsx`, `src/UserApp.jsx`, `scripts/scanner-camera-diagnostics-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Scanner получил production-safe диагностику lifecycle камеры: permission, stream, track, `srcObject`, `play()`, video events, размеры кадра и остановку tracks.
+- Добавлена проверка чёрного video surface: если `QrScanner.start()` прошёл, но `videoWidth/videoHeight` остались `0`, пользователь видит понятную ошибку вместо чёрного экрана.
+- При закрытии Scanner явно останавливаются все tracks; добавлен regression-тест `scanner-camera-diagnostics-test` в `test:core`.
+**Почему:** у отдельного iPhone PWA аккаунта Scanner открывался, но видеокадр не появлялся; теперь production покажет точный этап отказа и не оставит пользователя на чёрном экране.
+
+---
+
 ## [2026-07-16] feat: My Profile Dashboard v3
 **Коммит:** `pending`
 **Файлы:** `src/HomePanelV2.jsx`, `src/components/DesktopUI.jsx`, `scripts/home-profile-dashboard-test.mjs`, `.ai/17_CHANGELOG_AI.md`

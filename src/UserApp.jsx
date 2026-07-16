@@ -4300,6 +4300,15 @@ export function UserApp() {
                 onClose={() => setIsScannerOpen(false)}
                 mapPlaces={partners}
                 onConfirm={handleConfirmScan}
+                diagnosticUser={{
+                  id: user?.id,
+                  uid: user?.uid,
+                  email: user?.email,
+                  roles: user?.roles,
+                  role: user?.role,
+                  partnerId: user?.partnerId,
+                  expertId: user?.expertId,
+                }}
               />
             </Suspense>
           )}
