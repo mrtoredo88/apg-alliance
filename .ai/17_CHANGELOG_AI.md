@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] fix: Partner QR deep links
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/UserApp.jsx`, `scripts/partner-deeplink-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- `/partner/:id` теперь стартует в разделе партнёров и открывает карточку через общий resolver, а не через fallback на главную.
+- Публичный QR и scanner flow используют прямое чтение `partners/{id}`, если карточки ещё нет в public catalog/cache.
+- Добавлен regression-тест, фиксирующий корректный public QR, cold-start deep link и отсутствие зависимости от `partners.length`.
+**Почему:** у нового партнёра публичный QR мог открывать главную, если общий список партнёров ещё не загрузился или карточка отсутствовала в cached/public list.
+
+---
+
 ## [2026-07-17] feat: Partner locations architecture
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/locations.js`, `server-shared/booking.js`, `server/src/routes/user-actions.js`, `src/booking/BookingFlow.jsx`, `src/PartnerPage.jsx`, `src/PartnersPage.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `scripts/partner-locations-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

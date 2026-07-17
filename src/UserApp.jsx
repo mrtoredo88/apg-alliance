@@ -113,6 +113,28 @@ function isPublicContent(item) {
   return isLifecyclePublic(item);
 }
 
+function normalizeDeepLinkId(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  try {
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return raw;
+  }
+}
+
+function partnerMatchesDeepLink(partner, rawId) {
+  const target = normalizeDeepLinkId(rawId);
+  if (!partner || !target) return false;
+  return [
+    partner.id,
+    partner.publicId,
+    partner.slug,
+    partner.shareId,
+    partner.deepLinkId,
+  ].some(value => normalizeDeepLinkId(value) === target);
+}
+
 function readCachedArray(key) {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) || '[]');
@@ -162,6 +184,7 @@ function getInitialPanelFromDeepLink(deepLink) {
   if (deepLink.type === 'news') return 'news';
   if (deepLink.type === 'news-list') return 'news';
   if (deepLink.type === 'event' || deepLink.type === 'events') return 'events';
+  if (deepLink.type === 'partner') return 'partners';
   if (deepLink.type === 'partnership') return 'partnership';
   if (deepLink.type === 'expert' || deepLink.type === 'experts') return 'experts';
   if (deepLink.type === 'dialogs') return 'dialogs';
@@ -878,6 +901,7 @@ export function UserApp() {
     return fromHash ?? fromSearch ?? null;
   }, [initialDeepLink]);
   const deepLinkOpened = useRef(false);
+  const deepLinkResolving = useRef(false);
 
   // Deep link для скана эксперта: ?scan=expert_ID
   const pendingScanId = useMemo(() => {
@@ -1164,6 +1188,29 @@ export function UserApp() {
       visitCount: visitCounts[p.id] ?? 0,
     }));
   }, [partners, visitCounts]);
+
+  const resolvePartnerDeepLink = useCallback(async (rawPartnerId) => {
+    const partnerId = normalizeDeepLinkId(rawPartnerId);
+    if (!partnerId) return null;
+
+    const cachedPartner = [...enrichedPartners, ...partners]
+      .find(item => isNotArchived(item) && partnerMatchesDeepLink(item, partnerId));
+    if (cachedPartner) return cachedPartner;
+
+    try {
+      const snap = await getDoc(doc(db, 'partners', partnerId));
+      if (!snap.exists()) return null;
+      const partner = { id: snap.id, ...snap.data() };
+      if (!isNotArchived(partner)) return null;
+      setPartners(prev => prev.some(item => String(item.id) === String(partner.id))
+        ? prev.map(item => String(item.id) === String(partner.id) ? { ...item, ...partner } : item)
+        : [partner, ...prev]);
+      return partner;
+    } catch (e) {
+      logError(e, 'UserApp.resolvePartnerDeepLink');
+      return null;
+    }
+  }, [enrichedPartners, partners]);
 
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
@@ -2048,7 +2095,7 @@ export function UserApp() {
       if (scanValue) {
         rawQrValue = scanValue;
       } else if (partnerId) {
-          const partner = enrichedPartners.find(p => p.id === partnerId && isNotArchived(p));
+        const partner = await resolvePartnerDeepLink(partnerId);
         if (partner) {
           openPartner(partner);
           userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
@@ -2144,7 +2191,7 @@ export function UserApp() {
       setIsScannerOpen(false);
       isScanningRef.current = false;
     }
-  }, [user, enrichedPartners, experts, streak, showToast, platformSource]);
+  }, [user, enrichedPartners, experts, streak, showToast, platformSource, resolvePartnerDeepLink]);
 
   // ─── Партнёры ───────────────────────────────────────────────────────────────
 
@@ -2271,16 +2318,28 @@ export function UserApp() {
 
   // Открываем партнёра из deep link — после того как openPartner объявлен
   useEffect(() => {
-    if (!pendingPartnerId || !partners.length || deepLinkOpened.current) return;
-    deepLinkOpened.current = true;
-    const p = partners.find(p => p.id === pendingPartnerId);
-    if (p) {
-      openPartner(p);
-      userAction('publicQr:view', { type: 'partner', id: p.id }).catch(() => {});
-    } else {
-      showToast('🔍 Партнёр не найден');
-    }
-  }, [pendingPartnerId, partners, openPartner, showToast]);
+    if (!pendingPartnerId || deepLinkOpened.current || deepLinkResolving.current) return;
+    let cancelled = false;
+    deepLinkResolving.current = true;
+
+    resolvePartnerDeepLink(pendingPartnerId).then(partner => {
+      if (cancelled) return;
+      deepLinkOpened.current = true;
+      deepLinkResolving.current = false;
+      if (partner) {
+        openPartner(partner);
+        userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
+      } else {
+        navigatePanel('partners');
+        showToast('🔍 Партнёр не найден', 'error');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      deepLinkResolving.current = false;
+    };
+  }, [pendingPartnerId, resolvePartnerDeepLink, openPartner, navigatePanel, showToast]);
 
   // Авто-скан служебного QR из deep link ?scan=...
   useEffect(() => {
