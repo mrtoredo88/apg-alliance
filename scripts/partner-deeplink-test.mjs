@@ -15,7 +15,7 @@ if (!qrSection.includes("shareLink('partner', partner.id)")) {
   fail('public partner QR must be generated from shareLink(partner, partner.id)');
 }
 
-if (!userApp.includes("if (section === 'partner' && id) return { type: 'partner', id };")) {
+if (!/if\s*\(section === 'partner' && id\)\s*{[\s\S]*return \{ type: 'partner', id \};[\s\S]*}/.test(userApp)) {
   fail('readAppDeepLink must parse /partner/:id deep links');
 }
 

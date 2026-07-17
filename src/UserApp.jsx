@@ -5,6 +5,7 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 import '@vkontakte/vkui/dist/vkui.css';
 import vkBridge, { isVK } from './vk.js';
 import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js';
+import { qrError, qrLog, sanitizeQrPartnerSnapshot } from './qrDiagnostics.js';
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
 import { registerCurrentPushDevice } from './pushDiagnostics.js';
 import { confirmQrScan } from './rewardApi.js';
@@ -172,7 +173,13 @@ function readAppDeepLink() {
   }
   if (section === 'event' && id) return { type: 'event', id };
   if (section === 'events') return { type: 'events', id: '' };
-  if (section === 'partner' && id) return { type: 'partner', id };
+  if (section === 'partner' && id) {
+    qrLog('deep link', {
+      partnerId: id,
+      routeType: 'partner',
+    });
+    return { type: 'partner', id };
+  }
   if (section === 'partnership') return { type: 'partnership', id: '' };
   if (section === 'expert' && id) return { type: 'expert', id };
   if (section === 'experts') return { type: 'experts', id: '' };
@@ -843,6 +850,13 @@ export function UserApp() {
   const [notifications, setNotifications]       = useState([]);
   const [customTasks, setCustomTasks]           = useState([]);
   const [lokiKnowledge, setLokiKnowledge]       = useState([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__APG_CURRENT_PANEL__ = activePanel;
+    window.__APG_CURRENT_SECTION__ = appMode;
+  }, [activePanel, appMode]);
+
   const isManualLogoutFromStorage = () => {
     try {
       return localStorage.getItem('manualLogout') === 'true';
@@ -1191,22 +1205,71 @@ export function UserApp() {
 
   const resolvePartnerDeepLink = useCallback(async (rawPartnerId) => {
     const partnerId = normalizeDeepLinkId(rawPartnerId);
-    if (!partnerId) return null;
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (!partnerId) {
+      qrLog('resolver skipped', { partnerId: rawPartnerId || '', reason: 'empty partner id' });
+      return null;
+    }
+
+    const elapsed = () => Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
+    qrLog('resolver started', { partnerId });
+    qrLog('catalog search', {
+      partnerId,
+      partnersCount: partners.length,
+      enrichedPartnersCount: enrichedPartners.length,
+    });
 
     const cachedPartner = [...enrichedPartners, ...partners]
       .find(item => isNotArchived(item) && partnerMatchesDeepLink(item, partnerId));
-    if (cachedPartner) return cachedPartner;
+    if (cachedPartner) {
+      qrLog('catalog hit', {
+        partnerId,
+        loadingTimeMs: elapsed(),
+        partner: sanitizeQrPartnerSnapshot(cachedPartner),
+      });
+      qrLog('partner found', {
+        partnerId,
+        source: 'catalog',
+        loadingTimeMs: elapsed(),
+        partner: sanitizeQrPartnerSnapshot(cachedPartner),
+      });
+      return cachedPartner;
+    }
 
     try {
+      qrLog('firestore lookup', { partnerId });
       const snap = await getDoc(doc(db, 'partners', partnerId));
-      if (!snap.exists()) return null;
+      if (!snap.exists()) {
+        qrLog('firestore miss', { partnerId, loadingTimeMs: elapsed() });
+        return null;
+      }
       const partner = { id: snap.id, ...snap.data() };
-      if (!isNotArchived(partner)) return null;
+      qrLog('firestore hit', {
+        partnerId,
+        loadingTimeMs: elapsed(),
+        partner: sanitizeQrPartnerSnapshot(partner),
+      });
+      if (!isNotArchived(partner)) {
+        qrLog('partner filtered', {
+          partnerId,
+          reason: 'archived or unavailable',
+          loadingTimeMs: elapsed(),
+          partner: sanitizeQrPartnerSnapshot(partner),
+        });
+        return null;
+      }
       setPartners(prev => prev.some(item => String(item.id) === String(partner.id))
         ? prev.map(item => String(item.id) === String(partner.id) ? { ...item, ...partner } : item)
         : [partner, ...prev]);
+      qrLog('partner found', {
+        partnerId,
+        source: 'firestore',
+        loadingTimeMs: elapsed(),
+        partner: sanitizeQrPartnerSnapshot(partner),
+      });
       return partner;
     } catch (e) {
+      qrError('resolver error', e, { partnerId, loadingTimeMs: elapsed() });
       logError(e, 'UserApp.resolvePartnerDeepLink');
       return null;
     }
@@ -2321,25 +2384,54 @@ export function UserApp() {
     if (!pendingPartnerId || deepLinkOpened.current || deepLinkResolving.current) return;
     let cancelled = false;
     deepLinkResolving.current = true;
+    qrLog('deep link effect started', {
+      partnerId: pendingPartnerId,
+    });
 
     resolvePartnerDeepLink(pendingPartnerId).then(partner => {
-      if (cancelled) return;
+      if (cancelled) {
+        qrLog('deep link effect cancelled after resolve', { partnerId: pendingPartnerId });
+        return;
+      }
       deepLinkOpened.current = true;
       deepLinkResolving.current = false;
       if (partner) {
+        qrLog('profile loader open partner', {
+          partnerId: partner.id,
+          partner: sanitizeQrPartnerSnapshot(partner),
+        });
         openPartner(partner);
         userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
       } else {
+        qrLog('deep link partner not found', {
+          partnerId: pendingPartnerId,
+        });
         navigatePanel('partners');
         showToast('🔍 Партнёр не найден', 'error');
       }
+    }).catch(error => {
+      if (cancelled) return;
+      deepLinkResolving.current = false;
+      qrError('deep link effect error', error, {
+        partnerId: pendingPartnerId,
+      });
     });
 
     return () => {
       cancelled = true;
       deepLinkResolving.current = false;
+      qrLog('deep link effect cleanup', { partnerId: pendingPartnerId });
     };
   }, [pendingPartnerId, resolvePartnerDeepLink, openPartner, navigatePanel, showToast]);
+
+  useEffect(() => {
+    if (activePanel !== 'partner' || !activePartner?.id) return;
+    const renderedPartner = enrichedPartners.find(p => p.id === activePartner.id) ?? activePartner;
+    qrLog('profile loader render', {
+      partnerId: activePartner.id,
+      partner: sanitizeQrPartnerSnapshot(renderedPartner),
+    });
+  }, [activePanel, activePartner, enrichedPartners]);
 
   // Авто-скан служебного QR из deep link ?scan=...
   useEffect(() => {

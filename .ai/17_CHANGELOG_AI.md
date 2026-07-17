@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] chore: QR deep link production diagnostics
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/qrDiagnostics.js`, `src/UserApp.jsx`, `src/PartnerPage.jsx`, `src/ErrorBoundary.jsx`, `scripts/qr-diagnostics-test.mjs`, `scripts/partner-deeplink-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлена временная production-диагностика `[QR]` для `/partner/:id`: route, PWA/browser, resolver, cache/Firestore hit, partner snapshot без персональных данных.
+- ErrorBoundary теперь связывает React crash с QR-контекстом, текущим panel/section и componentStack в console/sessionStorage.
+- Добавлен тест, который фиксирует безопасный sanitizing partner snapshot для QR-логов.
+**Почему:** партнёры сообщают о периодическом падении QR-открытия карточки; перед hotfix нужно увидеть точный этап сбоя без изменения архитектуры.
+
+---
+
 ## [2026-07-17] fix: Partner QR deep links
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/UserApp.jsx`, `scripts/partner-deeplink-test.mjs`, `package.json`, `vercel.json`, `.ai/17_CHANGELOG_AI.md`

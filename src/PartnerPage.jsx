@@ -20,6 +20,7 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { logError } from './errorLogger.js';
+import { qrLog, sanitizeQrPartnerSnapshot } from './qrDiagnostics.js';
 import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
@@ -207,6 +208,23 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     if (variant !== 'v2' || !partner?.id) return;
     window.scrollTo(0, 0);
   }, [variant, partner?.id]);
+
+  useEffect(() => {
+    if (!partner?.id) return;
+    qrLog('PartnerPage mounted', {
+      partnerId: partner.id,
+      variant,
+      desktopMode: Boolean(desktopMode),
+      partner: sanitizeQrPartnerSnapshot(partner),
+    });
+    return () => {
+      qrLog('PartnerPage unmounted', {
+        partnerId: partner.id,
+        variant,
+        desktopMode: Boolean(desktopMode),
+      });
+    };
+  }, [partner?.id, variant, desktopMode]);
 
   useEffect(() => {
     setDesktopTab('feed');

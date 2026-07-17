@@ -1,5 +1,6 @@
 import React from 'react';
 import { logError } from './errorLogger.js';
+import { getQrRouteContext, qrError } from './qrDiagnostics.js';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { recoverPwaAndReload } from './pwa/PwaUpdateManager.js';
@@ -16,6 +17,9 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     const source = 'ErrorBoundary:' + (info.componentStack ?? '').slice(0, 220);
+    const qrContext = getQrRouteContext({
+      componentStack: String(info?.componentStack ?? '').slice(0, 4000),
+    });
     this.setState({ info });
     try {
       const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
@@ -29,8 +33,13 @@ export class ErrorBoundary extends React.Component {
         route: window.location.hash || window.location.pathname,
         standalone,
         userAgent: navigator.userAgent,
+        qrContext,
       }));
     } catch {}
+    qrError('react error boundary', error, {
+      errorId: this.state.errorId,
+      componentStack: String(info?.componentStack ?? '').slice(0, 4000),
+    });
     logError(error, source);
     try { showLokiMessage(LOKI_EVENTS.APP_ERROR, { source: 'error_boundary' }); } catch {}
   }
