@@ -70,6 +70,7 @@ import { buildLifecyclePatch, normalizeContentStatus } from '../../../server-sha
 import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import { normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 import { actorOwnsEditableProfile } from '../../../server-shared/profile-access.js';
+import { buildReferralRecoveryDecision } from '../../../server-shared/referral-recovery.js';
 import {
   buildWorkspaceEventBase,
   buildWorkspaceEventDuplicate,
@@ -161,6 +162,12 @@ function safeUserId(value) {
 
 function canUseReferral(referrerId, userId) {
   return !!referrerId && referrerId !== userId && !referrerId.startsWith('guest_') && !userId.startsWith('guest_');
+}
+
+function referralServerLog(stage, details = {}) {
+  try {
+    console.log('[REF]', stage, details);
+  } catch {}
 }
 
 function jsonError(res, status, message, code = 'USER_ACTION_ERROR') {
@@ -422,6 +429,8 @@ async function actionProfileSync(db, req, actor) {
   let created = false;
   let dailyBonusAwarded = false;
   let referralBonusAwarded = false;
+  let referralRecoveryStatus = 'skipped';
+  let referralRecoveryReason = 'not_started';
   let userDoc = {};
   let consentStatus = null;
 
@@ -431,10 +440,23 @@ async function actionProfileSync(db, req, actor) {
     if (snap.exists) {
       const before = snap.data() || {};
       const currentReferrer = safeUserId(before.referredBy);
-      const canAttachReferral = isValidRef && !currentReferrer && before.referralBonusGranted !== true;
-      const canGrantExistingReferral = isValidRef && (canAttachReferral || currentReferrer === refId) && before.referralBonusGranted !== true;
-      const referrerRef = canGrantExistingReferral ? db.collection('users').doc(refId) : null;
+      const effectiveReferrerId = currentReferrer || (isValidRef ? refId : '');
+      referralServerLog('recovery started', { userId, requestedReferrerId: refId || null, currentReferrer: currentReferrer || null, alreadyGranted: before.referralBonusGranted === true });
+      const referrerRef = canUseReferral(effectiveReferrerId, userId) && before.referralBonusGranted !== true
+        ? db.collection('users').doc(effectiveReferrerId)
+        : null;
       const referrerSnap = referrerRef ? await tx.get(referrerRef) : null;
+      const referrerData = referrerSnap?.exists ? (referrerSnap.data() || {}) : {};
+      const referralDecision = buildReferralRecoveryDecision({
+        userId,
+        requestedReferrerId: refId,
+        currentReferredBy: currentReferrer,
+        referralBonusGranted: before.referralBonusGranted === true,
+        referrerExists: !!referrerSnap?.exists,
+        referrerRewardedUsers: referrerData.referralRewardedUsers,
+      });
+      referralRecoveryStatus = referralDecision.status;
+      referralRecoveryReason = referralDecision.reason;
       const patch = { ...profile, lastSeen: FieldValue.serverTimestamp() };
       let keyIncrement = 0;
       let reputationIncrement = 0;
@@ -449,24 +471,33 @@ async function actionProfileSync(db, req, actor) {
         patch.lastBonusDate = todayKey;
         dailyBonusAwarded = true;
       }
-      if (referrerSnap?.exists) {
+      if (referralDecision.markInvitedRewarded) {
         const reward = getEconomyReward('referral');
-        referralBonusAwarded = true;
-        keyIncrement += canAttachReferral ? reward.keys : 0;
-        reputationIncrement += canAttachReferral ? reward.reputation : 0;
-        patch.referredBy = refId;
+        referralBonusAwarded = referralDecision.grantReferrerReward;
+        keyIncrement += referralDecision.grantInviteeReward ? reward.keys : 0;
+        reputationIncrement += referralDecision.grantInviteeReward ? reward.reputation : 0;
+        patch.referredBy = referralDecision.effectiveReferrerId;
         patch.referralBonusGranted = true;
-        patch.referralBonusGrantedTo = refId;
+        patch.referralBonusGrantedTo = referralDecision.effectiveReferrerId;
         patch.referralBonusGrantedAt = FieldValue.serverTimestamp();
-        tx.set(referrerRef, {
-          keys: FieldValue.increment(reward.keys),
-          reputation: FieldValue.increment(reward.reputation),
-          economyVersion: ECONOMY_VERSION,
-          referralCount: FieldValue.increment(1),
-          referralRewardedUsers: FieldValue.arrayUnion(userId),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        if (referralDecision.grantReferrerReward) {
+          tx.set(referrerRef, {
+            keys: FieldValue.increment(reward.keys),
+            reputation: FieldValue.increment(reward.reputation),
+            economyVersion: ECONOMY_VERSION,
+            referralCount: FieldValue.increment(1),
+            referralRewardedUsers: FieldValue.arrayUnion(userId),
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
       }
+      referralServerLog(
+        referralRecoveryStatus === 'recovery_completed' ? 'recovery completed'
+          : referralRecoveryStatus === 'duplicate_prevented' ? 'duplicate prevented'
+            : referralRecoveryStatus === 'already_rewarded' ? 'already rewarded'
+              : 'recovery skipped',
+        { userId, referrerId: referralDecision.effectiveReferrerId || null, reason: referralRecoveryReason },
+      );
       if (keyIncrement > 0) patch.keys = FieldValue.increment(keyIncrement);
       if (reputationIncrement > 0) patch.reputation = FieldValue.increment(reputationIncrement);
       tx.set(ref, patch, { merge: true });
@@ -475,10 +506,10 @@ async function actionProfileSync(db, req, actor) {
       userDoc = {
         ...before,
         ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null)),
-        ...(referralBonusAwarded ? {
-          referredBy: refId,
+        ...(referralDecision.markInvitedRewarded ? {
+          referredBy: referralDecision.effectiveReferrerId,
           referralBonusGranted: true,
-          referralBonusGrantedTo: refId,
+          referralBonusGrantedTo: referralDecision.effectiveReferrerId,
           referralBonusGrantedAt: null,
         } : {}),
         ...(consentMigration ? {
@@ -503,13 +534,24 @@ async function actionProfileSync(db, req, actor) {
     created = true;
     const referrerRef = isValidRef ? db.collection('users').doc(refId) : null;
     const referrerSnap = referrerRef ? await tx.get(referrerRef) : null;
-    const shouldGrantReferral = !!referrerSnap?.exists;
-    referralBonusAwarded = shouldGrantReferral;
+    const referrerData = referrerSnap?.exists ? (referrerSnap.data() || {}) : {};
+    const referralDecision = buildReferralRecoveryDecision({
+      userId,
+      requestedReferrerId: refId,
+      currentReferredBy: '',
+      referralBonusGranted: false,
+      referrerExists: !!referrerSnap?.exists,
+      referrerRewardedUsers: referrerData.referralRewardedUsers,
+    });
+    const shouldGrantReferral = referralDecision.markInvitedRewarded;
+    referralBonusAwarded = referralDecision.grantReferrerReward;
+    referralRecoveryStatus = referralDecision.status;
+    referralRecoveryReason = referralDecision.reason;
     const referralReward = getEconomyReward('referral');
-    const baseReputation = shouldGrantReferral ? referralReward.reputation : 0;
+    const baseReputation = referralDecision.grantInviteeReward ? referralReward.reputation : 0;
     const baseStatus = getReputationStatus(baseReputation);
     const base = {
-      keys: shouldGrantReferral ? referralReward.keys : 0,
+      keys: referralDecision.grantInviteeReward ? referralReward.keys : 0,
       tickets: 0,
       reputation: baseReputation,
       reputationStatus: baseStatus.id,
@@ -526,9 +568,9 @@ async function actionProfileSync(db, req, actor) {
       onboardingDone: false,
       scanDates: [],
       lastBonusDate: todayKey,
-      referredBy: shouldGrantReferral ? refId : null,
+      referredBy: shouldGrantReferral ? referralDecision.effectiveReferrerId : null,
       referralBonusGranted: shouldGrantReferral,
-      referralBonusGrantedTo: shouldGrantReferral ? refId : null,
+      referralBonusGrantedTo: shouldGrantReferral ? referralDecision.effectiveReferrerId : null,
       referralBonusGrantedAt: shouldGrantReferral ? FieldValue.serverTimestamp() : null,
       registeredEvents: [],
       registeredAt: FieldValue.serverTimestamp(),
@@ -546,7 +588,7 @@ async function actionProfileSync(db, req, actor) {
     }
     consentStatus = getConsentStatus(base);
     tx.set(ref, base, { merge: true });
-    if (shouldGrantReferral) {
+    if (referralDecision.grantReferrerReward) {
       tx.set(referrerRef, {
         keys: FieldValue.increment(referralReward.keys),
         reputation: FieldValue.increment(referralReward.reputation),
@@ -556,13 +598,19 @@ async function actionProfileSync(db, req, actor) {
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
     }
+    referralServerLog(
+      referralRecoveryStatus === 'completed' ? 'recovery completed'
+        : referralRecoveryStatus === 'duplicate_prevented' ? 'duplicate prevented'
+          : 'recovery skipped',
+      { userId, referrerId: referralDecision.effectiveReferrerId || null, reason: referralRecoveryReason },
+    );
     tx.set(db.collection('stats').doc('global'), { userCount: FieldValue.increment(1) }, { merge: true });
     userDoc = { ...base, keys: base.keys };
   });
 
   consentStatus = getConsentStatus(userDoc);
-  await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
-  return { ok: true, userId, created, dailyBonusAwarded, referralBonusAwarded, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
+  await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
+  return { ok: true, userId, created, dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
 }
 
 async function actionProfilePatch(db, req, actor) {

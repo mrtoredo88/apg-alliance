@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] fix: Idempotent referral recovery
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/referral-recovery.js`, `server/src/routes/user-actions.js`, `src/UserApp.jsx`, `scripts/referral-lifecycle-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- `profile:sync` стал идемпотентной точкой recovery: если у пользователя есть `referredBy`, но `referralBonusGranted` ещё не закрыт, сервер дозавершает начисление в транзакции.
+- Добавлена защита от двойного начисления через проверку `referralRewardedUsers` и статусы `already_rewarded` / `duplicate_prevented`.
+- Расширена production-диагностика `[REF]` и regression-тесты аварийных сценариев: повторный вход, две вкладки, reconnect, частично созданный email-пользователь.
+**Почему:** после сбоя между созданием email-пользователя и финальным начислением реферал должен восстанавливаться автоматически без действий пользователя.
+
+---
+
 ## [2026-07-17] fix: Email referral lifecycle
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/referralDiagnostics.js`, `src/EmailAuth.jsx`, `src/UserApp.jsx`, `scripts/referral-lifecycle-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

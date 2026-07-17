@@ -1739,8 +1739,16 @@ export function UserApp() {
               };
               const handleReferralSyncResult = result => {
                 if (!isMounted.current) return;
+                if (result?.referralRecoveryStatus === 'already_rewarded') {
+                  refLog('already rewarded', { stage: 'existing_profile_sync', userId: userData.id });
+                } else if (result?.referralRecoveryStatus === 'duplicate_prevented') {
+                  refLog('duplicate prevented', { stage: 'existing_profile_sync', userId: userData.id, reason: result?.referralRecoveryReason || null });
+                } else if (result?.referralRecoveryStatus === 'recovery_completed') {
+                  refLog('recovery completed', { stage: 'existing_profile_sync', userId: userData.id, referrerId: existingRefId || result?.user?.referredBy || null });
+                } else if (existingRefId) {
+                  refLog('recovery skipped', { stage: 'existing_profile_sync', referrerId: existingRefId, userId: userData.id, reason: result?.referralRecoveryReason || 'server_not_awarded' });
+                }
                 if (!result?.referralBonusAwarded) {
-                  if (existingRefId) refLog('reward skipped', { stage: 'existing_profile_sync', referrerId: existingRefId, userId: userData.id });
                   return;
                 }
                 clearPendingReferral('profile_sync_awarded');
@@ -1764,9 +1772,15 @@ export function UserApp() {
                     return result;
                   })
                   .then(handleReferralSyncResult)
-                  .catch(e => logError(e, 'UserApp.profileSync.dailyBonus'));
+                  .catch(e => {
+                    if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_daily', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
+                    logError(e, 'UserApp.profileSync.dailyBonus');
+                  });
               } else {
-                userAction('profile:sync', syncExistingPayload).then(handleReferralSyncResult).catch(e => logError(e, 'UserApp.profileSync.lastSeen'));
+                userAction('profile:sync', syncExistingPayload).then(handleReferralSyncResult).catch(e => {
+                  if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_lastSeen', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
+                  logError(e, 'UserApp.profileSync.lastSeen');
+                });
               }
             } else {
               // Новый пользователь
@@ -1798,6 +1812,9 @@ export function UserApp() {
 
               if (syncResult?.referralBonusAwarded) {
                 clearPendingReferral('profile_sync_awarded');
+                if (syncResult?.referralRecoveryStatus === 'recovery_completed' || syncResult?.referralRecoveryStatus === 'completed') {
+                  refLog('recovery completed', { stage: 'new_profile_sync', userId: userData.id, referrerId: refId });
+                }
                 refLog('friend added', { referrerId: refId, userId: userData.id });
                 refLog('reward granted', { referrerId: refId, userId: userData.id, keys: 2 });
                 if (isMounted.current) {
@@ -1805,8 +1822,11 @@ export function UserApp() {
                     if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
                   }, 1800);
                 }
+              } else if (syncResult?.referralRecoveryStatus === 'duplicate_prevented') {
+                clearPendingReferral('profile_sync_duplicate_prevented');
+                refLog('duplicate prevented', { stage: 'new_profile_sync', referrerId: refId, userId: userData.id, reason: syncResult?.referralRecoveryReason || null });
               } else if (isValidRef) {
-                refLog('reward skipped', { stage: 'new_profile_sync', referrerId: refId, userId: userData.id, reason: 'server_not_awarded' });
+                refLog('recovery skipped', { stage: 'new_profile_sync', referrerId: refId, userId: userData.id, reason: syncResult?.referralRecoveryReason || 'server_not_awarded' });
               }
 
               if (syncResult?.referralBonusAwarded) setUserKeys(2);
@@ -2725,11 +2745,20 @@ export function UserApp() {
       }
       if (profileResult?.referralBonusAwarded) {
         clearPendingReferral('email_profile_sync_awarded');
+        if (profileResult?.referralRecoveryStatus === 'recovery_completed' || profileResult?.referralRecoveryStatus === 'completed') {
+          refLog('recovery completed', { stage: 'email_profile_sync', userId: emailUser.id, referrerId: authRefId });
+        }
         refLog('referral attached', { provider: 'email', userId: emailUser.id, referrerId: authRefId });
         refLog('friend added', { referrerId: authRefId, userId: emailUser.id });
         refLog('reward granted', { referrerId: authRefId, userId: emailUser.id, keys: 2 });
+      } else if (profileResult?.referralRecoveryStatus === 'duplicate_prevented') {
+        clearPendingReferral('email_profile_sync_duplicate_prevented');
+        refLog('duplicate prevented', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: profileResult?.referralRecoveryReason || null });
+      } else if (profileResult?.referralRecoveryStatus === 'already_rewarded') {
+        clearPendingReferral('email_profile_sync_already_rewarded');
+        refLog('already rewarded', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id });
       } else if (authRefId) {
-        refLog('reward skipped', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: 'server_not_awarded' });
+        refLog('recovery skipped', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: profileResult?.referralRecoveryReason || 'server_not_awarded' });
       }
       const data = profileResult?.user || {};
       const consentRequired = profileResult?.consentRequired !== undefined
@@ -2753,6 +2782,7 @@ export function UserApp() {
         return;
       }
     } catch (e) {
+      if (authRefId) refLog('retry after reconnect', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: e?.message || String(e) });
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
       const error = Object.assign(e instanceof Error ? e : new Error(String(e)), { code: e?.code || 'PROFILE_BOOTSTRAP_FAILED' });
       logFinishLoginError('PROFILE_BOOTSTRAP_FAILED', emailUser, error, { provider: 'email' });
