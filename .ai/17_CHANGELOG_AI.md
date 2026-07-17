@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] feat: Referral Analytics Dashboard v3
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/referral-observability.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `scripts/referral-session-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Referral Diagnostics расширена read-only аналитикой: Referral Timeline, Referral Funnel, Referral Health, Incomplete Sessions, Needs Recovery и Session Inspector.
+- Серверный diagnostics response теперь вычисляет funnel, health, incomplete sessions, recovery candidates и inspector по существующим `referralEvents`, `referralSessions` и referral audit.
+- Regression `test:referral-session` проверяет новые вычисляемые метрики и наличие новых админских блоков.
+**Почему:** после server-side Referral Session v2 администратор должен быстро находить любой оборванный referral flow без анализа логов и без изменения механики начисления.
+
+---
+
 ## [2026-07-17] feat: Referral Session Architecture v2
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/referral-session.js`, `server-shared/referral-observability.js`, `server/src/lib/referralSessions.js`, `server/src/routes/referral-session.js`, `server/src/routes/email-auth.js`, `server/src/routes/telegram-auth-start.js`, `server/src/lib/telegramUpdates.js`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `server/src/server.js`, `src/referralDiagnostics.js`, `src/main.jsx`, `src/EmailAuth.jsx`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `scripts/referral-session-v2-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

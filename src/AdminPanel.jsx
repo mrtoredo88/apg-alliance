@@ -1761,8 +1761,10 @@ function AdminUsersPanel({ users, onAuthAction }) {
 
 function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck, onGrant, onRecover }) {
   const [eventSearch, setEventSearch] = useState('');
+  const [timelineSearch, setTimelineSearch] = useState('');
   const [eventType, setEventType] = useState('all');
   const [eventStatus, setEventStatus] = useState('all');
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [recoveryReferrerId, setRecoveryReferrerId] = useState('');
   const [recoveryResult, setRecoveryResult] = useState(null);
   const rows = Array.isArray(data?.rows) ? data.rows : [];
@@ -1772,9 +1774,19 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
   const sessions = Array.isArray(diagnostics.sessions) ? diagnostics.sessions : [];
   const timeline = Array.isArray(diagnostics.timeline) ? diagnostics.timeline : [];
   const problems = Array.isArray(diagnostics.problems) ? diagnostics.problems : [];
+  const sessionInspectors = Array.isArray(diagnostics.sessionInspectors) ? diagnostics.sessionInspectors : [];
+  const incompleteSessions = Array.isArray(diagnostics.incompleteSessions) ? diagnostics.incompleteSessions : [];
+  const recoveryCandidates = Array.isArray(diagnostics.recoveryCandidates) ? diagnostics.recoveryCandidates : [];
   const dashboard = diagnostics.dashboard || {};
+  const funnel = diagnostics.funnel || {};
+  const health = diagnostics.health || {};
+  const selectedSession = sessionInspectors.find(session => session.id === selectedSessionId) || sessionInspectors[0] || null;
   const eventTypes = ['all', ...new Set(events.map(event => event.type).filter(Boolean))].slice(0, 30);
   const eventStatuses = ['all', ...new Set(events.map(event => event.status).filter(Boolean))].slice(0, 12);
+  const visibleTimeline = timeline.filter(flow => {
+    if (!timelineSearch) return true;
+    return JSON.stringify(flow).toLowerCase().includes(timelineSearch.toLowerCase());
+  }).slice(0, 40);
   const visibleEvents = events.filter(event => {
     if (eventType !== 'all' && event.type !== eventType) return false;
     if (eventStatus !== 'all' && event.status !== eventStatus) return false;
@@ -1791,6 +1803,23 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
     link.download = `apg-referral-diagnostics.${format}`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+  const downloadReferralText = (filename, value, mime = 'text/csv;charset=utf-8') => {
+    if (!value) return;
+    const blob = new Blob([value], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const buildFunnelCsv = () => {
+    const headers = ['range', 'stage', 'value', 'conversionFromPreviousPct'];
+    const rowsCsv = ['today', 'week', 'month'].flatMap(range => (
+      (funnel[range]?.steps || []).map(step => [range, step.label, step.value, step.conversionFromPreviousPct])
+    ));
+    return [headers.join(','), ...rowsCsv.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','))].join('\n');
   };
   const filtered = rows.filter(row => {
     if (filter === 'all') return true;
@@ -1855,6 +1884,166 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
           </div>
         ))}
       </div>
+
+      <div style={{ ...s.card, marginBottom: 14, border: `1px solid ${(health.brokenSessions || health.recoveryPending) ? A.goldBrd : 'rgba(75,179,75,0.28)'}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: A.text }}>Referral Health</div>
+            <div style={{ fontSize: 12, color: A.textSec, marginTop: 4 }}>Самодиагностика цепочки referral sessions → auth → profile sync → reward.</div>
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 950, color: (health.brokenSessions || health.recoveryPending) ? A.gold : A.green }}>
+            {health.successRatePct ?? 100}%
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 8 }}>
+          {[
+            ['Success rate', `${health.successRatePct ?? 100}%`, (health.successRatePct ?? 100) >= 95 ? A.green : A.gold],
+            ['Average completion', health.averageCompletionSeconds == null ? '—' : `${health.averageCompletionSeconds}s`, A.blue],
+            ['Broken sessions', health.brokenSessions ?? 0, (health.brokenSessions ?? 0) ? A.red : A.green],
+            ['Recovery pending', health.recoveryPending ?? 0, (health.recoveryPending ?? 0) ? A.gold : A.green],
+            ['Duplicate prevented', health.duplicatePrevented ?? 0, A.text],
+            ['Completed today', health.completedToday ?? 0, A.green],
+          ].map(([label, value, color]) => (
+            <div key={label} style={{ background: A.chip, borderRadius: 12, padding: 10, border: `1px solid ${A.border}` }}>
+              <div style={{ fontSize: 10, color: A.textSec }}>{label}</div>
+              <div style={{ fontSize: 15, color, fontWeight: 900, marginTop: 4 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ ...s.card, marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: A.text }}>Referral Funnel</div>
+            <div style={{ fontSize: 12, color: A.textSec, marginTop: 4 }}>Сессии, авторизация, profile sync, привязка и начисление за сутки / неделю / месяц.</div>
+          </div>
+          <button style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12 }} onClick={() => downloadReferralText('apg-referral-funnel.csv', buildFunnelCsv())}>CSV Funnel</button>
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {['today', 'week', 'month'].map(range => (
+            <div key={range} style={{ background: A.chip, borderRadius: 14, padding: 12, border: `1px solid ${A.border}` }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: A.text, marginBottom: 9 }}>{range === 'today' ? 'Сутки' : range === 'week' ? 'Неделя' : 'Месяц'}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 8 }}>
+                {(funnel[range]?.steps || []).map(step => (
+                  <div key={`${range}_${step.key}`} style={{ minHeight: 62, borderRadius: 12, padding: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${A.border}` }}>
+                    <div style={{ fontSize: 18, fontWeight: 950, color: A.text }}>{step.value ?? 0}</div>
+                    <div style={{ fontSize: 10, color: A.textSec, marginTop: 3, lineHeight: '13px' }}>{step.label}</div>
+                    <div style={{ fontSize: 10, color: A.gold, marginTop: 4 }}>{step.conversionFromPreviousPct ?? 0}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ ...s.card, marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: A.text }}>Referral Timeline</div>
+            <div style={{ fontSize: 12, color: A.textSec, marginTop: 4 }}>Поиск по flowId, sessionId, userId, email, Telegram, username или ref code.</div>
+          </div>
+          <button style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12 }} onClick={() => downloadReferralExport('csv')}>CSV Timeline</button>
+        </div>
+        <input value={timelineSearch} onChange={e => setTimelineSearch(e.target.value)} placeholder="flowId / referralSessionId / userId / email / telegram / username / ref code" style={s.input} />
+        <div style={{ display: 'grid', gap: 8, maxHeight: 420, overflow: 'auto' }}>
+          {visibleTimeline.slice(0, 20).map(flow => (
+            <div key={flow.id} style={{ padding: 12, borderRadius: 14, background: A.chip, border: `1px solid ${flow.status === 'error' ? A.redBrd : A.border}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: A.text, overflowWrap: 'anywhere' }}>{flow.id}</div>
+                <div style={{ fontSize: 11, color: flow.status === 'completed' ? A.green : flow.status === 'error' ? A.red : A.gold, fontWeight: 800 }}>{flow.status}</div>
+              </div>
+              <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{flow.referrerId || flow.referralCode || 'ref —'} → {flow.referredUserId || 'user —'} · {flow.events.length} events</div>
+              <div style={{ display: 'grid', gap: 5, marginTop: 10 }}>
+                {flow.events.map(event => (
+                  <div key={event.id} style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 8, fontSize: 11, color: A.textSec }}>
+                    <span>{event.timestamp ? new Date(event.timestamp).toLocaleTimeString('ru-RU') : '—'}</span>
+                    <span><b style={{ color: A.text }}>{event.type}</b> · {event.source || 'source —'}</span>
+                    <span style={{ color: event.status === 'error' ? A.red : A.textSec }}>{event.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {!visibleTimeline.length && <div style={{ fontSize: 12, color: A.textSec }}>Цепочек по поиску не найдено.</div>}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <div style={{ ...s.card, marginBottom: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: A.text, marginBottom: 8 }}>Incomplete Sessions</div>
+          <div style={{ fontSize: 12, color: A.textSec, marginBottom: 10 }}>Сессии старше 10 минут без completed.</div>
+          <div style={{ display: 'grid', gap: 8, maxHeight: 280, overflow: 'auto' }}>
+            {incompleteSessions.slice(0, 12).map(session => (
+              <button key={session.id} type="button" onClick={() => setSelectedSessionId(session.id)} style={{ textAlign: 'left', padding: 10, borderRadius: 12, background: A.chip, border: `1px solid ${A.goldBrd}`, color: A.text, cursor: 'pointer' }}>
+                <div style={{ fontSize: 12, fontWeight: 900, overflowWrap: 'anywhere' }}>{session.id}</div>
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{session.reason} · {session.ageMinutes} мин</div>
+              </button>
+            ))}
+            {!incompleteSessions.length && <div style={{ fontSize: 12, color: A.green }}>Незавершённых sessions старше 10 минут нет.</div>}
+          </div>
+        </div>
+        <div style={{ ...s.card, marginBottom: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: A.text, marginBottom: 8 }}>Needs Recovery</div>
+          <div style={{ fontSize: 12, color: A.textSec, marginBottom: 10 }}>Кандидаты, найденные только чтением audit/session data.</div>
+          <div style={{ display: 'grid', gap: 8, maxHeight: 280, overflow: 'auto' }}>
+            {recoveryCandidates.slice(0, 12).map(item => (
+              <div key={item.id} style={{ padding: 10, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: A.text, overflowWrap: 'anywhere' }}>{item.kind}</div>
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{item.referrerId || 'ref —'} → {item.referredUserId || item.referralSessionId || 'user —'}</div>
+                <div style={{ fontSize: 11, color: A.gold, marginTop: 4 }}>{item.reason}</div>
+              </div>
+            ))}
+            {!recoveryCandidates.length && <div style={{ fontSize: 12, color: A.green }}>Recovery candidates не найдены.</div>}
+          </div>
+        </div>
+      </div>
+
+      {selectedSession && (
+        <div style={{ ...s.card, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: A.text }}>Session Inspector</div>
+              <div style={{ fontSize: 12, color: A.textSec, marginTop: 4 }}>{selectedSession.id}</div>
+            </div>
+            <select value={selectedSession.id} onChange={e => setSelectedSessionId(e.target.value)} style={{ ...s.input, width: 320, marginBottom: 0 }}>
+              {sessionInspectors.slice(0, 80).map(session => <option key={session.id} value={session.id}>{session.id}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 12 }}>
+            {[
+              ['Flow', selectedSession.referralFlowId || '—'],
+              ['Device', selectedSession.deviceId || '—'],
+              ['Platform', selectedSession.platform || '—'],
+              ['Source', selectedSession.source || '—'],
+              ['Ref', selectedSession.referrerId || '—'],
+              ['User', selectedSession.userId || '—'],
+              ['Current Status', selectedSession.currentStatus || selectedSession.status],
+              ['Reward', selectedSession.rewardStatus || '—'],
+              ['Recovery', selectedSession.recoveryStatus || '—'],
+              ['Completion', selectedSession.completionSeconds == null ? '—' : `${selectedSession.completionSeconds}s`],
+              ['Created', selectedSession.createdAt ? new Date(selectedSession.createdAt).toLocaleString('ru-RU') : '—'],
+              ['Completed', selectedSession.completedAt ? new Date(selectedSession.completedAt).toLocaleString('ru-RU') : '—'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: A.chip, borderRadius: 12, padding: 10, border: `1px solid ${A.border}` }}>
+                <div style={{ fontSize: 10, color: A.textSec }}>{label}</div>
+                <div style={{ fontSize: 12, color: A.text, fontWeight: 800, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {(selectedSession.events || []).map(event => (
+              <div key={event.id} style={{ display: 'grid', gridTemplateColumns: '96px 1fr auto', gap: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.035)', color: A.textSec, fontSize: 11 }}>
+                <span>{event.timestamp ? new Date(event.timestamp).toLocaleTimeString('ru-RU') : '—'}</span>
+                <span><b style={{ color: A.text }}>{event.type}</b> · {event.source || 'source —'}</span>
+                <span>{event.status}</span>
+              </div>
+            ))}
+            {!(selectedSession.events || []).length && <div style={{ fontSize: 12, color: A.textSec }}>Событий для этой session пока нет.</div>}
+          </div>
+        </div>
+      )}
 
       <div style={{ ...s.card, marginBottom: 14 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>

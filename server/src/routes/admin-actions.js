@@ -12,7 +12,11 @@ import { telegramUrl } from '../../../server-shared/telegram.js';
 import { buildApgNewsDistributionPatch } from '../../../server-shared/workspace-news.js';
 import {
   aggregateReferralEvents,
+  buildReferralFunnel,
+  buildReferralHealth,
+  buildReferralSessionInspectors,
   buildReferralTimeline,
+  detectIncompleteReferralSessions,
   detectReferralProblems,
   filterReferralEvents,
   referralEventsToCsv,
@@ -945,7 +949,35 @@ function serializeReferralSessionDoc(doc) {
   };
 }
 
-async function buildReferralDiagnostics(db, req) {
+function buildReferralRecoveryCandidates(rows = [], sessions = []) {
+  const userCandidates = rows
+    .filter(row => row?.referrer?.id && row?.invited?.id && row.registrationComplete && row.granted !== true)
+    .map(row => ({
+      id: `${row.referrer.id}__${row.invited.id}`,
+      kind: 'user_reward_missing',
+      referrerId: row.referrer.id,
+      referredUserId: row.invited.id,
+      referralSessionId: '',
+      reason: row.referredBy ? 'referredBy exists, reward not confirmed' : 'registered referral chain missing reward',
+      status: row.status || 'needs_recovery',
+    }));
+  const sessionCandidates = sessions
+    .filter(session => session?.id && !session.completed && session.status !== 'completed')
+    .map(session => ({
+      id: session.id,
+      kind: 'session_incomplete',
+      referrerId: session.referrerId || '',
+      referredUserId: session.userId || '',
+      referralSessionId: session.id,
+      reason: 'server referral session is not completed',
+      status: session.status || 'active',
+    }));
+  const byId = new Map();
+  [...userCandidates, ...sessionCandidates].forEach(item => byId.set(item.id, item));
+  return [...byId.values()].slice(0, 160);
+}
+
+async function buildReferralDiagnostics(db, req, auditRows = []) {
   const filters = req.body?.filters || {};
   let snap = null;
   try {
@@ -962,14 +994,25 @@ async function buildReferralDiagnostics(db, req) {
   }
   const sessions = (sessionSnap.docs || []).map(serializeReferralSessionDoc);
   const events = filterReferralEvents(allEvents, filters).slice(-800);
+  const recoveryCandidates = buildReferralRecoveryCandidates(auditRows, sessions);
+  const sessionInspectors = buildReferralSessionInspectors(sessions, allEvents).slice(0, 120);
+  const funnel = buildReferralFunnel(allEvents);
+  const incompleteSessions = detectIncompleteReferralSessions(sessions, allEvents).slice(0, 120);
+  const health = buildReferralHealth(allEvents, sessions, recoveryCandidates);
   return {
     allEventsCount: allEvents.length,
     events,
     sessions,
+    sessionInspectors,
+    incompleteSessions,
+    recoveryCandidates,
     timeline: buildReferralTimeline(events).slice(0, 120),
     dashboard: aggregateReferralEvents(allEvents),
+    funnel,
+    health,
     problems: detectReferralProblems(allEvents).slice(0, 80),
     exportCsv: referralEventsToCsv(events),
+    funnelExportCsv: referralEventsToCsv(allEvents),
     exportJson: referralEventsToJson(events),
   };
 }
@@ -1116,7 +1159,7 @@ async function handleReferralAction(db, req, actor) {
   await requireAdminPermission(req, 'users:read');
   if (action === 'referrals:audit' || action === 'referrals:check' || action === 'referrals:recalculate' || action === 'referrals:diagnostics') {
     const audit = await buildReferralAudit(db);
-    const diagnostics = await buildReferralDiagnostics(db, req);
+    const diagnostics = await buildReferralDiagnostics(db, req, audit.rows);
     await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary, events: diagnostics.events.length });
     return { ok: true, ...audit, diagnostics };
   }

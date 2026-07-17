@@ -7,7 +7,13 @@ import {
   normalizeReferralSessionId,
   referralSessionExpiresAt,
 } from '../server-shared/referral-session.js';
-import { REFERRAL_EVENT_TYPES } from '../server-shared/referral-observability.js';
+import {
+  REFERRAL_EVENT_TYPES,
+  buildReferralFunnel,
+  buildReferralHealth,
+  buildReferralSessionInspectors,
+  detectIncompleteReferralSessions,
+} from '../server-shared/referral-observability.js';
 
 const validSessionId = 'refsess_0123456789abcdef01234567';
 assert.equal(normalizeReferralSessionId(validSessionId), validSessionId);
@@ -65,5 +71,31 @@ assert.ok(userActions.includes('sessionResolution.referrerId || requestedRefId')
 assert.ok(userActions.includes('SESSION_PROFILE_SYNC'), 'profile:sync must log session profile sync event');
 assert.ok(adminActions.includes("collection('referralSessions')"), 'admin diagnostics must load referral sessions');
 assert.ok(adminPanel.includes('Referral Sessions'), 'admin panel must show referral sessions');
+assert.ok(adminActions.includes('buildReferralFunnel') && adminActions.includes('buildReferralHealth'), 'admin diagnostics must compute referral funnel and health');
+assert.ok(adminActions.includes('detectIncompleteReferralSessions') && adminActions.includes('recoveryCandidates'), 'admin diagnostics must expose failed sessions and recovery candidates');
+for (const label of ['Referral Timeline', 'Referral Funnel', 'Incomplete Sessions', 'Needs Recovery', 'Referral Health', 'Session Inspector']) {
+  assert.ok(adminPanel.includes(label), `admin panel must render ${label}`);
+}
+
+const now = new Date('2026-07-17T12:00:30.000Z');
+const sampleEvents = [
+  { id: 'e1', type: REFERRAL_EVENT_TYPES.SESSION_CREATED, status: 'created', sessionId: validSessionId, referralFlowId: 'flow_1', referrerId: 'tg_1', timestamp: '2026-07-17T12:00:00.000Z' },
+  { id: 'e2', type: REFERRAL_EVENT_TYPES.AUTH_STARTED, status: 'started', sessionId: validSessionId, referralFlowId: 'flow_1', timestamp: '2026-07-17T12:00:04.000Z' },
+  { id: 'e3', type: REFERRAL_EVENT_TYPES.SESSION_PROFILE_SYNC, status: 'completed', sessionId: validSessionId, referralFlowId: 'flow_1', referredUserId: 'email:a@example.com', timestamp: '2026-07-17T12:00:12.000Z' },
+  { id: 'e4', type: REFERRAL_EVENT_TYPES.SESSION_ATTACHED, status: 'completed', sessionId: validSessionId, referralFlowId: 'flow_1', referredUserId: 'email:a@example.com', timestamp: '2026-07-17T12:00:16.000Z' },
+  { id: 'e5', type: REFERRAL_EVENT_TYPES.REWARD_GRANTED, status: 'completed', sessionId: validSessionId, referralFlowId: 'flow_1', referredUserId: 'email:a@example.com', timestamp: '2026-07-17T12:00:18.000Z' },
+];
+const sampleSessions = [{ id: validSessionId, referrerId: 'tg_1', referralFlowId: 'flow_1', createdAt: '2026-07-17T12:00:00.000Z', completed: true, completedAt: '2026-07-17T12:00:18.000Z' }];
+const funnel = buildReferralFunnel(sampleEvents, now);
+assert.equal(funnel.today.sessionsCreated, 1, 'funnel counts created sessions');
+assert.equal(funnel.today.profileSync, 1, 'funnel counts profile sync stage');
+assert.equal(funnel.today.rewardGranted, 1, 'funnel counts rewards');
+assert.equal(detectIncompleteReferralSessions(sampleSessions, sampleEvents, now).length, 0, 'completed sessions are not failed sessions');
+const inspectors = buildReferralSessionInspectors(sampleSessions, sampleEvents);
+assert.equal(inspectors[0].rewardStatus, 'granted', 'session inspector exposes reward status');
+assert.equal(inspectors[0].completionSeconds, 18, 'session inspector exposes completion time');
+const health = buildReferralHealth(sampleEvents, sampleSessions, [], now);
+assert.equal(health.brokenSessions, 0, 'health shows no broken completed sessions');
+assert.equal(health.completedToday, 1, 'health shows completed today');
 
 console.log('Referral Session Architecture v2 regression passed');
