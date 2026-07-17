@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] fix: QR partner back navigation context
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/UserApp.jsx`, `scripts/partner-deeplink-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Добавлен явный `public-card` navigation context для публичных карточек с fallback-панелями по типу сущности и устройству.
+- Партнёр, открытый по `/partner/:id`, на mobile получает back-stack `home → offers → partner`, а на desktop сохраняет `home → partners → partner`.
+- Regression-тест фиксирует, что QR/deep-link Back не возвращает mobile-пользователя в desktop-only `partners` guard.
+**Почему:** после QR-открытия карточки партнёра Back на мобильном мог вести в `/partners`, где показывалась desktop-заглушка вместо мобильного каталога.
+
+---
+
 ## [2026-07-17] chore: QR deep link production diagnostics
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/qrDiagnostics.js`, `src/UserApp.jsx`, `src/PartnerPage.jsx`, `src/ErrorBoundary.jsx`, `scripts/qr-diagnostics-test.mjs`, `scripts/partner-deeplink-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

@@ -39,4 +39,20 @@ if (!userApp.includes('deepLinkOpened.current = true;') || !userApp.includes("sh
   fail('partner deep-link handling must distinguish successful open from definitive not found');
 }
 
+if (!userApp.includes("partner: { desktop: 'partners', mobile: 'offers' }")) {
+  fail('partner public deep links must use the mobile partner catalog fallback instead of the desktop-only partners panel');
+}
+
+if (!userApp.includes('createPublicCardNavigationContext') || !userApp.includes('applyPublicCardBackStack')) {
+  fail('public card navigation must use an explicit navigation context, not browser history heuristics');
+}
+
+if (!/openPartner\(partner,\s*\{[\s\S]*navigationContext: createPublicCardNavigationContext\('partner'/.test(userApp)) {
+  fail('partner deep links must seed a public-card back stack before opening the partner profile');
+}
+
+if (!userApp.includes("panelHistoryRef.current = fallbackPanel === 'home' ? ['home'] : ['home', fallbackPanel];")) {
+  fail('public-card back stack must be deterministic: home -> fallback -> card');
+}
+
 console.log('partner-deeplink-test: ok');

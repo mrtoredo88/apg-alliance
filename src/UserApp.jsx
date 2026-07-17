@@ -198,6 +198,38 @@ function getInitialPanelFromDeepLink(deepLink) {
   return 'home';
 }
 
+function isCurrentDesktopDevice(width) {
+  return isDesktopWorkspaceDevice({
+    width,
+    userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+    platform: typeof navigator === 'undefined' ? '' : navigator.platform,
+    maxTouchPoints: typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints,
+  });
+}
+
+function getPublicCardFallbackPanel(entityType, { desktopDevice = false } = {}) {
+  const targets = PUBLIC_CARD_BACK_TARGETS[entityType] || {};
+  return desktopDevice
+    ? (targets.desktop || targets.mobile || 'home')
+    : (targets.mobile || targets.desktop || 'home');
+}
+
+function createPublicCardNavigationContext(entityType, { source = 'direct-link', desktopDevice = false } = {}) {
+  return {
+    type: 'public-card',
+    entityType,
+    source,
+    fallbackPanel: getPublicCardFallbackPanel(entityType, { desktopDevice }),
+  };
+}
+
+function applyPublicCardBackStack(panelHistoryRef, navigationContext) {
+  if (navigationContext?.type !== 'public-card') return null;
+  const fallbackPanel = navigationContext.fallbackPanel || getPublicCardFallbackPanel(navigationContext.entityType);
+  panelHistoryRef.current = fallbackPanel === 'home' ? ['home'] : ['home', fallbackPanel];
+  return fallbackPanel;
+}
+
 function getQrErrorMessage(error) {
   const code = String(error?.code ?? '');
   if (code === 'TOKEN_USED') return 'Этот QR уже использован. Попросите сотрудника показать актуальный QR-код.';
@@ -394,6 +426,14 @@ initErrorLogger();
 
 const SWIPE_TABS = ['home', 'offers', 'experts', 'profile'];
 const PULL_REFRESH_PANELS = new Set(['home', 'offers', 'experts', 'events', 'news']);
+const PUBLIC_CARD_BACK_TARGETS = {
+  partner: { desktop: 'partners', mobile: 'offers' },
+  expert: { desktop: 'experts', mobile: 'experts' },
+  event: { desktop: 'events', mobile: 'events' },
+  news: { desktop: 'news', mobile: 'news' },
+  offer: { desktop: 'offers', mobile: 'offers' },
+  reward: { desktop: 'rewards', mobile: 'rewards' },
+};
 const PULL_START_TOP_PX = 2;
 const PULL_HORIZONTAL_CANCEL_PX = 44;
 const PULL_ACTIVATE_DY_PX = 16;
@@ -2263,7 +2303,16 @@ export function UserApp() {
     setActivePartner(prev => prev?.id === partnerId ? { ...prev, ...updates } : prev);
   }, []);
 
-  const openPartner = useCallback((partner) => {
+  const openPartner = useCallback((partner, options = {}) => {
+    const fallbackPanel = applyPublicCardBackStack(panelHistoryRef, options.navigationContext);
+    if (fallbackPanel) {
+      qrLog('navigation context applied', {
+        partnerId: partner?.id,
+        entityType: options.navigationContext?.entityType,
+        source: options.navigationContext?.source,
+        fallbackPanel,
+      });
+    }
     setActivePartner(partner);
     markLearningAction('partnerOpened');
     recordInterest({ type: 'partner_open', itemType: 'partner', item: partner });
@@ -2400,7 +2449,12 @@ export function UserApp() {
           partnerId: partner.id,
           partner: sanitizeQrPartnerSnapshot(partner),
         });
-        openPartner(partner);
+        openPartner(partner, {
+          navigationContext: createPublicCardNavigationContext('partner', {
+            source: 'public-deep-link',
+            desktopDevice: isCurrentDesktopDevice(workspaceWidth),
+          }),
+        });
         userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
       } else {
         qrLog('deep link partner not found', {
