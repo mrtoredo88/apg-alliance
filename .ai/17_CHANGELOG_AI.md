@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] feat: Referral observability and analytics
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/referral-observability.js`, `server/src/lib/referralEvents.js`, `server/src/routes/email-auth.js`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `src/referralDiagnostics.js`, `src/EmailAuth.jsx`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `scripts/referral-lifecycle-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен best-effort журнал `referralEvents` со сквозным `referralFlowId`, session/device/platform context и событиями всего lifecycle: query, auth, profile sync, recovery, reward, duplicate, failure.
+- В админке расширена вкладка рефералов: Referral Diagnostics, timeline по flow, KPI dashboard, проблемные цепочки и экспорт CSV/JSON.
+- Regression-тест `test:referral-lifecycle` теперь покрывает correlation id, очередь клиентских событий, timeline, dashboard, фильтрацию, экспорт и поиск зависших цепочек.
+**Почему:** реферальная система должна быть не только идемпотентной, но и наблюдаемой, чтобы быстро восстанавливать историю приглашения без анализа серверных логов.
+
+---
+
 ## [2026-07-17] fix: Idempotent referral recovery
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/referral-recovery.js`, `server/src/routes/user-actions.js`, `src/UserApp.jsx`, `scripts/referral-lifecycle-test.mjs`, `.ai/17_CHANGELOG_AI.md`
