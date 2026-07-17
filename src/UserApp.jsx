@@ -36,7 +36,7 @@ import { formatRelativeTime } from './utils/time.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
-import { clearPendingReferral, readPendingReferral, refLog } from './referralDiagnostics.js';
+import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { getRoleDiagnostics } from './roleEngine.js';
@@ -1732,10 +1732,17 @@ export function UserApp() {
               const existingRefId = !String(userData.id).startsWith('guest_') && activePendingRefId && activePendingRefId !== String(userData.id) && !data.referredBy && data.referralBonusGranted !== true
                 ? activePendingRefId
                 : null;
+              if (existingRefId) refLog('profile sync started', { stage: 'existing_profile_sync', referrerId: existingRefId, userId: userData.id });
+              const existingReferralContext = getReferralContext({ ref: existingRefId || activePendingRefId || '', source: 'UserApp.profileSync.existing' });
               const syncExistingPayload = {
                 userId: String(userData.id),
                 profile: { ...userData, ...profilePatch },
                 ...(existingRefId ? { referrerId: existingRefId } : {}),
+                referralFlowId: existingReferralContext.referralFlowId,
+                referralSessionId: existingReferralContext.sessionId,
+                referralDeviceId: existingReferralContext.deviceId,
+                referralPlatform: existingReferralContext.platform,
+                referralClientEvents: drainReferralEventQueue(),
               };
               const handleReferralSyncResult = result => {
                 if (!isMounted.current) return;
@@ -1797,10 +1804,17 @@ export function UserApp() {
                   pendingConsents = parsed;
                 }
               } catch {}
+              if (isValidRef) refLog('profile sync started', { stage: 'new_profile_sync', referrerId: refId, userId: userData.id });
+              const newReferralContext = getReferralContext({ ref: refId || '', source: 'UserApp.profileSync.newUser' });
               const syncResult = await userAction('profile:sync', {
                 userId: String(userData.id),
                 profile: { ...userData, ...profilePatch },
                 referrerId: refId,
+                referralFlowId: newReferralContext.referralFlowId,
+                referralSessionId: newReferralContext.sessionId,
+                referralDeviceId: newReferralContext.deviceId,
+                referralPlatform: newReferralContext.platform,
+                referralClientEvents: drainReferralEventQueue(),
                 consent: pendingConsents ? {
                   ...pendingConsents.consents,
                   docsVersion: pendingConsents.consentDocsVersion ?? CONSENT_DOCS_VERSION,
@@ -2721,6 +2735,7 @@ export function UserApp() {
     setConsentError('');
     traceAuthStage('AUTH_STARTED', { provider: 'email', profileId: emailUser.id, hasToken: !!authPayload?.token });
     refLog('auth start', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId, value: authRefId });
+    const emailReferralContext = getReferralContext({ ref: authRefId || '', source: 'UserApp.emailAuthSuccess' });
     try {
       if (authPayload?.token) {
         await signInWithCustomToken(auth, authPayload.token);
@@ -2735,10 +2750,16 @@ export function UserApp() {
         isAnonymous: auth.currentUser?.isAnonymous ?? null,
       });
       await ensureOwnerAuthSession(emailUser.id, 'email');
+      refLog('profile sync started', { stage: 'email_auth_profile_sync', referrerId: authRefId || null, userId: emailUser.id });
       const profileResult = await userAction('profile:sync', {
         userId: String(emailUser.id),
         profile: emailUser,
         ...(authRefId ? { referrerId: authRefId } : {}),
+        referralFlowId: authPayload?.referralFlowId || emailReferralContext.referralFlowId,
+        referralSessionId: authPayload?.referralSessionId || emailReferralContext.sessionId,
+        referralDeviceId: authPayload?.referralDeviceId || emailReferralContext.deviceId,
+        referralPlatform: authPayload?.referralPlatform || emailReferralContext.platform,
+        referralClientEvents: drainReferralEventQueue(),
       });
       if (profileResult?.created) {
         refLog('user created', { provider: 'email', userId: emailUser.id, referrerId: authRefId || null });

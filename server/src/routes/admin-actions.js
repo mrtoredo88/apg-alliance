@@ -10,6 +10,14 @@ import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentT
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { buildApgNewsDistributionPatch } from '../../../server-shared/workspace-news.js';
+import {
+  aggregateReferralEvents,
+  buildReferralTimeline,
+  detectReferralProblems,
+  filterReferralEvents,
+  referralEventsToCsv,
+  referralEventsToJson,
+} from '../../../server-shared/referral-observability.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
@@ -897,6 +905,47 @@ async function buildReferralAudit(db) {
   return { rows: list, summary, generatedAt: new Date().toISOString(), temporaryInvitationStorage: 'client_url_localStorage_only' };
 }
 
+function serializeReferralEventDoc(doc) {
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    timestamp: serializeAdminValue(data.timestamp) || serializeAdminValue(data.createdAt) || (data.timestampMs ? new Date(Number(data.timestampMs)).toISOString() : null),
+    referrerId: String(data.referrerId || ''),
+    referredUserId: String(data.referredUserId || ''),
+    referralCode: String(data.referralCode || ''),
+    referralFlowId: String(data.referralFlowId || ''),
+    type: String(data.type || ''),
+    status: String(data.status || ''),
+    source: String(data.source || ''),
+    sessionId: String(data.sessionId || ''),
+    deviceId: String(data.deviceId || ''),
+    platform: String(data.platform || ''),
+    attempt: Number(data.attempt || 1),
+    metadata: data.metadata && typeof data.metadata === 'object' ? data.metadata : {},
+  };
+}
+
+async function buildReferralDiagnostics(db, req) {
+  const filters = req.body?.filters || {};
+  let snap = null;
+  try {
+    snap = await db.collection('referralEvents').orderBy('timestampMs', 'desc').limit(1200).get();
+  } catch {
+    snap = await db.collection('referralEvents').limit(1200).get();
+  }
+  const allEvents = snap.docs.map(serializeReferralEventDoc);
+  const events = filterReferralEvents(allEvents, filters).slice(-800);
+  return {
+    allEventsCount: allEvents.length,
+    events,
+    timeline: buildReferralTimeline(events).slice(0, 120),
+    dashboard: aggregateReferralEvents(allEvents),
+    problems: detectReferralProblems(allEvents).slice(0, 80),
+    exportCsv: referralEventsToCsv(events),
+    exportJson: referralEventsToJson(events),
+  };
+}
+
 async function grantReferralCompensation(db, req, actor) {
   const referrerId = String(req.body?.referrerId || '').trim();
   const invitedUserId = String(req.body?.invitedUserId || req.body?.newUserId || '').trim();
@@ -953,10 +1002,11 @@ async function grantReferralCompensation(db, req, actor) {
 async function handleReferralAction(db, req, actor) {
   const action = String(req.body?.action || '').trim();
   await requireAdminPermission(req, 'users:read');
-  if (action === 'referrals:audit' || action === 'referrals:check' || action === 'referrals:recalculate') {
+  if (action === 'referrals:audit' || action === 'referrals:check' || action === 'referrals:recalculate' || action === 'referrals:diagnostics') {
     const audit = await buildReferralAudit(db);
-    await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary });
-    return { ok: true, ...audit };
+    const diagnostics = await buildReferralDiagnostics(db, req);
+    await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary, events: diagnostics.events.length });
+    return { ok: true, ...audit, diagnostics };
   }
   if (action === 'referrals:grant') return grantReferralCompensation(db, req, actor);
   const error = new Error('Неизвестное действие реферальной системы.');

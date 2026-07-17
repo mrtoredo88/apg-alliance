@@ -71,6 +71,8 @@ import { normalizeTelegramUrl } from '../../../server-shared/telegram.js';
 import { normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 import { actorOwnsEditableProfile } from '../../../server-shared/profile-access.js';
 import { buildReferralRecoveryDecision } from '../../../server-shared/referral-recovery.js';
+import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
+import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import {
   buildWorkspaceEventBase,
   buildWorkspaceEventDuplicate,
@@ -424,6 +426,28 @@ async function actionProfileSync(db, req, actor) {
     }
   }
   const refId = safeUserId(req.body?.referrerId);
+  const referralContext = referralContextFromBody(req.body || {}, { referralCode: refId });
+  const hasReferralObservability = Boolean(refId || referralContext.referralFlowId || Array.isArray(req.body?.referralClientEvents));
+  if (hasReferralObservability) {
+    recordReferralClientEventsAsync(db, req.body?.referralClientEvents, {
+      ...referralContext,
+      referralCode: refId || referralContext.referralCode,
+      referrerId: refId || referralContext.referralCode,
+      referredUserId: userId,
+      source: 'profile-sync:client',
+      metadata: { action: 'profile:sync' },
+    });
+    recordReferralEventAsync(db, {
+      ...referralContext,
+      referralCode: refId || referralContext.referralCode,
+      referrerId: refId || referralContext.referralCode,
+      referredUserId: userId,
+      type: REFERRAL_EVENT_TYPES.PROFILE_SYNC_STARTED,
+      status: 'started',
+      source: 'profile-sync',
+      metadata: { hasReferrerId: !!refId },
+    });
+  }
   const consent = req.body?.consent || null;
   const ref = db.collection('users').doc(userId);
   let created = false;
@@ -610,6 +634,100 @@ async function actionProfileSync(db, req, actor) {
 
   consentStatus = getConsentStatus(userDoc);
   await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
+  if (hasReferralObservability) {
+    const effectiveReferrerId = userDoc?.referredBy || userDoc?.referralBonusGrantedTo || refId || referralContext.referralCode;
+    recordReferralEventAsync(db, {
+      ...referralContext,
+      referralCode: refId || referralContext.referralCode,
+      referrerId: effectiveReferrerId,
+      referredUserId: userId,
+      type: REFERRAL_EVENT_TYPES.PROFILE_SYNC_COMPLETED,
+      status: 'completed',
+      source: 'profile-sync',
+      metadata: { created, referralRecoveryStatus, referralRecoveryReason, referralBonusAwarded },
+    });
+    if (created) {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: REFERRAL_EVENT_TYPES.USER_CREATED,
+        status: 'completed',
+        source: 'profile-sync',
+        metadata: { created },
+      });
+    }
+    if (effectiveReferrerId) {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: REFERRAL_EVENT_TYPES.REFERRAL_ATTACHED,
+        status: ['completed', 'recovery_completed'].includes(referralRecoveryStatus) ? 'completed' : 'info',
+        source: 'profile-sync',
+        metadata: { referralRecoveryStatus, referralRecoveryReason },
+      });
+    }
+    const terminalType = referralRecoveryStatus === 'already_rewarded'
+      ? REFERRAL_EVENT_TYPES.ALREADY_GRANTED
+      : referralRecoveryStatus === 'duplicate_prevented'
+        ? REFERRAL_EVENT_TYPES.DUPLICATE_PREVENTED
+        : referralRecoveryStatus === 'recovery_completed'
+          ? REFERRAL_EVENT_TYPES.RECOVERY_COMPLETED
+          : referralBonusAwarded
+            ? REFERRAL_EVENT_TYPES.REWARD_GRANTED
+            : '';
+    if (referralRecoveryStatus === 'recovery_completed') {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: REFERRAL_EVENT_TYPES.RECOVERY_STARTED,
+        status: 'started',
+        source: 'profile-sync',
+        metadata: { referralRecoveryReason },
+      });
+    }
+    if (terminalType) {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: terminalType,
+        status: terminalType === REFERRAL_EVENT_TYPES.DUPLICATE_PREVENTED ? 'warning' : 'completed',
+        source: 'profile-sync',
+        metadata: { referralRecoveryStatus, referralRecoveryReason },
+      });
+    }
+    if (referralBonusAwarded && terminalType !== REFERRAL_EVENT_TYPES.REWARD_GRANTED) {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: REFERRAL_EVENT_TYPES.REWARD_GRANTED,
+        status: 'completed',
+        source: 'profile-sync',
+        metadata: { referralRecoveryStatus, referralRecoveryReason },
+      });
+    }
+    if (!terminalType && refId && referralRecoveryStatus === 'skipped') {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: REFERRAL_EVENT_TYPES.FAILED,
+        status: 'error',
+        source: 'profile-sync',
+        metadata: { referralRecoveryStatus, referralRecoveryReason },
+      });
+    }
+  }
   return { ok: true, userId, created, dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
 }
 
@@ -3601,6 +3719,20 @@ export default async function userActionsRoutes(fastify) {
       actor = await requireActor(req);
       return await routeAction(db, req, actor);
     } catch (error) {
+      if (safeString(req.body?.action, 80) === 'profile:sync') {
+        const context = referralContextFromBody(req.body || {}, { referralCode: req.body?.referrerId || '' });
+        if (req.body?.referrerId || context.referralFlowId) {
+          recordReferralEventAsync(db, {
+            ...context,
+            referrerId: req.body?.referrerId || context.referralCode,
+            referredUserId: req.body?.userId || actor?.userId || '',
+            type: REFERRAL_EVENT_TYPES.FAILED,
+            status: 'error',
+            source: 'profile-sync',
+            metadata: { message: String(error?.message || error).slice(0, 500) },
+          });
+        }
+      }
       await audit(db, req, actor, safeString(req.body?.action || 'unknown'), 'unknown', req.body?.id || req.body?.userId || '', 'error', { message: String(error?.message || error).slice(0, 500) });
       return reply.code(error.statusCode || 500).send({ ok: false, code: error.code || 'USER_ACTION_ERROR', error: error.message || 'Не удалось выполнить действие.' });
     }

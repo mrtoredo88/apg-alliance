@@ -4,6 +4,8 @@ import { getDb, getDbAuth } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { resolveEmailIdentity, resolveFirebaseIdentity } from '../lib/identityCore.js';
 import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
+import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
+import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 
 const FROM = 'noreply@myapg.ru';
 
@@ -199,6 +201,26 @@ export default async function emailAuthRoutes(fastify) {
 
     const email = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
     const db    = getDb();
+    const referralContext = referralContextFromBody(request.body || {}, { referralCode: ref || '' });
+    if (action === 'login' || action === 'verify') {
+      recordReferralClientEventsAsync(db, request.body?.referralClientEvents, {
+        ...referralContext,
+        referralCode: ref || referralContext.referralCode,
+        source: 'email-auth:client',
+        metadata: { action, email },
+      });
+      if (ref || referralContext.referralFlowId) {
+        recordReferralEventAsync(db, {
+          ...referralContext,
+          referralCode: ref || referralContext.referralCode,
+          referrerId: ref || referralContext.referralCode,
+          type: REFERRAL_EVENT_TYPES.AUTH_STARTED,
+          status: 'started',
+          source: 'email-auth',
+          metadata: { action, email },
+        });
+      }
+    }
     const codeRef = email ? db.collection('emailAuthCodes').doc(email) : null;
 
     // ── SEND ────────────────────────────────────────────────────────────────────
@@ -277,6 +299,18 @@ export default async function emailAuthRoutes(fastify) {
       const userId = await resolveEmailUser(db, email, ref ?? null);
       const userSnap = await db.collection('users').doc(userId).get();
       const ud = userSnap.data() ?? {};
+      if (ref || referralContext.referralFlowId) {
+        recordReferralEventAsync(db, {
+          ...referralContext,
+          referralCode: ref || referralContext.referralCode,
+          referrerId: ref || referralContext.referralCode,
+          referredUserId: userId,
+          type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
+          status: 'completed',
+          source: 'email-auth:verify',
+          metadata: { email },
+        });
+      }
 
       const token = await createFirebaseToken(userId, ud);
       return {
@@ -410,6 +444,18 @@ export default async function emailAuthRoutes(fastify) {
       const userId  = await resolveEmailUser(db, email, ref ?? null);
       const userSnap = await db.collection('users').doc(userId).get();
       const ud = userSnap.data() ?? {};
+      if (ref || referralContext.referralFlowId) {
+        recordReferralEventAsync(db, {
+          ...referralContext,
+          referralCode: ref || referralContext.referralCode,
+          referrerId: ref || referralContext.referralCode,
+          referredUserId: userId,
+          type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
+          status: 'completed',
+          source: 'email-auth:login',
+          metadata: { email },
+        });
+      }
       if (ud.emailVerified === false) {
         sendVerificationEmail(db, email, userId, APP_URL).catch((e) => {
           request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox verification email failed');

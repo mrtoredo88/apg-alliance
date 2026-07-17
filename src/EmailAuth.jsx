@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { API_BASE_URL } from './constants.js';
 import { APG2_PROFILE, GlassButton, GlassInput } from './components/Apg2ProfileGlass.jsx';
 import { logError } from './errorLogger.js';
-import { readPendingReferral, refLog } from './referralDiagnostics.js';
+import { drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
 
 const SPINNER = (
   <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', verticalAlign: 'middle' }} />
@@ -21,11 +21,22 @@ export function EmailAuth({ onCancel, onSuccess }) {
     setError('');
     const ref = readPendingReferral({ source: 'EmailAuth.login' }) || undefined;
     refLog('auth start', { provider: 'email', hasReferral: !!ref, value: ref || null });
+    const referralContext = getReferralContext({ ref, source: 'EmailAuth.login' });
+    const referralClientEvents = drainReferralEventQueue();
     try {
       const res = await fetch(`${API_BASE_URL}/api/email-auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', email, ref }),
+        body: JSON.stringify({
+          action: 'login',
+          email,
+          ref,
+          referralFlowId: referralContext.referralFlowId,
+          referralSessionId: referralContext.sessionId,
+          referralDeviceId: referralContext.deviceId,
+          referralPlatform: referralContext.platform,
+          referralClientEvents,
+        }),
       });
       const data = await res.json();
       if (!data.ok) {
@@ -34,7 +45,7 @@ export function EmailAuth({ onCancel, onSuccess }) {
       } else {
         refLog('auth success', { provider: 'email', userId: data.user?.id || data.canonicalUserId || null, hasReferral: !!ref });
         if (onSuccess) {
-          onSuccess(data.user, { ...data, ref, referrerId: ref });
+          onSuccess(data.user, { ...data, ref, referrerId: ref, referralFlowId: referralContext.referralFlowId, referralSessionId: referralContext.sessionId, referralDeviceId: referralContext.deviceId, referralPlatform: referralContext.platform });
         } else {
           localStorage.setItem('apg_email_user', JSON.stringify(data.user));
           window.location.reload();

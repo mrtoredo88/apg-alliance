@@ -1760,8 +1760,35 @@ function AdminUsersPanel({ users, onAuthAction }) {
 }
 
 function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck, onGrant }) {
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventType, setEventType] = useState('all');
+  const [eventStatus, setEventStatus] = useState('all');
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const summary = data?.summary || {};
+  const diagnostics = data?.diagnostics || {};
+  const events = Array.isArray(diagnostics.events) ? diagnostics.events : [];
+  const timeline = Array.isArray(diagnostics.timeline) ? diagnostics.timeline : [];
+  const problems = Array.isArray(diagnostics.problems) ? diagnostics.problems : [];
+  const dashboard = diagnostics.dashboard || {};
+  const eventTypes = ['all', ...new Set(events.map(event => event.type).filter(Boolean))].slice(0, 30);
+  const eventStatuses = ['all', ...new Set(events.map(event => event.status).filter(Boolean))].slice(0, 12);
+  const visibleEvents = events.filter(event => {
+    if (eventType !== 'all' && event.type !== eventType) return false;
+    if (eventStatus !== 'all' && event.status !== eventStatus) return false;
+    if (eventSearch) return JSON.stringify(event).toLowerCase().includes(eventSearch.toLowerCase());
+    return true;
+  }).slice(-120).reverse();
+  const downloadReferralExport = (format) => {
+    const value = format === 'json' ? diagnostics.exportJson : diagnostics.exportCsv;
+    if (!value) return;
+    const blob = new Blob([value], { type: format === 'json' ? 'application/json;charset=utf-8' : 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `apg-referral-diagnostics.${format}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   const filtered = rows.filter(row => {
     if (filter === 'all') return true;
     if (filter === 'pending') return row.status === 'pending_registration';
@@ -1812,6 +1839,20 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
         ))}
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
+        {[
+          ['Открыто ссылок', dashboard.total?.openedLinks ?? 0, A.blue],
+          ['Начато регистраций', dashboard.total?.authStarted ?? 0, A.text],
+          ['Recovery', dashboard.total?.recovery ?? 0, A.gold],
+          ['Conversion', `${dashboard.total?.conversionPct ?? 0}%`, '#4BB34B'],
+        ].map(([label, value, color]) => (
+          <div key={label} style={{ ...s.card, marginBottom: 0, border: `1px solid ${color}30` }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
       <div style={{ ...s.card, marginBottom: 14 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
           {[
@@ -1830,7 +1871,66 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
           </button>
         </div>
         <div style={{ fontSize: 12, color: A.textSec, lineHeight: '18px' }}>
-          Временная запись приглашения сейчас хранится как URL/localStorage до регистрации. Сервер показывает подтверждённые цепочки из users.referredBy, referralBonusGranted и referralRewardedUsers.
+          Сервер показывает подтверждённые цепочки из users.referredBy, referralBonusGranted и referralRewardedUsers. Referral Diagnostics дополнительно читает журнал referralEvents и восстанавливает lifecycle по referralFlowId.
+        </div>
+      </div>
+
+      <div style={{ ...s.card, marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: A.text }}>Referral Diagnostics</div>
+            <div style={{ fontSize: 12, color: A.textSec, marginTop: 4 }}>События: {events.length} · Flow: {timeline.length} · Проблемы: {problems.length}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12 }} onClick={() => downloadReferralExport('csv')}>CSV</button>
+            <button style={{ ...s.btn, ...s.btnGray, padding: '8px 10px', fontSize: 12 }} onClick={() => downloadReferralExport('json')}>JSON</button>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: 8, marginBottom: 12 }}>
+          <input value={eventSearch} onChange={e => setEventSearch(e.target.value)} placeholder="email, userId, referrer, flowId" style={s.input} />
+          <select value={eventType} onChange={e => setEventType(e.target.value)} style={s.input}>
+            {eventTypes.map(type => <option key={type} value={type}>{type === 'all' ? 'Все типы' : type}</option>)}
+          </select>
+          <select value={eventStatus} onChange={e => setEventStatus(e.target.value)} style={s.input}>
+            {eventStatuses.map(status => <option key={status} value={status}>{status === 'all' ? 'Все статусы' : status}</option>)}
+          </select>
+        </div>
+        {problems.length > 0 && (
+          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+            {problems.slice(0, 5).map((problem, index) => (
+              <div key={`${problem.type}_${problem.flowId || problem.referrerId || index}`} style={{ padding: 10, borderRadius: 12, background: `${problem.severity === 'error' ? A.red : A.gold}12`, border: `1px solid ${problem.severity === 'error' ? A.red : A.gold}35`, color: A.text }}>
+                <b>{problem.type}</b> · {problem.message} {problem.flowId ? `· ${problem.flowId}` : ''}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+            {timeline.slice(0, 8).map(flow => (
+              <div key={flow.id} style={{ padding: 10, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: A.text }}>{flow.id}</div>
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{flow.referrerId || flow.referralCode || 'ref не указан'} → {flow.referredUserId || 'user не указан'} · {flow.status}</div>
+                <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
+                  {flow.events.slice(-5).map(event => (
+                    <div key={event.id} style={{ fontSize: 11, color: A.textSec }}>
+                      {event.timestamp ? new Date(event.timestamp).toLocaleTimeString('ru-RU') : '—'} · <b style={{ color: A.text }}>{event.type}</b> · {event.status}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+            {visibleEvents.slice(0, 10).map(event => (
+              <div key={event.id} style={{ padding: 10, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <b style={{ fontSize: 12, color: A.text }}>{event.type}</b>
+                  <span style={{ fontSize: 11, color: event.status === 'error' ? A.red : A.textSec }}>{event.status}</span>
+                </div>
+                <div style={{ fontSize: 11, color: A.textSec, marginTop: 5, lineHeight: '16px' }}>{event.referralFlowId || 'no-flow'} · {event.source || 'source'} · {event.timestamp ? new Date(event.timestamp).toLocaleString('ru-RU') : '—'}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -4292,7 +4392,7 @@ export const AdminPanel = () => {
     return Array.isArray(data.rows) ? data.rows.map(reviveAdminValue) : [];
   };
 
-  const loadReferralAudit = useCallback(async (action = 'referrals:audit') => {
+  const loadReferralAudit = useCallback(async (action = 'referrals:diagnostics') => {
     setReferralLoading(true);
     try {
       const data = await runAdminAction(action, { idempotencyKey: `${action}_${Date.now()}` });
@@ -4319,7 +4419,7 @@ export const AdminPanel = () => {
         reason: `admin_retry_from_referral_panel:${row.reason || row.status}`,
         idempotencyKey: `referral_grant_${row.referrer.id}_${row.invited.id}_${Date.now()}`,
       });
-      await loadReferralAudit('referrals:recalculate');
+      await loadReferralAudit('referrals:diagnostics');
     } catch (e) {
       logError(e, 'AdminPanel.grantReferralFromAudit');
       alert(e.message || 'Не удалось начислить реферальные ключи.');
@@ -6955,8 +7055,8 @@ export const AdminPanel = () => {
           loading={referralLoading}
           filter={referralFilter}
           onFilter={setReferralFilter}
-          onLoad={() => loadReferralAudit('referrals:recalculate')}
-          onCheck={() => loadReferralAudit('referrals:check')}
+          onLoad={() => loadReferralAudit('referrals:diagnostics')}
+          onCheck={() => loadReferralAudit('referrals:diagnostics')}
           onGrant={grantReferralFromAudit}
         />
       )}
