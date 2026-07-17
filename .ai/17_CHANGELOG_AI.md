@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] feat: Referral Monitoring v4
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/referral-monitoring.js`, `server-shared/referral-observability.js`, `server/src/routes/referral-monitoring.js`, `server/src/routes/admin-actions.js`, `server/src/server.js`, `src/AdminPanel.jsx`, `scripts/referral-monitoring-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only Referral Health Monitor поверх существующих `referralEvents` и `referralSessions`: health score, status, funnel-derived rates, active/abandoned sessions и pending-состояния.
+- Добавлен Alert Engine без авто-исправлений: `SUCCESS_RATE_LOW`, `BROKEN_SESSION`, `LONG_RUNNING_SESSION`, `RECOVERY_PENDING`, `REWARD_PENDING`, `PROFILE_SYNC_TIMEOUT`, `AUTH_TIMEOUT`, `SESSION_ORPHAN`, `DUPLICATE_ACTIVITY`.
+- В админку добавлена вкладка Referral Monitoring с System Status, карточками KPI, фильтрами alert, timeline alert и CSV export; добавлен read-only endpoint `/api/referral-monitoring/health`.
+**Почему:** реферальная система должна сама показывать проблемы до жалоб пользователей, не вмешиваясь в auth, profile sync, recovery или начисление ключей.
+
+---
+
 ## [2026-07-17] feat: Referral Analytics Dashboard v3
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/referral-observability.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `scripts/referral-session-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`

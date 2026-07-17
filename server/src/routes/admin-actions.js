@@ -22,6 +22,7 @@ import {
   referralEventsToCsv,
   referralEventsToJson,
 } from '../../../server-shared/referral-observability.js';
+import { buildReferralMonitoring, referralAlertsToCsv } from '../../../server-shared/referral-monitoring.js';
 import { buildReferralRecoveryScanPlan, summarizeReferralRecoveryPlan } from '../../../server-shared/referral-state-recovery.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
@@ -999,6 +1000,7 @@ async function buildReferralDiagnostics(db, req, auditRows = []) {
   const funnel = buildReferralFunnel(allEvents);
   const incompleteSessions = detectIncompleteReferralSessions(sessions, allEvents).slice(0, 120);
   const health = buildReferralHealth(allEvents, sessions, recoveryCandidates);
+  const monitoring = buildReferralMonitoring({ events: allEvents, sessions, recoveryCandidates });
   return {
     allEventsCount: allEvents.length,
     events,
@@ -1010,9 +1012,11 @@ async function buildReferralDiagnostics(db, req, auditRows = []) {
     dashboard: aggregateReferralEvents(allEvents),
     funnel,
     health,
+    monitoring,
     problems: detectReferralProblems(allEvents).slice(0, 80),
     exportCsv: referralEventsToCsv(events),
     funnelExportCsv: referralEventsToCsv(allEvents),
+    alertExportCsv: referralAlertsToCsv(monitoring.alerts),
     exportJson: referralEventsToJson(events),
   };
 }
@@ -1157,10 +1161,12 @@ async function grantReferralCompensation(db, req, actor) {
 async function handleReferralAction(db, req, actor) {
   const action = String(req.body?.action || '').trim();
   await requireAdminPermission(req, 'users:read');
-  if (action === 'referrals:audit' || action === 'referrals:check' || action === 'referrals:recalculate' || action === 'referrals:diagnostics') {
+  if (action === 'referrals:audit' || action === 'referrals:check' || action === 'referrals:recalculate' || action === 'referrals:diagnostics' || action === 'referrals:monitoring') {
     const audit = await buildReferralAudit(db);
     const diagnostics = await buildReferralDiagnostics(db, req, audit.rows);
-    await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary, events: diagnostics.events.length });
+    if (action !== 'referrals:monitoring') {
+      await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary, events: diagnostics.events.length });
+    }
     return { ok: true, ...audit, diagnostics };
   }
   if (action === 'referrals:recoverState' || action === 'referrals:recalculateReferrer') return recoverReferralState(db, req, actor);

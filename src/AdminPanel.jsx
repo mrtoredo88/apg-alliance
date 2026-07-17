@@ -1759,6 +1759,211 @@ function AdminUsersPanel({ users, onAuthAction }) {
   );
 }
 
+function ReferralMonitoringPanel({ data, loading, onLoad }) {
+  const [severity, setSeverity] = useState('all');
+  const [type, setType] = useState('all');
+  const [resolved, setResolved] = useState('open');
+  const [query, setQuery] = useState('');
+  const [date, setDate] = useState('');
+  const [selectedAlertId, setSelectedAlertId] = useState('');
+  const diagnostics = data?.diagnostics || {};
+  const monitoring = diagnostics.monitoring || {};
+  const summary = monitoring.summary || {};
+  const alerts = Array.isArray(monitoring.alerts) ? monitoring.alerts : [];
+  const selectedAlert = alerts.find(alert => alert.id === selectedAlertId) || alerts[0] || null;
+  const statusMeta = {
+    green: { label: 'Green', color: '#4BB34B' },
+    yellow: { label: 'Yellow', color: A.gold },
+    red: { label: 'Red', color: A.red },
+  }[monitoring.status || 'green'];
+  const alertTypes = ['all', ...new Set(alerts.map(alert => alert.type).filter(Boolean))];
+  const filteredAlerts = alerts.filter(alert => {
+    if (severity !== 'all' && alert.severity !== severity) return false;
+    if (type !== 'all' && alert.type !== type) return false;
+    if (resolved === 'open' && alert.resolved) return false;
+    if (resolved === 'resolved' && !alert.resolved) return false;
+    if (date && !String(alert.createdAt || '').startsWith(date)) return false;
+    if (query) {
+      const haystack = [
+        alert.flowId,
+        alert.sessionId,
+        alert.userId,
+        alert.summary,
+        alert.type,
+        alert.details?.email,
+        alert.details?.telegram,
+        alert.details?.telegramId,
+        alert.details?.username,
+        alert.details?.referrerId,
+        alert.details?.referralCode,
+      ].join(' ').toLowerCase();
+      if (!haystack.includes(query.toLowerCase())) return false;
+    }
+    return true;
+  });
+  const downloadAlertCsv = () => {
+    if (!diagnostics.alertExportCsv) return;
+    const blob = new Blob([diagnostics.alertExportCsv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'apg-referral-alerts.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+        <div>
+          <h1 style={s.h1}>🚦 Referral Monitoring</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: A.textSec, lineHeight: '18px' }}>
+            Read-only мониторинг referralSessions и referralEvents. Начисления, recovery и auth-flow не изменяются.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button style={{ ...s.btn, opacity: diagnostics.alertExportCsv ? 1 : 0.55 }} disabled={!diagnostics.alertExportCsv} onClick={downloadAlertCsv}>CSV alerts</button>
+          <button style={{ ...s.btn, ...s.btnPri, opacity: loading ? 0.7 : 1 }} disabled={loading} onClick={onLoad}>
+            {loading ? 'Сканируем...' : 'Обновить мониторинг'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ ...s.card, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', border: `1px solid ${statusMeta.color}55` }}>
+        <div>
+          <div style={{ fontSize: 12, color: A.textSec, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>System Status</div>
+          <div style={{ marginTop: 6, fontSize: 28, fontWeight: 900, color: statusMeta.color }}>{statusMeta.label}</div>
+          <div style={{ marginTop: 4, color: A.textSec, fontSize: 12 }}>Health score: {monitoring.healthScore ?? 100} · {monitoring.timestamp || 'нет данных'}</div>
+        </div>
+        <div style={{ minWidth: 160, textAlign: 'right' }}>
+          <div style={{ fontSize: 34, fontWeight: 900, color: statusMeta.color }}>{summary.openAlerts ?? 0}</div>
+          <div style={{ color: A.textSec, fontSize: 12 }}>open alerts</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
+        {[
+          ['Critical', summary.critical ?? 0, A.red],
+          ['Warnings', summary.warnings ?? 0, A.gold],
+          ['Resolved Today', summary.resolvedToday ?? 0, '#4BB34B'],
+          ['Broken Sessions', summary.brokenSessions ?? 0, A.red],
+          ['Recovery Pending', summary.recoveryPending ?? 0, A.gold],
+          ['Reward Pending', summary.rewardPending ?? 0, A.gold],
+          ['Success Rate', `${summary.successRate ?? 0}%`, '#4BB34B'],
+          ['Average Completion', `${summary.averageCompletion ?? 0}s`, A.blue],
+          ['Active Sessions', summary.activeSessions ?? 0, A.text],
+          ['Abandoned Sessions', summary.abandonedSessions ?? 0, A.red],
+        ].map(([label, value, color]) => (
+          <div key={label} style={{ ...s.card, marginBottom: 0, border: `1px solid ${color}30` }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: A.textSec, marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...s.card, display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, alignItems: 'end' }}>
+        <label style={{ display: 'grid', gap: 5, color: A.textSec, fontSize: 11, fontWeight: 800 }}>Severity
+          <select value={severity} onChange={e => setSeverity(e.target.value)} style={s.input}>
+            {['all', 'critical', 'warning', 'info'].map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'grid', gap: 5, color: A.textSec, fontSize: 11, fontWeight: 800 }}>Type
+          <select value={type} onChange={e => setType(e.target.value)} style={s.input}>
+            {alertTypes.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'grid', gap: 5, color: A.textSec, fontSize: 11, fontWeight: 800 }}>Resolved
+          <select value={resolved} onChange={e => setResolved(e.target.value)} style={s.input}>
+            {['open', 'resolved', 'all'].map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'grid', gap: 5, color: A.textSec, fontSize: 11, fontWeight: 800 }}>Date
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={s.input} />
+        </label>
+        <label style={{ display: 'grid', gap: 5, color: A.textSec, fontSize: 11, fontWeight: 800, gridColumn: 'span 2' }}>Search
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="flowId, sessionId, userId, email, telegram, ref code" style={s.input} />
+        </label>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 0.9fr) minmax(0, 1.1fr)', gap: 14 }}>
+        <div style={{ ...s.card, marginBottom: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: A.text, marginBottom: 10 }}>Последние предупреждения</div>
+          <div style={{ display: 'grid', gap: 8, maxHeight: 560, overflowY: 'auto' }}>
+            {filteredAlerts.slice(0, 160).map(alert => {
+              const color = alert.severity === 'critical' ? A.red : alert.severity === 'warning' ? A.gold : A.blue;
+              return (
+                <button key={alert.id} onClick={() => setSelectedAlertId(alert.id)} style={{
+                  ...s.card,
+                  marginBottom: 0,
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  border: selectedAlert?.id === alert.id ? `1px solid ${color}` : `1px solid ${color}33`,
+                  background: selectedAlert?.id === alert.id ? `${color}12` : s.card.background,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color }}>{alert.type}</div>
+                    <div style={{ fontSize: 11, color: alert.resolved ? '#4BB34B' : color }}>{alert.resolved ? 'resolved' : alert.severity}</div>
+                  </div>
+                  <div style={{ marginTop: 6, color: A.text, fontSize: 13, fontWeight: 800 }}>{alert.summary}</div>
+                  <div style={{ marginTop: 6, color: A.textSec, fontSize: 11, lineHeight: '16px' }}>
+                    {alert.createdAt} · flow {alert.flowId || '—'} · session {alert.sessionId || '—'}
+                  </div>
+                </button>
+              );
+            })}
+            {!filteredAlerts.length && <div style={{ color: A.textSec, fontSize: 13 }}>Предупреждений по выбранным фильтрам нет.</div>}
+          </div>
+        </div>
+
+        <div style={{ ...s.card, marginBottom: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: A.text, marginBottom: 10 }}>Timeline alert</div>
+          {selectedAlert ? (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: A.gold, fontWeight: 900, fontSize: 13 }}>{selectedAlert.type}</div>
+                  <div style={{ color: A.text, fontSize: 18, fontWeight: 900, marginTop: 4 }}>{selectedAlert.summary}</div>
+                </div>
+                <div style={{ color: selectedAlert.resolved ? '#4BB34B' : selectedAlert.severity === 'critical' ? A.red : A.gold, fontSize: 12, fontWeight: 900 }}>
+                  {selectedAlert.resolved ? 'resolved' : selectedAlert.severity}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 12 }}>
+                {[
+                  ['Flow', selectedAlert.flowId || '—'],
+                  ['Session', selectedAlert.sessionId || '—'],
+                  ['User', selectedAlert.userId || '—'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 10, color: A.textSec, fontWeight: 800, textTransform: 'uppercase' }}>{label}</div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: A.text, wordBreak: 'break-all' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {(selectedAlert.timeline || []).map((event, index) => (
+                  <div key={`${event.id || event.type}_${index}`} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
+                    <div style={{ color: A.textSec, fontSize: 11 }}>{event.timestamp ? new Date(event.timestamp).toLocaleString('ru-RU') : '—'}</div>
+                    <div style={{ padding: '9px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ color: A.text, fontSize: 12, fontWeight: 900 }}>{event.type}</div>
+                      <div style={{ color: A.textSec, fontSize: 11, marginTop: 3 }}>{event.status || 'status unknown'} · {event.source || 'source unknown'}</div>
+                    </div>
+                  </div>
+                ))}
+                {!selectedAlert.timeline?.length && (
+                  <pre style={{ ...s.pre, maxHeight: 280 }}>{JSON.stringify(selectedAlert.details || {}, null, 2)}</pre>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: A.textSec, fontSize: 13 }}>Выберите предупреждение, чтобы открыть историю.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck, onGrant, onRecover }) {
   const [eventSearch, setEventSearch] = useState('');
   const [timelineSearch, setTimelineSearch] = useState('');
@@ -6800,7 +7005,7 @@ export const AdminPanel = () => {
     if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
     if ((activeTab === 'ai-import' || activeTab === 'moderation') && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
     if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
-    if (activeTab === 'referrals' && !referralAudit && !referralLoading) loadReferralAudit();
+    if ((activeTab === 'referrals' || activeTab === 'referral-monitoring') && !referralAudit && !referralLoading) loadReferralAudit(activeTab === 'referral-monitoring' ? 'referrals:monitoring' : 'referrals:diagnostics');
     if (activeTab === 'automation' && !automationAudit && !automationLoading) loadAutomationAudit();
   }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit]);
 
@@ -7023,6 +7228,7 @@ export const AdminPanel = () => {
             { id: 'comments', emoji: '💬', label: 'Комментарии', count: newsComments.filter(c => !c.hidden).length || undefined },
             { id: 'users', emoji: '👥', label: 'Пользователи', count: adminMetrics.users.length || undefined },
             { id: 'referrals', emoji: '🔗', label: 'Рефералы', count: referralAudit?.summary?.grantErrors || undefined },
+            { id: 'referral-monitoring', emoji: '🚦', label: 'Referral Monitoring', count: referralAudit?.diagnostics?.monitoring?.summary?.openAlerts || undefined },
             { id: 'automation', emoji: '⚙️', label: 'Автоматизация', count: automationAudit?.summary?.pending || undefined },
             { id: 'content', emoji: '🧭', label: 'Центр контента', count: lifecycleRecommendations.length || undefined },
             { id: 'partners',  emoji: '🤝', label: 'Партнёры',  count: partners.length },
@@ -7049,7 +7255,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'automation') loadAutomationAudit(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -7331,6 +7537,14 @@ export const AdminPanel = () => {
           onCheck={() => loadReferralAudit('referrals:diagnostics')}
           onGrant={grantReferralFromAudit}
           onRecover={recoverReferralStateFromAudit}
+        />
+      )}
+
+      {activeTab === 'referral-monitoring' && (
+        <ReferralMonitoringPanel
+          data={referralAudit}
+          loading={referralLoading}
+          onLoad={() => loadReferralAudit('referrals:monitoring')}
         />
       )}
 
