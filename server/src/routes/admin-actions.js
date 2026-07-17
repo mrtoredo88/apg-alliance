@@ -926,6 +926,25 @@ function serializeReferralEventDoc(doc) {
   };
 }
 
+function serializeReferralSessionDoc(doc) {
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    referrerId: String(data.referrerId || data.referralCode || ''),
+    referralFlowId: String(data.flowId || data.referralFlowId || ''),
+    deviceId: String(data.deviceId || ''),
+    platform: String(data.platform || ''),
+    source: String(data.source || ''),
+    status: String(data.status || 'active'),
+    completed: data.completed === true,
+    completedAt: serializeAdminValue(data.completedAt || null),
+    createdAt: serializeAdminValue(data.createdAt || null),
+    expiresAt: serializeAdminValue(data.expiresAt || null),
+    authType: String(data.authType || ''),
+    userId: String(data.userId || ''),
+  };
+}
+
 async function buildReferralDiagnostics(db, req) {
   const filters = req.body?.filters || {};
   let snap = null;
@@ -935,10 +954,18 @@ async function buildReferralDiagnostics(db, req) {
     snap = await db.collection('referralEvents').limit(1200).get();
   }
   const allEvents = snap.docs.map(serializeReferralEventDoc);
+  let sessionSnap = null;
+  try {
+    sessionSnap = await db.collection('referralSessions').orderBy('createdAt', 'desc').limit(300).get();
+  } catch {
+    sessionSnap = await db.collection('referralSessions').limit(300).get().catch(() => ({ docs: [] }));
+  }
+  const sessions = (sessionSnap.docs || []).map(serializeReferralSessionDoc);
   const events = filterReferralEvents(allEvents, filters).slice(-800);
   return {
     allEventsCount: allEvents.length,
     events,
+    sessions,
     timeline: buildReferralTimeline(events).slice(0, 120),
     dashboard: aggregateReferralEvents(allEvents),
     problems: detectReferralProblems(allEvents).slice(0, 80),

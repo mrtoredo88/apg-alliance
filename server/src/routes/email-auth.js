@@ -6,6 +6,7 @@ import { resolveEmailIdentity, resolveFirebaseIdentity } from '../lib/identityCo
 import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
+import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
 
 const FROM = 'noreply@myapg.ru';
 
@@ -190,7 +191,7 @@ async function resolveEmailUser(db, email, ref) {
 
 export default async function emailAuthRoutes(fastify) {
   fastify.post('/api/email-auth', async (request, reply) => {
-    const { action, email: rawEmail, code, ref } = request.body ?? {};
+    const { action, email: rawEmail, code } = request.body ?? {};
 
     const NO_EMAIL_ACTIONS = ['verify-email', 'link-telegram', 'grant-referral', 'resend-verification'];
     if (!NO_EMAIL_ACTIONS.includes(action)) {
@@ -201,7 +202,10 @@ export default async function emailAuthRoutes(fastify) {
 
     const email = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
     const db    = getDb();
-    const referralContext = referralContextFromBody(request.body || {}, { referralCode: ref || '' });
+    const rawRef = request.body?.ref || request.body?.referrerId || request.body?.referralCode || '';
+    const sessionResolution = await resolveReferralSessionReferrer(db, request.body?.referralSessionId || request.body?.sessionId || '', { markMissing: true, source: 'email-auth' }).catch(() => ({ referrerId: '', session: null }));
+    const ref = rawRef || sessionResolution.referrerId || '';
+    const referralContext = referralContextFromBody(request.body || {}, { referralCode: ref || '', referralFlowId: sessionResolution.session?.data?.flowId || '' });
     if (action === 'login' || action === 'verify') {
       recordReferralClientEventsAsync(db, request.body?.referralClientEvents, {
         ...referralContext,
@@ -219,6 +223,17 @@ export default async function emailAuthRoutes(fastify) {
           source: 'email-auth',
           metadata: { action, email },
         });
+        if (request.body?.referralSessionId || request.body?.sessionId) {
+          recordReferralEventAsync(db, {
+            ...referralContext,
+            referralCode: ref || referralContext.referralCode,
+            referrerId: ref || referralContext.referralCode,
+            type: REFERRAL_EVENT_TYPES.SESSION_EMAIL_LINKED,
+            status: 'started',
+            source: 'email-auth',
+            metadata: { action, email },
+          });
+        }
       }
     }
     const codeRef = email ? db.collection('emailAuthCodes').doc(email) : null;

@@ -53,7 +53,8 @@ const adminPanel = fs.readFileSync('src/AdminPanel.jsx', 'utf8');
 
 const storageKeysBlock = userApp.match(/const USER_AUTH_STORAGE_KEYS = \[[\s\S]*?\];/)?.[0] || '';
 assert.ok(!storageKeysBlock.includes('apg_pending_ref'), 'auth cleanup must not wipe pending referral');
-assert.ok(emailAuth.includes("onSuccess(data.user, { ...data, ref, referrerId: ref, referralFlowId"), 'EmailAuth must pass referral context to UserApp');
+assert.ok(emailAuth.includes('referralSessionId: serverSession?.referralSessionId'), 'EmailAuth must pass server referral session to UserApp');
+assert.ok(emailAuth.includes('referralSessionIdLocal: referralContext.sessionId'), 'EmailAuth must keep legacy referral session only as local fallback');
 assert.ok(!emailAuth.includes("localStorage.removeItem('apg_pending_ref')"), 'EmailAuth must not clear referral before profile:sync confirms reward');
 assert.ok(userApp.includes('...(authRefId ? { referrerId: authRefId } : {})'), 'email profile:sync must include referrerId');
 assert.ok(userApp.includes('profileResult?.referralBonusAwarded'), 'email auth flow must wait for server referral award');

@@ -17,6 +17,7 @@ import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 import { CAPABILITIES, hasCapability } from './roleEngine.js';
 import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import { ensureServerReferralSession, getReferralContext, readPendingReferral } from './referralDiagnostics.js';
 import { groupBookingsForProfile, normalizeBooking } from '../server-shared/booking.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
@@ -643,6 +644,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const tgLinkingRef = useRef(false);
   const tgActionRef = useRef(0);
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
+  const roleValue = String(user?.role || user?.userRole || user?.status || '').toLowerCase();
 
   const stopPolling = useCallback(() => {
     if (tgPollRef.current) clearTimeout(tgPollRef.current);
@@ -753,6 +755,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     try {
       traceAuthStage('telegram_auth_click', { linking });
       traceAuthStage('telegram_auth_start', { linking, api: API_BASE_URL });
+      const pendingRef = readPendingReferral({ source: 'ProfilePanel.telegramAuth' }) || '';
+      const serverSession = await (globalThis.__APG_REFERRAL_SESSION_PROMISE__ || ensureServerReferralSession({ apiBaseUrl: API_BASE_URL, ref: pendingRef, source: 'telegram_auth_start' })).catch(() => null);
+      const referralContext = getReferralContext({ ref: pendingRef, source: 'telegram_auth_start' });
       const res = await fetch(`${API_BASE_URL}/api/telegram-auth-start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-APG-Version': 'hotfix-telegram-auth' },
@@ -761,6 +766,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           linking,
           ownerUserId: linking ? String(user?.id || '') : '',
           ownerEmail: linking ? String(user?.email || user?.linkedEmail || '') : '',
+          ref: pendingRef || undefined,
+          referralSessionId: serverSession?.referralSessionId || referralContext.referralSessionId || referralContext.sessionId,
+          referralFlowId: referralContext.referralFlowId,
+          referralDeviceId: referralContext.deviceId,
+          referralPlatform: referralContext.platform,
         }),
         signal: controller.signal,
       });

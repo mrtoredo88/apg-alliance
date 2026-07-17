@@ -4,7 +4,8 @@ const REF_FLOW_KEY = 'apg_ref_flow_id';
 const REF_FLOW_REF_KEY = 'apg_ref_flow_ref';
 const REF_DEVICE_KEY = 'apg_ref_device_id';
 const REF_EVENT_QUEUE_KEY = 'apg_ref_events_queue';
-const REF_SESSION_KEY = 'apg_ref_session_id';
+const REF_LOCAL_SESSION_KEY = 'apg_ref_local_session_id';
+const REF_SERVER_SESSION_KEY = 'apg_referral_session_id';
 
 const STAGE_EVENT_TYPES = {
   'query detected': 'REF_QUERY_DETECTED',
@@ -21,6 +22,9 @@ const STAGE_EVENT_TYPES = {
   'retry after reconnect': 'REFERRAL_FAILED',
   'friend added': 'REFERRAL_ATTACHED',
   'reward granted': 'REFERRAL_REWARD_GRANTED',
+  'session created': 'REF_SESSION_CREATED',
+  'session restored': 'REF_SESSION_RESTORED',
+  'session missing': 'REF_SESSION_MISSING',
 };
 
 function getLocalStorage() {
@@ -62,7 +66,11 @@ function safeDetails(details = {}) {
 
 export function normalizeReferralValue(value) {
   const clean = String(value ?? '').trim().slice(0, 180);
-  return clean && !/[\u0000-\u001F<>]/.test(clean) ? clean : '';
+  const hasUnsafeChars = Array.from(clean).some(char => {
+    const code = char.charCodeAt(0);
+    return code < 32 || char === '<' || char === '>';
+  });
+  return clean && !hasUnsafeChars ? clean : '';
 }
 
 function getOrCreateStorageId(storage, key, prefix) {
@@ -77,6 +85,7 @@ export function getReferralContext({ ref = '', source = 'unknown' } = {}) {
   const local = getLocalStorage();
   const session = getSessionStorage();
   const pendingRef = normalizeReferralValue(ref || local?.getItem?.(PENDING_REF_STORAGE_KEY));
+  const serverSessionId = normalizeReferralValue(local?.getItem?.(REF_SERVER_SESSION_KEY));
   const storedFlowRef = normalizeReferralValue(local?.getItem?.(REF_FLOW_REF_KEY));
   if (pendingRef && storedFlowRef && storedFlowRef !== pendingRef) {
     local?.removeItem?.(REF_FLOW_KEY);
@@ -85,7 +94,8 @@ export function getReferralContext({ ref = '', source = 'unknown' } = {}) {
   if (pendingRef) local?.setItem?.(REF_FLOW_REF_KEY, pendingRef);
   return {
     referralFlowId: flowId,
-    sessionId: getOrCreateStorageId(session || local, REF_SESSION_KEY, 'ref_session'),
+    sessionId: serverSessionId || getOrCreateStorageId(session || local, REF_LOCAL_SESSION_KEY, 'ref_session'),
+    referralSessionId: serverSessionId,
     deviceId: getOrCreateStorageId(local, REF_DEVICE_KEY, 'ref_device'),
     platform: [
       globalThis?.matchMedia?.('(display-mode: standalone)')?.matches || globalThis?.navigator?.standalone === true ? 'pwa' : 'browser',
@@ -94,6 +104,49 @@ export function getReferralContext({ ref = '', source = 'unknown' } = {}) {
     referralCode: pendingRef,
     source,
   };
+}
+
+export function getStoredReferralSessionId(storage = getLocalStorage()) {
+  return normalizeReferralValue(storage?.getItem?.(REF_SERVER_SESSION_KEY));
+}
+
+export function saveReferralSessionId(value, storage = getLocalStorage()) {
+  const id = normalizeReferralValue(value);
+  if (!id || !storage) return '';
+  storage.setItem(REF_SERVER_SESSION_KEY, id);
+  return id;
+}
+
+export async function ensureServerReferralSession({ apiBaseUrl = '', ref = '', source = 'client' } = {}) {
+  const local = getLocalStorage();
+  const currentRef = readPendingReferral({ source, storage: local });
+  const referralCode = normalizeReferralValue(ref || currentRef);
+  const referralSessionId = getStoredReferralSessionId(local);
+  if (!apiBaseUrl || (!referralCode && !referralSessionId)) return null;
+  const context = getReferralContext({ ref: referralCode, source });
+  const body = {
+    ref: referralCode || undefined,
+    referralCode: referralCode || undefined,
+    referralSessionId: referralSessionId || undefined,
+    referralFlowId: context.referralFlowId,
+    referralDeviceId: context.deviceId,
+    referralPlatform: context.platform,
+    source,
+  };
+  const response = await fetch(`${apiBaseUrl}/api/referral-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  const id = data?.session?.id || data?.referralSessionId || '';
+  if (response.ok && id) {
+    saveReferralSessionId(id, local);
+    refLog(data.created ? 'session created' : 'session restored', { value: referralCode || data.session?.referrerId || '', referralCode: referralCode || data.session?.referrerId || '', source, referralSessionId: id });
+    return { ...data, referralSessionId: id };
+  }
+  if (referralSessionId) refLog('session missing', { source, referralSessionId, referralCode });
+  return data;
 }
 
 function appendReferralEvent(type, status, details = {}) {

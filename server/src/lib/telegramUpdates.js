@@ -1,6 +1,10 @@
 import { APP_URL } from './config.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { telegramUrl } from '../../../server-shared/telegram.js';
+import { ECONOMY_VERSION, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
+import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
+import { completeReferralSessionAsync, resolveReferralSessionReferrer } from './referralSessions.js';
+import { recordReferralEventAsync } from './referralEvents.js';
 
 const TELEGRAM_HELPER_URL = `${APP_URL}/#/telegram-helper`;
 
@@ -64,32 +68,101 @@ async function tgGetPhotoUrl(userId) {
   }
 }
 
-async function upsertUser(db, from, photoUrl) {
+function canAttachReferral(referrerId, userId) {
+  return !!referrerId && !!userId && referrerId !== userId && !referrerId.startsWith('guest_') && !userId.startsWith('guest_');
+}
+
+async function upsertUser(db, from, photoUrl, referral = {}) {
   const uid      = `tg_${from.id}`;
   const userRef  = db.collection('users').doc(uid);
-  const userSnap = await userRef.get();
   const profilePatch = {
     authProvider: 'telegram',
     displayName: [from.first_name, from.last_name].filter(Boolean).join(' ') || null,
     firstName: from.first_name ?? null,
     lastName:  from.last_name  ?? null,
+    username: from.username ?? null,
     photo:     photoUrl ?? null,
     lastSeen:  FieldValue.serverTimestamp(),
   };
-  if (!userSnap.exists) {
-    await userRef.set({
-      keys: 0, favorites: [], scannedPartners: {},
-      completedTasks: [], streak: 0, onboardingDone: false,
-      scanDates: [], lastBonusDate: new Date().toLocaleDateString('sv'),
-      referredBy: null,
+  const referrerId = String(referral.referrerId || '').trim();
+  const referralSessionId = String(referral.referralSessionId || '').trim();
+  const referralFlowId = String(referral.referralFlowId || '').trim();
+  const referralReward = getEconomyReward('referral');
+  await db.runTransaction(async tx => {
+    const [userSnap, referrerSnap] = await Promise.all([
+      tx.get(userRef),
+      canAttachReferral(referrerId, uid) ? tx.get(db.collection('users').doc(referrerId)) : Promise.resolve(null),
+    ]);
+    const before = userSnap.data() || {};
+    const referrerData = referrerSnap?.exists ? (referrerSnap.data() || {}) : {};
+    const rewardedUsers = Array.isArray(referrerData.referralRewardedUsers) ? referrerData.referralRewardedUsers.map(String) : [];
+    const canReward = canAttachReferral(referrerId, uid)
+      && !!referrerSnap?.exists
+      && !before.referredBy
+      && before.referralBonusGranted !== true
+      && !rewardedUsers.includes(uid);
+    const baseReputation = canReward ? referralReward.reputation : 0;
+    const baseStatus = getReputationStatus(baseReputation);
+    const base = userSnap.exists ? profilePatch : {
+      keys: canReward ? referralReward.keys : 0,
+      reputation: baseReputation,
+      reputationStatus: baseStatus.id,
+      reputationStatusLabel: baseStatus.label,
+      economyVersion: ECONOMY_VERSION,
+      favorites: [],
+      scannedPartners: {},
+      completedTasks: [],
+      streak: 0,
+      onboardingDone: false,
+      scanDates: [],
+      lastBonusDate: new Date().toLocaleDateString('sv'),
+      referredBy: canReward ? referrerId : null,
+      referralBonusGranted: canReward,
+      referralBonusGrantedTo: canReward ? referrerId : null,
+      referralBonusGrantedAt: canReward ? FieldValue.serverTimestamp() : null,
+      referralSessionId: referralSessionId || null,
+      referralFlowId: referralFlowId || null,
       registeredAt: FieldValue.serverTimestamp(),
       ...profilePatch,
+    };
+    const patch = userSnap.exists ? {
+      ...profilePatch,
+      ...(referralSessionId ? { referralSessionId } : {}),
+      ...(referralFlowId ? { referralFlowId } : {}),
+      ...(canReward ? {
+        referredBy: referrerId,
+        referralBonusGranted: true,
+        referralBonusGrantedTo: referrerId,
+        referralBonusGrantedAt: FieldValue.serverTimestamp(),
+        keys: FieldValue.increment(referralReward.keys),
+        reputation: FieldValue.increment(referralReward.reputation),
+        economyVersion: ECONOMY_VERSION,
+      } : {}),
+    } : base;
+    tx.set(userRef, patch, { merge: true });
+    if (!userSnap.exists) tx.set(db.collection('stats').doc('global'), { userCount: FieldValue.increment(1) }, { merge: true });
+    if (canReward) {
+      tx.set(db.collection('users').doc(referrerId), {
+        keys: FieldValue.increment(referralReward.keys),
+        reputation: FieldValue.increment(referralReward.reputation),
+        economyVersion: ECONOMY_VERSION,
+        referralCount: FieldValue.increment(1),
+        referralRewardedUsers: FieldValue.arrayUnion(uid),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+  });
+  if (referrerId) {
+    recordReferralEventAsync(db, {
+      referralFlowId,
+      sessionId: referralSessionId,
+      referrerId,
+      referralCode: referrerId,
+      referredUserId: uid,
+      type: REFERRAL_EVENT_TYPES.SESSION_ATTACHED,
+      status: 'completed',
+      source: 'telegram-bot',
     });
-    db.collection('stats').doc('global')
-      .set({ userCount: FieldValue.increment(1) }, { merge: true })
-      .catch(() => {});
-  } else {
-    await userRef.update(profilePatch);
   }
 }
 
@@ -160,6 +233,11 @@ export async function processTelegramUpdate(db, update, log = console) {
       return { handled: true, kind: 'auth_link' };
     }
 
+    const referralSessionId = String(session.referralSessionId || '').trim();
+    const sessionResolution = referralSessionId
+      ? await resolveReferralSessionReferrer(db, referralSessionId, { markMissing: true, source: 'telegram-bot', userId: tgId })
+      : { referrerId: String(session.referrerId || '').trim(), session: null };
+    const resolvedReferrerId = sessionResolution.referrerId || String(session.referrerId || '').trim();
     await ref.update({
       status:    'done',
       tgUserId:  String(from.id),
@@ -167,10 +245,32 @@ export async function processTelegramUpdate(db, update, log = console) {
       lastName:  from.last_name  ?? '',
       username:  from.username   ?? '',
       photoUrl:  null,
+      referrerId: resolvedReferrerId || null,
+      referralSessionId: referralSessionId || null,
+      referralCompletedAt: resolvedReferrerId ? FieldValue.serverTimestamp() : null,
     });
 
     tgGetPhotoUrl(from.id)
-      .then(photoUrl => upsertUser(db, from, photoUrl))
+      .then(photoUrl => upsertUser(db, from, photoUrl, {
+        referrerId: resolvedReferrerId,
+        referralSessionId,
+        referralFlowId: session.referralFlowId || sessionResolution.session?.data?.flowId || '',
+      }))
+      .then(() => {
+        if (referralSessionId) completeReferralSessionAsync(db, referralSessionId, { userId: tgId, authType: 'telegram', source: 'telegram-bot' });
+        if (resolvedReferrerId) {
+          recordReferralEventAsync(db, {
+            referralFlowId: session.referralFlowId || '',
+            sessionId: referralSessionId,
+            referrerId: resolvedReferrerId,
+            referralCode: resolvedReferrerId,
+            referredUserId: tgId,
+            type: REFERRAL_EVENT_TYPES.SESSION_TELEGRAM_LINKED,
+            status: 'completed',
+            source: 'telegram-bot',
+          });
+        }
+      })
       .catch(error => log.warn?.({ message: error?.message || String(error) }, 'telegram profile background update failed'));
     tgSend(from.id,
       `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,

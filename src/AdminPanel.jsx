@@ -1769,6 +1769,7 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
   const summary = data?.summary || {};
   const diagnostics = data?.diagnostics || {};
   const events = Array.isArray(diagnostics.events) ? diagnostics.events : [];
+  const sessions = Array.isArray(diagnostics.sessions) ? diagnostics.sessions : [];
   const timeline = Array.isArray(diagnostics.timeline) ? diagnostics.timeline : [];
   const problems = Array.isArray(diagnostics.problems) ? diagnostics.problems : [];
   const dashboard = diagnostics.dashboard || {};
@@ -1948,6 +1949,22 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
                 <b>{problem.type}</b> · {problem.message} {problem.flowId ? `· ${problem.flowId}` : ''}
               </div>
             ))}
+          </div>
+        )}
+        {sessions.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: A.text, marginBottom: 8 }}>Referral Sessions</div>
+            <div style={{ display: 'grid', gap: 6, maxHeight: 220, overflow: 'auto' }}>
+              {sessions.slice(0, 12).map(session => (
+                <div key={session.id} style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.9fr 0.8fr 0.8fr 0.9fr', gap: 8, padding: 9, borderRadius: 12, background: A.chip, border: `1px solid ${A.border}`, fontSize: 11, color: A.textSec }}>
+                  <span style={{ color: A.text, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis' }}>{session.id}</span>
+                  <span>{session.referrerId || 'ref —'}</span>
+                  <span>{session.status}{session.completed ? ' ✓' : ''}</span>
+                  <span>{session.authType || session.source || 'source —'}</span>
+                  <span>{session.userId || session.createdAt || 'user —'}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

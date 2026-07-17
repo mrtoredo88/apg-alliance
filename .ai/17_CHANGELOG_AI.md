@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] feat: Referral Session Architecture v2
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/referral-session.js`, `server-shared/referral-observability.js`, `server/src/lib/referralSessions.js`, `server/src/routes/referral-session.js`, `server/src/routes/email-auth.js`, `server/src/routes/telegram-auth-start.js`, `server/src/lib/telegramUpdates.js`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `server/src/server.js`, `src/referralDiagnostics.js`, `src/main.jsx`, `src/EmailAuth.jsx`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `scripts/referral-session-v2-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлена серверная `referralSessions` с TTL, ранним client bootstrap до React render, восстановлением session по `referralSessionId` и новыми событиями observability.
+- Email, Telegram auth и `profile:sync` теперь передают `referralSessionId`; `profile:sync` восстанавливает `referrerId` из серверной session до legacy `referrerId`.
+- Telegram bot при наличии referral session идемпотентно закрывает начисление через текущий economy reward, а админская Referral Diagnostics показывает последние Referral Sessions.
+**Почему:** referral context не должен зависеть от localStorage как единственного носителя при переходах между Telegram, Safari, PWA и reload.
+
+---
+
 ## [2026-07-17] feat: Referral recovery scan
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/referral-state-recovery.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `scripts/referral-recovery-audit.mjs`, `scripts/referral-recovery-scan-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

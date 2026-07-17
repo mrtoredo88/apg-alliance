@@ -73,6 +73,7 @@ import { actorOwnsEditableProfile } from '../../../server-shared/profile-access.
 import { buildReferralRecoveryDecision } from '../../../server-shared/referral-recovery.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
+import { completeReferralSessionAsync, resolveReferralSessionReferrer } from '../lib/referralSessions.js';
 import {
   buildWorkspaceEventBase,
   buildWorkspaceEventDuplicate,
@@ -425,8 +426,10 @@ async function actionProfileSync(db, req, actor) {
       delete profile.emailVerified;
     }
   }
-  const refId = safeUserId(req.body?.referrerId);
-  const referralContext = referralContextFromBody(req.body || {}, { referralCode: refId });
+  const requestedRefId = safeUserId(req.body?.referrerId);
+  const sessionResolution = await resolveReferralSessionReferrer(db, req.body?.referralSessionId || req.body?.sessionId || '', { markMissing: true, source: 'profile-sync', userId }).catch(() => ({ referrerId: '', session: null, status: 'missing' }));
+  const refId = safeUserId(sessionResolution.referrerId || requestedRefId);
+  const referralContext = referralContextFromBody(req.body || {}, { referralCode: refId, referralFlowId: sessionResolution.session?.data?.flowId || '' });
   const hasReferralObservability = Boolean(refId || referralContext.referralFlowId || Array.isArray(req.body?.referralClientEvents));
   if (hasReferralObservability) {
     recordReferralClientEventsAsync(db, req.body?.referralClientEvents, {
@@ -714,6 +717,21 @@ async function actionProfileSync(db, req, actor) {
         source: 'profile-sync',
         metadata: { referralRecoveryStatus, referralRecoveryReason },
       });
+    }
+    if (req.body?.referralSessionId || req.body?.sessionId) {
+      recordReferralEventAsync(db, {
+        ...referralContext,
+        referrerId: effectiveReferrerId,
+        referredUserId: userId,
+        referralCode: refId || referralContext.referralCode,
+        type: REFERRAL_EVENT_TYPES.SESSION_PROFILE_SYNC,
+        status: referralBonusAwarded || userDoc?.referralBonusGranted ? 'completed' : 'info',
+        source: 'profile-sync',
+        metadata: { referralRecoveryStatus, referralRecoveryReason },
+      });
+      if (referralBonusAwarded || userDoc?.referralBonusGranted) {
+        completeReferralSessionAsync(db, req.body?.referralSessionId || req.body?.sessionId || '', { userId, authType: userId.startsWith('tg_') ? 'telegram' : userId.startsWith('email:') ? 'email' : 'profile', source: 'profile-sync' });
+      }
     }
     if (!terminalType && refId && referralRecoveryStatus === 'skipped') {
       recordReferralEventAsync(db, {

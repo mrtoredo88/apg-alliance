@@ -3,6 +3,8 @@ import vkBridge from './vk.js';
 import { App } from './App.jsx';
 import { installNetworkDiagnostics } from './networkDiagnostics.js';
 import { startPwaUpdateManager } from './pwa/PwaUpdateManager.js';
+import { API_BASE_URL } from './constants.js';
+import { ensureServerReferralSession } from './referralDiagnostics.js';
 import './fonts.css';
 import './index.css';
 
@@ -31,6 +33,10 @@ if (_vkHash.includes('access_token=') && window.opener) {
   window.__APG_BOOT_MARK?.('main_module_loaded');
   installNetworkDiagnostics();
   window.__APG_BOOT_MARK?.('network_diagnostics_installed');
+  window.__APG_REFERRAL_SESSION_PROMISE__ = ensureServerReferralSession({ apiBaseUrl: API_BASE_URL, source: 'main_bootstrap' }).catch((error) => {
+    console.info('[REF] session bootstrap skipped', { message: error?.message || String(error) });
+    return null;
+  });
   vkBridge.send('VKWebAppInit').catch(() => {});
   const noServiceWorker = new URLSearchParams(window.location.search).get('no-sw') === '1';
   const renderApp = () => {
