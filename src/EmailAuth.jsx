@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { API_BASE_URL } from './constants.js';
 import { APG2_PROFILE, GlassButton, GlassInput } from './components/Apg2ProfileGlass.jsx';
 import { logError } from './errorLogger.js';
+import { readPendingReferral, refLog } from './referralDiagnostics.js';
 
 const SPINNER = (
   <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', verticalAlign: 'middle' }} />
@@ -18,7 +19,8 @@ export function EmailAuth({ onCancel, onSuccess }) {
     if (!isValid || loading) return;
     setLoading(true);
     setError('');
-    const ref = localStorage.getItem('apg_pending_ref') ?? undefined;
+    const ref = readPendingReferral({ source: 'EmailAuth.login' }) || undefined;
+    refLog('auth start', { provider: 'email', hasReferral: !!ref, value: ref || null });
     try {
       const res = await fetch(`${API_BASE_URL}/api/email-auth`, {
         method: 'POST',
@@ -27,11 +29,12 @@ export function EmailAuth({ onCancel, onSuccess }) {
       });
       const data = await res.json();
       if (!data.ok) {
+        refLog('auth error', { provider: 'email', reason: data.error || data.message || 'unknown', hasReferral: !!ref });
         setError(data.message || 'Ошибка входа. Попробуйте снова.');
       } else {
-        if (ref) localStorage.removeItem('apg_pending_ref');
+        refLog('auth success', { provider: 'email', userId: data.user?.id || data.canonicalUserId || null, hasReferral: !!ref });
         if (onSuccess) {
-          onSuccess(data.user, data);
+          onSuccess(data.user, { ...data, ref, referrerId: ref });
         } else {
           localStorage.setItem('apg_email_user', JSON.stringify(data.user));
           window.location.reload();

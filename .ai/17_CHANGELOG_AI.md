@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] fix: Email referral lifecycle
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/referralDiagnostics.js`, `src/EmailAuth.jsx`, `src/UserApp.jsx`, `scripts/referral-lifecycle-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Реферальный `apg_pending_ref` больше не очищается auth-cleanup и EmailAuth до подтверждённого `profile:sync`.
+- Email login передаёт `referrerId` в финальный `profile:sync`, который начисляет пригласившему ключи, `referralCount` и `referralRewardedUsers`.
+- Добавлена production-диагностика `[REF]` и regression-тест жизненного цикла реферала.
+**Почему:** при регистрации по email сервер создавал пользователя с `referredBy`, но клиент удалял referral до `profile:sync`, поэтому пригласивший не получал друга и ключи.
+
+---
+
 ## [2026-07-17] fix: QR partner back navigation context
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/UserApp.jsx`, `scripts/partner-deeplink-test.mjs`, `.ai/17_CHANGELOG_AI.md`

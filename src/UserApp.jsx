@@ -36,6 +36,7 @@ import { formatRelativeTime } from './utils/time.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import { clearPendingReferral, readPendingReferral, refLog } from './referralDiagnostics.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { getRoleDiagnostics } from './roleEngine.js';
@@ -651,7 +652,6 @@ const USER_AUTH_STORAGE_KEYS = [
   'apg_request_notification_after_login',
   'apg_notif_enabled',
   'apg_notif_consent',
-  'apg_pending_ref',
   'apg_loki_memory',
   'apg_loki_user_memory',
 ];
@@ -935,17 +935,8 @@ export function UserApp() {
     return v ? Number(v) : null;
   });
 
-  // Реферальный параметр из URL (разовое чтение при монтировании)
-  const pendingRefId = useMemo(() => {
-    const fromHash   = window.location.hash.match(/[#&]ref[=_](\w+)/)?.[1];
-    const fromSearch = new URLSearchParams(window.location.search).get('ref');
-    const fromUrl = fromHash ?? fromSearch ?? null;
-    if (fromUrl) {
-      localStorage.setItem('apg_pending_ref', fromUrl);
-      return fromUrl;
-    }
-    return localStorage.getItem('apg_pending_ref') ?? null;
-  }, []);
+  // Реферальный параметр из URL должен переживать refresh/PWA-install до подтверждённого profile:sync.
+  const pendingRefId = useMemo(() => readPendingReferral({ source: 'UserApp.mount' }), []);
 
   // Deep link на конкретного партнёра: #partner_ID или ?partner=ID
   const pendingPartnerId = useMemo(() => {
@@ -1737,8 +1728,9 @@ export function UserApp() {
                 .then(snap => { if (isMounted.current) setUserRank(snap.data().count + 1); })
                 .catch(() => {});
 
-              const existingRefId = !String(userData.id).startsWith('guest_') && pendingRefId && pendingRefId !== String(userData.id) && !data.referredBy && data.referralBonusGranted !== true
-                ? pendingRefId
+              const activePendingRefId = readPendingReferral({ source: 'UserApp.profileSync.existing' }) || pendingRefId;
+              const existingRefId = !String(userData.id).startsWith('guest_') && activePendingRefId && activePendingRefId !== String(userData.id) && !data.referredBy && data.referralBonusGranted !== true
+                ? activePendingRefId
                 : null;
               const syncExistingPayload = {
                 userId: String(userData.id),
@@ -1746,8 +1738,14 @@ export function UserApp() {
                 ...(existingRefId ? { referrerId: existingRefId } : {}),
               };
               const handleReferralSyncResult = result => {
-                if (!result?.referralBonusAwarded || !isMounted.current) return;
-                localStorage.removeItem('apg_pending_ref');
+                if (!isMounted.current) return;
+                if (!result?.referralBonusAwarded) {
+                  if (existingRefId) refLog('reward skipped', { stage: 'existing_profile_sync', referrerId: existingRefId, userId: userData.id });
+                  return;
+                }
+                clearPendingReferral('profile_sync_awarded');
+                refLog('friend added', { referrerId: existingRefId, userId: userData.id });
+                refLog('reward granted', { referrerId: existingRefId, userId: userData.id, keys: 2 });
                 setUserKeys(prev => prev + 2);
                 setUserReputation(prev => prev + 8);
                 setTimeout(() => {
@@ -1773,7 +1771,8 @@ export function UserApp() {
             } else {
               // Новый пользователь
               const isRealUser = !String(userData.id).startsWith('guest_');
-              const refId = isRealUser ? pendingRefId : null;
+              const activePendingRefId = readPendingReferral({ source: 'UserApp.profileSync.newUser' }) || pendingRefId;
+              const refId = isRealUser ? activePendingRefId : null;
 
               const isValidRef = refId && refId !== String(userData.id);
               let pendingConsents = null;
@@ -1784,7 +1783,7 @@ export function UserApp() {
                   pendingConsents = parsed;
                 }
               } catch {}
-              await userAction('profile:sync', {
+              const syncResult = await userAction('profile:sync', {
                 userId: String(userData.id),
                 profile: { ...userData, ...profilePatch },
                 referrerId: refId,
@@ -1797,16 +1796,20 @@ export function UserApp() {
               });
               if (pendingConsents) localStorage.removeItem('apg_pending_consents');
 
-              if (isValidRef) {
-                localStorage.removeItem('apg_pending_ref');
+              if (syncResult?.referralBonusAwarded) {
+                clearPendingReferral('profile_sync_awarded');
+                refLog('friend added', { referrerId: refId, userId: userData.id });
+                refLog('reward granted', { referrerId: refId, userId: userData.id, keys: 2 });
                 if (isMounted.current) {
                   setTimeout(() => {
                     if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
                   }, 1800);
                 }
+              } else if (isValidRef) {
+                refLog('reward skipped', { stage: 'new_profile_sync', referrerId: refId, userId: userData.id, reason: 'server_not_awarded' });
               }
 
-              if (isValidRef) setUserKeys(2);
+              if (syncResult?.referralBonusAwarded) setUserKeys(2);
               if (pendingConsents) {
                 setShowOnboarding(true);
               } else if (!CONSENT_SCREEN_DISABLED_FOR_DEMO && isRealUser && isMounted.current) {
@@ -2694,12 +2697,15 @@ export function UserApp() {
 
   const handleEmailAuthSuccess = useCallback(async (emailUser, authPayload = {}) => {
     if (!emailUser?.id) return;
+    const authRefId = authPayload?.referrerId || authPayload?.ref || readPendingReferral({ source: 'UserApp.emailAuthSuccess' }) || null;
     setConsentError('');
     traceAuthStage('AUTH_STARTED', { provider: 'email', profileId: emailUser.id, hasToken: !!authPayload?.token });
+    refLog('auth start', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId, value: authRefId });
     try {
       if (authPayload?.token) {
         await signInWithCustomToken(auth, authPayload.token);
         traceAuthStage('AUTH_SUCCESS', { provider: 'email', profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
+        refLog('auth success', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId });
       }
       await waitForFirebaseUser(String(emailUser.id));
       traceAuthStage('AUTH_STATE_READY', {
@@ -2712,7 +2718,19 @@ export function UserApp() {
       const profileResult = await userAction('profile:sync', {
         userId: String(emailUser.id),
         profile: emailUser,
+        ...(authRefId ? { referrerId: authRefId } : {}),
       });
+      if (profileResult?.created) {
+        refLog('user created', { provider: 'email', userId: emailUser.id, referrerId: authRefId || null });
+      }
+      if (profileResult?.referralBonusAwarded) {
+        clearPendingReferral('email_profile_sync_awarded');
+        refLog('referral attached', { provider: 'email', userId: emailUser.id, referrerId: authRefId });
+        refLog('friend added', { referrerId: authRefId, userId: emailUser.id });
+        refLog('reward granted', { referrerId: authRefId, userId: emailUser.id, keys: 2 });
+      } else if (authRefId) {
+        refLog('reward skipped', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: 'server_not_awarded' });
+      }
       const data = profileResult?.user || {};
       const consentRequired = profileResult?.consentRequired !== undefined
         ? !!profileResult.consentRequired
