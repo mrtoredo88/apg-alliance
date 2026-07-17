@@ -17,7 +17,7 @@
 
 ## [2026-07-17] fix: Partner QR deep links
 **Коммит:** `см. финальный отчёт`
-**Файлы:** `src/UserApp.jsx`, `scripts/partner-deeplink-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Файлы:** `src/UserApp.jsx`, `scripts/partner-deeplink-test.mjs`, `package.json`, `vercel.json`, `.ai/17_CHANGELOG_AI.md`
 **Тип:** fix
 **Что изменено:**
 - `/partner/:id` теперь стартует в разделе партнёров и открывает карточку через общий resolver, а не через fallback на главную.
