@@ -1,3 +1,5 @@
+import { getLocationById, getMainLocation } from './locations.js';
+
 export const BOOKING_STATUSES = {
   pending: 'pending',
   new: 'new',
@@ -418,20 +420,27 @@ export function buildBookingSlots({ date, service, specialist, profile } = {}) {
 
 export function buildBookingProfile(profile = {}, type = 'partner') {
   const providerType = type === 'expert' ? 'expert' : 'partner';
+  const mainLocation = providerType === 'partner'
+    ? (profile.locationId ? getLocationById(profile, profile.locationId) : getMainLocation(profile))
+    : null;
   const services = buildBookingServices(profile);
   const specialists = buildBookingSpecialists(profile, services);
   return {
     providerType,
     providerId: text(profile.id, 160),
     title: text(profile.name || profile.title || (providerType === 'expert' ? 'Эксперт АПГ' : 'Партнер АПГ'), 180),
-    subtitle: text(profile.specialization || profile.categoryLabel || profile.address || '', 220),
-    address: text(profile.address || profile.location || '', 260),
-    phone: text(profile.phone || '', 80),
+    subtitle: text(profile.specialization || profile.categoryLabel || mainLocation?.address || profile.address || '', 220),
+    address: text(mainLocation?.address || profile.address || profile.location || '', 260),
+    phone: text(mainLocation?.phone || profile.phone || '', 80),
+    locationId: text(profile.locationId || mainLocation?.id || '', 120),
+    locationTitle: text(profile.locationTitle || mainLocation?.title || '', 160),
+    locationPhone: text(mainLocation?.phone || profile.phone || '', 80),
+    locationAddress: text(mainLocation?.address || profile.address || profile.location || '', 260),
     image: text(profile.logoUrl || profile.photo || profile.coverPhoto || '', 1000),
     enabled: isOnlineBookingEnabled(profile),
     services,
     specialists,
-    schedule: profile.bookingSchedule || profile.workingHours || profile.hours || null,
+    schedule: profile.bookingSchedule || mainLocation?.workingHours || profile.workingHours || profile.hours || null,
     settings: profile.bookingSettings || {},
   };
 }
@@ -444,12 +453,14 @@ export function buildBookingDialogContext(booking = {}) {
     objectId: text(booking.id || booking.bookingId, 180),
     bookingId: text(booking.id || booking.bookingId, 180),
     title: text(booking.providerName || booking.title || 'Встреча'),
-    subtitle: [booking.serviceTitle, booking.dateLabel, booking.time].filter(Boolean).join(' · '),
+    subtitle: [booking.serviceTitle, booking.locationTitle, booking.dateLabel, booking.time].filter(Boolean).join(' · '),
     parentTitle: text(booking.providerName || ''),
     label: 'Встреча',
     description: text(booking.comment || booking.serviceDescription || ''),
     address: text(booking.address || ''),
     phone: text(booking.providerPhone || ''),
+    locationId: text(booking.locationId || ''),
+    locationTitle: text(booking.locationTitle || ''),
     date: [booking.dateLabel, booking.time].filter(Boolean).join(' '),
     durationMinutes: Number(booking.durationMinutes || 0) || '',
     price: text(booking.price || ''),

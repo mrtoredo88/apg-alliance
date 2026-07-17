@@ -231,6 +231,67 @@ function ContactsTab({ draft, update }) {
   );
 }
 
+function LocationsTab({ draft, update }) {
+  const locations = Array.isArray(draft.locations) ? draft.locations : [];
+  const updateLocation = (index, patch) => update({
+    locations: locations.map((item, i) => i === index ? { ...item, ...patch } : item),
+  });
+  const addLocation = () => update({
+    locations: [
+      ...locations,
+      {
+        id: `location-${Date.now()}`,
+        title: '',
+        address: '',
+        phone: draft.phone || '',
+        workingHours: draft.hours || '',
+        coordinates: null,
+        comment: '',
+        isMain: locations.length === 0,
+      },
+    ],
+  });
+  const removeLocation = (index) => {
+    const next = locations.filter((_, i) => i !== index);
+    update({ locations: next.map((item, i) => ({ ...item, isMain: next.some(row => row.isMain) ? item.isMain : i === 0 })) });
+  };
+  const setMain = (index) => update({ locations: locations.map((item, i) => ({ ...item, isMain: i === index })) });
+  return (
+    <GlassSection title="Локации">
+      <div style={{ display: 'grid', gap: 12 }}>
+        <GlassCard style={{ borderRadius: 28 }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 880 }}>Филиалы и точки организации</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>Если локация одна, публичная карточка выглядит как раньше. При нескольких локациях клиент сможет выбрать филиал перед записью.</div>
+          <GlassButton onClick={addLocation} tone="gold" style={{ marginTop: 12, minHeight: 42, borderRadius: 18, color: '#17120a' }}>Добавить филиал</GlassButton>
+        </GlassCard>
+        {!locations.length && (
+          <EmptyStateV2 icon="📍" title="Локаций пока нет" text="Старый адрес карточки продолжит работать как основная локация." action={<GlassButton onClick={addLocation}>Добавить локацию</GlassButton>} />
+        )}
+        {locations.map((location, index) => (
+          <GlassCard key={location.id || index} style={{ borderRadius: 28, display: 'grid', gap: 9, border: location.isMain ? '1px solid rgba(201,168,76,0.42)' : undefined }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 880 }}>{location.isMain ? 'Главная локация' : `Локация ${index + 1}`}</div>
+              {location.isMain ? <GlassBadge tone="gold">Главная</GlassBadge> : <GlassButton onClick={() => setMain(index)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px' }}>Сделать главной</GlassButton>}
+            </div>
+            <Field label="Название филиала"><GlassInput value={location.title || ''} onChange={e => updateLocation(index, { title: e.target.value })} placeholder="Центральный салон" style={inputStyle} /></Field>
+            <Field label="Адрес"><GlassInput value={location.address || ''} onChange={e => updateLocation(index, { address: e.target.value })} placeholder="Зеленоград, корпус..." style={inputStyle} /></Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Field label="Телефон"><GlassInput value={location.phone || ''} onChange={e => updateLocation(index, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></Field>
+              <Field label="График"><GlassInput value={location.workingHours || ''} onChange={e => updateLocation(index, { workingHours: e.target.value })} placeholder="Пн-Пт 10:00-20:00" style={inputStyle} /></Field>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Field label="Широта"><GlassInput value={location.coordinates?.latitude ?? ''} onChange={e => updateLocation(index, { coordinates: { ...(location.coordinates || {}), latitude: e.target.value } })} inputMode="decimal" style={inputStyle} /></Field>
+              <Field label="Долгота"><GlassInput value={location.coordinates?.longitude ?? ''} onChange={e => updateLocation(index, { coordinates: { ...(location.coordinates || {}), longitude: e.target.value } })} inputMode="decimal" style={inputStyle} /></Field>
+            </div>
+            <Field label="Комментарий"><TextArea value={location.comment || ''} onChange={comment => updateLocation(index, { comment })} rows={2} placeholder="Например: вход со двора, парковка рядом." /></Field>
+            <GlassButton onClick={() => removeLocation(index)} style={{ minHeight: 38, borderRadius: 16 }}>Удалить филиал</GlassButton>
+          </GlassCard>
+        ))}
+      </div>
+    </GlassSection>
+  );
+}
+
 function AboutTab({ draft, update, roleId }) {
   return (
     <GlassSection title={roleId === 'expert' ? 'О эксперте' : 'О бизнесе'}>
@@ -452,10 +513,16 @@ export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSa
   const completion = useMemo(() => calculateShowcaseCompletion(draft, roleId), [draft, roleId]);
   const tips = useMemo(() => buildShowcaseLokiTips(draft, roleId), [draft, roleId]);
   const analytics = useMemo(() => buildShowcaseAnalytics(profile, relatedEvents), [profile, relatedEvents]);
-  const tabTitle = SHOWCASE_TABS.find(tab => tab.id === activeTab)?.label || 'Витрина';
+  const visibleTabs = useMemo(() => SHOWCASE_TABS.filter(tab => !tab.roles || tab.roles.includes(roleId)), [roleId]);
+  const tabTitle = visibleTabs.find(tab => tab.id === activeTab)?.label || 'Витрина';
+
+  useEffect(() => {
+    if (!visibleTabs.some(tab => tab.id === activeTab)) setActiveTab(visibleTabs[0]?.id || 'showcase');
+  }, [activeTab, visibleTabs]);
 
   const renderTab = () => {
     if (activeTab === 'showcase') return <ShowcaseTab draft={draft} update={update} roleId={roleId} publicUrl={publicUrl} />;
+    if (activeTab === 'locations' && roleId === 'partner') return <LocationsTab draft={draft} update={update} />;
     if (activeTab === 'media') return <MediaTab draft={draft} update={update} roleId={roleId} profileId={profile?.id} />;
     if (activeTab === 'contacts') return <ContactsTab draft={draft} update={update} />;
     if (activeTab === 'about') return <AboutTab draft={draft} update={update} roleId={roleId} />;
@@ -480,7 +547,7 @@ export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSa
       </GlassCard>
 
       <div style={{ display: 'flex', gap: 7, overflowX: 'auto', padding: '12px 0 4px', WebkitOverflowScrolling: 'touch' }}>
-        {SHOWCASE_TABS.map(tab => (
+        {visibleTabs.map(tab => (
           <GlassButton key={tab.id} tone={activeTab === tab.id ? 'gold' : 'glass'} onClick={() => setActiveTab(tab.id)} style={{ minHeight: 38, borderRadius: 18, padding: '8px 11px', whiteSpace: 'nowrap', color: activeTab === tab.id ? '#17120a' : APG2_PROFILE.text }}>
             {tab.short}
           </GlassButton>

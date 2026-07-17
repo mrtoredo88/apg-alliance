@@ -32,6 +32,7 @@ import { buildLivingProfileTabs } from './profileTimeline.js';
 import { getCanonicalNewsId } from './newsUtils.js';
 import { LivingFeedArticleSheet } from './components/LivingFeedArticleSheet.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
+import { getMainLocation, getProfileLocations, hasMultipleLocations, locationToProvider } from '../server-shared/locations.js';
 import { APG2_PROFILE as APG2, ContactCard, GlassBadge, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { ProfilePhotoGrid, ProfilePhotoViewer, ProfileVideoGrid, ProfileVideoViewer } from './components/ProfileMediaViewer.jsx';
 import {
@@ -316,6 +317,9 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const similar = partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6);
   const avgRating = partner.avgRating ?? 0;
   const reviewCount = partner.reviewCount ?? reviews.length;
+  const locations = getProfileLocations(partner);
+  const mainLocation = getMainLocation(partner);
+  const multipleLocations = hasMultipleLocations(partner);
 
   const openVkGroup = () => {
     trackAppEvent('partner:site_open', {
@@ -327,35 +331,40 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     });
     openNormalizedUrl(openUrl, partner.vkGroupUrl || partner.vkUrl || partner.socialUrl, { platform: 'vk' });
   };
-  const handlePhone = () => {
-    if (!partner.phone) return;
+  const handlePhone = (location = mainLocation) => {
+    const phone = location?.phone || partner.phone;
+    if (!phone) return;
     trackAppEvent('partner:call', {
       type: APG_EVENT_TYPES.PARTNER_CALLED,
       user,
       entityType: 'partner',
       entityId: partner.id,
-      payload: { partnerId: partner.id, title: partner.name },
+      payload: { partnerId: partner.id, title: partner.name, locationId: location?.id || '' },
     });
     // Копируем номер в буфер — VK WebView блокирует tel: схему
-    vkBridge.send('VKWebAppCopyText', { text: partner.phone }).catch(() => {
-      navigator.clipboard?.writeText(partner.phone).catch(() => {});
+    vkBridge.send('VKWebAppCopyText', { text: phone }).catch(() => {
+      navigator.clipboard?.writeText(phone).catch(() => {});
     });
     setPhoneCopied(true);
     clearTimeout(phoneCopyTimerRef.current);
     phoneCopyTimerRef.current = setTimeout(() => setPhoneCopied(false), 3000);
     // Попытка открыть диалер (может сработать в браузере)
-    openUrl(`tel:${partner.phone.replace(/\s/g, '')}`);
+    openUrl(`tel:${phone.replace(/\s/g, '')}`);
   };
-  const handleMap   = () => {
-    if (!partner.address) return;
+  const handleMap   = (location = mainLocation) => {
+    const address = location?.address || partner.address;
+    if (!address) return;
     trackAppEvent('partner:route', {
       type: APG_EVENT_TYPES.PARTNER_ROUTE_BUILT,
       user,
       entityType: 'partner',
       entityId: partner.id,
-      payload: { partnerId: partner.id, title: partner.name, address: partner.address },
+      payload: { partnerId: partner.id, title: partner.name, address, locationId: location?.id || '' },
     });
-    openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(partner.address + ', Зеленоград')}`);
+    openUrl(`https://yandex.ru/maps/?text=${encodeURIComponent(address + ', Зеленоград')}`);
+  };
+  const handleBookLocation = (location = mainLocation) => {
+    onBook?.(locationToProvider(partner, location));
   };
   const openPartnerUrl = (url, target = 'site', options = undefined) => {
     trackAppEvent('partner:site_open', {
@@ -389,7 +398,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     const textLines = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,
       `🎁 ${partner.offer || 'Скоро будут спецпредложения'}`,
-      partner.address && `📍 ${partner.address}`,
+      (mainLocation?.address || partner.address) && `📍 ${mainLocation?.address || partner.address}`,
       '',
       'Присоединяйся к программе лояльности АПГ.',
       `👉 ${deepLink}`,
@@ -419,9 +428,9 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   };
 
   const infoRows = [
-    partner.hours   && { icon:'🕐', label:'Часы работы', value:partner.hours },
-    partner.address && { icon:'📍', label:'Адрес',       value:partner.address, onClick:handleMap },
-    partner.phone   && { icon:'📞', label:'Телефон',     value:partner.phone,   onClick:handlePhone },
+    (mainLocation?.workingHours || partner.hours) && { icon:'🕐', label:'Часы работы', value:mainLocation?.workingHours || partner.hours },
+    (mainLocation?.address || partner.address) && { icon:'📍', label:'Адрес',       value:mainLocation?.address || partner.address, onClick:() => handleMap(mainLocation) },
+    (mainLocation?.phone || partner.phone) && { icon:'📞', label:'Телефон',     value:mainLocation?.phone || partner.phone,   onClick:() => handlePhone(mainLocation) },
   ].filter(Boolean);
 
   const ratingLabel = avg => avg >= 4.7 ? 'Отлично' : avg >= 4.0 ? 'Хорошо' : avg >= 3.0 ? 'Неплохо' : avg >= 2.0 ? 'Так себе' : 'Плохо';
@@ -438,12 +447,13 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     const heroBadges = [
       partner.categoryLabel,
       avgRating > 0 ? `★ ${avgRating.toFixed(1)} · ${reviewCount}` : null,
+      multipleLocations ? `${locations.length} локации` : null,
       partner.distance,
     ].filter(Boolean);
     const cta = [
-      partner.phone && { label: phoneCopied ? 'Номер скопирован' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', onClick: handlePhone, tone: 'gold' },
-      partner.address && { label: 'Маршрут', icon: '📍', onClick: handleMap },
-      canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(partner), tone: 'gold' },
+      (mainLocation?.phone || partner.phone) && { label: phoneCopied ? 'Номер скопирован' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', onClick: () => handlePhone(mainLocation), tone: 'gold' },
+      (mainLocation?.address || partner.address) && { label: 'Маршрут', icon: '📍', onClick: () => handleMap(mainLocation) },
+      canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => handleBookLocation(mainLocation), tone: 'gold' },
       !canUseApgBooking && !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
       !isVK() && partner.websiteUrl && { label: 'Сайт', icon: '🌐', onClick: () => openPartnerUrl(partner.websiteUrl, 'website') },
       partnerVkUrl && { label: 'VK', icon: '🔵', onClick: openVkGroup },
@@ -487,20 +497,20 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         hasVideos && { id: 'video', label: 'Видео', value: partner.videos.length, icon: '▶' },
       ].filter(Boolean);
       const heroActions = [
-        partner.phone && { label: 'Позвонить', icon: '📞', onClick: handlePhone, tone: 'gold' },
-        canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => onBook(partner), tone: 'gold' },
+        (mainLocation?.phone || partner.phone) && { label: 'Позвонить', icon: '📞', onClick: () => handlePhone(mainLocation), tone: 'gold' },
+        canUseApgBooking && { label: 'Записаться', icon: '📅', onClick: () => handleBookLocation(mainLocation), tone: 'gold' },
         !canUseApgBooking && !isVK() && partner.bookingUrl && { label: 'Записаться', icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking'), tone: 'gold' },
         onAskQuestion && { label: 'Написать', icon: '💬', onClick: () => onAskQuestion(partner), tone: 'gold' },
       ].filter(Boolean).map(item => ({ id: item.label, label: item.label, icon: item.icon, tone: item.tone, onClick: item.onClick }));
       const stickyActions = [
-        partner.phone && { id: 'call', label: phoneCopied ? 'Скопировано' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', tone: 'gold', onClick: handlePhone },
+        (mainLocation?.phone || partner.phone) && { id: 'call', label: phoneCopied ? 'Скопировано' : 'Позвонить', icon: phoneCopied ? '✓' : '📞', tone: 'gold', onClick: () => handlePhone(mainLocation) },
         onAskQuestion && { id: 'question', label: 'Написать', icon: '💬', onClick: () => onAskQuestion(partner) },
         { id: 'favorite', label: isFavorite ? 'В избранном' : 'В избранное', icon: isFavorite ? '♥' : '♡', onClick: () => onToggleFavorite(partner.id) },
       ].filter(Boolean);
       const contactItems = [
-        partner.phone && { id: 'phone', label: 'Телефон', value: partner.phone, icon: '📞', onClick: handlePhone },
-        partner.address && { id: 'address', label: 'Адрес', value: partner.address, icon: '📍', onClick: handleMap },
-        partner.hours && { id: 'hours', label: 'График', value: partner.hours, icon: '🕐' },
+        (mainLocation?.phone || partner.phone) && { id: 'phone', label: 'Телефон', value: mainLocation?.phone || partner.phone, icon: '📞', onClick: () => handlePhone(mainLocation) },
+        (mainLocation?.address || partner.address) && { id: 'address', label: 'Адрес', value: mainLocation?.address || partner.address, icon: '📍', onClick: () => handleMap(mainLocation) },
+        (mainLocation?.workingHours || partner.hours) && { id: 'hours', label: 'График', value: mainLocation?.workingHours || partner.hours, icon: '🕐' },
       ].filter(Boolean);
       const socialItems = [
         !canUseApgBooking && !isVK() && partner.bookingUrl && { id: 'booking', label: 'Запись', value: partner.bookingUrl, icon: '📅', onClick: () => openPartnerUrl(partner.bookingUrl, 'booking') },
@@ -567,9 +577,9 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               avatar={<PartnerLogo partner={partner} size={74} />}
               status={status}
               title={partner.name}
-              subtitle={partner.categoryLabel || partner.address || 'Партнёр АПГ'}
+              subtitle={partner.categoryLabel || mainLocation?.address || partner.address || 'Партнёр АПГ'}
               badges={heroBadges.map(label => ({ id: label, label, tone: String(label).includes('★') ? 'gold' : undefined }))}
-              description={partner.offer || partner.description || partner.address || 'Проверенное место в экосистеме АПГ.'}
+              description={partner.offer || partner.description || mainLocation?.address || partner.address || 'Проверенное место в экосистеме АПГ.'}
               meta={<DesktopInfoGrid columns="repeat(auto-fit, minmax(118px, 1fr))" items={kpiItems.map(item => ({ ...item, style: { minHeight: 54, padding: 11 } }))} />}
               actions={<DesktopHeroActions actions={heroActions} style={{ marginBottom: 4 }} />}
             />
@@ -589,7 +599,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   onOpenNews={handleOpenProfileNews}
                   onOpenEvent={onOpenEvent}
                   onOpenTab={setDesktopTab}
-                  onOpenBooking={() => onBook?.(partner)}
+                  onOpenBooking={() => handleBookLocation(mainLocation)}
                 />
               </DesktopSection>
             )}
@@ -617,6 +627,30 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   {contactItems.length > 0 && (
                     <div style={{ borderRadius: 22, padding: 14, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
                       <DesktopMeta items={contactItems} />
+                    </div>
+                  )}
+                  {multipleLocations && (
+                    <div style={{ gridColumn: '1 / -1', borderRadius: 22, padding: 14, background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.09)' }}>
+                      <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 860, marginBottom: 10 }}>Локации</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
+                        {locations.map(location => (
+                          <div key={location.id} style={{ borderRadius: 20, padding: 13, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: location.isMain ? '1px solid rgba(201,168,76,0.34)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', display: 'grid', gap: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 880 }}>{location.title || 'Локация'}</div>
+                                {location.address && <div style={{ color: APG2.textSoft, fontSize: 12.5, lineHeight: '17px', marginTop: 3 }}>{location.address}</div>}
+                              </div>
+                              {location.isMain && <GlassBadge tone="gold">Главная</GlassBadge>}
+                            </div>
+                            {(location.workingHours || location.phone) && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '16px' }}>{[location.workingHours, location.phone].filter(Boolean).join(' · ')}</div>}
+                            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                              {location.phone && <GlassButton onClick={() => handlePhone(location)} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px' }}>Позвонить</GlassButton>}
+                              {location.address && <GlassButton onClick={() => handleMap(location)} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px' }}>Маршрут</GlassButton>}
+                              {canUseApgBooking && <GlassButton onClick={() => handleBookLocation(location)} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', color: '#17120a' }}>Записаться</GlassButton>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                   {socialItems.length > 0 && (
@@ -654,7 +688,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                         {offerEndLabel && <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>До {offerEndLabel}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {canUseApgBooking && <GlassButton onClick={() => onBook(partner)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
+                        {canUseApgBooking && <GlassButton onClick={() => handleBookLocation(mainLocation)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
                         {onAskQuestion && <GlassButton onClick={() => onAskQuestion(partner)} style={{ minHeight: 40, borderRadius: 16, color: '#fff', background: 'rgba(255,255,255,0.16)' }}>Написать</GlassButton>}
                       </div>
                     </div>
@@ -759,7 +793,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               status={status}
               avatar={<PartnerLogo partner={partner} size={64} />}
               badges={heroBadges}
-              description={partner.offer || partner.description || partner.address || 'Проверенное место в экосистеме АПГ.'}
+              description={partner.offer || partner.description || mainLocation?.address || partner.address || 'Проверенное место в экосистеме АПГ.'}
             />
 
             <GlassSection title="Действия">
@@ -1093,6 +1127,31 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         {/* Видео */}
         <VideoSection videos={partner.videos} />
 
+        {multipleLocations && (
+          <div style={{ margin:'12px 16px' }}>
+            <div style={{ fontSize:13, color:T.gold, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>✦ Локации</div>
+            <div style={{ display:'grid', gap:10 }}>
+              {locations.map(location => (
+                <div key={location.id} style={{ ...GLASS, borderRadius:24, padding:'14px 16px', border: location.isMain ? `1px solid ${T.gold}55` : GLASS.border }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:10, alignItems:'flex-start' }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:15, color:T.textPri, fontWeight:800 }}>{location.title || 'Локация'}</div>
+                      {location.address && <div style={{ fontSize:13, color:T.textSec, lineHeight:'18px', marginTop:4 }}>{location.address}</div>}
+                    </div>
+                    {location.isMain && <span style={{ borderRadius:999, padding:'4px 8px', color:T.gold, background:T.gold+'18', border:`1px solid ${T.gold}33`, fontSize:10, fontWeight:800 }}>Главная</span>}
+                  </div>
+                  {(location.workingHours || location.phone) && <div style={{ fontSize:12, color:T.textSec, lineHeight:'17px', marginTop:8 }}>{[location.workingHours, location.phone].filter(Boolean).join(' · ')}</div>}
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:7, marginTop:10 }}>
+                    {location.phone && <button onClick={() => handlePhone(location)} style={{ minHeight:38, borderRadius:14, border:`1px solid ${T.border}`, background:T.chipBg, color:T.textPri, fontSize:12, fontWeight:800 }}>Позвонить</button>}
+                    {location.address && <button onClick={() => handleMap(location)} style={{ minHeight:38, borderRadius:14, border:`1px solid ${T.border}`, background:T.chipBg, color:T.textPri, fontSize:12, fontWeight:800 }}>Маршрут</button>}
+                    {canUseApgBooking && <button onClick={() => handleBookLocation(location)} style={{ minHeight:38, borderRadius:14, border:'none', background:`linear-gradient(135deg,${T.gold},${T.goldL})`, color:'#0F0F1A', fontSize:12, fontWeight:800 }}>Записаться</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Отзывы */}
         <div style={{ margin:'12px 16px' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
@@ -1212,9 +1271,9 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
         {/* Кнопки действий */}
         <div style={{ margin:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-          {partner.phone && (
+          {(mainLocation?.phone || partner.phone) && (
             <div>
-              <button onClick={handlePhone} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background: phoneCopied ? `linear-gradient(135deg,#2d7a2d,#1e5e1e)` : `linear-gradient(135deg,${T.green},#3a9a3a)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', transition:'background 0.3s' }}>
+              <button onClick={() => handlePhone(mainLocation)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background: phoneCopied ? `linear-gradient(135deg,#2d7a2d,#1e5e1e)` : `linear-gradient(135deg,${T.green},#3a9a3a)`, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', transition:'background 0.3s' }}>
                 {phoneCopied ? '✓ Номер скопирован' : '📞 Позвонить'}
               </button>
               {phoneCopied && (
@@ -1222,7 +1281,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   <span style={{ fontSize:20 }}>📋</span>
                   <div>
                     <div style={{ fontSize:11, color:T.green, fontWeight:700, marginBottom:2 }}>Номер в буфере обмена</div>
-                    <div style={{ fontSize:16, color:T.textPri, fontWeight:700, letterSpacing:1 }}>{partner.phone}</div>
+                    <div style={{ fontSize:16, color:T.textPri, fontWeight:700, letterSpacing:1 }}>{mainLocation?.phone || partner.phone}</div>
                   </div>
                 </div>
               )}
@@ -1233,7 +1292,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               📅 Записаться онлайн
             </button>
           )}
-          {partner.address && <button onClick={handleMap} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
+          {(mainLocation?.address || partner.address) && <button onClick={() => handleMap(mainLocation)} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', background:'linear-gradient(135deg,#FF6600,#FF8C00)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>🗺️ Проложить маршрут</button>}
           {!isVK() && partner.websiteUrl && partner.websiteUrl !== partnerVkUrl && (() => {
             const isVkLink = /vk\.com|vkontakte\.ru/i.test(partner.websiteUrl);
             return isVkLink

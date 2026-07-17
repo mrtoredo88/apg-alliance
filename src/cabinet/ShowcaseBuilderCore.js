@@ -1,4 +1,5 @@
 import { normalizeExternalUrl } from '../utils/externalUrls.js';
+import { normalizeLocationsForSave, getProfileLocations } from '../../server-shared/locations.js';
 
 function text(value, fallback = '') {
   return String(value ?? fallback).trim();
@@ -18,6 +19,7 @@ function videoList(profile = {}) {
 
 export const SHOWCASE_TABS = [
   { id: 'showcase', label: 'Витрина', short: 'Витрина' },
+  { id: 'locations', label: 'Локации', short: 'Локации', roles: ['partner'] },
   { id: 'media', label: 'Фото и видео', short: 'Медиа' },
   { id: 'contacts', label: 'Контакты и соцсети', short: 'Контакты' },
   { id: 'about', label: 'О бизнесе', short: 'О себе' },
@@ -104,6 +106,7 @@ export function buildShowcaseDraft(profile = {}, roleId = 'partner') {
     certificates: list(profile.certificates),
     consultationPrice: text(profile.consultationPrice || profile.serviceCost),
     workFormat: text(profile.workFormat || list(profile.workFormats || profile.formats).join(', ')),
+    locations: getProfileLocations(profile),
   };
 }
 
@@ -162,6 +165,19 @@ export function buildShowcasePatch(draft = {}, roleId = 'partner') {
     faq: draft.faq || [],
     customerNotes: draft.customerNotes,
   };
+  if (roleId === 'partner') {
+    const locations = normalizeLocationsForSave(draft.locations || [], draft);
+    patch.locations = locations;
+    const mainLocation = locations.find(item => item.isMain) || locations[0] || null;
+    if (mainLocation) {
+      patch.address = mainLocation.address || patch.address;
+      patch.phone = mainLocation.phone || patch.phone;
+      patch.hours = mainLocation.workingHours || patch.hours;
+      patch.workingHours = mainLocation.workingHours || patch.workingHours;
+      patch.latitude = mainLocation.coordinates?.latitude ?? draft.latitude;
+      patch.longitude = mainLocation.coordinates?.longitude ?? draft.longitude;
+    }
+  }
   if (roleId === 'expert') {
     patch.specialization = draft.shortDescription;
     patch.education = draft.education;
@@ -187,6 +203,7 @@ export function calculateShowcaseCompletion(draft = {}, roleId = 'partner') {
     { id: 'video', label: 'Видео', tab: 'media', done: (draft.videos || []).length > 0 },
     { id: 'telegram', label: 'Telegram', tab: 'contacts', done: Boolean(draft.telegramUrl || (draft.socialLinks || []).some(item => item.type === 'telegram' && item.url)) },
     { id: 'hours', label: 'Часы работы', tab: 'showcase', done: Boolean(draft.hours || roleId === 'expert') },
+    { id: 'locations', label: 'Локации', tab: 'locations', done: roleId !== 'partner' || (draft.locations || []).length > 0 },
     { id: 'faq', label: 'FAQ', tab: 'about', done: (draft.faq || []).some(item => item.question || item.answer) },
     { id: 'parking', label: 'Парковка', tab: 'about', done: Boolean(draft.parking || roleId === 'expert') },
     { id: 'prices', label: roleId === 'expert' ? 'Стоимость консультаций' : 'Цены', tab: 'about', done: Boolean(draft.consultationPrice || (draft.prices || []).length) },

@@ -18,6 +18,7 @@ import {
   DesktopTopOverview,
 } from './components/DesktopUI.jsx';
 import { openUrl } from './vk.js';
+import { getMainLocation } from '../server-shared/locations.js';
 
 const categoryLabels = {
   food: 'Еда',
@@ -95,12 +96,13 @@ function partnerRating(partner) {
 }
 
 function partnerSearchText(partner) {
+  const mainLocation = getMainLocation(partner || {});
   return [
     partner?.name,
     partner?.description,
     partner?.offer,
-    partner?.address,
-    partner?.phone,
+    mainLocation?.address || partner?.address,
+    mainLocation?.phone || partner?.phone,
     partner?.website,
     partnerCategory(partner).label,
     partnerCity(partner),
@@ -141,13 +143,13 @@ function partnerCatalogCover(partner, gallery = []) {
 }
 
 function routeToPartner(partner) {
-  const address = text(partner?.address);
+  const address = text(getMainLocation(partner || {})?.address || partner?.address);
   if (!address) return;
   openUrl(`https://yandex.ru/maps/?rtext=~${encodeURIComponent(`${address}, Зеленоград`)}&rtt=auto`);
 }
 
 function callPartner(partner) {
-  const phone = text(partner?.phone || partner?.contactPhone);
+  const phone = text(getMainLocation(partner || {})?.phone || partner?.phone || partner?.contactPhone);
   if (!phone) return;
   openUrl(`tel:${phone.replace(/[^\d+]/g, '')}`);
 }
@@ -187,8 +189,11 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const category = partnerCategory(partner);
   const city = partnerCity(partner);
   const rating = partnerRating(partner);
-  const canRoute = Boolean(text(partner?.address));
-  const canCall = Boolean(text(partner?.phone || partner?.contactPhone));
+  const mainLocation = getMainLocation(partner || {});
+  const address = text(mainLocation?.address || partner?.address);
+  const phone = text(mainLocation?.phone || partner?.phone || partner?.contactPhone);
+  const canRoute = Boolean(address);
+  const canCall = Boolean(phone);
   const canBook = Boolean(partner?.bookingEnabled || partner?.bookingUrl || partner?.services?.length || partner?.serviceCatalog?.length);
   const gallery = [
     ...(Array.isArray(partner?.gallery) ? partner.gallery : []),
@@ -196,7 +201,6 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
     ...(Array.isArray(partner?.images) ? partner.images : []),
   ];
   const cover = partnerCatalogCover(partner, gallery);
-  const address = text(partner?.address);
   const services = partnerPrimaryServices(partner);
   const isNew = (toDate(partner?.createdAt)?.getTime() || 0) >= Date.now() - 30 * 24 * 60 * 60 * 1000;
   const badges = [
@@ -246,7 +250,7 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
       description={partner?.description || partner?.offer || partner?.address || 'Организация АПГ'}
       meta={meta}
       tags={tags}
-      contact={address || text(partner?.phone || partner?.contactPhone)}
+      contact={address || phone}
       actions={actions}
       offer={partner?.offer ? `Акция: ${partner.offer}` : services.length ? `Услуги: ${services.join(', ')}` : ''}
       style={compact ? { height: 360 } : undefined}
@@ -255,7 +259,7 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
 }
 
 function PartnersMapPreview({ partners, selected, onOpenMap, onSelect }) {
-  const items = partners.filter(item => item?.address).slice(0, 6);
+  const items = partners.filter(item => getMainLocation(item || {})?.address || item?.address).slice(0, 6);
   return (
     <DesktopSidebarCard title="Карта партнёров" subtitle={`${items.length} адресов в выборке`}>
       <div style={{ height: 220, borderRadius: 24, overflow: 'hidden', position: 'relative', background: 'radial-gradient(circle at 24% 26%, rgba(201,168,76,0.22), transparent 22%), radial-gradient(circle at 76% 72%, rgba(255,255,255,0.12), transparent 28%), linear-gradient(145deg, rgba(35,36,40,0.92), rgba(19,20,23,0.94))', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)' }}>
@@ -328,10 +332,13 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
     });
   }, [category, city, district, format, query, rating, sort, visiblePartners]);
   const selectedPartner = selected && filtered.some(item => item.id === selected.id) ? selected : filtered[0] || null;
+  const selectedLocation = selectedPartner ? getMainLocation(selectedPartner) : null;
+  const selectedAddress = text(selectedLocation?.address || selectedPartner?.address);
+  const selectedPhone = text(selectedLocation?.phone || selectedPartner?.phone || selectedPartner?.contactPhone);
   const recentLimit = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const newCount = visiblePartners.filter(partner => (toDate(partner.createdAt)?.getTime() || 0) >= recentLimit).length;
   const verifiedCount = visiblePartners.filter(partner => partner?.verified || partner?.isVerified).length;
-  const nearbyCount = visiblePartners.filter(partner => partner?.latitude || partner?.longitude || partner?.address).length;
+  const nearbyCount = visiblePartners.filter(partner => partner?.latitude || partner?.longitude || getMainLocation(partner)?.address || partner?.address).length;
   const favoriteCount = visiblePartners.filter(partner => favoriteSet.has(String(partner.id))).length;
   const kpiItems = [
     visiblePartners.length > 0 && { id: 'total', label: 'Всего партнёров', value: visiblePartners.length, tone: 'gold', icon: '🏢' },
@@ -427,10 +434,10 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
               {selectedPartner ? (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><PartnerLogo partner={selectedPartner} size={52} /><div style={{ minWidth: 0 }}><div style={{ color: APG2_PROFILE.text, fontSize: 17, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedPartner.name}</div><div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, marginTop: 3 }}>{partnerCategory(selectedPartner).label} · {partnerCity(selectedPartner)}</div></div></div>
-                  <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedPartner.description || selectedPartner.offer || selectedPartner.address || 'Карточка партнёра АПГ'}</div>
+                  <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedPartner.description || selectedPartner.offer || selectedAddress || 'Карточка партнёра АПГ'}</div>
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                    {selectedPartner.address && <GlassBadge>Адрес: {selectedPartner.address}</GlassBadge>}
-                    {(selectedPartner.phone || selectedPartner.contactPhone) && <GlassBadge>Телефон указан</GlassBadge>}
+                    {selectedAddress && <GlassBadge>Адрес: {selectedAddress}</GlassBadge>}
+                    {selectedPhone && <GlassBadge>Телефон указан</GlassBadge>}
                     {partnerPrimaryServices(selectedPartner).slice(0, 2).map(service => <GlassBadge key={service}>{service}</GlassBadge>)}
                   </div>
                   {selectedPartner.offer && <div style={{ color: '#17120a', background: APG2_PROFILE.goldSoft, border: '1px solid rgba(201,168,76,0.34)', borderRadius: 16, padding: '9px 10px', fontSize: 12, lineHeight: '16px', fontWeight: 820, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>Акция: {selectedPartner.offer}</div>}
@@ -438,7 +445,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
                   {relatedNews[0] && <GlassBadge>Новость: {relatedNews[0].title || relatedNews[0].text}</GlassBadge>}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <GlassButton onClick={() => onOpenPartner?.(selectedPartner)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Подробнее</GlassButton>
-                    <GlassButton disabled={!selectedPartner.address} onClick={() => routeToPartner(selectedPartner)} style={{ minHeight: 40, borderRadius: 16 }}>Маршрут</GlassButton>
+                    <GlassButton disabled={!selectedAddress} onClick={() => routeToPartner(selectedPartner)} style={{ minHeight: 40, borderRadius: 16 }}>Маршрут</GlassButton>
                   </div>
                 </div>
               ) : <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Выберите карточку, чтобы увидеть краткий обзор.</div>}

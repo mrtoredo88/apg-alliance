@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] feat: Partner locations architecture
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/locations.js`, `server-shared/booking.js`, `server/src/routes/user-actions.js`, `src/booking/BookingFlow.jsx`, `src/PartnerPage.jsx`, `src/PartnersPage.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `scripts/partner-locations-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлена универсальная сущность `locations` внутри партнёра с fallback из legacy-полей `address`, `phone`, `hours/workingHours`.
+- Публичная карточка и каталог партнёров читают главную локацию без дополнительных Firestore-запросов; при нескольких филиалах показывается блок «Локации».
+- Запись через АПГ поддерживает выбор филиала и сохраняет `locationId/locationTitle/location` в booking, не меняя providerId и существующий pipeline.
+**Почему:** организации АПГ должны масштабироваться до сетей с несколькими филиалами без отдельной системы и без поломки старых карточек.
+
+---
+
 ## [2026-07-16] feat: Living Feed Article Sheet
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/components/ArticleContentRenderer.jsx`, `src/components/LivingFeedArticleSheet.jsx`, `src/PartnerPage.jsx`, `src/ExpertsPage.jsx`, `src/NewsPage.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`

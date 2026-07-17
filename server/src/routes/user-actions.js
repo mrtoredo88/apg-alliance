@@ -34,6 +34,11 @@ import {
   rangesOverlap,
 } from '../../../server-shared/booking.js';
 import {
+  getLocationById,
+  locationBookingPayload,
+  locationToProvider,
+} from '../../../server-shared/locations.js';
+import {
   buildBookingChangeEntry,
   sanitizeBookingInternalNotes,
 } from '../../../server-shared/workspace-bookings.js';
@@ -1957,7 +1962,11 @@ async function actionBookingCreate(db, req, actor) {
   const provider = { id: providerSnap.id, ...(providerSnap.data() || {}) };
   if (!isOnlineBookingEnabled(provider)) throw Object.assign(new Error('Онлайн-запись у этого профиля пока не включена.'), { statusCode: 400, code: 'BOOKING_DISABLED' });
 
-  const bookingProfile = buildBookingProfile(provider, providerType);
+  const requestedLocationId = safeString(req.body?.locationId || req.body?.location?.id, 120);
+  const bookingLocation = providerType === 'partner' ? getLocationById(provider, requestedLocationId) : null;
+  const bookingProvider = providerType === 'partner' ? locationToProvider(provider, bookingLocation) : provider;
+  const bookingLocationPayload = locationBookingPayload(bookingLocation);
+  const bookingProfile = buildBookingProfile(bookingProvider, providerType);
   const servicePayload = req.body?.service && typeof req.body.service === 'object' ? req.body.service : {};
   const specialistPayload = req.body?.specialist && typeof req.body.specialist === 'object' ? req.body.specialist : {};
   const slotPayload = req.body?.slot && typeof req.body.slot === 'object' ? req.body.slot : {};
@@ -2006,6 +2015,11 @@ async function actionBookingCreate(db, req, actor) {
       providerName: bookingProfile.title,
       providerPhone: bookingProfile.phone || null,
       address: bookingProfile.address || null,
+      locationId: bookingLocationPayload?.id || null,
+      locationTitle: bookingLocationPayload?.title || null,
+      locationAddress: bookingLocationPayload?.address || null,
+      locationPhone: bookingLocationPayload?.phone || null,
+      location: bookingLocationPayload,
       serviceId: service.id,
       serviceTitle: service.title,
       serviceDescription: service.description || null,
@@ -2084,7 +2098,7 @@ async function actionBookingCreate(db, req, actor) {
   await Promise.all(ownerUserIds.map(ownerId => sendDialogPush(db, ownerId, `booking_${safeDialogIdPart(ownerId)}_${safeDialogIdPart(booking.id)}`.slice(0, 900), `📅 ${booking.providerName}`, `Новая запись: ${booking.serviceTitle}, ${booking.dateLabel} ${booking.time}`, dialogId).catch(error => {
     req.log?.warn?.({ bookingPush: { bookingId: booking.id, ownerId, message: safeString(error?.message, 200) } }, 'booking push failed');
   })));
-  await audit(db, req, actor, 'booking:create', 'bookings', booking.id, 'success', { providerType, providerId, serviceId: service.id, dialogId });
+  await audit(db, req, actor, 'booking:create', 'bookings', booking.id, 'success', { providerType, providerId, locationId: bookingLocationPayload?.id || '', serviceId: service.id, dialogId });
   return { ok: true, booking, dialogId };
 }
 
@@ -2099,7 +2113,11 @@ async function actionBookingManualCreate(db, req, actor) {
   if (!actorOwnsProfile(provider, actor, providerType) && !hasRole(actor.user || {}, ROLES.owner) && !hasRole(actor.user || {}, ROLES.admin)) {
     throw Object.assign(new Error('Нет доступа к этому профилю.'), { statusCode: 403, code: 'BOOKING_FORBIDDEN' });
   }
-  const bookingProfile = buildBookingProfile(provider, providerType);
+  const requestedLocationId = safeString(req.body?.locationId || req.body?.location?.id, 120);
+  const bookingLocation = providerType === 'partner' ? getLocationById(provider, requestedLocationId) : null;
+  const bookingProvider = providerType === 'partner' ? locationToProvider(provider, bookingLocation) : provider;
+  const bookingLocationPayload = locationBookingPayload(bookingLocation);
+  const bookingProfile = buildBookingProfile(bookingProvider, providerType);
   const serviceId = safeString(req.body?.serviceId, 80);
   const service = bookingProfile.services.find(item => item.id === serviceId) || bookingProfile.services[0];
   if (!service) throw Object.assign(new Error('Не выбрана услуга.'), { statusCode: 400, code: 'BOOKING_BAD_SERVICE' });
@@ -2128,6 +2146,11 @@ async function actionBookingManualCreate(db, req, actor) {
       providerName: bookingProfile.title,
       providerPhone: bookingProfile.phone || null,
       address: bookingProfile.address || null,
+      locationId: bookingLocationPayload?.id || null,
+      locationTitle: bookingLocationPayload?.title || null,
+      locationAddress: bookingLocationPayload?.address || null,
+      locationPhone: bookingLocationPayload?.phone || null,
+      location: bookingLocationPayload,
       serviceId: service.id,
       serviceTitle: service.title,
       serviceDescription: service.description || null,
