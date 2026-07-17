@@ -1759,10 +1759,12 @@ function AdminUsersPanel({ users, onAuthAction }) {
   );
 }
 
-function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck, onGrant }) {
+function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck, onGrant, onRecover }) {
   const [eventSearch, setEventSearch] = useState('');
   const [eventType, setEventType] = useState('all');
   const [eventStatus, setEventStatus] = useState('all');
+  const [recoveryReferrerId, setRecoveryReferrerId] = useState('');
+  const [recoveryResult, setRecoveryResult] = useState(null);
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const summary = data?.summary || {};
   const diagnostics = data?.diagnostics || {};
@@ -1873,6 +1875,50 @@ function ReferralSystemPanel({ data, loading, filter, onFilter, onLoad, onCheck,
         <div style={{ fontSize: 12, color: A.textSec, lineHeight: '18px' }}>
           Сервер показывает подтверждённые цепочки из users.referredBy, referralBonusGranted и referralRewardedUsers. Referral Diagnostics дополнительно читает журнал referralEvents и восстанавливает lifecycle по referralFlowId.
         </div>
+      </div>
+
+      <div style={{ ...s.card, marginBottom: 14 }}>
+        <div style={{ fontSize: 16, fontWeight: 900, color: A.text, marginBottom: 8 }}>Recovery Scan</div>
+        <div style={{ fontSize: 12, color: A.textSec, lineHeight: '18px', marginBottom: 12 }}>
+          Безопасно пересчитывает состояние одного пригласившего. Dry Run ничего не меняет и показывает, что будет восстановлено.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+          <input value={recoveryReferrerId} onChange={e => setRecoveryReferrerId(e.target.value)} placeholder="referrerId, например tg_1670282567" style={s.input} />
+          <button
+            style={{ ...s.btn, ...s.btnGray, padding: '10px 12px', fontSize: 12 }}
+            disabled={loading || !recoveryReferrerId.trim()}
+            onClick={async () => setRecoveryResult(await onRecover?.(recoveryReferrerId.trim(), true))}
+          >
+            Dry Run
+          </button>
+          <button
+            style={{ ...s.btn, ...s.btnPri, padding: '10px 12px', fontSize: 12 }}
+            disabled={loading || !recoveryReferrerId.trim()}
+            onClick={async () => {
+              const ok = window.confirm(`Применить восстановление рефералов для ${recoveryReferrerId.trim()}?`);
+              if (ok) setRecoveryResult(await onRecover?.(recoveryReferrerId.trim(), false));
+            }}
+          >
+            Apply
+          </button>
+        </div>
+        {recoveryResult?.summary && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
+            {[
+              ['Найдено', recoveryResult.summary.foundUsers],
+              ['Уже начислено', recoveryResult.summary.rewardedUsers],
+              ['Восстановить', recoveryResult.summary.recoveredUsers],
+              ['Дубликаты', recoveryResult.summary.duplicateUsers],
+              ['Ключи +', recoveryResult.summary.keysAdded],
+              ['Итог друзей', recoveryResult.summary.finalReferralCount],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: A.chip, borderRadius: 12, padding: 10, border: `1px solid ${A.border}` }}>
+                <div style={{ fontSize: 10, color: A.textSec }}>{label}</div>
+                <div style={{ fontSize: 15, color: A.text, fontWeight: 900, marginTop: 3 }}>{value ?? 0}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ ...s.card, marginBottom: 14 }}>
@@ -4423,6 +4469,26 @@ export const AdminPanel = () => {
     } catch (e) {
       logError(e, 'AdminPanel.grantReferralFromAudit');
       alert(e.message || 'Не удалось начислить реферальные ключи.');
+    } finally {
+      setReferralLoading(false);
+    }
+  }, [loadReferralAudit]);
+
+  const recoverReferralStateFromAudit = useCallback(async (referrerId, dryRun = true) => {
+    if (!referrerId) return null;
+    setReferralLoading(true);
+    try {
+      const data = await runAdminAction('referrals:recoverState', {
+        referrerId,
+        dryRun,
+        idempotencyKey: `referral_recover_${referrerId}_${dryRun ? 'dry' : 'apply'}_${Date.now()}`,
+      });
+      if (!dryRun) await loadReferralAudit('referrals:diagnostics');
+      return data;
+    } catch (e) {
+      logError(e, 'AdminPanel.recoverReferralStateFromAudit');
+      alert(e.message || 'Не удалось выполнить recovery scan.');
+      return null;
     } finally {
       setReferralLoading(false);
     }
@@ -7058,6 +7124,7 @@ export const AdminPanel = () => {
           onLoad={() => loadReferralAudit('referrals:diagnostics')}
           onCheck={() => loadReferralAudit('referrals:diagnostics')}
           onGrant={grantReferralFromAudit}
+          onRecover={recoverReferralStateFromAudit}
         />
       )}
 

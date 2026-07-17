@@ -18,6 +18,7 @@ import {
   referralEventsToCsv,
   referralEventsToJson,
 } from '../../../server-shared/referral-observability.js';
+import { buildReferralRecoveryScanPlan, summarizeReferralRecoveryPlan } from '../../../server-shared/referral-state-recovery.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 const RESOURCE_CONFIG = {
@@ -946,6 +947,90 @@ async function buildReferralDiagnostics(db, req) {
   };
 }
 
+async function loadReferralRecoveryCandidates(db, referrerId) {
+  const [byReferred, byGrantedTo] = await Promise.all([
+    db.collection('users').where('referredBy', '==', referrerId).limit(500).get(),
+    db.collection('users').where('referralBonusGrantedTo', '==', referrerId).limit(500).get().catch(() => ({ docs: [] })),
+  ]);
+  const map = new Map();
+  [...byReferred.docs, ...(byGrantedTo.docs || [])].forEach(doc => {
+    map.set(doc.id, { id: doc.id, ...(doc.data() || {}) });
+  });
+  return [...map.values()];
+}
+
+function referralScanLog(tag, details = {}) {
+  try {
+    console.info(`[REF][${tag}]`, details);
+  } catch {}
+}
+
+async function recoverReferralState(db, req, actor) {
+  const referrerId = String(req.body?.referrerId || '').trim().slice(0, 180);
+  const dryRun = req.body?.dryRun !== false;
+  if (!referrerId || referrerId.startsWith('guest_')) {
+    throw Object.assign(new Error('Укажите корректный referrerId.'), { statusCode: 400 });
+  }
+  await requireAdminPermission(req, dryRun ? 'users:read' : 'users:update');
+  referralScanLog('SCAN', { referrerId, dryRun });
+  const referrerRef = db.collection('users').doc(referrerId);
+  const [referrerSnap, candidates] = await Promise.all([referrerRef.get(), loadReferralRecoveryCandidates(db, referrerId)]);
+  if (!referrerSnap.exists) throw Object.assign(new Error('Пригласивший пользователь не найден.'), { statusCode: 404 });
+  const initialPlan = buildReferralRecoveryScanPlan({ referrerId, referrer: referrerSnap.data() || {}, invitedUsers: candidates });
+  referralScanLog('SUMMARY', summarizeReferralRecoveryPlan(initialPlan));
+  if (dryRun) {
+    await writeAuditLog(db, req, actor, 'referrals:recoverState:dryRun', 'users', referrerId, { label: `Dry run recovery referral state: ${referrerId}`, summary: summarizeReferralRecoveryPlan(initialPlan) });
+    return { ok: true, dryRun: true, ...initialPlan, summary: summarizeReferralRecoveryPlan(initialPlan) };
+  }
+
+  const applyResult = await db.runTransaction(async tx => {
+    const refSnap = await tx.get(referrerRef);
+    if (!refSnap.exists) throw Object.assign(new Error('Пригласивший пользователь не найден.'), { statusCode: 404 });
+    const invitedRefs = candidates.map(user => db.collection('users').doc(user.id));
+    const invitedSnaps = await Promise.all(invitedRefs.map(ref => tx.get(ref)));
+    const latestUsers = invitedSnaps
+      .filter(snap => snap.exists)
+      .map(snap => ({ id: snap.id, ...(snap.data() || {}) }));
+    const plan = buildReferralRecoveryScanPlan({ referrerId, referrer: refSnap.data() || {}, invitedUsers: latestUsers });
+    const now = FieldValue.serverTimestamp();
+    plan.usersToMarkGranted.forEach(userId => {
+      const user = latestUsers.find(row => row.id === userId) || {};
+      const patch = {
+        referralBonusGranted: true,
+        referralBonusGrantedTo: referrerId,
+        referralBonusGrantedAt: now,
+        referralRecoveredAt: now,
+        updatedAt: now,
+      };
+      if (!user.referredBy) patch.referredBy = referrerId;
+      tx.set(db.collection('users').doc(userId), patch, { merge: true });
+      referralScanLog(plan.recoveredUsers.some(row => row.id === userId) ? 'RECOVER' : 'DUPLICATE', { referrerId, userId });
+    });
+    plan.usersToSyncGrantedTo.forEach(userId => {
+      tx.set(db.collection('users').doc(userId), {
+        referralBonusGrantedTo: referrerId,
+        referralRecoveredAt: now,
+        updatedAt: now,
+      }, { merge: true });
+      referralScanLog('FIXED', { referrerId, userId, reason: 'sync_granted_to' });
+    });
+    tx.set(referrerRef, {
+      referralRewardedUsers: plan.finalRewardedUsers,
+      referralCount: plan.finalReferralCount,
+      referralKeys: plan.finalReferralKeys,
+      ...(plan.keysAdded > 0 ? { keys: FieldValue.increment(plan.keysAdded) } : {}),
+      ...(plan.reputationAdded > 0 ? { reputation: FieldValue.increment(plan.reputationAdded) } : {}),
+      economyVersion: ECONOMY_VERSION,
+      referralStateRecoveredAt: now,
+      updatedAt: now,
+    }, { merge: true });
+    referralScanLog('SUMMARY', summarizeReferralRecoveryPlan(plan));
+    return { ok: true, dryRun: false, ...plan, summary: summarizeReferralRecoveryPlan(plan) };
+  });
+  await writeAuditLog(db, req, actor, 'referrals:recoverState', 'users', referrerId, { label: `Recovery referral state: ${referrerId}`, summary: applyResult.summary });
+  return applyResult;
+}
+
 async function grantReferralCompensation(db, req, actor) {
   const referrerId = String(req.body?.referrerId || '').trim();
   const invitedUserId = String(req.body?.invitedUserId || req.body?.newUserId || '').trim();
@@ -1008,6 +1093,7 @@ async function handleReferralAction(db, req, actor) {
     await writeAuditLog(db, req, actor, action, 'users', 'referrals', { label: 'Проверка реферальной системы', summary: audit.summary, events: diagnostics.events.length });
     return { ok: true, ...audit, diagnostics };
   }
+  if (action === 'referrals:recoverState' || action === 'referrals:recalculateReferrer') return recoverReferralState(db, req, actor);
   if (action === 'referrals:grant') return grantReferralCompensation(db, req, actor);
   const error = new Error('Неизвестное действие реферальной системы.');
   error.statusCode = 400;

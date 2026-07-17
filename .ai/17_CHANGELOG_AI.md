@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-17] feat: Referral recovery scan
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/referral-state-recovery.js`, `server/src/routes/admin-actions.js`, `src/AdminPanel.jsx`, `scripts/referral-recovery-audit.mjs`, `scripts/referral-recovery-scan-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен идемпотентный recovery scan для одного пригласившего: dry run по умолчанию, транзакционный apply, пересчёт `referralRewardedUsers` и `referralCount`.
+- В админку добавлен Recovery Scan с referrerId, Dry Run и Apply, результат показывает найденных, восстановленных, дубликаты, missing links и ключи к начислению.
+- Добавлен read-only Firestore audit script для расследования конкретного referrerId и regression-тесты повторного запуска, двух вкладок, частичных состояний и массового восстановления.
+**Почему:** нужен безопасный способ восстановить серверно подтверждённые, но недозавершённые реферальные начисления без ручного backfill и без риска двойной выдачи.
+
+---
+
 ## [2026-07-17] feat: Referral observability and analytics
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/referral-observability.js`, `server/src/lib/referralEvents.js`, `server/src/routes/email-auth.js`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `src/referralDiagnostics.js`, `src/EmailAuth.jsx`, `src/UserApp.jsx`, `src/AdminPanel.jsx`, `scripts/referral-lifecycle-test.mjs`, `.ai/17_CHANGELOG_AI.md`
