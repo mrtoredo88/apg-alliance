@@ -33,7 +33,7 @@ import { buildLivingProfileTabs } from './profileTimeline.js';
 import { getCanonicalNewsId } from './newsUtils.js';
 import { LivingFeedArticleSheet } from './components/LivingFeedArticleSheet.jsx';
 import { canOpenBookingFlow } from './booking/BookingFlow.jsx';
-import { getLocationById, getMainLocation, getProfileLocations, hasMultipleLocations, locationToProvider } from '../server-shared/locations.js';
+import { filterReviewsByLocation, getLocationById, getMainLocation, getProfileLocations, hasMultipleLocations, locationToProvider, offerMatchesLocation } from '../server-shared/locations.js';
 import { APG2_PROFILE as APG2, ContactCard, GlassBadge, GlassButton, GlassSection, ProfileGallery, ProfileHero, ProfileReviewCard, getProfileImage } from './components/Apg2ProfileGlass.jsx';
 import { ProfilePhotoGrid, ProfilePhotoViewer, ProfileVideoGrid, ProfileVideoViewer } from './components/ProfileMediaViewer.jsx';
 import {
@@ -184,6 +184,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const [videoViewerIdx, setVideoViewerIdx] = useState(null);
   const [locationsExpanded, setLocationsExpanded] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [reviewScope, setReviewScope] = useState('all');
   const phoneCopyTimerRef                 = useRef(null);
   const shareToastRef                     = useRef(null);
   const mountedRef                        = useRef(true);
@@ -304,6 +305,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         userPhoto: user?.photo_200 ?? null,
         stars: formStars,
         text: formText.trim(),
+        locationId: displayLocation?.id || '',
+        locationTitle: displayLocation?.title || '',
       };
       const result = await userAction('review:partner', {
         userId,
@@ -337,7 +340,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
     } catch (e) { logError(e, 'PartnerPage.submitReview'); setReviewError('Ошибка отправки. Проверьте соединение.'); }
     if (mountedRef.current) setSubmitting(false);
-  }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate, reviewPromptBookingId]);
+  }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate, reviewPromptBookingId, displayLocation?.id, displayLocation?.title]);
 
   if (!partner) return null;
 
@@ -351,6 +354,20 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const multipleLocations = hasMultipleLocations(partner);
   const selectedLocation = selectedLocationId ? getLocationById(partner, selectedLocationId) : mainLocation;
   const displayLocation = selectedLocation || mainLocation;
+  const selectedLocationReviews = filterReviewsByLocation(reviews, displayLocation?.id || '');
+  const scopedReviews = multipleLocations && reviewScope === 'location' ? selectedLocationReviews : reviews;
+  const scopedReviewCount = scopedReviews.length;
+  const scopedAvgRating = scopedReviewCount
+    ? scopedReviews.reduce((sum, item) => sum + (Number(item.stars || item.rating || 0) || 0), 0) / scopedReviewCount
+    : 0;
+  const visibleReviewCount = multipleLocations && reviewScope === 'location' ? scopedReviewCount : reviewCount;
+  const visibleAvgRating = multipleLocations && reviewScope === 'location' ? scopedAvgRating : avgRating;
+  const visibleOffer = offerMatchesLocation(partner, displayLocation?.id || '') ? partner.offer : '';
+  const offerLocationIds = Array.isArray(partner.offerLocationIds || partner.promotionLocationIds || partner.promoLocationIds)
+    ? (partner.offerLocationIds || partner.promotionLocationIds || partner.promoLocationIds)
+    : [];
+  const offerLocationId = partner.offerLocationId || partner.promotionLocationId || partner.promoLocationId || offerLocationIds[0] || '';
+  const offerLocation = offerLocationId ? getLocationById(partner, offerLocationId) : null;
   const orderedLocations = [...locations]
     .sort((a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0));
   const visibleLocations = selectedLocationId && selectedLocation
@@ -407,6 +424,21 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     setSelectedLocationId(location.id);
     setLocationsExpanded(true);
   };
+  const renderLocationSwitcher = (desktop = false) => {
+    if (!multipleLocations) return null;
+    return (
+      <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
+        {visibleLocations.map(location => {
+          const active = location.id === displayLocation?.id;
+          return (
+            <GlassButton key={location.id} tone={active ? 'gold' : 'glass'} onClick={() => handleSelectLocation(location)} style={{ minHeight: desktop ? 32 : 36, borderRadius: 999, padding: desktop ? '6px 10px' : '7px 12px', fontSize: desktop ? 11.5 : 12, whiteSpace: 'nowrap', color: active ? '#17120a' : APG2.text }}>
+              {location.isMain ? 'Основной · ' : ''}{location.title || location.address || 'Филиал'}
+            </GlassButton>
+          );
+        })}
+      </div>
+    );
+  };
   const openPartnerUrl = (url, target = 'site', options = undefined) => {
     trackAppEvent('partner:site_open', {
       type: APG_EVENT_TYPES.PARTNER_SITE_OPENED,
@@ -438,7 +470,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
   const textLines = [
       `${partner.name} — партнёр АПГ Зеленоград! 🔑`,
-      `🎁 ${partner.offer || 'Скоро будут спецпредложения'}`,
+      `🎁 ${visibleOffer || partner.offer || 'Скоро будут спецпредложения'}`,
       (displayLocation?.address || partner.address) && `📍 ${displayLocation?.address || partner.address}`,
       '',
       'Присоединяйся к программе лояльности АПГ.',
@@ -493,6 +525,15 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       {canUseApgBooking && <GlassButton onClick={() => handleBookLocation(location)} tone="gold" style={{ minHeight: small ? 32 : 36, borderRadius: 14, padding: small ? '6px 9px' : '8px 11px', color: '#17120a' }}>Записаться</GlassButton>}
     </div>
   );
+  const renderReviewScopeToggle = (desktop = false) => {
+    if (!multipleLocations || !displayLocation?.id) return null;
+    return (
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10 }}>
+        <GlassButton onClick={() => setReviewScope('all')} tone={reviewScope === 'all' ? 'gold' : 'glass'} style={{ minHeight: desktop ? 32 : 36, borderRadius: 999, padding: '6px 11px', fontSize: 12, color: reviewScope === 'all' ? '#17120a' : APG2.text }}>Все отзывы</GlassButton>
+        <GlassButton onClick={() => setReviewScope('location')} tone={reviewScope === 'location' ? 'gold' : 'glass'} style={{ minHeight: desktop ? 32 : 36, borderRadius: 999, padding: '6px 11px', fontSize: 12, color: reviewScope === 'location' ? '#17120a' : APG2.text }}>Отзывы филиала</GlassButton>
+      </div>
+    );
+  };
   const renderLocationsBlock = (desktop = false) => {
     if (!multipleLocations) return null;
     return (
@@ -510,6 +551,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
             {locationsExpanded ? 'Скрыть' : 'Посмотреть все'}
           </GlassButton>
         </div>
+        {renderLocationSwitcher(desktop)}
         {locationsExpanded && (
           <div style={{ display: 'grid', gridTemplateColumns: desktop ? 'repeat(auto-fit, minmax(260px, 1fr))' : '1fr', gap: 10 }}>
             {visibleLocations.map(location => {
@@ -638,9 +680,10 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 <DesktopSidebarCard title="Контакты" subtitle="Из анкеты партнёра">
                   <DesktopMeta items={contactItems} />
                 </DesktopSidebarCard>
-                {partner.offer && (
+                {visibleOffer && (
                   <DesktopSidebarCard title="Активная акция" subtitle="Предложение для участников">
-                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>{partner.offer}</div>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>{visibleOffer}</div>
+                    {offerLocation?.id && <div style={{ marginTop: 9 }}><GlassBadge tone="gold">Только филиал · {offerLocation.title || offerLocation.address}</GlassBadge></div>}
                   </DesktopSidebarCard>
                 )}
                 {stampTarget > 0 && (
@@ -678,7 +721,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               title={partner.name}
               subtitle={partner.categoryLabel || displayLocation?.address || partner.address || 'Партнёр АПГ'}
               badges={heroBadges.map(label => ({ id: label, label, tone: String(label).includes('★') ? 'gold' : undefined }))}
-              description={partner.offer || partner.description || displayLocation?.address || partner.address || 'Проверенное место в экосистеме АПГ.'}
+              description={visibleOffer || partner.description || displayLocation?.address || partner.address || 'Проверенное место в экосистеме АПГ.'}
               meta={<DesktopInfoGrid columns="repeat(auto-fit, minmax(118px, 1fr))" items={kpiItems.map(item => ({ ...item, style: { minHeight: 54, padding: 11 } }))} />}
               actions={<DesktopHeroActions actions={heroActions} style={{ marginBottom: 4 }} />}
             />
@@ -752,16 +795,17 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
             {activeTab === 'offer' && (
               <DesktopSection title="Акция">
-                {partner.offer ? (
+                {visibleOffer ? (
                   <div style={{ position: 'relative', minHeight: 220, borderRadius: 24, overflow: 'hidden', color: '#fff', background: 'rgba(201,168,76,0.18)' }}>
                     {heroImage && <img src={heroImage} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(1.05) contrast(1.04)' }} />}
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(9,9,12,0.82), rgba(9,9,12,0.52), rgba(9,9,12,0.20)), linear-gradient(180deg, rgba(9,9,12,0.08), rgba(9,9,12,0.68))' }} />
                     <div style={{ position: 'relative', zIndex: 1, minHeight: 220, padding: 20, display: 'grid', alignContent: 'end', gap: 12, maxWidth: 560 }}>
                       <div style={{ justifySelf: 'start', borderRadius: 999, padding: '6px 10px', color: '#17120a', background: 'linear-gradient(135deg,#FFF0B8,#D7B86A)', fontSize: 11, lineHeight: '14px', fontWeight: 900 }}>Акция</div>
-                      <div style={{ fontSize: 24, lineHeight: '29px', fontWeight: 930 }}>{partner.offer}</div>
+                      <div style={{ fontSize: 24, lineHeight: '29px', fontWeight: 930 }}>{visibleOffer}</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'rgba(255,255,255,0.82)', fontSize: 12, lineHeight: '16px', fontWeight: 800 }}>
                         <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>Активна</span>
                         {offerEndLabel && <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>До {offerEndLabel}</span>}
+                        {offerLocation?.id && <span style={{ borderRadius: 999, padding: '5px 9px', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.16)' }}>Только филиал · {offerLocation.title || offerLocation.address}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {canUseApgBooking && <GlassButton onClick={() => handleBookLocation(displayLocation)} tone="gold" style={{ minHeight: 40, borderRadius: 16, color: '#17120a' }}>Записаться</GlassButton>}
@@ -789,15 +833,16 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
             {activeTab === 'reviews' && (
               <DesktopSection
-                title={`Отзывы${reviewCount > 0 ? ` · ${reviewCount}` : ''}`}
+                title={`Отзывы${visibleReviewCount > 0 ? ` · ${visibleReviewCount}` : ''}`}
                 action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
               >
-                {reviewCount > 0 && (
+                {renderReviewScopeToggle(true)}
+                {visibleReviewCount > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)', gap: 12, marginBottom: 2 }}>
                     <div style={{ borderRadius: 22, padding: 16, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.26)' }}>
-                      <div style={{ color: APG2.gold, fontSize: 32, lineHeight: '36px', fontWeight: 940 }}>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</div>
-                      <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1, marginTop: 4 }}>{avgRating > 0 ? '★'.repeat(Math.round(avgRating)) : '★★★★★'}</div>
-                      <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 6 }}>{reviewCount} отзывов</div>
+                      <div style={{ color: APG2.gold, fontSize: 32, lineHeight: '36px', fontWeight: 940 }}>{visibleAvgRating > 0 ? visibleAvgRating.toFixed(1) : '—'}</div>
+                      <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1, marginTop: 4 }}>{visibleAvgRating > 0 ? '★'.repeat(Math.round(visibleAvgRating)) : '★★★★★'}</div>
+                      <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 6 }}>{visibleReviewCount} отзывов</div>
                     </div>
                     <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
                       Отзывы помогают другим участникам АПГ понять качество места и выбрать подходящий сценарий визита.
@@ -823,7 +868,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 )}
                 {reviewsLoading ? (
                   <div style={{ color: APG2.textMuted, fontSize: 13 }}>Загружаем отзывы...</div>
-                ) : reviews.length === 0 ? (
+                ) : scopedReviews.length === 0 ? (
                   <DesktopEmptyState
                     icon="💬"
                     title="Отзывы пока не добавлены"
@@ -831,7 +876,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   />
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
-                    {reviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
+                    {scopedReviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
                   </div>
                 )}
               </DesktopSection>
@@ -869,7 +914,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               status={status}
               avatar={<PartnerLogo partner={partner} size={64} />}
               badges={heroBadges}
-              description={partner.offer || partner.description || displayLocation?.address || partner.address || 'Проверенное место в экосистеме АПГ.'}
+              description={visibleOffer || partner.description || displayLocation?.address || partner.address || 'Проверенное место в экосистеме АПГ.'}
             />
 
             <GlassSection title="Действия">
@@ -948,15 +993,16 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
             <div id="partner-profile-offer" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title="Акции">
-              {partner.offer ? (
+              {visibleOffer ? (
                 <div style={{ ...APG2.goldGlass, borderRadius: 34, padding: 18, color: APG2.text, display: 'flex', gap: 14, alignItems: 'center' }}>
                   <div style={{ width: 54, height: 54, borderRadius: 20, background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎁</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.68, marginBottom: 5 }}>Для участников АПГ</div>
-                    <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{partner.offer}</div>
+                    <div style={{ fontSize: 16, lineHeight: '22px', fontWeight: 800 }}>{visibleOffer}</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, fontSize: 11, lineHeight: '14px', fontWeight: 820 }}>
                       <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>Активна</span>
                       {formatProfileDate(partner.offerUntil || partner.promoUntil || partner.discountUntil || partner.endsAt) && <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>До {formatProfileDate(partner.offerUntil || partner.promoUntil || partner.discountUntil || partner.endsAt)}</span>}
+                      {offerLocation?.id && <span style={{ borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.16)' }}>Только филиал · {offerLocation.title || offerLocation.address}</span>}
                     </div>
                   </div>
                 </div>
@@ -986,15 +1032,16 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
             <div id="partner-profile-reviews" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection
-              title={`Отзывы${reviewCount > 0 ? ` · ${reviewCount}` : ''}`}
+              title={`Отзывы${visibleReviewCount > 0 ? ` · ${visibleReviewCount}` : ''}`}
               action={canReview && !showForm && !submitDone ? <GlassButton onClick={() => { setShowForm(true); setFormStars(myReview?.stars ?? 0); setFormText(myReview?.text ?? ''); }} style={{ minHeight: 34, borderRadius: 15, padding: '7px 11px', fontSize: 12 }}>Написать</GlassButton> : null}
             >
-              {reviewCount > 0 && (
+              {renderReviewScopeToggle(false)}
+              {visibleReviewCount > 0 && (
                 <div style={{ ...APG2.glass, borderRadius: 28, padding: 15, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 22, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 20, fontWeight: 920 }}>{avgRating > 0 ? avgRating.toFixed(1) : '★'}</div>
+                  <div style={{ width: 56, height: 56, borderRadius: 22, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 20, fontWeight: 920 }}>{visibleAvgRating > 0 ? visibleAvgRating.toFixed(1) : '★'}</div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1 }}>{avgRating > 0 ? '★'.repeat(Math.round(avgRating)) : '★★★★★'}</div>
-                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 3 }}>На основе {reviewCount} отзывов</div>
+                    <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1 }}>{visibleAvgRating > 0 ? '★'.repeat(Math.round(visibleAvgRating)) : '★★★★★'}</div>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 3 }}>На основе {visibleReviewCount} отзывов</div>
                   </div>
                 </div>
               )}
@@ -1017,14 +1064,14 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
               )}
               {reviewsLoading ? (
                 <div style={{ ...APG2.glass, borderRadius: 28, padding: 22, color: APG2.textMuted, textAlign: 'center' }}>Загружаем отзывы...</div>
-              ) : reviews.length === 0 ? (
+              ) : scopedReviews.length === 0 ? (
                 <div style={{ ...APG2.glass, borderRadius: 34, padding: 28, textAlign: 'center' }}>
                   <div style={{ color: APG2.text, fontSize: 18, fontWeight: 780, marginBottom: 6 }}>Отзывов пока нет</div>
                   <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>Карточка выглядит законченно даже до первых отзывов.</div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollSnapType: 'x mandatory' }} onTouchStart={e => e.stopPropagation()}>
-                  {reviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
+                  {scopedReviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
                 </div>
               )}
             </GlassSection>

@@ -27,7 +27,7 @@ import { useAdminFormDraft, formatDraftTime, clearAdminDraft } from './adminForm
 import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
 import { formatEventPrice, isPaidEvent } from './eventPrice.js';
 import { telegramShareUrl } from '../server-shared/telegram.js';
-import { getProfileLocations, normalizeLocationsForSave } from '../server-shared/locations.js';
+import { getProfileLocations, normalizeLocationsForSave, normalizeLocationIds } from '../server-shared/locations.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -4282,6 +4282,7 @@ export const AdminPanel = () => {
   const [pGallery, setPGallery]           = useState([]);
   const [pVideos, setPVideos]             = useState([]);
   const [pLocations, setPLocations]       = useState([]);
+  const [pBookingSpecialists, setPBookingSpecialists] = useState([]);
   const [pVideoUrl, setPVideoUrl]         = useState('');
   const [pVideoTitle, setPVideoTitle]     = useState('');
   const [pVideoError, setPVideoError]     = useState('');
@@ -4501,7 +4502,7 @@ export const AdminPanel = () => {
     setNCommentsEnabled(d.nCommentsEnabled !== false); setNPublishedAt(d.nPublishedAt ?? new Date().toISOString().slice(0, 10));
   };
 
-  const partnerDraftData = { pName, pDesc, pCategory, pEmoji, pLogo, pPhone, pAddress, pHours, pTier, pSocial, pVkGroup, pOffer, pStampTarget, pOwnerEmail, pPublicationConsent, pBooking, pWebsite, pTelegramCom, pMaxCom, pCoverPhoto, pGallery, pVideos, pLocations, pLat, pLon };
+  const partnerDraftData = { pName, pDesc, pCategory, pEmoji, pLogo, pPhone, pAddress, pHours, pTier, pSocial, pVkGroup, pOffer, pStampTarget, pOwnerEmail, pPublicationConsent, pBooking, pWebsite, pTelegramCom, pMaxCom, pCoverPhoto, pGallery, pVideos, pLocations, pBookingSpecialists, pLat, pLon };
   const partnerDraft = useAdminFormDraft({
     formKey: 'partner',
     enabled: showPartnerModal,
@@ -4517,6 +4518,7 @@ export const AdminPanel = () => {
     setPBooking(d.pBooking ?? ''); setPWebsite(d.pWebsite ?? ''); setPTelegramCom(d.pTelegramCom ?? ''); setPMaxCom(d.pMaxCom ?? '');
     setPCoverPhoto(d.pCoverPhoto ?? ''); setPGallery(Array.isArray(d.pGallery) ? d.pGallery : []); setPVideos(Array.isArray(d.pVideos) ? d.pVideos : []);
     setPLocations(Array.isArray(d.pLocations) ? d.pLocations : []);
+    setPBookingSpecialists(Array.isArray(d.pBookingSpecialists) ? d.pBookingSpecialists : []);
     setPLat(d.pLat ?? ''); setPLon(d.pLon ?? '');
   };
 
@@ -5467,6 +5469,7 @@ export const AdminPanel = () => {
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
     setPLocations([]);
+    setPBookingSpecialists([]);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setPLat(''); setPLon('');
     setEditingPartner(null);
@@ -5486,6 +5489,7 @@ export const AdminPanel = () => {
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
     setPVideos(p.videos ?? []);
     setPLocations(getProfileLocations(p));
+    setPBookingSpecialists(Array.isArray(p.bookingSpecialists) ? p.bookingSpecialists : []);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setPLat(p.latitude != null ? String(p.latitude) : '');
     setPLon(p.longitude != null ? String(p.longitude) : '');
@@ -5680,6 +5684,46 @@ export const AdminPanel = () => {
     });
   };
 
+  const partnerLocationLink = (location) => {
+    if (!editingPartner?.id || !location?.id) return '';
+    return `${shareLink('partner', editingPartner.id)}?location=${encodeURIComponent(location.id)}`;
+  };
+
+  const copyPartnerLocationLink = async (location) => {
+    const link = partnerLocationLink(location);
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      window.alert('Ссылка филиала скопирована.');
+    } catch {
+      window.alert(link);
+    }
+  };
+
+  const downloadPartnerLocationQr = (location) => {
+    const wrapper = document.querySelector(`[data-partner-location-qr="${location?.id || ''}"]`);
+    const canvas = wrapper?.querySelector('canvas');
+    const url = canvas?.toDataURL?.('image/png');
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `partner-location-${editingPartner?.id || 'partner'}-${location.id}.png`;
+    link.click();
+  };
+
+  const updatePartnerSpecialistLocations = (specialistIndex, patch) => {
+    setPBookingSpecialists(prev => prev.map((item, index) => index === specialistIndex ? { ...item, ...patch } : item));
+  };
+
+  const togglePartnerSpecialistLocation = (specialistIndex, locationId) => {
+    setPBookingSpecialists(prev => prev.map((item, index) => {
+      if (index !== specialistIndex) return item;
+      const ids = normalizeLocationIds(item.locationIds || item.locations || item.branchIds);
+      const next = ids.includes(locationId) ? ids.filter(id => id !== locationId) : [...ids, locationId];
+      return { ...item, locationIds: next };
+    }));
+  };
+
   const movePartnerLocation = (index, direction) => {
     setPLocations(prev => {
       const target = index + direction;
@@ -5742,6 +5786,12 @@ export const AdminPanel = () => {
       gallery: pGallery,
       videos: finalVideos,
       locations: normalizedLocations,
+      bookingSpecialists: pBookingSpecialists.map((item, index) => ({
+        ...item,
+        id: item.id || `specialist_${index + 1}`,
+        locationIds: normalizeLocationIds(item.locationIds || item.locations || item.branchIds),
+        mainLocationId: item.mainLocationId || item.primaryLocationId || item.locationId || '',
+      })),
       hours: (mainLocation?.workingHours || pHours).trim(),
       workingHours: (mainLocation?.workingHours || pHours).trim(),
       latitude:  mainLocation?.coordinates?.latitude ?? (pLat.trim() ? parseFloat(pLat) : null),
@@ -8473,10 +8523,54 @@ export const AdminPanel = () => {
                           <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} onClick={() => copyPartnerLocation(index)}>Копировать</button>
                           <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11, color: A.red }} onClick={() => removePartnerLocation(index)}>Удалить</button>
                         </div>
+                        {editingPartner?.id && location.id && (
+                          <div style={{ marginTop: 10, borderTop: `1px solid ${A.border}`, paddingTop: 10, display: 'grid', gridTemplateColumns: viewportWidth < 720 ? '1fr' : '96px 1fr', gap: 10, alignItems: 'center' }}>
+                            <div data-partner-location-qr={location.id} style={{ width: 82, height: 82, borderRadius: 14, background: '#fff', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+                              <QRCodeCanvas value={partnerLocationLink(location)} size={72} bgColor="#ffffff" fgColor="#0F0F1A" level="M" includeMargin={false} />
+                            </div>
+                            <div style={{ display: 'grid', gap: 7, minWidth: 0 }}>
+                              <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px', wordBreak: 'break-all' }}>{partnerLocationLink(location)}</div>
+                              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                                <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} onClick={() => window.open(partnerLocationLink(location), '_blank', 'noopener,noreferrer')}>Открыть</button>
+                                <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} onClick={() => copyPartnerLocationLink(location)}>Скопировать ссылку</button>
+                                <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} onClick={() => downloadPartnerLocationQr(location)}>Скачать PNG</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
+
+                {pLocations.length > 1 && pBookingSpecialists.length > 0 && (
+                  <div style={{ border: `1px solid ${A.border}`, background: A.chip, borderRadius: 18, padding: 14, marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: A.text }}>👥 Специалисты по филиалам</div>
+                    <div style={{ fontSize: 12, color: A.textSec, lineHeight: '18px', marginTop: 4, marginBottom: 10 }}>
+                      Если филиалы не выбраны, специалист считается доступным во всех филиалах.
+                    </div>
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {pBookingSpecialists.map((specialist, specialistIndex) => {
+                        const ids = normalizeLocationIds(specialist.locationIds || specialist.locations || specialist.branchIds);
+                        return (
+                          <div key={specialist.id || specialistIndex} style={{ border: `1px solid ${A.border}`, borderRadius: 14, padding: 11, background: 'rgba(255,255,255,0.035)' }}>
+                            <input style={{ ...s.input, marginBottom: 8 }} placeholder="Имя специалиста" value={specialist.name || specialist.title || ''} onChange={e => updatePartnerSpecialistLocations(specialistIndex, { name: e.target.value })} />
+                            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                              {pLocations.map(location => {
+                                const active = ids.includes(location.id);
+                                return (
+                                  <button key={location.id} type="button" onClick={() => togglePartnerSpecialistLocation(specialistIndex, location.id)} style={{ ...s.btn, ...(active ? s.btnPri : s.btnGray), minHeight: 32, padding: '6px 10px', fontSize: 11 }}>
+                                    {active ? '✓ ' : ''}{location.title || location.address || 'Филиал'}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
                   <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 Email владельца заведения</label>

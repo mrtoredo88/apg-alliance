@@ -9,7 +9,11 @@ import {
   hasMultipleLocations,
   locationBookingPayload,
   locationToProvider,
+  filterReviewsByLocation,
+  filterSpecialistsByLocation,
+  locationDeepLink,
   normalizeLocationsForSave,
+  offerMatchesLocation,
 } from '../server-shared/locations.js';
 import { buildBookingProfile } from '../server-shared/booking.js';
 
@@ -32,6 +36,13 @@ assert.equal(hasMultipleLocations(legacyPartner), false);
 
 const networkPartner = {
   ...legacyPartner,
+  offer: 'Скидка на уход',
+  offerLocationId: 'north',
+  bookingSpecialists: [
+    { id: 'anna', name: 'Анна', serviceIds: ['service_1'], locationIds: ['center'] },
+    { id: 'maria', name: 'Мария', serviceIds: ['service_1'], locationIds: ['north'] },
+    { id: 'anywhere', name: 'Ольга', serviceIds: ['service_1'] },
+  ],
   locations: [
     { id: 'center', title: 'Центральный салон', address: 'Корпус 100', phone: '+79991111111', workingHours: '09:00-21:00', isMain: true },
     { id: 'north', title: 'Филиал в 12 районе', address: 'Корпус 1201', description: 'Второй зал', phone: '+79992222222', whatsapp: 'https://wa.me/79992222222', telegram: 'https://t.me/apg', website: 'https://example.com/north', workingHours: '10:00-19:00' },
@@ -57,6 +68,21 @@ const bookingProfile = buildBookingProfile(selectedProvider, 'partner');
 assert.equal(bookingProfile.locationId, 'north');
 assert.equal(bookingProfile.address, 'Корпус 1201');
 assert.equal(bookingProfile.phone, '+79992222222');
+assert.deepEqual(bookingProfile.specialists.map(item => item.id), ['any', 'maria', 'anywhere']);
+
+const centerProvider = locationToProvider(networkPartner, getLocationById(networkPartner, 'center'));
+assert.deepEqual(buildBookingProfile(centerProvider, 'partner').specialists.map(item => item.id), ['any', 'anna', 'anywhere']);
+assert.deepEqual(filterSpecialistsByLocation(networkPartner.bookingSpecialists, 'north').map(item => item.id), ['maria', 'anywhere']);
+assert.equal(offerMatchesLocation(networkPartner, 'north'), true);
+assert.equal(offerMatchesLocation(networkPartner, 'center'), false);
+assert.equal(locationDeepLink('partner', 'coffee-time', 'north', 'https://myapg.ru'), 'https://myapg.ru/partner/coffee-time?location=north');
+
+const branchReviews = [
+  { id: 'r1', text: 'Центр', locationId: 'center', stars: 5 },
+  { id: 'r2', text: 'Север', locationId: 'north', stars: 4 },
+  { id: 'r3', text: 'Старый отзыв', stars: 5 },
+];
+assert.deepEqual(filterReviewsByLocation(branchReviews, 'north').map(item => item.id), ['r2']);
 
 const payload = locationBookingPayload(getLocationById(networkPartner, 'north'));
 assert.deepEqual(payload, {
@@ -91,6 +117,9 @@ assert.match(adminPanel, /pLocations/, 'Admin partner editor keeps locations in 
 assert.match(adminPanel, /normalizeLocationsForSave/, 'Admin partner save uses shared locations normalizer');
 assert.match(adminPanel, /Филиалы/, 'Admin partner editor exposes branch section');
 assert.match(adminPanel, /Копировать/, 'Admin partner editor supports copy-as-template');
+assert.match(adminPanel, /Специалисты по филиалам/, 'Admin partner editor can bind booking specialists to locations');
+assert.match(adminPanel, /partnerLocationLink/, 'Admin partner editor creates branch deep links');
+assert.match(adminPanel, /Скачать PNG/, 'Admin partner editor exposes branch QR download');
 
 const partnerCabinet = fs.readFileSync('src/PartnerCabinetPage.jsx', 'utf8');
 assert.match(partnerCabinet, /fLocations/, 'Mobile partner cabinet keeps locations in autosave state');
@@ -101,6 +130,8 @@ const partnerPage = fs.readFileSync('src/PartnerPage.jsx', 'utf8');
 assert.match(partnerPage, /params\.get\('location'\)/, 'Partner profile supports location deep link query');
 assert.match(partnerPage, /Филиалы \(\{locations\.length\}\)/, 'Partner profile renders compact branches summary');
 assert.match(partnerPage, /locationId: location\?\.id/, 'Partner profile tracks branch-aware route and call actions');
+assert.match(partnerPage, /Отзывы филиала/, 'Partner profile exposes branch review filter');
+assert.match(partnerPage, /offerMatchesLocation/, 'Partner profile supports location-specific offers');
 
 const partnersPage = fs.readFileSync('src/PartnersPage.jsx', 'utf8');
 assert.match(partnersPage, /getLocationsSearchText/, 'Partner catalog search indexes all branch addresses and titles');
@@ -111,6 +142,7 @@ assert.match(mapPage, /mapPointsParam/, 'Map page can render multiple branch coo
 
 const bookingFlow = fs.readFileSync('src/booking/BookingFlow.jsx', 'utf8');
 assert.match(bookingFlow, /provider\?\.locationId/, 'Booking flow starts from selected branch when provided');
+assert.match(bookingFlow, /specialistIdsKey/, 'Booking flow resets stale specialist after branch change');
 
 const userApp = fs.readFileSync('src/UserApp.jsx', 'utf8');
 assert.match(userApp, /parsed\.searchParams\.get\('location'\)/, 'Public QR scanner preserves branch location query');

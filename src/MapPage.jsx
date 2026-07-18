@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import { openUrl } from './vk.js';
-import { getLocationsSearchText, getProfileLocations, hasMultipleLocations } from '../server-shared/locations.js';
+import { getLocationsSearchText, getProfileLocations, hasMultipleLocations, locationToProvider } from '../server-shared/locations.js';
 
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
@@ -223,7 +223,7 @@ export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }
               <button onClick={() => openRoute(selected.address)} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #FF6600, #FF8C00)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 🗺️
               </button>
-              <button onClick={() => { onOpenPartner(selected.partner || selected); }} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => { onOpenPartner(locationToProvider(selected.partner || selected, selected.location)); }} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 Открыть
               </button>
               <button onClick={() => setSelected(null)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textSec, fontSize: 11, cursor: 'pointer' }}>

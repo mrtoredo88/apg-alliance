@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-18] feat: Locations Intelligence v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/locations.js`, `server-shared/booking.js`, `server-shared/workspace-analytics.js`, `server/src/routes/user-actions.js`, `src/PartnerPage.jsx`, `src/booking/BookingFlow.jsx`, `src/AdminPanel.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `src/workspace/WorkspaceAnalyticsCenter.jsx`, `src/MapPage.jsx`, `scripts/partner-locations-test.mjs`, `scripts/workspace-core-test.mjs`
+**Тип:** feat
+**Что изменено:**
+- Добавлены shared-helper'ы для привязки специалистов, акций и отзывов к филиалам поверх существующей модели `locations`.
+- Онлайн-запись фильтрует специалистов по выбранному филиалу, публичная карточка переключает филиалы, отзывы и филиальные акции без перезагрузки.
+- Админка и Workspace получили управление филиалами специалистов; админка показывает QR каждого филиала с deep link `partner/:id?location=...`; Analytics Center показывает агрегаты филиалов из существующих событий.
+**Почему:** система филиалов должна стать платформой для сетевого бизнеса без новых коллекций, изменения API, Firestore schema и базовой UX-архитектуры.
+
+---
+
 ## [2026-07-18] feat: Locations UX polish
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/locations.js`, `src/PartnerPage.jsx`, `src/PartnersPage.jsx`, `src/MapPage.jsx`, `src/booking/BookingFlow.jsx`, `src/UserApp.jsx`, `scripts/partner-locations-test.mjs`, `.ai/17_CHANGELOG_AI.md`

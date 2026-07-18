@@ -1,4 +1,5 @@
 import { BOOKING_STATUSES, normalizeBooking } from './booking.js';
+import { getMainLocation, getProfileLocations } from './locations.js';
 import { workspaceEventBelongsToProfile, workspaceEventStatus } from './workspace-events.js';
 import { workspaceNewsBelongsToProfile, workspaceNewsStatus } from './workspace-news.js';
 
@@ -71,6 +72,46 @@ function rate(top, bottom) {
 
 function profileMetric(profile = {}, keys = []) {
   return keys.reduce((sum, key) => sum + num(key.split('.').reduce((acc, part) => acc?.[part], profile)), 0);
+}
+
+function itemLocationId(item = {}, mainLocationId = '') {
+  return text(item.locationId || item.location?.id || item.branchId || item.placeId || item.metadata?.locationId || mainLocationId, 120);
+}
+
+export function buildWorkspaceLocationAnalytics(profile = {}, sources = {}) {
+  const locations = getProfileLocations(profile);
+  if (locations.length <= 1) return [];
+  const mainLocationId = getMainLocation(profile)?.id || locations[0]?.id || '';
+  const stats = profile.locationStats && typeof profile.locationStats === 'object' ? profile.locationStats : {};
+  return locations.map(location => {
+    const locationId = location.id;
+    const bookings = (sources.bookings || []).filter(item => itemLocationId(item, mainLocationId) === locationId);
+    const scans = (sources.scans || []).filter(item => itemLocationId(item, mainLocationId) === locationId);
+    const notifications = (sources.notifications || []).filter(item => itemLocationId(item, mainLocationId) === locationId);
+    const locationStats = stats[locationId] || {};
+    const calls = num(locationStats.calls ?? locationStats.phoneClicks)
+      + notifications.filter(item => ['call', 'phone', 'partner:call'].includes(String(item.action || item.type || item.eventType || ''))).length;
+    const routes = num(locationStats.routes ?? locationStats.routeClicks)
+      + notifications.filter(item => ['route', 'map', 'partner:route'].includes(String(item.action || item.type || item.eventType || ''))).length;
+    const views = num(locationStats.views ?? locationStats.profileViews ?? locationStats.opens)
+      + scans.length
+      + notifications.filter(item => ['view', 'open', 'partner:view'].includes(String(item.action || item.type || item.eventType || ''))).length;
+    const completedBookings = bookings.filter(item => item.status === BOOKING_STATUSES.completed).length;
+    const bookingCount = bookings.length;
+    return {
+      id: locationId,
+      title: text(location.title || location.address || 'Филиал', 180),
+      isMain: Boolean(location.isMain),
+      address: text(location.address, 260),
+      views,
+      opens: views,
+      calls,
+      routes,
+      bookings: bookingCount,
+      completedBookings,
+      conversion: rate(bookingCount || completedBookings, Math.max(1, views)),
+    };
+  });
 }
 
 export function filterWorkspaceAnalyticsSources(sources = {}, profile = {}, role = 'partner', range = buildWorkspaceAnalyticsRange()) {
@@ -231,7 +272,8 @@ export function buildWorkspaceAnalyticsSnapshot({ profile = {}, role = 'partner'
     { id: 'push', label: 'Push', value: filtered.notifications.filter(item => item.source === 'push' || item.channel === 'push').length },
   ].filter(item => item.value > 0);
   const recommendations = buildWorkspaceAnalyticsRecommendations({ kpis, newsAnalytics, eventsAnalytics, bookingsAnalytics, dialogsAnalytics });
-  const exportRows = buildWorkspaceAnalyticsExportRows({ kpis, newsAnalytics, eventsAnalytics, bookingsAnalytics, dialogsAnalytics, sourcesBreakdown });
+  const locationsAnalytics = buildWorkspaceLocationAnalytics(profile, filtered);
+  const exportRows = buildWorkspaceAnalyticsExportRows({ kpis, newsAnalytics, eventsAnalytics, bookingsAnalytics, dialogsAnalytics, sourcesBreakdown, locationsAnalytics });
   return {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -245,6 +287,7 @@ export function buildWorkspaceAnalyticsSnapshot({ profile = {}, role = 'partner'
     dialogs: dialogsAnalytics,
     profileActions,
     sources: sourcesBreakdown,
+    locations: locationsAnalytics,
     recommendations,
     lokiContext: {
       range,
@@ -273,7 +316,7 @@ export function buildWorkspaceAnalyticsRecommendations({ kpis = {}, newsAnalytic
   return rows.slice(0, 6);
 }
 
-export function buildWorkspaceAnalyticsExportRows({ kpis = {}, newsAnalytics = {}, eventsAnalytics = {}, bookingsAnalytics = {}, dialogsAnalytics = {}, sourcesBreakdown = [] } = {}) {
+export function buildWorkspaceAnalyticsExportRows({ kpis = {}, newsAnalytics = {}, eventsAnalytics = {}, bookingsAnalytics = {}, dialogsAnalytics = {}, sourcesBreakdown = [], locationsAnalytics = [] } = {}) {
   return [
     ['Раздел', 'Показатель', 'Значение'],
     ...Object.entries(kpis).map(([key, value]) => ['KPI', key, value]),
@@ -288,6 +331,12 @@ export function buildWorkspaceAnalyticsExportRows({ kpis = {}, newsAnalytics = {
     ['Диалоги', 'new', dialogsAnalytics.new || 0],
     ['Диалоги', 'unread', dialogsAnalytics.unread || 0],
     ...sourcesBreakdown.map(item => ['Источники', item.label, item.value]),
+    ...locationsAnalytics.flatMap(item => [
+      ['Филиалы', `${item.title}: views`, item.views || 0],
+      ['Филиалы', `${item.title}: bookings`, item.bookings || 0],
+      ['Филиалы', `${item.title}: routes`, item.routes || 0],
+      ['Филиалы', `${item.title}: conversion`, item.conversion || 0],
+    ]),
   ];
 }
 

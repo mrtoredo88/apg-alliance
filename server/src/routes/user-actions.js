@@ -1496,6 +1496,8 @@ async function actionReviewPartner(db, req, actor) {
   const partnerId = safeString(req.body?.partnerId, 160);
   const stars = Math.max(1, Math.min(5, Number(req.body?.stars || 0)));
   const text = safeString(req.body?.text, MAX_TEXT);
+  const locationId = safeString(req.body?.locationId, 120);
+  const locationTitle = safeString(req.body?.locationTitle, 180);
   if (!partnerId || !stars) throw Object.assign(new Error('Некорректный отзыв.'), { statusCode: 400 });
   await assertPublicProfileAvailable(db, 'partners', partnerId, 'Партнёр');
   const reviewData = {
@@ -1504,6 +1506,8 @@ async function actionReviewPartner(db, req, actor) {
     userPhoto: safeString(req.body?.userPhoto, 1000) || null,
     stars,
     text,
+    locationId,
+    locationTitle,
     createdAt: FieldValue.serverTimestamp(),
   };
   const partnerRef = db.collection('partners').doc(partnerId);

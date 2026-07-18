@@ -4,6 +4,7 @@ import { EntityPreviewCard } from '../components/EntityPreviewCard.jsx';
 import { GalleryUpload, PhotoUpload } from '../PhotoUpload.jsx';
 import { userAction } from '../userApi.js';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
+import { normalizeLocationIds } from '../../server-shared/locations.js';
 import {
   SOCIAL_LINK_TYPES,
   SHOWCASE_TABS,
@@ -233,9 +234,23 @@ function ContactsTab({ draft, update }) {
 
 function LocationsTab({ draft, update }) {
   const locations = Array.isArray(draft.locations) ? draft.locations : [];
+  const specialists = Array.isArray(draft.bookingSpecialists) ? draft.bookingSpecialists : [];
   const updateLocation = (index, patch) => update({
     locations: locations.map((item, i) => i === index ? { ...item, ...patch } : item),
   });
+  const updateSpecialistLocations = (index, patch) => update({
+    bookingSpecialists: specialists.map((item, i) => i === index ? { ...item, ...patch } : item),
+  });
+  const toggleSpecialistLocation = (index, locationId) => {
+    update({
+      bookingSpecialists: specialists.map((item, i) => {
+        if (i !== index) return item;
+        const ids = normalizeLocationIds(item.locationIds || item.locations || item.branchIds);
+        const next = ids.includes(locationId) ? ids.filter(id => id !== locationId) : [...ids, locationId];
+        return { ...item, locationIds: next };
+      }),
+    });
+  };
   const addLocation = () => update({
     locations: [
       ...locations,
@@ -319,6 +334,30 @@ function LocationsTab({ draft, update }) {
             </div>
           </GlassCard>
         ))}
+        {locations.length > 1 && specialists.length > 0 && (
+          <GlassCard style={{ borderRadius: 28, display: 'grid', gap: 10 }}>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 880 }}>Специалисты по филиалам</div>
+            <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px' }}>Если филиалы не выбраны, специалист считается доступным во всех филиалах.</div>
+            {specialists.map((specialist, specialistIndex) => {
+              const ids = normalizeLocationIds(specialist.locationIds || specialist.locations || specialist.branchIds);
+              return (
+                <GlassCard key={specialist.id || specialistIndex} style={{ borderRadius: 22, padding: 11, display: 'grid', gap: 8 }}>
+                  <Field label="Специалист"><GlassInput value={specialist.name || specialist.title || ''} onChange={e => updateSpecialistLocations(specialistIndex, { name: e.target.value })} style={inputStyle} /></Field>
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                    {locations.map(location => {
+                      const active = ids.includes(location.id);
+                      return (
+                        <GlassButton key={location.id} tone={active ? 'gold' : 'glass'} onClick={() => toggleSpecialistLocation(specialistIndex, location.id)} style={{ minHeight: 34, borderRadius: 16, padding: '6px 10px', color: active ? '#17120a' : APG2_PROFILE.text }}>
+                          {active ? '✓ ' : ''}{location.title || location.address || 'Филиал'}
+                        </GlassButton>
+                      );
+                    })}
+                  </div>
+                </GlassCard>
+              );
+            })}
+          </GlassCard>
+        )}
       </div>
     </GlassSection>
   );

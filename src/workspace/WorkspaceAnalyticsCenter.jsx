@@ -377,6 +377,28 @@ export function WorkspaceAnalyticsCenter({ role, profile, actions, onOpenPanel, 
               {snapshot.sources?.length ? <MiniChart rows={snapshot.sources.map(item => ({ ...item, title: item.label, score: item.value, type: 'source' }))} /> : <div style={{ color: UI.soft, fontSize: 13 }}>Источники пока не определены.</div>}
             </Section>
           </div>
+
+          {snapshot.locations?.length > 0 && (
+            <Section title="Филиалы" subtitle="Агрегация по уже сохранённым просмотрам, звонкам, маршрутам, QR и записям.">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
+                {snapshot.locations.map(location => (
+                  <div key={location.id} style={{ border: `1px solid ${location.isMain ? 'rgba(200,155,60,0.42)' : UI.line}`, borderRadius: 8, padding: 12, background: UI.controlSoft }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
+                      <div style={{ color: UI.text, fontSize: 14, fontWeight: 920 }}>{location.title}</div>
+                      {location.isMain && <span style={{ color: UI.gold, fontSize: 10, fontWeight: 900 }}>Основной</span>}
+                    </div>
+                    {location.address && <div style={{ color: UI.soft, fontSize: 12, lineHeight: '17px', marginTop: 4 }}>{location.address}</div>}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7, marginTop: 10 }}>
+                      <KpiCard label="Просмотры" value={formatValue(location.views)} />
+                      <KpiCard label="Записи" value={formatValue(location.bookings)} tone="green" />
+                      <KpiCard label="Маршруты" value={formatValue(location.routes)} tone="blue" />
+                      <KpiCard label="Конверсия" value={formatValue(location.conversion, '%')} tone="green" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
         </>
       )}
     </div>

@@ -12,12 +12,30 @@ export const LOCATION_FUTURE_FIELDS = Object.freeze([
   'inventory',
 ]);
 
+export const LOCATION_SCHEDULE_FIELDS = Object.freeze([
+  'workingDays',
+  'closedDays',
+  'temporaryClosures',
+  'holidayHours',
+  'scheduleOverrides',
+]);
+
 function text(value, max = MAX_TEXT) {
   return String(value ?? '').trim().slice(0, max);
 }
 
 function list(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function idList(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => text(typeof item === 'string' ? item : item?.id || item?.locationId || item?.value, 120)).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value.split(/\n|;|,/).map(item => text(item, 120)).filter(Boolean);
+  }
+  return [];
 }
 
 function coordinatesFrom(source = {}) {
@@ -62,6 +80,9 @@ export function normalizeLocation(raw = {}, index = 0, profile = {}) {
     isMain: Boolean(source.isMain),
   };
   LOCATION_FUTURE_FIELDS.forEach(field => {
+    if (source[field] !== undefined) normalized[field] = source[field];
+  });
+  LOCATION_SCHEDULE_FIELDS.forEach(field => {
     if (source[field] !== undefined) normalized[field] = source[field];
   });
   if (!normalized.title && address) normalized.title = index === 0 ? 'Основная локация' : `Локация ${index + 1}`;
@@ -167,4 +188,55 @@ export function normalizeLocationsForSave(locations = [], profile = {}) {
     ...item,
     isMain: mainIndex >= 0 ? index === mainIndex : index === 0,
   }));
+}
+
+export function normalizeLocationIds(value) {
+  return Array.from(new Set(idList(value)));
+}
+
+export function getItemLocationIds(item = {}) {
+  return normalizeLocationIds(item.locationIds || item.locations || item.branchIds || item.branches || item.placeIds || item.places);
+}
+
+export function getItemMainLocationId(item = {}) {
+  return text(item.mainLocationId || item.primaryLocationId || item.locationId || item.branchId || item.placeId, 120);
+}
+
+export function itemMatchesLocation(item = {}, locationId = '') {
+  const cleanLocationId = text(locationId, 120);
+  if (!cleanLocationId) return true;
+  const ids = getItemLocationIds(item);
+  const mainId = getItemMainLocationId(item);
+  if (!ids.length && !mainId) return true;
+  return ids.includes(cleanLocationId) || mainId === cleanLocationId;
+}
+
+export function filterItemsByLocation(items = [], locationId = '') {
+  return list(items).filter(item => itemMatchesLocation(item, locationId));
+}
+
+export function filterSpecialistsByLocation(specialists = [], locationId = '') {
+  return filterItemsByLocation(specialists, locationId);
+}
+
+export function offerMatchesLocation(profile = {}, locationId = '') {
+  return itemMatchesLocation({
+    locationId: profile.offerLocationId || profile.promotionLocationId || profile.promoLocationId,
+    locationIds: profile.offerLocationIds || profile.promotionLocationIds || profile.promoLocationIds,
+  }, locationId);
+}
+
+export function filterReviewsByLocation(reviews = [], locationId = '') {
+  const cleanLocationId = text(locationId, 120);
+  if (!cleanLocationId) return list(reviews);
+  return list(reviews).filter(review => getItemMainLocationId(review) === cleanLocationId || getItemLocationIds(review).includes(cleanLocationId));
+}
+
+export function locationDeepLink(entityType = 'partner', entityId = '', locationId = '', baseUrl = '') {
+  const cleanEntityType = text(entityType, 60) || 'partner';
+  const cleanEntityId = encodeURIComponent(text(entityId, 180));
+  const cleanLocationId = encodeURIComponent(text(locationId, 120));
+  const path = cleanEntityId ? `/${cleanEntityType}/${cleanEntityId}` : `/${cleanEntityType}`;
+  const query = cleanLocationId ? `?location=${cleanLocationId}` : '';
+  return `${text(baseUrl, 260).replace(/\/$/, '')}${path}${query}`;
 }

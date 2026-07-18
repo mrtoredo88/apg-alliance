@@ -33,6 +33,7 @@ import {
 } from '../server-shared/workspace-news.js';
 import {
   buildWorkspaceAnalyticsRange,
+  buildWorkspaceLocationAnalytics,
   buildWorkspaceAnalyticsSnapshot,
   filterWorkspaceAnalyticsSources,
   workspaceAnalyticsRowsToCsv,
@@ -280,7 +281,15 @@ assert.deepEqual(filteredAnalytics.news.map(item => item.id), ['n1']);
 assert.deepEqual(filteredAnalytics.events.map(item => item.id), ['e1']);
 assert.deepEqual(filteredAnalytics.bookings.map(item => item.id), ['b1', 'b2']);
 const analyticsSnapshot = buildWorkspaceAnalyticsSnapshot({
-  profile: { ...partnerProfile, stats: { profileViews: 30, websiteClicks: 2, routeClicks: 3 } },
+  profile: {
+    ...partnerProfile,
+    stats: { profileViews: 30, websiteClicks: 2, routeClicks: 3 },
+    locations: [
+      { id: 'center', title: 'Центр', address: 'Корпус 1', isMain: true },
+      { id: 'north', title: 'Север', address: 'Корпус 2' },
+    ],
+    locationStats: { center: { views: 4, routeClicks: 1 }, north: { views: 7, phoneClicks: 2 } },
+  },
   role: 'partner',
   range: analyticsRange,
   sources: analyticsSources,
@@ -294,8 +303,12 @@ assert.ok(analyticsSnapshot.funnel.some(item => item.id === 'completed'));
 assert.ok(analyticsSnapshot.news.top[0].id === 'n1');
 assert.ok(analyticsSnapshot.recommendations.every(item => item.confidence === 'real-data'));
 assert.ok(analyticsSnapshot.lokiContext.kpis);
+assert.equal(analyticsSnapshot.locations.length, 2);
+assert.equal(analyticsSnapshot.locations.find(item => item.id === 'center').bookings, 2);
+assert.equal(buildWorkspaceLocationAnalytics({ id: 'single', address: 'Корпус 1' }, {}).length, 0);
 const analyticsCsv = workspaceAnalyticsRowsToCsv(analyticsSnapshot.exportRows);
 assert.ok(analyticsCsv.includes('"KPI";"newsViews";"100"'));
+assert.ok(analyticsCsv.includes('"Филиалы";"Центр: bookings";"2"'));
 const adminAnalyticsSnapshot = buildWorkspaceAnalyticsSnapshot({
   profile: { id: 'all', name: 'Вся система' },
   role: 'admin',

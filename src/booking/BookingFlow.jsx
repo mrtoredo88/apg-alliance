@@ -46,6 +46,7 @@ export function BookingFlow({ open, provider, providerType = 'partner', user, on
   const locationStepNeeded = providerType === 'partner' && locations.length > 1;
   const serviceStepNeeded = bookingProfile.services.length > 1;
   const specialistStepNeeded = specialists.length > 1;
+  const specialistIdsKey = specialists.map(item => item.id).join('|');
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +58,13 @@ export function BookingFlow({ open, provider, providerType = 'partner', user, on
     setComment('');
     setError('');
   }, [bookingProfile.providerId, bookingProfile.providerType, initialLocationId, locations.length, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (specialists.some(item => item.id === selectedSpecialistId)) return;
+    setSelectedSpecialistId(specialists[0]?.id || '');
+    setSelectedSlotId('');
+  }, [open, selectedSpecialistId, selectedLocationId, selectedServiceId, specialistIdsKey]);
 
   if (!open || !provider || !bookingProfile.enabled) return null;
 

@@ -1,5 +1,5 @@
 import { normalizeExternalUrl } from '../utils/externalUrls.js';
-import { normalizeLocationsForSave, getProfileLocations } from '../../server-shared/locations.js';
+import { normalizeLocationsForSave, getProfileLocations, normalizeLocationIds } from '../../server-shared/locations.js';
 
 function text(value, fallback = '') {
   return String(value ?? fallback).trim();
@@ -107,6 +107,7 @@ export function buildShowcaseDraft(profile = {}, roleId = 'partner') {
     consultationPrice: text(profile.consultationPrice || profile.serviceCost),
     workFormat: text(profile.workFormat || list(profile.workFormats || profile.formats).join(', ')),
     locations: getProfileLocations(profile),
+    bookingSpecialists: Array.isArray(profile.bookingSpecialists) ? profile.bookingSpecialists : [],
   };
 }
 
@@ -164,6 +165,14 @@ export function buildShowcasePatch(draft = {}, roleId = 'partner') {
     features: draft.features || [],
     faq: draft.faq || [],
     customerNotes: draft.customerNotes,
+    bookingSpecialists: Array.isArray(draft.bookingSpecialists)
+      ? draft.bookingSpecialists.map((item, index) => ({
+          ...item,
+          id: item.id || `specialist_${index + 1}`,
+          locationIds: normalizeLocationIds(item.locationIds || item.locations || item.branchIds),
+          mainLocationId: item.mainLocationId || item.primaryLocationId || item.locationId || '',
+        }))
+      : [],
   };
   if (roleId === 'partner') {
     const locations = normalizeLocationsForSave(draft.locations || [], draft);

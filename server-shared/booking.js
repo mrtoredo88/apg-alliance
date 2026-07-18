@@ -1,4 +1,4 @@
-import { getLocationById, getMainLocation } from './locations.js';
+import { filterSpecialistsByLocation, getLocationById, getMainLocation, normalizeLocationIds } from './locations.js';
 
 export const BOOKING_STATUSES = {
   pending: 'pending',
@@ -379,9 +379,13 @@ export function buildBookingSpecialists(profile = {}, services = []) {
     photo: text(item?.photo || item?.image || '', 1000),
     description: text(item?.description || item?.specialization || '', 600),
     serviceIds: Array.isArray(item?.serviceIds) && item.serviceIds.length ? item.serviceIds.map(id => text(id, 80)) : allServiceIds,
+    locationIds: normalizeLocationIds(item?.locationIds || item?.locations || item?.branchIds),
+    mainLocationId: text(item?.mainLocationId || item?.primaryLocationId || item?.locationId || item?.branchId, 120),
     schedule: item?.schedule && typeof item.schedule === 'object' ? item.schedule : null,
   })).filter(item => item.name);
-  if (specialists.length) return [{ id: 'any', name: 'Любой специалист', photo: '', description: 'АПГ подберет свободное окно.', serviceIds: allServiceIds, schedule: null }, ...specialists];
+  const locationId = text(profile.locationId || '', 120);
+  const locationSpecialists = filterSpecialistsByLocation(specialists, locationId);
+  if (locationSpecialists.length) return [{ id: 'any', name: 'Любой специалист', photo: '', description: 'АПГ подберет свободное окно.', serviceIds: allServiceIds, locationIds: [], mainLocationId: '', schedule: null }, ...locationSpecialists];
   return [{ id: 'default', name: text(profile.name || 'Специалист', 160), photo: text(profile.photo || profile.logoUrl || '', 1000), description: text(profile.specialization || profile.categoryLabel || '', 600), serviceIds: allServiceIds, schedule: null }];
 }
 
