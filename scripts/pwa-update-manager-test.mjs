@@ -112,14 +112,31 @@ assert.equal(diag.installedVersion, 'v2');
 assert.equal(localStorage.getItem('apg_build'), 'v2');
 assert.equal(localStorage.getItem('apg_pwa_pending_version'), null);
 
+sessionStorage.removeItem('apg_pwa_reloaded_for');
+fetchVersion = 'v3';
+await manager.checkPwaUpdate({ autoReload: true });
+diag = manager.getPwaUpdateDiagnostics();
+assert.equal(reloadCount, 1, 'autoReload=true must request exactly one reload for a new version');
+assert.equal(window.__APG_PWA_RELOAD_REQUESTED, true, 'PWA reload must mark the current document as non-renderable');
+assert.equal(diag.updateStatus, 'updated_pending_reload');
+
+sessionStorage.setItem('apg_pwa_reloaded_for', 'v3');
+window.__APG_PWA_RELOAD_REQUESTED = false;
+await manager.checkPwaUpdate({ autoReload: true });
+diag = manager.getPwaUpdateDiagnostics();
+assert.equal(diag.updateStatus, 'current');
+assert.equal(localStorage.getItem('apg_build'), 'v3');
+
 await manager.requestPwaDiagnostics();
 diag = manager.getPwaUpdateDiagnostics();
-assert.equal(diag.appVersion, 'v2');
+assert.equal(diag.appVersion, 'v3');
 assert.equal(diag.bootstrapSource, 'stored-version');
 assert.ok(swMessages.some(message => message.type === 'APG_SW_DIAGNOSTICS'));
 
 const mainSource = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 assert.match(mainSource, /startPwaUpdateManager/);
+assert.match(mainSource, /__APG_PWA_RELOAD_REQUESTED/, 'main bootstrap must skip React render after a PWA reload request');
+assert.match(mainSource, /react_render_skipped_for_pwa_reload/, 'boot trace must record skipped render during PWA reload');
 assert.doesNotMatch(mainSource, /navigator\.serviceWorker\.register\('/);
 assert.doesNotMatch(mainSource, /caches\.keys\(\)\.then/);
 

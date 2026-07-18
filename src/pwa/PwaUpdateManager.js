@@ -281,6 +281,8 @@ export async function checkPwaUpdate({ autoReload = true } = {}) {
 
   if (autoReload && reloadedFor !== availableVersion && isSafeToReload()) {
     sessionStorage?.setItem?.(SESSION_KEYS.reloadedForVersion, availableVersion);
+    window.__APG_PWA_RELOAD_REQUESTED = true;
+    window.__APG_BOOT_MARK?.('pwa_update_reload_requested', { from: installedVersion, to: availableVersion });
     window.location.reload();
     return getPwaUpdateDiagnostics();
   }
@@ -300,7 +302,14 @@ export async function startPwaUpdateManager({ noServiceWorker = false, autoReloa
   setState({ updateStatus: 'starting', bootstrapSource: 'pwa-update-manager' });
   await registerPwaServiceWorker({ noServiceWorker });
   await checkPwaUpdate({ autoReload });
-  await requestPwaDiagnostics();
+  if (window.__APG_PWA_RELOAD_REQUESTED !== true) {
+    window.__APG_BOOT_MARK?.('pwa_update_background_diagnostics_start');
+    requestPwaDiagnostics()
+      .then(() => window.__APG_BOOT_MARK?.('pwa_update_background_diagnostics_ready'))
+      .catch(error => {
+        window.__APG_BOOT_MARK?.('pwa_update_background_diagnostics_failed', { message: error?.message || String(error) });
+      });
+  }
   return getPwaUpdateDiagnostics();
 }
 

@@ -40,6 +40,10 @@ if (_vkHash.includes('access_token=') && window.opener) {
   vkBridge.send('VKWebAppInit').catch(() => {});
   const noServiceWorker = new URLSearchParams(window.location.search).get('no-sw') === '1';
   const renderApp = () => {
+    if (window.__APG_PWA_RELOAD_REQUESTED === true) {
+      window.__APG_BOOT_MARK?.('react_render_skipped_for_pwa_reload');
+      return;
+    }
     window.__APG_BOOT_MARK?.('react_render_start');
     createRoot(document.getElementById('root')).render(<App />);
     window.__APG_BOOT_MARK?.('react_render_called');

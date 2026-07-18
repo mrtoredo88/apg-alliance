@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-18] fix: Startup Stability & PWA reload guard
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/main.jsx`, `src/pwa/PwaUpdateManager.js`, `scripts/pwa-update-manager-test.mjs`, `scripts/startup-stability-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Исправлен startup race: после `window.location.reload()` при PWA update текущий документ помечается как non-renderable, а `main.jsx` больше не вызывает React render в документе, который уже уходит в reload.
+- Вторичная PWA-диагностика вынесена в background после критической проверки версии, чтобы первый render не зависел от service worker diagnostics.
+- Добавлен startup stability smoke, который ловит даже кратковременное появление `Что-то пошло не так` через MutationObserver и проверяет cold starts.
+**Почему:** пользователь не должен видеть ложный ErrorBoundary/фатальный текст на долю секунды во время штатного PWA update/startup, если приложение затем успешно продолжает работу.
+
+---
+
 ## [2026-07-18] feat: Locations Intelligence v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/locations.js`, `server-shared/booking.js`, `server-shared/workspace-analytics.js`, `server/src/routes/user-actions.js`, `src/PartnerPage.jsx`, `src/booking/BookingFlow.jsx`, `src/AdminPanel.jsx`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/cabinet/ShowcaseBuilderCore.js`, `src/workspace/WorkspaceAnalyticsCenter.jsx`, `src/MapPage.jsx`, `scripts/partner-locations-test.mjs`, `scripts/workspace-core-test.mjs`
