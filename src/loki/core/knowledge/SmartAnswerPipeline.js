@@ -3,6 +3,7 @@ import { normalizeText, titleOf } from '../lokiCoreUtils.js';
 import { detectLokiIntent, intentNeedsLocalAnswer } from '../intent/IntentRouter.js';
 import { buildLokiKnowledgeProvider, makeKnowledgeResultCard, searchKnowledge } from './KnowledgeProvider.js';
 import { runReasoningEngine } from '../reasoning/ReasoningEngine.js';
+import { runJourneyEngine } from '../journey/JourneyEngine.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -222,14 +223,20 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   const knowledge = buildLokiKnowledgeProvider({ ...sourceState, activeContext: context?.memory?.activeContext || sourceState.activeContext });
   const intent = detectLokiIntent(question, knowledge);
   const contextReasoning = runReasoningEngine({ question, intent, knowledge, context });
+  const contextJourney = runJourneyEngine({ question, intent, knowledge, reasoningResult: contextReasoning, context });
+  if (contextJourney?.journeyHandled) return contextJourney;
+  if (contextJourney && (context?.memory?.lastJourneyContext || context?.memory?.journeyContext)) return contextJourney;
   if (contextReasoning?.reasoningHandled) return contextReasoning;
   if (contextReasoning?.reasoningContext?.source === 'memory') return contextReasoning;
   if (!intentNeedsLocalAnswer(intent)) {
+    if (contextJourney) return contextJourney;
     if (contextReasoning) return contextReasoning;
     const fallbackRows = searchKnowledge(knowledge, intent.query || question, [], 4);
     if (fallbackRows.length) {
       const fallbackIntent = { ...intent, id: 'knowledge.search', types: [], query: intent.query || question };
       const reasoned = runReasoningEngine({ question, intent: fallbackIntent, knowledge, context });
+      const journey = runJourneyEngine({ question, intent: fallbackIntent, knowledge, reasoningResult: reasoned, context });
+      if (journey) return journey;
       return reasoned || answerSearch({ intent: fallbackIntent, knowledge });
     }
     return null;
@@ -237,10 +244,14 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
 
   if (intent.id.startsWith('search.') || intent.id === 'news.question') {
     const reasoned = runReasoningEngine({ question, intent, knowledge, context });
+    const journey = runJourneyEngine({ question, intent, knowledge, reasoningResult: reasoned, context });
+    if (journey) return journey;
     return reasoned || answerSearch({ intent, knowledge });
   }
   if (intent.id === 'context.card') {
     const reasoned = runReasoningEngine({ question, intent, knowledge, context });
+    const journey = runJourneyEngine({ question, intent, knowledge, reasoningResult: reasoned, context });
+    if (journey) return journey;
     if (reasoned) return reasoned;
   }
 

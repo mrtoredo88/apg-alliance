@@ -17,6 +17,7 @@
     "test:loki": "node scripts/loki-core-v2-test.mjs",
     "test:loki-knowledge": "node scripts/loki-knowledge-engine-test.mjs",
     "test:loki-reasoning": "node scripts/loki-reasoning-engine-test.mjs",
+    "test:loki-journey": "node scripts/loki-journey-engine-test.mjs",
     "test:admin-assistant": "node scripts/admin-assistant-v1-test.mjs",
     "test:admin-loading": "node scripts/admin-loading-test.mjs",
     "test:loki-personality": "node scripts/loki-personality-v1-test.mjs",

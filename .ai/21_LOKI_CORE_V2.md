@@ -20,6 +20,13 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Suggestion Engine
         └── Answer Composer
                     │
+           Journey Engine v1
+        ├── Goal Detector
+        ├── Journey Planner
+        ├── Journey State
+        ├── Progress Tracker
+        └── Action Resolver
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -70,6 +77,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Knowledge Provider | V1 production | агрегирует существующие partners/experts/locations/promotions/events/gifts/news/reviews/bookings/dialogs/workspace data без новых коллекций |
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
+| Journey Engine | V1 production | read-only слой после Reasoning: определяет цель пользователя, строит локальный путь, отслеживает прогресс и предлагает следующий action без backend/Firestore |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
@@ -100,10 +108,11 @@ Loki Core V2 внедрён как совместимый архитектурн
 npm run test:loki
 npm run test:loki-knowledge
 npm run test:loki-reasoning
+npm run test:loki-journey
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ и 200 reasoning-сценариев: ранжирование, confidence, follow-up вопросы, объяснение выбора, suggestions и антисписки до 3–5 вариантов.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев и 250 journey-сценариев: goal detection, planning, progress, recovery, completion, summary, suggestions и action resolution.
 
 ## Следующие production-этапы
 

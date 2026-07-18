@@ -3488,6 +3488,15 @@
 - `SmartAnswerPipeline` подключает reasoning только поверх уже построенного `KnowledgeProvider`; фактические ответы о контактах, записи, Workspace, профиле и отзывах сохранены.
 - Добавлен regression-тест `scripts/loki-reasoning-engine-test.mjs` и команда `npm run test:loki-reasoning`: 200 сценариев покрывают ранжирование, объяснения, confidence, follow-up, suggestions, антисписки и недостаток данных.
 
+# 2026-07-18 — Loki Journey Engine v1
+
+- Добавлен read-only слой `src/loki/core/journey` поверх Knowledge + Reasoning: `JourneyEngine`, `GoalDetector`, `JourneyPlanner`, `JourneyState`, `ProgressTracker`, `ActionResolver`.
+- Локи теперь определяет цель пользователя (`BOOK_SERVICE`, `FIND_PARTNER`, `FIND_EXPERT`, `JOIN_EVENT`, `GET_PROMOTION`, `CLAIM_GIFT`, `CONTACT_PARTNER`, `NAVIGATE`, `LEARN`, `GENERAL`) и строит локальный путь до результата без новых API, Firestore и backend-изменений.
+- Добавлена локальная память текущего пути `lastJourneyContext`: summary (`Что мы уже сделали?`), recovery (`Продолжим?`), completion (`готово`) и natural follow-up внутри активного journey.
+- Journey использует только существующие `LokiAction`: открыть карточку, событие, подарок, карту, каталог, регистрацию на событие; не создаёт новых действий и не выполняет бизнес-операции сам.
+- Fact intents (`contacts`, `hours`, `booking`, `profile`, `workspace`, `reviews`) сохранены: Journey перехватывает их только как follow-up внутри уже активного пути.
+- Добавлен regression-тест `scripts/loki-journey-engine-test.mjs` и команда `npm run test:loki-journey`: 250 сценариев покрывают goal detection, planning, progress tracking, recovery, completion, summary, suggestions, action resolution и совместимость с Knowledge/Reasoning.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.
