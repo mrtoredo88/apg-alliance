@@ -193,6 +193,17 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const knowledgeStart = nowMs();
   const knowledgeResult = runLokiKnowledgeEngine({ text, appState, context });
   trace.push({ module: 'knowledgeEngine', ms: Math.round(nowMs() - knowledgeStart), decision: knowledgeResult?.intent ?? 'skipped' });
+  if (knowledgeResult?.knowledgeSnapshot) {
+    trace.push({
+      module: 'knowledgeIndex',
+      ms: 0,
+      decision: knowledgeResult.knowledgeSnapshot.Indexed || 'OK',
+      entities: knowledgeResult.knowledgeSnapshot.Entities || 0,
+      relations: knowledgeResult.knowledgeSnapshot.Relations || 0,
+      searchResults: knowledgeResult.knowledgeIndexSearch?.entities?.length || 0,
+      expandedContext: knowledgeResult.expandedKnowledgeContext?.length || 0,
+    });
+  }
   if (knowledgeResult?.memoryContext) {
     trace.push({ module: 'memoryEngine', ms: 0, decision: knowledgeResult.memoryContext.empty ? 'empty' : `used:${knowledgeResult.memoryContext.used?.length || 0}` });
   }

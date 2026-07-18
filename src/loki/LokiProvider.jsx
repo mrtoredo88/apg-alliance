@@ -37,6 +37,7 @@ import { buildConversationHistoryPatch } from './core/conversation/ConversationH
 import { buildDecisionHistoryPatch } from './core/decision/index.js';
 import { buildEvaluationHistoryPatch } from './core/evaluation/index.js';
 import { buildCapabilityHistoryPatch } from './core/capabilities/index.js';
+import { buildKnowledgeHistoryPatch } from './core/knowledgeIndex/index.js';
 import { buildSkillHistoryPatch } from './core/skills/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
@@ -541,6 +542,23 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
+  const recordKnowledgeIndexSnapshot = useCallback((knowledgeSnapshot, knowledgeIndexSearch) => {
+    if (!knowledgeSnapshot?.snapshotId) return;
+    setMemory(prev => {
+      const historyPatch = buildKnowledgeHistoryPatch(prev, knowledgeSnapshot, knowledgeIndexSearch);
+      const next = {
+        ...prev,
+        ...historyPatch,
+        lastKnowledgeSnapshot: knowledgeSnapshot,
+        lastKnowledgeIndexSearch: knowledgeIndexSearch || null,
+        lastKnowledgeHistory: historyPatch.knowledgeIndexHistory || prev.lastKnowledgeHistory || [],
+        updatedAt: new Date().toISOString(),
+      };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, []);
+
   const recordSkillContext = useCallback((skillContext, skillSnapshot) => {
     if (!skillContext?.skill) return;
     setMemory(prev => {
@@ -1025,6 +1043,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setBrainThinking(false);
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
+      if (result.knowledgeSnapshot) recordKnowledgeIndexSnapshot(result.knowledgeSnapshot, result.knowledgeIndexSearch);
       if (result.conversationContext) recordConversationContext(result.conversationContext);
       if (result.capabilityContext) recordCapabilityContext(result.capabilityContext, result.capabilitySnapshot);
       if (result.skillContext) recordSkillContext(result.skillContext, result.skillSnapshot);
@@ -1035,7 +1054,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.agentContext) recordAgentContext(result.agentContext);
       if (result.decisionContext) recordDecisionContext(result.decisionContext);
       if (result.evaluationSnapshot) recordEvaluationSnapshot(result.evaluationContext, result.evaluationSnapshot);
-      if (result.reasoningContext || result.conversationContext || result.capabilityContext || result.skillContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
+      if (result.knowledgeSnapshot || result.reasoningContext || result.conversationContext || result.capabilityContext || result.skillContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
+        ...(result.knowledgeSnapshot ? { lastKnowledgeSnapshot: result.knowledgeSnapshot, lastKnowledgeIndexSearch: result.knowledgeIndexSearch || null } : {}),
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
         ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
@@ -1075,7 +1095,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
+  }, [activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordKnowledgeIndexSnapshot, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
@@ -1118,6 +1138,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         lastConversation: { userText: text, answer: result.text, action: result.executeAction ?? result.autoAction ?? result.card?.action ?? null },
         lastPanel: activePanel,
         inDialog: true,
+        ...(result.knowledgeSnapshot ? { lastKnowledgeSnapshot: result.knowledgeSnapshot, lastKnowledgeIndexSearch: result.knowledgeIndexSearch || null } : {}),
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
         ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
@@ -1135,6 +1156,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         conversationCount: Number(memory.conversationCount || 0) + 1,
         lastSeenAt: new Date().toISOString(),
       });
+      if (result.knowledgeSnapshot) recordKnowledgeIndexSnapshot(result.knowledgeSnapshot, result.knowledgeIndexSearch);
       if (result.planContext) recordPlanContext(result.planContext);
       if (result.workflowContext) recordWorkflowContext(result.workflowContext);
       if (result.agentContext) recordAgentContext(result.agentContext);
@@ -1181,7 +1203,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordKnowledgeIndexSnapshot, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const openContextExperience = useCallback((context) => {
     const normalized = normalizeLokiContext(context);
@@ -1239,6 +1261,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     scenarioCollections,
     memory: memory ?? DEFAULT_LOKI_MEMORY,
     lastCapabilityContext: memory?.lastCapabilityContext || null,
+    lastKnowledgeSnapshot: memory?.lastKnowledgeSnapshot || null,
+    lastKnowledgeIndexSearch: memory?.lastKnowledgeIndexSearch || null,
+    lastKnowledgeHistory: memory?.lastKnowledgeHistory || memory?.knowledgeIndexHistory || [],
     lastCapabilitySnapshot: memory?.lastCapabilitySnapshot || null,
     lastCapabilityHistory: memory?.lastCapabilityHistory || memory?.capabilityHistory || [],
     lastSkillContext: memory?.lastSkillContext || null,

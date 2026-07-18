@@ -223,6 +223,46 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </section>
     );
   };
+  const renderKnowledgeIndexBlock = () => {
+    const snapshot = loki.lastKnowledgeSnapshot;
+    const search = loki.lastKnowledgeIndexSearch;
+    const history = Array.isArray(loki.lastKnowledgeHistory) ? loki.lastKnowledgeHistory : [];
+    if (!snapshot && !search && !history.length) return null;
+    const searchTitles = (search?.entities || []).slice(0, 3).map(item => `${item.title} (${item.type})`).join(', ');
+    const expandedTitles = (search?.expandedContext || []).slice(0, 4).map(item => `${item.title} (${item.type})`).join(', ');
+    const rows = [
+      ['Indexed Entities', snapshot?.Entities],
+      ['Relations', snapshot?.Relations],
+      ['Last Update', snapshot?.LastUpdate],
+      ['Search Result', searchTitles],
+      ['Expanded Context', expandedTitles],
+    ];
+    return (
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Knowledge Index', history.length ? `${history.length} снимков` : '')}
+        <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: 8, alignItems: 'start', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                <span style={{ color: APG2_PROFILE.textMuted, fontWeight: 760 }}>{label}</span>
+                <span style={{ color: label === 'Indexed Entities' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontWeight: label === 'Indexed Entities' ? 900 : 720, minWidth: 0, overflowWrap: 'anywhere' }}>{value || '—'}</span>
+              </div>
+            ))}
+          </div>
+          {!!history.length && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {history.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `${item.createdAt}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 58px', gap: 8, alignItems: 'center', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.entities} entities · {item.relations} relations</span>
+                  <span style={{ color: item.indexed === 'OK' ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontWeight: 900, textAlign: 'right' }}>{item.indexed}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </section>
+    );
+  };
   const renderCapabilityBlock = () => {
     const snapshot = loki.lastCapabilitySnapshot;
     const capabilityContext = loki.lastCapabilityContext;
@@ -535,6 +575,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
         </GlassCard>
       )}
 
+      {renderKnowledgeIndexBlock()}
       {renderCapabilityBlock()}
       {renderSkillBlock()}
       {renderExecutionBlock()}

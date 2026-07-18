@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-19] feat: Loki Unified Knowledge Index v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/knowledgeIndex/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-knowledge-index-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен полностью read-only слой `src/loki/core/knowledgeIndex`: Knowledge Index, Indexer, Entity, Search, Relations, Snapshot, Explanation, History и Validator.
+- Индекс автоматически нормализует уже загруженные APG-данные partners, experts, locations, events, promotions, news, dialogs, bookings, workspace, rewards, keys, gifts, FAQ, categories и tags в локальные entities/relations/search/expanded context.
+- `SmartAnswerPipeline` строит Knowledge Index сразу после Knowledge Provider и передаёт `knowledgeSnapshot`, `knowledgeIndexSearch` и `expandedKnowledgeContext` downstream без изменения ответов Локи.
+- `LokiProvider` хранит `lastKnowledgeSnapshot`, `lastKnowledgeIndexSearch`, локальную history на 100 записей; `LokiPage` показывает dev-блок Knowledge Index.
+- Добавлен `npm run test:loki-knowledge-index`: 500 сценариев проверяют индексацию, поиск, синонимы, связи, расширение контекста, explain mode, pipeline/provider integration и read-only контракт.
+**Почему:** следующий прирост качества Локи должен идти через единое понимание существующих данных АПГ, без новых коллекций, API, backend-логики или ручного обслуживания.
+
+---
+
 ## [2026-07-19] feat: Loki Skills Framework v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/skills/*`, `src/loki/core/skills/skills/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-skills-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

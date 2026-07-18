@@ -13,6 +13,17 @@ Loki Core V2 внедрён как совместимый архитектурн
                     │
        Knowledge Provider + Intent Router
                     │
+        Unified Knowledge Index v1
+        ├── Knowledge Index
+        ├── Knowledge Indexer
+        ├── Knowledge Entity
+        ├── Knowledge Search
+        ├── Knowledge Relations
+        ├── Knowledge Snapshot
+        ├── Knowledge Explanation
+        ├── Knowledge History
+        └── Knowledge Validator
+                    │
           Reasoning Engine v1
         ├── Ranking Engine
         ├── Context Resolver
@@ -230,6 +241,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 |---|---|---|
 | Brain / Intent | production, совместимый | эвристический semantic scoring, без внешней LLM по умолчанию |
 | Knowledge Provider | V1 production | агрегирует существующие partners/experts/locations/promotions/events/gifts/news/reviews/bookings/dialogs/workspace data без новых коллекций |
+| Unified Knowledge Index | V1 production | read-only слой сразу после Knowledge Provider: нормализует существующие данные в локальные entities/relations/search/expanded context, хранит snapshot/history и не создаёт новых коллекций или моделей |
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
 | Capability Engine | V1 production | read-only слой после Reasoning/Conversation resolution: определяет функцию приложения (`BOOK_APPOINTMENT`, `OPEN_REWARDS`, `SEARCH_PROMOTIONS` и др.), параметры, missing values, alternatives и execution order без изменения ответов или downstream-движков |
@@ -270,6 +282,9 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Навигационные client actions отделены от privileged backend actions.
 - Action Center использует только существующие `LOKI_APP_ACTIONS` и browser-safe действия; новые backend/API действия не добавляются.
 - Перед выполнением Action Center проверяет наличие объекта, публикацию/архив, доступность route handler и права actor.
+- Unified Knowledge Index v1 строится только из уже загруженных `KnowledgeProvider`/app state данных: partners, experts, locations, events, promotions, news, dialogs, bookings, workspace, rewards, keys, gifts, FAQ, categories и tags.
+- Knowledge Index не импортирует Firebase, не вызывает `fetch`, не создаёт коллекции, не меняет source objects и не заменяет существующие модели данных; Provider сохраняет только локальные `lastKnowledgeSnapshot`, `lastKnowledgeIndexSearch` и `lastKnowledgeHistory` на 100 записей.
+- Explain Mode Knowledge Index использует последний локальный snapshot/search result и отвечает, какие сущности, связи и расширенный контекст участвовали в поиске.
 - Tool Calling v1 использует только уже загруженный `KnowledgeProvider` snapshot; tools не импортируют Firebase, не вызывают `fetch`, не создают API/backend действия и не меняют данные.
 - Tool Validator проверяет наличие tool, read-only контракт, роль пользователя и готовность контекста; denied/failed превращаются в безопасный Loki-ответ или совместимый fallback.
 - Capability Engine v1 не исполняет действия и не выбирает данные за пользователя: слой только читает question/intent/reasoning/conversation/context/memory/knowledge, добавляет `capabilityContext`/`capabilitySnapshot` и локальную `capabilityHistory` на 100 записей.
@@ -326,11 +341,12 @@ npm run test:loki-proactive
 npm run test:loki-observability
 npm run test:loki-actions
 npm run test:loki-tool
+npm run test:loki-knowledge-index
 npm run test:loki-skills
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 1500+ agent-сценариев, 1800+ conversation-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев, 844 tool-сценария и 500 skills-сценариев: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow/Agent/Conversation/Skill History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`/`agentContext`/`conversationContext`/`skillContext`, Memory/Workflow/Agent/Conversation/Skill Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow/Agent/Conversation/Skills Layer.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 500 knowledge-index сценариев, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 1500+ agent-сценариев, 1800+ conversation-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев, 844 tool-сценария и 500 skills-сценариев: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow/Agent/Conversation/Skill/Knowledge Index History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`/`agentContext`/`conversationContext`/`skillContext`, Memory/Workflow/Agent/Conversation/Skill/Knowledge Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow/Agent/Conversation/Skills/Knowledge Index Layer.
 
 ## Следующие production-этапы
 

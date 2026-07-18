@@ -27,6 +27,7 @@
     "test:loki-execution": "node scripts/loki-execution-bridge-test.mjs",
     "test:loki-controlled-execution": "node scripts/loki-controlled-execution-test.mjs",
     "test:loki-skills": "node scripts/loki-skills-test.mjs",
+    "test:loki-knowledge-index": "node scripts/loki-knowledge-index-test.mjs",
     "test:loki-decision": "node scripts/loki-decision-test.mjs",
     "test:loki-evaluation": "node scripts/loki-evaluation-test.mjs",
     "test:loki-personalization": "node scripts/loki-personalization-engine-test.mjs",
