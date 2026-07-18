@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Planner v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/planner/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-planner-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only слой `src/loki/core/planner`: Intent Classifier, Goal Resolver, Plan Builder, Step Executor, Plan Validator и локальная Plan History.
+- `SmartAnswerPipeline` теперь для многошаговых запросов строит прозрачный план между Journey и Tool Calling, а шаги выполняет только через существующий read-only Tool Executor.
+- Loki Core показывает Planner в debug trace, а `LokiProvider` сохраняет `lastPlanContext`/`planHistory` локально без Firestore.
+- Добавлен `npm run test:loki-planner`: 914 сценариев проверяют классификацию целей, планы, validator, Tool Executor integration, Action Center compatibility и read-only контракт.
+**Почему:** после Knowledge, Reasoning, Journey, Personalization, Proactive, Action Center и Tool Calling Локи нужен планировщик многошаговых задач как основа будущего Agent Mode без изменения backend, Firestore, API и бизнес-логики.
+
+---
+
 ## [2026-07-18] feat: Loki Tool Calling v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/tools/*`, `src/loki/core/tools/tools/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-tool-test.mjs`, `scripts/loki-knowledge-engine-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
