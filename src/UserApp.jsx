@@ -44,6 +44,7 @@ import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManage
 import { buildAIContext } from './intelligence/AIContextService.js';
 import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
 import { buildPostVisitMomentState } from '../server-shared/booking.js';
+import { getLocationById, locationToProvider } from '../server-shared/locations.js';
 import {
   APG_EVENT_TYPES,
   getAIMemorySnapshot,
@@ -2229,6 +2230,7 @@ export function UserApp() {
     try {
       const parsed = new URL(rawQrValue, APP_URL);
       const scanValue = parsed.searchParams.get('scan');
+      const locationId = parsed.searchParams.get('location') || parsed.searchParams.get('locationId') || '';
       const pathParts = parsed.pathname.split('/').filter(Boolean).map(decodeURIComponent);
       const partnerId = parsed.searchParams.get('partner') || (pathParts[0] === 'partner' ? pathParts[1] : '');
       const expertId = parsed.searchParams.get('expert') || (pathParts[0] === 'expert' ? pathParts[1] : '');
@@ -2237,8 +2239,10 @@ export function UserApp() {
       } else if (partnerId) {
         const partner = await resolvePartnerDeepLink(partnerId);
         if (partner) {
-          openPartner(partner);
-          userAction('publicQr:view', { type: 'partner', id: partner.id }).catch(() => {});
+          const location = locationId ? getLocationById(partner, locationId) : null;
+          const partnerWithLocation = locationId ? locationToProvider(partner, location) : partner;
+          openPartner(partnerWithLocation);
+          userAction('publicQr:view', { type: 'partner', id: partner.id, locationId: location?.id || '' }).catch(() => {});
           showToast('Это информационный QR. Для ключа попросите служебный QR у сотрудника.', 'info');
         } else {
           showToast('Партнёр не найден');

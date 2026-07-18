@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-18] feat: Locations UX polish
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/locations.js`, `src/PartnerPage.jsx`, `src/PartnersPage.jsx`, `src/MapPage.jsx`, `src/booking/BookingFlow.jsx`, `src/UserApp.jsx`, `scripts/partner-locations-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Карточка партнёра получила компактный блок филиалов, раскрытие полного списка, бейдж основного филиала и действия по конкретной локации.
+- Deep link `?location=<locationId>` выбирает филиал в карточке и передаёт его в онлайн-запись; поиск и карта учитывают названия, адреса и координаты всех филиалов.
+- Онлайн-запись сохраняет прежний UX для одного филиала и стартует с выбранной локации при множественных филиалах.
+**Почему:** система филиалов должна быть завершённой для публичного UX без изменения модели `locations`, Firestore schema, API, маршрутизации и бизнес-логики.
+
+---
+
 ## [2026-07-18] feat: Locations management in Admin and Mobile Workspace
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/locations.js`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/PartnerCabinetPage.jsx`, `src/AdminPanel.jsx`, `scripts/partner-locations-test.mjs`, `.ai/17_CHANGELOG_AI.md`

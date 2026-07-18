@@ -23,7 +23,8 @@ export function canOpenBookingFlow(profile, type) {
 export function BookingFlow({ open, provider, providerType = 'partner', user, onClose, onCreated, onOpenDialog }) {
   const locations = useMemo(() => providerType === 'partner' ? getProfileLocations(provider || {}) : [], [provider, providerType]);
   const mainLocation = useMemo(() => getMainLocation(provider || {}), [provider]);
-  const [selectedLocationId, setSelectedLocationId] = useState(() => mainLocation?.id || locations[0]?.id || '');
+  const initialLocationId = String(provider?.locationId || mainLocation?.id || locations[0]?.id || '');
+  const [selectedLocationId, setSelectedLocationId] = useState(() => initialLocationId);
   const selectedLocation = locations.find(item => item.id === selectedLocationId) || mainLocation || locations[0] || null;
   const effectiveProvider = useMemo(() => locationToProvider(provider || {}, selectedLocation), [provider, selectedLocation]);
   const bookingProfile = useMemo(() => buildBookingProfile(effectiveProvider || {}, providerType), [effectiveProvider, providerType]);
@@ -48,14 +49,14 @@ export function BookingFlow({ open, provider, providerType = 'partner', user, on
 
   useEffect(() => {
     if (!open) return;
-    setSelectedLocationId(mainLocation?.id || locations[0]?.id || '');
+    setSelectedLocationId(initialLocationId);
     setSelectedServiceId(bookingProfile.services[0]?.id || '');
     setSelectedSpecialistId(bookingProfile.specialists[0]?.id || '');
     setSelectedDateKey('');
     setSelectedSlotId('');
     setComment('');
     setError('');
-  }, [bookingProfile.providerId, bookingProfile.providerType, locations.length, mainLocation?.id, open]);
+  }, [bookingProfile.providerId, bookingProfile.providerType, initialLocationId, locations.length, open]);
 
   if (!open || !provider || !bookingProfile.enabled) return null;
 

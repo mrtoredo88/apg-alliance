@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import { openUrl } from './vk.js';
+import { getLocationsSearchText, getProfileLocations, hasMultipleLocations } from '../server-shared/locations.js';
 
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
@@ -44,35 +45,77 @@ function openRoute(address) {
   openUrl(url);
 }
 
+function mapLocationRows(partners = []) {
+  return partners.flatMap(partner => {
+    const locations = getProfileLocations(partner || {});
+    const rows = locations.length
+      ? locations.filter(location => location.address || location.coordinates)
+      : [];
+    if (!rows.length && partner?.address?.trim()) {
+      return [{ ...partner, mapId: `${partner.id || partner.name}-legacy`, partner, location: null, locationCount: 1, address: partner.address }];
+    }
+    return rows.map((location, index) => ({
+      ...partner,
+      mapId: `${partner.id || partner.name}-${location.id || index}`,
+      partner,
+      location,
+      locationId: location.id,
+      locationTitle: location.title,
+      locationCount: locations.length,
+      address: location.address || partner.address,
+      phone: location.phone || partner.phone,
+      coordinates: location.coordinates,
+    }));
+  });
+}
+
+function mapPointsParam(rows = []) {
+  const points = rows
+    .map(row => {
+      const latitude = Number(row?.coordinates?.latitude ?? row?.latitude);
+      const longitude = Number(row?.coordinates?.longitude ?? row?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+      return `${longitude},${latitude},pm2rdm${row.location?.isMain ? '1' : '2'}`;
+    })
+    .filter(Boolean);
+  return points.length ? `pt=${points.join('~')}` : '';
+}
+
 export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }) {
   const [selected, setSelected]       = useState(null);
   const [activeCategory, setCategory] = useState('all');
   const [search, setSearch]           = useState('');
   const [mapLoaded, setMapLoaded]     = useState(false);
 
-  const partnersWithAddress = useMemo(() =>
-    partners.filter(p => p.address?.trim()),
-    [partners]
-  );
+  const partnersWithAddress = useMemo(() => mapLocationRows(partners), [partners]);
 
   const filtered = useMemo(() =>
     partnersWithAddress
       .filter(p => activeCategory === 'all' || p.category === activeCategory)
       .filter(p => !search.trim() ||
         p.name?.toLowerCase().includes(search.toLowerCase()) ||
-        p.address?.toLowerCase().includes(search.toLowerCase())
+        p.address?.toLowerCase().includes(search.toLowerCase()) ||
+        p.locationTitle?.toLowerCase().includes(search.toLowerCase()) ||
+        getLocationsSearchText(p.partner || p).includes(search.toLowerCase())
       ),
     [partnersWithAddress, activeCategory, search]
   );
 
-  const mapQuery = selected?.address
-    ? `text=${encodeURIComponent(selected.address + ', Зеленоград')}&z=16`
-    : ZELENOGRAD_CENTER;
+  const selectedCoordinates = selected?.coordinates;
+  const hasSelectedCoordinates = Number.isFinite(Number(selectedCoordinates?.latitude)) && Number.isFinite(Number(selectedCoordinates?.longitude));
+  const allPoints = mapPointsParam(filtered);
+  const mapQuery = hasSelectedCoordinates
+    ? `ll=${selectedCoordinates.longitude},${selectedCoordinates.latitude}&z=16&${mapPointsParam([selected])}`
+    : selected?.address
+      ? `text=${encodeURIComponent(selected.address + ', Зеленоград')}&z=16`
+      : allPoints
+        ? `${ZELENOGRAD_CENTER}&${allPoints}`
+        : ZELENOGRAD_CENTER;
 
   const mapSrc = `https://yandex.ru/maps/?${mapQuery}&l=map`;
 
   const handleSelect = (p) => {
-    setSelected(prev => prev?.id === p.id ? null : p);
+    setSelected(prev => prev?.mapId === p.mapId ? null : p);
     setMapLoaded(false);
   };
 
@@ -97,13 +140,14 @@ export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }
               <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>Загрузка карты...</div>
             </div>
           )}
-          <iframe key={selected?.id ?? 'default-v2'} src={mapSrc} title="Яндекс.Карты" onLoad={() => setMapLoaded(true)} style={{ position: 'relative', zIndex: 1, width: '100%', height: 320, border: 'none', display: 'block', opacity: mapLoaded ? 0.42 : 0, filter: 'saturate(0.72) contrast(0.98)', mixBlendMode: 'screen', transition: 'opacity 0.3s' }} allow="geolocation" />
+          <iframe key={selected?.mapId ?? 'default-v2'} src={mapSrc} title="Яндекс.Карты" onLoad={() => setMapLoaded(true)} style={{ position: 'relative', zIndex: 1, width: '100%', height: 320, border: 'none', display: 'block', opacity: mapLoaded ? 0.42 : 0, filter: 'saturate(0.72) contrast(0.98)', mixBlendMode: 'screen', transition: 'opacity 0.3s' }} allow="geolocation" />
           {selected && (
             <GlassCard style={{ position: 'absolute', left: 12, right: 12, bottom: 12, borderRadius: 28, padding: 13, display: 'flex', gap: 12, alignItems: 'center' }}>
-              <PartnerLogo partner={selected} size={44} />
+              <PartnerLogo partner={selected.partner || selected} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: APG2_PROFILE.text, fontSize: 15, fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.name}</div>
-                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.address}</div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{[selected.locationTitle, selected.address].filter(Boolean).join(' · ')}</div>
+                {hasMultipleLocations(selected.partner || selected) && <div style={{ color: APG2_PROFILE.gold, fontSize: 11, marginTop: 3 }}>{selected.locationCount} филиала</div>}
               </div>
               <GlassButton onClick={() => openRoute(selected.address)} tone="gold" style={{ minHeight: 42, borderRadius: 17, padding: '9px 11px', color: '#17120a' }}>Маршрут</GlassButton>
             </GlassCard>
@@ -127,7 +171,7 @@ export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {filtered.map((p, i) => (
-                <GlassListItem key={p.id} icon={<PartnerLogo partner={p} size={42} />} title={p.name} subtitle={p.address} meta={selected?.id === p.id ? <GlassBadge tone="gold">на карте</GlassBadge> : '›'} onClick={() => handleSelect(p)} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />
+                <GlassListItem key={p.mapId || p.id} icon={<PartnerLogo partner={p.partner || p} size={42} />} title={p.name} subtitle={[p.locationTitle, p.address].filter(Boolean).join(' · ')} meta={selected?.mapId === p.mapId ? <GlassBadge tone="gold">на карте</GlassBadge> : hasMultipleLocations(p.partner || p) ? `${p.locationCount} филиала` : '›'} onClick={() => handleSelect(p)} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />
               ))}
             </div>
           )}
@@ -158,8 +202,8 @@ export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }
             <div style={{ fontSize: 13, color: T.textSec }}>Загрузка карты...</div>
           </div>
         )}
-        <iframe
-          key={selected?.id ?? 'default'}
+          <iframe
+          key={selected?.mapId ?? 'default'}
           src={mapSrc}
           title="Яндекс.Карты"
           onLoad={() => setMapLoaded(true)}
@@ -170,16 +214,16 @@ export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }
         {/* Оверлей выбранного партнёра */}
         {selected && (
           <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12, zIndex: 10, ...GLASS, borderRadius: 20, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <PartnerLogo partner={selected} size={40} />
+            <PartnerLogo partner={selected.partner || selected} size={40} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: T.textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.name}</div>
-              <div style={{ fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>📍 {selected.address}</div>
+              <div style={{ fontSize: 11, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>📍 {[selected.locationTitle, selected.address].filter(Boolean).join(' · ')}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button onClick={() => openRoute(selected.address)} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #FF6600, #FF8C00)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 🗺️
               </button>
-              <button onClick={() => { onOpenPartner(selected); }} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => { onOpenPartner(selected.partner || selected); }} style={{ padding: '7px 10px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`, color: '#0F0F1A', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 Открыть
               </button>
               <button onClick={() => setSelected(null)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.chipBg, color: T.textSec, fontSize: 11, cursor: 'pointer' }}>
@@ -245,17 +289,18 @@ export function MapPage({ variant = 'v2', partners = [], onBack, onOpenPartner }
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filtered.map((p, i) => {
-                const isSelected = selected?.id === p.id;
+                const isSelected = selected?.mapId === p.mapId;
                 return (
                   <button
-                    key={p.id}
+                    key={p.mapId || p.id}
                     onClick={() => handleSelect(p)}
                     style={{ width: '100%', textAlign: 'left', padding: '14px', borderRadius: 18, border: `1px solid ${isSelected ? 'rgba(201,168,76,0.45)' : T.border}`, background: isSelected ? 'rgba(201,168,76,0.08)' : T.chipBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, animation: `fadeInUp 0.35s ease ${i * 0.04}s both`, transition: 'border-color 0.2s, background 0.2s' }}
                   >
                     <PartnerLogo partner={p} size={44} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: isSelected ? T.gold : T.textPri, marginBottom: 3 }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {p.address}</div>
+                      <div style={{ fontSize: 12, color: T.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {[p.locationTitle, p.address].filter(Boolean).join(' · ')}</div>
+                      {hasMultipleLocations(p.partner || p) && <div style={{ fontSize: 11, color: T.gold, marginTop: 3 }}>{p.locationCount} филиала</div>}
                       {p.offer && <div style={{ fontSize: 11, color: T.green, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🎁 {p.offer}</div>}
                     </div>
                     <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>

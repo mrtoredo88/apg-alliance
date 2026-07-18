@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {
   LOCATION_FUTURE_FIELDS,
   getLocationById,
+  getLocationsSearchText,
   getMainLocation,
   getProfileLocations,
   hasMultipleLocations,
@@ -44,6 +45,8 @@ assert.equal(getLocationById(networkPartner, 'north').description, 'Второй
 assert.equal(getLocationById(networkPartner, 'north').whatsapp, 'https://wa.me/79992222222');
 assert.equal(getLocationById(networkPartner, 'north').telegram, 'https://t.me/apg');
 assert.equal(getLocationById(networkPartner, 'north').website, 'https://example.com/north');
+assert.ok(getLocationsSearchText(networkPartner).includes('12 районе'));
+assert.ok(getLocationsSearchText(networkPartner).includes('корпус 1201'));
 
 const selectedProvider = locationToProvider(networkPartner, getLocationById(networkPartner, 'north'));
 assert.equal(selectedProvider.locationId, 'north');
@@ -93,5 +96,24 @@ const partnerCabinet = fs.readFileSync('src/PartnerCabinetPage.jsx', 'utf8');
 assert.match(partnerCabinet, /fLocations/, 'Mobile partner cabinet keeps locations in autosave state');
 assert.match(partnerCabinet, /Филиалы/, 'Mobile partner cabinet exposes branch tab');
 assert.match(partnerCabinet, /setMainLocation/, 'Mobile partner cabinet can set main location');
+
+const partnerPage = fs.readFileSync('src/PartnerPage.jsx', 'utf8');
+assert.match(partnerPage, /params\.get\('location'\)/, 'Partner profile supports location deep link query');
+assert.match(partnerPage, /Филиалы \(\{locations\.length\}\)/, 'Partner profile renders compact branches summary');
+assert.match(partnerPage, /locationId: location\?\.id/, 'Partner profile tracks branch-aware route and call actions');
+
+const partnersPage = fs.readFileSync('src/PartnersPage.jsx', 'utf8');
+assert.match(partnersPage, /getLocationsSearchText/, 'Partner catalog search indexes all branch addresses and titles');
+
+const mapPage = fs.readFileSync('src/MapPage.jsx', 'utf8');
+assert.match(mapPage, /mapLocationRows/, 'Map page flattens partner locations into map rows');
+assert.match(mapPage, /mapPointsParam/, 'Map page can render multiple branch coordinates');
+
+const bookingFlow = fs.readFileSync('src/booking/BookingFlow.jsx', 'utf8');
+assert.match(bookingFlow, /provider\?\.locationId/, 'Booking flow starts from selected branch when provided');
+
+const userApp = fs.readFileSync('src/UserApp.jsx', 'utf8');
+assert.match(userApp, /parsed\.searchParams\.get\('location'\)/, 'Public QR scanner preserves branch location query');
+assert.match(userApp, /locationToProvider\(partner, location\)/, 'Public QR scanner opens partner with selected branch provider data');
 
 console.log('partner-locations-test: ok');

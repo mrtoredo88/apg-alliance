@@ -18,7 +18,7 @@ import {
   DesktopTopOverview,
 } from './components/DesktopUI.jsx';
 import { openUrl } from './vk.js';
-import { getMainLocation } from '../server-shared/locations.js';
+import { getLocationsSearchText, getMainLocation, getProfileLocations, hasMultipleLocations } from '../server-shared/locations.js';
 
 const categoryLabels = {
   food: 'Еда',
@@ -103,6 +103,7 @@ function partnerSearchText(partner) {
     partner?.offer,
     mainLocation?.address || partner?.address,
     mainLocation?.phone || partner?.phone,
+    getLocationsSearchText(partner || {}),
     partner?.website,
     partnerCategory(partner).label,
     partnerCity(partner),
@@ -190,6 +191,8 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
   const city = partnerCity(partner);
   const rating = partnerRating(partner);
   const mainLocation = getMainLocation(partner || {});
+  const locations = getProfileLocations(partner || {});
+  const multipleLocations = hasMultipleLocations(partner || {});
   const address = text(mainLocation?.address || partner?.address);
   const phone = text(mainLocation?.phone || partner?.phone || partner?.contactPhone);
   const canRoute = Boolean(address);
@@ -208,11 +211,13 @@ function PartnerCatalogCard({ partner, selected, compact = false, onSelect, onOp
     (partner?.verified || partner?.isVerified) && { id: 'verified', label: 'Проверен' },
     isNew && { id: 'new', label: 'Новый' },
     partner?.offer && { id: 'offer', label: 'Акция', tone: 'gold' },
+    multipleLocations && { id: 'locations', label: `${locations.length} филиала` },
     canBook && { id: 'booking', label: 'Запись доступна' },
   ].filter(Boolean);
   const meta = [
     rating > 0 && { id: 'rating', label: 'Рейтинг', value: `★ ${rating.toFixed(1)}`, tone: 'gold' },
     address && { id: 'address', label: 'Адрес', value: address },
+    multipleLocations && { id: 'locations', label: 'Филиалы', value: `${locations.length}` },
     city && { id: 'city', label: 'Город', value: city },
   ].filter(Boolean);
   const tags = [

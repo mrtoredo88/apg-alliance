@@ -112,6 +112,20 @@ export function getLocationById(profile = {}, locationId = '') {
   return locations.find(item => item.id === cleanId) || getMainLocation(profile);
 }
 
+export function getLocationsSearchText(profile = {}) {
+  return getProfileLocations(profile)
+    .map(location => [
+      location.title,
+      location.address,
+      location.description,
+      location.comment,
+      location.phone,
+      location.workingHours,
+    ].filter(Boolean).join(' '))
+    .join(' ')
+    .toLowerCase();
+}
+
 export function locationToProvider(provider = {}, location = null) {
   if (!location) return provider;
   const coordinates = coordinatesFrom(location) || {};
