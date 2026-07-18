@@ -3598,6 +3598,14 @@
 - После профильной карточки контент теперь сразу переходит к разделу `Что интересного сегодня`, без заглушек, пустого контейнера и резервирования места под рекомендации.
 - Loki, Proactive Assistant, нижняя навигация, маршруты, API, Firestore и бизнес-логика не изменялись.
 
+# 2026-07-18 — Loki Workflow Engine v1
+
+- Добавлен декларативный слой `src/loki/core/workflows`: registry, resolver, planner, runner, progress/state, validator, local history и snapshot.
+- Подключены базовые workflow: Booking, Event, Journey, Partner, Gift, Workspace и Referral. Все сценарии используют существующие read-only tools и существующий Action Center; новой бизнес-логики, Firestore/API/backend изменений нет.
+- `SmartAnswerPipeline` теперь передаёт Workflow Snapshot в Planner и запускает Workflow Engine после Planner, но до generic Tool Layer. Пользовательские шаги переводят сценарий в `WAITING_USER`, а не выполняются автоматически.
+- `LokiCore` получил debug trace для `workflowEngine`; `LokiProvider` сохраняет `lastWorkflowContext` и локальную `workflowHistory`.
+- Добавлен regression-тест `scripts/loki-workflow-test.mjs` и npm script `test:loki-workflow` с 1200+ workflow-сценариями.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

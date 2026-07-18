@@ -14,7 +14,17 @@ function memoryPlanSummary(memorySnapshot = null) {
   };
 }
 
-export function buildLokiPlan({ goal = {}, classification = {}, question = '', memorySnapshot = null } = {}) {
+function workflowPlanSummary(workflowSnapshot = null) {
+  if (!workflowSnapshot || workflowSnapshot.empty) return null;
+  return {
+    source: workflowSnapshot.source,
+    activeWorkflowId: workflowSnapshot.active?.workflowId || '',
+    currentStep: workflowSnapshot.currentStep?.id || '',
+    completedSteps: workflowSnapshot.completedSteps?.slice?.(0, 8) || [],
+  };
+}
+
+export function buildLokiPlan({ goal = {}, classification = {}, question = '', memorySnapshot = null, workflowSnapshot = null } = {}) {
   const base = {
     id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     goal: goal.id,
@@ -23,6 +33,7 @@ export function buildLokiPlan({ goal = {}, classification = {}, question = '', m
     query: classification.query || question,
     confidence: classification.confidence || 0,
     memory: memoryPlanSummary(memorySnapshot),
+    workflow: workflowPlanSummary(workflowSnapshot),
     createdAt: new Date().toISOString(),
     steps: [],
   };

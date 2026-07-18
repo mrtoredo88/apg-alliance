@@ -20,6 +20,7 @@
     "test:loki-journey": "node scripts/loki-journey-engine-test.mjs",
     "test:loki-planner": "node scripts/loki-planner-test.mjs",
     "test:loki-memory": "node scripts/loki-memory-test.mjs",
+    "test:loki-workflow": "node scripts/loki-workflow-test.mjs",
     "test:loki-personalization": "node scripts/loki-personalization-engine-test.mjs",
     "test:loki-proactive": "node scripts/loki-proactive-engine-test.mjs",
     "test:loki-observability": "node scripts/loki-observability-test.mjs",

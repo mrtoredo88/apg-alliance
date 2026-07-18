@@ -69,6 +69,17 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Plan Validator
         └── Plan History
                     │
+        Workflow Engine v1
+        ├── Workflow Registry
+        ├── Workflow Resolver
+        ├── Workflow Planner
+        ├── Workflow Runner
+        ├── Workflow Progress
+        ├── Workflow State
+        ├── Workflow Validator
+        ├── Workflow History
+        └── Workflow Snapshot
+                    │
         Tool Calling v1
         ├── Tool Registry
         ├── Tool Resolver
@@ -141,6 +152,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Proactive Assistant | V1 production | read-only/local слой поверх загруженного app state: находит одну полезную opportunity, уважает timing, dismiss, cooldown, silent mode и объясняет причину показа |
 | Observability & Quality Center | V1 production | read-only analytics слой поверх существующих Loki events: KPI, intent/fallback/journey/proactive analytics, quality score, insights, session inspector и CSV export |
 | Planner | V1 production | read-only слой перед Tool Calling: классифицирует многошаговые запросы, строит прозрачный план, выполняет шаги только через существующий Tool Executor и хранит локальную Plan History |
+| Workflow Engine | V1 production | декларативный слой после Planner: выбирает сценарий, строит последовательность шагов, выполняет только существующие read-only tools, ждёт пользовательские действия и хранит локальные Workflow Snapshot/History |
 | Tool Calling | V1 production | read-only internal tool layer поверх Knowledge snapshot: user/promotions/events/meetings/gifts/news/workspace/search tools, TTL cache, local Tool History и observability events без LLM tool calling |
 | Action Center | V1 production | client-only слой поверх существующих действий приложения: registry, resolver, validator, executor, local history и action-кнопки в ответах Локи без новых API/Firestore |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
@@ -168,6 +180,9 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Tool Validator проверяет наличие tool, read-only контракт, роль пользователя и готовность контекста; denied/failed превращаются в безопасный Loki-ответ или совместимый fallback.
 - Planner v1 не вызывает backend, Firestore или API напрямую; он строит план, валидирует tool-шаги и исполняет только read-only tools из `ToolRegistry`.
 - План сохраняется только локально в Loki memory как `lastPlanContext`/`planHistory`, чтобы debug и follow-up могли видеть цель, шаги, failed/completed и duration без серверной памяти.
+- Workflow Engine v1 не содержит бизнес-логики и не создаёт новые действия: workflow-декларации описывают шаги, tool-шаги идут через существующий `ToolExecutor`, а шаги действий останавливают сценарий в `WAITING_USER`.
+- Workflow Snapshot передаётся Planner как готовый локальный снимок, чтобы Planner не обращался к Runner и не повторял уже завершённые шаги активного сценария.
+- Workflow History хранится только локально в Loki memory как `lastWorkflowContext`/`workflowHistory`, без Firestore, backend, API и изменений схемы.
 - Memory Engine v1 хранит данные только локально в `userMemory.lokiMemory`, не отправляет их во внешние сервисы, не импортирует Firebase/API и фильтрует email, телефоны, пароли, токены, платёжные и другие чувствительные данные.
 - Planner получает только готовый `memorySnapshot`; прямого доступа Planner к Memory Store нет.
 - Создание и публикация не маскируются под клиентские вызовы.
@@ -184,6 +199,7 @@ npm run test:loki-reasoning
 npm run test:loki-journey
 npm run test:loki-planner
 npm run test:loki-memory
+npm run test:loki-workflow
 npm run test:loki-personalization
 npm run test:loki-proactive
 npm run test:loki-observability
@@ -192,7 +208,7 @@ npm run test:loki-tool
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев и 844 tool-сценария: registry, resolver, validator, executor, TTL cache, local Tool History, Action Center integration, denied/empty states, прозрачный `planContext`, Memory Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory Layer.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев и 844 tool-сценария: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`, Memory/Workflow Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow Layer.
 
 ## Следующие production-этапы
 

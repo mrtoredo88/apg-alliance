@@ -7,6 +7,8 @@ import { runJourneyEngine } from '../journey/JourneyEngine.js';
 import { runLokiMemoryEngine } from '../memory/MemoryEngine.js';
 import { runLokiPlanner } from '../planner/Planner.js';
 import { runLokiToolLayer } from '../tools/ToolCenter.js';
+import { runLokiWorkflowEngine } from '../workflows/WorkflowEngine.js';
+import { buildWorkflowSnapshot } from '../workflows/WorkflowSnapshot.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -229,9 +231,18 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   const contextJourney = runJourneyEngine({ question, intent, knowledge, reasoningResult: contextReasoning, context });
   const memoryResult = runLokiMemoryEngine({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context, appState: sourceState });
   const contextWithMemory = memoryResult?.context || context;
-  const plannerResult = runLokiPlanner({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithMemory, appState: sourceState });
-  if (plannerResult) return { ...plannerResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
-  const toolResult = runLokiToolLayer({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithMemory, appState: sourceState });
+  const workflowSnapshot = buildWorkflowSnapshot(contextWithMemory?.memory || {});
+  const contextWithWorkflow = {
+    ...contextWithMemory,
+    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot },
+  };
+  const plannerResult = runLokiPlanner({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+  if (plannerResult) {
+    const workflowResult = runLokiWorkflowEngine({ question, intent, plannerResult, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+    if (workflowResult) return { ...workflowResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+    return { ...plannerResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+  }
+  const toolResult = runLokiToolLayer({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
   if (toolResult && toolResult.toolContext?.status !== 'denied') return { ...toolResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
   if (contextJourney?.journeyHandled) return contextJourney;
   if (contextJourney && (context?.memory?.lastJourneyContext || context?.memory?.journeyContext)) return contextJourney;

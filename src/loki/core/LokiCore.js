@@ -139,6 +139,15 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (knowledgeResult?.planContext) {
     trace.push({ module: 'planner', ms: knowledgeResult.planContext.durationMs ?? 0, decision: knowledgeResult.planContext.goal || knowledgeResult.planContext.status || 'completed' });
   }
+  if (knowledgeResult?.workflowContext) {
+    trace.push({
+      module: 'workflowEngine',
+      ms: knowledgeResult.workflowContext.durationMs ?? 0,
+      decision: `${knowledgeResult.workflowContext.workflowId || 'workflow'}:${knowledgeResult.workflowContext.status || 'selected'}`,
+      steps: knowledgeResult.workflowContext.steps?.map?.(step => ({ id: step.id, status: step.status })) || [],
+      expectedUserActions: knowledgeResult.workflowContext.expectedUserActions || [],
+    });
+  }
   if (knowledgeResult?.toolContext) {
     trace.push({ module: 'toolLayer', ms: knowledgeResult.toolContext.durationMs ?? 0, decision: knowledgeResult.toolContext.call?.id || knowledgeResult.toolContext.status || 'completed' });
   }
