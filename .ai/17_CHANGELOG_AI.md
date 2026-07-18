@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-19] feat: APG Social Messaging v2 Server Persistence & Security
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/social-messaging.js`, `server-shared/context-dialogs.js`, `server/src/routes/user-actions.js`, `firestore.rules`, `src/ProfilePanel.jsx`, `src/messaging/ConversationEligibility.js`, `scripts/social-messaging-server-test.mjs`, `scripts/social-messaging-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Conversation Requests, privacy, blocks, rate limit и direct-dialog permission вынесены на серверный слой `/api/user-actions`; клиент больше не является источником истины для Social Messaging.
+- Добавлена read/write модель: `conversationRequests` как source of truth, realtime mirrors `users/{id}/socialMessagingRequests`, backend-only `blockedUsers`, deterministic direct dialogs через существующий Context Dialog Engine.
+- Firestore rules закрывают клиентскую запись в requests/blocks и direct social state, сохраняя owner-read mirrors для realtime UI.
+- Профиль читает серверное состояние, подписывается на realtime mirrors и вызывает server actions для request/accept/decline/cancel/block/privacy.
+- Добавлен `npm run test:social-messaging-server`: 1000 сценариев проверяют eligibility, privacy, blocks, statuses, rate limit, rules, backend actions и отсутствие второго messaging API.
+**Почему:** личные диалоги между пользователями должны быть защищены серверным source of truth, чтобы клиент не мог подделать разрешение, обойти блокировку или открыть direct dialog без принятого запроса/разрешённой связи.
+
+---
+
 ## [2026-07-19] feat: APG Messaging v2 Start Conversations
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/context-dialogs.js`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/NewsPage.jsx`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `scripts/context-dialogs-test.mjs`, `scripts/messaging-start-conversations-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

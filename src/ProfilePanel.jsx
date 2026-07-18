@@ -6,9 +6,10 @@ import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { signInWithCustomToken } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 import { APP_URL, API_BASE_URL } from './constants.js';
-import { auth } from './firebase.js';
+import { auth, db } from './firebase.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
@@ -672,6 +673,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       return [];
     }
   });
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialError, setSocialError] = useState('');
 
   useEffect(() => {
     try {
@@ -687,18 +690,72 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [socialStorageKey, user?.socialMessagingPrivacy]);
 
   const saveSocialMessagingState = useCallback((patch = {}) => {
+    let previous = {};
+    try {
+      previous = JSON.parse(localStorage.getItem(socialStorageKey) || '{}');
+    } catch {}
     const next = {
-      privacy: patch.privacy ?? socialPrivacy,
-      requests: patch.requests ?? socialRequests,
-      blocked: patch.blocked ?? socialBlockedIds,
+      privacy: patch.privacy ?? previous.privacy ?? SOCIAL_PRIVACY.ALLOWED_RELATIONS,
+      requests: patch.requests ?? previous.requests ?? [],
+      blocked: patch.blocked ?? previous.blocked ?? [],
     };
     try {
       localStorage.setItem(socialStorageKey, JSON.stringify(next));
     } catch {}
-    if (patch.privacy) setSocialPrivacy(normalizeSocialPrivacy(patch.privacy));
-    if (patch.requests) setSocialRequests(patch.requests);
-    if (patch.blocked) setSocialBlockedIds(patch.blocked);
-  }, [socialBlockedIds, socialPrivacy, socialRequests, socialStorageKey]);
+    if (patch.privacy !== undefined) setSocialPrivacy(normalizeSocialPrivacy(patch.privacy));
+    if (patch.requests !== undefined) setSocialRequests(patch.requests);
+    if (patch.blocked !== undefined) setSocialBlockedIds(patch.blocked);
+  }, [socialStorageKey]);
+
+  useEffect(() => {
+    if (!user?.id || isGuest) return;
+    let cancelled = false;
+    setSocialLoading(true);
+    setSocialError('');
+    userAction('socialMessaging:listRequests')
+      .then(data => {
+        if (cancelled) return;
+        const requests = Array.isArray(data.requests) ? data.requests : [];
+        const blocked = Array.isArray(data.blocked) ? data.blocked.map(item => String(item.blockedUserId || item.id || '')).filter(Boolean) : [];
+        saveSocialMessagingState({ requests, blocked, privacy: normalizeSocialPrivacy(data.privacy || user?.messagingPrivacy || user?.socialMessagingPrivacy) });
+      })
+      .catch(e => {
+        if (!cancelled) setSocialError(e?.message || 'Не удалось загрузить социальные сообщения.');
+      })
+      .finally(() => {
+        if (!cancelled) setSocialLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isGuest, saveSocialMessagingState, user?.id, user?.messagingPrivacy, user?.socialMessagingPrivacy]);
+
+  useEffect(() => {
+    if (!user?.id || isGuest) return undefined;
+    const unsubRequests = onSnapshot(collection(db, 'users', String(user.id), 'socialMessagingRequests'), snap => {
+      const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      saveSocialMessagingState({ requests: rows });
+    }, () => {});
+    const unsubBlocks = onSnapshot(collection(db, 'users', String(user.id), 'blockedUsers'), snap => {
+      const rows = snap.docs.map(doc => String(doc.id || doc.data()?.blockedUserId || '')).filter(Boolean);
+      saveSocialMessagingState({ blocked: rows });
+    }, () => {});
+    return () => {
+      unsubRequests();
+      unsubBlocks();
+    };
+  }, [isGuest, saveSocialMessagingState, user?.id]);
+
+  const updateSocialPrivacyServer = useCallback(async (privacy) => {
+    const next = normalizeSocialPrivacy(privacy);
+    saveSocialMessagingState({ privacy: next });
+    setSocialError('');
+    try {
+      const data = await userAction('socialMessaging:updatePrivacy', { privacy: next });
+      saveSocialMessagingState({ privacy: normalizeSocialPrivacy(data.privacy || next) });
+      onUserUpdate?.({ messagingPrivacy: normalizeSocialPrivacy(data.privacy || next) });
+    } catch (e) {
+      setSocialError(e?.message || 'Не удалось сохранить приватность.');
+    }
+  }, [onUserUpdate, saveSocialMessagingState]);
 
   const stopPolling = useCallback(() => {
     if (tgPollRef.current) clearTimeout(tgPollRef.current);
@@ -1156,16 +1213,29 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     privacy: socialPrivacy,
   }), [socialBlockedIds, socialPrivacy, socialRequests, user]);
   const updateSocialRequest = useCallback((requestId, status) => {
-    const next = socialRequests.map(item => String(item.id) === String(requestId)
-      ? { ...item, status, updatedAt: new Date().toISOString(), acceptedAt: status === 'accepted' ? new Date().toISOString() : item.acceptedAt || null, declinedAt: status === 'declined' ? new Date().toISOString() : item.declinedAt || null }
-      : item);
-    saveSocialMessagingState({ requests: next });
-  }, [saveSocialMessagingState, socialRequests]);
+    setSocialError('');
+    const action = status === 'accepted' ? 'socialMessaging:accept' : status === 'declined' ? 'socialMessaging:decline' : status === 'cancelled' ? 'socialMessaging:cancel' : '';
+    if (!action) return;
+    userAction(action, { requestId })
+      .then(data => {
+        if (data.request) {
+          const next = socialRequests.map(item => String(item.id) === String(requestId) ? data.request : item);
+          saveSocialMessagingState({ requests: next });
+        }
+        if (data.dialogId) onOpenDialog?.(data.dialogId);
+      })
+      .catch(e => setSocialError(e?.message || 'Не удалось обновить запрос.'));
+  }, [onOpenDialog, saveSocialMessagingState, socialRequests]);
   const toggleSocialBlock = useCallback((targetId) => {
     const id = String(targetId || '').trim();
     if (!id) return;
-    const next = socialBlockedIds.includes(id) ? socialBlockedIds.filter(item => item !== id) : [id, ...socialBlockedIds].slice(0, 100);
-    saveSocialMessagingState({ blocked: next });
+    const blocked = socialBlockedIds.includes(id);
+    userAction(blocked ? 'socialMessaging:unblock' : 'socialMessaging:block', { targetUserId: id })
+      .then(() => {
+        const next = blocked ? socialBlockedIds.filter(item => item !== id) : [id, ...socialBlockedIds].slice(0, 100);
+        saveSocialMessagingState({ blocked: next });
+      })
+      .catch(e => setSocialError(e?.message || 'Не удалось обновить блокировку.'));
   }, [saveSocialMessagingState, socialBlockedIds]);
   const handleDesktopReschedule = useCallback((item) => {
     const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
@@ -1687,7 +1757,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <span style={{ color: APG2.textMuted, fontSize: 11, fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.6 }}>Кто может начать со мной общение?</span>
               <select
                 value={socialPrivacy}
-                onChange={e => saveSocialMessagingState({ privacy: normalizeSocialPrivacy(e.target.value) })}
+                onChange={e => updateSocialPrivacyServer(e.target.value)}
                 style={{ minHeight: 42, borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2.text, padding: '0 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 760 }}
               >
                 <option value={SOCIAL_PRIVACY.ALLOWED_RELATIONS}>Все разрешённые связи</option>
@@ -1695,6 +1765,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <option value={SOCIAL_PRIVACY.NOBODY}>Никто</option>
               </select>
             </label>
+            {socialLoading && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>Синхронизируем запросы...</div>}
+            {socialError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px' }}>{socialError}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {[
                 ['Входящие', socialIncomingRequests.filter(item => item.status === 'pending').length],

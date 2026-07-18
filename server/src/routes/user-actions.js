@@ -83,6 +83,22 @@ import {
   workspaceEventBelongsToProfile,
   workspaceEventStatus,
 } from '../../../server-shared/workspace-events.js';
+import {
+  SOCIAL_DECLINE_COOLDOWN_MS,
+  SOCIAL_EVENTS,
+  SOCIAL_PRIVACY,
+  SOCIAL_REQUEST_LIMIT,
+  SOCIAL_REQUEST_STATUS,
+  cleanSocialId,
+  createSocialRequestRecord,
+  isDeclineCooldownActive,
+  isRecentSocialRequest,
+  normalizeSocialPair,
+  normalizeSocialPrivacy,
+  normalizeSocialRequestStatus,
+  socialDirectDialogId,
+  socialRequestId,
+} from '../../../server-shared/social-messaging.js';
 
 const MAX_TEXT = 4000;
 const MAX_DIALOG_TEXT = 1800;
@@ -372,8 +388,8 @@ async function audit(db, req, actor, action, targetType, targetId, result = 'suc
     firebaseUid: actor?.uid || null,
     result,
     details,
-    userAgent: safeString(req.headers['user-agent'], 300),
-    appVersion: safeString(req.headers['x-apg-version'], 80),
+    userAgent: safeString(req?.headers?.['user-agent'], 300),
+    appVersion: safeString(req?.headers?.['x-apg-version'], 80),
     createdAt: FieldValue.serverTimestamp(),
   }).catch(() => {});
 }
@@ -751,10 +767,10 @@ async function actionProfileSync(db, req, actor) {
 
 async function actionProfilePatch(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
-  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics']);
+  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
-    if (allowed.has(key)) patch[key] = value;
+    if (allowed.has(key)) patch[key] = key === 'messagingPrivacy' ? normalizeSocialPrivacy(value) : value;
   });
   if (req.body?.serverConsentAt && patch.consents) {
     patch.consents = { ...patch.consents, acceptedAt: FieldValue.serverTimestamp() };
@@ -3157,6 +3173,209 @@ function isDialogActiveForUser(user = {}, dialogId = '') {
   return Number.isFinite(ms) && Date.now() - ms < 45000;
 }
 
+async function getSocialUser(db, userId) {
+  const id = cleanSocialId(userId);
+  if (!id) return null;
+  const snap = await db.collection('users').doc(id).get().catch(() => null);
+  if (!snap?.exists) return null;
+  return { id, ref: snap.ref, data: snap.data() || {} };
+}
+
+async function hasSocialBlock(db, a = '', b = '') {
+  const left = cleanSocialId(a);
+  const right = cleanSocialId(b);
+  if (!left || !right) return true;
+  const [leftDoc, rightDoc, leftUser, rightUser] = await Promise.all([
+    db.collection('users').doc(left).collection('blockedUsers').doc(right).get().catch(() => null),
+    db.collection('users').doc(right).collection('blockedUsers').doc(left).get().catch(() => null),
+    db.collection('users').doc(left).get().catch(() => null),
+    db.collection('users').doc(right).get().catch(() => null),
+  ]);
+  const leftData = leftUser?.data?.() || {};
+  const rightData = rightUser?.data?.() || {};
+  return leftDoc?.exists || rightDoc?.exists || hasBlockedDialog(leftData, right) || hasBlockedDialog(rightData, left);
+}
+
+function socialFriends(a = {}, b = {}, aId = '', bId = '') {
+  const aFriends = Array.isArray(a.friendIds) ? a.friendIds : Array.isArray(a.friends) ? a.friends : [];
+  const bFriends = Array.isArray(b.friendIds) ? b.friendIds : Array.isArray(b.friends) ? b.friends : [];
+  return aFriends.map(String).includes(String(bId)) || bFriends.map(String).includes(String(aId));
+}
+
+function socialSharedPartner(a = {}, b = {}) {
+  const left = new Set([...(Array.isArray(a.visitedPartnerIds) ? a.visitedPartnerIds : []), ...(Array.isArray(a.partnerIds) ? a.partnerIds : [])].map(String));
+  const right = new Set([...(Array.isArray(b.visitedPartnerIds) ? b.visitedPartnerIds : []), ...(Array.isArray(b.partnerIds) ? b.partnerIds : [])].map(String));
+  return [...left].find(id => right.has(id)) || '';
+}
+
+function socialSharedEvent(a = {}, b = {}) {
+  const left = new Set([...(Array.isArray(a.registeredEventIds) ? a.registeredEventIds : []), ...(Array.isArray(a.eventIds) ? a.eventIds : [])].map(String));
+  const right = new Set([...(Array.isArray(b.registeredEventIds) ? b.registeredEventIds : []), ...(Array.isArray(b.eventIds) ? b.eventIds : [])].map(String));
+  return [...left].find(id => right.has(id)) || '';
+}
+
+async function findExistingDirectDialog(db, a = '', b = '') {
+  const id = socialDirectDialogId(a, b);
+  if (!id) return null;
+  const snap = await db.collection('contextDialogs').doc(id).get().catch(() => null);
+  return snap?.exists ? { id: snap.id, ...(snap.data() || {}) } : null;
+}
+
+async function findAcceptedSocialPermission(db, a = '', b = '') {
+  const requestId = socialRequestId(a, b);
+  if (!requestId) return null;
+  const snap = await db.collection('conversationRequests').doc(requestId).get().catch(() => null);
+  if (!snap?.exists) return null;
+  const data = snap.data() || {};
+  const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
+  return status === SOCIAL_REQUEST_STATUS.ACCEPTED ? { id: snap.id, ...data, status } : null;
+}
+
+async function evaluateServerSocialEligibility(db, actor, recipientId) {
+  const senderId = cleanSocialId(actor.userId);
+  const targetId = cleanSocialId(recipientId);
+  if (!senderId || !targetId) return { ok: false, reason: 'missing_user' };
+  if (senderId === targetId) return { ok: false, reason: 'self' };
+  const [sender, recipient, existingDialog, acceptedPermission, blocked] = await Promise.all([
+    getSocialUser(db, senderId),
+    getSocialUser(db, targetId),
+    findExistingDirectDialog(db, senderId, targetId),
+    findAcceptedSocialPermission(db, senderId, targetId),
+    hasSocialBlock(db, senderId, targetId),
+  ]);
+  if (!recipient) return { ok: false, reason: 'recipient_not_found' };
+  if (blocked) return { ok: false, reason: 'blocked', sender, recipient };
+  if (existingDialog) return { ok: true, reason: 'existing_conversation', sender, recipient, dialogId: existingDialog.id };
+  if (acceptedPermission) return { ok: true, reason: 'manual_permission', sender, recipient, request: acceptedPermission, dialogId: acceptedPermission.dialogId || '' };
+  const privacy = normalizeSocialPrivacy(recipient.data.messagingPrivacy || recipient.data.socialMessagingPrivacy);
+  if (privacy === SOCIAL_PRIVACY.NOBODY) return { ok: false, reason: 'privacy', privacy, sender, recipient };
+  if (socialFriends(sender?.data || {}, recipient.data, senderId, targetId)) return { ok: true, reason: 'friends', privacy, sender, recipient };
+  if (privacy === SOCIAL_PRIVACY.FRIENDS_ONLY) return { ok: false, reason: 'privacy', privacy, sender, recipient };
+  const eventId = socialSharedEvent(sender?.data || {}, recipient.data);
+  if (eventId) return { ok: true, reason: 'shared_event', eventId, privacy, sender, recipient };
+  const partnerId = socialSharedPartner(sender?.data || {}, recipient.data);
+  if (partnerId) return { ok: true, reason: 'shared_partner', partnerId, privacy, sender, recipient };
+  return { ok: false, reason: 'manual_request_available', privacy, sender, recipient };
+}
+
+function socialRequestMirror(data = {}, viewerId = '') {
+  return {
+    id: data.id,
+    pairKey: data.pairKey,
+    senderId: data.senderId,
+    recipientId: data.recipientId,
+    status: data.status,
+    relationshipReason: data.relationshipReason || 'manual_permission',
+    dialogId: data.dialogId || '',
+    sender: data.sender || null,
+    recipient: data.recipient || null,
+    direction: String(data.senderId) === String(viewerId) ? 'outgoing' : 'incoming',
+    createdAt: data.createdAt || FieldValue.serverTimestamp(),
+    updatedAt: data.updatedAt || FieldValue.serverTimestamp(),
+    expiresAt: data.expiresAt || null,
+    acceptedAt: data.acceptedAt || null,
+    declinedAt: data.declinedAt || null,
+    cancelledAt: data.cancelledAt || null,
+  };
+}
+
+async function mirrorSocialRequest(db, data = {}) {
+  const batch = db.batch();
+  for (const participantId of [data.senderId, data.recipientId].filter(Boolean)) {
+    batch.set(db.collection('users').doc(participantId).collection('socialMessagingRequests').doc(data.id), socialRequestMirror(data, participantId), { merge: true });
+  }
+  await batch.commit();
+}
+
+async function writeSocialNotification(db, userId, data = {}) {
+  const ref = db.collection('notifications').doc();
+  await ref.set({
+    userId,
+    targetUserId: userId,
+    category: 'messages',
+    type: data.type || 'socialMessaging',
+    title: data.title || 'Социальные сообщения',
+    body: data.body || '',
+    text: data.body || '',
+    requestId: data.requestId || '',
+    dialogId: data.dialogId || '',
+    deepLink: '/messages',
+    url: '/messages',
+    actionUrl: '/messages',
+    isRead: false,
+    priority: 'normal',
+    pushStatus: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return ref.id;
+}
+
+async function ensureDirectDialogForPair(db, actor, targetId, request = null) {
+  const senderId = cleanSocialId(actor.userId);
+  const recipientId = cleanSocialId(targetId);
+  const dialogId = socialDirectDialogId(senderId, recipientId);
+  if (!dialogId) throw Object.assign(new Error('Не удалось создать ID диалога.'), { statusCode: 400, code: 'BAD_DIRECT_DIALOG_ID' });
+  const [sender, recipient] = await Promise.all([getSocialUser(db, senderId), getSocialUser(db, recipientId)]);
+  const context = {
+    type: 'direct',
+    objectId: recipientId,
+    targetUserId: recipientId,
+    category: 'PERSONAL',
+    title: recipient?.data?.displayName || recipient?.data?.firstName || 'Личный диалог АПГ',
+    subtitle: 'Личный диалог АПГ',
+    participantIds: [senderId, recipientId],
+    relationshipReason: request?.relationshipReason || 'manual_permission',
+    requestId: request?.id || '',
+    source: 'social-messaging',
+  };
+  const ref = db.collection('contextDialogs').doc(dialogId);
+  let dialog = null;
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const before = snap.exists ? snap.data() || {} : {};
+    dialog = {
+      id: dialogId,
+      type: 'direct',
+      objectId: recipientId,
+      userId: before.userId || senderId,
+      context,
+      participantIds: uniqueSafeIds([senderId, recipientId, ...(before.participantIds || [])]),
+      ownerUserIds: [],
+      unreadBy: before.unreadBy || {},
+      typing: before.typing || {},
+      lastMessage: before.lastMessage || null,
+      lastMessageAt: before.lastMessageAt || null,
+      createdAt: before.createdAt || FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    tx.set(ref, dialog, { merge: true });
+  });
+  await mirrorDialog(db, dialog);
+  return { dialogId, dialog, sender, recipient };
+}
+
+async function assertCanWriteDirectDialog(db, dialog, actor) {
+  if (dialog.type !== 'direct') return { ok: true };
+  const participants = uniqueSafeIds(dialog.participantIds || []);
+  const otherId = participants.find(id => id !== actor.userId && id !== actor.uid);
+  if (!participants.includes(actor.userId) || !otherId) {
+    await audit(db, null, actor, SOCIAL_EVENTS.WRITE_DENIED, 'contextDialog', dialog.id, 'denied', { reason: 'not_participant' }).catch(() => {});
+    throw Object.assign(new Error('Нет доступа к личному диалогу.'), { statusCode: 403, code: 'DIRECT_DIALOG_FORBIDDEN' });
+  }
+  if (await hasSocialBlock(db, actor.userId, otherId)) {
+    await audit(db, null, actor, SOCIAL_EVENTS.WRITE_DENIED, 'contextDialog', dialog.id, 'denied', { reason: 'blocked' }).catch(() => {});
+    throw Object.assign(new Error('Сообщение недоступно из-за блокировки.'), { statusCode: 403, code: 'SOCIAL_BLOCKED' });
+  }
+  const accepted = await findAcceptedSocialPermission(db, actor.userId, otherId);
+  const existing = await findExistingDirectDialog(db, actor.userId, otherId);
+  if (!accepted && !existing) {
+    await audit(db, null, actor, SOCIAL_EVENTS.WRITE_DENIED, 'contextDialog', dialog.id, 'denied', { reason: 'no_permission' }).catch(() => {});
+    throw Object.assign(new Error('Нет разрешения на личную переписку.'), { statusCode: 403, code: 'SOCIAL_PERMISSION_REQUIRED' });
+  }
+  return { ok: true };
+}
+
 async function getDialogRecipientState(db, userId, dialogId, senderId) {
   const snap = await db.collection('users').doc(String(userId)).get().catch(() => null);
   if (!snap?.exists) return { userId, user: null, canCreateNotification: false, canPush: false, active: false, reason: 'user_not_found' };
@@ -3316,14 +3535,24 @@ async function mirrorDialog(db, dialog) {
 
 async function actionDialogOpen(db, req, actor) {
   const context = await resolveDialogContext(db, req);
-  const dialogId = buildContextDialogId(actor.userId, context.type, context.objectId);
+  if (context.type === 'direct') {
+    const eligibility = await evaluateServerSocialEligibility(db, actor, context.targetUserId || context.objectId);
+    if (!eligibility.ok && eligibility.reason !== 'existing_conversation') {
+      throw Object.assign(new Error('Нет разрешения на личную переписку.'), { statusCode: 403, code: 'SOCIAL_PERMISSION_REQUIRED' });
+    }
+  }
+  const dialogId = context.type === 'direct'
+    ? socialDirectDialogId(actor.userId, context.targetUserId || context.objectId)
+    : buildContextDialogId(actor.userId, context.type, context.objectId);
   if (!dialogId) throw Object.assign(new Error('Не удалось создать ID диалога.'), { statusCode: 400, code: 'BAD_DIALOG_ID' });
   const ref = db.collection('contextDialogs').doc(dialogId);
   let dialog = null;
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     const before = snap.exists ? snap.data() || {} : {};
-    const participantIds = dialogParticipants(actor, context, before.participantIds || []);
+    const participantIds = context.type === 'direct'
+      ? uniqueSafeIds([actor.userId, context.targetUserId || context.objectId, ...(before.participantIds || [])])
+      : dialogParticipants(actor, context, before.participantIds || []);
     dialog = {
       id: dialogId,
       type: context.type,
@@ -3372,6 +3601,7 @@ async function actionDialogMessage(db, req, actor) {
   if (!dialogId) throw Object.assign(new Error('Не указан диалог.'), { statusCode: 400 });
   if (!text && !attachments.length) throw Object.assign(new Error('Сообщение пустое.'), { statusCode: 400 });
   const { ref, dialog, participantIds } = await getDialogForActor(db, dialogId, actor);
+  await assertCanWriteDirectDialog(db, dialog, actor);
   const senderRole = req.body?.senderRole === 'loki' ? 'loki' : (dialog.ownerUserIds || []).includes(actor.userId) ? 'owner' : 'user';
   const senderId = senderRole === 'loki' ? 'loki' : actor.userId;
   const messageRef = ref.collection('messages').doc();
@@ -3467,6 +3697,158 @@ async function actionDialogRead(db, req, actor) {
   await batch.commit();
   await mirrorDialog(db, { ...dialog, id: dialogId, participantIds, unreadBy });
   return { ok: true, dialogId };
+}
+
+async function getSocialRequest(db, requestId = '') {
+  const id = safeString(requestId, 260);
+  if (!id) return null;
+  const snap = await db.collection('conversationRequests').doc(id).get().catch(() => null);
+  if (!snap?.exists) return null;
+  const data = { id: snap.id, ...(snap.data() || {}) };
+  data.status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
+  return data;
+}
+
+async function querySocialRequestsForUser(db, userId = '') {
+  const uid = cleanSocialId(userId);
+  if (!uid) return [];
+  const snap = await db.collection('conversationRequests').where('participants', 'array-contains', uid).limit(100).get();
+  return snap.docs.map(doc => {
+    const data = { id: doc.id, ...doc.data() };
+    return { ...data, status: normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt) };
+  }).sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+}
+
+async function actionSocialListRequests(db, req, actor) {
+  const requests = await querySocialRequestsForUser(db, actor.userId);
+  const blockedSnap = await db.collection('users').doc(actor.userId).collection('blockedUsers').limit(100).get().catch(() => null);
+  const blocked = blockedSnap?.docs?.map(doc => ({ id: doc.id, ...doc.data() })) || [];
+  return {
+    ok: true,
+    requests: requests.map(item => socialRequestMirror(item, actor.userId)),
+    blocked,
+    privacy: normalizeSocialPrivacy(actor.user?.messagingPrivacy || actor.user?.socialMessagingPrivacy),
+  };
+}
+
+async function actionSocialCheckEligibility(db, req, actor) {
+  const recipientId = cleanSocialId(req.body?.recipientId || req.body?.targetUserId);
+  const result = await evaluateServerSocialEligibility(db, actor, recipientId);
+  return { ok: true, eligible: result.ok, reason: result.reason, dialogId: result.dialogId || '', privacy: result.privacy || SOCIAL_PRIVACY.ALLOWED_CONNECTIONS };
+}
+
+async function actionSocialRequest(db, req, actor) {
+  const senderId = cleanSocialId(actor.userId);
+  const recipientId = cleanSocialId(req.body?.recipientId || req.body?.targetUserId);
+  if (!recipientId || senderId === recipientId) throw Object.assign(new Error('Некорректный получатель.'), { statusCode: 400, code: 'INVALID_RECIPIENT' });
+  const eligibility = await evaluateServerSocialEligibility(db, actor, recipientId);
+  if (!eligibility.recipient) throw Object.assign(new Error('Получатель не найден.'), { statusCode: 404, code: 'RECIPIENT_NOT_FOUND' });
+  if (eligibility.reason === 'blocked') {
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_BLOCKED, 'users', recipientId, 'blocked', { reason: 'blocked' });
+    throw Object.assign(new Error('Запрос недоступен.'), { statusCode: 403, code: 'SOCIAL_BLOCKED' });
+  }
+  if (eligibility.reason === 'privacy') throw Object.assign(new Error('Запрос недоступен.'), { statusCode: 403, code: 'SOCIAL_PRIVACY_DENIED' });
+  if (eligibility.ok) return { ok: true, eligible: true, reason: eligibility.reason, dialogId: eligibility.dialogId || '' };
+
+  const requestId = socialRequestId(senderId, recipientId);
+  const ref = db.collection('conversationRequests').doc(requestId);
+  const recent = await db.collection('conversationRequests').where('senderId', '==', senderId).limit(50).get().catch(() => null);
+  const recentRequests = recent?.docs?.map(doc => doc.data() || {}) || [];
+  const recentCount = recentRequests.filter(item => isRecentSocialRequest(item)).length;
+  if (recentCount >= SOCIAL_REQUEST_LIMIT) {
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_RATE_LIMITED, 'users', recipientId, 'blocked', { window: '24h', limit: SOCIAL_REQUEST_LIMIT });
+    throw Object.assign(new Error('Лимит запросов на сегодня исчерпан.'), { statusCode: 429, code: 'SOCIAL_RATE_LIMITED' });
+  }
+  const existing = await ref.get();
+  if (existing.exists) {
+    const data = { id: existing.id, ...(existing.data() || {}) };
+    const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
+    if (status === SOCIAL_REQUEST_STATUS.PENDING) return { ok: true, request: socialRequestMirror({ ...data, status }, senderId), status };
+    if (isDeclineCooldownActive({ ...data, status })) throw Object.assign(new Error('Повторный запрос пока недоступен.'), { statusCode: 429, code: 'SOCIAL_DECLINE_COOLDOWN' });
+  }
+  const record = createSocialRequestRecord({
+    senderId,
+    recipientId,
+    sender: eligibility.sender?.data || actor.user || {},
+    recipient: eligibility.recipient.data,
+    relationshipReason: 'manual_permission',
+    now: Date.now(),
+  });
+  await ref.set({ ...record, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, { merge: true });
+  const saved = { ...record, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  await mirrorSocialRequest(db, saved);
+  await writeSocialNotification(db, recipientId, {
+    type: 'socialMessageRequest',
+    title: `${actorName(actor)} хочет начать с вами общение`,
+    body: 'Откройте профиль, чтобы принять или отклонить запрос.',
+    requestId,
+  }).catch(() => {});
+  await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_CREATED, 'conversationRequests', requestId, 'success', { recipientId, relationshipReason: 'manual_permission' });
+  return { ok: true, request: socialRequestMirror(saved, senderId), status: SOCIAL_REQUEST_STATUS.PENDING };
+}
+
+async function actionSocialResolveRequest(db, req, actor, status) {
+  const requestId = safeString(req.body?.requestId, 260);
+  const request = await getSocialRequest(db, requestId);
+  if (!request) throw Object.assign(new Error('Запрос не найден.'), { statusCode: 404, code: 'REQUEST_NOT_FOUND' });
+  if (status === SOCIAL_REQUEST_STATUS.CANCELLED && request.senderId !== actor.userId) throw Object.assign(new Error('Нельзя отменить чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+  if ([SOCIAL_REQUEST_STATUS.ACCEPTED, SOCIAL_REQUEST_STATUS.DECLINED].includes(status) && request.recipientId !== actor.userId) throw Object.assign(new Error('Нельзя отвечать на чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+  if (request.status === status && status !== SOCIAL_REQUEST_STATUS.ACCEPTED) return { ok: true, request: socialRequestMirror(request, actor.userId), status, dialogId: request.dialogId || '' };
+  if (request.status !== SOCIAL_REQUEST_STATUS.PENDING && !(request.status === SOCIAL_REQUEST_STATUS.ACCEPTED && status === SOCIAL_REQUEST_STATUS.ACCEPTED)) {
+    throw Object.assign(new Error('Запрос уже обработан.'), { statusCode: 409, code: 'REQUEST_ALREADY_RESOLVED' });
+  }
+  if (await hasSocialBlock(db, request.senderId, request.recipientId)) throw Object.assign(new Error('Действие недоступно из-за блокировки.'), { statusCode: 403, code: 'SOCIAL_BLOCKED' });
+  let dialogId = request.dialogId || '';
+  if (status === SOCIAL_REQUEST_STATUS.ACCEPTED) {
+    const linked = await ensureDirectDialogForPair(db, { ...actor, userId: request.senderId, user: request.sender || {} }, request.recipientId, request);
+    dialogId = linked.dialogId;
+  }
+  const patch = {
+    status,
+    dialogId,
+    resolvedBy: actor.userId,
+    updatedAt: FieldValue.serverTimestamp(),
+    acceptedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? FieldValue.serverTimestamp() : request.acceptedAt || null,
+    declinedAt: status === SOCIAL_REQUEST_STATUS.DECLINED ? FieldValue.serverTimestamp() : request.declinedAt || null,
+    cancelledAt: status === SOCIAL_REQUEST_STATUS.CANCELLED ? FieldValue.serverTimestamp() : request.cancelledAt || null,
+  };
+  await db.collection('conversationRequests').doc(request.id).set(patch, { merge: true });
+  const mirrored = { ...request, ...patch, updatedAt: new Date().toISOString(), acceptedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? new Date().toISOString() : request.acceptedAt || null, declinedAt: status === SOCIAL_REQUEST_STATUS.DECLINED ? new Date().toISOString() : request.declinedAt || null, cancelledAt: status === SOCIAL_REQUEST_STATUS.CANCELLED ? new Date().toISOString() : request.cancelledAt || null };
+  await mirrorSocialRequest(db, mirrored);
+  if (status === SOCIAL_REQUEST_STATUS.ACCEPTED) {
+    await writeSocialNotification(db, request.senderId, { type: 'socialMessageRequestAccepted', title: 'Запрос на общение принят', body: 'Можно перейти к переписке.', requestId: request.id, dialogId }).catch(() => {});
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_ACCEPTED, 'conversationRequests', request.id, 'success', { dialogId });
+    await audit(db, req, actor, SOCIAL_EVENTS.DIALOG_LINKED, 'contextDialog', dialogId, 'success', { requestId: request.id });
+  } else if (status === SOCIAL_REQUEST_STATUS.DECLINED) {
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_DECLINED, 'conversationRequests', request.id, 'success', {});
+  }
+  return { ok: true, request: socialRequestMirror(mirrored, actor.userId), status, dialogId };
+}
+
+async function actionSocialBlock(db, req, actor, block = true) {
+  const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
+  if (!targetId || targetId === actor.userId) throw Object.assign(new Error('Некорректный пользователь.'), { statusCode: 400, code: 'INVALID_TARGET' });
+  const ref = db.collection('users').doc(actor.userId).collection('blockedUsers').doc(targetId);
+  if (block) {
+    await Promise.all([
+      ref.set({ id: targetId, blockedUserId: targetId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('users').doc(actor.userId).set({ blockedUserIds: FieldValue.arrayUnion(targetId), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+    ]);
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_BLOCKED, 'users', targetId, 'success', {});
+  } else {
+    await Promise.all([
+      ref.delete().catch(() => {}),
+      db.collection('users').doc(actor.userId).set({ blockedUserIds: FieldValue.arrayRemove(targetId), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+    ]);
+  }
+  return { ok: true, blocked: block, targetUserId: targetId };
+}
+
+async function actionSocialUpdatePrivacy(db, req, actor) {
+  const privacy = normalizeSocialPrivacy(req.body?.privacy || req.body?.messagingPrivacy);
+  await db.collection('users').doc(actor.userId).set({ messagingPrivacy: privacy, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await audit(db, req, actor, 'socialMessaging:updatePrivacy', 'users', actor.userId, 'success', { privacy });
+  return { ok: true, privacy };
 }
 
 async function actionDialogTyping(db, req, actor) {
@@ -3721,6 +4103,15 @@ async function routeAction(db, req, actor) {
   if (action === 'booking:moment') return actionBookingMoment(db, req, actor);
   if (action === 'loki:settings') return actionLokiSettings(db, req, actor);
   if (action === 'loki:analytics') return actionLokiAnalytics(db, req, actor);
+  if (action === 'socialMessaging:request') return actionSocialRequest(db, req, actor);
+  if (action === 'socialMessaging:accept') return actionSocialResolveRequest(db, req, actor, SOCIAL_REQUEST_STATUS.ACCEPTED);
+  if (action === 'socialMessaging:decline') return actionSocialResolveRequest(db, req, actor, SOCIAL_REQUEST_STATUS.DECLINED);
+  if (action === 'socialMessaging:cancel') return actionSocialResolveRequest(db, req, actor, SOCIAL_REQUEST_STATUS.CANCELLED);
+  if (action === 'socialMessaging:block') return actionSocialBlock(db, req, actor, true);
+  if (action === 'socialMessaging:unblock') return actionSocialBlock(db, req, actor, false);
+  if (action === 'socialMessaging:updatePrivacy') return actionSocialUpdatePrivacy(db, req, actor);
+  if (action === 'socialMessaging:listRequests') return actionSocialListRequests(db, req, actor);
+  if (action === 'socialMessaging:checkEligibility') return actionSocialCheckEligibility(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);
   if (action === 'dialog:message') return actionDialogMessage(db, req, actor);
   if (action === 'dialog:read') return actionDialogRead(db, req, actor);

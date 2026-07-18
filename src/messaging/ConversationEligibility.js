@@ -1,5 +1,5 @@
 export const SOCIAL_PRIVACY = Object.freeze({
-  ALLOWED_RELATIONS: 'allowed_relations',
+  ALLOWED_RELATIONS: 'allowed_connections',
   FRIENDS_ONLY: 'friends_only',
   NOBODY: 'nobody',
 });
@@ -39,6 +39,7 @@ function hasBoth(values = [], actorId = '', targetId = '') {
 
 export function normalizeSocialPrivacy(value = '') {
   const normalized = String(value || '').trim();
+  if (normalized === 'allowed_relations') return SOCIAL_PRIVACY.ALLOWED_RELATIONS;
   if (Object.values(SOCIAL_PRIVACY).includes(normalized)) return normalized;
   if (normalized === 'friends' || normalized === 'friends_only') return SOCIAL_PRIVACY.FRIENDS_ONLY;
   if (normalized === 'none' || normalized === 'nobody') return SOCIAL_PRIVACY.NOBODY;

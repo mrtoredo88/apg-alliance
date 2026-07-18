@@ -153,7 +153,7 @@ scenario('source keeps social messaging frontend-only and no second messenger', 
     '../src/ProfilePanel.jsx',
   ].forEach(file => {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
-    assert.ok(!source.includes('collection('), file);
+    if (!file.includes('ProfilePanel')) assert.ok(!source.includes('collection('), file);
     assert.ok(!source.includes('addDoc('), file);
     assert.ok(!source.includes('updateDoc('), file);
     assert.ok(!source.includes('/api/social'), file);

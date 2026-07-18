@@ -1,4 +1,10 @@
 export const CONTEXT_DIALOG_TYPES = {
+  direct: {
+    label: 'Личный диалог',
+    collection: '',
+    idField: 'targetUserId',
+    titleFallback: 'Личный диалог АПГ',
+  },
   partner: {
     label: 'Партнер',
     collection: 'partners',
