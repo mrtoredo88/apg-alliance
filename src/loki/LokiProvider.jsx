@@ -37,6 +37,7 @@ import { buildConversationHistoryPatch } from './core/conversation/ConversationH
 import { buildDecisionHistoryPatch } from './core/decision/index.js';
 import { buildEvaluationHistoryPatch } from './core/evaluation/index.js';
 import { buildCapabilityHistoryPatch } from './core/capabilities/index.js';
+import { buildSkillHistoryPatch } from './core/skills/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
 import {
@@ -540,6 +541,23 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
+  const recordSkillContext = useCallback((skillContext, skillSnapshot) => {
+    if (!skillContext?.skill) return;
+    setMemory(prev => {
+      const historyPatch = buildSkillHistoryPatch(prev, skillContext);
+      const next = {
+        ...prev,
+        ...historyPatch,
+        lastSkillContext: skillContext,
+        lastSkillSnapshot: skillSnapshot || null,
+        lastSkillHistory: historyPatch.skillHistory || prev.lastSkillHistory || [],
+        updatedAt: new Date().toISOString(),
+      };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, []);
+
   const recordExecutionContext = useCallback((executionContext, executionSnapshot) => {
     if (!executionContext?.capability) return;
     setMemory(prev => {
@@ -1009,6 +1027,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
       if (result.conversationContext) recordConversationContext(result.conversationContext);
       if (result.capabilityContext) recordCapabilityContext(result.capabilityContext, result.capabilitySnapshot);
+      if (result.skillContext) recordSkillContext(result.skillContext, result.skillSnapshot);
       if (result.executionContext) recordExecutionContext(result.executionContext, result.executionSnapshot);
       if (result.controlledExecutionContext) recordControlledExecutionContext(result.controlledExecutionContext, result.controlledExecutionSnapshot);
       if (result.planContext) recordPlanContext(result.planContext);
@@ -1016,10 +1035,11 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.agentContext) recordAgentContext(result.agentContext);
       if (result.decisionContext) recordDecisionContext(result.decisionContext);
       if (result.evaluationSnapshot) recordEvaluationSnapshot(result.evaluationContext, result.evaluationSnapshot);
-      if (result.reasoningContext || result.conversationContext || result.capabilityContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
+      if (result.reasoningContext || result.conversationContext || result.capabilityContext || result.skillContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
         ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
+        ...(result.skillContext ? { lastSkillContext: result.skillContext, lastSkillSnapshot: result.skillSnapshot } : {}),
         ...(result.executionContext ? { lastExecutionContext: result.executionContext, lastExecutionSnapshot: result.executionSnapshot } : {}),
         ...(result.controlledExecutionContext ? { lastControlledExecutionContext: result.controlledExecutionContext, lastControlledExecutionSnapshot: result.controlledExecutionSnapshot } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
@@ -1055,7 +1075,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
+  }, [activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
@@ -1101,6 +1121,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
         ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
+        ...(result.skillContext ? { lastSkillContext: result.skillContext, lastSkillSnapshot: result.skillSnapshot } : {}),
         ...(result.executionContext ? { lastExecutionContext: result.executionContext, lastExecutionSnapshot: result.executionSnapshot } : {}),
         ...(result.controlledExecutionContext ? { lastControlledExecutionContext: result.controlledExecutionContext, lastControlledExecutionSnapshot: result.controlledExecutionSnapshot } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
@@ -1119,6 +1140,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.agentContext) recordAgentContext(result.agentContext);
       if (result.conversationContext) recordConversationContext(result.conversationContext);
       if (result.capabilityContext) recordCapabilityContext(result.capabilityContext, result.capabilitySnapshot);
+      if (result.skillContext) recordSkillContext(result.skillContext, result.skillSnapshot);
       if (result.executionContext) recordExecutionContext(result.executionContext, result.executionSnapshot);
       if (result.controlledExecutionContext) recordControlledExecutionContext(result.controlledExecutionContext, result.controlledExecutionSnapshot);
       if (result.decisionContext) recordDecisionContext(result.decisionContext);
@@ -1159,7 +1181,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const openContextExperience = useCallback((context) => {
     const normalized = normalizeLokiContext(context);
@@ -1219,6 +1241,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     lastCapabilityContext: memory?.lastCapabilityContext || null,
     lastCapabilitySnapshot: memory?.lastCapabilitySnapshot || null,
     lastCapabilityHistory: memory?.lastCapabilityHistory || memory?.capabilityHistory || [],
+    lastSkillContext: memory?.lastSkillContext || null,
+    lastSkillSnapshot: memory?.lastSkillSnapshot || null,
+    lastSkillHistory: memory?.lastSkillHistory || memory?.skillHistory || [],
     lastExecutionContext: memory?.lastExecutionContext || null,
     lastExecutionSnapshot: memory?.lastExecutionSnapshot || null,
     lastExecutionHistory: memory?.lastExecutionHistory || memory?.executionHistory || [],

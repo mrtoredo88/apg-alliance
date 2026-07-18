@@ -41,6 +41,16 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Capability Explanation
         └── Capability Validator
                     │
+        Loki Skills Framework v1
+        ├── Skill Registry
+        ├── Skill Resolver
+        ├── Skill Context
+        ├── Skill History
+        ├── Skill Snapshot
+        ├── Skill Explanation
+        ├── Skill Validator
+        └── APG Skill Adapters
+                    │
         Capability Execution Bridge v1
         ├── Capability Execution Bridge
         ├── Execution Resolver
@@ -223,6 +233,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
 | Capability Engine | V1 production | read-only слой после Reasoning/Conversation resolution: определяет функцию приложения (`BOOK_APPOINTMENT`, `OPEN_REWARDS`, `SEARCH_PROMOTIONS` и др.), параметры, missing values, alternatives и execution order без изменения ответов или downstream-движков |
+| Loki Skills Framework | V1 production | библиотека специализированных APG-сценариев после Capability Resolver: выбирает лучший Skill-адаптер, нормализует запрос, подготавливает параметры и рекомендации для существующих Planner/Workflow/Tool/Execution Bridge без самостоятельного выполнения действий |
 | Capability Execution Bridge | V1 production | read-only слой после Capability Engine: сопоставляет capability с уже существующими Planner goals, Workflow ids, Tool ids, Navigation routes и Action Center actions; строит `executionContext`/`executionSnapshot`, ready/missing/clarification diagnostics и локальную history без выполнения действий |
 | Controlled Execution | V1 production | тонкий исполнительный адаптер после Execution Bridge: по whitelist разрешает только безопасную navigation/search dispatch через существующий Action Executor, для state-changing capability требует одноразовый bound confirmation и сохраняет локальный preview/result/history без новых tools/UI/API |
 | Conversation Engine | V1 production | локальный слой после Reasoning: удерживает темы диалога, активные сущности, местоимения, порядковые ссылки и follow-up context перед Journey/Planner/Agent без Firestore/API |
@@ -263,6 +274,9 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Tool Validator проверяет наличие tool, read-only контракт, роль пользователя и готовность контекста; denied/failed превращаются в безопасный Loki-ответ или совместимый fallback.
 - Capability Engine v1 не исполняет действия и не выбирает данные за пользователя: слой только читает question/intent/reasoning/conversation/context/memory/knowledge, добавляет `capabilityContext`/`capabilitySnapshot` и локальную `capabilityHistory` на 100 записей.
 - Capability Registry описывает возможности приложения декларативно: id, title, description, aliases, required/optional parameters, role, tools, screens, priority и category; Firestore, API, backend, Planner, Workflow, Agent, Tool Calling, Action Center, Decision и Evaluation не меняются.
+- Loki Skills Framework v1 не является Engine и не исполняет действия: это изолированная библиотека skill-адаптеров, которая после Capability Resolver выбирает специализированную стратегию АПГ и передаёт только подготовленные параметры, planner/workflow/tool hints и `skillContext`.
+- Skills не создают новую бизнес-логику, новые tools, routes или workflow; `BookingSkill`, `PartnerSearchSkill`, `PromotionSkill`, `EventSkill`, `WorkspaceSkill` и остальные адаптеры ссылаются только на существующие механизмы приложения.
+- Skill History хранится только локально в Loki memory как `lastSkillContext`/`lastSkillSnapshot`/`skillHistory` на 100 записей; Firestore, backend, API, Security Rules, Planner, Workflow, Capability, Execution Bridge, Controlled Execution, Decision и Evaluation не меняются.
 - Capability Execution Bridge v1 не исполняет Planner, Workflow, Tool Calling, Navigation или Action Center: слой только описывает безопасную цепочку через существующие registry и добавляет `executionContext`/`executionSnapshot`.
 - Execution Registry не создаёт новые действия или маршруты приложения; он ссылается на уже существующие `LOKI_APP_ACTIONS`, `ACTION_IDS`, `TOOL_IDS`, planner goals и workflow ids.
 - Если Execution Bridge видит missing parameters, он выставляет `ready:false` и сохраняет один точный `clarificationQuestion` в диагностике, но не меняет пользовательский текст ответа Локи.
@@ -312,10 +326,11 @@ npm run test:loki-proactive
 npm run test:loki-observability
 npm run test:loki-actions
 npm run test:loki-tool
+npm run test:loki-skills
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 1500+ agent-сценариев, 1800+ conversation-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев и 844 tool-сценария: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow/Agent/Conversation History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`/`agentContext`/`conversationContext`, Memory/Workflow/Agent/Conversation Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow/Agent/Conversation Layer.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 1500+ agent-сценариев, 1800+ conversation-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев, 844 tool-сценария и 500 skills-сценариев: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow/Agent/Conversation/Skill History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`/`agentContext`/`conversationContext`/`skillContext`, Memory/Workflow/Agent/Conversation/Skill Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow/Agent/Conversation/Skills Layer.
 
 ## Следующие production-этапы
 

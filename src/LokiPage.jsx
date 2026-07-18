@@ -263,6 +263,46 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </section>
     );
   };
+  const renderSkillBlock = () => {
+    const snapshot = loki.lastSkillSnapshot;
+    const skillContext = loki.lastSkillContext;
+    const skillHistory = Array.isArray(loki.lastSkillHistory) ? loki.lastSkillHistory : [];
+    if (!snapshot && !skillContext && !skillHistory.length) return null;
+    const rows = [
+      ['Selected Skill', snapshot?.SelectedSkill || skillContext?.skill],
+      ['Confidence', snapshot?.Confidence ?? skillContext?.confidence],
+      ['Alternatives', (snapshot?.Alternatives || skillContext?.alternatives?.map?.(item => item.id) || []).join(', ')],
+      ['Planner', snapshot?.Planner || skillContext?.planner],
+      ['Workflow', snapshot?.Workflow || skillContext?.workflow],
+      ['Related Tools', (snapshot?.RelatedTools || skillContext?.tools || []).join(', ')],
+      ['Capability', snapshot?.Capability || skillContext?.capability],
+    ];
+    return (
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Skills', skillHistory.length ? `${skillHistory.length} записей` : '')}
+        <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: 8, alignItems: 'start', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                <span style={{ color: APG2_PROFILE.textMuted, fontWeight: 760 }}>{label}</span>
+                <span style={{ color: label === 'Selected Skill' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontWeight: label === 'Selected Skill' ? 900 : 720, minWidth: 0, overflowWrap: 'anywhere' }}>{value || '—'}</span>
+              </div>
+            ))}
+          </div>
+          {!!skillHistory.length && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {skillHistory.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `${item.createdAt}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 46px', gap: 8, alignItems: 'center', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.skill} · {item.capability}</span>
+                  <span style={{ color: APG2_PROFILE.gold, fontWeight: 900, textAlign: 'right' }}>{item.confidence}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </section>
+    );
+  };
   const renderExecutionBlock = () => {
     const snapshot = loki.lastExecutionSnapshot;
     const executionContext = loki.lastExecutionContext;
@@ -496,6 +536,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       )}
 
       {renderCapabilityBlock()}
+      {renderSkillBlock()}
       {renderExecutionBlock()}
       {renderControlledExecutionBlock()}
       {renderEvaluationBlock()}

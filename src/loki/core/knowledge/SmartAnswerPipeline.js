@@ -13,6 +13,7 @@ import { runLokiAgentContinuation, runLokiAgentEngine } from '../agent/AgentEngi
 import { runLokiConversationEngine } from '../conversation/ConversationEngine.js';
 import { explainLastDecision, isDecisionExplainQuery, runLokiDecisionEngine } from '../decision/index.js';
 import { explainLastCapability, isCapabilityExplainQuery, runLokiCapabilityEngine } from '../capabilities/index.js';
+import { explainLastSkill, isSkillExplainQuery, runLokiSkillResolver } from '../skills/index.js';
 import { explainLastExecution, isExecutionExplainQuery, runCapabilityExecutionBridge } from '../execution/index.js';
 import { explainLastControlledExecution, isControlledExecutionExplainQuery, runControlledExecutionEngine } from '../controlledExecution/index.js';
 
@@ -265,7 +266,19 @@ function attachControlledExecution(result, controlled = {}) {
   };
 }
 
+function attachSkill(result, skill = {}) {
+  if (!result || !skill.skillContext?.skill) return result;
+  return {
+    ...result,
+    skillContext: result.skillContext || skill.skillContext,
+    skillSnapshot: result.skillSnapshot || skill.skillSnapshot,
+  };
+}
+
 export function runLokiKnowledgeEngine({ text: question, appState = {}, context = null } = {}) {
+  if (isSkillExplainQuery(question)) {
+    return attachDecision(explainLastSkill(context?.memory || {}), question, context);
+  }
   if (isControlledExecutionExplainQuery(question)) {
     return attachDecision(explainLastControlledExecution(context?.memory || {}), question, context);
   }
@@ -319,12 +332,23 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     memory: context?.memory || {},
     knowledge,
   });
+  const skillResult = runLokiSkillResolver({
+    question: effectiveQuestion,
+    intent: effectiveIntent,
+    reasoningResult: effectiveReasoning,
+    conversationContext,
+    capabilityContext: capabilityResult.capabilityContext,
+    context: contextWithConversation,
+    memory: context?.memory || {},
+    knowledge,
+  });
   const executionResult = runCapabilityExecutionBridge({
     question: effectiveQuestion,
     capabilityContext: capabilityResult.capabilityContext,
     context: contextWithConversation,
     memory: context?.memory || {},
     knowledge,
+    parameters: skillResult.skillContext?.preparedParameters || {},
   });
   const controlledExecutionResult = runControlledExecutionEngine({
     question: effectiveQuestion,
@@ -337,6 +361,8 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     ...contextWithConversation,
     capabilityContext: capabilityResult.capabilityContext,
     capabilitySnapshot: capabilityResult.capabilitySnapshot,
+    skillContext: skillResult.skillContext,
+    skillSnapshot: skillResult.skillSnapshot,
     executionContext: executionResult.executionContext,
     executionSnapshot: executionResult.executionSnapshot,
     controlledExecutionContext: controlledExecutionResult.controlledExecutionContext,
@@ -346,6 +372,9 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
       capabilityContext: capabilityResult.capabilityContext,
       capabilitySnapshot: capabilityResult.capabilitySnapshot,
       lastCapabilityContext: capabilityResult.capabilityContext,
+      skillContext: skillResult.skillContext,
+      skillSnapshot: skillResult.skillSnapshot,
+      lastSkillContext: skillResult.skillContext,
       executionContext: executionResult.executionContext,
       executionSnapshot: executionResult.executionSnapshot,
       lastExecutionContext: executionResult.executionContext,
@@ -362,13 +391,15 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     ...contextWithMemory,
     capabilityContext: capabilityResult.capabilityContext,
     capabilitySnapshot: capabilityResult.capabilitySnapshot,
+    skillContext: skillResult.skillContext,
+    skillSnapshot: skillResult.skillSnapshot,
     executionContext: executionResult.executionContext,
     executionSnapshot: executionResult.executionSnapshot,
     controlledExecutionContext: controlledExecutionResult.controlledExecutionContext,
     controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot,
-    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot, conversationSnapshot: conversationContext?.snapshot, lastConversationSession: conversationContext?.session, capabilityContext: capabilityResult.capabilityContext, capabilitySnapshot: capabilityResult.capabilitySnapshot, lastCapabilityContext: capabilityResult.capabilityContext, executionContext: executionResult.executionContext, executionSnapshot: executionResult.executionSnapshot, lastExecutionContext: executionResult.executionContext, controlledExecutionContext: controlledExecutionResult.controlledExecutionContext, controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot, lastControlledExecutionContext: controlledExecutionResult.controlledExecutionContext },
+    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot, conversationSnapshot: conversationContext?.snapshot, lastConversationSession: conversationContext?.session, capabilityContext: capabilityResult.capabilityContext, capabilitySnapshot: capabilityResult.capabilitySnapshot, lastCapabilityContext: capabilityResult.capabilityContext, skillContext: skillResult.skillContext, skillSnapshot: skillResult.skillSnapshot, lastSkillContext: skillResult.skillContext, executionContext: executionResult.executionContext, executionSnapshot: executionResult.executionSnapshot, lastExecutionContext: executionResult.executionContext, controlledExecutionContext: controlledExecutionResult.controlledExecutionContext, controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot, lastControlledExecutionContext: controlledExecutionResult.controlledExecutionContext },
   };
-  const finalize = result => attachDecision(attachControlledExecution(attachExecution(attachCapability(result, capabilityResult), executionResult), controlledExecutionResult), effectiveQuestion, contextWithWorkflow);
+  const finalize = result => attachDecision(attachControlledExecution(attachExecution(attachSkill(attachCapability(result, capabilityResult), skillResult), executionResult), controlledExecutionResult), effectiveQuestion, contextWithWorkflow);
   const continuationResult = runLokiAgentContinuation({ question: effectiveQuestion, context: contextWithWorkflow });
   if (continuationResult) return finalize({ ...continuationResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });
   const plannerResult = runLokiPlanner({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });

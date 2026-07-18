@@ -220,6 +220,20 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
       executionOrder: knowledgeResult.capabilityContext.executionOrder?.map?.(item => item.capability) || [],
     });
   }
+  if (knowledgeResult?.skillContext) {
+    trace.push({
+      module: 'skillResolver',
+      ms: 0,
+      decision: knowledgeResult.skillContext.skill || 'empty',
+      capability: knowledgeResult.skillContext.capability,
+      confidence: knowledgeResult.skillContext.confidence,
+      planner: knowledgeResult.skillContext.planner,
+      workflow: knowledgeResult.skillContext.workflow,
+      tools: knowledgeResult.skillContext.tools || [],
+      alternatives: knowledgeResult.skillContext.alternatives?.length || 0,
+      reason: knowledgeResult.skillContext.reason || '',
+    });
+  }
   if (knowledgeResult?.executionContext) {
     trace.push({
       module: 'executionBridge',

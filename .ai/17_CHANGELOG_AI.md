@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-19] feat: Loki Skills Framework v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/skills/*`, `src/loki/core/skills/skills/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-skills-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен изолированный `Loki Skills Framework v1`: Skill Registry, Resolver, Context, History, Snapshot, Explanation, Validator и базовый `LokiSkill`.
+- Добавлена библиотека 12 APG skill-адаптеров: Partner Search, Expert Search, Booking, Promotion, Event, Gift, Rewards, Keys, Profile, Dialog, Workspace и News.
+- `SmartAnswerPipeline` теперь после Capability Resolver выбирает лучший Skill, передаёт подготовленные параметры в существующий Execution Bridge и сохраняет локальные `skillContext`/`skillSnapshot` без изменения текста ответа Локи.
+- `LokiProvider` хранит `lastSkillContext`, `lastSkillSnapshot`, историю на 100 записей; `LokiPage` показывает dev-блок Skills.
+- Добавлен `npm run test:loki-skills`: 500 сценариев проверяют выбор Skill, неоднозначные запросы, переключение между Skill, передачу Planner/Workflow/Tool hints, history, explain mode и read-only контракт.
+**Почему:** Локи должен стать специалистом по АПГ через специализированные сценарные адаптеры поверх зрелой архитектуры, не добавляя новую бизнес-логику и не меняя существующие Planner, Workflow, Capability, Execution Bridge, Controlled Execution, Decision или Evaluation.
+
+---
+
 ## [2026-07-19] feat: Loki Controlled Execution v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/controlledExecution/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-controlled-execution-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
