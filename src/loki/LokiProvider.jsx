@@ -26,6 +26,9 @@ import { rememberPersonalityPhrase } from './personality/PersonalityMemory.js';
 import { selectPersonalityPhrase } from './core/modules/PersonalityEngine.js';
 import { markOpportunityAccepted, markOpportunityDismissed, markOpportunityShown } from './core/proactive/DismissManager.js';
 import { runProactiveEngine } from './core/proactive/ProactiveEngine.js';
+import { LOKI_ACTION_CENTER_EVENTS } from './core/actions/ActionRegistry.js';
+import { executeLokiAction } from './core/actions/ActionExecutor.js';
+import { buildActionHistoryPatch } from './core/actions/ActionHistory.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -430,6 +433,14 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
+  const recordActionEvent = useCallback((event) => {
+    setMemory(prev => {
+      const next = { ...prev, ...buildActionHistoryPatch(prev, event), updatedAt: new Date().toISOString() };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!memory.sessionStartedAt) updateMemory({ sessionStartedAt: new Date().toISOString() });
   }, [memory.sessionStartedAt, updateMemory]);
@@ -730,13 +741,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const executeAction = useCallback(async (request) => {
     const normalized = normalizeLokiActionRequest(request);
     if (!normalized?.type) return false;
-    const handler = appActions?.[normalized.type];
-    if (typeof handler !== 'function') {
-      showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_missing', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
-      return false;
-    }
     const activeAdvice = memory?.lastRecommendation;
     if (activeAdvice?.opportunity) markOpportunityAccepted(activeAdvice.opportunity);
+    const actionEvents = [];
     updateMemory({
       lastAction: { ...normalized, ts: new Date().toISOString() },
       lastActionType: normalized.type,
@@ -744,12 +751,26 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       inDialog: false,
       ...(activeAdvice ? { learning: learnFromRecommendationResult(memory.learning, activeAdvice, 'opened') } : {}),
     });
+    recordActionEvent({
+      type: LOKI_ACTION_CENTER_EVENTS.STARTED,
+      action: normalized,
+      actionType: normalized.type,
+      status: 'started',
+    });
     if (activeHistoryIdRef.current) {
       const id = activeHistoryIdRef.current;
       updateHistory(prev => markLokiHistoryItem(prev, id, 'opened'));
     }
-    try {
-      await handler(normalized.payload ?? {});
+    const execution = await executeLokiAction(normalized, {
+      appActions,
+      appState,
+      actor: { role: user?.role || user?.userRole || 'user', permissions: user?.adminPermissions || [] },
+      onEvent: event => actionEvents.push(event),
+    });
+    if (execution.ok) {
+      if (actionEvents.length) {
+        recordActionEvent(actionEvents[actionEvents.length - 1]);
+      }
       setCard(null);
       const personalityEvent = normalized.type === LOKI_APP_ACTIONS.START_EVENT_REGISTRATION ? 'registration_complete' : 'success';
       const personalityPhrase = selectPersonalityPhrase({
@@ -766,12 +787,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         if (activePanel !== 'home') setVisible(false);
       }, 520);
       return true;
-    } catch (e) {
-      logError(e, 'LokiProvider.executeAction');
-      showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, priority: LOKI_MESSAGE_PRIORITY.HIGH });
-      return false;
     }
-  }, [activePanel, appActions, memory, settings.personalityMode, showMessage, updateHistory, updateMemory]);
+    if (execution.error) logError(execution.error, 'LokiProvider.executeAction');
+    recordActionEvent(actionEvents[actionEvents.length - 1] || {
+        type: LOKI_ACTION_CENTER_EVENTS.FAILED,
+        action: normalized,
+        actionType: normalized.type,
+        status: 'failed',
+        reason: execution.reason,
+    });
+    showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, message: execution.reason, priority: LOKI_MESSAGE_PRIORITY.HIGH });
+    return false;
+  }, [activePanel, appActions, appState, memory, recordActionEvent, settings.personalityMode, showMessage, updateHistory, updateMemory, user]);
 
   const askBrain = useCallback(async (text) => {
     if (!settings.enabled) return false;

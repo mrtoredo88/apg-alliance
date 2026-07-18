@@ -26,6 +26,7 @@ import { buildLokiKnowledgeProvider } from './knowledge/KnowledgeProvider.js';
 import { runLokiKnowledgeEngine } from './knowledge/SmartAnswerPipeline.js';
 import { runPersonalizationEngine } from './personalization/PersonalizationEngine.js';
 import { runProactiveAnswer } from './proactive/ProactiveEngine.js';
+import { runLokiActionCenter } from './actions/ActionCenter.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -108,6 +109,10 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
   return MemoryEngine.enrich({ context: base, memory, userMemory });
 }
 
+function applyActions(result, context, appState) {
+  return runLokiActionCenter({ result, context, appState });
+}
+
 export async function askLokiCore({ text, appState, memory, userMemory, history = [], debug = false }) {
   const start = nowMs();
   const query = normalizeText(text);
@@ -119,7 +124,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
 
   if (!query) {
     const result = PersonalityEngine.shape({
-      result: { text: 'Спроси меня про места, мероприятия, акции, ключи или новости АПГ.', card: null, cards: [] },
+      result: applyActions({ text: 'Спроси меня про места, мероприятия, акции, ключи или новости АПГ.', card: null, cards: [] }, context, appState),
       context,
     });
     return debug ? { ...result, debug: { provider, totalMs: Math.round(nowMs() - start), trace } } : result;
@@ -132,7 +137,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
     const personalizationStart = nowMs();
     const personalized = runPersonalizationEngine({ question: text, result: knowledgeResult, context, appState });
     trace.push({ module: 'personalizationEngine', ms: Math.round(nowMs() - personalizationStart), decision: personalized?.personalizationContext?.enabled ? 'applied' : 'skipped' });
-    const shaped = PersonalityEngine.shape({ result: personalized || knowledgeResult, context, selectedModule: { id: 'knowledgeEngine' } });
+    const actionReady = applyActions(personalized || knowledgeResult, context, appState);
+    trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'knowledgeEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'knowledgeEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -140,7 +147,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const personalOnly = runPersonalizationEngine({ question: text, result: null, context, appState });
   trace.push({ module: 'personalizationEngine', ms: Math.round(nowMs() - personalOnlyStart), decision: personalOnly?.intent ?? 'skipped' });
   if (personalOnly) {
-    const shaped = PersonalityEngine.shape({ result: personalOnly, context, selectedModule: { id: 'personalizationEngine' } });
+    const actionReady = applyActions(personalOnly, context, appState);
+    trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'personalizationEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'personalizationEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -148,7 +157,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const proactiveAnswer = runProactiveAnswer({ question: text, memory });
   trace.push({ module: 'proactiveEngine', ms: Math.round(nowMs() - proactiveStart), decision: proactiveAnswer?.intent ?? 'skipped' });
   if (proactiveAnswer) {
-    const shaped = PersonalityEngine.shape({ result: proactiveAnswer, context, selectedModule: { id: 'proactiveEngine' } });
+    const actionReady = applyActions(proactiveAnswer, context, appState);
+    trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'proactiveEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'proactiveEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -157,8 +168,10 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   trace.push({ module: v2Resolution.module?.id ?? 'v2Plugins', ms: Math.round(nowMs() - v2Start), decision: v2Resolution.result?.intent ?? 'skipped' });
   if (v2Resolution.result) {
     const reasoned = Reasoner.combine({ query, context });
+    const actionReady = applyActions({ ...v2Resolution.result, evidence: v2Resolution.result.evidence ?? reasoned.evidence }, context, appState);
+    trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
     const shaped = PersonalityEngine.shape({
-      result: { ...v2Resolution.result, evidence: v2Resolution.result.evidence ?? reasoned.evidence },
+      result: actionReady,
       context,
       selectedModule: v2Resolution.module,
     });
@@ -183,7 +196,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
   trace.push({ module: 'lokiIntelligence', ms: Math.round(nowMs() - intelligenceStart), decision: intelligenceResult?.intent ?? 'skipped' });
   if (intelligenceResult) {
-    const shaped = PersonalityEngine.shape({ result: intelligenceResult, context, selectedModule: { id: 'lokiIntelligence' } });
+    const actionReady = applyActions(intelligenceResult, context, appState);
+    trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'lokiIntelligence' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'lokiIntelligence', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -191,7 +206,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const brainResult = runBrainLayer({ query, context, history, debug });
   trace.push({ module: 'brainLayer', ms: Math.round(nowMs() - brainStart), decision: brainResult?.intent ?? 'skipped' });
   if (brainResult) {
-    const shaped = PersonalityEngine.shape({ result: brainResult, context, selectedModule: { id: 'brainLayer' } });
+    const actionReady = applyActions(brainResult, context, appState);
+    trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'brainLayer' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'brainLayer', totalMs: Math.round(nowMs() - start), trace, brain: brainResult.debugBrain ?? brainResult.brain } } : shaped;
   }
 
@@ -214,7 +231,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const personalityStart = nowMs();
-  const result = PersonalityEngine.shape({ result: rawResult ?? emptyResult(), context, selectedModule: selected });
+  const actionReady = applyActions(rawResult ?? emptyResult(), context, appState);
+  trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+  const result = PersonalityEngine.shape({ result: actionReady, context, selectedModule: selected });
   trace.push({ module: PersonalityEngine.id, ms: Math.round(nowMs() - personalityStart), decision: result.tone });
   return debug ? { ...result, debug: { provider, selectedModule: selected?.id ?? null, totalMs: Math.round(nowMs() - start), trace } } : result;
 }

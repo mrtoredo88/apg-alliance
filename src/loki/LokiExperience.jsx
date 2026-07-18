@@ -70,19 +70,40 @@ function LokiAvatar({ thinking, listening, speaking }) {
   );
 }
 
-function ResultCard({ card, onOpen }) {
+function ResultCard({ card, onOpen, onAction }) {
+  const actions = Array.isArray(card.actions) ? card.actions.filter(Boolean).slice(0, 3) : [];
   return (
-    <GlassCard onClick={onOpen} style={{ padding: 10, borderRadius: 22, display: 'grid', gridTemplateColumns: card.image ? '64px 1fr' : '1fr', gap: 10, alignItems: 'center' }}>
-      {card.image && (
-        <span style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', display: 'block' }}>
-          <img src={card.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+    <GlassCard onClick={onOpen} style={{ padding: 10, borderRadius: 22, display: 'grid', gap: 10 }}>
+      <span style={{ display: 'grid', gridTemplateColumns: card.image ? '64px 1fr' : '1fr', gap: 10, alignItems: 'center', minWidth: 0 }}>
+        {card.image && (
+          <span style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', display: 'block' }}>
+            <img src={card.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </span>
+        )}
+        <span style={{ minWidth: 0, display: 'grid', gap: 4 }}>
+          <span style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getShortTitle(card.title)}</span>
+          <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.text}</span>
+          <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '15px', fontWeight: 820 }}>{card.label || 'Открыть'}</span>
+        </span>
+      </span>
+      {!!actions.length && (
+        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {actions.map(item => (
+            <GlassButton
+              key={`${item.label}-${item.action?.type || item.href || ''}`}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (item.action) onAction?.(item.action);
+                else if (item.href && typeof window !== 'undefined') window.open(item.href, '_blank', 'noopener,noreferrer');
+              }}
+              style={{ minHeight: 32, borderRadius: 999, padding: '0 10px', fontSize: 11, lineHeight: '14px', fontWeight: 820 }}
+            >
+              {item.label}
+            </GlassButton>
+          ))}
         </span>
       )}
-      <span style={{ minWidth: 0, display: 'grid', gap: 4 }}>
-        <span style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getShortTitle(card.title)}</span>
-        <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.text}</span>
-        <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '15px', fontWeight: 820 }}>{card.label || 'Открыть'}</span>
-      </span>
     </GlassCard>
   );
 }
@@ -272,7 +293,7 @@ export function LokiExperience({ loki }) {
               {!!item.cards?.length && (
                 <div style={{ width: '100%', display: 'grid', gap: 8 }}>
                   {item.cards.slice(0, 3).map(card => (
-                    <ResultCard key={`${item.id}-${card.id}`} card={card} onOpen={() => loki.executeAction(card.action)} />
+                    <ResultCard key={`${item.id}-${card.id}`} card={card} onOpen={() => card.action && loki.executeAction(card.action)} onAction={action => loki.executeAction(action)} />
                   ))}
                 </div>
               )}

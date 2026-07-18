@@ -3544,6 +3544,14 @@
 - Если персонального контекста недостаточно, слой автоматически отключается и оставляет обычный Journey/Reasoning ответ.
 - Добавлен regression-тест `scripts/loki-personalization-engine-test.mjs` и команда `npm run test:loki-personalization`: 300 сценариев покрывают новых/опытных пользователей, роли, уровни, privacy, fallback, Journey + Personalization и отсутствие Firestore/API imports.
 
+# 2026-07-18 — Loki Action Center v1
+
+- Добавлен слой `src/loki/core/actions/`: `ActionRegistry`, `ActionResolver`, `ActionValidator`, `ActionExecutor`, `ActionHistory` и объединяющий `ActionCenter`.
+- `LokiCore` теперь пропускает ответы через Action Center перед Personality: ответы получают до трёх безопасных действий на основе intent, Journey, карточки и текущего контекста.
+- `LokiProvider` выполняет действия через единый validate/execute lifecycle и пишет локальную историю событий `LOKI_ACTION_SUGGESTED/STARTED/COMPLETED/FAILED` без Firestore, backend и новых API.
+- `LokiExperience` показывает action-кнопки внутри существующих карточек ответа, без нового экрана и без изменения маршрутов.
+- Добавлен `npm run test:loki-actions`: 618 сценариев покрывают registry, resolver, validator, executor, local history, Multi-step/context actions, недоступные объекты и совместимость с Knowledge/Reasoning/Journey.
+
 # 2026-07-18 — Home Screen Simplification v1
 
 - С мобильного главного экрана полностью удалён статичный блок `Что важно сейчас` вместе с карточками FAQ, ключей, подарков, ближайших мест и мероприятий.

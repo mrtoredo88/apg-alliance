@@ -52,6 +52,13 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Quality Score
         └── Insight Generator
                     │
+        Action Center v1
+        ├── Action Registry
+        ├── Action Resolver
+        ├── Action Validator
+        ├── Action Executor
+        └── Action History
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -106,6 +113,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Personalization Engine | V1 production | read-only слой после Journey: строит пользовательский контекст из уже загруженного app state, динамически вычисляет предпочтения, адаптирует рекомендации и объясняет используемые данные |
 | Proactive Assistant | V1 production | read-only/local слой поверх загруженного app state: находит одну полезную opportunity, уважает timing, dismiss, cooldown, silent mode и объясняет причину показа |
 | Observability & Quality Center | V1 production | read-only analytics слой поверх существующих Loki events: KPI, intent/fallback/journey/proactive analytics, quality score, insights, session inspector и CSV export |
+| Action Center | V1 production | client-only слой поверх существующих действий приложения: registry, resolver, validator, executor, local history и action-кнопки в ответах Локи без новых API/Firestore |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
@@ -125,6 +133,8 @@ Loki Core V2 внедрён как совместимый архитектурн
 
 - Роль и permissions проверяются до выполнения действия.
 - Навигационные client actions отделены от privileged backend actions.
+- Action Center использует только существующие `LOKI_APP_ACTIONS` и browser-safe действия; новые backend/API действия не добавляются.
+- Перед выполнением Action Center проверяет наличие объекта, публикацию/архив, доступность route handler и права actor.
 - Создание и публикация не маскируются под клиентские вызовы.
 - Planner по умолчанию создаёт подтверждаемый план, а не выполняет изменения.
 - Memory policy удаляет поля с email, phone, token, password и address, ограничивает размер и TTL.
@@ -140,10 +150,11 @@ npm run test:loki-journey
 npm run test:loki-personalization
 npm run test:loki-proactive
 npm run test:loki-observability
+npm run test:loki-actions
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 300 personalization-сценариев, 400 proactive-сценариев и 500 observability-сценариев: KPI, intent/fallback/proactive/journey analytics, quality score, session inspector, export, empty state и отсутствие Firestore/API imports в analytics-слое.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев и 618 action-сценариев: registry, resolver, validator, executor, local history, недоступные/архивные объекты, action-кнопки в UI и отсутствие Firestore/API imports в Action Center.
 
 ## Следующие production-этапы
 
