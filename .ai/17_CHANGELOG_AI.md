@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] ux: Workspace Smart Status Bar v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлена компактная статусная строка Workspace под header и над содержимым всех разделов.
+- Строка показывает приветствие, до трёх кликабельных индикаторов из уже загруженных данных: записи сегодня, события, активные акции, новые сообщения или задачи плана.
+- Empty state показывает “Сегодня всё спокойно ✓”, а справа отображается последнее обновление без дополнительных запросов.
+**Почему:** Workspace должен сразу показывать владельцу, что сегодня требует внимания, не возвращая большие карточки и не меняя существующие разделы.
+
+---
+
 ## [2026-07-19] feat: Loki Unified Knowledge Index v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/knowledgeIndex/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-knowledge-index-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

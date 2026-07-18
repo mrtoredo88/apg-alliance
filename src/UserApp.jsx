@@ -4041,6 +4041,7 @@ export function UserApp() {
                 experts={experts}
                 events={events}
                 news={news}
+                bookings={userBookings}
                 notifications={notifications}
                 unreadCount={unreadCount}
                 userKeys={userKeys}

@@ -651,6 +651,113 @@ function buildWorkdaySummary({ data = {}, plan = {} }) {
   ];
 }
 
+function getWorkspaceStatusPromotions(data = {}) {
+  const explicit = Array.isArray(data.promotions) ? data.promotions : [];
+  if (explicit.length) return explicit.filter(item => item.active !== false && item.archived !== true);
+  const profiles = [data.activeProfile, ...(Array.isArray(data.partners) ? data.partners : []), ...(Array.isArray(data.experts) ? data.experts : [])];
+  const seen = new Set();
+  return profiles.filter(item => {
+    const id = String(item?.id || item?.profileId || item?.name || '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    if (item.archived || item.hidden || item.isArchived) return false;
+    return Boolean(item.offer || item.promo || item.discount || item.specialOffer || item.promotion?.offer);
+  });
+}
+
+function getWorkspaceStatusIndicators({ data = {}, plan = {} } = {}) {
+  const now = new Date();
+  const todayBookings = (data.bookings || []).filter(item => isSameCalendarDay(item.startAt || item.date, now));
+  const todayEvents = (data.events || []).filter(item => isSameCalendarDay(item.eventDate || item.date || item.startAt, now));
+  const activePromotions = getWorkspaceStatusPromotions(data);
+  const unreadDialogs = data.dialogUnreadCount || 0;
+  const plannedTasks = plan?.tasks?.length || 0;
+  return [
+    todayBookings.length ? { id: 'bookings', icon: '📅', label: `Сегодня ${todayBookings.length} ${pluralRu(todayBookings.length, 'запись', 'записи', 'записей')}`, target: 'booking', tone: WS.green } : null,
+    todayEvents.length ? { id: 'events', icon: '🎉', label: `Сегодня ${todayEvents.length} ${pluralRu(todayEvents.length, 'событие', 'события', 'событий')}`, target: 'events', tone: WS.blue } : null,
+    activePromotions.length ? { id: 'offers', icon: '🎁', label: `${activePromotions.length} ${pluralRu(activePromotions.length, 'акция активна', 'акции активны', 'акций активны')}`, target: 'offers', tone: WS.gold } : null,
+    unreadDialogs ? { id: 'dialogs', icon: '💬', label: `${unreadDialogs} ${pluralRu(unreadDialogs, 'новое сообщение', 'новых сообщения', 'новых сообщений')}`, target: 'dialogs', tone: WS.red } : null,
+    plannedTasks && !todayBookings.length && !todayEvents.length ? { id: 'tasks', icon: '✓', label: `${plannedTasks} ${pluralRu(plannedTasks, 'задача в плане', 'задачи в плане', 'задач в плане')}`, target: 'dashboard', tone: WS.gold } : null,
+  ].filter(Boolean).slice(0, 3);
+}
+
+function pluralRu(count, one, few, many) {
+  const abs = Math.abs(Number(count) || 0);
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+function latestWorkspaceUpdate(data = {}) {
+  const values = [
+    data.activeProfile?.updatedAt,
+    data.activeProfile?.profileUpdatedAt,
+    ...(data.bookings || []).map(item => item.updatedAt || item.createdAt || item.startAt),
+    ...(data.notifications || []).map(item => item.updatedAt || item.createdAt),
+    ...(data.events || []).map(item => item.updatedAt || item.eventDate || item.date),
+    ...(data.news || []).map(item => item.updatedAt || item.publishedAt || item.createdAt),
+  ];
+  return values.reduce((latest, value) => {
+    const date = toDate(value);
+    const time = date?.getTime?.() || 0;
+    return time > latest ? time : latest;
+  }, 0);
+}
+
+function formatWorkspaceUpdateTime(timestamp) {
+  if (!timestamp) return 'Сейчас';
+  const diff = Date.now() - timestamp;
+  if (diff < 90 * 1000) return 'Сейчас';
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 60) return `${minutes} мин назад`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  return new Date(timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
+function WorkspaceSmartStatusBar({ data, actions, plan }) {
+  const indicators = getWorkspaceStatusIndicators({ data, plan });
+  const updatedText = formatWorkspaceUpdateTime(latestWorkspaceUpdate(data));
+  return (
+    <section data-workspace-smart-status-bar style={{ minHeight: 56, maxWidth: '100%', borderRadius: 18, background: WS.cardStrong, border: `1px solid ${WS.line}`, boxShadow: WS.shadowSoft, backdropFilter: 'blur(22px) saturate(1.25)', WebkitBackdropFilter: 'blur(22px) saturate(1.25)', padding: '8px 12px', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: 'minmax(190px,0.9fr) minmax(0,1.35fr) auto', gap: 12, alignItems: 'center', overflow: 'hidden' }}>
+      <style>{`
+        @media (max-width: 980px) {
+          [data-workspace-smart-status-bar] {
+            grid-template-columns: minmax(0,1fr) !important;
+            align-items: stretch !important;
+          }
+          [data-workspace-smart-status-indicators] {
+            justify-content: flex-start !important;
+          }
+          [data-workspace-smart-status-updated] {
+            justify-self: start !important;
+          }
+        }
+      `}</style>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: WS.text, fontSize: 15, lineHeight: '18px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDayGreeting()}, {data.userName || 'АПГ'}</div>
+        <div style={{ color: WS.soft, fontSize: 12, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Центр состояния Workspace</div>
+      </div>
+      <div data-workspace-smart-status-indicators style={{ minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', overflow: 'hidden' }}>
+        {indicators.length ? indicators.map(item => (
+          <button key={item.id} type="button" onClick={getWorkspaceAction(actions, item.target)} style={{ border: `1px solid ${item.tone}26`, background: `${item.tone}12`, color: WS.text, borderRadius: 999, minHeight: 34, padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: 7, maxWidth: '100%', fontFamily: 'inherit', fontSize: 12.5, lineHeight: '15px', fontWeight: 850, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <span style={{ color: item.tone, fontSize: 15, lineHeight: '15px' }}>{item.icon}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+          </button>
+        )) : (
+          <div style={{ minHeight: 34, display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '6px 11px', background: 'rgba(46,179,107,0.10)', color: WS.green, fontSize: 13, lineHeight: '16px', fontWeight: 900, whiteSpace: 'nowrap' }}>Сегодня всё спокойно ✓</div>
+        )}
+      </div>
+      <div data-workspace-smart-status-updated style={{ justifySelf: 'end', minWidth: 92, textAlign: 'right' }}>
+        <div style={{ color: WS.muted, fontSize: 10.8, lineHeight: '13px', fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0 }}>Последнее обновление</div>
+        <div style={{ color: WS.text, fontSize: 13, lineHeight: '16px', fontWeight: 900, marginTop: 2 }}>{updatedText}</div>
+      </div>
+    </section>
+  );
+}
+
 function mergeWorkdayQueue(plan = {}) {
   const rows = [...(plan.tasks || []), ...(plan.attention || [])];
   const map = new Map();
@@ -1699,6 +1806,8 @@ export function DesktopWorkspace({
   experts = [],
   events = [],
   news = [],
+  bookings = [],
+  promotions = [],
   notifications = [],
   unreadCount = 0,
   userKeys = 0,
@@ -1735,7 +1844,8 @@ export function DesktopWorkspace({
   const userName = user?.firstName || user?.name || user?.displayName || 'Mr. TOREDO';
   const dialogNotifications = useMemo(() => notifications.filter(item => (item?.category === 'messages' || item?.type === 'contextDialogMessage') && item?.isRead !== true), [notifications]);
   const dialogUnreadCount = dialogNotifications.length || 0;
-  const workspaceData = useMemo(() => ({ userName, activeProfile, partners, experts, events, news, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience }), [userName, activeProfile, partners, experts, events, news, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience]);
+  const normalizedWorkspaceBookings = useMemo(() => (Array.isArray(bookings) ? bookings.map(item => normalizeBooking(item)) : []), [bookings]);
+  const workspaceData = useMemo(() => ({ userName, activeProfile, partners, experts, events, news, bookings: normalizedWorkspaceBookings, promotions, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience }), [userName, activeProfile, partners, experts, events, news, normalizedWorkspaceBookings, promotions, notifications, dialogNotifications, dialogUnreadCount, unreadCount, userKeys, userCount, homeExperience]);
   const workspaceIntelligence = useMemo(() => buildWorkspaceIntelligence({ data: workspaceData, analytics, activityTimeline, recommendations, dailySummary }), [workspaceData, analytics, activityTimeline, recommendations, dailySummary]);
   const availableWorkspaceViews = useMemo(() => getWorkspaceRoleViews({ roles: roleState.roles, activeRole, ownedPartner: workspacePartner, ownedExpert: workspaceExpert, isAdminRole }), [roleState.roles, activeRole, workspacePartner, workspaceExpert, isAdminRole]);
   const workspaceView = availableWorkspaceViews.find(view => view.id === activeWorkspaceViewId) || availableWorkspaceViews[0] || WORKSPACE_ROLE_VIEWS.partner;
@@ -1881,7 +1991,8 @@ export function DesktopWorkspace({
       <WorkspaceHeader query={query} onQueryChange={setQuery} unreadCount={unreadCount} onModeChange={onModeChange} onOpenNotifications={() => setActiveSection('notifications')} />
       <div style={{ maxWidth: 1760, margin: '0 auto', padding: '18px 24px 22px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
         <WorkspaceSidebar items={navItems} activeSection={activeSection} onSelect={handleSelectNav} user={user} data={workspaceData} onModeChange={onModeChange} availableViews={availableWorkspaceViews} activeViewId={workspaceView.id} onViewChange={setActiveWorkspaceViewId} profileCompletion={profileCompletion} onCompleteProfile={openProfileMissingFields} />
-        <main data-workspace-region="content" style={{ minWidth: 0 }}>
+        <main data-workspace-region="content" style={{ minWidth: 0, display: 'grid', gap: 14 }}>
+          <WorkspaceSmartStatusBar data={workspaceData} actions={actions} plan={workspaceDayPlan} />
           {renderContent()}
         </main>
       </div>
