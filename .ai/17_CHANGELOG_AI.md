@@ -3768,6 +3768,14 @@
 - `LokiCore` получил debug trace для `workflowEngine`; `LokiProvider` сохраняет `lastWorkflowContext` и локальную `workflowHistory`.
 - Добавлен regression-тест `scripts/loki-workflow-test.mjs` и npm script `test:loki-workflow` с 1200+ workflow-сценариями.
 
+# 2026-07-19 — APG Messaging v3 Smart Conversations
+
+- Контекстные диалоги получили sticky Smart Conversation Header: верхняя карточка автоматически показывает объект переписки для партнёра, эксперта, записи, мероприятия, акции и новости.
+- Для booking context добавлены статус, дата, время, специалист, услуга и быстрые действия `Перенести`, `Отменить`, `Маршрут`, `Подтвердить` через существующие booking actions.
+- Для event, partner, expert, promotion и news context добавлены компактные read-only поля и быстрые действия на базе существующей навигации, звонка, маршрута и открытия объекта.
+- Shared-normalizer `buildDialogContext` расширен только производными полями из уже переданного объекта: время, рейтинг, открытость, филиал, акция, скидка, срок, автор и свободные места.
+- Добавлен smoke/unit-скрипт `scripts/messaging-smart-conversations-test.mjs` на 500 сценариев Smart Conversations, sticky markers, context types, actions и read-only контракт.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

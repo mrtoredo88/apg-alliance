@@ -186,6 +186,151 @@ function QuickReplyChips({ context, onPick }) {
   );
 }
 
+function smartValue(...values) {
+  for (const value of values) {
+    if (value != null && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+function buildSmartContextRows(context = {}) {
+  if (!context) return [];
+  if (context.type === 'booking') {
+    return [
+      ['Статус', smartValue(context.statusLabel, context.status, 'Уточняется')],
+      ['Дата', smartValue(context.date, context.startAt)],
+      ['Время', smartValue(context.time)],
+      ['Специалист', smartValue(context.specialistName)],
+      ['Услуга', smartValue(context.serviceTitle, context.title)],
+    ];
+  }
+  if (context.type === 'event') {
+    return [
+      ['Дата', smartValue(context.date, context.startAt)],
+      ['Место', smartValue(context.address, context.place)],
+      ['Организатор', smartValue(context.parentTitle, context.organizer)],
+      ['Свободные места', smartValue(context.freePlaces, context.availableSeats, context.capacity)],
+    ];
+  }
+  if (context.type === 'expert') {
+    return [
+      ['Специализация', smartValue(context.subtitle, context.specialization)],
+      ['Стоимость', smartValue(context.price, context.cost)],
+      ['Ближайшее время', smartValue(context.nextSlot, context.date)],
+      ['Запись', smartValue(context.bookingUrl, context.hasBooking ? 'Доступна' : '')],
+      ['Контакты', smartValue(context.phone)],
+    ];
+  }
+  if (context.type === 'promotion') {
+    return [
+      ['Скидка', smartValue(context.discount, context.offer, context.title)],
+      ['Срок', smartValue(context.validUntil, context.date, context.status)],
+      ['Партнёр', smartValue(context.parentTitle)],
+    ];
+  }
+  if (context.type === 'news') {
+    return [
+      ['Заголовок', smartValue(context.title)],
+      ['Автор', smartValue(context.author, context.source, 'АПГ')],
+      ['Дата', smartValue(context.date)],
+    ];
+  }
+  return [
+    ['Рейтинг', smartValue(context.rating, context.stars, '★★★★★')],
+    ['Открыт/закрыт', smartValue(context.openNow, context.hours, 'График в карточке')],
+    ['Адрес', smartValue(context.address)],
+    ['Ближайший филиал', smartValue(context.locationTitle, context.nearestLocation, context.address)],
+    ['Акции', smartValue(context.promotionTitle, context.offer, context.promotionId ? 'Есть активная акция' : '')],
+  ];
+}
+
+function buildSmartActions({ context, isOwner, onOpenObject, onAction }) {
+  if (!context) return [];
+  const openRoute = context.address ? () => window.open(`https://yandex.ru/maps/?text=${encodeURIComponent(context.address)}`, '_blank', 'noopener,noreferrer') : null;
+  const call = context.phone ? () => window.open(`tel:${String(context.phone).replace(/\s+/g, '')}`) : null;
+  const openObject = () => onOpenObject?.(context);
+  if (context.type === 'booking') {
+    const inactive = [BOOKING_STATUSES.cancelledByUser, BOOKING_STATUSES.cancelledByProvider, BOOKING_STATUSES.completed, BOOKING_STATUSES.noShow].includes(context.status);
+    return [
+      !inactive && { id: 'reschedule', label: 'Перенести', onClick: () => {
+        const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
+        if (!startAt) return;
+        const start = new Date(String(startAt).trim().replace(' ', 'T'));
+        if (Number.isNaN(start.getTime())) return alert('Не удалось распознать дату.');
+        const duration = Number(context.durationMinutes || 60);
+        onAction?.('booking:requestReschedule', { slot: { startAt: start.toISOString(), endAt: new Date(start.getTime() + duration * 60000).toISOString() }, reason: 'Запрос из диалога' });
+      } },
+      !inactive && { id: 'cancel', label: 'Отменить', onClick: () => onAction?.('booking:cancel', { reason: prompt('Причина отмены, если хотите указать') || '' }) },
+      openRoute && { id: 'route', label: 'Маршрут', onClick: openRoute },
+      isOwner && [BOOKING_STATUSES.pending, BOOKING_STATUSES.new].includes(context.status) && { id: 'confirm', label: 'Подтвердить', tone: 'gold', onClick: () => onAction?.('booking:confirm') },
+    ].filter(Boolean);
+  }
+  if (context.type === 'event') return [
+    { id: 'open', label: 'Открыть', onClick: openObject },
+    openRoute && { id: 'route', label: 'Маршрут', onClick: openRoute },
+    { id: 'register', label: 'Записаться', tone: 'gold', onClick: openObject },
+  ].filter(Boolean);
+  if (context.type === 'expert') return [
+    { id: 'book', label: 'Запись', tone: 'gold', onClick: openObject },
+    call && { id: 'call', label: 'Позвонить', onClick: call },
+    openRoute && { id: 'route', label: 'Маршрут', onClick: openRoute },
+  ].filter(Boolean);
+  if (context.type === 'promotion') return [{ id: 'use', label: 'Использовать', tone: 'gold', onClick: openObject }];
+  if (context.type === 'news') return [{ id: 'open', label: 'Открыть статью', tone: 'gold', onClick: openObject }];
+  return [
+    call && { id: 'call', label: 'Позвонить', onClick: call },
+    openRoute && { id: 'route', label: 'Маршрут', onClick: openRoute },
+    { id: 'booking', label: 'Запись', tone: 'gold', onClick: openObject },
+  ].filter(Boolean);
+}
+
+function SmartConversationHeader({ context, isOwner, collapsed, onOpenObject, onAction }) {
+  if (!context) return null;
+  const rows = buildSmartContextRows(context).filter(([, value]) => value).slice(0, collapsed ? 2 : 6);
+  const actions = buildSmartActions({ context, isOwner, onOpenObject, onAction }).slice(0, collapsed ? 2 : 5);
+  const title = context.type === 'booking' ? smartValue(context.parentTitle, context.title, 'Запись АПГ') : smartValue(context.title, context.parentTitle, 'АПГ');
+  return (
+    <GlassCard data-smart-conversation-header data-collapsed={collapsed ? 'true' : 'false'} style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 8px)', zIndex: 8, borderRadius: collapsed ? 22 : 28, padding: collapsed ? 10 : 14, display: 'grid', gap: collapsed ? 8 : 12, border: '1px solid rgba(215,184,106,0.30)', boxShadow: '0 16px 42px var(--apg2-elev-shadow, rgba(0,0,0,0.18))', transition: 'padding 180ms ease, border-radius 180ms ease' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: collapsed ? '38px 1fr auto' : '54px 1fr auto', gap: 11, alignItems: 'center' }}>
+        <div style={{ width: collapsed ? 38 : 54, height: collapsed ? 38 : 54, borderRadius: collapsed ? 15 : 20, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: collapsed ? 18 : 24, overflow: 'hidden', transition: 'width 180ms ease, height 180ms ease' }}>
+          {context.image ? <img src={context.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : contextIcon(context.type)}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', marginBottom: collapsed ? 2 : 5 }}>
+            <ContextBadge context={context} />
+            {context.type === 'booking' && <GlassBadge tone="gold">📅 Запись</GlassBadge>}
+          </div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: collapsed ? 15 : 18, lineHeight: collapsed ? '19px' : '23px', fontWeight: 930, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+          {collapsed && rows[0] && <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rows.map(([, value]) => value).join(' · ')}</div>}
+        </div>
+        <GlassButton onClick={() => onOpenObject?.(context)} style={{ minHeight: collapsed ? 32 : 36, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Открыть</GlassButton>
+      </div>
+      {!collapsed && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ borderRadius: 18, padding: '9px 10px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)' }}>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', fontWeight: 820 }}>{label}</div>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 850, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          {actions.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {actions.map(action => <GlassButton key={action.id} tone={action.tone} onClick={action.onClick} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: 12 }}>{action.label}</GlassButton>)}
+            </div>
+          )}
+        </>
+      )}
+      {collapsed && actions.length > 0 && (
+        <div style={{ display: 'flex', gap: 7, overflowX: 'auto' }}>
+          {actions.map(action => <GlassButton key={action.id} tone={action.tone} onClick={action.onClick} style={{ flex: '0 0 auto', minHeight: 30, borderRadius: 14, padding: '6px 9px', color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: 11.5 }}>{action.label}</GlassButton>)}
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 function BookingContextCard({ context, isOwner, onOpenObject, onAction }) {
   if (context?.type !== 'booking') return null;
   const bookingId = context.bookingId || context.objectId;
@@ -283,6 +428,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const [query, setQuery] = useState('');
   const [aiAssist, setAiAssist] = useState(Boolean(user?.contextDialogAiAssist));
   const [attachment, setAttachment] = useState(null);
+  const [contextCollapsed, setContextCollapsed] = useState(false);
   const messagesEndRef = useRef(null);
   const lastRequestRef = useRef(0);
 
@@ -331,6 +477,20 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [activeDialogId, messages.length]);
+
+  useEffect(() => {
+    const update = () => {
+      const root = document.querySelector('[data-apg-scroll-root]') || document.scrollingElement || document.documentElement;
+      setContextCollapsed(Number(root?.scrollTop || window.scrollY || 0) > 120);
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    document.querySelector('[data-apg-scroll-root]')?.addEventListener('scroll', update, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', update);
+      document.querySelector('[data-apg-scroll-root]')?.removeEventListener('scroll', update);
+    };
+  }, [activeDialogId]);
 
   const activeDialog = useMemo(() => dialogs.find(dialog => dialog.id === activeDialogId) || dialogs[0] || null, [dialogs, activeDialogId]);
   const activeMessages = useMemo(() => messages.filter(message => message.dialogId === activeDialog?.dialogId || message.dialogId === activeDialog?.id), [messages, activeDialog]);
@@ -431,10 +591,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
               )}
             </div>
           )}
-          {activeContext?.type === 'booking'
-            ? <BookingContextCard context={activeContext} isOwner={isOwner} onOpenObject={onOpenObject} onAction={runBookingAction} />
-            : <ContextHeader context={activeContext} onOpenObject={onOpenObject} />}
-          <MessagingContextInfo context={activeContext} onOpenObject={onOpenObject} />
+          <SmartConversationHeader context={activeContext} isOwner={isOwner} collapsed={contextCollapsed} onOpenObject={onOpenObject} onAction={runBookingAction} />
           {isOwner && <OwnerAssist enabled={aiAssist} onToggle={toggleAiAssist} context={activeContext} lastQuestion={lastQuestion} onUse={value => setText(value)} />}
           <div style={{ display: 'grid', gap: 9, minHeight: 220 }}>
             {activeMessages.length ? activeMessages.map(message => <MessageBubble key={message.id} message={message} own={message.senderId === uid && message.senderRole !== 'loki'} />) : (
