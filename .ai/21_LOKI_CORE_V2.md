@@ -52,6 +52,17 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Execution Snapshot
         └── Execution Explanation
                     │
+        Controlled Execution v1
+        ├── Controlled Execution Engine
+        ├── Execution Policy
+        ├── Execution Guard
+        ├── Execution Dispatcher
+        ├── Execution Preview
+        ├── Execution Result
+        ├── Execution History
+        ├── Execution Snapshot
+        └── Execution Explanation
+                    │
            Journey Engine v1
         ├── Goal Detector
         ├── Journey Planner
@@ -213,6 +224,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
 | Capability Engine | V1 production | read-only слой после Reasoning/Conversation resolution: определяет функцию приложения (`BOOK_APPOINTMENT`, `OPEN_REWARDS`, `SEARCH_PROMOTIONS` и др.), параметры, missing values, alternatives и execution order без изменения ответов или downstream-движков |
 | Capability Execution Bridge | V1 production | read-only слой после Capability Engine: сопоставляет capability с уже существующими Planner goals, Workflow ids, Tool ids, Navigation routes и Action Center actions; строит `executionContext`/`executionSnapshot`, ready/missing/clarification diagnostics и локальную history без выполнения действий |
+| Controlled Execution | V1 production | тонкий исполнительный адаптер после Execution Bridge: по whitelist разрешает только безопасную navigation/search dispatch через существующий Action Executor, для state-changing capability требует одноразовый bound confirmation и сохраняет локальный preview/result/history без новых tools/UI/API |
 | Conversation Engine | V1 production | локальный слой после Reasoning: удерживает темы диалога, активные сущности, местоимения, порядковые ссылки и follow-up context перед Journey/Planner/Agent без Firestore/API |
 | Journey Engine | V1 production | read-only слой после Conversation: определяет цель пользователя, строит локальный путь, отслеживает прогресс и предлагает следующий action без backend/Firestore |
 | Personalization Engine | V1 production | read-only слой после Journey: строит пользовательский контекст из уже загруженного app state, динамически вычисляет предпочтения, адаптирует рекомендации и объясняет используемые данные |
@@ -255,6 +267,11 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Execution Registry не создаёт новые действия или маршруты приложения; он ссылается на уже существующие `LOKI_APP_ACTIONS`, `ACTION_IDS`, `TOOL_IDS`, planner goals и workflow ids.
 - Если Execution Bridge видит missing parameters, он выставляет `ready:false` и сохраняет один точный `clarificationQuestion` в диагностике, но не меняет пользовательский текст ответа Локи.
 - Execution History хранится только локально в Loki memory как `lastExecutionContext`/`lastExecutionSnapshot`/`executionHistory` на 100 записей; Firestore, backend, API, Security Rules, Planner, Workflow, Agent, Tool Calling, Action Center, Decision и Evaluation не меняются.
+- Controlled Execution v1 исполняет только whitelist безопасных navigation/search действий и только через существующий `executeLokiAction`; новых Tool, Action Center actions, routes, API или Firestore-записей слой не создаёт.
+- Для state-changing capability `confirmationRequired:true` означает только pending-state, а не согласие пользователя; подтверждение должно иметь одноразовый `confirmation.executionId`, привязанный к fingerprint текущего execution plan.
+- Controlled Execution не считает подтверждением наличие capability, высокий confidence, повторную сборку plan, прошлое неявное сообщение, обычную navigation-кнопку или автоматически созданный action.
+- При изменении capability, параметров или execution plan прежний `confirmation.executionId` считается expired; выполнение блокируется до нового явного подтверждения через существующий confirmation flow.
+- Controlled Execution не меняет текст ответа Локи: Provider делает тихий dispatch разрешённых navigation/search действий через существующий Action Executor и сохраняет только локальный `controlledExecutionContext`/`controlledExecutionHistory`.
 - Decision Intelligence v1 не выбирает новые данные и не исполняет действия: слой только анализирует уже готовый ответ после Knowledge/Reasoning/Conversation/Journey/Memory/Planner/Workflow/Agent/Tool/Action Center и сохраняет локальный `decisionContext`.
 - Decision History хранится только локально в Loki memory как `lastDecisionContext`/`decisionSnapshot`/`decisionHistory`; Firestore, backend, API, Security Rules и business logic не меняются.
 - Explain Mode для вопроса “Почему ты это предложил?” использует последний локальный decision snapshot и не вызывает новые tools, backend или Firestore.

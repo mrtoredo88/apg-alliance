@@ -312,6 +312,52 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </section>
     );
   };
+  const renderControlledExecutionBlock = () => {
+    const snapshot = loki.lastControlledExecutionSnapshot;
+    const controlledContext = loki.lastControlledExecutionContext;
+    const controlledHistory = Array.isArray(loki.lastControlledExecutionHistory) ? loki.lastControlledExecutionHistory : [];
+    if (!snapshot && !controlledContext && !controlledHistory.length) return null;
+    const confirmation = controlledContext?.confirmation || {};
+    const rows = [
+      ['Policy', snapshot?.Policy || controlledContext?.policy?.policy],
+      ['Ready', String(snapshot?.Ready ?? controlledContext?.executionReady ?? false)],
+      ['Confirmation', `${snapshot?.ConfirmationStatus || confirmation.status || '—'}${confirmation.executionId ? ` · ${confirmation.executionId}` : ''}`],
+      ['Dispatcher', snapshot?.Dispatcher || controlledContext?.dispatcher?.dispatcher],
+      ['Action', snapshot?.ActionType || controlledContext?.dispatcher?.action?.type],
+      ['Execution Result', snapshot?.Result || controlledContext?.result?.status],
+      ['Reason', snapshot?.Reason || controlledContext?.result?.reason || controlledContext?.guard?.reason],
+    ];
+    return (
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Controlled Execution', controlledHistory.length ? `${controlledHistory.length} записей` : '')}
+        <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: 8, alignItems: 'start', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                <span style={{ color: APG2_PROFILE.textMuted, fontWeight: 760 }}>{label}</span>
+                <span style={{ color: label === 'Policy' || label === 'Ready' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontWeight: label === 'Policy' || label === 'Ready' ? 900 : 720, minWidth: 0, overflowWrap: 'anywhere' }}>{value || '—'}</span>
+              </div>
+            ))}
+          </div>
+          {(snapshot?.Preview || controlledContext?.preview?.text) && (
+            <div style={{ border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 10, color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px', whiteSpace: 'pre-line' }}>
+              {snapshot?.Preview || controlledContext?.preview?.text}
+            </div>
+          )}
+          {!!controlledHistory.length && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {controlledHistory.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `${item.createdAt}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 78px', gap: 8, alignItems: 'center', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.capability} · {item.policy} · {item.dispatcher || '—'}</span>
+                  <span style={{ color: item.ready ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontWeight: 900, textAlign: 'right' }}>{item.resultStatus || (item.ready ? 'ready' : 'blocked')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </section>
+    );
+  };
   const renderContinueItem = (item) => (
     <button
       key={`${item.type}-${item.id}`}
@@ -451,6 +497,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
 
       {renderCapabilityBlock()}
       {renderExecutionBlock()}
+      {renderControlledExecutionBlock()}
       {renderEvaluationBlock()}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>

@@ -234,6 +234,20 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
       executionOrder: knowledgeResult.executionContext.executionOrder?.map?.(item => item.capability) || [],
     });
   }
+  if (knowledgeResult?.controlledExecutionContext) {
+    trace.push({
+      module: 'controlledExecution',
+      ms: 0,
+      decision: knowledgeResult.controlledExecutionContext.result?.status || 'skipped',
+      capability: knowledgeResult.controlledExecutionContext.capability,
+      ready: knowledgeResult.controlledExecutionContext.executionReady,
+      policy: knowledgeResult.controlledExecutionContext.policy?.policy || '',
+      confirmation: knowledgeResult.controlledExecutionContext.confirmation?.status || '',
+      dispatcher: knowledgeResult.controlledExecutionContext.dispatcher?.dispatcher || '',
+      actionType: knowledgeResult.controlledExecutionContext.dispatcher?.action?.type || '',
+      reason: knowledgeResult.controlledExecutionContext.result?.reason || '',
+    });
+  }
   if (knowledgeResult?.planContext) {
     trace.push({ module: 'planner', ms: knowledgeResult.planContext.durationMs ?? 0, decision: knowledgeResult.planContext.goal || knowledgeResult.planContext.status || 'completed' });
   }

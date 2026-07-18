@@ -38,6 +38,7 @@ import { buildDecisionHistoryPatch } from './core/decision/index.js';
 import { buildEvaluationHistoryPatch } from './core/evaluation/index.js';
 import { buildCapabilityHistoryPatch } from './core/capabilities/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
+import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -556,6 +557,23 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
+  const recordControlledExecutionContext = useCallback((controlledExecutionContext, controlledExecutionSnapshot) => {
+    if (!controlledExecutionContext?.capability) return;
+    setMemory(prev => {
+      const historyPatch = buildControlledExecutionHistoryPatch(prev, controlledExecutionContext);
+      const next = {
+        ...prev,
+        ...historyPatch,
+        lastControlledExecutionContext: controlledExecutionContext,
+        lastControlledExecutionSnapshot: controlledExecutionSnapshot || null,
+        lastControlledExecutionHistory: historyPatch.controlledExecutionHistory || prev.lastControlledExecutionHistory || [],
+        updatedAt: new Date().toISOString(),
+      };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, []);
+
   const recordEvaluationSnapshot = useCallback((evaluationContext, evaluationSnapshot) => {
     if (!evaluationSnapshot?.evaluationId && !evaluationContext?.evaluationId) return;
     const snapshot = {
@@ -936,6 +954,41 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     return false;
   }, [activePanel, appActions, appState, memory, recordActionEvent, settings.personalityMode, showMessage, updateHistory, updateMemory, user]);
 
+  const dispatchControlledExecution = useCallback(async (controlledExecutionContext) => {
+    const actionToRun = controlledExecutionContext?.result?.dispatch || controlledExecutionContext?.dispatcher?.action || null;
+    if (!controlledExecutionContext?.executionReady || !actionToRun) return null;
+    const actionEvents = [];
+    const execution = await executeLokiAction(actionToRun, {
+      appActions,
+      appState,
+      actor: { role: user?.role || user?.userRole || 'user', permissions: user?.adminPermissions || [] },
+      onEvent: event => actionEvents.push(event),
+    });
+    actionEvents.forEach(event => recordActionEvent(event));
+    const nextContext = {
+      ...controlledExecutionContext,
+      result: completeControlledExecutionResult(controlledExecutionContext.result, {
+        ok: execution.ok,
+        reason: execution.reason || controlledExecutionContext.result?.reason || '',
+        action: execution.action || actionToRun,
+      }),
+    };
+    recordControlledExecutionContext(nextContext, {
+      ...(memory?.lastControlledExecutionSnapshot || {}),
+      Result: nextContext.result.status,
+      Reason: nextContext.result.reason,
+      Capability: nextContext.capability,
+      Ready: nextContext.executionReady,
+      Policy: nextContext.policy?.policy || '',
+      Confirmation: nextContext.confirmationRequired,
+      ConfirmationStatus: nextContext.confirmation?.status || '',
+      Dispatcher: nextContext.dispatcher?.dispatcher || '',
+      ActionType: nextContext.dispatcher?.action?.type || '',
+      createdAt: nextContext.createdAt,
+    });
+    return nextContext;
+  }, [appActions, appState, memory?.lastControlledExecutionSnapshot, recordActionEvent, recordControlledExecutionContext, user]);
+
   const askBrain = useCallback(async (text) => {
     if (!settings.enabled) return false;
     const thinkingTimer = setTimeout(() => {
@@ -957,16 +1010,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.conversationContext) recordConversationContext(result.conversationContext);
       if (result.capabilityContext) recordCapabilityContext(result.capabilityContext, result.capabilitySnapshot);
       if (result.executionContext) recordExecutionContext(result.executionContext, result.executionSnapshot);
+      if (result.controlledExecutionContext) recordControlledExecutionContext(result.controlledExecutionContext, result.controlledExecutionSnapshot);
       if (result.planContext) recordPlanContext(result.planContext);
       if (result.workflowContext) recordWorkflowContext(result.workflowContext);
       if (result.agentContext) recordAgentContext(result.agentContext);
       if (result.decisionContext) recordDecisionContext(result.decisionContext);
       if (result.evaluationSnapshot) recordEvaluationSnapshot(result.evaluationContext, result.evaluationSnapshot);
-      if (result.reasoningContext || result.conversationContext || result.capabilityContext || result.executionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
+      if (result.reasoningContext || result.conversationContext || result.capabilityContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
         ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
         ...(result.executionContext ? { lastExecutionContext: result.executionContext, lastExecutionSnapshot: result.executionSnapshot } : {}),
+        ...(result.controlledExecutionContext ? { lastControlledExecutionContext: result.controlledExecutionContext, lastControlledExecutionSnapshot: result.controlledExecutionSnapshot } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
         ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
@@ -989,6 +1044,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         card: result.card,
         priority: LOKI_MESSAGE_PRIORITY.HIGH,
       });
+      if (result.controlledExecutionContext?.executionReady) {
+        setTimeout(() => dispatchControlledExecution(result.controlledExecutionContext), 120);
+      }
       return true;
     } catch (e) {
       clearTimeout(thinkingTimer);
@@ -997,7 +1055,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appState, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
+  }, [activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
@@ -1044,6 +1102,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
         ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
         ...(result.executionContext ? { lastExecutionContext: result.executionContext, lastExecutionSnapshot: result.executionSnapshot } : {}),
+        ...(result.controlledExecutionContext ? { lastControlledExecutionContext: result.controlledExecutionContext, lastControlledExecutionSnapshot: result.controlledExecutionSnapshot } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
         ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
@@ -1061,6 +1120,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.conversationContext) recordConversationContext(result.conversationContext);
       if (result.capabilityContext) recordCapabilityContext(result.capabilityContext, result.capabilitySnapshot);
       if (result.executionContext) recordExecutionContext(result.executionContext, result.executionSnapshot);
+      if (result.controlledExecutionContext) recordControlledExecutionContext(result.controlledExecutionContext, result.controlledExecutionSnapshot);
       if (result.decisionContext) recordDecisionContext(result.decisionContext);
       if (result.evaluationSnapshot) recordEvaluationSnapshot(result.evaluationContext, result.evaluationSnapshot);
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
@@ -1087,6 +1147,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       }));
       const actionToRun = result.executeAction ?? (options.autoExecute ? result.autoAction : null);
       if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
+      else if (result.controlledExecutionContext?.executionReady) setTimeout(() => dispatchControlledExecution(result.controlledExecutionContext), 120);
       return result;
     } catch (e) {
       setBrainThinking(false);
@@ -1098,7 +1159,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activeContext, activePanel, appState, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const openContextExperience = useCallback((context) => {
     const normalized = normalizeLokiContext(context);
@@ -1161,6 +1222,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     lastExecutionContext: memory?.lastExecutionContext || null,
     lastExecutionSnapshot: memory?.lastExecutionSnapshot || null,
     lastExecutionHistory: memory?.lastExecutionHistory || memory?.executionHistory || [],
+    lastControlledExecutionContext: memory?.lastControlledExecutionContext || null,
+    lastControlledExecutionSnapshot: memory?.lastControlledExecutionSnapshot || null,
+    lastControlledExecutionHistory: memory?.lastControlledExecutionHistory || memory?.controlledExecutionHistory || [],
     lastEvaluationContext: memory?.lastEvaluationContext || null,
     lastEvaluationSnapshot: memory?.lastEvaluationSnapshot || null,
     lastEvaluationHistory: memory?.lastEvaluationHistory || memory?.evaluationHistory || [],

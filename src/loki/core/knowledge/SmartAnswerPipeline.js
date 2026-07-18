@@ -14,6 +14,7 @@ import { runLokiConversationEngine } from '../conversation/ConversationEngine.js
 import { explainLastDecision, isDecisionExplainQuery, runLokiDecisionEngine } from '../decision/index.js';
 import { explainLastCapability, isCapabilityExplainQuery, runLokiCapabilityEngine } from '../capabilities/index.js';
 import { explainLastExecution, isExecutionExplainQuery, runCapabilityExecutionBridge } from '../execution/index.js';
+import { explainLastControlledExecution, isControlledExecutionExplainQuery, runControlledExecutionEngine } from '../controlledExecution/index.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -255,7 +256,19 @@ function attachExecution(result, execution = {}) {
   };
 }
 
+function attachControlledExecution(result, controlled = {}) {
+  if (!result || !controlled.controlledExecutionContext?.capability) return result;
+  return {
+    ...result,
+    controlledExecutionContext: result.controlledExecutionContext || controlled.controlledExecutionContext,
+    controlledExecutionSnapshot: result.controlledExecutionSnapshot || controlled.controlledExecutionSnapshot,
+  };
+}
+
 export function runLokiKnowledgeEngine({ text: question, appState = {}, context = null } = {}) {
+  if (isControlledExecutionExplainQuery(question)) {
+    return attachDecision(explainLastControlledExecution(context?.memory || {}), question, context);
+  }
   if (isExecutionExplainQuery(question)) {
     return attachDecision(explainLastExecution(context?.memory || {}), question, context);
   }
@@ -313,12 +326,21 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     memory: context?.memory || {},
     knowledge,
   });
+  const controlledExecutionResult = runControlledExecutionEngine({
+    question: effectiveQuestion,
+    executionContext: executionResult.executionContext,
+    context: contextWithConversation,
+    memory: context?.memory || {},
+    appState: sourceState,
+  });
   const contextWithCapability = {
     ...contextWithConversation,
     capabilityContext: capabilityResult.capabilityContext,
     capabilitySnapshot: capabilityResult.capabilitySnapshot,
     executionContext: executionResult.executionContext,
     executionSnapshot: executionResult.executionSnapshot,
+    controlledExecutionContext: controlledExecutionResult.controlledExecutionContext,
+    controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot,
     memory: {
       ...(contextWithConversation?.memory || {}),
       capabilityContext: capabilityResult.capabilityContext,
@@ -327,6 +349,9 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
       executionContext: executionResult.executionContext,
       executionSnapshot: executionResult.executionSnapshot,
       lastExecutionContext: executionResult.executionContext,
+      controlledExecutionContext: controlledExecutionResult.controlledExecutionContext,
+      controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot,
+      lastControlledExecutionContext: controlledExecutionResult.controlledExecutionContext,
     },
   };
   const contextJourney = runJourneyEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, reasoningResult: effectiveReasoning, context: contextWithCapability });
@@ -339,9 +364,11 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     capabilitySnapshot: capabilityResult.capabilitySnapshot,
     executionContext: executionResult.executionContext,
     executionSnapshot: executionResult.executionSnapshot,
-    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot, conversationSnapshot: conversationContext?.snapshot, lastConversationSession: conversationContext?.session, capabilityContext: capabilityResult.capabilityContext, capabilitySnapshot: capabilityResult.capabilitySnapshot, lastCapabilityContext: capabilityResult.capabilityContext, executionContext: executionResult.executionContext, executionSnapshot: executionResult.executionSnapshot, lastExecutionContext: executionResult.executionContext },
+    controlledExecutionContext: controlledExecutionResult.controlledExecutionContext,
+    controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot,
+    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot, conversationSnapshot: conversationContext?.snapshot, lastConversationSession: conversationContext?.session, capabilityContext: capabilityResult.capabilityContext, capabilitySnapshot: capabilityResult.capabilitySnapshot, lastCapabilityContext: capabilityResult.capabilityContext, executionContext: executionResult.executionContext, executionSnapshot: executionResult.executionSnapshot, lastExecutionContext: executionResult.executionContext, controlledExecutionContext: controlledExecutionResult.controlledExecutionContext, controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot, lastControlledExecutionContext: controlledExecutionResult.controlledExecutionContext },
   };
-  const finalize = result => attachDecision(attachExecution(attachCapability(result, capabilityResult), executionResult), effectiveQuestion, contextWithWorkflow);
+  const finalize = result => attachDecision(attachControlledExecution(attachExecution(attachCapability(result, capabilityResult), executionResult), controlledExecutionResult), effectiveQuestion, contextWithWorkflow);
   const continuationResult = runLokiAgentContinuation({ question: effectiveQuestion, context: contextWithWorkflow });
   if (continuationResult) return finalize({ ...continuationResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });
   const plannerResult = runLokiPlanner({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });

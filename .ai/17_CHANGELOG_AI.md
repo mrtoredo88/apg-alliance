@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] feat: Loki Controlled Execution v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/controlledExecution/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-controlled-execution-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен изолированный слой `src/loki/core/controlledExecution`: Engine, Policy, Guard, Dispatcher, Preview, Result, History, Snapshot и Explanation.
+- Controlled Execution после Execution Bridge решает, можно ли выполнить capability сейчас: auto разрешён только для whitelist navigation/search, state-changing capability требуют одноразовый confirmation, привязанный к execution plan.
+- `LokiProvider` сохраняет `lastControlledExecutionContext`, `lastControlledExecutionSnapshot`, историю на 100 записей и тихо dispatch-ит разрешённые действия через существующий `executeLokiAction`, не меняя текст ответа Локи.
+- Добавлен `npm run test:loki-controlled-execution`: 400 сценариев проверяют auto execution, confirmation pending/confirmed/expired, блокировки, отсутствие прав/handler/параметров, successful navigation, provider/UI integration и read-only контракт.
+**Почему:** после Capability Execution Bridge Локи должен начать безопасно выполнять только уже существующие действия приложения, не создавая новую бизнес-логику и не обходя confirmation-модель.
+
+---
+
 ## [2026-07-19] feat: Loki Capability Execution Bridge v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/execution/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-execution-bridge-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
