@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Quality & Evaluation Framework v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/evaluation/*`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-evaluation-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен полностью read-only слой `src/loki/core/evaluation`: Evaluation Engine, Context, Metrics, Scorer, History, Snapshot, Explanation и Validator.
+- Loki pipeline теперь после Decision Intelligence прикрепляет локальные `evaluationContext`, `evaluationMetrics`, `evaluationScore` и `evaluationSnapshot` без изменения текста ответа, карточек, actions, Firestore, API или backend.
+- `LokiProvider` хранит `lastEvaluationContext`, `lastEvaluationSnapshot` и последние 100 локальных оценок; `LokiPage` показывает dev-блок Evaluation.
+- Добавлен `npm run test:loki-evaluation`: 300 сценариев проверяют метрики, scoring, history, explain mode, provider/UI integration, null-safe поведение и read-only контракт.
+**Почему:** после Decision Intelligence Локи должен уметь детерминированно оценивать качество уже сформированного ответа без повторного LLM-вызова и без влияния на бизнес-логику.
+
+---
+
 ## [2026-07-18] feat: Loki Decision Intelligence v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/decision/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-decision-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

@@ -129,6 +129,16 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Decision Snapshot
         └── Decision Validator
                     │
+        Quality & Evaluation Framework v1
+        ├── Evaluation Engine
+        ├── Evaluation Context
+        ├── Evaluation Metrics
+        ├── Evaluation Scorer
+        ├── Evaluation History
+        ├── Evaluation Snapshot
+        ├── Evaluation Explanation
+        └── Evaluation Validator
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -191,6 +201,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Tool Calling | V1 production | read-only internal tool layer поверх Knowledge snapshot: user/promotions/events/meetings/gifts/news/workspace/search tools, TTL cache, local Tool History и observability events без LLM tool calling |
 | Action Center | V1 production | client-only слой поверх существующих действий приложения: registry, resolver, validator, executor, local history и action-кнопки в ответах Локи без новых API/Firestore |
 | Decision Intelligence | V1 production | read-only слой после Action Center: фиксирует итоговое решение ответа, confidence, trace участвующих движков, альтернативы, причину выбора, локальный snapshot/history и explain mode без изменения pipeline-логики |
+| Quality & Evaluation Framework | V1 production | read-only слой после Decision Intelligence: детерминированно оценивает уже сформированный ответ по answer/context/tool/decision/action/personalization/conversation/hallucination/confidence, хранит локальный snapshot/history и показывает dev-блок Evaluation |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
@@ -217,6 +228,8 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Decision Intelligence v1 не выбирает новые данные и не исполняет действия: слой только анализирует уже готовый ответ после Knowledge/Reasoning/Conversation/Journey/Memory/Planner/Workflow/Agent/Tool/Action Center и сохраняет локальный `decisionContext`.
 - Decision History хранится только локально в Loki memory как `lastDecisionContext`/`decisionSnapshot`/`decisionHistory`; Firestore, backend, API, Security Rules и business logic не меняются.
 - Explain Mode для вопроса “Почему ты это предложил?” использует последний локальный decision snapshot и не вызывает новые tools, backend или Firestore.
+- Quality & Evaluation Framework v1 не вызывает LLM, tools, backend, API или Firestore: слой только читает уже готовые `result/context/trace`, добавляет `evaluationContext`, `evaluationMetrics`, `evaluationSnapshot` и локальную `evaluationHistory` на 100 записей.
+- Evaluation не меняет `text`, `cards`, `actions`, business logic или Decision outcome; UI-блок `Evaluation` отображает только локальные диагностические поля.
 - Planner v1 не вызывает backend, Firestore или API напрямую; он строит план, валидирует tool-шаги и исполняет только read-only tools из `ToolRegistry`.
 - План сохраняется только локально в Loki memory как `lastPlanContext`/`planHistory`, чтобы debug и follow-up могли видеть цель, шаги, failed/completed и duration без серверной памяти.
 - Workflow Engine v1 не содержит бизнес-логики и не создаёт новые действия: workflow-декларации описывают шаги, tool-шаги идут через существующий `ToolExecutor`, а шаги действий останавливают сценарий в `WAITING_USER`.

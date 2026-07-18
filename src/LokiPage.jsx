@@ -181,6 +181,48 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       ))}
     </GlassCard>
   );
+  const renderEvaluationBlock = () => {
+    const snapshot = loki.lastEvaluationSnapshot;
+    const evaluationHistory = Array.isArray(loki.lastEvaluationHistory) ? loki.lastEvaluationHistory : [];
+    if (!snapshot && !evaluationHistory.length) return null;
+    const rows = [
+      ['Overall Score', snapshot?.Overall],
+      ['Grade', snapshot?.Grade],
+      ['Confidence', snapshot?.Confidence],
+      ['Context Coverage', snapshot?.Context],
+      ['Hallucination', snapshot?.Hallucination],
+      ['Tool Quality', snapshot?.Tools],
+      ['Decision Quality', snapshot?.Decision],
+      ['Conversation Quality', snapshot?.Conversation],
+      ['Personalization', snapshot?.Personalization],
+    ];
+    return (
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Evaluation', evaluationHistory.length ? `${evaluationHistory.length} оценок` : '')}
+        <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 10, minWidth: 0 }}>
+                <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', fontWeight: 760 }}>{label}</div>
+                <div style={{ color: label === 'Grade' ? APG2_PROFILE.gold : APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 930, marginTop: 3 }}>{value ?? '—'}</div>
+              </div>
+            ))}
+          </div>
+          {!!evaluationHistory.length && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {evaluationHistory.slice(0, 5).map((item, idx) => (
+                <div key={item.evaluationId || `${item.createdAt}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '46px 42px 1fr', gap: 8, alignItems: 'center', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                  <span style={{ color: APG2_PROFILE.text, fontWeight: 900 }}>{item.overallScore}</span>
+                  <span style={{ color: APG2_PROFILE.gold, fontWeight: 900 }}>{item.grade}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.hallucination} · confidence {item.confidence}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </section>
+    );
+  };
   const renderContinueItem = (item) => (
     <button
       key={`${item.type}-${item.id}`}
@@ -317,6 +359,8 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
           {!!answer.cards?.length && <div style={{ display: 'grid', gap: 9, marginTop: 12 }}>{answer.cards.slice(0, 3).map(card => renderLokiCard(card, 'answer'))}</div>}
         </GlassCard>
       )}
+
+      {renderEvaluationBlock()}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
         <GlassButton onClick={onOpenReference}>Справочник</GlassButton>
