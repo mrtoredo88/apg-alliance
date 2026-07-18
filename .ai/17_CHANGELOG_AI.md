@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] feat: Loki Capability Execution Bridge v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/execution/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-execution-bridge-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен полностью read-only слой `src/loki/core/execution`: Capability Execution Bridge, Execution Resolver, Plan, Context, Registry, Validator, History, Snapshot и Explanation.
+- `SmartAnswerPipeline` теперь после Capability Engine строит `executionContext`/`executionSnapshot`, сопоставляя capability с существующими Planner goals, Workflow ids, Tool ids, Navigation routes и Action Center actions без выполнения действий.
+- `LokiProvider` хранит `lastExecutionContext`, `lastExecutionSnapshot` и последние 100 локальных execution-записей; `LokiPage` показывает dev-блок Execution.
+- Добавлен `npm run test:loki-execution`: 300 сценариев проверяют registry coverage, missing parameters, multiple capability, impossible execution, successful routes, explain mode, history, trace, UI/provider integration и read-only контракт.
+**Почему:** после Capability Engine Локи должен понимать, какой существующей цепочкой приложения можно безопасно реализовать найденную возможность, не создавая новую бизнес-логику и не меняя ответы.
+
+---
+
 ## [2026-07-18] feat: Loki Capability Engine v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/capabilities/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-capability-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

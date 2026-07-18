@@ -263,6 +263,55 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </section>
     );
   };
+  const renderExecutionBlock = () => {
+    const snapshot = loki.lastExecutionSnapshot;
+    const executionContext = loki.lastExecutionContext;
+    const executionHistory = Array.isArray(loki.lastExecutionHistory) ? loki.lastExecutionHistory : [];
+    if (!snapshot && !executionContext && !executionHistory.length) return null;
+    const plan = snapshot?.ExecutionPlan || executionContext?.executionPlan?.order || executionContext?.executionOrder?.map?.(item => item.capability) || [];
+    const rows = [
+      ['Capability', snapshot?.Capability || executionContext?.capability],
+      ['Execution Plan', plan.join(' → ')],
+      ['Planner', snapshot?.Planner || executionContext?.planner],
+      ['Workflow', snapshot?.Workflow || executionContext?.workflow],
+      ['Navigation', snapshot?.Navigation || executionContext?.navigation?.screen],
+      ['Tools', (snapshot?.Tools || executionContext?.tools || []).join(', ')],
+      ['Resolved Parameters', Object.keys(snapshot?.ResolvedParameters || executionContext?.resolved || {}).join(', ')],
+      ['Missing Parameters', (snapshot?.Missing || executionContext?.missing || []).join(', ')],
+      ['Execution Ready', String(snapshot?.Ready ?? executionContext?.ready ?? false)],
+    ];
+    return (
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Execution', executionHistory.length ? `${executionHistory.length} записей` : '')}
+        <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: 8, alignItems: 'start', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                <span style={{ color: APG2_PROFILE.textMuted, fontWeight: 760 }}>{label}</span>
+                <span style={{ color: label === 'Execution Ready' ? ((value === 'true' || value === true) ? APG2_PROFILE.gold : APG2_PROFILE.textSoft) : label === 'Capability' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontWeight: label === 'Capability' || label === 'Execution Ready' ? 900 : 720, minWidth: 0, overflowWrap: 'anywhere' }}>{value || '—'}</span>
+              </div>
+            ))}
+          </div>
+          {executionContext?.clarificationQuestion && (
+            <div style={{ border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 10, color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '17px' }}>
+              <span style={{ color: APG2_PROFILE.textMuted, fontWeight: 760 }}>Clarification</span>
+              <div style={{ color: APG2_PROFILE.text, fontWeight: 820, marginTop: 4 }}>{executionContext.clarificationQuestion}</div>
+            </div>
+          )}
+          {!!executionHistory.length && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {executionHistory.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `${item.createdAt}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 58px', gap: 8, alignItems: 'center', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.capability} · {item.navigation || item.workflow || item.execution || '—'}</span>
+                  <span style={{ color: item.ready ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontWeight: 900, textAlign: 'right' }}>{item.ready ? 'ready' : 'wait'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </section>
+    );
+  };
   const renderContinueItem = (item) => (
     <button
       key={`${item.type}-${item.id}`}
@@ -401,6 +450,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       )}
 
       {renderCapabilityBlock()}
+      {renderExecutionBlock()}
       {renderEvaluationBlock()}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
