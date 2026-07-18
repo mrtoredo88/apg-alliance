@@ -30,6 +30,17 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Conversation Snapshot
         └── Conversation Validator
                     │
+        Capability Engine v1
+        ├── Capability Engine
+        ├── Capability Resolver
+        ├── Capability Registry
+        ├── Capability Matcher
+        ├── Capability Context
+        ├── Capability History
+        ├── Capability Snapshot
+        ├── Capability Explanation
+        └── Capability Validator
+                    │
            Journey Engine v1
         ├── Goal Detector
         ├── Journey Planner
@@ -189,6 +200,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Knowledge Provider | V1 production | агрегирует существующие partners/experts/locations/promotions/events/gifts/news/reviews/bookings/dialogs/workspace data без новых коллекций |
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
+| Capability Engine | V1 production | read-only слой после Reasoning/Conversation resolution: определяет функцию приложения (`BOOK_APPOINTMENT`, `OPEN_REWARDS`, `SEARCH_PROMOTIONS` и др.), параметры, missing values, alternatives и execution order без изменения ответов или downstream-движков |
 | Conversation Engine | V1 production | локальный слой после Reasoning: удерживает темы диалога, активные сущности, местоимения, порядковые ссылки и follow-up context перед Journey/Planner/Agent без Firestore/API |
 | Journey Engine | V1 production | read-only слой после Conversation: определяет цель пользователя, строит локальный путь, отслеживает прогресс и предлагает следующий action без backend/Firestore |
 | Personalization Engine | V1 production | read-only слой после Journey: строит пользовательский контекст из уже загруженного app state, динамически вычисляет предпочтения, адаптирует рекомендации и объясняет используемые данные |
@@ -225,6 +237,8 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Перед выполнением Action Center проверяет наличие объекта, публикацию/архив, доступность route handler и права actor.
 - Tool Calling v1 использует только уже загруженный `KnowledgeProvider` snapshot; tools не импортируют Firebase, не вызывают `fetch`, не создают API/backend действия и не меняют данные.
 - Tool Validator проверяет наличие tool, read-only контракт, роль пользователя и готовность контекста; denied/failed превращаются в безопасный Loki-ответ или совместимый fallback.
+- Capability Engine v1 не исполняет действия и не выбирает данные за пользователя: слой только читает question/intent/reasoning/conversation/context/memory/knowledge, добавляет `capabilityContext`/`capabilitySnapshot` и локальную `capabilityHistory` на 100 записей.
+- Capability Registry описывает возможности приложения декларативно: id, title, description, aliases, required/optional parameters, role, tools, screens, priority и category; Firestore, API, backend, Planner, Workflow, Agent, Tool Calling, Action Center, Decision и Evaluation не меняются.
 - Decision Intelligence v1 не выбирает новые данные и не исполняет действия: слой только анализирует уже готовый ответ после Knowledge/Reasoning/Conversation/Journey/Memory/Planner/Workflow/Agent/Tool/Action Center и сохраняет локальный `decisionContext`.
 - Decision History хранится только локально в Loki memory как `lastDecisionContext`/`decisionSnapshot`/`decisionHistory`; Firestore, backend, API, Security Rules и business logic не меняются.
 - Explain Mode для вопроса “Почему ты это предложил?” использует последний локальный decision snapshot и не вызывает новые tools, backend или Firestore.

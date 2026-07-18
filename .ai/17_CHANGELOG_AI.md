@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Capability Engine v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/capabilities/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-capability-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only слой `src/loki/core/capabilities`: Capability Engine, Resolver, Registry, Matcher, Context, History, Snapshot, Explanation и Validator.
+- `SmartAnswerPipeline` теперь после Reasoning/Conversation resolution определяет `capabilityContext` и передаёт его downstream через context/memory без изменения Planner, Workflow, Agent, Tool Calling, Action Center, Decision и Evaluation.
+- `LokiProvider` хранит `lastCapabilityContext`, `lastCapabilitySnapshot` и последние 100 локальных capability-записей; `LokiPage` показывает dev-блок Capability.
+- Добавлен `npm run test:loki-capability`: 300 сценариев проверяют single/multiple capability, ambiguous queries, missing parameters, explain mode, history, UI/provider integration и read-only контракт.
+**Почему:** Локи должен понимать не только intent вопроса, но и операционную возможность приложения АПГ, которую пользователь хочет задействовать, оставаясь полностью совместимым с текущей архитектурой.
+
+---
+
 ## [2026-07-18] feat: Loki Quality & Evaluation Framework v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/evaluation/*`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `src/LokiPage.jsx`, `scripts/loki-evaluation-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

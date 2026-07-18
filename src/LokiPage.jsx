@@ -223,6 +223,46 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
       </section>
     );
   };
+  const renderCapabilityBlock = () => {
+    const snapshot = loki.lastCapabilitySnapshot;
+    const capabilityContext = loki.lastCapabilityContext;
+    const capabilityHistory = Array.isArray(loki.lastCapabilityHistory) ? loki.lastCapabilityHistory : [];
+    if (!snapshot && !capabilityContext && !capabilityHistory.length) return null;
+    const rows = [
+      ['Detected Capability', snapshot?.DetectedCapability || capabilityContext?.capability],
+      ['Confidence', snapshot?.Confidence ?? capabilityContext?.confidence],
+      ['Alternatives', (snapshot?.Alternatives || capabilityContext?.alternatives?.map?.(item => item.id) || []).join(', ')],
+      ['Parameters', (snapshot?.Parameters || capabilityContext?.required || []).join(', ')],
+      ['Missing Parameters', (snapshot?.Missing || capabilityContext?.missing || []).join(', ')],
+      ['Related Tools', (snapshot?.RelatedTools || capabilityContext?.relatedTools || []).join(', ')],
+      ['Execution Order', (snapshot?.ExecutionOrder || capabilityContext?.executionOrder || []).map?.(item => item.capability || item).join(' → ')],
+    ];
+    return (
+      <section style={{ marginBottom: 14 }}>
+        {renderSectionTitle('Capability', capabilityHistory.length ? `${capabilityHistory.length} записей` : '')}
+        <GlassCard style={{ borderRadius: 28, padding: 15, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: 8, alignItems: 'start', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                <span style={{ color: APG2_PROFILE.textMuted, fontWeight: 760 }}>{label}</span>
+                <span style={{ color: label === 'Detected Capability' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontWeight: label === 'Detected Capability' ? 900 : 720, minWidth: 0, overflowWrap: 'anywhere' }}>{value || '—'}</span>
+              </div>
+            ))}
+          </div>
+          {!!capabilityHistory.length && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {capabilityHistory.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `${item.createdAt}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 46px', gap: 8, alignItems: 'center', color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.capability}</span>
+                  <span style={{ color: APG2_PROFILE.gold, fontWeight: 900, textAlign: 'right' }}>{item.confidence}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </section>
+    );
+  };
   const renderContinueItem = (item) => (
     <button
       key={`${item.type}-${item.id}`}
@@ -360,6 +400,7 @@ export function LokiPage({ onBack, onOpenReference, onOpenPanel }) {
         </GlassCard>
       )}
 
+      {renderCapabilityBlock()}
       {renderEvaluationBlock()}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>

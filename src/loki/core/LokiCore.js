@@ -209,6 +209,17 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
       source: knowledgeResult.conversationContext.source || 'local',
     });
   }
+  if (knowledgeResult?.capabilityContext) {
+    trace.push({
+      module: 'capabilityEngine',
+      ms: knowledgeResult.capabilityContext.durationMs ?? 0,
+      decision: knowledgeResult.capabilityContext.capability || 'empty',
+      confidence: knowledgeResult.capabilityContext.confidence,
+      alternatives: knowledgeResult.capabilityContext.alternatives?.length || 0,
+      missingParameters: knowledgeResult.capabilityContext.missing || [],
+      executionOrder: knowledgeResult.capabilityContext.executionOrder?.map?.(item => item.capability) || [],
+    });
+  }
   if (knowledgeResult?.planContext) {
     trace.push({ module: 'planner', ms: knowledgeResult.planContext.durationMs ?? 0, decision: knowledgeResult.planContext.goal || knowledgeResult.planContext.status || 'completed' });
   }
