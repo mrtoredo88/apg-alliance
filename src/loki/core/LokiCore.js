@@ -24,6 +24,7 @@ import { ScenarioRegistry } from './v2/ScenarioRegistry.js';
 import { LOKI_SCENARIOS } from './brain/lokiScenarios.js';
 import { buildLokiKnowledgeProvider } from './knowledge/KnowledgeProvider.js';
 import { runLokiKnowledgeEngine } from './knowledge/SmartAnswerPipeline.js';
+import { runPersonalizationEngine } from './personalization/PersonalizationEngine.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -127,8 +128,19 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const knowledgeResult = runLokiKnowledgeEngine({ text, appState, context });
   trace.push({ module: 'knowledgeEngine', ms: Math.round(nowMs() - knowledgeStart), decision: knowledgeResult?.intent ?? 'skipped' });
   if (knowledgeResult) {
-    const shaped = PersonalityEngine.shape({ result: knowledgeResult, context, selectedModule: { id: 'knowledgeEngine' } });
+    const personalizationStart = nowMs();
+    const personalized = runPersonalizationEngine({ question: text, result: knowledgeResult, context, appState });
+    trace.push({ module: 'personalizationEngine', ms: Math.round(nowMs() - personalizationStart), decision: personalized?.personalizationContext?.enabled ? 'applied' : 'skipped' });
+    const shaped = PersonalityEngine.shape({ result: personalized || knowledgeResult, context, selectedModule: { id: 'knowledgeEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'knowledgeEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
+  }
+
+  const personalOnlyStart = nowMs();
+  const personalOnly = runPersonalizationEngine({ question: text, result: null, context, appState });
+  trace.push({ module: 'personalizationEngine', ms: Math.round(nowMs() - personalOnlyStart), decision: personalOnly?.intent ?? 'skipped' });
+  if (personalOnly) {
+    const shaped = PersonalityEngine.shape({ result: personalOnly, context, selectedModule: { id: 'personalizationEngine' } });
+    return debug ? { ...shaped, debug: { provider, selectedModule: 'personalizationEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
   const v2Start = nowMs();

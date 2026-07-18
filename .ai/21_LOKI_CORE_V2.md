@@ -27,6 +27,13 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Progress Tracker
         └── Action Resolver
                     │
+        Personalization Engine v1
+        ├── User Context Builder
+        ├── User Profile Analyzer
+        ├── Preference Resolver
+        ├── Recommendation Adjuster
+        └── Explanation Builder
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -78,6 +85,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
 | Journey Engine | V1 production | read-only слой после Reasoning: определяет цель пользователя, строит локальный путь, отслеживает прогресс и предлагает следующий action без backend/Firestore |
+| Personalization Engine | V1 production | read-only слой после Journey: строит пользовательский контекст из уже загруженного app state, динамически вычисляет предпочтения, адаптирует рекомендации и объясняет используемые данные |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
@@ -109,10 +117,11 @@ npm run test:loki
 npm run test:loki-knowledge
 npm run test:loki-reasoning
 npm run test:loki-journey
+npm run test:loki-personalization
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев и 250 journey-сценариев: goal detection, planning, progress, recovery, completion, summary, suggestions и action resolution.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев и 300 personalization-сценариев: новый/опытный пользователь, роли, уровни, privacy explain, fallback, Journey + Personalization и отсутствие Firestore/API imports в новом слое.
 
 ## Следующие production-этапы
 

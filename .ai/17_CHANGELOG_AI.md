@@ -3497,6 +3497,16 @@
 - Fact intents (`contacts`, `hours`, `booking`, `profile`, `workspace`, `reviews`) сохранены: Journey перехватывает их только как follow-up внутри уже активного пути.
 - Добавлен regression-тест `scripts/loki-journey-engine-test.mjs` и команда `npm run test:loki-journey`: 250 сценариев покрывают goal detection, planning, progress tracking, recovery, completion, summary, suggestions, action resolution и совместимость с Knowledge/Reasoning.
 
+# 2026-07-18 — Loki Personalization Engine v1
+
+- Добавлен read-only слой `src/loki/core/personalization` после Journey и до Personality: `PersonalizationEngine`, `UserProfileAnalyzer`, `PreferenceResolver`, `RecommendationAdjuster`, `UserContextBuilder`, `ExplanationBuilder`.
+- Персонализация использует только уже загруженный `appState/context`: роль, город, уровень, ключи, избранное, записи, посещения, события, диалоги, отзывы и Workspace-state; Firestore, API, backend и Security Rules не менялись.
+- Preference Resolver динамически вычисляет частые категории, партнёров, экспертов, районы, время записи и интересы без записи новых данных и без долгосрочной памяти.
+- Recommendation Adjuster добавляет прозрачные персональные причины только при наличии фактов: избранное, предыдущие записи/посещения, доступные ключи, активный Journey и роль пользователя.
+- Добавлен privacy-режим `Что ты знаешь обо мне?`: Локи перечисляет только данные, реально используемые для рекомендаций, и не раскрывает скрытые поля.
+- Если персонального контекста недостаточно, слой автоматически отключается и оставляет обычный Journey/Reasoning ответ.
+- Добавлен regression-тест `scripts/loki-personalization-engine-test.mjs` и команда `npm run test:loki-personalization`: 300 сценариев покрывают новых/опытных пользователей, роли, уровни, privacy, fallback, Journey + Personalization и отсутствие Firestore/API imports.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.
