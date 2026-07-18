@@ -28,6 +28,7 @@ import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
 import { formatEventPrice, isPaidEvent } from './eventPrice.js';
 import { telegramShareUrl } from '../server-shared/telegram.js';
 import { getProfileLocations, normalizeLocationsForSave, normalizeLocationIds } from '../server-shared/locations.js';
+import { buildLokiQualityCenter, exportLokiQualityCsv } from './loki/analytics/index.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -7377,7 +7378,7 @@ export const AdminPanel = () => {
             { id: 'ai-import', emoji: '📥', label: 'ИИ-импорт', count: aiImportRequests.filter(item => item.status !== 'published' && item.status !== 'rejected').length || undefined },
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
             { id: 'loki-knowledge', emoji: '🧠', label: 'База знаний Локи', count: lokiKnowledge.length || undefined },
-            { id: 'loki-analytics', emoji: '📈', label: 'Аналитика Локи', count: lokiAnalytics.length || undefined },
+            { id: 'loki-analytics', emoji: '📈', label: 'AI Center: Loki Quality', count: lokiAnalytics.length || undefined },
             { id: 'diag',      emoji: '📡', label: 'Диагностика' },
           ].map(t => {
             const active = activeTab === t.id;
@@ -7923,43 +7924,41 @@ export const AdminPanel = () => {
       )}
 
       {activeTab === 'loki-analytics' && (() => {
-        const total = lokiAnalytics.length;
-        const unanswered = lokiAnalytics.filter(x => !x.success || x.intent === 'knowledge.unknown' || x.intent === 'partner.empty').length;
-        const byIntent = Object.entries(lokiAnalytics.reduce((acc, item) => {
-          const key = item.intent || 'unknown';
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
-        const byAction = Object.entries(lokiAnalytics.reduce((acc, item) => {
-          const key = item.actionType || 'без действия';
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
-        const unansweredQuestions = lokiAnalytics
-          .filter(x => !x.success || x.intent === 'knowledge.unknown' || x.intent === 'partner.empty')
-          .map(x => String(x.query || '').trim())
-          .filter(Boolean)
-          .slice(0, 12);
-        const popularQuestions = lokiAnalytics
-          .map(x => String(x.query || '').trim())
-          .filter(Boolean)
-          .reduce((acc, q) => ({ ...acc, [q]: (acc[q] || 0) + 1 }), {});
-        const topQuestions = Object.entries(popularQuestions).sort((a, b) => b[1] - a[1]).slice(0, 8);
-        const avgMs = total ? Math.round(lokiAnalytics.reduce((sum, x) => sum + Number(x.ms || 0), 0) / total) : 0;
+        const center = buildLokiQualityCenter(lokiAnalytics);
+        const q = center.quality;
+        const downloadQualityCsv = (kind) => {
+          const blob = new Blob(['﻿' + exportLokiQualityCsv(kind, center)], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `apg-loki-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+          link.click();
+          URL.revokeObjectURL(url);
+        };
+        const metricCards = [
+          ['Quality Score', `${q.qualityScore}%`, q.qualityScore >= 85 ? A.green : q.qualityScore >= 70 ? A.gold : A.red],
+          ['Intent Accuracy', `${q.intentAccuracy}%`, q.intentAccuracy >= 90 ? A.green : A.gold],
+          ['Fallback Rate', `${q.fallbackRate}%`, q.fallbackRate <= 5 ? A.green : q.fallbackRate <= 12 ? A.gold : A.red],
+          ['Journey Completion', center.journey.total ? `${q.journeyCompletion}%` : 'нет данных', center.journey.total ? A.green : A.textSec],
+          ['Proactive Accepted', center.proactive.shown ? `${q.proactiveAccepted}%` : 'нет данных', center.proactive.shown ? A.green : A.textSec],
+          ['Average Conversation', center.conversations.averageConversationMessages ? `${center.conversations.averageConversationMessages} сообщ.` : 'нет данных', A.text],
+        ];
+        const inspectorRows = center.conversations.rows.slice(0, 12);
         return (
-          <div>
+          <div style={{ display: 'grid', gap: 12 }}>
             <div style={s.card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <h2 style={{ ...s.h2, margin: 0, flex: 1 }}>📈 Аналитика Локи</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>📈 AI Center → Loki Quality</h2>
+                  <p style={{ margin: '6px 0 0', color: A.textSec, fontSize: 13 }}>Read-only оценка качества по существующим событиям Loki Analytics. Если поля ещё не пишутся, метрика явно показывает нехватку данных.</p>
+                </div>
                 <button style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }} onClick={loadLokiAnalytics}>{lokiAnalyticsLoading ? '⏳' : '↻ Обновить'}</button>
+                {['intents', 'quality', 'proactive', 'journeys'].map(kind => (
+                  <button key={kind} type="button" onClick={() => downloadQualityCsv(kind)} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>CSV {kind}</button>
+                ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10 }}>
-                {[
-                  ['Диалогов', total, A.gold],
-                  ['Без ответа', unanswered, unanswered ? A.red : A.green],
-                  ['Успешность', total ? `${Math.round((total - unanswered) / total * 100)}%` : '—', A.green],
-                  ['Средний ответ', avgMs ? `${avgMs} мс` : '—', A.text],
-                ].map(([label, value, color]) => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
+                {metricCards.map(([label, value, color]) => (
                   <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${A.border}`, borderRadius: 14, padding: 14 }}>
                     <div style={{ color, fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{value}</div>
                     <div style={{ color: A.textSec, fontSize: 11, marginTop: 6 }}>{label}</div>
@@ -7967,43 +7966,123 @@ export const AdminPanel = () => {
                 ))}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 860 ? '1fr' : '1fr 1fr', gap: 12 }}>
+
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 960 ? '1fr' : '1.15fr 0.85fr', gap: 12 }}>
               <div style={s.card}>
-                <h2 style={s.h2}>Популярные вопросы</h2>
-                {topQuestions.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : topQuestions.map(([q, count]) => (
-                  <div key={q} style={s.row}>
-                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{q}</span>
-                    <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
+                <h2 style={s.h2}>Insight Generator</h2>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {center.insights.map((item, i) => (
+                    <div key={i} style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(201,168,76,0.08)', border: `1px solid ${A.goldBrd}`, color: A.text, fontSize: 13, lineHeight: '18px' }}>{item}</div>
+                  ))}
+                </div>
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Data Coverage</h2>
+                {[
+                  ['Диалоги', center.conversations.dataCoverage.hasRows],
+                  ['Confidence', center.conversations.dataCoverage.hasConfidence],
+                  ['Session IDs', center.conversations.dataCoverage.hasSessionIds],
+                  ['Journey steps', center.conversations.dataCoverage.hasJourneySteps],
+                  ['Proactive events', center.proactive.hasEventData],
+                ].map(([label, ok]) => (
+                  <div key={label} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13 }}>{label}</span>
+                    <span style={{ color: ok ? A.green : A.textSec, fontWeight: 900 }}>{ok ? 'есть' : 'нет данных'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 960 ? '1fr' : '1fr 1fr', gap: 12 }}>
+              <div style={s.card}>
+                <h2 style={s.h2}>ТОП-50 вопросов</h2>
+                {center.intents.topQuestions.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : center.intents.topQuestions.slice(0, 12).map(row => (
+                  <div key={row.label} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{row.label}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{row.count}</span>
                   </div>
                 ))}
               </div>
               <div style={s.card}>
-                <h2 style={s.h2}>Интенты и действия</h2>
-                {byIntent.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : byIntent.map(([intent, count]) => (
-                  <div key={intent} style={s.row}>
-                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{intent}</span>
-                    <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
+                <h2 style={s.h2}>Intent Distribution</h2>
+                {center.intents.intents.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : center.intents.intents.slice(0, 12).map(row => (
+                  <div key={row.label} style={{ display: 'grid', gap: 5, marginBottom: 9 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{row.label}</span>
+                      <span style={{ color: A.gold, fontWeight: 900 }}>{row.percent}%</span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: `${row.percent}%`, height: '100%', background: A.gold, borderRadius: 999 }} />
+                    </div>
                   </div>
                 ))}
               </div>
+
               <div style={s.card}>
-                <h2 style={s.h2}>Переходы после рекомендаций</h2>
-                {byAction.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных пока нет.</p> : byAction.map(([action, count]) => (
-                  <div key={action} style={s.row}>
-                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{action}</span>
-                    <span style={{ color: A.gold, fontWeight: 900 }}>{count}</span>
+                <h2 style={s.h2}>Fallback Analytics</h2>
+                {center.fallback.reasons.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Критичных fallback-сигналов пока нет.</p> : center.fallback.reasons.map(row => (
+                  <div key={row.label} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{row.label}</span>
+                    <span style={{ color: A.red, fontWeight: 900 }}>{row.count}</span>
                   </div>
                 ))}
-              </div>
-              <div style={s.card}>
-                <h2 style={s.h2}>Непонятые вопросы</h2>
-                {unansweredQuestions.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Критичных пробелов пока нет.</p> : unansweredQuestions.map(q => (
-                  <button key={q} onClick={() => { setActiveTab('loki-knowledge'); setLkQuestion(q); setLkTitle(q.slice(0, 80)); }} style={{ ...s.row, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
-                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{q}</span>
+                {center.fallback.questions.slice(0, 8).map(row => (
+                  <button key={row.id} onClick={() => { setActiveTab('loki-knowledge'); setLkQuestion(row.query); setLkTitle(row.query.slice(0, 80)); }} style={{ ...s.row, width: '100%', textAlign: 'left', cursor: 'pointer', marginTop: 6 }}>
+                    <span style={{ color: A.textSec, fontSize: 12, lineHeight: '17px', flex: 1 }}>{row.query}</span>
                     <span style={{ color: A.gold, fontSize: 11, fontWeight: 800 }}>добавить ответ</span>
                   </button>
                 ))}
               </div>
+
+              <div style={s.card}>
+                <h2 style={s.h2}>Recommendation Analytics</h2>
+                {center.recommendations.byAction.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Данных о действиях пока нет.</p> : center.recommendations.byAction.slice(0, 10).map(row => (
+                  <div key={row.label} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{row.label}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{row.acceptedRate}%</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={s.card}>
+                <h2 style={s.h2}>Journey Heat Map</h2>
+                {center.journey.total === 0 && <p style={{ color: A.textSec, fontSize: 14 }}>Данных по Journey пока нет.</p>}
+                {center.journey.heatMap.map(row => (
+                  <div key={row.step} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 42px', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ color: A.textSec, fontSize: 12 }}>{row.step}</span>
+                    <div style={{ height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(row.percent, row.count ? 8 : 0)}%`, height: '100%', background: row.count ? A.gold : 'transparent', borderRadius: 999 }} />
+                    </div>
+                    <span style={{ color: A.text, fontSize: 12, fontWeight: 800 }}>{row.count}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={s.card}>
+                <h2 style={s.h2}>Proactive Analytics</h2>
+                {center.proactive.byOpportunity.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Событий proactive в admin-данных пока нет. Локальная история пользователей не выгружается в Firestore.</p> : center.proactive.byOpportunity.slice(0, 10).map(row => (
+                  <div key={row.label} style={{ ...s.row, alignItems: 'flex-start' }}>
+                    <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{row.label}</span>
+                    <span style={{ color: A.textSec, fontSize: 12 }}>shown {row.shown} · accepted {row.accepted} · dismissed {row.dismissed} · expired {row.expired}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={s.card}>
+              <h2 style={s.h2}>Session Inspector</h2>
+              {inspectorRows.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Диалогов пока нет.</p> : inspectorRows.map(row => (
+                <div key={row.id} style={{ border: `1px solid ${A.border}`, borderRadius: 14, padding: 12, marginBottom: 8, background: 'rgba(255,255,255,0.03)' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {['Intent', 'Knowledge', 'Reasoning', 'Journey', 'Personalization', 'Proactive', 'Personality'].map(stage => {
+                      const active = stage === 'Intent' || (stage === 'Journey' && row.intent.startsWith('journey.')) || (stage === 'Reasoning' && row.intent.startsWith('reasoning.')) || (stage === 'Proactive' && row.intent.startsWith('proactive.')) || stage === 'Personality';
+                      return <span key={stage} style={{ padding: '4px 8px', borderRadius: 999, fontSize: 11, color: active ? A.gold : A.textSec, background: active ? A.goldDim : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? A.goldBrd : A.border}` }}>{stage}</span>;
+                    })}
+                  </div>
+                  <div style={{ color: A.text, fontSize: 13, fontWeight: 800 }}>{row.query || 'Без текста вопроса'}</div>
+                  <div style={{ color: A.textSec, fontSize: 12, marginTop: 5 }}>intent: {row.intent} · source: {row.source} · panel: {row.panel} · action: {row.actionType || 'нет'} · {row.ms} мс</div>
+                </div>
+              ))}
             </div>
           </div>
         );

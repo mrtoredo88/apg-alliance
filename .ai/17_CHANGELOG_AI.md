@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-18] feat: Loki Observability & Quality Center v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/analytics/*`, `src/AdminPanel.jsx`, `scripts/loki-observability-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only слой `src/loki/analytics`: Conversation, Intent, Fallback, Journey, Recommendation, Proactive analytics, Quality Score и Insight Generator.
+- В админке существующая вкладка `loki-analytics` превращена в `AI Center → Loki Quality` с KPI, intent distribution, fallback reasons, journey heat map, proactive lifecycle, session inspector и CSV export.
+- Добавлен `npm run test:loki-observability`: 500 сценариев проверяют KPI, intent/fallback/proactive/journey analytics, quality score, export, empty state и отсутствие Firestore/API/fetch в analytics-слое.
+**Почему:** после Knowledge, Reasoning, Journey, Personalization и Proactive Локи нужно не “усложнять”, а измерять качество его работы по уже существующим событиям без изменения AI pipeline и бизнес-логики.
+
+---
+
 ## [2026-07-18] feat: Loki Proactive Assistant v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/proactive/*`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `scripts/loki-proactive-engine-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
