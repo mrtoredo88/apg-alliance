@@ -785,7 +785,12 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       clearTimeout(thinkingTimer);
       setBrainThinking(false);
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
-      if (result.personalityPhraseId) updateMemory({ personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }), conversationCount: Number(memory.conversationCount || 0) + 1, lastSeenAt: new Date().toISOString() });
+      if (result.reasoningContext || result.personalityPhraseId) updateMemory({
+        ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
+        ...(result.personalityPhraseId ? { personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) } : {}),
+        conversationCount: Number(memory.conversationCount || 0) + 1,
+        lastSeenAt: new Date().toISOString(),
+      });
       if (result.executeAction) {
         setMessage('Показываю.');
         await executeAction(result.executeAction);
@@ -848,6 +853,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         lastConversation: { userText: text, answer: result.text, action: result.executeAction ?? result.autoAction ?? result.card?.action ?? null },
         lastPanel: activePanel,
         inDialog: true,
+        ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         personalityHistory: result.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) : memory.personalityHistory,
         conversationCount: Number(memory.conversationCount || 0) + 1,
         lastSeenAt: new Date().toISOString(),

@@ -3479,6 +3479,15 @@
 - Добавлен `SmartAnswerPipeline`: перед старым набором Loki-модулей Локи сначала пытается ответить из локальных данных АПГ, а существующий Loki Core V2 остаётся fallback для навигации, сценариев, хроник и personality layer.
 - Добавлен regression-тест `scripts/loki-knowledge-engine-test.mjs` и команда `npm run test:loki-knowledge`: покрыто 100 пользовательских вопросов, 97 отвечаются из данных АПГ без ответа “не знаю”.
 
+# 2026-07-18 — Loki Reasoning Engine v1
+
+- Добавлен read-only слой `src/loki/core/reasoning` между Knowledge Provider и существующим Smart Answer / Personality pipeline: `ReasoningEngine`, `RankingEngine`, `ContextResolver`, `AnswerComposer`, `ConfidenceCalculator`, `SuggestionEngine`.
+- Локи теперь не выводит длинные списки найденных объектов, а ранжирует 3–5 лучших вариантов по уже загруженным данным: совпадение с запросом, расстояние, рейтинг, отзывы, график, онлайн-запись, акции, свежесть и пользовательские предпочтения.
+- Добавлен локальный follow-up контекст без Firestore: вопросы вроде `Какая работает до 22?` и `Почему именно этот?` используют предыдущую рекомендацию, не перезапуская общий поиск.
+- Ответы получили confidence, объяснение выбора и 1–3 следующих действия через существующие `LokiAction` deeplink-команды, без новых API и без изменения бизнес-логики.
+- `SmartAnswerPipeline` подключает reasoning только поверх уже построенного `KnowledgeProvider`; фактические ответы о контактах, записи, Workspace, профиле и отзывах сохранены.
+- Добавлен regression-тест `scripts/loki-reasoning-engine-test.mjs` и команда `npm run test:loki-reasoning`: 200 сценариев покрывают ранжирование, объяснения, confidence, follow-up, suggestions, антисписки и недостаток данных.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

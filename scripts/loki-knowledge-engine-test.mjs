@@ -118,7 +118,10 @@ const directCases = [
 
 for (const [query, expectedIntent] of directCases) {
   const result = runLokiKnowledgeEngine({ text: query, appState });
-  assert.equal(result?.intent, expectedIntent, query);
+  const expected = expectedIntent.startsWith('search.') || expectedIntent === 'news.question'
+    ? `reasoning.${expectedIntent}`
+    : expectedIntent;
+  assert.equal(result?.intent, expected, query);
   assert.ok(result.text, query);
 }
 

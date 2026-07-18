@@ -13,6 +13,13 @@ Loki Core V2 внедрён как совместимый архитектурн
                     │
        Knowledge Provider + Intent Router
                     │
+          Reasoning Engine v1
+        ├── Ranking Engine
+        ├── Context Resolver
+        ├── Confidence Calculator
+        ├── Suggestion Engine
+        └── Answer Composer
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -62,6 +69,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Brain / Intent | production, совместимый | эвристический semantic scoring, без внешней LLM по умолчанию |
 | Knowledge Provider | V1 production | агрегирует существующие partners/experts/locations/promotions/events/gifts/news/reviews/bookings/dialogs/workspace data без новых коллекций |
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
+| Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
@@ -91,10 +99,11 @@ Loki Core V2 внедрён как совместимый архитектурн
 ```bash
 npm run test:loki
 npm run test:loki-knowledge
+npm run test:loki-reasoning
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner и 100 knowledge-вопросов по данным АПГ.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ и 200 reasoning-сценариев: ранжирование, confidence, follow-up вопросы, объяснение выбора, suggestions и антисписки до 3–5 вариантов.
 
 ## Следующие production-этапы
 

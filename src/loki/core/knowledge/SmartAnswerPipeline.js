@@ -2,6 +2,7 @@ import { LOKI_APP_ACTIONS, createLokiAction } from '../../lokiActionTypes.js';
 import { normalizeText, titleOf } from '../lokiCoreUtils.js';
 import { detectLokiIntent, intentNeedsLocalAnswer } from '../intent/IntentRouter.js';
 import { buildLokiKnowledgeProvider, makeKnowledgeResultCard, searchKnowledge } from './KnowledgeProvider.js';
+import { runReasoningEngine } from '../reasoning/ReasoningEngine.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -220,10 +221,27 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   const sourceState = context?.appState || appState?.appState || appState;
   const knowledge = buildLokiKnowledgeProvider({ ...sourceState, activeContext: context?.memory?.activeContext || sourceState.activeContext });
   const intent = detectLokiIntent(question, knowledge);
+  const contextReasoning = runReasoningEngine({ question, intent, knowledge, context });
+  if (contextReasoning?.reasoningHandled) return contextReasoning;
+  if (contextReasoning?.reasoningContext?.source === 'memory') return contextReasoning;
   if (!intentNeedsLocalAnswer(intent)) {
+    if (contextReasoning) return contextReasoning;
     const fallbackRows = searchKnowledge(knowledge, intent.query || question, [], 4);
-    if (fallbackRows.length) return answerSearch({ intent: { ...intent, id: 'knowledge.search', types: [], query: intent.query || question }, knowledge });
+    if (fallbackRows.length) {
+      const fallbackIntent = { ...intent, id: 'knowledge.search', types: [], query: intent.query || question };
+      const reasoned = runReasoningEngine({ question, intent: fallbackIntent, knowledge, context });
+      return reasoned || answerSearch({ intent: fallbackIntent, knowledge });
+    }
     return null;
+  }
+
+  if (intent.id.startsWith('search.') || intent.id === 'news.question') {
+    const reasoned = runReasoningEngine({ question, intent, knowledge, context });
+    return reasoned || answerSearch({ intent, knowledge });
+  }
+  if (intent.id === 'context.card') {
+    const reasoned = runReasoningEngine({ question, intent, knowledge, context });
+    if (reasoned) return reasoned;
   }
 
   if (intent.id === 'info.hours') return answerHours({ intent, knowledge });
@@ -233,6 +251,5 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   if (intent.id === 'workspace.question') return answerWorkspace({ knowledge });
   if (intent.id === 'reviews.question') return answerReviews({ knowledge });
   if (intent.id === 'context.card') return answerContext({ intent, knowledge });
-  if (intent.id.startsWith('search.') || intent.id === 'news.question') return answerSearch({ intent, knowledge });
   return null;
 }
