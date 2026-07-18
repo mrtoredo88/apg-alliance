@@ -119,6 +119,16 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Action Executor
         └── Action History
                     │
+        Decision Intelligence v1
+        ├── Decision Engine
+        ├── Decision Trace
+        ├── Decision Resolver
+        ├── Decision Scorer
+        ├── Decision Explanation
+        ├── Decision History
+        ├── Decision Snapshot
+        └── Decision Validator
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -180,6 +190,7 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Agent Mode | V1 production | тонкий orchestration layer поверх Planner/Workflow/Tool/Action: выбирает RESPOND/RUN_TOOL/START_WORKFLOW/CONTINUE_WORKFLOW/ASK_CONFIRMATION/WAIT_USER/FINISH, хранит локальную Agent Session и требует подтверждение перед потенциально изменяющими действиями |
 | Tool Calling | V1 production | read-only internal tool layer поверх Knowledge snapshot: user/promotions/events/meetings/gifts/news/workspace/search tools, TTL cache, local Tool History и observability events без LLM tool calling |
 | Action Center | V1 production | client-only слой поверх существующих действий приложения: registry, resolver, validator, executor, local history и action-кнопки в ответах Локи без новых API/Firestore |
+| Decision Intelligence | V1 production | read-only слой после Action Center: фиксирует итоговое решение ответа, confidence, trace участвующих движков, альтернативы, причину выбора, локальный snapshot/history и explain mode без изменения pipeline-логики |
 | Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
@@ -203,6 +214,9 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Перед выполнением Action Center проверяет наличие объекта, публикацию/архив, доступность route handler и права actor.
 - Tool Calling v1 использует только уже загруженный `KnowledgeProvider` snapshot; tools не импортируют Firebase, не вызывают `fetch`, не создают API/backend действия и не меняют данные.
 - Tool Validator проверяет наличие tool, read-only контракт, роль пользователя и готовность контекста; denied/failed превращаются в безопасный Loki-ответ или совместимый fallback.
+- Decision Intelligence v1 не выбирает новые данные и не исполняет действия: слой только анализирует уже готовый ответ после Knowledge/Reasoning/Conversation/Journey/Memory/Planner/Workflow/Agent/Tool/Action Center и сохраняет локальный `decisionContext`.
+- Decision History хранится только локально в Loki memory как `lastDecisionContext`/`decisionSnapshot`/`decisionHistory`; Firestore, backend, API, Security Rules и business logic не меняются.
+- Explain Mode для вопроса “Почему ты это предложил?” использует последний локальный decision snapshot и не вызывает новые tools, backend или Firestore.
 - Planner v1 не вызывает backend, Firestore или API напрямую; он строит план, валидирует tool-шаги и исполняет только read-only tools из `ToolRegistry`.
 - План сохраняется только локально в Loki memory как `lastPlanContext`/`planHistory`, чтобы debug и follow-up могли видеть цель, шаги, failed/completed и duration без серверной памяти.
 - Workflow Engine v1 не содержит бизнес-логики и не создаёт новые действия: workflow-декларации описывают шаги, tool-шаги идут через существующий `ToolExecutor`, а шаги действий останавливают сценарий в `WAITING_USER`.

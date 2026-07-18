@@ -27,6 +27,7 @@ import { runLokiKnowledgeEngine } from './knowledge/SmartAnswerPipeline.js';
 import { runPersonalizationEngine } from './personalization/PersonalizationEngine.js';
 import { runProactiveAnswer } from './proactive/ProactiveEngine.js';
 import { runLokiActionCenter } from './actions/ActionCenter.js';
+import { runLokiDecisionEngine } from './decision/index.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -113,6 +114,31 @@ function applyActions(result, context, appState) {
   return runLokiActionCenter({ result, context, appState });
 }
 
+function applyDecision({ question, result, context }) {
+  if (!result) return result;
+  return {
+    ...result,
+    decisionContext: runLokiDecisionEngine({ question, result, context }),
+  };
+}
+
+function pushDecisionTrace(trace, decisionContext) {
+  if (!decisionContext?.decisionId) return;
+  trace.push({
+    module: 'decisionIntelligence',
+    ms: decisionContext.duration ?? 0,
+    decision: decisionContext.status || 'completed',
+    decisionId: decisionContext.decisionId,
+    intent: decisionContext.intent,
+    goal: decisionContext.goal,
+    confidence: decisionContext.confidence,
+    level: decisionContext.level,
+    engines: decisionContext.trace?.engines || [],
+    alternatives: decisionContext.alternatives?.length || 0,
+    reason: decisionContext.reason,
+  });
+}
+
 export async function askLokiCore({ text, appState, memory, userMemory, history = [], debug = false }) {
   const start = nowMs();
   const query = normalizeText(text);
@@ -123,8 +149,11 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   trace.push({ module: MemoryEngine.id, ms: Math.round(nowMs() - contextStart), decision: 'context_enriched' });
 
   if (!query) {
+    const actionReady = applyActions({ intent: 'empty.query', text: 'Спроси меня про места, мероприятия, акции, ключи или новости АПГ.', card: null, cards: [] }, context, appState);
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
     const result = PersonalityEngine.shape({
-      result: applyActions({ text: 'Спроси меня про места, мероприятия, акции, ключи или новости АПГ.', card: null, cards: [] }, context, appState),
+      result: decisionReady,
       context,
     });
     return debug ? { ...result, debug: { provider, totalMs: Math.round(nowMs() - start), trace } } : result;
@@ -184,7 +213,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
     trace.push({ module: 'personalizationEngine', ms: Math.round(nowMs() - personalizationStart), decision: personalized?.personalizationContext?.enabled ? 'applied' : 'skipped' });
     const actionReady = applyActions(personalized || knowledgeResult, context, appState);
     trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
-    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'knowledgeEngine' } });
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
+    const shaped = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: { id: 'knowledgeEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'knowledgeEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -194,7 +225,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (personalOnly) {
     const actionReady = applyActions(personalOnly, context, appState);
     trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
-    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'personalizationEngine' } });
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
+    const shaped = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: { id: 'personalizationEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'personalizationEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -204,7 +237,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (proactiveAnswer) {
     const actionReady = applyActions(proactiveAnswer, context, appState);
     trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
-    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'proactiveEngine' } });
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
+    const shaped = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: { id: 'proactiveEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'proactiveEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -215,8 +250,10 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
     const reasoned = Reasoner.combine({ query, context });
     const actionReady = applyActions({ ...v2Resolution.result, evidence: v2Resolution.result.evidence ?? reasoned.evidence }, context, appState);
     trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
     const shaped = PersonalityEngine.shape({
-      result: actionReady,
+      result: decisionReady,
       context,
       selectedModule: v2Resolution.module,
     });
@@ -243,7 +280,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (intelligenceResult) {
     const actionReady = applyActions(intelligenceResult, context, appState);
     trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
-    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'lokiIntelligence' } });
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
+    const shaped = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: { id: 'lokiIntelligence' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'lokiIntelligence', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
@@ -253,7 +292,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (brainResult) {
     const actionReady = applyActions(brainResult, context, appState);
     trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
-    const shaped = PersonalityEngine.shape({ result: actionReady, context, selectedModule: { id: 'brainLayer' } });
+    const decisionReady = applyDecision({ question: text, result: actionReady, context });
+    pushDecisionTrace(trace, decisionReady.decisionContext);
+    const shaped = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: { id: 'brainLayer' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'brainLayer', totalMs: Math.round(nowMs() - start), trace, brain: brainResult.debugBrain ?? brainResult.brain } } : shaped;
   }
 
@@ -278,7 +319,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const personalityStart = nowMs();
   const actionReady = applyActions(rawResult ?? emptyResult(), context, appState);
   trace.push({ module: 'actionCenter', ms: 0, decision: actionReady?.actionCenter?.suggested?.length ? 'suggested' : 'empty' });
-  const result = PersonalityEngine.shape({ result: actionReady, context, selectedModule: selected });
+  const decisionReady = applyDecision({ question: text, result: actionReady, context });
+  pushDecisionTrace(trace, decisionReady.decisionContext);
+  const result = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: selected });
   trace.push({ module: PersonalityEngine.id, ms: Math.round(nowMs() - personalityStart), decision: result.tone });
   return debug ? { ...result, debug: { provider, selectedModule: selected?.id ?? null, totalMs: Math.round(nowMs() - start), trace } } : result;
 }

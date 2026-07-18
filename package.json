@@ -23,6 +23,7 @@
     "test:loki-workflow": "node scripts/loki-workflow-test.mjs",
     "test:loki-agent": "node scripts/loki-agent-test.mjs",
     "test:loki-conversation": "node scripts/loki-conversation-test.mjs",
+    "test:loki-decision": "node scripts/loki-decision-test.mjs",
     "test:loki-personalization": "node scripts/loki-personalization-engine-test.mjs",
     "test:loki-proactive": "node scripts/loki-proactive-engine-test.mjs",
     "test:loki-observability": "node scripts/loki-observability-test.mjs",

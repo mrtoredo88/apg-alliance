@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Decision Intelligence v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/decision/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-decision-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only слой `src/loki/core/decision`: Decision Engine, Trace, Resolver, Scorer, Explanation, History, Snapshot и Validator.
+- Loki pipeline теперь прикрепляет к ответу `decisionContext` после Action Center: цель, intent, conversation/memory/planner/workflow/agent/tool/action trace, confidence, reason, alternatives и локальные events.
+- Включён Explain Mode: вопрос “Почему ты это предложил?” использует последний локальный `decisionSnapshot` без новых запросов и без изменения поведения остальных движков.
+- Добавлен `npm run test:loki-decision`: 2000 сценариев проверяют trace, alternatives, confidence, explain mode, history/snapshot, debug trace и read-only контракт.
+**Почему:** после Conversation Engine Локи должен не только действовать, но и уметь прозрачно объяснять, почему был выбран конкретный ответ или действие, не меняя backend, Firestore, API, Planner, Workflow, Agent, Tool Calling и бизнес-логику.
+
+---
+
 ## [2026-07-18] feat: Loki Conversation Engine v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/conversation/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-conversation-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
