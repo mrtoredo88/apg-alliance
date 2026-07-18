@@ -1020,6 +1020,7 @@ export function ArticleView({
   user,
   onToast,
   onOpenLoki,
+  onAskQuestion,
   desktopMode = false,
 }) {
   const loki = useLoki();
@@ -1165,8 +1166,9 @@ export function ArticleView({
       { id: 'share', icon: '↗', label: 'Поделиться', tone: 'gold', onClick: async () => { await shareNewsItem(item, onToast); trackShare('top'); } },
       saved ? { id: 'saved', icon: '★', label: 'Сохранено', onClick: () => onSave?.(item) } : { id: 'save', icon: '☆', label: 'Сохранить', onClick: () => onSave?.(item) },
       later ? { id: 'later', icon: '⏰', label: 'В отложенных', onClick: () => onReadLater?.(item) } : { id: 'add-later', icon: '🕒', label: 'В отложенные', onClick: () => onReadLater?.(item) },
+      onAskQuestion && !commentsDisabledByFlag ? { id: 'message', icon: '💬', label: 'Написать', onClick: () => onAskQuestion(item) } : null,
       { id: 'loki', icon: '🤖', label: 'Loki', onClick: openLokiForArticle },
-    ];
+    ].filter(Boolean);
     const stickyActions = [
       { id: 'close', icon: '✕', label: 'Закрыть', tone: 'gold', onClick: onClose },
       { id: 'question', icon: '💬', label: 'Коммент.', onClick: () => setDesktopTab('comments'), disabled: commentsDisabledByFlag },
@@ -1413,6 +1415,18 @@ export function ArticleView({
             <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
           </div>
 
+          {onAskQuestion && !commentsDisabledByFlag && (
+            <div style={{ padding: '12px 14px 0' }}>
+              <GlassCard style={{ borderRadius: 28, padding: 14, display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 900 }}>Обсудить публикацию</div>
+                  <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 3 }}>Откроется диалог с контекстом этой новости.</div>
+                </div>
+                <GlassButton onClick={() => onAskQuestion(item)} tone="gold" style={{ minHeight: 38, borderRadius: 17, color: '#17120a' }}>Написать</GlassButton>
+              </GlassCard>
+            </div>
+          )}
+
           {/* ── feedback ── */}
           <div style={{ padding: '12px 14px 0' }}>
             <GlassCard style={{ borderRadius: 28, padding: 16 }}>
@@ -1522,6 +1536,7 @@ export function NewsPage({
   onRefresh,
   onToast,
   onOpenLoki,
+  onAskQuestion,
   initialNewsTarget = null,
   desktopOverview = null,
   desktopMode = false,
@@ -1655,6 +1670,7 @@ export function NewsPage({
       onSubscribe={onSubscribe}
       onToast={onToast}
       onOpenLoki={onOpenLoki}
+      onAskQuestion={onAskQuestion}
       desktopMode={desktopMode}
       saved={savedSet.has(selectedId)}
       later={laterSet.has(selectedId)}

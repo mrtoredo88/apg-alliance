@@ -56,6 +56,18 @@ assert.equal(promoContext.title, 'Кофе + десерт');
 assert.equal(promoContext.partnerId, 'p1');
 assert.equal(promoContext.promotionId, 'p1');
 
+const newsContext = buildDialogContext('news', {
+  id: 'n1',
+  title: 'Новые партнёры недели',
+  categoryLabel: 'Новости АПГ',
+  source: 'apg',
+});
+assert.equal(newsContext.type, 'news');
+assert.equal(newsContext.objectId, 'n1');
+assert.equal(newsContext.newsId, 'n1');
+assert.equal(buildDialogNotificationTitle(newsContext), '📰 Новые партнёры недели');
+assert.equal(buildDialogNotificationBody(newsContext), 'Новое сообщение по публикации.');
+
 assert.equal(buildDialogAutoAnswer(partnerContext, 'До скольки работаете?'), 'По данным карточки: 09:00-22:00.');
 assert.equal(buildDialogAutoAnswer(partnerContext, 'Как добраться?'), 'Адрес из карточки: Зеленоград.');
 assert.equal(buildDialogAutoAnswer(partnerContext, 'Можно с ребенком?'), null);

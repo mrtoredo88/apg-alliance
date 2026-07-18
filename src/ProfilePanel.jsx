@@ -331,7 +331,7 @@ const DesktopBookingRow = memo(function DesktopBookingRow({ item, onDialog, onRe
         <span style={{ borderRadius: 999, background: active ? 'rgba(46,179,107,0.12)' : completed ? 'rgba(200,155,60,0.13)' : 'rgba(31,26,20,0.06)', color: active ? DP.green : completed ? DP.gold : DP.soft, border: `1px solid ${active ? 'rgba(46,179,107,0.28)' : completed ? 'rgba(200,155,60,0.24)' : DP.border}`, padding: '4px 8px', fontSize: 11, lineHeight: '14px', fontWeight: 850, whiteSpace: 'nowrap' }}>{item?.statusLabel || 'Запись'}</span>
       </div>
       <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-        {item?.dialogId && <button onClick={() => onDialog?.(item.dialogId)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Диалог</button>}
+        <button onClick={() => onDialog?.(item)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Написать</button>
         {active && <button onClick={() => onReschedule?.(item)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Перенести</button>}
         {active && <button onClick={() => onCancel?.(item)} style={dpButton('light', { minHeight: 30, padding: '5px 8px', fontSize: 12, color: DP.red })}>Отменить</button>}
         {completed && (item?.journey?.reviewPromptAvailable || item?.reviewPromptAvailable) && !item?.journey?.reviewPublishedAt && <button onClick={() => onReview?.(item)} style={dpButton('primary', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Отзыв</button>}
@@ -618,7 +618,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingReview, desktopOverview = null, desktopMode = false, onBack }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, desktopOverview = null, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -1251,7 +1251,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     <DesktopEmpty title="Записей пока нет" text="Когда вы запишетесь к партнёру или эксперту, ближайшие встречи появятся здесь." />
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10 }}>
-                      {activeBookings.map(item => <DesktopBookingRow key={item.id || item.bookingId} item={item} onDialog={onOpenDialog} onReschedule={handleDesktopReschedule} onCancel={handleDesktopCancel} onReview={onOpenBookingReview} />)}
+                      {activeBookings.map(item => <DesktopBookingRow key={item.id || item.bookingId} item={item} onDialog={onOpenBookingDialog || onOpenDialog} onReschedule={handleDesktopReschedule} onCancel={handleDesktopCancel} onReview={onOpenBookingReview} />)}
                     </div>
                   )}
                 </DesktopSection>
@@ -1637,8 +1637,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     >
                       <button
                         type="button"
-                        onClick={() => item.dialogId ? onOpenDialog?.(item.dialogId) : null}
-                        style={{ border: 0, background: 'transparent', padding: 0, color: APG2.text, textAlign: 'left', fontFamily: 'inherit', cursor: item.dialogId ? 'pointer' : 'default', display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}
+                        onClick={() => (onOpenBookingDialog || onOpenDialog)?.(item)}
+                        style={{ border: 0, background: 'transparent', padding: 0, color: APG2.text, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}
                       >
                         <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.providerName || 'Запись АПГ'}</span>
@@ -1649,7 +1649,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                       </button>
                       {item.isActive && (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {item.dialogId && <GlassButton onClick={() => onOpenDialog?.(item.dialogId)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Диалог</GlassButton>}
+                          <GlassButton onClick={() => (onOpenBookingDialog || onOpenDialog)?.(item)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Написать</GlassButton>
                           <GlassButton onClick={() => {
                             const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
                             if (!startAt) return;
@@ -1668,7 +1668,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                       {item.status === 'completed' && (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {(item.journey?.reviewPromptAvailable || item.reviewPromptAvailable) && !item.journey?.reviewPublishedAt && <GlassButton tone="gold" onClick={() => onOpenBookingReview?.(item)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12, color: '#17120a' }}>Оставить отзыв</GlassButton>}
-                          {item.dialogId && <GlassButton onClick={() => onOpenDialog?.(item.dialogId)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Диалог встречи</GlassButton>}
+                          <GlassButton onClick={() => (onOpenBookingDialog || onOpenDialog)?.(item)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Написать</GlassButton>
                         </div>
                       )}
                     </div>

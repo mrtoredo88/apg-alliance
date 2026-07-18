@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] feat: APG Messaging v2 Start Conversations
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/context-dialogs.js`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/NewsPage.jsx`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `scripts/context-dialogs-test.mjs`, `scripts/messaging-start-conversations-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Пользователь может начинать переписку из карточек партнёров, экспертов, мероприятий, новостей с обсуждениями и записей без отдельного экрана создания.
+- Новые диалоги получают контекст `partner`, `expert`, `event`, `news` или `booking`; существующие `dialogId` открываются напрямую.
+- Экран сообщений показывает intro для нового диалога, компактный context-info блок и быстрые сообщения по типу контекста.
+- Добавлен `npm run test:messaging-start`: 500 сценариев проверяют start conversation context, existing dialog open, UI affordances и отсутствие второго messaging backend.
+**Почему:** foundation становится пользовательской функцией: написать партнёру, эксперту, организатору или по записи можно одним нажатием из уже существующих карточек.
+
+---
+
 ## [2026-07-19] fix: mobile tabbar scanner slot after Messaging tab
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`

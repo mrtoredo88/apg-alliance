@@ -1067,6 +1067,22 @@ export function UserApp() {
     navigatePanel('dialogs');
   }, [navigatePanel]);
 
+  const openBookingContextDialog = useCallback((booking) => {
+    if (!booking) return;
+    if (booking.dialogId) {
+      openContextDialogById(booking.dialogId);
+      return;
+    }
+    openContextDialog('booking', {
+      ...booking,
+      title: booking.providerName || booking.serviceTitle || 'Запись АПГ',
+      parentTitle: booking.providerName || '',
+      bookingId: booking.id || booking.bookingId,
+      date: [booking.dateLabel, booking.time].filter(Boolean).join(' ') || booking.startAt || booking.date || '',
+      source: 'booking-card',
+    }, 'booking-card');
+  }, [openContextDialog, openContextDialogById]);
+
   const openBookingFlow = useCallback((providerType, provider) => {
     if (!provider) return;
     setBookingRequest({ providerType: providerType === 'expert' ? 'expert' : 'partner', provider, nonce: Date.now() });
@@ -4159,6 +4175,7 @@ export function UserApp() {
                     onRefresh={handleRefresh}
                     onToast={showToast}
                     onOpenLoki={() => goPanel('loki')}
+                    onAskQuestion={(item) => openContextDialog('news', item, 'news-article')}
                     initialNewsTarget={pendingLokiNewsTarget}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
@@ -4273,6 +4290,7 @@ export function UserApp() {
                     onOpenNews={() => goPanel('news')}
                     onOpenHealth={() => goPanel('health')}
                     onOpenDialog={openContextDialogById}
+                    onOpenBookingDialog={openBookingContextDialog}
                     onOpenBookingReview={openBookingReview}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}

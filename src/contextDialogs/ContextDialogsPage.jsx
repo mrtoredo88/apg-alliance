@@ -77,6 +77,115 @@ function ContextHeader({ context, onOpenObject }) {
   );
 }
 
+function contextIcon(type) {
+  if (type === 'event') return '🎫';
+  if (type === 'expert') return '✦';
+  if (type === 'promotion') return '🎁';
+  if (type === 'booking') return '📅';
+  if (type === 'news') return '📰';
+  return '🏪';
+}
+
+function responseHint(context = {}) {
+  if (context.type === 'event') return 'Организатор обычно отвечает в течение дня';
+  if (context.type === 'expert') return 'Обычно отвечает за 1-2 часа';
+  if (context.type === 'booking') return 'Детали записи синхронизируются в этом диалоге';
+  if (context.type === 'news') return 'Обсуждение публикации идет в АПГ';
+  return 'Обычно отвечает за 10 минут';
+}
+
+function ConversationIntro({ context }) {
+  if (!context) return null;
+  return (
+    <GlassCard style={{ borderRadius: 24, padding: 14, display: 'grid', gridTemplateColumns: '46px 1fr', gap: 12, alignItems: 'center', border: '1px solid rgba(215,184,106,0.24)' }}>
+      <div style={{ width: 46, height: 46, borderRadius: 18, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 22, overflow: 'hidden' }}>
+        {context.image ? <img src={context.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : contextIcon(context.type)}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', fontWeight: 780 }}>Вы общаетесь с</div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '21px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{context.parentTitle || context.title || 'АПГ'}</div>
+        <div style={{ color: APG2_PROFILE.gold, fontSize: 12, lineHeight: '17px', marginTop: 2 }}>{getDialogObjectLabel(context)} · ★★★★★ · {responseHint(context)}</div>
+      </div>
+    </GlassCard>
+  );
+}
+
+function contextInfoRows(context = {}) {
+  if (!context) return [];
+  if (context.type === 'event') {
+    return [
+      ['Дата', context.date],
+      ['Адрес', context.address],
+      ['Организатор', context.parentTitle],
+      ['Участники', context.participantsCount],
+    ];
+  }
+  if (context.type === 'booking') {
+    return [
+      ['Услуга', context.serviceTitle],
+      ['Специалист', context.specialistName],
+      ['Когда', context.date],
+      ['Статус', context.statusLabel || context.status],
+    ];
+  }
+  if (context.type === 'news') {
+    return [
+      ['Категория', context.subtitle],
+      ['Источник', context.source],
+      ['Дата', context.date],
+    ];
+  }
+  return [
+    ['Активные акции', context.promotionId ? 'Есть' : 'Проверьте карточку'],
+    ['Сегодня открыт', context.hours || 'График в карточке'],
+    ['Онлайн-запись', context.bookingUrl || context.hasBooking ? 'Есть' : 'Уточните в диалоге'],
+    ['Адрес', context.address],
+    ['Позвонить', context.phone],
+  ];
+}
+
+function MessagingContextInfo({ context, onOpenObject }) {
+  if (!context) return null;
+  const rows = contextInfoRows(context).filter(([, value]) => value != null && String(value).trim()).slice(0, 6);
+  return (
+    <GlassCard style={{ borderRadius: 24, padding: 13, display: 'grid', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 14, lineHeight: '18px', fontWeight: 900 }}>{getDialogObjectLabel(context)}</div>
+        <ContextBadge context={context} />
+      </div>
+      <div style={{ display: 'grid', gap: 7 }}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: 8, color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px' }}>
+            <span style={{ color: APG2_PROFILE.textMuted }}>{label}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+          </div>
+        ))}
+      </div>
+      {context.phone && <GlassButton onClick={() => window.open(`tel:${String(context.phone).replace(/\s+/g, '')}`)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
+      <GlassButton onClick={() => onOpenObject?.(context)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Открыть карточку</GlassButton>
+    </GlassCard>
+  );
+}
+
+function quickMessagesFor(context = {}) {
+  if (context?.type === 'event') return ['Где проходит?', 'Буду участвовать', 'Есть места?', 'Во сколько начало?'];
+  if (context?.type === 'expert') return ['Хочу консультацию', 'Стоимость', 'Когда удобно?', 'Есть запись?'];
+  if (context?.type === 'booking') return ['Здравствуйте', 'Хочу уточнить запись', 'Можно перенести?', 'Свободное время'];
+  if (context?.type === 'news') return ['Интересная новость', 'Есть вопрос', 'Где подробнее?', 'Спасибо'];
+  return ['Здравствуйте', 'Хочу записаться', 'Есть вопрос', 'Стоимость', 'Свободное время'];
+}
+
+function QuickReplyChips({ context, onPick }) {
+  const items = quickMessagesFor(context);
+  return (
+    <div style={{ display: 'flex', gap: 7, overflowX: 'auto', padding: '1px 1px 3px' }}>
+      {items.map(item => (
+        <button key={item} type="button" onClick={() => onPick(item)} style={{ flex: '0 0 auto', minHeight: 32, borderRadius: 999, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: APG2_PROFILE.textSoft, padding: '6px 10px', fontFamily: 'inherit', fontSize: 12, fontWeight: 780 }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+
 function BookingContextCard({ context, isOwner, onOpenObject, onAction }) {
   if (context?.type !== 'booking') return null;
   const bookingId = context.bookingId || context.objectId;
@@ -325,10 +434,11 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
           {activeContext?.type === 'booking'
             ? <BookingContextCard context={activeContext} isOwner={isOwner} onOpenObject={onOpenObject} onAction={runBookingAction} />
             : <ContextHeader context={activeContext} onOpenObject={onOpenObject} />}
+          <MessagingContextInfo context={activeContext} onOpenObject={onOpenObject} />
           {isOwner && <OwnerAssist enabled={aiAssist} onToggle={toggleAiAssist} context={activeContext} lastQuestion={lastQuestion} onUse={value => setText(value)} />}
           <div style={{ display: 'grid', gap: 9, minHeight: 220 }}>
             {activeMessages.length ? activeMessages.map(message => <MessageBubble key={message.id} message={message} own={message.senderId === uid && message.senderRole !== 'loki'} />) : (
-              <GlassCard style={{ borderRadius: 24, padding: 18, color: APG2_PROFILE.textSoft, textAlign: 'center' }}>История по этому объекту начнется здесь.</GlassCard>
+              <ConversationIntro context={activeContext} />
             )}
             {typingUsers > 0 && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>Собеседник печатает...</div>}
             <div ref={messagesEndRef} />
@@ -340,20 +450,23 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
               <button onClick={() => setAttachment(null)} style={{ border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, fontSize: 18 }}>×</button>
             </GlassCard>
           )}
-          <GlassCard style={{ borderRadius: 26, padding: 10, display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, alignItems: 'end' }}>
-            <label style={{ width: 42, height: 42, borderRadius: 17, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, cursor: 'pointer' }}>
-              📷
-              <input type="file" accept="image/*" onChange={e => handlePhoto(e.target.files?.[0])} style={{ display: 'none' }} />
-            </label>
-            <textarea
-              value={text}
-              onFocus={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: true }).catch(() => {})}
-              onBlur={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: false }).catch(() => {})}
-              onChange={e => setText(e.target.value)}
-              placeholder={isOwner ? 'Ответить по этому объекту...' : 'Задать вопрос по этому объекту...'}
-              style={{ minHeight: 42, maxHeight: 110, resize: 'vertical', border: 0, outline: 0, background: 'transparent', color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontFamily: 'inherit', padding: '10px 0' }}
-            />
-            <GlassButton onClick={() => sendText()} tone="gold" style={{ minHeight: 42, borderRadius: 17, color: '#17120a', opacity: pending ? 0.6 : 1 }}>Отправить</GlassButton>
+          <GlassCard style={{ borderRadius: 26, padding: 10, display: 'grid', gap: 8 }}>
+            <QuickReplyChips context={activeContext} onPick={value => setText(current => current.trim() ? current : value)} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, alignItems: 'end' }}>
+              <label style={{ width: 42, height: 42, borderRadius: 17, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, cursor: 'pointer' }}>
+                📷
+                <input type="file" accept="image/*" onChange={e => handlePhoto(e.target.files?.[0])} style={{ display: 'none' }} />
+              </label>
+              <textarea
+                value={text}
+                onFocus={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: true }).catch(() => {})}
+                onBlur={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: false }).catch(() => {})}
+                onChange={e => setText(e.target.value)}
+                placeholder={isOwner ? 'Ответить по этому объекту...' : 'Задать вопрос по этому объекту...'}
+                style={{ minHeight: 42, maxHeight: 110, resize: 'vertical', border: 0, outline: 0, background: 'transparent', color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontFamily: 'inherit', padding: '10px 0' }}
+              />
+              <GlassButton onClick={() => sendText()} tone="gold" style={{ minHeight: 42, borderRadius: 17, color: '#17120a', opacity: pending ? 0.6 : 1 }}>Отправить</GlassButton>
+            </div>
           </GlassCard>
         </div>
       )}

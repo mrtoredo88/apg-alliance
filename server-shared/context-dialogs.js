@@ -23,6 +23,12 @@ export const CONTEXT_DIALOG_TYPES = {
     idField: 'promotionId',
     titleFallback: 'Акция АПГ',
   },
+  news: {
+    label: 'Новость',
+    collection: 'news',
+    idField: 'newsId',
+    titleFallback: 'Новость АПГ',
+  },
   booking: {
     label: 'Запись',
     collection: 'bookings',
@@ -100,6 +106,7 @@ export function buildDialogContext(type, item = {}, extra = {}) {
   const subtitle = firstText(
     extra.subtitle,
     isPromotion ? parentTitle : '',
+    normalizedType === 'news' ? firstText(item.categoryLabel, item.category, item.source) : '',
     item.categoryLabel,
     item.specialization,
     item.date,
@@ -136,7 +143,14 @@ export function buildDialogContext(type, item = {}, extra = {}) {
     eventId: firstText(item.eventId, normalizedType === 'event' ? objectId : ''),
     promotionId: firstText(item.promotionId, isPromotion ? objectId : ''),
     bookingId: firstText(item.bookingId, normalizedType === 'booking' ? objectId : ''),
+    newsId: firstText(item.newsId, normalizedType === 'news' ? objectId : ''),
     reviewId: firstText(item.reviewId, normalizedType === 'review' ? objectId : ''),
+    serviceTitle: firstText(item.serviceTitle, item.service?.title),
+    specialistName: firstText(item.specialistName, item.specialist?.name),
+    durationMinutes: firstText(item.durationMinutes, item.service?.durationMinutes),
+    price: firstText(item.price, item.service?.price),
+    statusLabel: firstText(item.statusLabel),
+    journeySummary: firstText(item.journeySummary, item.journey?.summary),
     ownerUserIds,
     source: firstText(extra.source, item.source, 'context-dialog'),
   };
@@ -158,6 +172,7 @@ export function buildDialogNotificationTitle(context = {}) {
   if (type === 'event') return `🎫 ${title}`;
   if (type === 'expert') return `✦ ${title}`;
   if (type === 'promotion') return `🎁 ${firstText(context.parentTitle, title)}`;
+  if (type === 'news') return `📰 ${title}`;
   if (type === 'booking') return `📅 ${title}`;
   if (type === 'partner') return `💬 ${title}`;
   return `💬 ${title}`;
@@ -176,6 +191,7 @@ export function buildDialogNotificationBody(context = {}, { senderRole = '', mes
   if (type === 'event') return senderRole === 'owner' ? 'Организатор отправил сообщение.' : 'Новое сообщение по мероприятию.';
   if (type === 'expert') return senderRole === 'owner' ? 'Ответил на ваш вопрос.' : 'Новый вопрос эксперту.';
   if (type === 'promotion') return 'Новое сообщение по акции.';
+  if (type === 'news') return 'Новое сообщение по публикации.';
   if (type === 'booking') return senderRole === 'owner' ? 'Новое сообщение по записи.' : 'Новая запись ожидает подтверждения.';
   if (type === 'partner') return senderRole === 'owner' ? 'Ответил на ваше сообщение.' : 'Новый вопрос партнеру.';
   return 'Новое сообщение в диалоге.';
