@@ -5,7 +5,16 @@ function step(id, title, kind, payload = {}) {
   return { id, title, kind, status: 'pending', ...payload };
 }
 
-export function buildLokiPlan({ goal = {}, classification = {}, question = '' } = {}) {
+function memoryPlanSummary(memorySnapshot = null) {
+  if (!memorySnapshot?.used?.length) return null;
+  return {
+    source: memorySnapshot.source,
+    used: memorySnapshot.used.slice(0, 5).map(item => ({ id: item.id, key: item.key, type: item.type, score: item.score })),
+    preferences: memorySnapshot.preferences?.slice?.(0, 3) || [],
+  };
+}
+
+export function buildLokiPlan({ goal = {}, classification = {}, question = '', memorySnapshot = null } = {}) {
   const base = {
     id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     goal: goal.id,
@@ -13,6 +22,7 @@ export function buildLokiPlan({ goal = {}, classification = {}, question = '' } 
     intent: classification.id,
     query: classification.query || question,
     confidence: classification.confidence || 0,
+    memory: memoryPlanSummary(memorySnapshot),
     createdAt: new Date().toISOString(),
     steps: [],
   };

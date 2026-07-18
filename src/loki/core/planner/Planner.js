@@ -16,7 +16,8 @@ export function runLokiPlanner({
   const classification = classifyPlannerIntent({ question, intent, reasoningResult, journeyResult, context });
   if (!classification || classification.id === PLANNER_INTENTS.GENERAL || classification.confidence < 0.75) return null;
   const goal = resolvePlannerGoal(classification);
-  const plan = buildLokiPlan({ goal, classification, question, intent });
+  const memorySnapshot = context?.memory?.memorySnapshot || context?.userMemory?.memorySnapshot || null;
+  const plan = buildLokiPlan({ goal, classification, question, intent, memorySnapshot });
   if (!plan) return null;
   const validation = validateLokiPlan(plan);
   if (!validation.ok) return makePlanDeniedResult(plan, validation);

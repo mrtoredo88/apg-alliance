@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-18] feat: Loki Memory Engine v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/memory/*`, `src/loki/core/lokiUserMemory.js`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/planner/*`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-memory-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен локальный read-only/append-only Memory Engine v1: Store, Collector, Resolver, Ranker, Validator, History и Snapshot.
+- `learnFromLokiQuery` теперь совместимо накапливает обезличенные предпочтения, activity, conversation-сигналы и successful recommendations в `userMemory.lokiMemory`.
+- `SmartAnswerPipeline` подключает Memory Snapshot перед Planner/Tool Layer; Planner получает только snapshot и учитывает memory-bias при ранжировании.
+- Debug trace показывает `memoryEngine`, а `LokiProvider` сохраняет последний `memoryContext` локально.
+- Добавлен `npm run test:loki-memory`: 1000+ сценариев проверяют накопление предпочтений, decay, snapshot, privacy guard, observability events и интеграцию Planner.
+**Почему:** Локи должен постепенно адаптироваться к пользователю внутри АПГ, не превращая это в LLM-память и не меняя backend, Firestore, API, Planner, Tool Calling или бизнес-логику.
+
+---
+
 ## [2026-07-18] feat: Loki Planner v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/planner/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-planner-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

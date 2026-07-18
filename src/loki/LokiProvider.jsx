@@ -839,9 +839,10 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
       if (result.planContext) recordPlanContext(result.planContext);
-      if (result.reasoningContext || result.journeyContext || result.planContext || result.personalityPhraseId || result.toolContext) updateMemory({
+      if (result.reasoningContext || result.journeyContext || result.memoryContext || result.planContext || result.personalityPhraseId || result.toolContext) updateMemory({
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
+        ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
         ...(result.toolContext ? { lastToolContext: result.toolContext } : {}),
         ...(result.personalityPhraseId ? { personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) } : {}),
@@ -912,6 +913,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         inDialog: true,
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
+        ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
         ...(result.toolContext ? { lastToolContext: result.toolContext } : {}),
         personalityHistory: result.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) : memory.personalityHistory,

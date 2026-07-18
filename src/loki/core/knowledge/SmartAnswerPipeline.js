@@ -4,6 +4,7 @@ import { detectLokiIntent, intentNeedsLocalAnswer } from '../intent/IntentRouter
 import { buildLokiKnowledgeProvider, makeKnowledgeResultCard, searchKnowledge } from './KnowledgeProvider.js';
 import { runReasoningEngine } from '../reasoning/ReasoningEngine.js';
 import { runJourneyEngine } from '../journey/JourneyEngine.js';
+import { runLokiMemoryEngine } from '../memory/MemoryEngine.js';
 import { runLokiPlanner } from '../planner/Planner.js';
 import { runLokiToolLayer } from '../tools/ToolCenter.js';
 
@@ -226,10 +227,12 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   const intent = detectLokiIntent(question, knowledge);
   const contextReasoning = runReasoningEngine({ question, intent, knowledge, context });
   const contextJourney = runJourneyEngine({ question, intent, knowledge, reasoningResult: contextReasoning, context });
-  const plannerResult = runLokiPlanner({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context, appState: sourceState });
-  if (plannerResult) return { ...plannerResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext };
-  const toolResult = runLokiToolLayer({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context, appState: sourceState });
-  if (toolResult && toolResult.toolContext?.status !== 'denied') return { ...toolResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext };
+  const memoryResult = runLokiMemoryEngine({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context, appState: sourceState });
+  const contextWithMemory = memoryResult?.context || context;
+  const plannerResult = runLokiPlanner({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithMemory, appState: sourceState });
+  if (plannerResult) return { ...plannerResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+  const toolResult = runLokiToolLayer({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithMemory, appState: sourceState });
+  if (toolResult && toolResult.toolContext?.status !== 'denied') return { ...toolResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
   if (contextJourney?.journeyHandled) return contextJourney;
   if (contextJourney && (context?.memory?.lastJourneyContext || context?.memory?.journeyContext)) return contextJourney;
   if (contextReasoning?.reasoningHandled) return contextReasoning;

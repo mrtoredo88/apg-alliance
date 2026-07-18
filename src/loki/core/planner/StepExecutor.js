@@ -1,5 +1,6 @@
 import { executeLokiTool } from '../tools/ToolExecutor.js';
 import { cardForToolItem, list, nowMs } from '../tools/ToolResult.js';
+import { memoryMatchScore } from '../memory/MemoryRanker.js';
 import { PLANNER_GOALS } from './GoalResolver.js';
 
 function uniqueCards(cards = []) {
@@ -16,8 +17,11 @@ function collectCards(toolResults = []) {
   return uniqueCards(toolResults.flatMap(result => list(result.cards)));
 }
 
-function collectItems(toolResults = []) {
-  return toolResults.flatMap(result => list(result.cards).map(card => ({ ...card, score: scoreCard(card) })));
+function collectItems(toolResults = [], memorySnapshot = null) {
+  return toolResults.flatMap(result => list(result.cards).map(card => {
+    const memoryScore = memoryMatchScore(card, memorySnapshot);
+    return { ...card, score: scoreCard(card) + memoryScore, memoryScore };
+  }));
 }
 
 function scoreCard(card = {}) {
@@ -61,6 +65,7 @@ function buildAnswer({ plan, toolResults, ranked }) {
 export function executePlanSteps(plan, { knowledge = {}, context = {}, appState = {} } = {}) {
   const started = nowMs();
   const toolResults = [];
+  const memorySnapshot = context?.memory?.memorySnapshot || context?.userMemory?.memorySnapshot || null;
   let merged = [];
   let ranked = [];
   const steps = [];
@@ -71,13 +76,13 @@ export function executePlanSteps(plan, { knowledge = {}, context = {}, appState 
       toolResults.push(result);
       steps.push({ ...step, status: result.toolContext?.status === 'completed' ? 'completed' : 'failed', durationMs: Math.round(nowMs() - stepStarted), toolContext: result.toolContext });
     } else if (step.kind === 'merge') {
-      merged = collectItems(toolResults);
+      merged = collectItems(toolResults, memorySnapshot);
       steps.push({ ...step, status: 'completed', durationMs: Math.round(nowMs() - stepStarted), count: merged.length });
     } else if (step.kind === 'rank') {
-      ranked = (merged.length ? merged : collectItems(toolResults)).sort((a, b) => Number(b.score || 0) - Number(a.score || 0)).slice(0, 5);
+      ranked = (merged.length ? merged : collectItems(toolResults, memorySnapshot)).sort((a, b) => Number(b.score || 0) - Number(a.score || 0)).slice(0, 5);
       steps.push({ ...step, status: 'completed', durationMs: Math.round(nowMs() - stepStarted), count: ranked.length });
     } else if (step.kind === 'respond') {
-      if (!ranked.length) ranked = collectCards(toolResults).map(card => ({ ...card, score: scoreCard(card) })).sort((a, b) => b.score - a.score);
+      if (!ranked.length) ranked = collectCards(toolResults).map(card => ({ ...card, score: scoreCard(card) + memoryMatchScore(card, memorySnapshot) })).sort((a, b) => b.score - a.score);
       steps.push({ ...step, status: 'completed', durationMs: Math.round(nowMs() - stepStarted) });
     }
   }
@@ -102,6 +107,7 @@ export function executePlanSteps(plan, { knowledge = {}, context = {}, appState 
       durationMs: Math.round(nowMs() - started),
       status: failed.length ? 'partial' : 'completed',
       toolCalls: toolResults.map(result => result.toolContext?.call).filter(Boolean),
+      memoryUsed: list(memorySnapshot?.used).slice(0, 5).map(item => ({ id: item.id, key: item.key, type: item.type, score: item.score })),
     },
     toolContext: {
       status: failed.length ? 'partial' : 'completed',
