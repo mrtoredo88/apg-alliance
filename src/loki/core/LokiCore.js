@@ -133,6 +133,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const knowledgeStart = nowMs();
   const knowledgeResult = runLokiKnowledgeEngine({ text, appState, context });
   trace.push({ module: 'knowledgeEngine', ms: Math.round(nowMs() - knowledgeStart), decision: knowledgeResult?.intent ?? 'skipped' });
+  if (knowledgeResult?.toolContext) {
+    trace.push({ module: 'toolLayer', ms: knowledgeResult.toolContext.durationMs ?? 0, decision: knowledgeResult.toolContext.call?.id || knowledgeResult.toolContext.status || 'completed' });
+  }
   if (knowledgeResult) {
     const personalizationStart = nowMs();
     const personalized = runPersonalizationEngine({ question: text, result: knowledgeResult, context, appState });

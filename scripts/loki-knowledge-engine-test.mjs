@@ -101,24 +101,26 @@ assert.equal(searchKnowledge(knowledge, 'Андреевка', ['location'], 1)[0
 assert.equal(detectLokiIntent('где находится филиал в андреевке', knowledge).id, 'search.locations');
 
 const directCases = [
-  ['где сделать маникюр', 'search.partners'],
-  ['какие есть филиалы', 'search.locations'],
-  ['какие акции сейчас', 'search.promotions'],
-  ['что подарить за ключи', 'search.gifts'],
-  ['найди семейного психолога', 'search.specialists'],
-  ['какие мероприятия завтра', 'search.events'],
-  ['что нового в АПГ', 'news.question'],
+  ['где сделать маникюр', ['tool.partner.find', 'reasoning.search.partners', /^journey\./]],
+  ['какие есть филиалы', ['tool.search.query', 'reasoning.search.locations', /^journey\./]],
+  ['какие акции сейчас', ['tool.promotion.active', 'reasoning.search.promotions', /^journey\./]],
+  ['что подарить за ключи', ['tool.gift.available', 'reasoning.search.gifts', /^journey\./]],
+  ['найди семейного психолога', ['tool.expert.find', 'reasoning.search.specialists', /^journey\./]],
+  ['какие мероприятия завтра', ['tool.event.upcoming', 'reasoning.search.events', /^journey\./]],
+  ['что нового в АПГ', ['tool.news.latest', 'reasoning.news.question', /^journey\./]],
   ['какой телефон салона', 'info.contacts'],
   ['когда работает салон', 'info.hours'],
   ['как записаться', 'info.booking'],
   ['что с workspace аналитикой', 'workspace.question'],
-  ['сколько у меня ключей', 'profile.question'],
+  ['сколько у меня ключей', ['tool.user.keys', 'profile.question']],
   ['какие отзывы', 'reviews.question'],
 ];
 
 for (const [query, expectedIntent] of directCases) {
   const result = runLokiKnowledgeEngine({ text: query, appState });
-  const expected = expectedIntent.startsWith('search.') || expectedIntent === 'news.question'
+  const expected = Array.isArray(expectedIntent)
+    ? expectedIntent
+    : expectedIntent.startsWith('search.') || expectedIntent === 'news.question'
     ? [`reasoning.${expectedIntent}`, /^journey\./]
     : [expectedIntent];
   assert.ok(expected.some(item => item instanceof RegExp ? item.test(result?.intent || '') : item === result?.intent), query);

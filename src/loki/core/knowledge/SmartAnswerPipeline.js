@@ -4,6 +4,7 @@ import { detectLokiIntent, intentNeedsLocalAnswer } from '../intent/IntentRouter
 import { buildLokiKnowledgeProvider, makeKnowledgeResultCard, searchKnowledge } from './KnowledgeProvider.js';
 import { runReasoningEngine } from '../reasoning/ReasoningEngine.js';
 import { runJourneyEngine } from '../journey/JourneyEngine.js';
+import { runLokiToolLayer } from '../tools/ToolCenter.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -224,6 +225,8 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   const intent = detectLokiIntent(question, knowledge);
   const contextReasoning = runReasoningEngine({ question, intent, knowledge, context });
   const contextJourney = runJourneyEngine({ question, intent, knowledge, reasoningResult: contextReasoning, context });
+  const toolResult = runLokiToolLayer({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context, appState: sourceState });
+  if (toolResult && toolResult.toolContext?.status !== 'denied') return { ...toolResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext };
   if (contextJourney?.journeyHandled) return contextJourney;
   if (contextJourney && (context?.memory?.lastJourneyContext || context?.memory?.journeyContext)) return contextJourney;
   if (contextReasoning?.reasoningHandled) return contextReasoning;

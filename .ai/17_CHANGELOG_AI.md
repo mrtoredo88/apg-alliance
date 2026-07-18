@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Tool Calling v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/tools/*`, `src/loki/core/tools/tools/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-tool-test.mjs`, `scripts/loki-knowledge-engine-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен внутренний read-only Tool Layer: Tool Registry, Resolver, Validator, Executor, Tool Result, Tool History и domain tools для user, partners, experts, promotions, gifts, events, news, meetings, journey, workspace и search.
+- `SmartAnswerPipeline` теперь может после Reasoning/Journey выполнить нужный tool по актуальному Knowledge snapshot; результат дальше проходит через Personalization, Action Center и Personality без новых API/Firestore.
+- Добавлен TTL cache для повторных tool-вызовов и локальная Tool History/observability events `TOOL_REQUESTED/RESOLVED/STARTED/COMPLETED/FAILED/DENIED`.
+- Добавлен `npm run test:loki-tool`: 844 сценария проверяют выбор tools, права, ошибки, пустые состояния, cache invalidation, Action Center integration и read-only контракт.
+**Почему:** Локи должен отвечать на вопросы о текущих ключах, акциях, событиях, записях, подарках, новостях и Workspace по актуальным данным приложения, а не только по заранее известной логике.
+
+---
+
 ## [2026-07-18] feat: Loki Observability & Quality Center v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/analytics/*`, `src/AdminPanel.jsx`, `scripts/loki-observability-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
