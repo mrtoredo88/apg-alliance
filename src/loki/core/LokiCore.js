@@ -25,6 +25,7 @@ import { LOKI_SCENARIOS } from './brain/lokiScenarios.js';
 import { buildLokiKnowledgeProvider } from './knowledge/KnowledgeProvider.js';
 import { runLokiKnowledgeEngine } from './knowledge/SmartAnswerPipeline.js';
 import { runPersonalizationEngine } from './personalization/PersonalizationEngine.js';
+import { runProactiveAnswer } from './proactive/ProactiveEngine.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -141,6 +142,14 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   if (personalOnly) {
     const shaped = PersonalityEngine.shape({ result: personalOnly, context, selectedModule: { id: 'personalizationEngine' } });
     return debug ? { ...shaped, debug: { provider, selectedModule: 'personalizationEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
+  }
+
+  const proactiveStart = nowMs();
+  const proactiveAnswer = runProactiveAnswer({ question: text, memory });
+  trace.push({ module: 'proactiveEngine', ms: Math.round(nowMs() - proactiveStart), decision: proactiveAnswer?.intent ?? 'skipped' });
+  if (proactiveAnswer) {
+    const shaped = PersonalityEngine.shape({ result: proactiveAnswer, context, selectedModule: { id: 'proactiveEngine' } });
+    return debug ? { ...shaped, debug: { provider, selectedModule: 'proactiveEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
   const v2Start = nowMs();

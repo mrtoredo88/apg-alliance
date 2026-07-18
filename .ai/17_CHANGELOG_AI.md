@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Proactive Assistant v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/proactive/*`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `scripts/loki-proactive-engine-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only/local слой `src/loki/core/proactive`: Opportunity Detector, Priority Resolver, Timing Resolver, Dismiss Manager, Opportunity History и Proactive Card Builder.
+- `LokiProvider` теперь показывает не больше одной proactive-карточки, учитывает 10 секунд после startup, активность пользователя, blocking work, cooldown, dismiss и silent mode; shown/accepted/dismissed события пишутся только в локальную историю.
+- Loki Core умеет объяснять вопрос “Почему ты мне это показал?” через последнюю proactive opportunity.
+- Добавлен `npm run test:loki-proactive`: 400 сценариев покрывают типы opportunities, приоритеты, cooldown, dismiss, explain, роли, отсутствие ложных рекомендаций и отсутствие Firestore/API imports.
+**Почему:** Локи должен ненавязчиво помогать по реальным событиям АПГ, не меняя backend, Firestore, API, бизнес-логику, Knowledge, Reasoning, Journey, Personalization или Personality.
+
+---
+
 ## [2026-07-18] fix: Startup Stability & PWA reload guard
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/main.jsx`, `src/pwa/PwaUpdateManager.js`, `scripts/pwa-update-manager-test.mjs`, `scripts/startup-stability-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

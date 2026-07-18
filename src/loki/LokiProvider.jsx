@@ -8,7 +8,6 @@ import { LOKI_ACTIONS, TAP_ACTIONS, getBehaviorForEvent, getNextMicroDelay, getR
 import { DEFAULT_LOKI_MEMORY, loadLokiMemory, saveLokiMemory } from './lokiMemory.js';
 import { getLokiSuggestion } from './lokiSuggestions.js';
 import { LOKI_APP_ACTIONS, LOKI_MESSAGE_PRIORITY, createLokiAction, normalizeLokiActionRequest } from './lokiActionTypes.js';
-import { evaluateLokiObserver } from './LokiObserver.js';
 import { addLokiHistoryItem, loadLokiHistory, markLokiHistoryItem, saveLokiHistory } from './lokiHistory.js';
 import { askLokiBrain } from './LokiBrain.js';
 import {
@@ -25,6 +24,8 @@ import { buildInterestProfile, buildRecommendationFeed, buildScenarioCollections
 import { buildLokiContext } from './core/context/ContextEngine.js';
 import { rememberPersonalityPhrase } from './personality/PersonalityMemory.js';
 import { selectPersonalityPhrase } from './core/modules/PersonalityEngine.js';
+import { markOpportunityAccepted, markOpportunityDismissed, markOpportunityShown } from './core/proactive/DismissManager.js';
+import { runProactiveEngine } from './core/proactive/ProactiveEngine.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -474,10 +475,13 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         emotionalState: nextEmotionalState,
       };
       if (eventType === LOKI_EVENTS.PROACTIVE_SUGGESTION) {
+        if (payload.opportunity) markOpportunityShown(payload.opportunity);
         memoryPatch.lastRecommendation = {
           adviceId: payload.adviceId ?? null,
           reason: payload.reason ?? null,
           card: nextCard,
+          opportunity: payload.opportunity ?? null,
+          opportunityType: payload.opportunityType ?? null,
           panel: activePanel,
           shownAt: new Date().toISOString(),
         };
@@ -699,7 +703,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     if (!settings.enabled || !user || !appState || settings.mode === 'on_demand') return;
     if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
     observerTimerRef.current = setTimeout(() => {
-      const recommendation = evaluateLokiObserver({
+      const recommendation = runProactiveEngine({
         appState: { ...appState, activePanel },
         memory,
         history,
@@ -732,6 +736,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       return false;
     }
     const activeAdvice = memory?.lastRecommendation;
+    if (activeAdvice?.opportunity) markOpportunityAccepted(activeAdvice.opportunity);
     updateMemory({
       lastAction: { ...normalized, ts: new Date().toISOString() },
       lastActionType: normalized.type,
@@ -978,6 +983,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         updateHistory(prev => markLokiHistoryItem(prev, id, 'ignored'));
       }
       if (memory?.lastRecommendation) {
+        if (memory.lastRecommendation.opportunity) markOpportunityDismissed(memory.lastRecommendation.opportunity);
         updateMemory({ learning: learnFromRecommendationResult(memory.learning, memory.lastRecommendation, 'ignored') });
       }
       setAction(LOKI_ACTIONS.WAVE);
