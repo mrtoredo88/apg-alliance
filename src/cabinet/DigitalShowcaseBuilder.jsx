@@ -76,31 +76,6 @@ function ListEditor({ title, items = [], onChange, placeholder = 'Новый п�
   );
 }
 
-function CompletionCard({ completion, onOpenTab }) {
-  return (
-    <GlassCard tone="gold" style={{ borderRadius: 30 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }}>
-        <div>
-          <div style={{ color: '#17120a', fontSize: 20, lineHeight: '24px', fontWeight: 930 }}>Профиль заполнен на {completion.percent}%</div>
-          <div style={{ color: 'rgba(23,18,10,0.62)', fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{completion.doneCount} из {completion.checks.length} пунктов готовы</div>
-        </div>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: `conic-gradient(#17120a ${completion.percent * 3.6}deg, rgba(23,18,10,0.14) 0deg)`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-          <span style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.34)', color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 930 }}>{completion.percent}%</span>
-        </div>
-      </div>
-      <div style={{ display: 'grid', gap: 6, marginTop: 14 }}>
-        {completion.checks.map(item => (
-          <button key={item.id} type="button" onClick={() => onOpenTab(item.tab)} style={{ border: 0, borderRadius: 16, padding: '9px 11px', background: item.done ? 'rgba(23,18,10,0.08)' : 'rgba(255,255,255,0.30)', color: '#17120a', display: 'grid', gridTemplateColumns: '22px 1fr auto', gap: 9, alignItems: 'center', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
-            <span style={{ width: 22, height: 22, borderRadius: 999, background: item.done ? '#17120a' : 'rgba(23,18,10,0.13)', color: item.done ? '#D7B86A' : 'rgba(23,18,10,0.48)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900 }}>{item.done ? '✓' : '•'}</span>
-            <span style={{ fontSize: 13, lineHeight: '17px', fontWeight: 780 }}>{item.label}</span>
-            {!item.done && <span style={{ fontSize: 12, opacity: 0.55 }}>Исправить</span>}
-          </button>
-        ))}
-      </div>
-    </GlassCard>
-  );
-}
-
 function SaveState({ state }) {
   const label = state === 'saving' ? 'Сохраняем...' : state === 'dirty' ? 'Есть несохранённые изменения' : state === 'error' ? 'Не сохранено' : state === 'saved' ? 'Изменения сохранены' : 'Автосохранение';
   return <GlassBadge tone={state === 'saved' ? 'gold' : 'glass'}>{state === 'saved' ? '✓ ' : state === 'dirty' ? '• ' : ''}{label}</GlassBadge>;
@@ -493,7 +468,7 @@ function LokiTab({ tips, onOpenTab }) {
   );
 }
 
-export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSaved, onOpenModule, onEventCreated, onToast, publicUrl }) {
+export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSaved, onOpenModule, onEventCreated, onToast, publicUrl, focusTab, onCompletionChange }) {
   const roleId = role?.id || 'partner';
   const draftKey = profile?.id ? `apg_showcase_draft_${roleId}_${profile.id}` : '';
   const [activeTab, setActiveTab] = useState('showcase');
@@ -591,6 +566,15 @@ export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSa
     if (!visibleTabs.some(tab => tab.id === activeTab)) setActiveTab(visibleTabs[0]?.id || 'showcase');
   }, [activeTab, visibleTabs]);
 
+  useEffect(() => {
+    onCompletionChange?.(completion);
+  }, [completion, onCompletionChange]);
+
+  useEffect(() => {
+    if (!focusTab?.tab) return;
+    if (visibleTabs.some(tab => tab.id === focusTab.tab)) setActiveTab(focusTab.tab);
+  }, [focusTab?.tab, focusTab?.nonce, visibleTabs]);
+
   const renderTab = () => {
     if (activeTab === 'showcase') return <ShowcaseTab draft={draft} update={update} roleId={roleId} publicUrl={publicUrl} />;
     if (activeTab === 'locations' && roleId === 'partner') return <LocationsTab draft={draft} update={update} />;
@@ -624,8 +608,6 @@ export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSa
           </GlassButton>
         ))}
       </div>
-
-      <CompletionCard completion={completion} onOpenTab={setActiveTab} />
 
       <GlassCard style={{ borderRadius: 24, marginTop: 12, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
         <div>

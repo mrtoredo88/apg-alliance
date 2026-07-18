@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
 import { buildCabinetSnapshot, getCabinetPublicUrl } from '../cabinet/CabinetModules.js';
 import { DigitalShowcaseBuilder } from '../cabinet/DigitalShowcaseBuilder.jsx';
+import { buildShowcaseDraft, calculateShowcaseCompletion } from '../cabinet/ShowcaseBuilderCore.js';
 import { NewsCard } from '../NewsPage.jsx';
 import { EventPosterCard } from '../EventsPage.jsx';
 import { PartnerCard } from '../HomePanelV2.jsx';
@@ -357,7 +358,27 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
   );
 }
 
-function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeChange, availableViews, activeViewId, onViewChange }) {
+function WorkspaceProfileProgressCard({ completion, onClick }) {
+  if (!completion?.checks?.length) return null;
+  const missingCount = completion.checks.length - completion.doneCount;
+  return (
+    <button type="button" onClick={onClick} style={{ ...cardStyle({ padding: 10, borderRadius: 16, background: WS.controlSoft, boxShadow: 'none', minHeight: 88, textAlign: 'left', cursor: 'pointer' }), fontFamily: 'inherit', display: 'grid', gap: 7 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ color: WS.text, fontSize: 13, lineHeight: '16px', fontWeight: 930 }}>Профиль</span>
+        <span style={{ color: '#8A6422', fontSize: 13, lineHeight: '16px', fontWeight: 940 }}>{completion.percent}%</span>
+      </div>
+      <div style={{ height: 7, borderRadius: 999, background: WS.track, overflow: 'hidden' }}>
+        <div style={{ width: `${completion.percent}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#E9C66B,#C89B3C)', transition: 'width 220ms ease' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ color: WS.soft, fontSize: 11.5, lineHeight: '14px', fontWeight: 760 }}>Заполнено {completion.percent}% · осталось {missingCount}</span>
+        <span style={{ borderRadius: 999, padding: '5px 8px', background: 'rgba(201,155,60,0.15)', color: '#8A6422', fontSize: 11.5, lineHeight: '13px', fontWeight: 900, whiteSpace: 'nowrap' }}>{missingCount ? 'Дозаполнить' : 'Готово'}</span>
+      </div>
+    </button>
+  );
+}
+
+function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeChange, availableViews, activeViewId, onViewChange, profileCompletion, onCompleteProfile }) {
   const main = items.filter(item => !['finance', 'notifications', 'settings'].includes(item.id));
   const settings = items.filter(item => ['finance', 'notifications', 'settings'].includes(item.id));
   const initial = String(user?.firstName || user?.name || user?.displayName || 'A').slice(0, 1).toUpperCase();
@@ -404,6 +425,7 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
       </div>
       </div>
       <div style={{ marginTop: 'auto', padding: 14, display: 'grid', gap: 8 }}>
+        <WorkspaceProfileProgressCard completion={profileCompletion} onClick={onCompleteProfile} />
         <div style={cardStyle({ padding: 10, borderRadius: 16, background: WS.profileCard, boxShadow: 'none' })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 38, height: 38, borderRadius: 14, background: 'linear-gradient(135deg,#100B32,#4A327F)', color: '#F5D77E', display: 'grid', placeItems: 'center', fontWeight: 950 }}>{initial}</div>
@@ -747,7 +769,7 @@ function profileEvents(events = [], profile = {}, roleId = '') {
   });
 }
 
-function WorkspaceProfileSection({ role, profile, events = [], roleState, actions, onRoleChange, onSaved, onOpenPanel, onToast }) {
+function WorkspaceProfileSection({ role, profile, events = [], roleState, actions, onRoleChange, onSaved, onOpenPanel, onToast, focusTab, onCompletionChange }) {
   if (!role || !['partner', 'expert'].includes(role.id) || !profile?.id) {
     return (
       <PlaceholderSection
@@ -791,6 +813,8 @@ function WorkspaceProfileSection({ role, profile, events = [], roleState, action
         role={role}
         profile={profile}
         relatedEvents={relatedEvents}
+        focusTab={focusTab}
+        onCompletionChange={onCompletionChange}
         onSaved={updated => onSaved?.(role.id, updated)}
         onOpenModule={module => {
           if (module === 'events') onOpenPanel?.('events');
@@ -1697,6 +1721,8 @@ export function DesktopWorkspace({
   const [query, setQuery] = useState('');
   const [activeWorkspaceViewId, setActiveWorkspaceViewId] = useState(null);
   const [profileOverrides, setProfileOverrides] = useState({});
+  const [profileFocusTab, setProfileFocusTab] = useState(null);
+  const [liveProfileCompletion, setLiveProfileCompletion] = useState(null);
   const workspacePartner = profileOverrides.partner || ownedPartner;
   const workspaceExpert = profileOverrides.expert || ownedExpert;
   const roleState = useMemo(() => getCabinetRoles({ user, partner: workspacePartner, expert: workspaceExpert, preferredRole: activeWorkspaceViewId || undefined }), [user, workspacePartner, workspaceExpert, activeWorkspaceViewId]);
@@ -1714,6 +1740,24 @@ export function DesktopWorkspace({
   const availableWorkspaceViews = useMemo(() => getWorkspaceRoleViews({ roles: roleState.roles, activeRole, ownedPartner: workspacePartner, ownedExpert: workspaceExpert, isAdminRole }), [roleState.roles, activeRole, workspacePartner, workspaceExpert, isAdminRole]);
   const workspaceView = availableWorkspaceViews.find(view => view.id === activeWorkspaceViewId) || availableWorkspaceViews[0] || WORKSPACE_ROLE_VIEWS.partner;
   const navItems = NAV_ITEMS.filter(item => item.id !== 'finance' || businessHubAvailable || isAdminRole || activeRole?.id === 'partner' || activeRole?.id === 'expert');
+  const baseProfileCompletion = useMemo(() => {
+    if (!activeProfile?.id || !['partner', 'expert'].includes(activeRole?.id)) return null;
+    return calculateShowcaseCompletion(buildShowcaseDraft(activeProfile, activeRole.id), activeRole.id);
+  }, [activeProfile, activeRole?.id]);
+  const profileCompletion = liveProfileCompletion || baseProfileCompletion;
+  const handleCompletionChange = useCallback(completion => {
+    setLiveProfileCompletion(completion || null);
+  }, []);
+  const openProfileMissingFields = useCallback(() => {
+    const firstMissing = profileCompletion?.checks?.find(item => !item.done);
+    setProfileFocusTab({ tab: firstMissing?.tab || 'showcase', nonce: Date.now() });
+    setActiveSection('profile');
+  }, [profileCompletion]);
+
+  useEffect(() => {
+    setLiveProfileCompletion(null);
+    setProfileFocusTab(null);
+  }, [activeProfile?.id, activeRole?.id]);
 
   const actions = {
     openDashboard: () => setActiveSection('dashboard'),
@@ -1791,7 +1835,7 @@ export function DesktopWorkspace({
 
   const renderContent = () => {
     if (activeSection === 'dashboard') return <WorkspaceDashboard data={workspaceData} actions={actions} workspaceView={workspaceView} intelligence={workspaceIntelligence} dayPlan={workspaceDayPlan} />;
-    if (activeSection === 'profile') return <WorkspaceProfileSection role={activeRole} profile={activeProfile} events={events} roleState={roleState} actions={actions} onRoleChange={setActiveWorkspaceViewId} onSaved={handleProfileSaved} onOpenPanel={onOpenPanel} />;
+    if (activeSection === 'profile') return <WorkspaceProfileSection role={activeRole} profile={activeProfile} events={events} roleState={roleState} actions={actions} onRoleChange={setActiveWorkspaceViewId} onSaved={handleProfileSaved} onOpenPanel={onOpenPanel} onToast={onToast} focusTab={profileFocusTab} onCompletionChange={handleCompletionChange} />;
     if (activeSection === 'content') return <WorkspaceNewsCenter role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'events') return <WorkspaceEventsManager role={activeRole} profile={activeProfile} roleViews={availableWorkspaceViews} activeViewId={workspaceView.id} onRoleChange={setActiveWorkspaceViewId} events={events} actions={actions} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventChanged} onToast={onToast} />;
     if (activeSection === 'booking') return <WorkspaceMeetingsCRM role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenDialog={onOpenDialog} onOpenPanel={onOpenPanel} onToast={onToast} />;
@@ -1836,7 +1880,7 @@ export function DesktopWorkspace({
     >
       <WorkspaceHeader query={query} onQueryChange={setQuery} unreadCount={unreadCount} onModeChange={onModeChange} onOpenNotifications={() => setActiveSection('notifications')} />
       <div style={{ maxWidth: 1760, margin: '0 auto', padding: '18px 24px 22px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
-        <WorkspaceSidebar items={navItems} activeSection={activeSection} onSelect={handleSelectNav} user={user} data={workspaceData} onModeChange={onModeChange} availableViews={availableWorkspaceViews} activeViewId={workspaceView.id} onViewChange={setActiveWorkspaceViewId} />
+        <WorkspaceSidebar items={navItems} activeSection={activeSection} onSelect={handleSelectNav} user={user} data={workspaceData} onModeChange={onModeChange} availableViews={availableWorkspaceViews} activeViewId={workspaceView.id} onViewChange={setActiveWorkspaceViewId} profileCompletion={profileCompletion} onCompleteProfile={openProfileMissingFields} />
         <main data-workspace-region="content" style={{ minWidth: 0 }}>
           {renderContent()}
         </main>
