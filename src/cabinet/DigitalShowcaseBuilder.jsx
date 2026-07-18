@@ -243,7 +243,11 @@ function LocationsTab({ draft, update }) {
         id: `location-${Date.now()}`,
         title: '',
         address: '',
+        description: '',
         phone: draft.phone || '',
+        whatsapp: '',
+        telegram: '',
+        website: '',
         workingHours: draft.hours || '',
         coordinates: null,
         comment: '',
@@ -256,12 +260,29 @@ function LocationsTab({ draft, update }) {
     update({ locations: next.map((item, i) => ({ ...item, isMain: next.some(row => row.isMain) ? item.isMain : i === 0 })) });
   };
   const setMain = (index) => update({ locations: locations.map((item, i) => ({ ...item, isMain: i === index })) });
+  const copyLocation = (index) => {
+    const source = locations[index] || {};
+    update({
+      locations: [
+        ...locations.slice(0, index + 1),
+        { ...source, id: `location-${Date.now()}`, title: `${source.title || `Локация ${index + 1}`} копия`, isMain: false },
+        ...locations.slice(index + 1),
+      ],
+    });
+  };
+  const moveLocation = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= locations.length) return;
+    const next = [...locations];
+    [next[index], next[target]] = [next[target], next[index]];
+    update({ locations: next });
+  };
   return (
     <GlassSection title="Локации">
       <div style={{ display: 'grid', gap: 12 }}>
         <GlassCard style={{ borderRadius: 28 }}>
           <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 880 }}>Филиалы и точки организации</div>
-          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>Если локация одна, публичная карточка выглядит как раньше. При нескольких локациях клиент сможет выбрать филиал перед записью.</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>Если у вас несколько адресов, добавьте каждый филиал отдельно. Посетители смогут выбрать удобную локацию.</div>
           <GlassButton onClick={addLocation} tone="gold" style={{ marginTop: 12, minHeight: 42, borderRadius: 18, color: '#17120a' }}>Добавить филиал</GlassButton>
         </GlassCard>
         {!locations.length && (
@@ -275,16 +296,27 @@ function LocationsTab({ draft, update }) {
             </div>
             <Field label="Название филиала"><GlassInput value={location.title || ''} onChange={e => updateLocation(index, { title: e.target.value })} placeholder="Центральный салон" style={inputStyle} /></Field>
             <Field label="Адрес"><GlassInput value={location.address || ''} onChange={e => updateLocation(index, { address: e.target.value })} placeholder="Зеленоград, корпус..." style={inputStyle} /></Field>
+            <Field label="Описание филиала"><TextArea value={location.description || ''} onChange={description => updateLocation(index, { description })} rows={2} placeholder="Например: косметология, парикмахерский зал, отдельный вход." /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <Field label="Телефон"><GlassInput value={location.phone || ''} onChange={e => updateLocation(index, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></Field>
               <Field label="График"><GlassInput value={location.workingHours || ''} onChange={e => updateLocation(index, { workingHours: e.target.value })} placeholder="Пн-Пт 10:00-20:00" style={inputStyle} /></Field>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Field label="WhatsApp"><GlassInput value={location.whatsapp || ''} onChange={e => updateLocation(index, { whatsapp: e.target.value })} placeholder="https://wa.me/..." style={inputStyle} /></Field>
+              <Field label="Telegram"><GlassInput value={location.telegram || ''} onChange={e => updateLocation(index, { telegram: e.target.value })} placeholder="https://t.me/..." style={inputStyle} /></Field>
+            </div>
+            <Field label="Сайт филиала"><GlassInput value={location.website || ''} onChange={e => updateLocation(index, { website: e.target.value })} placeholder="https://..." style={inputStyle} /></Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <Field label="Широта"><GlassInput value={location.coordinates?.latitude ?? ''} onChange={e => updateLocation(index, { coordinates: { ...(location.coordinates || {}), latitude: e.target.value } })} inputMode="decimal" style={inputStyle} /></Field>
               <Field label="Долгота"><GlassInput value={location.coordinates?.longitude ?? ''} onChange={e => updateLocation(index, { coordinates: { ...(location.coordinates || {}), longitude: e.target.value } })} inputMode="decimal" style={inputStyle} /></Field>
             </div>
             <Field label="Комментарий"><TextArea value={location.comment || ''} onChange={comment => updateLocation(index, { comment })} rows={2} placeholder="Например: вход со двора, парковка рядом." /></Field>
-            <GlassButton onClick={() => removeLocation(index)} style={{ minHeight: 38, borderRadius: 16 }}>Удалить филиал</GlassButton>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 7 }}>
+              <GlassButton onClick={() => moveLocation(index, -1)} disabled={index === 0} style={{ minHeight: 38, borderRadius: 16 }}>Выше</GlassButton>
+              <GlassButton onClick={() => moveLocation(index, 1)} disabled={index === locations.length - 1} style={{ minHeight: 38, borderRadius: 16 }}>Ниже</GlassButton>
+              <GlassButton onClick={() => copyLocation(index)} style={{ minHeight: 38, borderRadius: 16 }}>Копия</GlassButton>
+              <GlassButton onClick={() => removeLocation(index)} style={{ minHeight: 38, borderRadius: 16 }}>Удалить</GlassButton>
+            </div>
           </GlassCard>
         ))}
       </div>

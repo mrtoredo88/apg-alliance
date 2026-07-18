@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-18] feat: Locations management in Admin and Mobile Workspace
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/locations.js`, `src/cabinet/DigitalShowcaseBuilder.jsx`, `src/PartnerCabinetPage.jsx`, `src/AdminPanel.jsx`, `scripts/partner-locations-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Расширено управление существующей моделью `locations`: описание, WhatsApp, Telegram, сайт, комментарий, координаты и основной филиал.
+- В админской форме партнёра добавлен блок «Филиалы» с добавлением, редактированием, удалением, сменой порядка, назначением основного и копированием филиала.
+- В мобильном кабинете партнёра добавлена вкладка «Филиалы» с autosave и ручным сохранением; Desktop Workspace продолжает использовать `DigitalShowcaseBuilder`.
+**Почему:** управление филиалами должно быть доступно не только в Desktop Workspace, но и через Админку и мобильный кабинет без новой схемы данных и без миграций.
+
+---
+
 ## [2026-07-17] feat: Referral Monitoring v4
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/referral-monitoring.js`, `server-shared/referral-observability.js`, `server/src/routes/referral-monitoring.js`, `server/src/routes/admin-actions.js`, `server/src/server.js`, `src/AdminPanel.jsx`, `scripts/referral-monitoring-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

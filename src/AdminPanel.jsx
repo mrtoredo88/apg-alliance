@@ -27,6 +27,7 @@ import { useAdminFormDraft, formatDraftTime, clearAdminDraft } from './adminForm
 import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
 import { formatEventPrice, isPaidEvent } from './eventPrice.js';
 import { telegramShareUrl } from '../server-shared/telegram.js';
+import { getProfileLocations, normalizeLocationsForSave } from '../server-shared/locations.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -4280,6 +4281,7 @@ export const AdminPanel = () => {
   const [pCoverPhoto, setPCoverPhoto]     = useState('');
   const [pGallery, setPGallery]           = useState([]);
   const [pVideos, setPVideos]             = useState([]);
+  const [pLocations, setPLocations]       = useState([]);
   const [pVideoUrl, setPVideoUrl]         = useState('');
   const [pVideoTitle, setPVideoTitle]     = useState('');
   const [pVideoError, setPVideoError]     = useState('');
@@ -4499,7 +4501,7 @@ export const AdminPanel = () => {
     setNCommentsEnabled(d.nCommentsEnabled !== false); setNPublishedAt(d.nPublishedAt ?? new Date().toISOString().slice(0, 10));
   };
 
-  const partnerDraftData = { pName, pDesc, pCategory, pEmoji, pLogo, pPhone, pAddress, pHours, pTier, pSocial, pVkGroup, pOffer, pStampTarget, pOwnerEmail, pPublicationConsent, pBooking, pWebsite, pTelegramCom, pMaxCom, pCoverPhoto, pGallery, pVideos, pLat, pLon };
+  const partnerDraftData = { pName, pDesc, pCategory, pEmoji, pLogo, pPhone, pAddress, pHours, pTier, pSocial, pVkGroup, pOffer, pStampTarget, pOwnerEmail, pPublicationConsent, pBooking, pWebsite, pTelegramCom, pMaxCom, pCoverPhoto, pGallery, pVideos, pLocations, pLat, pLon };
   const partnerDraft = useAdminFormDraft({
     formKey: 'partner',
     enabled: showPartnerModal,
@@ -4514,6 +4516,7 @@ export const AdminPanel = () => {
     setPStampTarget(d.pStampTarget ?? ''); setPOwnerEmail(d.pOwnerEmail ?? ''); setPPublicationConsent(!!d.pPublicationConsent);
     setPBooking(d.pBooking ?? ''); setPWebsite(d.pWebsite ?? ''); setPTelegramCom(d.pTelegramCom ?? ''); setPMaxCom(d.pMaxCom ?? '');
     setPCoverPhoto(d.pCoverPhoto ?? ''); setPGallery(Array.isArray(d.pGallery) ? d.pGallery : []); setPVideos(Array.isArray(d.pVideos) ? d.pVideos : []);
+    setPLocations(Array.isArray(d.pLocations) ? d.pLocations : []);
     setPLat(d.pLat ?? ''); setPLon(d.pLon ?? '');
   };
 
@@ -5463,6 +5466,7 @@ export const AdminPanel = () => {
     setPPublicationConsent(false);
     setPBooking(''); setPWebsite(''); setPTelegramCom(''); setPMaxCom('');
     setPCoverPhoto(''); setPGallery([]); setPVideos([]);
+    setPLocations([]);
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setPLat(''); setPLon('');
     setEditingPartner(null);
@@ -5481,6 +5485,7 @@ export const AdminPanel = () => {
     setPTelegramCom(p.telegramCommunityUrl ?? p.telegramUrl ?? ''); setPMaxCom(p.maxCommunityUrl ?? p.maxUrl ?? '');
     setPCoverPhoto(p.coverPhoto ?? ''); setPGallery(p.gallery ?? []);
     setPVideos(p.videos ?? []);
+    setPLocations(getProfileLocations(p));
     setPVideoUrl(''); setPVideoTitle(''); setPVideoError('');
     setPLat(p.latitude != null ? String(p.latitude) : '');
     setPLon(p.longitude != null ? String(p.longitude) : '');
@@ -5629,6 +5634,62 @@ export const AdminPanel = () => {
     }
   };
 
+  const addPartnerLocation = () => {
+    setPLocations(prev => [
+      ...prev,
+      {
+        id: `location-${Date.now()}`,
+        title: '',
+        address: '',
+        description: '',
+        phone: pPhone || '',
+        whatsapp: '',
+        telegram: '',
+        website: '',
+        workingHours: pHours || '',
+        coordinates: null,
+        comment: '',
+        isMain: prev.length === 0,
+      },
+    ]);
+  };
+
+  const updatePartnerLocation = (index, patch) => {
+    setPLocations(prev => prev.map((item, i) => i === index ? { ...item, ...patch } : item));
+  };
+
+  const removePartnerLocation = (index) => {
+    setPLocations(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.map((item, i) => ({ ...item, isMain: next.some(row => row.isMain) ? item.isMain : i === 0 }));
+    });
+  };
+
+  const setMainPartnerLocation = (index) => {
+    setPLocations(prev => prev.map((item, i) => ({ ...item, isMain: i === index })));
+  };
+
+  const copyPartnerLocation = (index) => {
+    setPLocations(prev => {
+      const source = prev[index] || {};
+      return [
+        ...prev.slice(0, index + 1),
+        { ...source, id: `location-${Date.now()}`, title: `${source.title || `Филиал ${index + 1}`} копия`, isMain: false },
+        ...prev.slice(index + 1),
+      ];
+    });
+  };
+
+  const movePartnerLocation = (index, direction) => {
+    setPLocations(prev => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
   const savePartner = async () => {
     if (!pName.trim()) return;
     const urlError = validateUrlFields([
@@ -5638,6 +5699,11 @@ export const AdminPanel = () => {
       { label: 'Сайт', value: pWebsite },
       { label: 'Telegram', value: pTelegramCom, platform: 'telegram' },
       { label: 'Max', value: pMaxCom, platform: 'max' },
+      ...pLocations.flatMap((location, index) => [
+        { label: `Филиал ${index + 1}: WhatsApp`, value: location.whatsapp },
+        { label: `Филиал ${index + 1}: Telegram`, value: location.telegram, platform: 'telegram' },
+        { label: `Филиал ${index + 1}: сайт`, value: location.website },
+      ]),
     ]);
     if (urlError) { alert(urlError); return; }
     let finalVideos = pVideos;
@@ -5647,12 +5713,21 @@ export const AdminPanel = () => {
         finalVideos = [...finalVideos, { url: pVideoUrl.trim(), title: pVideoTitle.trim(), platform: parsed.platform, embedUrl: parsed.embedUrl, thumbnailUrl: parsed.thumbnailUrl }];
       }
     }
+    const normalizedLocations = normalizeLocationsForSave(pLocations, {
+      address: pAddress,
+      phone: pPhone,
+      hours: pHours,
+      workingHours: pHours,
+      latitude: pLat.trim() ? parseFloat(pLat) : null,
+      longitude: pLon.trim() ? parseFloat(pLon) : null,
+    });
+    const mainLocation = normalizedLocations.find(item => item.isMain) || normalizedLocations[0] || null;
     const data = {
       name: pName.trim(), description: pDesc.trim(), category: pCategory,
       emoji: pEmoji, logoUrl: pLogo.trim(),
       categoryLabel: CATEGORIES.find(c => c.id === pCategory)?.label ?? '',
-      phone: pPhone.trim(), address: pAddress.trim(),
-      tier: pTier, hours: pHours.trim(), socialUrl: normalizeUrl(pSocial), vkGroupUrl: normalizeUrl(pVkGroup, 'vk'), vkUrl: normalizeUrl(pVkGroup, 'vk'), offer: pOffer.trim(),
+      phone: (mainLocation?.phone || pPhone).trim(), address: (mainLocation?.address || pAddress).trim(),
+      tier: pTier, socialUrl: normalizeUrl(pSocial), vkGroupUrl: normalizeUrl(pVkGroup, 'vk'), vkUrl: normalizeUrl(pVkGroup, 'vk'), offer: pOffer.trim(),
       stampTarget: Number(pStampTarget) || 0,
       ownerEmail: pOwnerEmail.trim().toLowerCase() || null,
       publicationConsentAccepted: pPublicationConsent,
@@ -5666,8 +5741,11 @@ export const AdminPanel = () => {
       coverPhoto: pCoverPhoto.trim(),
       gallery: pGallery,
       videos: finalVideos,
-      latitude:  pLat.trim() ? parseFloat(pLat) : null,
-      longitude: pLon.trim() ? parseFloat(pLon) : null,
+      locations: normalizedLocations,
+      hours: (mainLocation?.workingHours || pHours).trim(),
+      workingHours: (mainLocation?.workingHours || pHours).trim(),
+      latitude:  mainLocation?.coordinates?.latitude ?? (pLat.trim() ? parseFloat(pLat) : null),
+      longitude: mainLocation?.coordinates?.longitude ?? (pLon.trim() ? parseFloat(pLon) : null),
     };
     let savedPartnerId = editingPartner?.id || '';
     if (editingPartner) {
@@ -8345,6 +8423,60 @@ export const AdminPanel = () => {
 
                 <label style={s.label}>Max-сообщество</label>
                 <input style={s.input} placeholder="https://..." value={pMaxCom} onChange={e => setPMaxCom(e.target.value)} />
+
+                <div style={{ border: `1px solid ${A.border}`, background: A.chip, borderRadius: 18, padding: 14, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: A.text }}>📍 Филиалы</div>
+                      <div style={{ fontSize: 12, color: A.textSec, lineHeight: '18px', marginTop: 4 }}>
+                        Если у вас несколько адресов, добавьте каждый филиал отдельно. Посетители смогут выбрать удобную локацию.
+                      </div>
+                    </div>
+                    <button type="button" style={{ ...s.btn, ...s.btnPri, minHeight: 36, padding: '7px 11px', flexShrink: 0 }} onClick={addPartnerLocation}>Добавить</button>
+                  </div>
+
+                  {!pLocations.length && (
+                    <div style={{ border: `1px dashed ${A.border}`, borderRadius: 14, padding: 12, color: A.textSec, fontSize: 12, lineHeight: '18px', marginBottom: 10 }}>
+                      Филиалы не заданы. Публичная карточка продолжит использовать основной адрес, телефон и часы работы выше.
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {pLocations.map((location, index) => (
+                      <div key={location.id || index} style={{ border: `1px solid ${location.isMain ? A.goldBrd : A.border}`, background: location.isMain ? A.goldDim : 'rgba(255,255,255,0.035)', borderRadius: 16, padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: location.isMain ? A.gold : A.text }}>{location.isMain ? 'Основной филиал' : `Филиал ${index + 1}`}</div>
+                          {location.isMain ? (
+                            <span style={{ color: A.gold, fontSize: 11, fontWeight: 900 }}>Главный</span>
+                          ) : (
+                            <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} onClick={() => setMainPartnerLocation(index)}>Сделать основным</button>
+                          )}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 720 ? '1fr' : '1fr 1fr', gap: 8 }}>
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="Название филиала" value={location.title || ''} onChange={e => updatePartnerLocation(index, { title: e.target.value })} />
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="Адрес" value={location.address || ''} onChange={e => updatePartnerLocation(index, { address: e.target.value })} />
+                          <textarea style={{ ...s.textarea, minHeight: 70, marginBottom: 0 }} placeholder="Описание филиала" value={location.description || ''} onChange={e => updatePartnerLocation(index, { description: e.target.value })} />
+                          <textarea style={{ ...s.textarea, minHeight: 70, marginBottom: 0 }} placeholder="Комментарий" value={location.comment || ''} onChange={e => updatePartnerLocation(index, { comment: e.target.value })} />
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="Телефон" value={location.phone || ''} onChange={e => updatePartnerLocation(index, { phone: e.target.value })} />
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="Часы работы" value={location.workingHours || ''} onChange={e => updatePartnerLocation(index, { workingHours: e.target.value })} />
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="WhatsApp" value={location.whatsapp || ''} onChange={e => updatePartnerLocation(index, { whatsapp: e.target.value })} />
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="Telegram" value={location.telegram || ''} onChange={e => updatePartnerLocation(index, { telegram: e.target.value })} />
+                          <input style={{ ...s.input, marginBottom: 0 }} placeholder="Сайт" value={location.website || ''} onChange={e => updatePartnerLocation(index, { website: e.target.value })} />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <input style={{ ...s.input, marginBottom: 0 }} placeholder="Широта" value={location.coordinates?.latitude ?? ''} onChange={e => updatePartnerLocation(index, { coordinates: { ...(location.coordinates || {}), latitude: e.target.value } })} />
+                            <input style={{ ...s.input, marginBottom: 0 }} placeholder="Долгота" value={location.coordinates?.longitude ?? ''} onChange={e => updatePartnerLocation(index, { coordinates: { ...(location.coordinates || {}), longitude: e.target.value } })} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 10 }}>
+                          <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} disabled={index === 0} onClick={() => movePartnerLocation(index, -1)}>Выше</button>
+                          <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} disabled={index === pLocations.length - 1} onClick={() => movePartnerLocation(index, 1)}>Ниже</button>
+                          <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11 }} onClick={() => copyPartnerLocation(index)}>Копировать</button>
+                          <button type="button" style={{ ...s.btn, ...s.btnGray, minHeight: 32, padding: '6px 10px', fontSize: 11, color: A.red }} onClick={() => removePartnerLocation(index)}>Удалить</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <div style={{ background: A.goldDim, border: `1px solid ${A.goldBrd}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
                   <label style={{ ...s.label, color: A.gold, marginBottom: 6 }}>🔑 Email владельца заведения</label>

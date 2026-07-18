@@ -32,7 +32,9 @@ function hasLocationContent(location = {}) {
   return Boolean(
     text(location.title || location.name)
     || text(location.address || location.location)
+    || text(location.description)
     || text(location.phone || location.contactPhone)
+    || text(location.whatsapp || location.telegram || location.website)
     || text(location.workingHours || location.hours || location.schedule)
     || coordinatesFrom(location)
   );
@@ -49,10 +51,14 @@ export function normalizeLocation(raw = {}, index = 0, profile = {}) {
     id: id || `location-${index + 1}`,
     title: text(source.title || source.name || (source.isMain ? 'Основная локация' : `Локация ${index + 1}`), 160),
     address,
+    description: text(source.description || source.shortDescription || '', 700),
     phone,
+    whatsapp: text(source.whatsapp || source.whatsappUrl || source.whatsApp || '', 220),
+    telegram: text(source.telegram || source.telegramUrl || source.telegramChannel || '', 220),
+    website: text(source.website || source.websiteUrl || source.site || '', 260),
     workingHours,
     coordinates,
-    comment: text(source.comment || source.note || source.description || '', 700),
+    comment: text(source.comment || source.note || '', 700),
     isMain: Boolean(source.isMain),
   };
   LOCATION_FUTURE_FIELDS.forEach(field => {

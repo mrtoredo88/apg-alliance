@@ -16,6 +16,7 @@ import { aiProfileListToText, buildAiProfileDraft, sanitizeAiProfile } from './a
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { useProfileAutosave } from './hooks/useProfileAutosave.js';
 import { ContentStudio } from './components/ContentStudio.jsx';
+import { getProfileLocations, normalizeLocationsForSave } from '../server-shared/locations.js';
 
 export function Stars({ rating }) {
   const r = Math.round(rating ?? 0);
@@ -331,6 +332,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const [fHours,  setFHours]  = useState('');
   const [fSocial, setFSocial] = useState('');
   const [fLogo,   setFLogo]   = useState('');
+  const [fLocations, setFLocations] = useState([]);
   const [fAiProfile, setFAiProfile] = useState(null);
 
   useEffect(() => {
@@ -353,6 +355,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
       setFHours(p.hours ?? '');
       setFSocial(p.socialUrl ?? '');
       setFLogo(p.logoUrl ?? '');
+      setFLocations(getProfileLocations(p));
       setFAiProfile(sanitizeAiProfile(p.aiProfile || buildAiProfileDraft(p, 'partner')));
       setReviews(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -363,19 +366,33 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     description: String(source.description || '').trim(),
     offer: String(source.offer || '').trim(),
     phone: String(source.phone || '').trim(),
+    address: String(source.address || '').trim(),
     hours: String(source.hours || '').trim(),
+    workingHours: String(source.workingHours || source.hours || '').trim(),
     socialUrl: normalizeExternalUrl(source.socialUrl || ''),
     logoUrl: String(source.logoUrl || '').trim(),
+    locations: normalizeLocationsForSave(source.locations || [], source),
+    latitude: source.latitude ?? null,
+    longitude: source.longitude ?? null,
   }), []);
 
-  const partnerSaveData = useMemo(() => ({
-    description: fDesc.trim(),
-    offer: fOffer.trim(),
-    phone: fPhone.trim(),
-    hours: fHours.trim(),
-    socialUrl: normalizeExternalUrl(fSocial),
-    logoUrl: fLogo.trim(),
-  }), [fDesc, fOffer, fPhone, fHours, fSocial, fLogo]);
+  const partnerSaveData = useMemo(() => {
+    const locations = normalizeLocationsForSave(fLocations, { ...partner, phone: fPhone, hours: fHours });
+    const mainLocation = locations.find(item => item.isMain) || locations[0] || null;
+    return {
+      description: fDesc.trim(),
+      offer: fOffer.trim(),
+      phone: (mainLocation?.phone || fPhone).trim(),
+      address: mainLocation?.address || partner?.address || '',
+      hours: (mainLocation?.workingHours || fHours).trim(),
+      workingHours: (mainLocation?.workingHours || fHours).trim(),
+      socialUrl: normalizeExternalUrl(fSocial),
+      logoUrl: fLogo.trim(),
+      locations,
+      latitude: mainLocation?.coordinates?.latitude ?? partner?.latitude ?? null,
+      longitude: mainLocation?.coordinates?.longitude ?? partner?.longitude ?? null,
+    };
+  }, [fDesc, fOffer, fPhone, fHours, fSocial, fLogo, fLocations, partner]);
 
   const applyPartnerDraft = useCallback((draft = {}) => {
     setFDesc(draft.description ?? '');
@@ -384,6 +401,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     setFHours(draft.hours ?? '');
     setFSocial(draft.socialUrl ?? '');
     setFLogo(draft.logoUrl ?? '');
+    setFLocations(Array.isArray(draft.locations) ? draft.locations : []);
   }, []);
 
   const validatePartnerSave = useCallback((data = {}) => {
@@ -391,6 +409,12 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     if (phone && !/^[+\d()\s-]{7,16}$/.test(phone)) return 'Некорректный номер телефона. Пример: +7 (999) 123-45-67';
     const socialResult = validateExternalUrl(data.socialUrl);
     if (!socialResult.ok) return `Соцсеть: ${socialResult.error}`;
+    for (const [index, location] of (data.locations || []).entries()) {
+      for (const [label, value] of [['WhatsApp', location.whatsapp], ['Telegram', location.telegram], ['Сайт', location.website]]) {
+        const result = validateExternalUrl(value);
+        if (!result.ok) return `Филиал ${index + 1}, ${label}: ${result.error}`;
+      }
+    }
     return '';
   }, []);
 
@@ -430,6 +454,52 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     setUploading(false);
   };
 
+  const addLocation = () => {
+    setFLocations(prev => [
+      ...prev,
+      {
+        id: `location-${Date.now()}`,
+        title: '',
+        address: '',
+        description: '',
+        phone: fPhone || '',
+        whatsapp: '',
+        telegram: '',
+        website: '',
+        workingHours: fHours || '',
+        coordinates: null,
+        comment: '',
+        isMain: prev.length === 0,
+      },
+    ]);
+  };
+
+  const updateLocation = (index, patch) => {
+    setFLocations(prev => prev.map((item, i) => i === index ? { ...item, ...patch } : item));
+  };
+
+  const removeLocation = (index) => {
+    setFLocations(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.map((item, i) => ({ ...item, isMain: next.some(row => row.isMain) ? item.isMain : i === 0 }));
+    });
+  };
+
+  const setMainLocation = (index) => {
+    setFLocations(prev => prev.map((item, i) => ({ ...item, isMain: i === index })));
+  };
+
+  const copyLocation = (index) => {
+    setFLocations(prev => {
+      const source = prev[index] || {};
+      return [
+        ...prev.slice(0, index + 1),
+        { ...source, id: `location-${Date.now()}`, title: `${source.title || `Филиал ${index + 1}`} копия`, isMain: false },
+        ...prev.slice(index + 1),
+      ];
+    });
+  };
+
   const handleSave = async () => {
     await autosave.saveNow();
   };
@@ -437,11 +507,11 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const handleAiProfileSave = async (aiProfile) => {
     if (!partner?.id) return;
     await userAction('partner:profileUpdate', { id: partner.id, patch: { aiProfile } });
-	    const updated = { ...partner, aiProfile };
-	    setPartner(updated);
-	    setFAiProfile(aiProfile);
-	    onPartnerUpdate?.(updated.id, { aiProfile });
-	  };
+    const updated = { ...partner, aiProfile };
+    setPartner(updated);
+    setFAiProfile(aiProfile);
+    onPartnerUpdate?.(updated.id, { aiProfile });
+  };
 
   if (!partner) return null;
 
@@ -474,6 +544,71 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     border: '1px solid rgba(255,255,255,0.24)',
     background: 'rgba(255,255,255,0.20)', color: APG2_PROFILE.text,
     fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12,
+  };
+
+  const renderLocationsEditor = (v2 = true) => {
+    const frameStyle = v2 ? { borderRadius: 32 } : { ...GLASS, borderRadius: 24, padding: 16 };
+    const fieldStyle = v2 ? v2InputStyle : inputStyle;
+    const textStyle = v2 ? APG2_PROFILE.text : T.textPri;
+    const softStyle = v2 ? APG2_PROFILE.textSoft : T.textSec;
+    const content = (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <GlassCard style={frameStyle}>
+          <div style={{ color: textStyle, fontSize: 15, fontWeight: 880 }}>Филиалы и адреса</div>
+          <div style={{ color: softStyle, fontSize: 12.5, lineHeight: '18px', marginTop: 6 }}>
+            Если у вас несколько адресов, добавьте каждый филиал отдельно. Посетители смогут выбрать удобную локацию.
+          </div>
+          <GlassButton onClick={addLocation} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 12 }}>Добавить филиал</GlassButton>
+        </GlassCard>
+        {!fLocations.length && (
+          <EmptyStateV2 icon="📍" title="Филиалов пока нет" text="Основной адрес карточки продолжит работать как главная локация." action={<GlassButton onClick={addLocation}>Добавить филиал</GlassButton>} />
+        )}
+        {fLocations.map((location, index) => (
+          <GlassCard key={location.id || index} style={{ ...frameStyle, border: location.isMain ? '1px solid rgba(201,168,76,0.42)' : frameStyle.border }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ color: textStyle, fontSize: 15, fontWeight: 880 }}>{location.isMain ? 'Основной филиал' : `Филиал ${index + 1}`}</div>
+              {location.isMain ? <GlassBadge tone="gold">Главный</GlassBadge> : <GlassButton onClick={() => setMainLocation(index)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px' }}>Главный</GlassButton>}
+            </div>
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Название филиала</label>
+            <input value={location.title || ''} onChange={e => updateLocation(index, { title: e.target.value })} placeholder="Центральный салон" style={{ ...fieldStyle, marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Адрес</label>
+            <input value={location.address || ''} onChange={e => updateLocation(index, { address: e.target.value })} placeholder="Зеленоград, корпус..." style={{ ...fieldStyle, marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Описание</label>
+            <textarea value={location.description || ''} onChange={e => updateLocation(index, { description: e.target.value })} rows={2} placeholder="Что находится в этом филиале" style={{ ...fieldStyle, resize: 'vertical', marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Телефон</label>
+            <input value={location.phone || ''} onChange={e => updateLocation(index, { phone: e.target.value })} placeholder="+7 (999) 123-45-67" style={{ ...fieldStyle, marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Часы работы</label>
+            <input value={location.workingHours || ''} onChange={e => updateLocation(index, { workingHours: e.target.value })} placeholder="Пн-Пт 10:00-20:00" style={{ ...fieldStyle, marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>WhatsApp</label>
+            <input value={location.whatsapp || ''} onChange={e => updateLocation(index, { whatsapp: e.target.value })} placeholder="https://wa.me/..." style={{ ...fieldStyle, marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Telegram</label>
+            <input value={location.telegram || ''} onChange={e => updateLocation(index, { telegram: e.target.value })} placeholder="https://t.me/..." style={{ ...fieldStyle, marginTop: 6 }} />
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Сайт</label>
+            <input value={location.website || ''} onChange={e => updateLocation(index, { website: e.target.value })} placeholder="https://..." style={{ ...fieldStyle, marginTop: 6 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Широта</label>
+                <input value={location.coordinates?.latitude ?? ''} onChange={e => updateLocation(index, { coordinates: { ...(location.coordinates || {}), latitude: e.target.value } })} style={{ ...fieldStyle, marginTop: 6 }} />
+              </div>
+              <div>
+                <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Долгота</label>
+                <input value={location.coordinates?.longitude ?? ''} onChange={e => updateLocation(index, { coordinates: { ...(location.coordinates || {}), longitude: e.target.value } })} style={{ ...fieldStyle, marginTop: 6 }} />
+              </div>
+            </div>
+            <label style={v2 ? { color: softStyle, fontSize: 12, fontWeight: 760 } : labelStyle}>Комментарий</label>
+            <textarea value={location.comment || ''} onChange={e => updateLocation(index, { comment: e.target.value })} rows={2} placeholder="Вход, парковка, ориентиры" style={{ ...fieldStyle, resize: 'vertical', marginTop: 6 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <GlassButton onClick={() => copyLocation(index)} style={{ minHeight: 40, borderRadius: 16 }}>Копировать</GlassButton>
+              <GlassButton onClick={() => removeLocation(index)} style={{ minHeight: 40, borderRadius: 16 }}>Удалить</GlassButton>
+            </div>
+          </GlassCard>
+        ))}
+        <GlassButton onClick={handleSave} disabled={saving} tone="gold" style={{ width: '100%', color: '#17120a' }}>
+          {saveButtonLabel}
+        </GlassButton>
+      </div>
+    );
+    return v2 ? <GlassSection title="Филиалы">{content}</GlassSection> : content;
   };
 
   if (variant === 'v2') {
@@ -541,7 +676,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* Навигация по вкладкам */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['ai-profile', 'AI Profile'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['ai-profile', 'AI Profile'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['locations', 'Филиалы'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -833,10 +968,10 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* ── Карточка ── */}
           {activeTab === 'edit' && (
-	            <GlassSection title="Карточка партнера">
-	              <GlassCard style={{ borderRadius: 32 }}>
-	                <ProfileAutosaveNotice autosave={autosave} compact />
-	                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Логотип</label>
+            <GlassSection title="Карточка партнера">
+              <GlassCard style={{ borderRadius: 32 }}>
+                <ProfileAutosaveNotice autosave={autosave} compact />
+                <label style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760 }}>Логотип</label>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '8px 0 14px' }}>
                   <div style={{ width: 64, height: 64, borderRadius: 24, background: APG2_PROFILE.goldSoft, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {fLogo ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (partner.emoji ?? '🏪')}
@@ -861,9 +996,9 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                 <input value={fSocial} onChange={e => setFSocial(e.target.value)} style={{ ...v2InputStyle, marginTop: 6 }} placeholder="https://vk.com/mypage" />
                 <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '18px', marginTop: -6, marginBottom: 10 }}>Укажите ссылку на ваше сообщество VK. Записи VK станут частью общей “Ленты” вашей карточки.</div>
 
-	                <GlassButton onClick={handleSave} disabled={saving} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
-	                  {saveButtonLabel}
-	                </GlassButton>
+                <GlassButton onClick={handleSave} disabled={saving} tone="gold" style={{ width: '100%', color: '#17120a', marginTop: 4 }}>
+                  {saveButtonLabel}
+                </GlassButton>
 
                 <div style={{ marginTop: 10, padding: '10px 12px', background: 'rgba(215,184,106,0.07)', border: '1px solid rgba(215,184,106,0.18)', borderRadius: 16 }}>
                   <div style={{ fontSize: 11, color: APG2_PROFILE.textMuted, lineHeight: '17px' }}>
@@ -873,6 +1008,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
               </GlassCard>
             </GlassSection>
           )}
+
+          {activeTab === 'locations' && renderLocationsEditor(true)}
 
         </GlassPanel>
       </Panel>
@@ -897,7 +1034,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
         </div>
         {/* Вкладки */}
         <div style={{ display: 'flex', gap: 8, paddingBottom: 12 }}>
-          {[['stats', '📊 Статистика'], ['qr', '📲 QR-коды'], ['edit', '✏️ Карточка']].map(([id, label]) => (
+          {[['stats', '📊 Статистика'], ['qr', '📲 QR-коды'], ['edit', '✏️ Карточка'], ['locations', '📍 Филиалы']].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)} style={{
               padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 700,
@@ -1051,10 +1188,10 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
         {/* ── РЕДАКТИРОВАНИЕ ── */}
         {activeTab === 'edit' && (
-	          <>
-	            {/* Логотип */}
-	            <ProfileAutosaveNotice autosave={autosave} />
-	            <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
+          <>
+            {/* Логотип */}
+            <ProfileAutosaveNotice autosave={autosave} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...GLASS, borderRadius: 20, padding: '14px 16px', marginBottom: 16 }}>
               <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                 {fLogo
                   ? <img src={fLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
@@ -1114,8 +1251,8 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                 outline: saved ? '1px solid rgba(75,179,75,0.4)' : 'none',
               }}
             >
-	              {saveButtonLabel}
-	            </button>
+              {saveButtonLabel}
+            </button>
 
             <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: 12 }}>
               <div style={{ fontSize: 11, color: T.textSec, lineHeight: '17px' }}>
@@ -1123,6 +1260,13 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === 'locations' && (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <ProfileAutosaveNotice autosave={autosave} />
+            {renderLocationsEditor(false)}
+          </div>
         )}
       </div>
     </Panel>
