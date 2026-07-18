@@ -184,7 +184,7 @@ scenario('workflow engine plugs into smart answer pipeline', () => {
   const result = runLokiKnowledgeEngine({ text: 'Хочу записаться на массаж рядом с домом', appState, context });
   assert.equal(result.workflowContext.workflowId, 'booking');
   assert.equal(result.workflowContext.status, WORKFLOW_STATES.WAITING_USER);
-  assert.ok(result.text.includes('Следующий шаг'));
+  assert.ok(result.text.includes('подтвердите') || result.text.includes('Следующий шаг'));
   assert.ok(result.planContext);
   assert.ok(result.toolContext.workflowEvents.length >= 3);
 });

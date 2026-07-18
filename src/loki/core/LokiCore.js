@@ -148,6 +148,20 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
       expectedUserActions: knowledgeResult.workflowContext.expectedUserActions || [],
     });
   }
+  if (knowledgeResult?.agentContext) {
+    trace.push({
+      module: 'agentMode',
+      ms: knowledgeResult.agentContext.durationMs ?? 0,
+      decision: knowledgeResult.agentContext.decision?.type || 'RESPOND',
+      mode: knowledgeResult.agentContext.decision?.mode || 'passive',
+      sessionId: knowledgeResult.agentContext.session?.sessionId || '',
+      workflowId: knowledgeResult.agentContext.session?.currentWorkflow?.workflowId || '',
+      waitingForUser: Boolean(knowledgeResult.agentContext.session?.waitingForUser),
+      reason: knowledgeResult.agentContext.decision?.reason || '',
+      safety: knowledgeResult.agentContext.safety?.checks || [],
+      confirmation: knowledgeResult.agentContext.session?.pendingConfirmation || null,
+    });
+  }
   if (knowledgeResult?.toolContext) {
     trace.push({ module: 'toolLayer', ms: knowledgeResult.toolContext.durationMs ?? 0, decision: knowledgeResult.toolContext.call?.id || knowledgeResult.toolContext.status || 'completed' });
   }

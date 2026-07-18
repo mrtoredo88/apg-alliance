@@ -1,0 +1,10 @@
+export { runLokiAgentContinuation, runLokiAgentEngine } from './AgentEngine.js';
+export { resolveAgentDecision } from './AgentResolver.js';
+export { buildAgentContext } from './AgentContext.js';
+export { AGENT_DECISIONS, AGENT_MODES, makeAgentDecision } from './AgentDecision.js';
+export { validateAgentSafety, actionRequiresConfirmation } from './AgentSafety.js';
+export { buildAgentSnapshot, summarizeAgentSnapshot } from './AgentSnapshot.js';
+export { createAgentSession, normalizeAgentSession, sessionFromMemory, updateAgentSession } from './AgentSession.js';
+export { resolveAgentContinuation } from './AgentContinuation.js';
+export { detectAgentConfirmation, buildConfirmationText } from './AgentConfirmation.js';
+export { buildAgentHistoryPatch, LOKI_AGENT_EVENTS } from './AgentHistory.js';

@@ -32,6 +32,7 @@ import { buildActionHistoryPatch } from './core/actions/ActionHistory.js';
 import { buildPlanHistoryPatch } from './core/planner/PlanHistory.js';
 import { buildToolHistoryPatch } from './core/tools/ToolHistory.js';
 import { buildWorkflowHistoryPatch } from './core/workflows/WorkflowHistory.js';
+import { buildAgentHistoryPatch } from './core/agent/AgentHistory.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -471,6 +472,21 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
+  const recordAgentContext = useCallback((agentContext) => {
+    if (!agentContext?.decision) return;
+    setMemory(prev => {
+      const next = {
+        ...prev,
+        ...buildAgentHistoryPatch(prev, agentContext),
+        lastAgentContext: agentContext,
+        lastAgentSession: agentContext.session || prev.lastAgentSession || null,
+        updatedAt: new Date().toISOString(),
+      };
+      saveLokiMemory(next);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!memory.sessionStartedAt) updateMemory({ sessionStartedAt: new Date().toISOString() });
   }, [memory.sessionStartedAt, updateMemory]);
@@ -850,12 +866,14 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
       if (result.planContext) recordPlanContext(result.planContext);
       if (result.workflowContext) recordWorkflowContext(result.workflowContext);
-      if (result.reasoningContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.personalityPhraseId || result.toolContext) updateMemory({
+      if (result.agentContext) recordAgentContext(result.agentContext);
+      if (result.reasoningContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
         ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
         ...(result.workflowContext ? { lastWorkflowContext: result.workflowContext } : {}),
+        ...(result.agentContext ? { lastAgentContext: result.agentContext, lastAgentSession: result.agentContext.session } : {}),
         ...(result.toolContext ? { lastToolContext: result.toolContext } : {}),
         ...(result.personalityPhraseId ? { personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) } : {}),
         conversationCount: Number(memory.conversationCount || 0) + 1,
@@ -880,7 +898,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_brain', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return false;
     }
-  }, [activePanel, appState, executeAction, history, memory, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
+  }, [activePanel, appState, executeAction, history, memory, recordAgentContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
     if (!settings.enabled) return null;
@@ -928,6 +946,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
         ...(result.workflowContext ? { lastWorkflowContext: result.workflowContext } : {}),
+        ...(result.agentContext ? { lastAgentContext: result.agentContext, lastAgentSession: result.agentContext.session } : {}),
         ...(result.toolContext ? { lastToolContext: result.toolContext } : {}),
         personalityHistory: result.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) : memory.personalityHistory,
         conversationCount: Number(memory.conversationCount || 0) + 1,
@@ -935,6 +954,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       });
       if (result.planContext) recordPlanContext(result.planContext);
       if (result.workflowContext) recordWorkflowContext(result.workflowContext);
+      if (result.agentContext) recordAgentContext(result.agentContext);
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
       setUserMemory(prev => learnFromLokiQuery(prev, text, result));
       userAction('loki:analytics', {
@@ -970,7 +990,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         cards: [],
       };
     }
-  }, [activeContext, activePanel, appState, executeAction, history, memory, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, executeAction, history, memory, recordAgentContext, recordPlanContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const openContextExperience = useCallback((context) => {
     const normalized = normalizeLokiContext(context);

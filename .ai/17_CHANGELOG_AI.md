@@ -3598,6 +3598,15 @@
 - После профильной карточки контент теперь сразу переходит к разделу `Что интересного сегодня`, без заглушек, пустого контейнера и резервирования места под рекомендации.
 - Loki, Proactive Assistant, нижняя навигация, маршруты, API, Firestore и бизнес-логика не изменялись.
 
+# 2026-07-18 — Loki Agent Mode v1
+
+- Добавлен новый orchestration layer `src/loki/core/agent`: Agent Engine, Resolver, Context, Decision, Executor, Session, Continuation, Confirmation, Safety, History и Snapshot.
+- Agent Mode работает поверх существующих Planner, Workflow Engine, Tool Calling и Action Center: выбирает `RESPOND`, `RUN_TOOL`, `START_WORKFLOW`, `CONTINUE_WORKFLOW`, `ASK_CONFIRMATION`, `WAIT_USER`, `FINISH`, не создавая новый “мозг” Локи.
+- Добавлена локальная `Agent Session`: `sessionId`, текущая цель, workflow, plan, last decision, `waitingForUser`, pending confirmation. Сохраняется только в Loki memory как `lastAgentSession`/`agentHistory`.
+- Для ответов `да`/`отмена` добавлен Agent Continuation: активный workflow продолжается или закрывается без повторного запуска Planner.
+- Agent Safety требует подтверждение перед потенциально изменяющими действиями и валидирует реальные actions через существующий Action Validator. Backend, Firestore, API, Security Rules, Tool Layer, Workflow Engine, Planner, Memory Engine и бизнес-логика не менялись.
+- Добавлен regression-тест `scripts/loki-agent-test.mjs` и npm script `test:loki-agent` с 1500+ сценариями.
+
 # 2026-07-18 — Loki Workflow Engine v1
 
 - Добавлен декларативный слой `src/loki/core/workflows`: registry, resolver, planner, runner, progress/state, validator, local history и snapshot.
