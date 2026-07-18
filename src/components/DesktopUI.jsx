@@ -318,6 +318,8 @@ export function DesktopTopOverview({
   onSearchClear,
   unreadCount = 0,
   onOpenNotifications,
+  onOpenMessages,
+  messageUnreadCount = 0,
   onOpenLoki,
   onOpenProfile,
   workspaceAction,
@@ -353,6 +355,7 @@ export function DesktopTopOverview({
   const safeProgress = Math.max(0, Math.min(100, Math.round(Number(progressValue) || 0)));
   const progressColor = profileProgressColor || APG2_PROFILE.gold;
   const levelBadgeText = String(profileBadge || '').trim();
+  const safeMessageUnread = Math.max(0, Math.min(99, Number(messageUnreadCount || 0) || 0));
   const runSearch = () => {
     if (typeof onSearchSubmit === 'function') onSearchSubmit(actualSearchValue);
   };
@@ -425,6 +428,10 @@ export function DesktopTopOverview({
           <button type="button" onClick={onOpenNotifications} aria-label="Уведомления" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
             🔔
             {unreadCount > 0 && <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />}
+          </button>
+          <button type="button" onClick={onOpenMessages} aria-label="Сообщения" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
+            💬
+            {safeMessageUnread > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 20, height: 20, borderRadius: 999, padding: '0 5px', boxSizing: 'border-box', background: '#E64646', border: '2px solid #101012', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10.5, lineHeight: '14px', fontWeight: 900 }}>{safeMessageUnread}</span>}
           </button>
           {workspaceAction}
         </div>

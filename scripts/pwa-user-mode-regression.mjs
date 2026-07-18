@@ -22,9 +22,14 @@ assert.equal(getPrimaryRole({ role: 'super_admin' }), 'super_admin');
 assert.equal(normalizeRole('administrator'), 'admin');
 
 const userAppSource = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
+const lokiAssistantSource = readFileSync(new URL('../src/loki/LokiAssistant.jsx', import.meta.url), 'utf8');
+const workspaceCoreSource = readFileSync(new URL('../src/workspace/WorkspaceCore.js', import.meta.url), 'utf8');
 assert.match(userAppSource, /readCachedArray\('apg_news_cache'\)\.filter\(item => isNotArchived\(item\) && isPublicContent\(item\)\)/);
 assert.match(userAppSource, /readCachedArray\('apg_events_cache'\)[\s\S]*isPublicContent\(item\) \|\| normalizeContentStatus\(item\) === 'completed'/);
 assert.match(userAppSource, /UserApp Branch/);
 assert.match(userAppSource, /'serviceWorker' in navigator/);
+assert.match(lokiAssistantSource, /data-floating-messages-button/);
+assert.match(lokiAssistantSource, /zIndex: 10040/);
+assert.doesNotMatch(workspaceCoreSource, /id: 'messages',[\s\S]{0,160}regions: \[WORKSPACE_REGIONS\.bottomBar\]/);
 
 console.log('PWA User Mode regression passed');

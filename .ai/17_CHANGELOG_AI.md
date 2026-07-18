@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] ux: Messaging + Loki Navigation
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/UserApp.jsx`, `src/loki/LokiAssistant.jsx`, `src/components/DesktopUI.jsx`, `src/HomePanelV2.jsx`, `src/workspace/WorkspaceCore.js`, `scripts/pwa-user-mode-regression.mjs`, `scripts/desktop-ui-framework-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Сообщения убраны из mobile bottom navigation island и перенесены в floating communication cluster над кнопкой Локи.
+- Floating-кнопка сообщений открывает `/messages`, показывает badge непрочитанных и не перегружает нижний остров навигации.
+- Кнопка Локи получила повышенный `z-index`, явный `pointerEvents`, `touchAction` и стабильный hitbox; desktop header получил кнопку “Сообщения” с badge.
+**Почему:** Локи стал центром общения, а сообщения логичнее держать рядом с ним, не раздувая основной mobile navigation island.
+
+---
+
 ## [2026-07-19] feat: APG Social Messaging v2 Server Persistence & Security
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/social-messaging.js`, `server-shared/context-dialogs.js`, `server/src/routes/user-actions.js`, `firestore.rules`, `src/ProfilePanel.jsx`, `src/messaging/ConversationEligibility.js`, `scripts/social-messaging-server-test.mjs`, `scripts/social-messaging-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

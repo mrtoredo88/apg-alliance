@@ -37,7 +37,7 @@ function getIdentityState(emotion, action) {
   return 'ready';
 }
 
-export function LokiAssistant({ desktopMode = false }) {
+export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnreadCount = 0 }) {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -65,6 +65,50 @@ export function LokiAssistant({ desktopMode = false }) {
   const isLongMessage = bubbleText.length > 86;
   const isCelebrating = loki.emotion === 'happy' || loki.emotion === 'excited';
   const isThinking = loki.emotion === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND;
+  const safeMessageUnread = Math.max(0, Math.min(99, Number(messageUnreadCount || 0) || 0));
+  const showMessageFab = !desktopMode && typeof onOpenMessages === 'function';
+  const hasLokiSignal = Boolean(loki.card || (loki.message && loki.canTalk));
+  const messageFab = showMessageFab ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenMessages();
+      }}
+      aria-label="Сообщения"
+      data-floating-messages-button="true"
+      style={{
+        width: 56,
+        height: 56,
+        minWidth: 56,
+        minHeight: 56,
+        borderRadius: 22,
+        border: '1px solid rgba(120,214,255,0.34)',
+        background: 'linear-gradient(145deg, rgba(120,214,255,0.24), rgba(var(--apg2-glass-a,255,255,255),0.10))',
+        color: '#EAF8FF',
+        display: 'grid',
+        placeItems: 'center',
+        fontSize: 23,
+        lineHeight: '28px',
+        padding: 0,
+        position: 'relative',
+        cursor: 'pointer',
+        touchAction: 'manipulation',
+        pointerEvents: 'auto',
+        WebkitTapHighlightColor: 'transparent',
+        backdropFilter: 'blur(22px) saturate(1.65)',
+        WebkitBackdropFilter: 'blur(22px) saturate(1.65)',
+        boxShadow: '0 18px 44px rgba(0,0,0,0.28), 0 0 28px rgba(120,214,255,0.14), inset 0 1px 0 rgba(255,255,255,0.24)',
+      }}
+    >
+      💬
+      {safeMessageUnread > 0 && (
+        <span style={{ position: 'absolute', right: -5, top: -5, minWidth: 22, height: 22, borderRadius: 999, padding: '0 6px', boxSizing: 'border-box', background: '#E64646', border: '2px solid rgba(9,10,16,0.96)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, lineHeight: '15px', fontWeight: 920 }}>
+          {safeMessageUnread}
+        </span>
+      )}
+    </button>
+  ) : null;
 
   useEffect(() => {
     if (!loki.visible) return undefined;
@@ -110,37 +154,53 @@ export function LokiAssistant({ desktopMode = false }) {
 
   if (shouldShowRestore) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          loki.setHintsEnabled(true);
-          loki.showCurrentPanel();
-          loki.show();
-          setMenuOpen(false);
-        }}
-        aria-label="Вернуть Локи"
+      <div
         style={{
           position: 'fixed',
           right: 'max(14px, env(safe-area-inset-right, 0px))',
           bottom: desktopMode ? 'max(18px, env(safe-area-inset-bottom, 0px))' : 'calc(84px + env(safe-area-inset-bottom, 0px))',
-          zIndex: 9997,
-          width: 46,
-          height: 46,
-          borderRadius: 19,
-          border: '1px solid rgba(215,184,106,0.34)',
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.20), rgba(255,255,255,0.06))',
-          backdropFilter: 'blur(22px) saturate(1.7)',
-          WebkitBackdropFilter: 'blur(22px) saturate(1.7)',
-          boxShadow: '0 14px 36px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.24)',
-          padding: 0,
-          overflow: 'hidden',
-          cursor: 'pointer',
-          WebkitTapHighlightColor: 'transparent',
-          animation: 'lokiAppear 620ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both, lokiBreath 5.8s ease-in-out 700ms infinite',
+          zIndex: 10040,
+          display: 'grid',
+          gap: 10,
+          justifyItems: 'end',
+          pointerEvents: 'none',
         }}
       >
-        <LokiIdentity size={42} state="ready" showText={false} style={{ width: '100%', height: '100%', placeItems: 'center' }} />
-      </button>
+        {messageFab}
+        <button
+          type="button"
+          onClick={() => {
+            loki.setHintsEnabled(true);
+            loki.showCurrentPanel();
+            loki.show();
+            setMenuOpen(false);
+          }}
+          aria-label="Вернуть Локи"
+          style={{
+            width: 56,
+            height: 56,
+            minWidth: 56,
+            minHeight: 56,
+            borderRadius: 22,
+            border: '1px solid rgba(215,184,106,0.34)',
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.20), rgba(255,255,255,0.06))',
+            backdropFilter: 'blur(22px) saturate(1.7)',
+            WebkitBackdropFilter: 'blur(22px) saturate(1.7)',
+            boxShadow: '0 14px 36px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.24)',
+            padding: 0,
+            overflow: 'hidden',
+            cursor: 'pointer',
+            position: 'relative',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            animation: 'lokiAppear 620ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both, lokiBreath 5.8s ease-in-out 700ms infinite',
+          }}
+        >
+          <LokiIdentity size={48} state="ready" showText={false} style={{ width: '100%', height: '100%', placeItems: 'center' }} />
+          {hasLokiSignal && <span style={{ position: 'absolute', right: 5, top: 5, width: 9, height: 9, borderRadius: '50%', background: '#78D6FF', border: '2px solid rgba(9,10,16,0.96)', boxShadow: '0 0 16px rgba(120,214,255,0.72)' }} />}
+        </button>
+      </div>
     );
   }
 
@@ -151,7 +211,7 @@ export function LokiAssistant({ desktopMode = false }) {
       style={{
         position: 'fixed',
         ...position,
-        zIndex: 9997,
+        zIndex: 10040,
         display: 'grid',
         gap: 10,
         pointerEvents: 'none',
@@ -230,6 +290,7 @@ export function LokiAssistant({ desktopMode = false }) {
       )}
 
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
+        {messageFab && <div style={{ display: 'grid', justifyItems: 'end', gap: 10, marginBottom: 10, pointerEvents: 'auto' }}>{messageFab}</div>}
         {menuOpen && (
           <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 190, borderRadius: 24, padding: 9, display: 'grid', gap: 7, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
             <button type="button" onClick={() => { loki.executeAction(createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI)); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
@@ -301,6 +362,8 @@ export function LokiAssistant({ desktopMode = false }) {
           style={{
             width: 92,
             height: 92,
+            minWidth: 92,
+            minHeight: 92,
             border: 0,
             borderRadius: 34,
             padding: 5,
@@ -309,6 +372,8 @@ export function LokiAssistant({ desktopMode = false }) {
               : 'linear-gradient(145deg, rgba(215,184,106,0.36), rgba(var(--apg2-glass-a,255,255,255),0.12))',
             boxShadow: '0 24px 64px rgba(0,0,0,0.30), 0 0 34px rgba(215,184,106,0.18)',
             cursor: 'pointer',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             transformOrigin: '50% 80%',
             overflow: 'visible',
@@ -316,6 +381,7 @@ export function LokiAssistant({ desktopMode = false }) {
           }}
         >
           <span style={{ position: 'absolute', inset: -8, borderRadius: 38, background: isThinking ? 'radial-gradient(circle, rgba(120,214,255,0.18), transparent 68%)' : 'radial-gradient(circle, rgba(232,201,122,0.22), transparent 70%)', filter: 'blur(7px)', opacity: 0.9, animation: 'lokiAmbientGlow 4.8s ease-in-out infinite', pointerEvents: 'none' }} />
+          {hasLokiSignal && <span style={{ position: 'absolute', right: 10, top: 10, width: 11, height: 11, borderRadius: '50%', background: '#78D6FF', border: '2px solid rgba(9,10,16,0.96)', boxShadow: '0 0 18px rgba(120,214,255,0.72)' }} />}
           <span style={{ display: 'block', transformOrigin: '50% 80%', animation: `${motionName} ${loki.emotion === 'excited' ? '1180ms' : '6.2s'} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
             <span style={{ display: 'block', transform: `translate3d(${look.x}px, ${look.y}px, 0) rotate(${look.x * 0.55}deg)`, transition: 'transform 420ms cubic-bezier(0.16,1,0.3,1)', animation: actionName === 'none' ? 'none' : `${actionName} 1800ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both`, willChange: 'transform' }}>
               <LokiIdentity size={82} state={identityState} showText={false} style={{ placeItems: 'center', willChange: 'transform' }} />

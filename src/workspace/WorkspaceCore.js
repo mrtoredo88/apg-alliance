@@ -49,14 +49,6 @@ export const USER_MODE_NAV_ITEMS = [
     capability: CAPABILITIES.canUseUserMode,
   },
   {
-    id: 'messages',
-    panelId: 'dialogs',
-    label: 'Сообщения',
-    iconKey: 'messages',
-    regions: [WORKSPACE_REGIONS.bottomBar],
-    capability: CAPABILITIES.canUseUserMode,
-  },
-  {
     id: 'scan',
     panelId: null,
     label: 'Скан',

@@ -3068,6 +3068,15 @@ export function UserApp() {
     navigatePanel('notifications');
   }, [navigatePanel]);
 
+  const handleOpenMessages = useCallback(() => {
+    try {
+      if (window.location.pathname !== '/messages') {
+        window.history.pushState({ panel: 'dialogs' }, '', '/messages');
+      }
+    } catch {}
+    navigatePanel('dialogs');
+  }, [navigatePanel]);
+
   const requestWebPushPermission = useCallback(async ({ silent = false } = {}) => {
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       if (!silent) showToast('❌ Push не поддерживается в этом браузере', 'error');
@@ -3283,6 +3292,7 @@ export function UserApp() {
     } catch {}
   }, []);
   const bottomNavigation = useMemo(() => getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, identity: roleIdentity }), [roleIdentity]);
+  const mobileNavigationItems = useMemo(() => bottomNavigation.primary.filter(item => item.id !== 'messages'), [bottomNavigation.primary]);
   const tabIconByKey = {
     home: TabHomeIcon,
     partners: TabPartnersIcon,
@@ -3290,7 +3300,7 @@ export function UserApp() {
     experts: TabExpertsIcon,
     profile: TabProfileIcon,
   };
-  const TABS = bottomNavigation.primary.map(item => ({
+  const TABS = mobileNavigationItems.map(item => ({
     id: item.panelId,
     workspaceId: item.id,
     label: item.label,
@@ -3305,7 +3315,7 @@ export function UserApp() {
       : loggedOut
         ? 'UserApp Branch: LoggedOut'
         : 'UserApp Branch: PWA User Mode';
-  const activeNavigation = bottomNavigation.primary.map(item => `${item.id}:${item.panelId ?? 'action'}`).join(', ') || 'empty';
+  const activeNavigation = mobileNavigationItems.map(item => `${item.id}:${item.panelId ?? 'action'}`).join(', ') || 'empty';
   const tabBarReason = showTabBar
     ? 'visible'
     : desktopDevice
@@ -3853,6 +3863,7 @@ export function UserApp() {
     onOpenLeaderboard: () => goPanel('leaderboard'),
     onOpenRewards: () => goPanel('rewards'),
     onOpenNotifications: openNotifications,
+    onOpenMessages: handleOpenMessages,
     onOpenNews: (itemOrId) => {
       const targetId = typeof itemOrId === 'object' ? getCanonicalNewsId(itemOrId) : String(itemOrId || '').trim();
       if (typeof itemOrId === 'object') {
@@ -3963,6 +3974,8 @@ export function UserApp() {
     onSearchClear: () => {},
     unreadCount,
     onOpenNotifications: openNotifications,
+    onOpenMessages: handleOpenMessages,
+    messageUnreadCount: unreadCount,
     onOpenLoki: handleOpenLoki,
     onOpenProfile: handleOpenProfile,
     workspaceAction: desktopWorkspaceAvailable ? (
@@ -4012,6 +4025,7 @@ export function UserApp() {
     handleOpenExperts,
     handleOpenHome,
     handleOpenLoki,
+    handleOpenMessages,
     handleOpenNews,
     handleOpenOffers,
     handleOpenPartners,
@@ -4787,7 +4801,7 @@ export function UserApp() {
           />
           {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
             <Suspense fallback={null}>
-              <LokiAssistant desktopMode={desktopDevice} />
+              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={unreadCount} />
             </Suspense>
           )}
           </LokiProvider>

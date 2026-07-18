@@ -399,6 +399,7 @@ function V2FirstScreen({
   partnerOfMonth,
   unreadCount,
   onOpenNotifications,
+  onOpenMessages,
   onOpenPartner,
   onOpenNearby,
   onOpenEvents,
@@ -436,6 +437,7 @@ function V2FirstScreen({
         unreadCount={unreadCount}
         counterPulse={counterPulse}
         onOpenNotifications={onOpenNotifications}
+        onOpenMessages={onOpenMessages}
         onOpenPartner={onOpenPartner}
         onOpenNearby={onOpenNearby}
         onOpenEvents={onOpenEvents}
@@ -498,6 +500,7 @@ function V2FirstScreenMobile({
   partnerOfMonth,
   unreadCount,
   onOpenNotifications,
+  onOpenMessages,
   onOpenPartner,
   onOpenNearby,
   onOpenEvents,
@@ -903,6 +906,7 @@ function V2FirstScreenDesktop({
           onSearchClear={() => setDesktopSearchQuery('')}
           unreadCount={unreadCount}
           onOpenNotifications={onOpenNotifications}
+          onOpenMessages={onOpenMessages}
           onOpenLoki={onOpenLoki}
           onOpenProfile={onOpenProfile}
           workspaceAction={desktopWorkspaceAvailable && typeof onSwitchAppMode === 'function' ? (
@@ -2835,7 +2839,7 @@ export function HomePanelV2({
   counterPulse = false,
   interestProfile = null,
   desktopMode = false,
-  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenPartners, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
+  onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenPartners, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onOpenMessages, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
   onOpenProfile,
   desktopWorkspaceAvailable = false,
   onSwitchAppMode,
@@ -2980,6 +2984,7 @@ export function HomePanelV2({
         onOpenOffers={onOpenOffers}
         onOpenEvents={onOpenEvents}
         onOpenRewards={onOpenRewards}
+        onOpenMessages={onOpenMessages}
         onOpenTasks={onOpenTasks}
         onOpenReference={onOpenReference}
         onOpenLoki={onOpenLoki}
