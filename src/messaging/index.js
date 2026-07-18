@@ -6,3 +6,6 @@ export * from './MessagingContext.js';
 export * from './MessagingHistory.js';
 export * from './MessagingSnapshot.js';
 export * from './MessagingValidator.js';
+export * from './ConversationEligibility.js';
+export * from './ConversationRequest.js';
+export * from './SocialMessagingSnapshot.js';

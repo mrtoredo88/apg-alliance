@@ -1,4 +1,5 @@
 import { buildUnifiedDialogList } from './MessagingRouter.js';
+import { buildSocialMessagingSnapshot } from './SocialMessagingSnapshot.js';
 
 export function buildMessagingSnapshot(input = {}) {
   const dialogs = buildUnifiedDialogList(input);
@@ -19,6 +20,7 @@ export function buildMessagingSnapshot(input = {}) {
     source: 'users.contextDialogs',
     byType,
     byCategory,
+    socialMessaging: buildSocialMessagingSnapshot(input),
     updatedAt: new Date().toISOString(),
   };
 }

@@ -41,11 +41,13 @@ export function buildMessagingPermissions(actor = {}, dialog = {}) {
   const access = canAccessDialog(actor, dialog);
   const user = getMessagingActor(actor);
   const owner = list(dialog.ownerUserIds || dialog.context?.ownerUserIds).includes(user.id);
+  const blocked = list(dialog.blockedUserIds || dialog.context?.blockedUserIds || dialog.socialBlockedUserIds).includes(user.id);
   return {
     ...access,
     canRead: access.allowed,
-    canWrite: access.allowed && dialog.archived !== true && dialog.workspaceState?.archived !== true,
+    canWrite: access.allowed && !blocked && dialog.archived !== true && dialog.workspaceState?.archived !== true,
     canModerate: user.isAdmin || owner,
     actorRole: user.role,
+    blocked,
   };
 }

@@ -3768,6 +3768,15 @@
 - `LokiCore` получил debug trace для `workflowEngine`; `LokiProvider` сохраняет `lastWorkflowContext` и локальную `workflowHistory`.
 - Добавлен regression-тест `scripts/loki-workflow-test.mjs` и npm script `test:loki-workflow` с 1200+ workflow-сценариями.
 
+# 2026-07-19 — APG Social Messaging v1
+
+- Добавлен frontend-only слой Social Messaging поверх существующей Messaging Platform: `ConversationEligibility`, request lifecycle, privacy, block state и diagnostics без новой системы сообщений.
+- Eligibility разрешает личный `direct` диалог только по причинам `friends`, `shared_event`, `existing_conversation`, `shared_partner` или `manual_permission`.
+- Добавлены локальные Conversation Requests со статусами `pending`, `accepted`, `declined`, `expired` и лимитом 10 новых запросов за 24 часа.
+- Профиль получил раздел `Социальные сообщения`: настройка приватности, входящие/исходящие запросы, блокировки и Dev Panel `Social Messaging`.
+- Существующие direct-диалоги остаются read-compatible; при block marker запись выключается через `MessagingPermissions`, чтение сохраняется.
+- Добавлен regression/smoke `scripts/social-messaging-test.mjs` на 700 сценариев eligibility, запросов, приватности, блокировок и совместимости с Dialog Engine.
+
 # 2026-07-19 — APG Messaging v3 Smart Conversations
 
 - Контекстные диалоги получили sticky Smart Conversation Header: верхняя карточка автоматически показывает объект переписки для партнёра, эксперта, записи, мероприятия, акции и новости.
