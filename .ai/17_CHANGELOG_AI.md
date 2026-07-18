@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-19] fix: mobile tabbar scanner slot after Messaging tab
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** нижняя навигация теперь определяет кнопку сканера по `workspaceId: scan`, а не по фиксированному индексу, и пропускает tab без валидной иконки.
+**Почему:** добавление вкладки “Сообщения” изменило порядок mobile tabs и могло привести к runtime React error при рендере action-only пункта сканера.
+
+---
+
 ## [2026-07-19] feat: Universal Messaging Foundation v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/messaging/*`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/workspace/WorkspaceCore.js`, `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `scripts/messaging-foundation-test.mjs`, `scripts/workspace-core-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

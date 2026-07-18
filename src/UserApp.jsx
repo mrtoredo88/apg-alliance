@@ -3466,7 +3466,7 @@ export function UserApp() {
         />
       )}
       {TABS.map((tab, i) => {
-        if (i === 2) return (
+        if (tab.workspaceId === 'scan' || !tab.id) return (
           <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { openScanner('tabbar'); }}
             style={{ flex: 1, background: isScannerOpen ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isScannerOpen ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isScannerOpen ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 0, position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
@@ -3484,6 +3484,7 @@ export function UserApp() {
         const isActive = activePanel === tab.id && !isScannerOpen;
         const Icon     = tab.icon;
         const hasNotif = tab.id === 'profile' && unreadCount > 0;
+        if (!Icon) return null;
 
         return (
           <button key={tab.id}
