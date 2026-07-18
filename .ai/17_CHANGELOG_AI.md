@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-18] feat: Loki Conversation Engine v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/conversation/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-conversation-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен локальный Conversation Engine v1: Session, Context, Resolver, References, Topics, History, Snapshot и Validator.
+- `SmartAnswerPipeline` теперь перед Journey/Planner/Workflow/Agent передаёт `conversationSnapshot`, умеет разрешать follow-up, местоимения и порядковые ссылки в `effectiveQuestion/effectiveIntent`.
+- `LokiProvider` сохраняет `lastConversationSession`/`conversationHistory` локально, а debug trace показывает темы, активные сущности, resolved reference и причину восстановления контекста.
+- Добавлен `npm run test:loki-conversation`: 1800+ сценариев проверяют продолжение разговора, ссылки на сущности, смену/возврат тем, конфликт ссылок, Agent/Planner integration, snapshot, observability и read-only контракт.
+**Почему:** после Agent Mode Локи должен вести естественный многосообщенческий диалог и передавать уже разрешённый контекст в Planner, Workflow Engine и Agent Mode без изменения backend, Firestore, API, Memory Engine и бизнес-логики.
+
+---
+
 ## [2026-07-18] feat: Loki Memory Engine v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/memory/*`, `src/loki/core/lokiUserMemory.js`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/planner/*`, `src/loki/core/LokiCore.js`, `src/loki/LokiProvider.jsx`, `scripts/loki-memory-test.mjs`, `package.json`, `.ai/21_LOKI_CORE_V2.md`, `.ai/17_CHANGELOG_AI.md`

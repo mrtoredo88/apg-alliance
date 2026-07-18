@@ -20,6 +20,16 @@ Loki Core V2 внедрён как совместимый архитектурн
         ├── Suggestion Engine
         └── Answer Composer
                     │
+        Conversation Engine v1
+        ├── Conversation Session
+        ├── Conversation Context
+        ├── Conversation Resolver
+        ├── Conversation References
+        ├── Conversation Topics
+        ├── Conversation History
+        ├── Conversation Snapshot
+        └── Conversation Validator
+                    │
            Journey Engine v1
         ├── Goal Detector
         ├── Journey Planner
@@ -159,7 +169,8 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Knowledge Provider | V1 production | агрегирует существующие partners/experts/locations/promotions/events/gifts/news/reviews/bookings/dialogs/workspace data без новых коллекций |
 | Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
 | Reasoning Engine | V1 production | read-only слой после Knowledge Provider: ранжирует варианты, считает confidence, хранит follow-up контекст локально и предлагает действия без новых API |
-| Journey Engine | V1 production | read-only слой после Reasoning: определяет цель пользователя, строит локальный путь, отслеживает прогресс и предлагает следующий action без backend/Firestore |
+| Conversation Engine | V1 production | локальный слой после Reasoning: удерживает темы диалога, активные сущности, местоимения, порядковые ссылки и follow-up context перед Journey/Planner/Agent без Firestore/API |
+| Journey Engine | V1 production | read-only слой после Conversation: определяет цель пользователя, строит локальный путь, отслеживает прогресс и предлагает следующий action без backend/Firestore |
 | Personalization Engine | V1 production | read-only слой после Journey: строит пользовательский контекст из уже загруженного app state, динамически вычисляет предпочтения, адаптирует рекомендации и объясняет используемые данные |
 | Memory Engine | V1 production | локальный read-only/append-only слой пользовательской памяти: собирает обезличенные предпочтения, активность, conversation-сигналы и successful recommendations; отдаёт Planner готовый Memory Snapshot |
 | Proactive Assistant | V1 production | read-only/local слой поверх загруженного app state: находит одну полезную opportunity, уважает timing, dismiss, cooldown, silent mode и объясняет причину показа |
@@ -201,6 +212,8 @@ Loki Core V2 внедрён как совместимый архитектурн
 - Agent Session хранится локально как `lastAgentSession`/`agentHistory`; Firestore, backend, API, Security Rules и business logic не меняются.
 - Agent Safety валидирует только реальные `LOKI_APP_ACTIONS` через существующий Action Validator и запрашивает подтверждение перед потенциально state-changing действиями: запись, регистрация, отправка, отмена, подтверждение, изменение данных.
 - При коротком ответе пользователя `да`/`отмена` Agent Continuation использует активную локальную session и не запускает Planner повторно.
+- Conversation Engine v1 хранит только локальную `lastConversationSession`/`conversationHistory`, не импортирует Firebase/API, не выполняет запросы и отдаёт Planner/Workflow/Agent готовый `conversationSnapshot`.
+- Conversation Validator не угадывает неоднозначные местоимения: если ссылка может относиться к нескольким объектам разных типов, Локи просит уточнение.
 - Memory Engine v1 хранит данные только локально в `userMemory.lokiMemory`, не отправляет их во внешние сервисы, не импортирует Firebase/API и фильтрует email, телефоны, пароли, токены, платёжные и другие чувствительные данные.
 - Planner получает только готовый `memorySnapshot`; прямого доступа Planner к Memory Store нет.
 - Создание и публикация не маскируются под клиентские вызовы.
@@ -219,6 +232,7 @@ npm run test:loki-planner
 npm run test:loki-memory
 npm run test:loki-workflow
 npm run test:loki-agent
+npm run test:loki-conversation
 npm run test:loki-personalization
 npm run test:loki-proactive
 npm run test:loki-observability
@@ -227,7 +241,7 @@ npm run test:loki-tool
 npm run build
 ```
 
-Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 1500+ agent-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев и 844 tool-сценария: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow/Agent History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`/`agentContext`, Memory/Workflow/Agent Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow/Agent Layer.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner, 100 knowledge-вопросов по данным АПГ, 200 reasoning-сценариев, 250 journey-сценариев, 914 planner-сценариев, 1000+ memory-сценариев, 1200+ workflow-сценариев, 1500+ agent-сценариев, 1800+ conversation-сценариев, 300 personalization-сценариев, 400 proactive-сценариев, 500 observability-сценариев, 618 action-сценариев и 844 tool-сценария: registry, resolver, validator, executor, TTL cache, local Tool/Plan/Workflow/Agent/Conversation History, Action Center integration, denied/empty states, прозрачные `planContext`/`workflowContext`/`agentContext`/`conversationContext`, Memory/Workflow/Agent/Conversation Snapshot, privacy guard и отсутствие Firestore/API/fetch imports в Tool/Planner/Memory/Workflow/Agent/Conversation Layer.
 
 ## Следующие production-этапы
 

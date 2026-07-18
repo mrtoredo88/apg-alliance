@@ -10,6 +10,7 @@ import { runLokiToolLayer } from '../tools/ToolCenter.js';
 import { runLokiWorkflowEngine } from '../workflows/WorkflowEngine.js';
 import { buildWorkflowSnapshot } from '../workflows/WorkflowSnapshot.js';
 import { runLokiAgentContinuation, runLokiAgentEngine } from '../agent/AgentEngine.js';
+import { runLokiConversationEngine } from '../conversation/ConversationEngine.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -229,68 +230,95 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   const knowledge = buildLokiKnowledgeProvider({ ...sourceState, activeContext: context?.memory?.activeContext || sourceState.activeContext });
   const intent = detectLokiIntent(question, knowledge);
   const contextReasoning = runReasoningEngine({ question, intent, knowledge, context });
-  const contextJourney = runJourneyEngine({ question, intent, knowledge, reasoningResult: contextReasoning, context });
-  const memoryResult = runLokiMemoryEngine({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context, appState: sourceState });
+  const conversationResult = runLokiConversationEngine({ question, intent, reasoningResult: contextReasoning, context });
+  const conversationContext = conversationResult?.conversationContext || null;
+  if (conversationResult?.needsClarification) {
+    return {
+      intent: 'conversation.clarify',
+      preserveText: true,
+      text: conversationResult.clarificationText,
+      card: null,
+      cards: [],
+      knowledge,
+      reasoningContext: contextReasoning?.reasoningContext,
+      conversationContext,
+    };
+  }
+  const effectiveQuestion = conversationResult?.effectiveQuestion || question;
+  const effectiveIntent = conversationResult?.effectiveIntent || intent;
+  const contextWithConversation = {
+    ...(context || {}),
+    memory: {
+      ...(context?.memory || {}),
+      conversationSnapshot: conversationContext?.snapshot,
+      lastConversationSession: conversationContext?.session,
+    },
+  };
+  const effectiveReasoning = effectiveQuestion !== question || effectiveIntent !== intent
+    ? runReasoningEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, context: contextWithConversation }) || contextReasoning
+    : contextReasoning;
+  const contextJourney = runJourneyEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, reasoningResult: effectiveReasoning, context: contextWithConversation });
+  const memoryResult = runLokiMemoryEngine({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithConversation, appState: sourceState });
   const contextWithMemory = memoryResult?.context || context;
   const workflowSnapshot = buildWorkflowSnapshot(contextWithMemory?.memory || {});
   const contextWithWorkflow = {
     ...contextWithMemory,
-    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot },
+    memory: { ...(contextWithMemory?.memory || {}), workflowSnapshot, conversationSnapshot: conversationContext?.snapshot, lastConversationSession: conversationContext?.session },
   };
-  const continuationResult = runLokiAgentContinuation({ question, context: contextWithWorkflow });
-  if (continuationResult) return { ...continuationResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
-  const plannerResult = runLokiPlanner({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+  const continuationResult = runLokiAgentContinuation({ question: effectiveQuestion, context: contextWithWorkflow });
+  if (continuationResult) return { ...continuationResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+  const plannerResult = runLokiPlanner({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
   if (plannerResult) {
-    const workflowResult = runLokiWorkflowEngine({ question, intent, plannerResult, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+    const workflowResult = runLokiWorkflowEngine({ question: effectiveQuestion, intent: effectiveIntent, plannerResult, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
     if (workflowResult) {
-      const agentResult = runLokiAgentEngine({ question, result: workflowResult, context: contextWithWorkflow, appState: sourceState });
-      return { ...agentResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+      const agentResult = runLokiAgentEngine({ question: effectiveQuestion, result: workflowResult, context: contextWithWorkflow, appState: sourceState });
+      return { ...agentResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
     }
-    const agentResult = runLokiAgentEngine({ question, result: plannerResult, context: contextWithWorkflow, appState: sourceState });
-    return { ...agentResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+    const agentResult = runLokiAgentEngine({ question: effectiveQuestion, result: plannerResult, context: contextWithWorkflow, appState: sourceState });
+    return { ...agentResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
   }
-  const toolResult = runLokiToolLayer({ question, intent, reasoningResult: contextReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+  const toolResult = runLokiToolLayer({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
   if (toolResult && toolResult.toolContext?.status !== 'denied') {
-    const agentResult = runLokiAgentEngine({ question, result: toolResult, context: contextWithWorkflow, appState: sourceState });
-    return { ...agentResult, knowledge, reasoningContext: contextReasoning?.reasoningContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
+    const agentResult = runLokiAgentEngine({ question: effectiveQuestion, result: toolResult, context: contextWithWorkflow, appState: sourceState });
+    return { ...agentResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext };
   }
-  if (contextJourney?.journeyHandled) return contextJourney;
-  if (contextJourney && (context?.memory?.lastJourneyContext || context?.memory?.journeyContext)) return contextJourney;
-  if (contextReasoning?.reasoningHandled) return contextReasoning;
-  if (contextReasoning?.reasoningContext?.source === 'memory') return contextReasoning;
-  if (!intentNeedsLocalAnswer(intent)) {
-    if (contextJourney) return contextJourney;
-    if (contextReasoning) return contextReasoning;
-    const fallbackRows = searchKnowledge(knowledge, intent.query || question, [], 4);
+  if (contextJourney?.journeyHandled) return { ...contextJourney, conversationContext };
+  if (contextJourney && (context?.memory?.lastJourneyContext || context?.memory?.journeyContext)) return { ...contextJourney, conversationContext };
+  if (effectiveReasoning?.reasoningHandled) return { ...effectiveReasoning, conversationContext };
+  if (effectiveReasoning?.reasoningContext?.source === 'memory') return { ...effectiveReasoning, conversationContext };
+  if (!intentNeedsLocalAnswer(effectiveIntent)) {
+    if (contextJourney) return { ...contextJourney, conversationContext };
+    if (effectiveReasoning) return { ...effectiveReasoning, conversationContext };
+    const fallbackRows = searchKnowledge(knowledge, effectiveIntent.query || effectiveQuestion, [], 4);
     if (fallbackRows.length) {
-      const fallbackIntent = { ...intent, id: 'knowledge.search', types: [], query: intent.query || question };
-      const reasoned = runReasoningEngine({ question, intent: fallbackIntent, knowledge, context });
-      const journey = runJourneyEngine({ question, intent: fallbackIntent, knowledge, reasoningResult: reasoned, context });
-      if (journey) return journey;
-      return reasoned || answerSearch({ intent: fallbackIntent, knowledge });
+      const fallbackIntent = { ...effectiveIntent, id: 'knowledge.search', types: [], query: effectiveIntent.query || effectiveQuestion };
+      const reasoned = runReasoningEngine({ question: effectiveQuestion, intent: fallbackIntent, knowledge, context: contextWithWorkflow });
+      const journey = runJourneyEngine({ question: effectiveQuestion, intent: fallbackIntent, knowledge, reasoningResult: reasoned, context: contextWithWorkflow });
+      if (journey) return { ...journey, conversationContext };
+      return { ...(reasoned || answerSearch({ intent: fallbackIntent, knowledge })), conversationContext };
     }
     return null;
   }
 
-  if (intent.id.startsWith('search.') || intent.id === 'news.question') {
-    const reasoned = runReasoningEngine({ question, intent, knowledge, context });
-    const journey = runJourneyEngine({ question, intent, knowledge, reasoningResult: reasoned, context });
-    if (journey) return journey;
-    return reasoned || answerSearch({ intent, knowledge });
+  if (effectiveIntent.id.startsWith('search.') || effectiveIntent.id === 'news.question') {
+    const reasoned = runReasoningEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, context: contextWithWorkflow });
+    const journey = runJourneyEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, reasoningResult: reasoned, context: contextWithWorkflow });
+    if (journey) return { ...journey, conversationContext };
+    return { ...(reasoned || answerSearch({ intent: effectiveIntent, knowledge })), conversationContext };
   }
-  if (intent.id === 'context.card') {
-    const reasoned = runReasoningEngine({ question, intent, knowledge, context });
-    const journey = runJourneyEngine({ question, intent, knowledge, reasoningResult: reasoned, context });
-    if (journey) return journey;
-    if (reasoned) return reasoned;
+  if (effectiveIntent.id === 'context.card') {
+    const reasoned = runReasoningEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, context: contextWithWorkflow });
+    const journey = runJourneyEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, reasoningResult: reasoned, context: contextWithWorkflow });
+    if (journey) return { ...journey, conversationContext };
+    if (reasoned) return { ...reasoned, conversationContext };
   }
 
-  if (intent.id === 'info.hours') return answerHours({ intent, knowledge });
-  if (intent.id === 'info.contacts') return answerContacts({ intent, knowledge });
-  if (intent.id === 'info.booking') return answerBooking({ intent, knowledge });
-  if (intent.id === 'profile.question') return answerProfile({ context: context || {}, knowledge });
-  if (intent.id === 'workspace.question') return answerWorkspace({ knowledge });
-  if (intent.id === 'reviews.question') return answerReviews({ knowledge });
-  if (intent.id === 'context.card') return answerContext({ intent, knowledge });
+  if (effectiveIntent.id === 'info.hours') return { ...answerHours({ intent: effectiveIntent, knowledge }), conversationContext };
+  if (effectiveIntent.id === 'info.contacts') return { ...answerContacts({ intent: effectiveIntent, knowledge }), conversationContext };
+  if (effectiveIntent.id === 'info.booking') return { ...answerBooking({ intent: effectiveIntent, knowledge }), conversationContext };
+  if (effectiveIntent.id === 'profile.question') return { ...answerProfile({ context: context || {}, knowledge }), conversationContext };
+  if (effectiveIntent.id === 'workspace.question') return { ...answerWorkspace({ knowledge }), conversationContext };
+  if (effectiveIntent.id === 'reviews.question') return { ...answerReviews({ knowledge }), conversationContext };
+  if (effectiveIntent.id === 'context.card') return { ...answerContext({ intent: effectiveIntent, knowledge }), conversationContext };
   return null;
 }

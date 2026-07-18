@@ -220,7 +220,7 @@ scenario('provider records local agent history', () => {
 
 scenario('pipeline keeps agent after workflow and before generic tool fallback', () => {
   const source = readFileSync(new URL('../src/loki/core/knowledge/SmartAnswerPipeline.js', import.meta.url), 'utf8');
-  assert.ok(source.indexOf('const workflowResult = runLokiWorkflowEngine') < source.indexOf('runLokiAgentEngine({ question, result: workflowResult'));
+  assert.ok(source.indexOf('const workflowResult = runLokiWorkflowEngine') < source.indexOf('runLokiAgentEngine({ question: effectiveQuestion, result: workflowResult'));
   assert.ok(source.indexOf('const continuationResult = runLokiAgentContinuation') < source.indexOf('const plannerResult = runLokiPlanner'));
 });
 
