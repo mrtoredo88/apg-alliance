@@ -11,6 +11,8 @@ Loki Core V2 внедрён как совместимый архитектурн
                     │
              Context Engine
                     │
+       Knowledge Provider + Intent Router
+                    │
         Scenario Registry + Intent/Brain
                     │
        Module Registry (role-aware plugins)
@@ -28,7 +30,7 @@ Loki Core V2 внедрён как совместимый архитектурн
           └── привилегированные действия только backend
 ```
 
-Ядро не содержит продуктовых знаний АПГ: знания остаются в `src/loki/knowledge`, сценарии — в каталоге сценариев, интеграции — в модулях и action adapters. Поэтому те же контракты можно использовать в web, VK, Telegram, desktop или другом продукте.
+Ядро не содержит жёстко зашитых продуктовых знаний АПГ: статическая база остаётся в `src/loki/knowledge`, а runtime-данные приложения собираются совместимым слоем `src/loki/core/knowledge`. Сценарии остаются в каталоге сценариев, интеграции — в модулях и action adapters. Поэтому те же контракты можно использовать в web, VK, Telegram, desktop или другом продукте.
 
 ## Контракт сценария
 
@@ -58,7 +60,9 @@ Loki Core V2 внедрён как совместимый архитектурн
 | Движок | Статус | Ограничение |
 |---|---|---|
 | Brain / Intent | production, совместимый | эвристический semantic scoring, без внешней LLM по умолчанию |
-| Context | production | глубокий card context пока полностью реализован для news |
+| Knowledge Provider | V1 production | агрегирует существующие partners/experts/locations/promotions/events/gifts/news/reviews/bookings/dialogs/workspace data без новых коллекций |
+| Intent Router | V1 production | определяет search/info/profile/workspace/card intents перед legacy-модулями |
+| Context | production | news context сохранён; runtime context теперь дополняется Knowledge Provider |
 | Scenario Registry | V2 готов | 63 legacy-сценария нормализуются при загрузке |
 | Module Registry | V2 готов | role-aware, приоритетный, без switch/case |
 | Reasoner | V2 готов | объединяет partners/experts/events/news по доступным данным |
@@ -86,10 +90,11 @@ Loki Core V2 внедрён как совместимый архитектурн
 
 ```bash
 npm run test:loki
+npm run test:loki-knowledge
 npm run build
 ```
 
-Тест покрывает schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration и event planner.
+Тесты покрывают schema/duplicate guard, plugin resolution, permission denial, safe client action, memory compaction, analytics privacy buckets, voice configuration, event planner и 100 knowledge-вопросов по данным АПГ.
 
 ## Следующие production-этапы
 

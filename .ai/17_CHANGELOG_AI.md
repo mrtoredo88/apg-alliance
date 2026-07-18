@@ -3470,6 +3470,15 @@
 - Фронтовая диагностика владения профилем теперь распознаёт прямые `partnerId/expertId`, а ошибки сохранения больше не скрываются за общей фразой: пользователь видит реальную причину отказа API.
 - Добавлен regression-тест `scripts/profile-save-access-test.mjs`, подключённый к `npm run test:core`, чтобы сохранение linked-профиля без legacy owner-полей больше не ломалось.
 
+# 2026-07-18 — Loki Knowledge Engine v1
+
+- Проведён аудит Loki pipeline: пользовательский Локи работает через `LokiProvider` → `buildLokiContext` → `askLokiCore`, backend AI используется отдельно в `loki-editor`, а старые модули читали в основном партнёров, экспертов, события, новости, ключи и базовую хронику.
+- Найден разрыв покрытия: филиалы, промо как отдельный слой, подарки, отзывы, bookings/meetings, dialogs, workspace analytics, user profile и общий search index уже существовали в `lokiAppState`/моделях АПГ, но не были сведены в единый knowledge context перед ответом.
+- Добавлен изолированный `KnowledgeProvider` без новых Firestore-коллекций и без дополнительных запросов: он агрегирует существующие `partners`, `experts`, `locations`, `promotions`, `events`, `gifts`, `articles/news`, `reviews`, `booking/meetings`, `dialogs`, `workspace analytics`, `user profile` и строит локальный `searchIndex`.
+- Добавлен `IntentRouter` для намерений: поиск партнёров, мероприятий, акций, подарков, филиалов, специалистов, вопросы о карточке, часах работы, контактах, записи, Workspace, профиле, новостях и отзывах.
+- Добавлен `SmartAnswerPipeline`: перед старым набором Loki-модулей Локи сначала пытается ответить из локальных данных АПГ, а существующий Loki Core V2 остаётся fallback для навигации, сценариев, хроник и personality layer.
+- Добавлен regression-тест `scripts/loki-knowledge-engine-test.mjs` и команда `npm run test:loki-knowledge`: покрыто 100 пользовательских вопросов, 97 отвечаются из данных АПГ без ответа “не знаю”.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

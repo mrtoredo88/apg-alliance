@@ -22,6 +22,8 @@ import { AdminAssistant, PlannerEngine, Reasoner } from './v2/index.js';
 import { LokiModuleRegistry } from './v2/LokiModuleRegistry.js';
 import { ScenarioRegistry } from './v2/ScenarioRegistry.js';
 import { LOKI_SCENARIOS } from './brain/lokiScenarios.js';
+import { buildLokiKnowledgeProvider } from './knowledge/KnowledgeProvider.js';
+import { runLokiKnowledgeEngine } from './knowledge/SmartAnswerPipeline.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -92,6 +94,7 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
       ...APG_KNOWLEDGE_BASE,
       custom: Array.isArray(sourceState.lokiKnowledge) ? sourceState.lokiKnowledge : [],
     },
+    knowledgeEngine: buildLokiKnowledgeProvider(sourceState),
     memory: {
       ...memory,
       activeContext: sourceState.activeContext ?? appState.memory?.activeContext ?? memory?.activeContext ?? memory?.lastContext ?? null,
@@ -118,6 +121,14 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
       context,
     });
     return debug ? { ...result, debug: { provider, totalMs: Math.round(nowMs() - start), trace } } : result;
+  }
+
+  const knowledgeStart = nowMs();
+  const knowledgeResult = runLokiKnowledgeEngine({ text, appState, context });
+  trace.push({ module: 'knowledgeEngine', ms: Math.round(nowMs() - knowledgeStart), decision: knowledgeResult?.intent ?? 'skipped' });
+  if (knowledgeResult) {
+    const shaped = PersonalityEngine.shape({ result: knowledgeResult, context, selectedModule: { id: 'knowledgeEngine' } });
+    return debug ? { ...shaped, debug: { provider, selectedModule: 'knowledgeEngine', totalMs: Math.round(nowMs() - start), trace } } : shaped;
   }
 
   const v2Start = nowMs();
