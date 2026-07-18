@@ -185,7 +185,7 @@ function readAppDeepLink() {
   if (section === 'partnership') return { type: 'partnership', id: '' };
   if (section === 'expert' && id) return { type: 'expert', id };
   if (section === 'experts') return { type: 'experts', id: '' };
-  if (section === 'dialogs') return { type: 'dialogs', id: params.get('dialogId') || id || '' };
+  if (section === 'dialogs' || section === 'messages') return { type: 'dialogs', id: params.get('dialogId') || id || '' };
   return { type: '', id: '' };
 }
 
@@ -3202,6 +3202,12 @@ export function UserApp() {
       <path d="M8 12L11 15L16 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
+  const TabMessagesIcon = ({ active }) => (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
+      <path d="M5 5.5H19C20.1 5.5 21 6.4 21 7.5V16C21 17.1 20.1 18 19 18H10L5 21V18H5C3.9 18 3 17.1 3 16V7.5C3 6.4 3.9 5.5 5 5.5Z" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round"/>
+      <path d="M7.5 10H16.5M7.5 13.5H13.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
   const TabProfileIcon = ({ active }) => (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
       <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
@@ -3264,6 +3270,7 @@ export function UserApp() {
   const tabIconByKey = {
     home: TabHomeIcon,
     partners: TabPartnersIcon,
+    messages: TabMessagesIcon,
     experts: TabExpertsIcon,
     profile: TabProfileIcon,
   };

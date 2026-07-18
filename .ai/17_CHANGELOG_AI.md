@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] feat: Universal Messaging Foundation v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/messaging/*`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/workspace/WorkspaceCore.js`, `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `scripts/messaging-foundation-test.mjs`, `scripts/workspace-core-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен слой `src/messaging`: registry, router, permissions, context/header normalization, history, snapshot, validator и provider над существующими Dialogs.
+- `ContextDialogsPage` использует unified dialog list с фильтрами, поиском, сортировкой Pinned → Unread → Last Activity и dev-диагностикой Messaging, сохраняя прежние realtime subscriptions и `userAction` flow.
+- Добавлен route alias `/messages`, mobile-вкладка “Сообщения” и desktop-пункт “Сообщения” без удаления существующего Dialog Center/Workspace CRM dialogs.
+- Добавлен `npm run test:messaging`: 500 сценариев проверяют permissions, filtering, search, navigation, snapshot/realtime marker, validator и read-only контракт.
+**Почему:** сообщения должны развиваться как единая коммуникационная платформа поверх уже зрелой Dialog System, без второго мессенджера, новых коллекций или дубля моделей.
+
+---
+
 ## [2026-07-19] ux: Workspace Smart Status Bar v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/workspace/DesktopWorkspace.jsx`, `src/UserApp.jsx`, `.ai/17_CHANGELOG_AI.md`

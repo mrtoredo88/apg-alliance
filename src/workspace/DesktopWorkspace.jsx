@@ -60,7 +60,7 @@ const NAV_ITEMS = [
   { id: 'profile', label: 'Мой профиль', icon: '👤', description: 'Карточка и витрина' },
   { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
   { id: 'booking', label: 'Встречи', icon: '📅', description: 'Календарь и записи' },
-  { id: 'dialogs', label: 'Диалоги', icon: '💬', description: 'Вопросы по объектам', badge: data => data.dialogUnreadCount || 0 },
+  { id: 'dialogs', label: 'Сообщения', icon: '💬', description: 'Диалоги по объектам', badge: data => data.dialogUnreadCount || 0 },
   { id: 'content', label: 'Новости', icon: '📰', description: 'Публикации и черновики' },
   { id: 'growth', label: 'Партнёры', icon: '📢', description: 'QR, ссылки, промо' },
   { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
