@@ -76,8 +76,14 @@ assert(index.includes('PerformanceEngine'), 'Index re-exports engine');
   'loki_ready',
   'workspace_ready',
   'idle_complete',
+  'bootstrap_critical_start',
+  'bootstrap_critical_complete',
+  'bootstrap_interactive_start',
+  'bootstrap_interactive_complete',
+  'bootstrap_idle_start',
+  'bootstrap_idle_complete',
 ].forEach(stage => {
-  const corpus = `${indexHtml}\n${main}\n${app}\n${userApp}\n${home}\n${engine}\n${timeline}`;
+  const corpus = `${indexHtml}\n${main}\n${app}\n${userApp}\n${home}\n${engine}\n${timeline}\n${metrics}\n${report}\n${health}`;
   assert(corpus.includes(stage), `startup stage ${stage} is wired`);
 });
 
@@ -114,6 +120,7 @@ assert(userApp.includes('markRouteReady'), 'UserApp marks routes');
 assert(home.includes('countRender'), 'Home counts renders');
 assert(health.includes("['performance', 'Perf']"), 'APG Health has Performance tab');
 assert(health.includes('Startup Timeline'), 'Performance tab shows startup timeline');
+assert(health.includes('Bootstrap Timeline'), 'Performance tab shows bootstrap timeline');
 assert(health.includes('Последние 20 запусков'), 'Performance tab shows last launches');
 assert(health.includes('Скопировать отчёт'), 'Performance tab can copy export');
 assert(packageJson.includes('test:performance-observatory'), 'package script registered');

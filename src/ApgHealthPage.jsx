@@ -190,8 +190,17 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       'loki_ready',
       'workspace_ready',
       'home_ready',
+      'bootstrap_critical_start',
+      'bootstrap_critical_complete',
+      'bootstrap_interactive_start',
+      'bootstrap_interactive_complete',
+      'bootstrap_idle_start',
+      'bootstrap_idle_complete',
       'idle_complete',
     ].includes(item.stage))
+    .slice(-18);
+  const bootstrapRows = performanceTimeline
+    .filter(item => String(item.stage || '').startsWith('bootstrap_') || item.stage === 'home_ready')
     .slice(-18);
 
   const warnColor = { error: 'rgba(230,70,70,0.34)', warn: 'rgba(255,165,0,0.34)', info: 'rgba(215,184,106,0.28)' };
@@ -425,6 +434,9 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <DiagnosticLine label="Home" value={formatMs(performanceReport?.metrics?.homeMs)} />
                 <DiagnosticLine label="Loki" value={formatMs(performanceReport?.metrics?.lokiMs)} />
                 <DiagnosticLine label="SW register" value={formatMs(performanceReport?.metrics?.serviceWorkerMs)} />
+                <DiagnosticLine label="Critical queue" value={formatMs(performanceReport?.metrics?.bootstrapCriticalMs)} />
+                <DiagnosticLine label="Interactive queue" value={formatMs(performanceReport?.metrics?.bootstrapInteractiveMs)} />
+                <DiagnosticLine label="Idle queue" value={formatMs(performanceReport?.metrics?.bootstrapIdleMs)} />
                 <DiagnosticLine label="FPS startup" value={performanceReport?.fps ? `${performanceReport.fps}` : '—'} />
               </GlassCard>
               <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
@@ -435,6 +447,29 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
                       <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
                       <span style={{ color: item.severity === 'critical' ? '#f87171' : item.severity === 'slow' ? '#fbbf24' : APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>
+                        +{Math.round(item.relativeMs || 0)} ms · {formatMs(item.durationMs)}
+                      </span>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Bootstrap Timeline">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Scheduler" value={performanceReport?.bootstrap?.status || '—'} />
+                <DiagnosticLine label="CRITICAL" value={formatMs(performanceReport?.bootstrap?.queues?.critical?.durationMs)} />
+                <DiagnosticLine label="INTERACTIVE" value={formatMs(performanceReport?.bootstrap?.queues?.interactive?.durationMs)} />
+                <DiagnosticLine label="IDLE" value={formatMs(performanceReport?.bootstrap?.queues?.idle?.durationMs)} />
+              </GlassCard>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                {bootstrapRows.length === 0 ? (
+                  <EmptyStateV2 icon="⏱" title="Bootstrap timeline пуст" text="Очереди появятся после следующего запуска." />
+                ) : bootstrapRows.map((item, index) => (
+                  <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>
                         +{Math.round(item.relativeMs || 0)} ms · {formatMs(item.durationMs)}
                       </span>
                     </div>

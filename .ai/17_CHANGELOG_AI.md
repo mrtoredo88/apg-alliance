@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Bootstrap Scheduler v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/bootstrap/*`, `src/main.jsx`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/bootstrap-scheduler-test.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен client-side Bootstrap Scheduler с очередями CRITICAL, INTERACTIVE и IDLE, task metrics и requestIdleCallback fallback.
+- Первый React render перенесён в CRITICAL queue; PWA update, VK init и referral session больше не блокируют первый интерфейс и выполняются в INTERACTIVE; runtime diagnostics и intelligence wiring уходят в IDLE.
+- Performance Observatory и APG Health получили bootstrap queue metrics и Bootstrap Timeline.
+**Почему:** пользователь должен увидеть интерфейс раньше, а тяжёлые сервисы должны догружаться управляемо и измеримо без изменения бизнес-логики.
+
+---
+
 ## [2026-07-19] feat: APG Performance Observatory v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/performance/*`, `src/main.jsx`, `src/App.jsx`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/loki/LokiProvider.jsx`, `src/pwa/PwaUpdateManager.js`, `src/ApgHealthPage.jsx`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

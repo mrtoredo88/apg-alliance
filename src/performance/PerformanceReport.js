@@ -1,4 +1,5 @@
 import { getPwaUpdateDiagnostics } from '../pwa/PwaUpdateManager.js';
+import { getBootstrapSnapshot } from '../bootstrap/index.js';
 import { collectDeviceMetrics, summarizeRuns } from './PerformanceMetrics.js';
 import { readPerformanceRuns } from './PerformanceStorage.js';
 
@@ -35,6 +36,9 @@ export function buildPerformanceExport(report) {
     `Home: ${metrics.homeMs || 0} ms`,
     `Loki: ${metrics.lokiMs || 0} ms`,
     `SW register: ${metrics.serviceWorkerMs || 0} ms`,
+    `Bootstrap Critical: ${metrics.bootstrapCriticalMs || 0} ms`,
+    `Bootstrap Interactive: ${metrics.bootstrapInteractiveMs || 0} ms`,
+    `Bootstrap Idle: ${metrics.bootstrapIdleMs || 0} ms`,
     `FPS: ${report?.fps || 0}`,
   ].join('\n');
 }
@@ -48,6 +52,7 @@ export function buildPerformanceReport({ timeline = [], metrics = {}, fps = 0, r
     buildTime: typeof window !== 'undefined' ? window.__APG_BUILD_TIME__ || 'unknown' : 'unknown',
     bundleVersion: typeof window !== 'undefined' ? window.__APG_BUILD_DIAGNOSTICS__?.runningBundle || '' : '',
     serviceWorkerVersion: swVersion(),
+    bootstrap: getBootstrapSnapshot(),
     device: collectDeviceMetrics(),
     timeline,
     metrics,

@@ -53,6 +53,7 @@ import {
   syncFirstJourneyDerived,
 } from './firstJourney.js';
 import { countRender, finalizePerformanceRun, markFirebase, markPerformanceStage, markRouteReady } from './performance/index.js';
+import { BOOTSTRAP_PRIORITIES, scheduleBootstrapTask } from './bootstrap/index.js';
 import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
@@ -851,7 +852,12 @@ export function UserApp() {
 
   useEffect(() => {
     const unsubscribe = subscribePwaUpdate(() => {});
-    requestPwaDiagnostics().catch(() => {});
+    scheduleBootstrapTask({
+      id: 'userapp_pwa_diagnostics',
+      label: 'UserApp PWA diagnostics',
+      priority: BOOTSTRAP_PRIORITIES.INTERACTIVE,
+      run: () => requestPwaDiagnostics().catch(() => {}),
+    });
     return unsubscribe;
   }, []);
 
@@ -1190,19 +1196,38 @@ export function UserApp() {
   }, [platformSource, user]);
 
   useEffect(() => {
-    wireActivityTimeline();
-    wireAIMemory();
-    wireAnalyticsCollector();
-    wireContinueExperience();
-    wireInterestModel();
+    let cleanup = () => {};
+    let disposed = false;
     let timer = null;
-    return subscribeToEvents('*', () => {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        setIntelligenceTick(tick => (tick + 1) % 100000);
-      }, 120);
+    scheduleBootstrapTask({
+      id: 'userapp_intelligence_wiring',
+      label: 'Intelligence wiring',
+      priority: BOOTSTRAP_PRIORITIES.IDLE,
+      run: () => {
+        if (disposed) return null;
+        wireActivityTimeline();
+        wireAIMemory();
+        wireAnalyticsCollector();
+        wireContinueExperience();
+        wireInterestModel();
+        const unsubscribe = subscribeToEvents('*', () => {
+          if (timer) return;
+          timer = setTimeout(() => {
+            timer = null;
+            setIntelligenceTick(tick => (tick + 1) % 100000);
+          }, 120);
+        });
+        cleanup = () => {
+          if (timer) clearTimeout(timer);
+          unsubscribe?.();
+        };
+        return null;
+      },
     });
+    return () => {
+      disposed = true;
+      cleanup();
+    };
   }, []);
 
   useEffect(() => {

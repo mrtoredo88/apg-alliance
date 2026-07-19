@@ -76,7 +76,10 @@ export function buildStageMetrics(timeline = []) {
     authMs: between('auth_start', 'auth_ready'),
     homeMs: between('home_render', 'home_ready'),
     lokiMs: between('loki_ready_start', 'loki_ready'),
-    serviceWorkerMs: between('pwa_update_sw_register_start', 'pwa_update_sw_registered'),
+    serviceWorkerMs: between('pwa_update_sw_register_start', 'pwa_update_sw_registered') || between('sw_register_start', 'sw_register'),
+    bootstrapCriticalMs: between('bootstrap_critical_start', 'bootstrap_critical_complete'),
+    bootstrapInteractiveMs: between('bootstrap_interactive_start', 'bootstrap_interactive_complete'),
+    bootstrapIdleMs: between('bootstrap_idle_start', 'bootstrap_idle_complete'),
     idleMs: byStage.get('idle_complete') || 0,
   };
 }
