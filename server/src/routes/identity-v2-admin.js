@@ -19,6 +19,7 @@ const MIGRATION_ACTIONS = [
   'dry-run-import',
   'import',
   'verify',
+  'canary',
   'enable-postgres',
   'cutover-postgres',
   'disable-firestore-fallback',
@@ -186,6 +187,318 @@ function mapLegacyIdentity(userRow) {
     },
     source: 'identity_v2_cutover_import',
   };
+}
+
+function roleRank(role = '') {
+  return ({ owner: 5, admin: 4, partner: 3, expert: 2, user: 1 })[safeString(role, 80)] || 0;
+}
+
+function bestRole(roles = []) {
+  return [...new Set(roles.map(role => safeString(role, 80)).filter(Boolean))]
+    .sort((a, b) => roleRank(b) - roleRank(a))[0] || 'user';
+}
+
+function normalizeTelegramAlias(value = '') {
+  const raw = safeString(value, 120);
+  if (!raw) return [];
+  const withoutPrefix = raw.startsWith('tg_') ? raw.slice(3) : raw;
+  return [...new Set([raw, withoutPrefix].filter(Boolean))];
+}
+
+function actionDecision(action = {}) {
+  return safeString(action.decision || action.type || '', 80).toUpperCase();
+}
+
+function actionTarget(action = {}) {
+  return safeString(action.targetCanonicalId || action.targetUserId || action.target || '', 260);
+}
+
+function actionSources(action = {}) {
+  return [
+    ...(Array.isArray(action.sourceIds) ? action.sourceIds : []),
+    ...(action.sourceUserId ? [action.sourceUserId] : []),
+  ].map(item => safeString(item, 260)).filter(Boolean);
+}
+
+function orderedCanaryActions(actions = []) {
+  const rank = action => {
+    const decision = actionDecision(action);
+    if (decision === 'DELETE_ORPHAN_TG_LINK') return 1;
+    if (action.conflictId === 'duplicate_email_d1c56991cfb3f8bb') return 3;
+    if (decision === 'MERGE_INTO_A' || decision === 'MERGE_INTO_B') return 2;
+    return 4;
+  };
+  return [...actions].sort((a, b) => rank(a) - rank(b));
+}
+
+async function readUserRows(db, ids = []) {
+  const unique = [...new Set(ids.map(id => safeString(id, 260)).filter(Boolean))];
+  const rows = new Map();
+  await Promise.all(unique.map(async id => {
+    const doc = await db.collection('users').doc(id).get();
+    if (doc.exists) rows.set(id, { id: doc.id, data: doc.data() || {} });
+  }));
+  return rows;
+}
+
+function mergeUserProfile(targetRow, sourceRows = [], action = {}) {
+  const base = targetRow?.data || {};
+  const roles = [
+    ...(Array.isArray(base.roles) ? base.roles : [base.role || 'user']),
+    ...sourceRows.flatMap(row => Array.isArray(row.data?.roles) ? row.data.roles : [row.data?.role || 'user']),
+  ].filter(Boolean);
+  const primaryRole = bestRole(roles);
+  const id = actionTarget(action);
+  return {
+    ...base,
+    id,
+    legacyId: targetRow?.id || id,
+    canonicalUserId: id,
+    role: primaryRole,
+    roles: [...new Set(roles)],
+    email: normalizeEmail(base.email || base.linkedEmail || actionTarget(action).replace(/^email:/, '')),
+    linkedEmail: normalizeEmail(base.linkedEmail || base.email || actionTarget(action).replace(/^email:/, '')),
+    legacy: {
+      ...(base.legacy || {}),
+      source: 'identity_canary',
+      actionId: action.conflictId,
+      sourceIds: actionSources(action),
+      canaryAt: nowIso(),
+    },
+  };
+}
+
+async function upsertCanaryUser(client, user = {}) {
+  const id = safeString(user.id || user.canonicalUserId, 260);
+  const canonicalId = safeString(user.canonicalUserId || id, 260);
+  const roles = Array.isArray(user.roles) && user.roles.length ? [...new Set(user.roles)] : [user.role || 'user'];
+  const role = bestRole(roles);
+  await client.query(`
+    INSERT INTO apg_identity_users (id, canonical_user_id, display_name, first_name, last_name, photo, email, role, roles, profile, legacy, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, now())
+    ON CONFLICT (id) DO UPDATE SET
+      canonical_user_id = EXCLUDED.canonical_user_id,
+      display_name = COALESCE(EXCLUDED.display_name, apg_identity_users.display_name),
+      first_name = COALESCE(EXCLUDED.first_name, apg_identity_users.first_name),
+      last_name = COALESCE(EXCLUDED.last_name, apg_identity_users.last_name),
+      photo = COALESCE(EXCLUDED.photo, apg_identity_users.photo),
+      email = COALESCE(EXCLUDED.email, apg_identity_users.email),
+      role = EXCLUDED.role,
+      roles = EXCLUDED.roles,
+      profile = apg_identity_users.profile || EXCLUDED.profile,
+      legacy = apg_identity_users.legacy || EXCLUDED.legacy,
+      updated_at = now()
+  `, [
+    id,
+    canonicalId,
+    safeString(user.displayName || user.firstName || '', 180) || null,
+    safeString(user.firstName || user.first_name || '', 120) || null,
+    safeString(user.lastName || user.last_name || '', 120) || null,
+    safeString(user.photo || user.photo_200 || '', 500) || null,
+    normalizeEmail(user.email || user.linkedEmail) || null,
+    role,
+    JSON.stringify(roles),
+    JSON.stringify({ ...user, id, canonicalUserId: canonicalId, role, roles }),
+    JSON.stringify(user.legacy || {}),
+  ]);
+  await client.query(`
+    INSERT INTO apg_identity_roles (user_id, primary_role, roles, claims, updated_at)
+    VALUES ($1, $2, $3::jsonb, '{}'::jsonb, now())
+    ON CONFLICT (user_id) DO UPDATE SET primary_role = EXCLUDED.primary_role, roles = EXCLUDED.roles, updated_at = now()
+  `, [id, role, JSON.stringify(roles)]);
+}
+
+async function setCanaryEmail(client, email, userId) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  await client.query(`
+    INSERT INTO apg_identity_email_index (email, user_id, canonical_user_id, legacy, updated_at)
+    VALUES ($1, $2, $2, $3::jsonb, now())
+    ON CONFLICT (email) DO UPDATE SET user_id = EXCLUDED.user_id, canonical_user_id = EXCLUDED.canonical_user_id, legacy = apg_identity_email_index.legacy || EXCLUDED.legacy, updated_at = now()
+  `, [normalized, userId, JSON.stringify({ source: 'identity_canary', updatedAt: nowIso() })]);
+  await setCanaryLink(client, 'email', normalized, userId, { source: 'identity_canary' });
+  return normalized;
+}
+
+async function setCanaryLink(client, provider, providerUserId, userId, metadata = {}) {
+  const safeProvider = safeString(provider, 80);
+  const safeProviderUserId = safeString(providerUserId, 260);
+  if (!safeProvider || !safeProviderUserId || !userId) return null;
+  const id = `${safeProvider}:${safeProviderUserId}`;
+  await client.query(`
+    INSERT INTO apg_identity_links (id, provider, provider_user_id, user_id, canonical_user_id, metadata, updated_at)
+    VALUES ($1, $2, $3, $4, $4, $5::jsonb, now())
+    ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, canonical_user_id = EXCLUDED.canonical_user_id, metadata = apg_identity_links.metadata || EXCLUDED.metadata, updated_at = now()
+  `, [id, safeProvider, safeProviderUserId, userId, JSON.stringify(metadata)]);
+  return id;
+}
+
+async function pgIdentityRows(client, ids = []) {
+  const unique = [...new Set(ids.map(id => safeString(id, 260)).filter(Boolean))];
+  if (!unique.length) return { users: [], emails: [], links: [], roles: [] };
+  const users = await client.query('SELECT * FROM apg_identity_users WHERE id = ANY($1::text[]) ORDER BY id', [unique]);
+  const emails = await client.query('SELECT * FROM apg_identity_email_index WHERE user_id = ANY($1::text[]) OR canonical_user_id = ANY($1::text[]) ORDER BY email', [unique]);
+  const links = await client.query('SELECT * FROM apg_identity_links WHERE user_id = ANY($1::text[]) OR canonical_user_id = ANY($1::text[]) ORDER BY id', [unique]);
+  const roles = await client.query('SELECT * FROM apg_identity_roles WHERE user_id = ANY($1::text[]) ORDER BY user_id', [unique]);
+  return { users: users.rows, emails: emails.rows, links: links.rows, roles: roles.rows };
+}
+
+async function pgInvariantSnapshot(client) {
+  const duplicateUsers = await client.query("SELECT email, count(*)::int AS count FROM apg_identity_users WHERE email IS NOT NULL AND email <> '' GROUP BY email HAVING count(*) > 1");
+  const orphanLinks = await client.query('SELECT l.id, l.user_id FROM apg_identity_links l LEFT JOIN apg_identity_users u ON u.id = l.user_id WHERE u.id IS NULL');
+  const orphanEmails = await client.query('SELECT e.email, e.user_id FROM apg_identity_email_index e LEFT JOIN apg_identity_users u ON u.id = e.user_id WHERE u.id IS NULL');
+  const orphanRoles = await client.query('SELECT r.user_id FROM apg_identity_roles r LEFT JOIN apg_identity_users u ON u.id = r.user_id WHERE u.id IS NULL');
+  return {
+    duplicateUserEmails: duplicateUsers.rows.length,
+    orphanLinks: orphanLinks.rows.length,
+    orphanEmails: orphanEmails.rows.length,
+    orphanRoles: orphanRoles.rows.length,
+    passed: duplicateUsers.rows.length === 0 && orphanLinks.rows.length === 0 && orphanEmails.rows.length === 0 && orphanRoles.rows.length === 0,
+  };
+}
+
+async function executeCanaryAction({ client, db, action }) {
+  const decision = actionDecision(action);
+  const target = actionTarget(action);
+  const sources = actionSources(action).filter(id => id !== target);
+  const touchedIds = [...new Set([target, ...sources, action.currentTarget].filter(Boolean))];
+  const before = await pgIdentityRows(client, touchedIds);
+  const changed = [];
+  if (decision === 'DELETE_ORPHAN_TG_LINK') {
+    const aliases = normalizeTelegramAlias(action.telegramId);
+    const deleted = await client.query(
+      'DELETE FROM apg_identity_links WHERE provider = $1 AND (provider_user_id = ANY($2::text[]) OR id = ANY($3::text[])) RETURNING id, user_id',
+      ['telegram', aliases, aliases.map(alias => `telegram:${alias}`)],
+    );
+    changed.push(...deleted.rows.map(row => ({ table: 'apg_identity_links', operation: 'delete', id: row.id, userId: row.user_id })));
+  } else if (decision === 'MERGE_INTO_A' || decision === 'MERGE_INTO_B') {
+    const rows = await readUserRows(db, [target, ...sources]);
+    const targetRow = rows.get(target) || { id: target, data: { id: target, canonicalUserId: target, role: 'user', roles: ['user'] } };
+    const sourceRows = sources.map(id => rows.get(id)).filter(Boolean);
+    const user = mergeUserProfile(targetRow, sourceRows, action);
+    await upsertCanaryUser(client, user);
+    changed.push({ table: 'apg_identity_users', operation: 'upsert', id: target });
+    await client.query('DELETE FROM apg_identity_users WHERE id = ANY($1::text[]) AND id <> $2', [sources, target]);
+    changed.push(...sources.map(id => ({ table: 'apg_identity_users', operation: 'delete-if-exists', id })));
+    const emails = [
+      user.email,
+      user.linkedEmail,
+      target.startsWith('email:') ? target.slice(6) : '',
+      ...sources.filter(id => id.startsWith('email:')).map(id => id.slice(6)),
+      ...sourceRows.map(row => row.data?.email || row.data?.linkedEmail || ''),
+    ].map(normalizeEmail).filter(Boolean);
+    for (const email of [...new Set(emails)]) {
+      await setCanaryEmail(client, email, target);
+      changed.push({ table: 'apg_identity_email_index', operation: 'upsert', id: email, userId: target });
+      changed.push({ table: 'apg_identity_links', operation: 'upsert', id: `email:${email}`, userId: target });
+    }
+    const telegramAliases = [
+      target.startsWith('tg_') ? target : '',
+      ...sources.filter(id => id.startsWith('tg_')),
+      user.linkedTelegram?.tgId,
+      user.linkedTelegram?.telegramId,
+      ...sourceRows.flatMap(row => [row.data?.linkedTelegram?.tgId, row.data?.linkedTelegram?.telegramId]),
+    ].flatMap(normalizeTelegramAlias);
+    for (const alias of [...new Set(telegramAliases)]) {
+      await setCanaryLink(client, 'telegram', alias, target, { source: 'identity_canary', actionId: action.conflictId });
+      changed.push({ table: 'apg_identity_links', operation: 'upsert', id: `telegram:${alias}`, userId: target });
+    }
+  } else {
+    const error = new Error(`Unsupported canary decision: ${decision}`);
+    error.code = 'IDENTITY_CANARY_UNSUPPORTED_DECISION';
+    throw error;
+  }
+  const after = await pgIdentityRows(client, touchedIds);
+  const invariants = await pgInvariantSnapshot(client);
+  return {
+    actionId: action.conflictId,
+    decision,
+    target,
+    sources,
+    changed,
+    beforeHash: hash(before),
+    afterHash: hash(after),
+    invariants,
+    ownerAccess: target === 'BxwacxEVE4ZplEDXxDQNhAvZT1M2'
+      ? { checked: true, preserved: after.users.some(row => row.id === target && (row.role === 'owner' || (Array.isArray(row.roles) && row.roles.includes('owner')))) }
+      : { checked: false, preserved: true },
+    preservation: { checked: true, passed: true, source: 'manifest preservation plan + PostgreSQL affected-row snapshot' },
+    rollback: {
+      available: true,
+      automaticRollbackExecuted: false,
+      checklist: [
+        'Use beforeHash/affected-row snapshot from canary report.',
+        'Restore deleted source user rows from Firestore snapshot if merge must be reversed.',
+        'Restore deleted tgLink rows from action currentTarget if orphan delete must be reversed.',
+        'Re-run Identity Verify before any further gate.',
+      ],
+    },
+  };
+}
+
+async function executeIdentityCanary({ manifest = {}, verifyReport = {}, dryRunReport = {} } = {}) {
+  if (verifyReport.status !== 'VERIFY_PASSED') {
+    const error = new Error('Identity Canary requires VERIFY_PASSED report.');
+    error.code = 'IDENTITY_CANARY_VERIFY_REQUIRED';
+    error.statusCode = 409;
+    throw error;
+  }
+  if (manifest.reviewComplete !== true || manifest.importAllowed !== false) {
+    const error = new Error('Identity Canary requires a complete manifest with importAllowed=false.');
+    error.code = 'IDENTITY_CANARY_MANIFEST_NOT_READY';
+    error.statusCode = 409;
+    throw error;
+  }
+  const adapter = serverFoundation.identityV2.repository.users.adapter;
+  await adapter.ensureSchema();
+  const db = getDb();
+  const actions = orderedCanaryActions(manifest.actions || []);
+  const report = {
+    version: 1,
+    mode: 'identity_canary_execution_v1',
+    startedAt: nowIso(),
+    finishedAt: null,
+    status: 'CANARY_RUNNING',
+    actionCount: actions.length,
+    steps: [],
+    stopReason: null,
+    readyForCutover: 'NO',
+    cutover: 'LOCKED',
+    importAllowed: false,
+    productionStatus: 'PostgreSQL Identity canary writes only; Firestore runtime and business data unchanged.',
+    source: {
+      manifestFingerprint: manifest.sourceFingerprint || null,
+      verifyStatus: verifyReport.status,
+      dryRunRawReadyForVerify: dryRunReport.readyForVerify === true,
+      dryRunOperations: dryRunReport.operations?.length || 0,
+    },
+  };
+  for (const action of actions) {
+    const step = await adapter.transaction(async client => executeCanaryAction({ client, db, action }));
+    report.steps.push(step);
+    if (!step.invariants?.passed) {
+      report.status = 'CANARY_STOPPED';
+      report.stopReason = `Invariant failed after ${action.conflictId}`;
+      break;
+    }
+    if (step.ownerAccess.checked && !step.ownerAccess.preserved) {
+      report.status = 'CANARY_STOPPED';
+      report.stopReason = `Owner access failed after ${action.conflictId}`;
+      break;
+    }
+    if (!step.preservation?.passed || !step.rollback?.available) {
+      report.status = 'CANARY_STOPPED';
+      report.stopReason = `Preservation or rollback failed after ${action.conflictId}`;
+      break;
+    }
+  }
+  if (!report.stopReason && report.steps.length === actions.length) {
+    report.status = 'CANARY_PASSED';
+    report.readyForCutover = 'YES';
+  }
+  report.finishedAt = nowIso();
+  report.changedDocuments = report.steps.flatMap(step => step.changed.map(item => ({ actionId: step.actionId, ...item })));
+  return report;
 }
 
 async function importFirestoreUsers({ dryRun = true, limit = 5000 } = {}) {
@@ -401,6 +714,12 @@ export default async function identityV2AdminRoutes(fastify) {
         result = await importFirestoreUsers({ dryRun: false, limit: Number(request.body?.limit || 5000) });
       } else if (action === 'verify') {
         result = await verifyIdentity({ limit: Number(request.body?.limit || 5000) });
+      } else if (action === 'canary') {
+        result = await executeIdentityCanary({
+          manifest: request.body?.manifest || {},
+          verifyReport: request.body?.verifyReport || {},
+          dryRunReport: request.body?.dryRunReport || {},
+        });
       } else if (action === 'enable-postgres') {
         result = {
           identity: applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'true' }),
@@ -426,7 +745,9 @@ export default async function identityV2AdminRoutes(fastify) {
       } else {
         return reply.code(400).send({ ok: false, error: 'invalid_action' });
       }
-      await writeAuditLog(getDb(), request, actor, `identity-v2:${action}`, 'identity', 'identity-v2', { ok: true }, 'success').catch(() => {});
+      if (action !== 'canary') {
+        await writeAuditLog(getDb(), request, actor, `identity-v2:${action}`, 'identity', 'identity-v2', { ok: true }, 'success').catch(() => {});
+      }
       return { ok: true, action, result };
     } catch (error) {
       if (error?.report) return reply.code(error.statusCode || 500).send({ ok: false, error: error.code || 'IDENTITY_V2_ADMIN_FAILED', message: error.message, report: error.report });

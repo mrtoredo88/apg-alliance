@@ -27,9 +27,12 @@ assert.ok(route.includes('if (shouldWriteLegacyIdentitySideEffects())'), 'legacy
 const admin = read('server/src/routes/identity-v2-admin.js');
 [
   'cutover-postgres',
+  'canary',
   "identityDualWrite: 'false'",
   "identityFallback: 'firestore'",
 ].forEach(token => assert.ok(admin.includes(token), `Migration Center supports ${token}`));
+assert.ok(admin.includes('executeIdentityCanary'), 'Migration Center includes per-action Canary executor');
+assert.ok(admin.includes("if (action !== 'canary')"), 'Canary avoids Firestore audit writes outside approved action');
 
 const schema = read('server/src/apg/identity/schema/identity-v2.sql');
 assert.ok(schema.includes('apg_identity_email_verify_tokens'), 'email verification tokens live in Identity PostgreSQL schema');

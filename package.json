@@ -126,7 +126,9 @@
     "test:identity-orchestrator": "node scripts/identity-migration-orchestrator-test.mjs",
     "identity:final-owner-approval": "node scripts/identity-final-owner-approval.mjs",
     "identity:verify": "node scripts/identity-verify.mjs",
-    "test:identity-verify": "node scripts/identity-verify-test.mjs"
+    "test:identity-verify": "node scripts/identity-verify-test.mjs",
+    "identity:canary": "node scripts/identity-canary.mjs",
+    "test:identity-canary": "node scripts/identity-canary-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
