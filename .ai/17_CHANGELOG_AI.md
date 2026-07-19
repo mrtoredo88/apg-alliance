@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Identity Final Readiness Review v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/identity-final-readiness-review.mjs`, `scripts/identity-final-readiness-review-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен read-only readiness review, который сводит dry-run, invariant classification, broken references forensic, owner forensic и resolution manifest в один Verify-gate отчёт.
+- Отчёт разделяет проблемы на `Ready`, `Owner Decision Required`, `Technical Fix Required`, `Verify Blocking` и создаёт full/redacted MD+JSON в `backups/identity/readiness/`.
+- Добавлен regression-тест, подтверждающий, что broken references не блокируют Verify, текущие блокеры остаются owner-decision gate, а import/verify/cutover не запускаются.
+**Почему:** перед Verify нужен официальный документ с реальными препятствиями, чтобы не смешивать исторические артефакты, deferred owner decisions и технические блокеры.
+
 ## [2026-07-20] chore: Owner Identity Deep Forensic
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/identity-owner-deep-forensic.mjs`, `scripts/identity-owner-deep-forensic-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

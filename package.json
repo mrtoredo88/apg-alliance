@@ -119,7 +119,9 @@
     "identity:invariants": "node scripts/identity-invariants.mjs",
     "test:identity-invariants": "node scripts/identity-invariants-test.mjs",
     "identity:owner-forensic": "node scripts/identity-owner-deep-forensic.mjs",
-    "test:identity-owner-forensic": "node scripts/identity-owner-deep-forensic-test.mjs"
+    "test:identity-owner-forensic": "node scripts/identity-owner-deep-forensic-test.mjs",
+    "identity:readiness": "node scripts/identity-final-readiness-review.mjs",
+    "test:identity-readiness": "node scripts/identity-final-readiness-review-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
