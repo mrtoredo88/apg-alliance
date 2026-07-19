@@ -166,6 +166,7 @@ function floatingLokiState() {
     lastInputNearLoki: window.__APG_LAST_LOKI_INPUT__ || null,
     tapTrace: Array.isArray(window.__APG_LOKI_TAP_TRACE__) ? window.__APG_LOKI_TAP_TRACE__.slice(-40) : [],
     messageTrace: Array.isArray(window.__APG_LOKI_MESSAGE_TRACE__) ? window.__APG_LOKI_MESSAGE_TRACE__.slice(-80) : [],
+    requestDiagnostics: Array.isArray(window.__APG_LOKI_REQUEST_DIAGNOSTICS__) ? window.__APG_LOKI_REQUEST_DIAGNOSTICS__.slice(-40) : [],
   };
 }
 

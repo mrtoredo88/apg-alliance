@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] fix: Loki article conversation response UX
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/lokiResponseText.js`, `src/loki/lokiMessageTrace.js`, `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-message-chain-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Article context Локи теперь различает greeting, small talk, summary, main point, explanation, navigation и article question; `Привет` внутри новости получает нормальный разговорный ответ без ожидания полного core pipeline.
+- Пользовательские fallback-и очищены от технического текста, ответы проходят normalizer, debug-блок в UI скрыт в production без явного dev/debug-флага.
+- Runtime diagnostics сохраняет компактные request diagnostics без полного текста сообщения, а smoke-тест проверяет обычный и article-context сценарии `Привет → ответ`.
+**Почему:** в установленной PWA пользователь видел технический fallback и `Loki Core debug` вместо нормального ответа в режиме обсуждения новости.
+
+---
+
 ## [2026-07-19] fix: Loki message response chain tracing
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/lokiMessageTrace.js`, `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-message-chain-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

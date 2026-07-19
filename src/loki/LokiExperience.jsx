@@ -4,6 +4,7 @@ import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
 import { LokiIdentity } from './LokiIdentity.jsx';
 import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrace.js';
+import { isLokiUserDebugVisible, normalizeLokiResponseText } from './lokiResponseText.js';
 
 const QUICK_ACTIONS = [
   { label: '📍 Что рядом?', text: 'Что рядом?', action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS) },
@@ -122,6 +123,7 @@ export function LokiExperience({ loki }) {
   const quickActions = activeNewsContext ? NEWS_QUICK_ACTIONS : QUICK_ACTIONS;
   const contextTitle = activeNewsContext?.title || activeNewsContext?.article?.title || '';
   const summaryToSpeak = activeNewsContext?.initialAnswer || conversation.find(item => item.from === 'loki')?.text || '';
+  const showDebug = isLokiUserDebugVisible();
 
   useEffect(() => {
     setConversation(buildInitialConversation(loki));
@@ -174,7 +176,7 @@ export function LokiExperience({ loki }) {
     } catch (error) {
       recordLokiMessageTrace('STOP Provider askExperience rejected', { error: error?.message || String(error) });
       result = {
-        text: 'Что-то пошло не так. Сейчас попробуем разобраться.',
+        text: 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.',
         card: null,
         cards: [],
         debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
@@ -183,23 +185,24 @@ export function LokiExperience({ loki }) {
     if (!result) {
       recordLokiMessageTrace('STOP Provider returned empty result', {});
       result = {
-        text: 'Я получил сообщение, но внутренний обработчик не вернул ответ. Попробуйте ещё раз коротко.',
+        text: 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.',
         card: null,
         cards: [],
         debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
       };
     }
+    const answerText = normalizeLokiResponseText(result.text || 'Готово.');
     const cards = result.cards?.length ? result.cards : result.card ? [result.card] : [];
     setConversation(prev => [...prev, {
       id: `loki-${Date.now()}`,
       from: 'loki',
-      text: result.text || 'Готово.',
+      text: answerText,
       cards,
       debug: result.debug ?? null,
     }]);
-    recordLokiMessageTrace('STEP 19 UI answer message added', { textLength: String(result.text || '').length, cardCount: cards.length });
+    recordLokiMessageTrace('STEP 19 UI answer message added', { textLength: answerText.length, cardCount: cards.length });
     const action = result.executeAction || quickAction || (question.toLowerCase().includes('покажи') ? result.autoAction : null);
-    if (options.speak) speak(result.text);
+    if (options.speak) speak(answerText);
     if (action) setTimeout(() => loki.executeAction(action), 520);
   };
 
@@ -326,7 +329,7 @@ export function LokiExperience({ loki }) {
                   ))}
                 </div>
               )}
-              {item.debug && (
+              {showDebug && item.debug && (
                 <div style={{ ...APG2_PROFILE.glass, width: '100%', borderRadius: 18, padding: 10, border: '1px solid rgba(215,184,106,0.14)', color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '15px', display: 'grid', gap: 4 }}>
                   <span style={{ color: APG2_PROFILE.gold, fontWeight: 850 }}>Loki Core debug · {item.debug.provider} · {item.debug.totalMs}ms</span>
                   {item.debug.trace?.slice(0, 8).map(step => (

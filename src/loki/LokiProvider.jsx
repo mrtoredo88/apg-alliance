@@ -41,7 +41,8 @@ import { buildKnowledgeHistoryPatch } from './core/knowledgeIndex/index.js';
 import { buildSkillHistoryPatch } from './core/skills/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
-import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace } from './lokiMessageTrace.js';
+import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics } from './lokiMessageTrace.js';
+import { normalizeLokiResponseText } from './lokiResponseText.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -78,12 +79,13 @@ function recordLokiTapTrace(step, detail = {}) {
 }
 
 function withLokiAnswerTimeout(promise, text) {
+  const timeoutMs = 10000;
   let timer = null;
   const timeout = new Promise(resolve => {
     timer = setTimeout(() => {
-      recordLokiMessageTrace('STOP LokiBrain timeout', { ms: 5000 });
-      resolve(buildLokiMessageTimeoutFallback(text));
-    }, 5000);
+      recordLokiMessageTrace('STOP LokiBrain timeout', { ms: timeoutMs });
+      resolve(buildLokiMessageTimeoutFallback(text, timeoutMs));
+    }, timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
@@ -167,9 +169,33 @@ function buildNewsSummaryBullets(context) {
   return sentences.slice(0, 3).map(sentence => sentence.length > 170 ? `${sentence.slice(0, 167).trim()}...` : sentence);
 }
 
+function classifyNewsContextQuery(value) {
+  const query = safeString(value).toLowerCase().replace(/ё/g, 'е');
+  if (!query) return 'empty';
+  if (/^(привет|здравствуй|здравствуйте|добрый день|доброе утро|добрый вечер|хай|hello)$/i.test(query)) return 'greeting';
+  if (['как дела', 'как ты', 'кто ты', 'что ты умеешь', 'помоги', 'что можешь'].some(item => query.includes(item))) return 'small_talk';
+  if (['кратко', 'перескаж', 'о чем', 'о чём', 'суть', 'саммари', 'summary'].some(item => query.includes(item))) return 'summary';
+  if (['главное', 'важно', 'вывод', 'мысль'].some(item => query.includes(item))) return 'main_point';
+  if (['объясни', 'простыми словами', 'что значит', 'почему'].some(item => query.includes(item))) return 'explanation';
+  if (['открой', 'перейди', 'покажи автора', 'автор'].some(item => query.includes(item))) return 'navigation';
+  if (query.includes('событ')) return 'events';
+  if (query.includes('партн')) return 'partners';
+  if (query.includes('эксперт')) return 'experts';
+  if (query.includes('похож') || query.includes('ещё') || query.includes('друг')) return 'similar';
+  if (query.includes('бизнес')) return 'business';
+  if (query.includes('жител') || query.includes('прост') || query.includes('реб')) return 'residents';
+  return 'article_question';
+}
+
+function buildCompactNewsSummary(context) {
+  const bullets = buildNewsSummaryBullets(context);
+  const short = bullets.slice(0, 2).join(' ');
+  return normalizeLokiResponseText(`Я прочитал эту новость.\n\nКоротко: ${short}\n\nМогу:\n• кратко пересказать статью;\n• выделить главное;\n• ответить на вопрос;\n• открыть связанные разделы.`, { maxLength: 760 });
+}
+
 function buildNewsContextAnswer(context, text, appState = {}) {
   if (!context || context.type !== 'news') return null;
-  const query = safeString(text).toLowerCase();
+  const queryType = classifyNewsContextQuery(text);
   const article = context.article ?? {};
   const bullets = buildNewsSummaryBullets(context);
   const title = safeString(context.title || article.title || 'эта новость');
@@ -180,65 +206,113 @@ function buildNewsContextAnswer(context, text, appState = {}) {
     .filter(item => String(item?.id ?? '') !== String(context.newsId ?? '') && safeString(item?.category || item?.type) === safeString(article.category))
     .slice(0, 3);
 
-  if (query.includes('событ')) {
+  if (queryType === 'greeting') {
     return {
-      intent: 'context.news.events',
-      text: eventRows.length
-        ? `К этой новости я вижу связанные события:\n${eventRows.map(item => `• ${titleOf(item, 'Мероприятие')}`).join('\n')}`
-        : 'Я не вижу привязанных событий у этой новости. Если событие есть в тексте, можно открыть афишу и проверить его вручную.',
-      cards: eventRows.map(item => ({ id: item.id, title: titleOf(item, 'Мероприятие'), text: safeString(item?.date || item?.address || 'Связанное событие'), label: 'Открыть', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: item.id }) })),
-    };
-  }
-
-  if (query.includes('партн')) {
-    return {
-      intent: 'context.news.partners',
-      text: partnerRows.length
-        ? `В новости участвуют партнёры:\n${partnerRows.map(item => `• ${titleOf(item, 'Партнёр АПГ')}`).join('\n')}`
-        : 'У этой новости пока нет явно привязанных партнёров.',
-      cards: partnerRows.map(item => ({ id: item.id, title: titleOf(item, 'Партнёр АПГ'), text: safeString(item?.category || item?.address || 'Партнёр АПГ'), label: 'Открыть', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: item.id }) })),
-    };
-  }
-
-  if (query.includes('эксперт')) {
-    return {
-      intent: 'context.news.experts',
-      text: expertRows.length
-        ? `По теме новости могут быть полезны эксперты:\n${expertRows.map(item => `• ${titleOf(item, 'Эксперт')}`).join('\n')}`
-        : 'У этой новости пока нет явно привязанных экспертов.',
-      cards: expertRows.map(item => ({ id: item.id, title: titleOf(item, 'Эксперт'), text: safeString(item?.specialization || item?.category || 'Эксперт АПГ'), label: 'Открыть экспертов', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EXPERTS, { expertId: item.id }) })),
-    };
-  }
-
-  if (query.includes('похож') || query.includes('ещё') || query.includes('друг')) {
-    return {
-      intent: 'context.news.similar',
-      text: similarNews.length
-        ? `Нашёл похожие материалы по теме «${article.categoryLabel || article.category || 'новости'}».`
-        : 'Похожих материалов по этой теме пока не нашёл.',
-      cards: similarNews.map(item => ({ id: item.id, title: titleOf(item, 'Новость'), text: truncateText(item?.summary || item?.text || item?.description, 120), label: 'Читать', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: item.id }) })),
-    };
-  }
-
-  if (query.includes('бизнес')) {
-    return {
-      intent: 'context.news.business',
-      text: `Если смотреть на новость «${title}» с точки зрения бизнеса:\n• это повод оценить спрос и интерес жителей;\n• можно подумать о партнёрстве, акции или событии вокруг темы;\n• если тема близка вашей сфере, стоит использовать её в коммуникации с клиентами.`,
+      intent: 'context.news.greeting',
+      text: normalizeLokiResponseText('Привет! Я могу помочь обсудить эту новость: кратко пересказать её, выделить главное, объяснить простыми словами или ответить на вопрос по теме.'),
       cards: [],
     };
   }
 
-  if (query.includes('жител') || query.includes('прост') || query.includes('реб')) {
+  if (queryType === 'small_talk') {
+    return {
+      intent: 'context.news.small_talk',
+      text: normalizeLokiResponseText('Я Локи, помощник АПГ. Сейчас мы в режиме обсуждения новости: могу быстро объяснить смысл статьи, найти главное или открыть связанные разделы.'),
+      cards: [],
+    };
+  }
+
+  if (queryType === 'summary') {
+    return {
+      intent: 'context.news.summary',
+      text: buildCompactNewsSummary(context),
+      cards: [],
+    };
+  }
+
+  if (queryType === 'main_point') {
+    return {
+      intent: 'context.news.main_point',
+      text: normalizeLokiResponseText(`Главное в этой новости: ${bullets[0]}\n\nЕсли нужно, могу разложить статью на короткие выводы или показать связанные разделы АПГ.`),
+      cards: [],
+    };
+  }
+
+  if (queryType === 'explanation') {
+    return {
+      intent: 'context.news.explanation',
+      text: normalizeLokiResponseText(`Простыми словами: ${bullets[0]}\n\nЭта новость помогает понять, что происходит в АПГ сейчас и какие возможности могут быть полезны жителям, партнёрам или экспертам.`),
+      cards: [],
+    };
+  }
+
+  if (queryType === 'navigation') {
+    return {
+      intent: 'context.news.navigation',
+      text: normalizeLokiResponseText('Могу открыть саму новость или связанные разделы. Если в статье есть партнёры, эксперты или события, покажу их отдельными карточками.'),
+      cards: [{ id: context.newsId || 'news', title, text: 'Открыть материал в новостях АПГ.', label: 'Открыть статью', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: context.newsId }) }],
+    };
+  }
+
+  if (queryType === 'events') {
+    return {
+      intent: 'context.news.events',
+      text: normalizeLokiResponseText(eventRows.length
+        ? `К этой новости я вижу связанные события:\n${eventRows.map(item => `• ${titleOf(item, 'Мероприятие')}`).join('\n')}`
+        : 'Я не вижу привязанных событий у этой новости. Если событие есть в тексте, можно открыть афишу и проверить его вручную.'),
+      cards: eventRows.map(item => ({ id: item.id, title: titleOf(item, 'Мероприятие'), text: safeString(item?.date || item?.address || 'Связанное событие'), label: 'Открыть', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT, { eventId: item.id }) })),
+    };
+  }
+
+  if (queryType === 'partners') {
+    return {
+      intent: 'context.news.partners',
+      text: normalizeLokiResponseText(partnerRows.length
+        ? `В новости участвуют партнёры:\n${partnerRows.map(item => `• ${titleOf(item, 'Партнёр АПГ')}`).join('\n')}`
+        : 'У этой новости пока нет явно привязанных партнёров.'),
+      cards: partnerRows.map(item => ({ id: item.id, title: titleOf(item, 'Партнёр АПГ'), text: safeString(item?.category || item?.address || 'Партнёр АПГ'), label: 'Открыть', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_PARTNER, { partnerId: item.id }) })),
+    };
+  }
+
+  if (queryType === 'experts') {
+    return {
+      intent: 'context.news.experts',
+      text: normalizeLokiResponseText(expertRows.length
+        ? `По теме новости могут быть полезны эксперты:\n${expertRows.map(item => `• ${titleOf(item, 'Эксперт')}`).join('\n')}`
+        : 'У этой новости пока нет явно привязанных экспертов.'),
+      cards: expertRows.map(item => ({ id: item.id, title: titleOf(item, 'Эксперт'), text: safeString(item?.specialization || item?.category || 'Эксперт АПГ'), label: 'Открыть экспертов', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EXPERTS, { expertId: item.id }) })),
+    };
+  }
+
+  if (queryType === 'similar') {
+    return {
+      intent: 'context.news.similar',
+      text: normalizeLokiResponseText(similarNews.length
+        ? `Нашёл похожие материалы по теме «${article.categoryLabel || article.category || 'новости'}».`
+        : 'Похожих материалов по этой теме пока не нашёл.'),
+      cards: similarNews.map(item => ({ id: item.id, title: titleOf(item, 'Новость'), text: truncateText(item?.summary || item?.text || item?.description, 120), label: 'Читать', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS, { newsId: item.id }) })),
+    };
+  }
+
+  if (queryType === 'business') {
+    return {
+      intent: 'context.news.business',
+      text: normalizeLokiResponseText(`Если смотреть на новость «${title}» с точки зрения бизнеса:\n• это повод оценить спрос и интерес жителей;\n• можно подумать о партнёрстве, акции или событии вокруг темы;\n• если тема близка вашей сфере, стоит использовать её в коммуникации с клиентами.`),
+      cards: [],
+    };
+  }
+
+  if (queryType === 'residents') {
     return {
       intent: 'context.news.residents',
-      text: `Простыми словами: ${bullets[0]}\n\nДля жителей это означает: стоит обратить внимание на тему новости, потому что она может дать полезное место, событие, услугу или городскую возможность внутри АПГ.`,
+      text: normalizeLokiResponseText(`Простыми словами: ${bullets[0]}\n\nДля жителей это означает: стоит обратить внимание на тему новости, потому что она может дать полезное место, событие, услугу или городскую возможность внутри АПГ.`),
       cards: [],
     };
   }
 
   return {
-    intent: 'context.news.summary',
-    text: `Я прочитал эту новость.\n\nЕсли кратко:\n${bullets.map(item => `• ${item}`).join('\n')}\n\nГлавная мысль: ${bullets[0]}\n\nДля жителей это означает: можно быстро понять суть и, если нужно, перейти к связанным партнёрам, экспертам или событиям.\n\nХотите рассказать подробнее или ответить на вопросы?`,
+    intent: 'context.news.question',
+    text: normalizeLokiResponseText(`По этой новости могу ответить так: ${bullets[0]}\n\nЗадайте вопрос чуть конкретнее, и я разберу именно нужный фрагмент статьи.`),
     cards: [],
   };
 }
@@ -1141,13 +1215,17 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       recordLokiMessageTrace('STEP 6 News context check start', { activeContextType: activeContext?.type || '' });
       const contextResult = buildNewsContextAnswer(activeContext, text, appState);
       if (contextResult) {
-        recordLokiMessageTrace('STEP 7 News context answer returned', { hasText: Boolean(contextResult.text) });
+        const normalizedContextResult = {
+          ...contextResult,
+          text: normalizeLokiResponseText(contextResult.text),
+        };
+        recordLokiMessageTrace('STEP 7 News context answer returned', { hasText: Boolean(normalizedContextResult.text), intent: normalizedContextResult.intent || '' });
         setBrainThinking(false);
         setEmotion('helper');
         setAction(LOKI_ACTIONS.LISTEN);
         updateMemory({
-          lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: contextResult.text, payload: { cards: contextResult.cards } },
-          lastConversation: { userText: text, answer: contextResult.text, action: null },
+          lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: normalizedContextResult.text, payload: { cards: normalizedContextResult.cards } },
+          lastConversation: { userText: text, answer: normalizedContextResult.text, action: null },
           lastPanel: activePanel,
           activeContext,
           lastContext: activeContext,
@@ -1156,12 +1234,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         updateHistory(prev => addLokiHistoryItem(prev, {
           kind: 'brain',
           eventType: LOKI_EVENTS.BRAIN_RESPONSE,
-          text: contextResult.text,
-          card: contextResult.card,
+          text: normalizedContextResult.text,
+          card: normalizedContextResult.card,
           priority: LOKI_MESSAGE_PRIORITY.HIGH,
           panel: activePanel,
         }));
-        return { card: null, ...contextResult };
+        recordLokiRequestDiagnostics({
+          contextType: activeContext?.type || '',
+          intent: normalizedContextResult.intent || '',
+          resultStatus: 'answered',
+          responseTextLength: normalizedContextResult.text.length,
+        });
+        return { card: null, ...normalizedContextResult };
       }
       recordLokiMessageTrace('STEP 7 News context skipped', {});
       const lokiContext = buildLokiContext({ appState: { ...appState, activeContext }, user, activePanel, memory: { ...memory, activeContext }, userMemory });
@@ -1175,59 +1259,70 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       recordLokiMessageTrace('STEP 16 LokiBrain returned to Provider', { hasResult: Boolean(result), intent: result?.intent || '', timeout: Boolean(result?.debug?.timeout) });
       if (!result) {
         recordLokiMessageTrace('STOP LokiBrain returned null', {});
+        recordLokiRequestDiagnostics({
+          contextType: activeContext?.type || '',
+          resultStatus: 'empty',
+          fallbackUsed: true,
+          errorCode: 'EMPTY_RESULT',
+          responseTextLength: 67,
+        });
         return {
-          text: 'Я получил сообщение, но внутренний обработчик не вернул ответ. Попробуйте ещё раз коротко.',
+          text: 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.',
           card: null,
           cards: [],
           debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
         };
       }
+      const normalizedResult = {
+        ...result,
+        text: normalizeLokiResponseText(result.text || (result.debug?.timeout ? 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.' : 'Готово.')),
+      };
       setBrainThinking(false);
-      setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
-      setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
-      recordLokiMessageTrace('STEP 17 Provider state updated from result', { hasText: Boolean(result.text), hasAction: Boolean(result.executeAction || result.autoAction) });
+      setEmotion(normalizedResult.executeAction || normalizedResult.autoAction ? 'excited' : 'helper');
+      setAction(normalizedResult.executeAction || normalizedResult.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
+      recordLokiMessageTrace('STEP 17 Provider state updated from result', { hasText: Boolean(normalizedResult.text), hasAction: Boolean(normalizedResult.executeAction || normalizedResult.autoAction) });
       updateMemory({
-        lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: result.text, payload: { card: result.card, cards: result.cards } },
-        lastConversation: { userText: text, answer: result.text, action: result.executeAction ?? result.autoAction ?? result.card?.action ?? null },
+        lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: normalizedResult.text, payload: { card: normalizedResult.card, cards: normalizedResult.cards } },
+        lastConversation: { userText: text, answer: normalizedResult.text, action: normalizedResult.executeAction ?? normalizedResult.autoAction ?? normalizedResult.card?.action ?? null },
         lastPanel: activePanel,
         inDialog: true,
-        ...(result.knowledgeSnapshot ? { lastKnowledgeSnapshot: result.knowledgeSnapshot, lastKnowledgeIndexSearch: result.knowledgeIndexSearch || null } : {}),
-        ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
-        ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
-        ...(result.capabilityContext ? { lastCapabilityContext: result.capabilityContext, lastCapabilitySnapshot: result.capabilitySnapshot } : {}),
-        ...(result.skillContext ? { lastSkillContext: result.skillContext, lastSkillSnapshot: result.skillSnapshot } : {}),
-        ...(result.executionContext ? { lastExecutionContext: result.executionContext, lastExecutionSnapshot: result.executionSnapshot } : {}),
-        ...(result.controlledExecutionContext ? { lastControlledExecutionContext: result.controlledExecutionContext, lastControlledExecutionSnapshot: result.controlledExecutionSnapshot } : {}),
-        ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
-        ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
-        ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
-        ...(result.workflowContext ? { lastWorkflowContext: result.workflowContext } : {}),
-        ...(result.agentContext ? { lastAgentContext: result.agentContext, lastAgentSession: result.agentContext.session } : {}),
-        ...(result.toolContext ? { lastToolContext: result.toolContext } : {}),
-        ...(result.decisionContext ? { lastDecisionContext: result.decisionContext, decisionSnapshot: result.decisionContext } : {}),
-        personalityHistory: result.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) : memory.personalityHistory,
+        ...(normalizedResult.knowledgeSnapshot ? { lastKnowledgeSnapshot: normalizedResult.knowledgeSnapshot, lastKnowledgeIndexSearch: normalizedResult.knowledgeIndexSearch || null } : {}),
+        ...(normalizedResult.reasoningContext ? { lastReasoningContext: normalizedResult.reasoningContext } : {}),
+        ...(normalizedResult.conversationContext ? { lastConversationContext: normalizedResult.conversationContext, lastConversationSession: normalizedResult.conversationContext.session } : {}),
+        ...(normalizedResult.capabilityContext ? { lastCapabilityContext: normalizedResult.capabilityContext, lastCapabilitySnapshot: normalizedResult.capabilitySnapshot } : {}),
+        ...(normalizedResult.skillContext ? { lastSkillContext: normalizedResult.skillContext, lastSkillSnapshot: normalizedResult.skillSnapshot } : {}),
+        ...(normalizedResult.executionContext ? { lastExecutionContext: normalizedResult.executionContext, lastExecutionSnapshot: normalizedResult.executionSnapshot } : {}),
+        ...(normalizedResult.controlledExecutionContext ? { lastControlledExecutionContext: normalizedResult.controlledExecutionContext, lastControlledExecutionSnapshot: normalizedResult.controlledExecutionSnapshot } : {}),
+        ...(normalizedResult.journeyContext ? { lastJourneyContext: normalizedResult.journeyContext } : {}),
+        ...(normalizedResult.memoryContext ? { lastMemoryContext: normalizedResult.memoryContext } : {}),
+        ...(normalizedResult.planContext ? { lastPlanContext: normalizedResult.planContext } : {}),
+        ...(normalizedResult.workflowContext ? { lastWorkflowContext: normalizedResult.workflowContext } : {}),
+        ...(normalizedResult.agentContext ? { lastAgentContext: normalizedResult.agentContext, lastAgentSession: normalizedResult.agentContext.session } : {}),
+        ...(normalizedResult.toolContext ? { lastToolContext: normalizedResult.toolContext } : {}),
+        ...(normalizedResult.decisionContext ? { lastDecisionContext: normalizedResult.decisionContext, decisionSnapshot: normalizedResult.decisionContext } : {}),
+        personalityHistory: normalizedResult.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: normalizedResult.personalityPhraseId }) : memory.personalityHistory,
         conversationCount: Number(memory.conversationCount || 0) + 1,
         lastSeenAt: new Date().toISOString(),
       });
-      if (result.knowledgeSnapshot) recordKnowledgeIndexSnapshot(result.knowledgeSnapshot, result.knowledgeIndexSearch);
-      if (result.planContext) recordPlanContext(result.planContext);
-      if (result.workflowContext) recordWorkflowContext(result.workflowContext);
-      if (result.agentContext) recordAgentContext(result.agentContext);
-      if (result.conversationContext) recordConversationContext(result.conversationContext);
-      if (result.capabilityContext) recordCapabilityContext(result.capabilityContext, result.capabilitySnapshot);
-      if (result.skillContext) recordSkillContext(result.skillContext, result.skillSnapshot);
-      if (result.executionContext) recordExecutionContext(result.executionContext, result.executionSnapshot);
-      if (result.controlledExecutionContext) recordControlledExecutionContext(result.controlledExecutionContext, result.controlledExecutionSnapshot);
-      if (result.decisionContext) recordDecisionContext(result.decisionContext);
-      if (result.evaluationSnapshot) recordEvaluationSnapshot(result.evaluationContext, result.evaluationSnapshot);
-      if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
-      setUserMemory(prev => learnFromLokiQuery(prev, text, result));
+      if (normalizedResult.knowledgeSnapshot) recordKnowledgeIndexSnapshot(normalizedResult.knowledgeSnapshot, normalizedResult.knowledgeIndexSearch);
+      if (normalizedResult.planContext) recordPlanContext(normalizedResult.planContext);
+      if (normalizedResult.workflowContext) recordWorkflowContext(normalizedResult.workflowContext);
+      if (normalizedResult.agentContext) recordAgentContext(normalizedResult.agentContext);
+      if (normalizedResult.conversationContext) recordConversationContext(normalizedResult.conversationContext);
+      if (normalizedResult.capabilityContext) recordCapabilityContext(normalizedResult.capabilityContext, normalizedResult.capabilitySnapshot);
+      if (normalizedResult.skillContext) recordSkillContext(normalizedResult.skillContext, normalizedResult.skillSnapshot);
+      if (normalizedResult.executionContext) recordExecutionContext(normalizedResult.executionContext, normalizedResult.executionSnapshot);
+      if (normalizedResult.controlledExecutionContext) recordControlledExecutionContext(normalizedResult.controlledExecutionContext, normalizedResult.controlledExecutionSnapshot);
+      if (normalizedResult.decisionContext) recordDecisionContext(normalizedResult.decisionContext);
+      if (normalizedResult.evaluationSnapshot) recordEvaluationSnapshot(normalizedResult.evaluationContext, normalizedResult.evaluationSnapshot);
+      if (normalizedResult.toolContext?.events?.length) recordToolEvents(normalizedResult.toolContext.events);
+      setUserMemory(prev => learnFromLokiQuery(prev, text, normalizedResult));
       userAction('loki:analytics', {
         payload: {
           query: text,
-          intent: result.intent,
-          resultCount: result.cards?.length || (result.card ? 1 : 0),
-          actionType: result.executeAction?.type || result.autoAction?.type || result.card?.action?.type || '',
+          intent: normalizedResult.intent,
+          resultCount: normalizedResult.cards?.length || (normalizedResult.card ? 1 : 0),
+          actionType: normalizedResult.executeAction?.type || normalizedResult.autoAction?.type || normalizedResult.card?.action?.type || '',
           panel: activePanel,
           ms: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
           success: true,
@@ -1237,23 +1332,40 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       updateHistory(prev => addLokiHistoryItem(prev, {
         kind: 'brain',
         eventType: LOKI_EVENTS.BRAIN_RESPONSE,
-        text: result.text,
-        card: result.card,
+        text: normalizedResult.text,
+        card: normalizedResult.card,
         priority: LOKI_MESSAGE_PRIORITY.HIGH,
         panel: activePanel,
       }));
-      const actionToRun = result.executeAction ?? (options.autoExecute ? result.autoAction : null);
+      recordLokiRequestDiagnostics({
+        contextType: activeContext?.type || '',
+        intent: normalizedResult.intent || '',
+        resultStatus: normalizedResult.debug?.timeout ? 'timeout' : 'answered',
+        fallbackUsed: Boolean(normalizedResult.debug?.timeout),
+        timeoutUsed: Boolean(normalizedResult.debug?.timeout),
+        responseTextLength: normalizedResult.text.length,
+        errorCode: normalizedResult.debug?.timeout ? 'TIMEOUT' : '',
+      });
+      const actionToRun = normalizedResult.executeAction ?? (options.autoExecute ? normalizedResult.autoAction : null);
       if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
-      else if (result.controlledExecutionContext?.executionReady) setTimeout(() => dispatchControlledExecution(result.controlledExecutionContext), 120);
-      recordLokiMessageTrace('STEP 18 Provider returns result to UI', { textLength: String(result.text || '').length });
-      return result;
+      else if (normalizedResult.controlledExecutionContext?.executionReady) setTimeout(() => dispatchControlledExecution(normalizedResult.controlledExecutionContext), 120);
+      recordLokiMessageTrace('STEP 18 Provider returns result to UI', { textLength: normalizedResult.text.length });
+      return normalizedResult;
     } catch (e) {
       setBrainThinking(false);
       recordLokiMessageTrace('STOP Provider caught exception', { error: e?.message || String(e) });
+      recordLokiRequestDiagnostics({
+        contextType: activeContext?.type || '',
+        resultStatus: 'failed',
+        fallbackUsed: true,
+        failedStage: 'Provider exception',
+        errorCode: 'PROVIDER_EXCEPTION',
+        responseTextLength: 67,
+      });
       logError(e, 'LokiProvider.askExperience');
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_experience', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return {
-        text: 'Что-то пошло не так. Сейчас попробуем разобраться.',
+        text: 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.',
         card: null,
         cards: [],
         debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
