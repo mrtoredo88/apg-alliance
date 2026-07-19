@@ -19,9 +19,17 @@ import {
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
+import { EmailAuth } from './EmailAuth.jsx';
 import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassToast } from './components/Apg2ProfileGlass.jsx';
+import {
+  PWA_EMAIL_HINT_HIDDEN_KEY,
+  PwaEmailLoginHint,
+  PwaInstallGuide,
+  shouldShowPwaEmailHint,
+  shouldShowPwaInstallGuide,
+} from './components/onboarding/PwaInstallGuide.jsx';
 import { MOTION, motionTransition } from './motion.js';
 import { LokiProvider } from './loki/LokiProvider.jsx';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
@@ -921,6 +929,9 @@ export function UserApp() {
   const [consentReloginNeeded, setConsentReloginNeeded] = useState(false);
   const [pendingNotificationPrompt, setPendingNotificationPrompt] = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
+  const [showPwaInstallGuide, setShowPwaInstallGuide] = useState(false);
+  const [showPwaEmailHint, setShowPwaEmailHint] = useState(false);
+  const [showPwaEmailAuth, setShowPwaEmailAuth] = useState(false);
   const [showScannerHint, setShowScannerHint]   = useState(false);
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
   const [recentReviews, setRecentReviews]       = useState([]);
@@ -938,6 +949,13 @@ export function UserApp() {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;
   });
+
+  useEffect(() => {
+    if (loading || loggedOut || consentRequest) return;
+    const vkShell = isVK();
+    setShowPwaInstallGuide(shouldShowPwaInstallGuide({ user, isVk: vkShell }));
+    setShowPwaEmailHint(shouldShowPwaEmailHint({ user, isVk: vkShell }));
+  }, [loading, loggedOut, consentRequest, user?.id]);
 
   // Реферальный параметр из URL должен переживать refresh/PWA-install до подтверждённого profile:sync.
   const pendingRefId = useMemo(() => readPendingReferral({ source: 'UserApp.mount' }), []);
@@ -2844,6 +2862,22 @@ export function UserApp() {
       notificationsDefault: true,
     });
   }, [completeEmailLogin, showToast]);
+
+  const handlePwaEmailLoginOpen = useCallback(() => {
+    try {
+      localStorage.setItem(PWA_EMAIL_HINT_HIDDEN_KEY, '1');
+    } catch {}
+    setShowPwaInstallGuide(false);
+    setShowPwaEmailHint(false);
+    setShowPwaEmailAuth(true);
+  }, []);
+
+  const handlePwaEmailAuthSuccess = useCallback((emailUser, authPayload) => {
+    setShowPwaEmailAuth(false);
+    setShowPwaInstallGuide(false);
+    setShowPwaEmailHint(false);
+    handleEmailAuthSuccess(emailUser, authPayload);
+  }, [handleEmailAuthSuccess]);
 
   const handleConsentAccept = useCallback(async ({ termsAccepted, privacyAccepted, notificationsAccepted }) => {
     const targetUser = consentRequest?.user;
@@ -4793,6 +4827,52 @@ export function UserApp() {
                 setConsentRequest(null);
               } : undefined}
             />
+          )}
+
+          <PwaInstallGuide
+            open={showPwaInstallGuide && splashDone && !loading && !showOnboarding && !isScannerOpen && !loggedOut && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest)}
+            onClose={() => setShowPwaInstallGuide(false)}
+          />
+
+          <PwaEmailLoginHint
+            open={showPwaEmailHint && splashDone && !loading && !showOnboarding && !isScannerOpen && !loggedOut && !showPwaEmailAuth && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest)}
+            onClose={() => setShowPwaEmailHint(false)}
+            onEmailLogin={handlePwaEmailLoginOpen}
+          />
+
+          {showPwaEmailAuth && createPortal(
+            <div
+              data-pwa-email-auth
+              onClick={event => {
+                if (event.target === event.currentTarget) setShowPwaEmailAuth(false);
+              }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 12600,
+                background: 'rgba(10,10,14,0.76)',
+                backdropFilter: 'blur(16px) saturate(1.35)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 'calc(18px + env(safe-area-inset-top, 0px)) 14px calc(18px + env(safe-area-inset-bottom, 0px))',
+                boxSizing: 'border-box',
+                overflowY: 'auto',
+              }}
+            >
+              <GlassCard interactiveAs="div" style={{ width: '100%', maxWidth: 430, borderRadius: 30, padding: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 20, lineHeight: '24px', fontWeight: 900 }}>Вход по электронной почте</div>
+                    <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 5 }}>Так сохраняются профиль, бонусы, друзья, сообщения и записи.</div>
+                  </div>
+                  <button type="button" onClick={() => setShowPwaEmailAuth(false)} aria-label="Закрыть вход" style={{ width: 34, height: 34, borderRadius: 17, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.08)', color: APG2_PROFILE.textSoft, fontSize: 18, cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}>×</button>
+                </div>
+                <EmailAuth onCancel={() => setShowPwaEmailAuth(false)} onSuccess={handlePwaEmailAuthSuccess} />
+              </GlassCard>
+            </div>,
+            document.body,
           )}
 
           <GlassToast

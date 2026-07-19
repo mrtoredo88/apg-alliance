@@ -1825,6 +1825,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     <span style={{ color: APG2.textMuted, fontSize: 12, fontWeight: 720 }}>или</span>
                     <div style={{ flex: 1, height: 1, background: 'var(--apg2-glass-border, rgba(255,255,255,0.14))' }} />
                   </div>
+                  <div style={{ borderRadius: 16, padding: '10px 12px', background: 'rgba(74,144,217,0.09)', border: '1px solid rgba(74,144,217,0.18)', color: APG2.textMuted, fontSize: 12.5, lineHeight: '17px', textAlign: 'center' }}>
+                    Для первого входа рекомендуем использовать электронную почту. После этого Telegram можно привязать к аккаунту.
+                  </div>
                   {tgLoading ? (
                     <GlassButton disabled><span style={{ color: '#26A8EA' }}>●</span>Создаём сессию...</GlassButton>
                   ) : tgStep === 'waiting' ? (
@@ -2272,6 +2275,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                   <span style={{ fontSize: 11, color: APG2.textSoft, fontWeight: 600 }}>или</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+                </div>
+                <div style={{ borderRadius: 14, padding: '9px 11px', background: 'rgba(74,144,217,0.09)', border: '1px solid rgba(74,144,217,0.18)', color: APG2.textSoft, fontSize: 12, lineHeight: '16px', textAlign: 'center' }}>
+                  Для первого входа рекомендуем email. После этого Telegram можно привязать к аккаунту.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
                   {tgLoading

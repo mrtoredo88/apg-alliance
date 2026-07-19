@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: mobile browser first-launch PWA onboarding
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/components/onboarding/PwaInstallGuide.jsx`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `scripts/pwa-first-launch-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен fullscreen onboarding для первого открытия APG в мобильном браузере: он показывается только гостю, только вне standalone PWA/VK/desktop и учитывает session/localStorage dismissal.
+- В установленной PWA для гостя появляется компактная подсказка с прямым открытием существующего email-входа.
+- В гостевом профиле добавлена мягкая рекомендация начинать первый вход с email, не блокируя Telegram.
+**Почему:** пользователю нужно быстро понять два первых шага: установить PWA и войти по email, без навязчивого alert и без изменения backend/auth-модели.
+
+---
+
 ## [2026-07-19] fix: Loki article conversation response UX
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/lokiResponseText.js`, `src/loki/lokiMessageTrace.js`, `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-message-chain-test.mjs`, `.ai/17_CHANGELOG_AI.md`
