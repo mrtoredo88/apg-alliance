@@ -17,6 +17,7 @@ import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
 import { countRender, markPerformanceStage } from './performance/index.js';
+import { createInitialHomeHydrationState, HOME_HYDRATION_STAGES, startHomeHydration } from './home/index.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -982,6 +983,7 @@ function V2SecondScreen({
   homeExperience = null,
   continueExperience = null,
   recommendations = null,
+  hydration = null,
 }) {
   if (desktopMode) {
     return (
@@ -1010,6 +1012,7 @@ function V2SecondScreen({
         homeExperience={homeExperience}
         continueExperience={continueExperience}
         recommendations={recommendations}
+        hydration={hydration}
       />
     );
   }
@@ -1035,6 +1038,7 @@ function V2SecondScreen({
       homeExperience={homeExperience}
       continueExperience={continueExperience}
       recommendations={recommendations}
+      hydration={hydration}
     />
   );
 }
@@ -1059,7 +1063,9 @@ function V2SecondScreenMobile({
   isOffline = false,
   desktopMode = false,
   homeExperience = null,
+  hydration = null,
 }) {
+  const isHydrated = (stage) => !hydration || Boolean(hydration[stage]);
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
     const parts = String(event?.date || 'Скоро').split(/[,\s]+/).filter(Boolean);
@@ -1164,7 +1170,9 @@ function V2SecondScreenMobile({
 
       <div data-apg-horizontal-scroll={!desktopMode ? 'true' : undefined} onTouchStart={e => e.stopPropagation()}>
           <div style={desktopMode ? { display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', alignItems: 'stretch', gap: 12, padding: '0 0 22px' } : { ...horizontalSnapTrack, alignItems: 'stretch', gap: 12, padding: '0 18px 26px', scrollPaddingLeft: 18 }}>
-            {forYouCards.map((card, index) => (
+            {!isHydrated(HOME_HYDRATION_STAGES.PARTNERS) ? [0, 1, 2].map(index => (
+              <HomeHydrationPlaceholder key={`for-you-hydration-${index}`} stage="partners" desktopMode={desktopMode} rows={2} height={desktopMode ? 246 : 286} style={{ flex: desktopMode ? undefined : '0 0 min(74vw, 244px)', ...horizontalSnapItem }} />
+            )) : forYouCards.map((card, index) => (
               <button
                 key={`${card.label}-${index}`}
                 onClick={card.onClick}
@@ -1199,7 +1207,11 @@ function V2SecondScreenMobile({
 
       <div style={{ padding: '0 0 0', display: desktopMode ? 'grid' : 'block', gridTemplateColumns: desktopMode ? 'minmax(0, 1fr) minmax(340px, 0.62fr)' : undefined, gap: desktopMode ? 18 : undefined, alignItems: 'start' }}>
         <div>
-        <NewsFeed news={newsItems} onOpenNews={onOpenNews} onOpenNewsItem={onOpenNewsItem} />
+        {isHydrated(HOME_HYDRATION_STAGES.NEWS) ? (
+          <NewsFeed news={newsItems} onOpenNews={onOpenNews} onOpenNewsItem={onOpenNewsItem} />
+        ) : (
+          <HomeHydrationPlaceholder stage="news" desktopMode={desktopMode} rows={3} height={desktopMode ? 210 : 286} style={desktopMode ? undefined : { margin: '0 18px 18px' }} />
+        )}
         </div>
 
         <div>
@@ -1207,7 +1219,9 @@ function V2SecondScreenMobile({
           Ближайшие мероприятия
         </div>
 
-        {visibleEvents.length === 0 ? (
+        {!isHydrated(HOME_HYDRATION_STAGES.EVENTS) ? (
+          <HomeHydrationPlaceholder stage="events" desktopMode={desktopMode} rows={3} height={desktopMode ? 210 : 236} />
+        ) : visibleEvents.length === 0 ? (
           <div style={{ ...GlassCard, borderRadius: 36, padding: 22, minHeight: 146, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: fallbackCardBg, animation: 'fadeInUp 0.5s ease both' }}>
             <span style={{ ...GlassBadge, alignSelf: 'flex-start' }}>Скоро</span>
             <span>
@@ -1318,7 +1332,9 @@ function V2SecondScreenDesktop({
   homeExperience = null,
   continueExperience = null,
   recommendations = null,
+  hydration = null,
 }) {
+  const isHydrated = (stage) => !hydration || Boolean(hydration[stage]);
   const desktopWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const titleOf = (item, fallback) => String(item?.title || item?.name || item?.offer || item?.specialization || fallback).trim();
   const eventDayParts = (event) => {
@@ -1720,7 +1736,12 @@ function V2SecondScreenDesktop({
                 <div style={{ ...DesktopSectionHeader, fontSize: 23 }}>Сегодня в АПГ</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: desktopSideCardColumns, gap: desktopRowGap, alignItems: 'stretch', minHeight: 0 }}>
-                {todayInApg.map((card, index) => (
+                {!isHydrated(HOME_HYDRATION_STAGES.RECOMMENDATIONS) ? (
+                  <>
+                    <HomeHydrationPlaceholder stage="recommendations" desktopMode rows={3} height="100%" style={{ gridColumn: '1 / 2', gridRow: '1 / span 3' }} />
+                    <HomeHydrationPlaceholder stage="recommendations" desktopMode rows={3} height="100%" style={{ gridColumn: '2 / 3', gridRow: '1 / span 3' }} />
+                  </>
+                ) : todayInApg.map((card, index) => (
                   <button
                     key={`${card.label}-${index}`}
                     type="button"
@@ -1765,7 +1786,7 @@ function V2SecondScreenDesktop({
                 </div>
                 <button type="button" onClick={() => onOpenNews?.()} style={{ ...GlassButton, minHeight: 30, padding: '0 10px', fontSize: 10.8, flexShrink: 0 }}>Все новости</button>
               </div>
-              {loading ? (
+              {!isHydrated(HOME_HYDRATION_STAGES.NEWS) || loading ? (
                 <div style={{ display: 'grid', gridTemplateColumns: desktopNewsCardColumns, gap: desktopRowGap, alignItems: 'stretch', minHeight: 0, alignContent: 'start', height: '100%' }}>
                   <div style={{ ...DesktopTile, border: 'none', padding: 0, height: '100%', overflow: 'hidden' }}>
                     <Skel h={compactSectionLeadImageHeight} w="100%" radius={0} />
@@ -1841,7 +1862,7 @@ function V2SecondScreenDesktop({
                 <button type="button" onClick={onOpenEvents} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все мероприятия</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${afishaColumns}, minmax(0, 1fr))`, gap: desktopLayout.compactGap, height: '100%', alignContent: 'start' }}>
-                {loading ? [0, 1, 2, 3].map(i => <div key={`event-skel-${i}`} style={{ ...DesktopTile, minHeight: afishaTileHeight, height: afishaTileHeight }}><Skel h={18} w="60%" radius={7} /></div>) : afishaEvents.length === 0 ? (
+                {!isHydrated(HOME_HYDRATION_STAGES.EVENTS) || loading ? [0, 1, 2, 3].map(i => <div key={`event-skel-${i}`} style={{ ...DesktopTile, minHeight: afishaTileHeight, height: afishaTileHeight }}><Skel h={18} w="60%" radius={7} /></div>) : afishaEvents.length === 0 ? (
                   <div style={{
                     ...EmptyDesktopCard,
                     gridColumn: '1 / -1',
@@ -1898,7 +1919,7 @@ function V2SecondScreenDesktop({
                 <button type="button" onClick={onOpenPartners} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все партнёры</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactPartnerColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
-                {loading ? [0, 1, 2].map(i => (
+                {!isHydrated(HOME_HYDRATION_STAGES.PARTNERS) || loading ? [0, 1, 2].map(i => (
                   <div key={`partner-skel-${i}`} style={{ ...DesktopDenseTile, minHeight: compactSectionTileHeight, height: '100%', padding: 12, display: 'grid', gap: 7, gridTemplateColumns: '1fr', alignContent: 'start' }}>
                     <Skel h={44} w="100%" radius={11} />
                     <Skel h={13} w="84%" radius={6} />
@@ -1949,7 +1970,7 @@ function V2SecondScreenDesktop({
                 <button type="button" onClick={onOpenExperts} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все эксперты</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${compactExpertsColumns}, minmax(0, 1fr))`, gap: desktopSecondRowGap, height: '100%', alignContent: 'start' }}>
-                {loading ? [0, 1, 2].map(i => (
+                {!isHydrated(HOME_HYDRATION_STAGES.RECOMMENDATIONS) || loading ? [0, 1, 2].map(i => (
                   <div key={`expert-skel-${i}`} style={{ ...DesktopDenseTile, minHeight: compactSectionTileHeight, height: '100%', padding: 12, display: 'grid', gap: 7, alignItems: 'start', justifyItems: 'start', gridTemplateRows: 'auto auto auto' }}>
                     <Skel h={52} w={52} radius={13} />
                     <Skel h={11} w="92%" radius={6} />
@@ -1979,7 +2000,7 @@ function V2SecondScreenDesktop({
             </section>
 
               <section style={{ ...desktopSecondRowStyle, display: 'grid', gridTemplateRows: hasContinueSection ? 'auto 1fr' : '1fr', gap: 10 }}>
-                {hasContinueSection ? (
+                {hasContinueSection && isHydrated(HOME_HYDRATION_STAGES.RECOMMENDATIONS) ? (
                   <div>
                     <div style={{ color: V2.text, fontWeight: 850, fontSize: 18, marginBottom: 8 }}>Продолжить</div>
                     <div style={{ display: 'grid', gap: 7 }}>
@@ -1997,6 +2018,7 @@ function V2SecondScreenDesktop({
                   <div style={{ color: V2.text, fontWeight: 850, fontSize: 23 }}>Рядом</div>
                   <button type="button" onClick={onOpenNearby} style={{ ...GlassButton, minHeight: 32, padding: '0 12px', fontSize: 12 }}>Открыть карту</button>
                 </div>
+                {isHydrated(HOME_HYDRATION_STAGES.RECOMMENDATIONS) ? (
                 <div style={{ ...DesktopDenseTile, padding: 10, display: 'grid', gap: 8 }}>
                   {nearbySummary.hasCoords ? (
                     <button
@@ -2113,6 +2135,9 @@ function V2SecondScreenDesktop({
                     ))}
                   </div>
                 </div>
+                ) : (
+                  <HomeHydrationPlaceholder stage="recommendations" desktopMode rows={4} height={hasContinueSection ? 122 : 204} />
+                )}
               </div>
             </section>
 
@@ -2831,6 +2856,32 @@ function SkeletonHome() {
   );
 }
 
+function HomeHydrationPlaceholder({ stage, desktopMode = false, rows = 3, height, style = {} }) {
+  const minHeight = height || (desktopMode ? 120 : 148);
+  return (
+    <div
+      data-home-hydration-placeholder={stage}
+      style={{
+        ...V2.glass,
+        borderRadius: desktopMode ? 20 : 28,
+        padding: desktopMode ? 12 : 16,
+        minHeight,
+        boxSizing: 'border-box',
+        display: 'grid',
+        gap: desktopMode ? 8 : 10,
+        alignContent: 'start',
+        animation: 'fadeInUp 0.26s ease both',
+        ...style,
+      }}
+    >
+      <Skel h={desktopMode ? 12 : 15} w={desktopMode ? '48%' : '58%'} radius={7} />
+      {Array.from({ length: rows }).map((_, index) => (
+        <Skel key={`${stage}-${index}`} h={desktopMode ? 30 : 44} w={index === rows - 1 ? '74%' : '100%'} radius={desktopMode ? 12 : 16} />
+      ))}
+    </div>
+  );
+}
+
 export function HomePanelV2({
   user, userKeys = 0, favorites = [], partners = [], experts = [], events: rawEvents = [], news = [], recentReviews = [],
   loading = false, error = null, streak = 0, lastScanDate = null,
@@ -2862,6 +2913,7 @@ export function HomePanelV2({
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isOffline, setIsOffline] = useState(() => typeof navigator === 'undefined' ? false : !navigator.onLine);
+  const [homeHydration, setHomeHydration] = useState(() => createInitialHomeHydrationState());
 
   useEffect(() => {
     markPerformanceStage('home_render', {
@@ -2875,13 +2927,32 @@ export function HomePanelV2({
 
   useEffect(() => {
     if (loading) return;
-    markPerformanceStage('home_ready', {
+    markPerformanceStage('home_data_ready', {
       partners: partners.length,
       events: events.length,
       news: news.length,
       recommendations: Array.isArray(recommendations?.items) ? recommendations.items.length : 0,
     }, 'home');
   }, [events.length, loading, news.length, partners.length, recommendations]);
+
+  useEffect(() => {
+    if (loading || error) {
+      setHomeHydration(createInitialHomeHydrationState());
+      return undefined;
+    }
+    const scheduler = startHomeHydration({
+      detail: {
+        desktopMode,
+        partners: partners.length,
+        events: events.length,
+        news: news.length,
+      },
+      onStageReady: (stage) => {
+        setHomeHydration(prev => prev?.[stage] ? prev : { ...prev, [stage]: true });
+      },
+    });
+    return () => scheduler.cancel();
+  }, [desktopMode, error, loading, events.length, news.length, partners.length]);
 
   // ─── Pull-to-refresh ────────────────────────────────────────────────────────
   const [pullY, setPullY] = useState(0);
@@ -3028,15 +3099,19 @@ export function HomePanelV2({
         homeExperience={homeExperience}
       />
 
-      <FirstJourneyCard
-        journey={firstJourney}
-        onEmailLogin={onFirstJourneyEmailLogin}
-        onAskLoki={onFirstJourneyAskLoki}
-        onOpenRewards={onOpenRewards}
-        onOpenPanel={onFirstJourneyOpenPanel}
-        onOpenLoki={onOpenLoki}
-        onOpenHome={() => onFirstJourneyOpenPanel?.('home')}
-      />
+      {firstJourney && !firstJourney.complete && !firstJourney.hidden && !homeHydration[HOME_HYDRATION_STAGES.JOURNEY] ? (
+        <HomeHydrationPlaceholder stage="journey" desktopMode={desktopMode} rows={2} height={desktopMode ? 84 : 92} style={{ margin: desktopMode ? '14px auto 0' : '14px 14px 0', maxWidth: desktopMode ? 1180 : undefined }} />
+      ) : (
+        <FirstJourneyCard
+          journey={firstJourney}
+          onEmailLogin={onFirstJourneyEmailLogin}
+          onAskLoki={onFirstJourneyAskLoki}
+          onOpenRewards={onOpenRewards}
+          onOpenPanel={onFirstJourneyOpenPanel}
+          onOpenLoki={onOpenLoki}
+          onOpenHome={() => onFirstJourneyOpenPanel?.('home')}
+        />
+      )}
 
       {/* Pull-to-refresh indicator */}
       <div style={{
@@ -3124,6 +3199,7 @@ export function HomePanelV2({
               homeExperience={homeExperience}
               continueExperience={continueExperience}
               recommendations={recommendations}
+              hydration={homeHydration}
             />
 
           </>

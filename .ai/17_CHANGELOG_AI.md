@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Home Incremental Hydration v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/home/*`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/home-hydration-test.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only слой Home Hydration: shell/news/partners/events/journey/loki/recommendations раскрываются по очереди с requestIdleCallback для последних блоков.
+- Home теперь показывает staged skeleton placeholders без изменения данных, Firestore/API, UX-структуры или бизнес-логики; `home_ready` привязан к shell, а data-ready фиксируется отдельной диагностикой.
+- Performance Observatory и APG Health получили Home Hydration Timeline и экспорт новых home metrics.
+**Почему:** после Bootstrap Scheduler нужно ускорить воспринимаемую готовность главной страницы и сделать появление тяжёлых блоков измеримым.
+
+---
+
 ## [2026-07-19] feat: APG Bootstrap Scheduler v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/bootstrap/*`, `src/main.jsx`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/bootstrap-scheduler-test.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

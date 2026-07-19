@@ -80,6 +80,13 @@ export function buildStageMetrics(timeline = []) {
     bootstrapCriticalMs: between('bootstrap_critical_start', 'bootstrap_critical_complete'),
     bootstrapInteractiveMs: between('bootstrap_interactive_start', 'bootstrap_interactive_complete'),
     bootstrapIdleMs: between('bootstrap_idle_start', 'bootstrap_idle_complete'),
+    homeShellMs: between('home_hydration_start', 'home_shell_ready'),
+    homeNewsMs: between('home_hydration_start', 'home_news_ready'),
+    homePartnersMs: between('home_hydration_start', 'home_partners_ready'),
+    homeEventsMs: between('home_hydration_start', 'home_events_ready'),
+    homeJourneyMs: between('home_hydration_start', 'home_journey_ready'),
+    homeLokiHydrationMs: between('home_hydration_start', 'home_loki_ready'),
+    homeRecommendationsMs: between('home_hydration_start', 'home_recommendations_ready'),
     idleMs: byStage.get('idle_complete') || 0,
   };
 }

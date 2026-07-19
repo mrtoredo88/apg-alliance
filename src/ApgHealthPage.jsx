@@ -190,6 +190,15 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       'loki_ready',
       'workspace_ready',
       'home_ready',
+      'home_hydration_start',
+      'home_shell_ready',
+      'home_news_ready',
+      'home_partners_ready',
+      'home_events_ready',
+      'home_journey_ready',
+      'home_loki_ready',
+      'home_recommendations_ready',
+      'home_hydration_complete',
       'bootstrap_critical_start',
       'bootstrap_critical_complete',
       'bootstrap_interactive_start',
@@ -201,6 +210,12 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     .slice(-18);
   const bootstrapRows = performanceTimeline
     .filter(item => String(item.stage || '').startsWith('bootstrap_') || item.stage === 'home_ready')
+    .slice(-18);
+  const homeHydrationRows = performanceTimeline
+    .filter(item => {
+      const stage = String(item.stage || '');
+      return (stage.startsWith('home_') && stage.includes('_ready')) || stage === 'home_hydration_start' || stage === 'home_hydration_complete';
+    })
     .slice(-18);
 
   const warnColor = { error: 'rgba(230,70,70,0.34)', warn: 'rgba(255,165,0,0.34)', info: 'rgba(215,184,106,0.28)' };
@@ -466,6 +481,32 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 {bootstrapRows.length === 0 ? (
                   <EmptyStateV2 icon="⏱" title="Bootstrap timeline пуст" text="Очереди появятся после следующего запуска." />
                 ) : bootstrapRows.map((item, index) => (
+                  <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>
+                        +{Math.round(item.relativeMs || 0)} ms · {formatMs(item.durationMs)}
+                      </span>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Home Hydration Timeline">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Home Shell" value={formatMs(performanceReport?.metrics?.homeShellMs)} />
+                <DiagnosticLine label="News" value={formatMs(performanceReport?.metrics?.homeNewsMs)} />
+                <DiagnosticLine label="Partners" value={formatMs(performanceReport?.metrics?.homePartnersMs)} />
+                <DiagnosticLine label="Events" value={formatMs(performanceReport?.metrics?.homeEventsMs)} />
+                <DiagnosticLine label="Journey" value={formatMs(performanceReport?.metrics?.homeJourneyMs)} />
+                <DiagnosticLine label="Loki" value={formatMs(performanceReport?.metrics?.homeLokiHydrationMs)} />
+                <DiagnosticLine label="Recommendations" value={formatMs(performanceReport?.metrics?.homeRecommendationsMs)} />
+              </GlassCard>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                {homeHydrationRows.length === 0 ? (
+                  <EmptyStateV2 icon="⏱" title="Home hydration timeline пуст" text="Этапы главной появятся после следующего открытия Home." />
+                ) : homeHydrationRows.map((item, index) => (
                   <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
                       <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>

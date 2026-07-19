@@ -3841,7 +3841,7 @@ export function UserApp() {
   useEffect(() => {
     if (performanceReadyRef.current.home || loading || activePanel !== 'home') return;
     performanceReadyRef.current.home = true;
-    markPerformanceStage('home_ready', {
+    markPerformanceStage('home_data_ready', {
       partners: enrichedPartners.length,
       events: events.length,
       news: apgNews.length,

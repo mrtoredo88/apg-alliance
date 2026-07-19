@@ -39,6 +39,13 @@ export function buildPerformanceExport(report) {
     `Bootstrap Critical: ${metrics.bootstrapCriticalMs || 0} ms`,
     `Bootstrap Interactive: ${metrics.bootstrapInteractiveMs || 0} ms`,
     `Bootstrap Idle: ${metrics.bootstrapIdleMs || 0} ms`,
+    `Home Shell: ${metrics.homeShellMs || 0} ms`,
+    `Home News: ${metrics.homeNewsMs || 0} ms`,
+    `Home Partners: ${metrics.homePartnersMs || 0} ms`,
+    `Home Events: ${metrics.homeEventsMs || 0} ms`,
+    `Home Journey: ${metrics.homeJourneyMs || 0} ms`,
+    `Home Loki: ${metrics.homeLokiHydrationMs || 0} ms`,
+    `Home Recommendations: ${metrics.homeRecommendationsMs || 0} ms`,
     `FPS: ${report?.fps || 0}`,
   ].join('\n');
 }

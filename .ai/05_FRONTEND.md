@@ -47,6 +47,11 @@ src/
 │   ├── RichText.jsx           ← Markdown рендер
 │   ├── MdEditor.jsx           ← Markdown редактор
 │   └── VideoSection.jsx       ← видеогалерея
+├── home/
+│   ├── HomeHydrationEngine.js    ← read-only incremental hydration facade for Home
+│   ├── HomeHydrationScheduler.js ← staged shell/news/partners/events/journey/loki/recommendations queue
+│   ├── HomeHydrationTask.js      ← stage constants and ready marks
+│   └── HomeHydrationMetrics.js   ← Performance Observatory marks for Home hydration
 ├── utils/
 │   ├── geo.js
 │   ├── parseVideoUrl.js
