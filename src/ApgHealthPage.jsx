@@ -199,6 +199,11 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       'home_loki_ready',
       'home_recommendations_ready',
       'home_hydration_complete',
+      'home_cache_restore',
+      'home_cache_hit',
+      'home_cache_miss',
+      'home_cache_refresh',
+      'home_cache_update',
       'bootstrap_critical_start',
       'bootstrap_critical_complete',
       'bootstrap_interactive_start',
@@ -217,6 +222,11 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       return (stage.startsWith('home_') && stage.includes('_ready')) || stage === 'home_hydration_start' || stage === 'home_hydration_complete';
     })
     .slice(-18);
+  const homeCacheRows = performanceTimeline
+    .filter(item => String(item.stage || '').startsWith('home_cache_'))
+    .slice(-18);
+  const homeCache = performanceReport?.homeCache || {};
+  const homeCacheSections = homeCache.sections || {};
 
   const warnColor = { error: 'rgba(230,70,70,0.34)', warn: 'rgba(255,165,0,0.34)', info: 'rgba(215,184,106,0.28)' };
   const warnIcon  = { error: '🔴', warn: '🟡', info: 'ℹ️' };
@@ -507,6 +517,43 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 {homeHydrationRows.length === 0 ? (
                   <EmptyStateV2 icon="⏱" title="Home hydration timeline пуст" text="Этапы главной появятся после следующего открытия Home." />
                 ) : homeHydrationRows.map((item, index) => (
+                  <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>
+                        +{Math.round(item.relativeMs || 0)} ms · {formatMs(item.durationMs)}
+                      </span>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Home Cache">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Status" value={homeCache.status || '—'} />
+                <DiagnosticLine label="Hit / Miss" value={`${homeCache.hits || 0} / ${homeCache.misses || 0}`} />
+                <DiagnosticLine label="Restore" value={formatMs(homeCache.lastRestoreMs)} />
+                <DiagnosticLine label="Refresh" value={formatMs(homeCache.lastRefreshMs || performanceReport?.metrics?.homeCacheRefreshMs)} />
+                <DiagnosticLine label="Update" value={formatMs(homeCache.lastUpdateMs || performanceReport?.metrics?.homeCacheUpdateMs)} />
+                <DiagnosticLine label="TTL" value={homeCache.expired ? `expired: ${homeCache.expired}` : 'valid'} />
+              </GlassCard>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 10 }}>
+                {['news', 'partners', 'events', 'recommendations', 'journey'].map(section => {
+                  const row = homeCacheSections[section] || {};
+                  return (
+                    <GlassCard key={section} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                      <div style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{section}</div>
+                      <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, marginTop: 4 }}>{row.status || '—'} · {row.ttlStatus || '—'}</div>
+                      <div style={{ color: APG2_PROFILE.text, fontSize: 18, fontWeight: 900, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>{row.count || 0}</div>
+                    </GlassCard>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                {homeCacheRows.length === 0 ? (
+                  <EmptyStateV2 icon="⏱" title="Home Cache пуст" text="Hit/miss появятся после следующего запуска Home." />
+                ) : homeCacheRows.map((item, index) => (
                   <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
                       <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>

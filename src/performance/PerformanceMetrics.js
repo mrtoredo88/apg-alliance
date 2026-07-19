@@ -87,6 +87,9 @@ export function buildStageMetrics(timeline = []) {
     homeJourneyMs: between('home_hydration_start', 'home_journey_ready'),
     homeLokiHydrationMs: between('home_hydration_start', 'home_loki_ready'),
     homeRecommendationsMs: between('home_hydration_start', 'home_recommendations_ready'),
+    homeCacheRestoreMs: between('home_cache_restore', 'home_ready') || byStage.get('home_cache_restore') || 0,
+    homeCacheRefreshMs: between('home_cache_restore', 'home_cache_refresh'),
+    homeCacheUpdateMs: between('home_cache_refresh', 'home_cache_update') || 0,
     idleMs: byStage.get('idle_complete') || 0,
   };
 }

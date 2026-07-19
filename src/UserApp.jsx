@@ -52,6 +52,14 @@ import {
   requestFirstJourneyLokiQuestion,
   syncFirstJourneyDerived,
 } from './firstJourney.js';
+import {
+  HOME_CACHE_SECTIONS,
+  areHomeCacheValuesEqual,
+  getHomeCacheSnapshot,
+  markHomeCacheRefreshComplete,
+  refreshHomeCacheSection,
+  restoreHomeCache,
+} from './home/cache/index.js';
 import { countRender, finalizePerformanceRun, markFirebase, markPerformanceStage, markRouteReady } from './performance/index.js';
 import { BOOTSTRAP_PRIORITIES, scheduleBootstrapTask } from './bootstrap/index.js';
 import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
@@ -167,6 +175,10 @@ function readCachedArray(key) {
 
 function writeCachedArray(key, items) {
   try { localStorage.setItem(key, JSON.stringify(items)); } catch {}
+}
+
+function setIfChanged(setter, next) {
+  setter(prev => areHomeCacheValuesEqual(prev, next) ? prev : next);
 }
 
 function safeStringList(value) {
@@ -976,6 +988,7 @@ export function UserApp() {
     const v = localStorage.getItem('apg_cache_ts');
     return v ? Number(v) : null;
   });
+  const [homeCacheSnapshot, setHomeCacheSnapshot] = useState(() => getHomeCacheSnapshot());
 
   useEffect(() => {
     if (loading || loggedOut || consentRequest) return;
@@ -1433,19 +1446,22 @@ export function UserApp() {
     setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
     markFirebase('firebase_start', { source: 'UserApp.loadData' });
 
-    // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
-    const cachedPartners = readCachedArray('apg_partners_cache').filter(item => item.catalogPublished !== false && isNotArchived(item));
-    if (cachedPartners.length) setPartners(cachedPartners);
-    writeCachedArray('apg_partners_cache', cachedPartners);
+    const restoredHomeCache = restoreHomeCache();
+    setHomeCacheSnapshot(restoredHomeCache.snapshot);
+    const cachedPartners = Array.isArray(restoredHomeCache.values.partners)
+      ? restoredHomeCache.values.partners.filter(item => item.catalogPublished !== false && isNotArchived(item))
+      : [];
+    if (cachedPartners.length) setIfChanged(setPartners, cachedPartners);
 
-    const cachedEvents = readCachedArray('apg_events_cache')
-      .filter(item => isNotArchived(item) && (isPublicContent(item) || normalizeContentStatus(item) === 'completed'));
-    if (cachedEvents.length) setEvents(cachedEvents);
-    writeCachedArray('apg_events_cache', cachedEvents);
+    const cachedEvents = Array.isArray(restoredHomeCache.values.events)
+      ? restoredHomeCache.values.events.filter(item => isNotArchived(item) && (isPublicContent(item) || normalizeContentStatus(item) === 'completed'))
+      : [];
+    if (cachedEvents.length) setIfChanged(setEvents, cachedEvents);
 
-    const cachedNews = readCachedArray('apg_news_cache').filter(item => isNotArchived(item) && isPublicContent(item));
-    if (cachedNews.length) setNews(cachedNews);
-    writeCachedArray('apg_news_cache', cachedNews);
+    const cachedNews = Array.isArray(restoredHomeCache.values.news)
+      ? restoredHomeCache.values.news.filter(item => isNotArchived(item) && isPublicContent(item))
+      : [];
+    if (cachedNews.length) setIfChanged(setNews, cachedNews);
 
     const cachedNotifications = readCachedArray('apg_notif_cache').filter(isNotArchived);
     if (cachedNotifications.length) setNotifications(cachedNotifications);
@@ -1592,6 +1608,7 @@ export function UserApp() {
         safeLoad('lokiKnowledge', () => loadPublicSnap('lokiKnowledge', () => getDocs(query(collection(db, 'lokiKnowledge'), orderBy('priority', 'desc'), limit(120)))), emptySnap),
       ]);
 
+      const homeCacheRefreshStartedAt = Date.now();
       const _loadResult = await _loadCritical();
       const [pSnap, eSnap, nSnap, vkPostsRaw, exSnap, statsSnap] = _loadResult;
 
@@ -1599,8 +1616,8 @@ export function UserApp() {
       const freshPartners = pSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(item => item.catalogPublished !== false && isNotArchived(item));
-      setPartners(freshPartners);
-      writeCachedArray('apg_partners_cache', freshPartners);
+      setIfChanged(setPartners, freshPartners);
+      refreshHomeCacheSection(HOME_CACHE_SECTIONS.PARTNERS, freshPartners);
       if (userData && isMounted.current) {
         const owned = freshPartners.find(p => profileOwnedByUser(p, userData));
         if (owned) {
@@ -1629,8 +1646,8 @@ export function UserApp() {
           const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ?? 0);
           return tb - ta;
         });
-      setEvents(freshEvents);
-      writeCachedArray('apg_events_cache', freshEvents);
+      setIfChanged(setEvents, freshEvents);
+      refreshHomeCacheSection(HOME_CACHE_SECTIONS.EVENTS, freshEvents);
 
       const firestoreNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const getMs = n => n.createdAt?.toDate ? n.createdAt.toDate().getTime() : (n.createdAt ?? 0);
@@ -1651,8 +1668,15 @@ export function UserApp() {
           return dp !== 0 ? dp : getMs(b) - getMs(a);
         })
         .slice(0, 50);
-      setNews(freshNews);
-      writeCachedArray('apg_news_cache', freshNews);
+      setIfChanged(setNews, freshNews);
+      refreshHomeCacheSection(HOME_CACHE_SECTIONS.NEWS, freshNews);
+      markHomeCacheRefreshComplete({
+        durationMs: Date.now() - homeCacheRefreshStartedAt,
+        partners: freshPartners.length,
+        events: freshEvents.length,
+        news: freshNews.length,
+      });
+      setHomeCacheSnapshot(getHomeCacheSnapshot());
 
       const freshExperts = exSnap.docs.map(d => normalizeExpertRecord({ id: d.id, ...d.data() })).filter(isNotArchived);
       if (isMounted.current) {
@@ -3749,6 +3773,21 @@ export function UserApp() {
   const dailySummary = useMemo(() => intelligenceService.getDailySummary(), [intelligenceService]);
   const workspaceDayPlan = useMemo(() => intelligenceService.getWorkspaceDayPlan({ recommendations, dailySummary }), [dailySummary, intelligenceService, recommendations]);
 
+  useEffect(() => {
+    if (loading) return;
+    refreshHomeCacheSection(
+      HOME_CACHE_SECTIONS.RECOMMENDATIONS,
+      Array.isArray(recommendations?.items) ? recommendations.items.slice(0, 24) : [],
+    );
+    refreshHomeCacheSection(HOME_CACHE_SECTIONS.JOURNEY, {
+      completed: Boolean(firstJourney?.completed),
+      completedCount: firstJourney?.completedCount ?? firstJourney?.completedSteps ?? 0,
+      totalSteps: firstJourney?.totalSteps ?? 5,
+      currentStepId: firstJourney?.currentStep?.id || firstJourney?.nextStep?.id || '',
+    });
+    setHomeCacheSnapshot(getHomeCacheSnapshot());
+  }, [firstJourney, loading, recommendations]);
+
   const personalHomeContext = useMemo(() => buildPersonalHomeContext({
     user,
     userState: {
@@ -3980,6 +4019,9 @@ export function UserApp() {
     );
   }
 
+  const homeHasRestoredCache = Boolean(homeCacheSnapshot?.hasRestoredData);
+  const homeLoading = loading && !homeHasRestoredCache;
+
   const homePanelProps = {
     nav: 'home',
     counterPulse,
@@ -3991,7 +4033,7 @@ export function UserApp() {
     news: apgNews,
     interestProfile: adaptiveInterestProfile,
     recentReviews,
-    loading,
+    loading: homeLoading,
     error,
     streak,
     lastScanDate,

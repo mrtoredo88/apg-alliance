@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Smart Home Cache v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/home/cache/*`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/home-cache-test.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only client cache для Home с раздельными секциями news/partners/events/recommendations/journey, TTL, build-version invalidation, 1 MB storage limit и очисткой повреждённых записей.
+- `UserApp` восстанавливает публичные Home-данные до сетевого refresh и затем обновляет только изменившиеся секции после свежих Firestore/API данных.
+- Performance Observatory и APG Health получили Home Cache hit/miss/restore/refresh/update metrics и export diagnostics.
+**Почему:** повторный запуск должен показывать заполненную главную почти мгновенно, при этом Firestore/API остаются источником истины.
+
+---
+
 ## [2026-07-19] feat: APG Home Incremental Hydration v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/home/*`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/home-hydration-test.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`

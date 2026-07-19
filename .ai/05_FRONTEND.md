@@ -51,7 +51,13 @@ src/
 │   ├── HomeHydrationEngine.js    ← read-only incremental hydration facade for Home
 │   ├── HomeHydrationScheduler.js ← staged shell/news/partners/events/journey/loki/recommendations queue
 │   ├── HomeHydrationTask.js      ← stage constants and ready marks
-│   └── HomeHydrationMetrics.js   ← Performance Observatory marks for Home hydration
+│   ├── HomeHydrationMetrics.js   ← Performance Observatory marks for Home hydration
+│   └── cache/
+│       ├── HomeCache.js          ← read-only Home cache constants, sections, TTL and build version
+│       ├── HomeCacheEngine.js    ← restore/refresh facade for per-section Home cache
+│       ├── HomeCacheStorage.js   ← localStorage storage with 1 MB limit and build-version cleanup
+│       ├── HomeCacheMetrics.js   ← Performance Observatory marks for cache hit/miss/refresh/update
+│       └── HomeCacheValidator.js ← schema validation and sensitive field stripping
 ├── utils/
 │   ├── geo.js
 │   ├── parseVideoUrl.js

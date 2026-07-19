@@ -91,6 +91,11 @@ assert(index.includes('PerformanceEngine'), 'Index re-exports engine');
   'home_loki_ready',
   'home_recommendations_ready',
   'home_hydration_complete',
+  'home_cache_restore',
+  'home_cache_hit',
+  'home_cache_miss',
+  'home_cache_refresh',
+  'home_cache_update',
 ].forEach(stage => {
   const corpus = `${indexHtml}\n${main}\n${app}\n${userApp}\n${home}\n${engine}\n${timeline}\n${metrics}\n${report}\n${health}`;
   assert(corpus.includes(stage), `startup stage ${stage} is wired`);
@@ -131,6 +136,7 @@ assert(health.includes("['performance', 'Perf']"), 'APG Health has Performance t
 assert(health.includes('Startup Timeline'), 'Performance tab shows startup timeline');
 assert(health.includes('Bootstrap Timeline'), 'Performance tab shows bootstrap timeline');
 assert(health.includes('Home Hydration Timeline'), 'Performance tab shows home hydration timeline');
+assert(health.includes('Home Cache'), 'Performance tab shows home cache');
 assert(health.includes('Последние 20 запусков'), 'Performance tab shows last launches');
 assert(health.includes('Скопировать отчёт'), 'Performance tab can copy export');
 assert(packageJson.includes('test:performance-observatory'), 'package script registered');

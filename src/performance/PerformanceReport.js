@@ -1,5 +1,6 @@
 import { getPwaUpdateDiagnostics } from '../pwa/PwaUpdateManager.js';
 import { getBootstrapSnapshot } from '../bootstrap/index.js';
+import { getHomeCacheSnapshot } from '../home/cache/index.js';
 import { collectDeviceMetrics, summarizeRuns } from './PerformanceMetrics.js';
 import { readPerformanceRuns } from './PerformanceStorage.js';
 
@@ -46,6 +47,8 @@ export function buildPerformanceExport(report) {
     `Home Journey: ${metrics.homeJourneyMs || 0} ms`,
     `Home Loki: ${metrics.homeLokiHydrationMs || 0} ms`,
     `Home Recommendations: ${metrics.homeRecommendationsMs || 0} ms`,
+    `Home Cache Restore: ${metrics.homeCacheRestoreMs || 0} ms`,
+    `Home Cache Refresh: ${metrics.homeCacheRefreshMs || 0} ms`,
     `FPS: ${report?.fps || 0}`,
   ].join('\n');
 }
@@ -60,6 +63,7 @@ export function buildPerformanceReport({ timeline = [], metrics = {}, fps = 0, r
     bundleVersion: typeof window !== 'undefined' ? window.__APG_BUILD_DIAGNOSTICS__?.runningBundle || '' : '',
     serviceWorkerVersion: swVersion(),
     bootstrap: getBootstrapSnapshot(),
+    homeCache: getHomeCacheSnapshot(),
     device: collectDeviceMetrics(),
     timeline,
     metrics,
