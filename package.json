@@ -115,7 +115,9 @@
     "identity:forensic-conflicts": "node scripts/identity-remaining-conflicts-forensic.mjs",
     "test:identity-forensic-conflicts": "node scripts/identity-forensic-conflicts-test.mjs",
     "identity:broken-references": "node scripts/identity-broken-references-forensic.mjs",
-    "test:identity-broken-references": "node scripts/identity-broken-references-test.mjs"
+    "test:identity-broken-references": "node scripts/identity-broken-references-test.mjs",
+    "identity:invariants": "node scripts/identity-invariants.mjs",
+    "test:identity-invariants": "node scripts/identity-invariants-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

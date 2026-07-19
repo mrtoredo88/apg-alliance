@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Identity Invariant Classification v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/admin/identity/invariants/*`, `scripts/identity-invariants.mjs`, `scripts/identity-invariants-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен read-only слой классификации Identity-инвариантов с категориями `BLOCKING`, `WARNING`, `INFORMATIONAL`, evidence-based правилами и отдельным расчётом Migration/Verify readiness.
+- Добавлен CLI `npm run identity:invariants`, который строит markdown/json и redacted отчёты в `backups/identity/invariants/` без изменения Firestore, runtime, review session или manifest.
+- Добавлен regression-тест `npm run test:identity-invariants`, проверяющий отсутствие name-based эвристик, анализ бизнес-ссылок, readiness и read-only гарантии.
+**Почему:** dry-run смешивал реальные блокеры миграции и исторические `auth_map` артефакты в один статус `FAILED`; теперь каждое нарушение получает объяснимую классификацию без ослабления проверок.
+
 ## [2026-07-19] feat: APG Identity v2 Production Cutover tooling
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/routes/identity-v2-admin.js`, `server/src/server.js`, `server/src/apg/identity/schema/identity-v2.sql`, `server/deploy.sh`, `scripts/identity-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`
