@@ -4150,6 +4150,7 @@
 - Добавлен локальный `Identity Manual Review Workflow` (`src/admin/identity/review/`) и CLI `npm run identity:review`: создаёт review sessions, fingerprints, audit jsonl, markdown report и `resolution-manifest-v2.json`, при этом `importAllowed` всегда остаётся `false`.
 - Добавлен read-only `Identity Dry Run Executor` (`src/admin/identity/dryrun/`) и CLI `npm run identity:dry-run`: симулирует manifest v2 в памяти, строит diff/rollback preview/invariants и отчёты без production-запросов, import/verify/cutover.
 - Расширен `Identity Manual Review Workflow`: добавлены owner decision cards, `decision-pack`, `show-next`, разделение `systemRecommendation`/`ownerDecision` и строгая валидация preservation/remap/delete metadata без автоматического принятия решений.
+- Добавлен read-only forensic CLI `npm run identity:forensic-conflict`: строит локальный Markdown/redacted отчёт по одному Identity conflict из snapshot/audit без Firestore-запросов и без изменения review session/manifest.
 
 # 2026-07-14 — Workspace Meetings CRM
 
