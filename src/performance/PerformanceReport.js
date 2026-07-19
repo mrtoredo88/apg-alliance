@@ -2,6 +2,7 @@ import { getPwaUpdateDiagnostics } from '../pwa/PwaUpdateManager.js';
 import { getBootstrapSnapshot } from '../bootstrap/index.js';
 import { getHomeCacheSnapshot } from '../home/cache/index.js';
 import { getFirebaseStartupSnapshot } from '../firebase/resilience/index.js';
+import { collectBundleMetrics } from './BundleMetrics.js';
 import { collectDeviceMetrics, summarizeRuns } from './PerformanceMetrics.js';
 import { readPerformanceRuns } from './PerformanceStorage.js';
 
@@ -22,6 +23,7 @@ export function buildPerformanceExport(report) {
   const device = report?.device || collectDeviceMetrics();
   const metrics = report?.metrics || {};
   const firebaseStartup = report?.firebaseStartup || {};
+  const bundle = report?.bundle || {};
   return [
     'APG Performance Report',
     `Version: ${report?.version || buildVersion()}`,
@@ -54,6 +56,10 @@ export function buildPerformanceExport(report) {
     `Home Recommendations: ${metrics.homeRecommendationsMs || 0} ms`,
     `Home Cache Restore: ${metrics.homeCacheRestoreMs || 0} ms`,
     `Home Cache Refresh: ${metrics.homeCacheRefreshMs || 0} ms`,
+    `Bundle Initial Hint: ${bundle.initialHint || 0}`,
+    `Bundle Transfer: ${bundle.totals?.transferKb || 0} KB`,
+    `Bundle Encoded: ${bundle.totals?.encodedKb || 0} KB`,
+    `Bundle Decoded: ${bundle.totals?.decodedKb || 0} KB`,
     `FPS: ${report?.fps || 0}`,
   ].join('\n');
 }
@@ -70,6 +76,7 @@ export function buildPerformanceReport({ timeline = [], metrics = {}, fps = 0, r
     bootstrap: getBootstrapSnapshot(),
     homeCache: getHomeCacheSnapshot(),
     firebaseStartup: getFirebaseStartupSnapshot(),
+    bundle: collectBundleMetrics(),
     device: collectDeviceMetrics(),
     timeline,
     metrics,

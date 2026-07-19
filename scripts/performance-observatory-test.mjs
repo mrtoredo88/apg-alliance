@@ -23,6 +23,7 @@ const files = [
   'src/performance/PerformanceReport.js',
   'src/performance/PerformanceStorage.js',
   'src/performance/PerformanceMarks.js',
+  'src/performance/BundleMetrics.js',
   'src/performance/index.js',
 ];
 
@@ -36,6 +37,7 @@ const metrics = read('src/performance/PerformanceMetrics.js');
 const report = read('src/performance/PerformanceReport.js');
 const storage = read('src/performance/PerformanceStorage.js');
 const marks = read('src/performance/PerformanceMarks.js');
+const bundleMetrics = read('src/performance/BundleMetrics.js');
 const index = read('src/performance/index.js');
 const main = read('src/main.jsx');
 const app = read('src/App.jsx');
@@ -56,6 +58,8 @@ assert(metrics.includes('buildStageMetrics'), 'Metrics builds startup metrics');
 assert(metrics.includes('estimateStartupFps'), 'Metrics estimates startup FPS');
 assert(report.includes('buildPerformanceExport'), 'Report exports copyable report');
 assert(report.includes('getPwaUpdateDiagnostics'), 'Report includes service worker diagnostics');
+assert(report.includes('collectBundleMetrics'), 'Report includes bundle metrics');
+assert(bundleMetrics.includes('collectBundleMetrics'), 'Bundle metrics collector exists');
 assert(storage.includes('PERFORMANCE_HISTORY_LIMIT = 20'), 'Storage keeps last 20 runs');
 assert(storage.includes('localStorage'), 'Storage is localStorage only');
 assert(marks.includes('countRender'), 'Marks counts React renders');
@@ -138,8 +142,10 @@ assert(health.includes('Bootstrap Timeline'), 'Performance tab shows bootstrap t
 assert(health.includes('Home Hydration Timeline'), 'Performance tab shows home hydration timeline');
 assert(health.includes('Home Cache'), 'Performance tab shows home cache');
 assert(health.includes('Firebase Startup'), 'Performance tab shows Firebase Startup');
+assert(health.includes('Bundle Analysis'), 'Performance tab shows bundle analysis');
 assert(health.includes('Последние 20 запусков'), 'Performance tab shows last launches');
 assert(health.includes('Скопировать отчёт'), 'Performance tab can copy export');
 assert(packageJson.includes('test:performance-observatory'), 'package script registered');
+assert(packageJson.includes('test:bundle-analysis'), 'bundle analysis package script registered');
 
 if (process.exitCode) process.exit(process.exitCode);

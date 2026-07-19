@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] perf: APG Bundle Analysis & Optimization v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/LokiProvider.jsx`, `src/performance/BundleMetrics.js`, `src/performance/PerformanceReport.js`, `src/performance/index.js`, `src/ApgHealthPage.jsx`, `scripts/bundle-report.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** perf
+**Что изменено:**
+- Добавлен production bundle report и runtime Bundle Analysis в Performance Observatory/APG Health: initial graph, категории, top chunks, transfer/encoded/decoded metrics.
+- Тяжёлые Loki-модули вынесены из стартового графа через lazy imports: `LokiCore`, SmartAnswer pipeline, user memory, recommendations, proactive/action/history/personality helpers загружаются по требованию.
+- Manual chunks оставлены без расширения: Workspace, Admin, QR, Markdown и тяжёлые страницы уже lazy, а дополнительное дробление не уменьшало initial graph и повышало Safari-риск.
+**Почему:** первый запуск должен загружать только то, что нужно для Home shell; специализированный Loki pipeline нужен при открытии/использовании Локи, а не при каждом старте приложения.
+
+---
+
 ## [2026-07-19] test: APG Startup Stability Test Hardening v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/startup-stability-test.mjs`, `scripts/firebase-startup-resilience-test.mjs`, `src/firebase/resilience/FirebaseAvailability.js`, `src/firebase/resilience/FirebaseRetryQueue.js`, `src/firebase/resilience/FirebaseRecovery.js`, `src/firebase/resilience/FirebaseStartupResilience.js`, `src/firebase/resilience/index.js`, `.ai/17_CHANGELOG_AI.md`

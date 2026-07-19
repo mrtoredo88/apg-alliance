@@ -10,7 +10,6 @@ import { DEFAULT_LOKI_MEMORY, loadLokiMemory, saveLokiMemory } from './lokiMemor
 import { getLokiSuggestion } from './lokiSuggestions.js';
 import { LOKI_APP_ACTIONS, LOKI_MESSAGE_PRIORITY, createLokiAction, normalizeLokiActionRequest } from './lokiActionTypes.js';
 import { addLokiHistoryItem, loadLokiHistory, markLokiHistoryItem, saveLokiHistory } from './lokiHistory.js';
-import { askLokiBrain } from './LokiBrain.js';
 import {
   evolveLokiEmotion,
   getEmotionalMicroAction,
@@ -19,29 +18,7 @@ import {
   normalizeLokiEmotionState,
   shouldLokiStayQuiet,
 } from './LokiEmotionEngine.js';
-import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from './core/lokiUserMemory.js';
 import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearning.js';
-import { buildInterestProfile, buildRecommendationFeed, buildScenarioCollections } from './LokiRecommendationCenter.js';
-import { buildLokiContext } from './core/context/ContextEngine.js';
-import { rememberPersonalityPhrase } from './personality/PersonalityMemory.js';
-import { selectPersonalityPhrase } from './core/modules/PersonalityEngine.js';
-import { markOpportunityAccepted, markOpportunityDismissed, markOpportunityShown } from './core/proactive/DismissManager.js';
-import { runProactiveEngine } from './core/proactive/ProactiveEngine.js';
-import { LOKI_ACTION_CENTER_EVENTS } from './core/actions/ActionRegistry.js';
-import { executeLokiAction } from './core/actions/ActionExecutor.js';
-import { buildActionHistoryPatch } from './core/actions/ActionHistory.js';
-import { buildPlanHistoryPatch } from './core/planner/PlanHistory.js';
-import { buildToolHistoryPatch } from './core/tools/ToolHistory.js';
-import { buildWorkflowHistoryPatch } from './core/workflows/WorkflowHistory.js';
-import { buildAgentHistoryPatch } from './core/agent/AgentHistory.js';
-import { buildConversationHistoryPatch } from './core/conversation/ConversationHistory.js';
-import { buildDecisionHistoryPatch } from './core/decision/index.js';
-import { buildEvaluationHistoryPatch } from './core/evaluation/index.js';
-import { buildCapabilityHistoryPatch } from './core/capabilities/index.js';
-import { buildKnowledgeHistoryPatch } from './core/knowledgeIndex/index.js';
-import { buildSkillHistoryPatch } from './core/skills/index.js';
-import { buildExecutionHistoryPatch } from './core/execution/index.js';
-import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
 import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics, recordLokiPipelineError, recordLokiPipelineReturn } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, normalizeLokiResponseText } from './lokiResponseText.js';
 import { markLokiStage } from '../performance/index.js';
@@ -57,6 +34,97 @@ import {
 } from './lokiState.js';
 
 const LokiContext = createContext(null);
+let lokiBrainModulePromise = null;
+let lokiContextModulePromise = null;
+let lokiRecommendationModulePromise = null;
+let lokiUserMemoryModulePromise = null;
+let lokiProactiveModulePromise = null;
+let lokiDismissModulePromise = null;
+let lokiActionExecutorModulePromise = null;
+let lokiPersonalityModulePromise = null;
+const lokiHistoryModulePromises = new Map();
+
+const LOKI_ACTION_CENTER_EVENTS = {
+  STARTED: 'LOKI_ACTION_STARTED',
+  COMPLETED: 'LOKI_ACTION_COMPLETED',
+  FAILED: 'LOKI_ACTION_FAILED',
+};
+
+function loadLokiBrainModule() {
+  if (!lokiBrainModulePromise) lokiBrainModulePromise = import('./LokiBrain.js');
+  return lokiBrainModulePromise;
+}
+
+function loadLokiContextModule() {
+  if (!lokiContextModulePromise) lokiContextModulePromise = import('./core/context/ContextEngine.js');
+  return lokiContextModulePromise;
+}
+
+function loadLokiRecommendationModule() {
+  if (!lokiRecommendationModulePromise) lokiRecommendationModulePromise = import('./LokiRecommendationCenter.js');
+  return lokiRecommendationModulePromise;
+}
+
+function loadLokiUserMemoryModule() {
+  if (!lokiUserMemoryModulePromise) lokiUserMemoryModulePromise = import('./core/lokiUserMemory.js');
+  return lokiUserMemoryModulePromise;
+}
+
+function loadLokiProactiveModule() {
+  if (!lokiProactiveModulePromise) lokiProactiveModulePromise = import('./core/proactive/ProactiveEngine.js');
+  return lokiProactiveModulePromise;
+}
+
+function loadLokiDismissModule() {
+  if (!lokiDismissModulePromise) lokiDismissModulePromise = import('./core/proactive/DismissManager.js');
+  return lokiDismissModulePromise;
+}
+
+function loadLokiActionExecutorModule() {
+  if (!lokiActionExecutorModulePromise) lokiActionExecutorModulePromise = import('./core/actions/ActionExecutor.js');
+  return lokiActionExecutorModulePromise;
+}
+
+function loadLokiPersonalityModule() {
+  if (!lokiPersonalityModulePromise) {
+    lokiPersonalityModulePromise = Promise.all([
+      import('./personality/PersonalityMemory.js'),
+      import('./core/modules/PersonalityEngine.js'),
+    ]).then(([memoryModule, engineModule]) => ({ ...memoryModule, ...engineModule }));
+  }
+  return lokiPersonalityModulePromise;
+}
+
+function loadLokiHistoryModule(key) {
+  if (!lokiHistoryModulePromises.has(key)) {
+    const loaders = {
+      action: () => import('./core/actions/ActionHistory.js'),
+      plan: () => import('./core/planner/PlanHistory.js'),
+      tool: () => import('./core/tools/ToolHistory.js'),
+      workflow: () => import('./core/workflows/WorkflowHistory.js'),
+      agent: () => import('./core/agent/AgentHistory.js'),
+      conversation: () => import('./core/conversation/ConversationHistory.js'),
+      decision: () => import('./core/decision/index.js'),
+      evaluation: () => import('./core/evaluation/index.js'),
+      capability: () => import('./core/capabilities/index.js'),
+      knowledge: () => import('./core/knowledgeIndex/index.js'),
+      skill: () => import('./core/skills/index.js'),
+      execution: () => import('./core/execution/index.js'),
+      controlledExecution: () => import('./core/controlledExecution/index.js'),
+    };
+    lokiHistoryModulePromises.set(key, loaders[key]());
+  }
+  return lokiHistoryModulePromises.get(key);
+}
+
+const DEFAULT_LOKI_USER_MEMORY_FALLBACK = {
+  favoriteCategories: {},
+  frequentIntents: {},
+  queryHours: {},
+  lastQueries: [],
+  lokiMemory: null,
+  updatedAt: null,
+};
 
 function getUserId(user) {
   return user?.id ? String(user.id) : 'guest';
@@ -167,6 +235,19 @@ function normalizeLokiContext(context) {
     openedAt: new Date().toISOString(),
   };
   return { ...next, initialAnswer: buildNewsContextAnswer(next, 'кратко перескажи новость')?.text || '' };
+}
+
+function buildLightweightLokiContext({ appState = {}, user = null, activePanel = 'home' } = {}) {
+  return {
+    __lokiContext: true,
+    version: 1,
+    lightweight: true,
+    generatedAt: new Date().toISOString(),
+    user: user ?? appState.user ?? null,
+    currentScreen: { id: activePanel, name: activePanel },
+    appState: { ...appState, user: user ?? appState.user ?? null, activePanel },
+    recommendations: { feed: [] },
+  };
 }
 
 function findItemsByIds(items = [], ids = []) {
@@ -513,7 +594,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const [settings, setSettings] = useState(() => loadLokiSettings());
   const [memory, setMemory] = useState(() => loadLokiMemory());
   const [emotionalState, setEmotionalState] = useState(() => normalizeLokiEmotionState(loadLokiMemory().emotionalState));
-  const [userMemory, setUserMemory] = useState(() => loadLokiUserMemory());
+  const [userMemory, setUserMemory] = useState(DEFAULT_LOKI_USER_MEMORY_FALLBACK);
+  const [lokiDerived, setLokiDerived] = useState(null);
   const [history, setHistory] = useState(() => loadLokiHistory());
   const [visible, setVisible] = useState(false);
   const [emotion, setEmotion] = useState('idle');
@@ -562,6 +644,16 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const isHiddenOnPanel = settings.hiddenPanels.includes(activePanel);
   const canTalk = settings.enabled && settings.bubbleEnabled && !isHiddenOnPanel;
 
+  useEffect(() => {
+    let cancelled = false;
+    loadLokiUserMemoryModule()
+      .then(({ loadLokiUserMemory }) => {
+        if (!cancelled) setUserMemory(loadLokiUserMemory());
+      })
+      .catch(error => logError(error, 'LokiProvider.loadUserMemory'));
+    return () => { cancelled = true; };
+  }, []);
+
   const persistSettings = useCallback((next, options = {}) => {
     const normalized = normalizeLokiSettings(next);
     if (options.sync !== false) settingsDirtyRef.current = true;
@@ -577,7 +669,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordActionEvent = useCallback((event) => {
+  const recordActionEvent = useCallback(async (event) => {
+    const { buildActionHistoryPatch } = await loadLokiHistoryModule('action');
     setMemory(prev => {
       const next = { ...prev, ...buildActionHistoryPatch(prev, event), updatedAt: new Date().toISOString() };
       saveLokiMemory(next);
@@ -585,8 +678,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordToolEvents = useCallback((events = []) => {
+  const recordToolEvents = useCallback(async (events = []) => {
     if (!events.length) return;
+    const { buildToolHistoryPatch } = await loadLokiHistoryModule('tool');
     setMemory(prev => {
       const next = { ...prev, ...buildToolHistoryPatch(prev, events), updatedAt: new Date().toISOString() };
       saveLokiMemory(next);
@@ -594,8 +688,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordPlanContext = useCallback((planContext) => {
+  const recordPlanContext = useCallback(async (planContext) => {
     if (!planContext?.id) return;
+    const { buildPlanHistoryPatch } = await loadLokiHistoryModule('plan');
     setMemory(prev => {
       const next = { ...prev, ...buildPlanHistoryPatch(prev, planContext), lastPlanContext: planContext, updatedAt: new Date().toISOString() };
       saveLokiMemory(next);
@@ -603,8 +698,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordWorkflowContext = useCallback((workflowContext) => {
+  const recordWorkflowContext = useCallback(async (workflowContext) => {
     if (!workflowContext?.id) return;
+    const { buildWorkflowHistoryPatch } = await loadLokiHistoryModule('workflow');
     setMemory(prev => {
       const next = { ...prev, ...buildWorkflowHistoryPatch(prev, workflowContext), lastWorkflowContext: workflowContext, updatedAt: new Date().toISOString() };
       saveLokiMemory(next);
@@ -612,8 +708,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordAgentContext = useCallback((agentContext) => {
+  const recordAgentContext = useCallback(async (agentContext) => {
     if (!agentContext?.decision) return;
+    const { buildAgentHistoryPatch } = await loadLokiHistoryModule('agent');
     setMemory(prev => {
       const next = {
         ...prev,
@@ -627,8 +724,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordConversationContext = useCallback((conversationContext) => {
+  const recordConversationContext = useCallback(async (conversationContext) => {
     if (!conversationContext?.session) return;
+    const { buildConversationHistoryPatch } = await loadLokiHistoryModule('conversation');
     setMemory(prev => {
       const next = {
         ...prev,
@@ -642,8 +740,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordDecisionContext = useCallback((decisionContext) => {
+  const recordDecisionContext = useCallback(async (decisionContext) => {
     if (!decisionContext?.decisionId) return;
+    const { buildDecisionHistoryPatch } = await loadLokiHistoryModule('decision');
     setMemory(prev => {
       const next = {
         ...prev,
@@ -657,8 +756,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordCapabilityContext = useCallback((capabilityContext, capabilitySnapshot) => {
+  const recordCapabilityContext = useCallback(async (capabilityContext, capabilitySnapshot) => {
     if (!capabilityContext?.capability) return;
+    const { buildCapabilityHistoryPatch } = await loadLokiHistoryModule('capability');
     setMemory(prev => {
       const historyPatch = buildCapabilityHistoryPatch(prev, capabilityContext);
       const next = {
@@ -674,8 +774,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordKnowledgeIndexSnapshot = useCallback((knowledgeSnapshot, knowledgeIndexSearch) => {
+  const recordKnowledgeIndexSnapshot = useCallback(async (knowledgeSnapshot, knowledgeIndexSearch) => {
     if (!knowledgeSnapshot?.snapshotId) return;
+    const { buildKnowledgeHistoryPatch } = await loadLokiHistoryModule('knowledge');
     setMemory(prev => {
       const historyPatch = buildKnowledgeHistoryPatch(prev, knowledgeSnapshot, knowledgeIndexSearch);
       const next = {
@@ -691,8 +792,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordSkillContext = useCallback((skillContext, skillSnapshot) => {
+  const recordSkillContext = useCallback(async (skillContext, skillSnapshot) => {
     if (!skillContext?.skill) return;
+    const { buildSkillHistoryPatch } = await loadLokiHistoryModule('skill');
     setMemory(prev => {
       const historyPatch = buildSkillHistoryPatch(prev, skillContext);
       const next = {
@@ -708,8 +810,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordExecutionContext = useCallback((executionContext, executionSnapshot) => {
+  const recordExecutionContext = useCallback(async (executionContext, executionSnapshot) => {
     if (!executionContext?.capability) return;
+    const { buildExecutionHistoryPatch } = await loadLokiHistoryModule('execution');
     setMemory(prev => {
       const historyPatch = buildExecutionHistoryPatch(prev, executionContext);
       const next = {
@@ -725,8 +828,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordControlledExecutionContext = useCallback((controlledExecutionContext, controlledExecutionSnapshot) => {
+  const recordControlledExecutionContext = useCallback(async (controlledExecutionContext, controlledExecutionSnapshot) => {
     if (!controlledExecutionContext?.capability) return;
+    const { buildControlledExecutionHistoryPatch } = await loadLokiHistoryModule('controlledExecution');
     setMemory(prev => {
       const historyPatch = buildControlledExecutionHistoryPatch(prev, controlledExecutionContext);
       const next = {
@@ -742,8 +846,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const recordEvaluationSnapshot = useCallback((evaluationContext, evaluationSnapshot) => {
+  const recordEvaluationSnapshot = useCallback(async (evaluationContext, evaluationSnapshot) => {
     if (!evaluationSnapshot?.evaluationId && !evaluationContext?.evaluationId) return;
+    const { buildEvaluationHistoryPatch } = await loadLokiHistoryModule('evaluation');
     const snapshot = {
       ...evaluationSnapshot,
       evaluationId: evaluationSnapshot?.evaluationId || evaluationContext?.evaluationId || '',
@@ -775,10 +880,10 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, []);
 
-  const resetUserMemory = useCallback(() => {
+  const resetUserMemory = useCallback(async () => {
+    const { clearLokiUserMemory, loadLokiUserMemory } = await loadLokiUserMemoryModule();
     clearLokiUserMemory();
-    const fresh = loadLokiUserMemory();
-    setUserMemory(fresh);
+    setUserMemory(loadLokiUserMemory());
   }, []);
 
   const displayMessage = useCallback((eventType, payload = {}) => {
@@ -808,7 +913,11 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         emotionalState: nextEmotionalState,
       };
       if (eventType === LOKI_EVENTS.PROACTIVE_SUGGESTION) {
-        if (payload.opportunity) markOpportunityShown(payload.opportunity);
+        if (payload.opportunity) {
+          loadLokiDismissModule()
+            .then(({ markOpportunityShown }) => markOpportunityShown(payload.opportunity))
+            .catch(error => logError(error, 'LokiProvider.opportunityShown'));
+        }
         memoryPatch.lastRecommendation = {
           adviceId: payload.adviceId ?? null,
           reason: payload.reason ?? null,
@@ -1039,18 +1148,23 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   useEffect(() => {
     if (!settings.enabled || !user || !appState || settings.mode === 'on_demand') return;
     if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
-    observerTimerRef.current = setTimeout(() => {
-      const recommendation = runProactiveEngine({
-        appState: { ...appState, activePanel },
-        memory,
-        history,
-        userMemory,
-        lastUserActionAt: lastUserActionAtRef.current,
-        lastPanelChangeAt: lastPanelChangeAtRef.current,
-      });
-      if (!recommendation) return;
-      if (settings.mode === 'minimal' && recommendation.payload?.priority < LOKI_MESSAGE_PRIORITY.HIGH) return;
-      showMessage(recommendation.eventType, recommendation.payload);
+    observerTimerRef.current = setTimeout(async () => {
+      try {
+        const { runProactiveEngine } = await loadLokiProactiveModule();
+        const recommendation = runProactiveEngine({
+          appState: { ...appState, activePanel },
+          memory,
+          history,
+          userMemory,
+          lastUserActionAt: lastUserActionAtRef.current,
+          lastPanelChangeAt: lastPanelChangeAtRef.current,
+        });
+        if (!recommendation) return;
+        if (settings.mode === 'minimal' && recommendation.payload?.priority < LOKI_MESSAGE_PRIORITY.HIGH) return;
+        showMessage(recommendation.eventType, recommendation.payload);
+      } catch (error) {
+        logError(error, 'LokiProvider.proactive');
+      }
     }, 9000);
     return () => {
       if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
@@ -1068,7 +1182,11 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     const normalized = normalizeLokiActionRequest(request);
     if (!normalized?.type) return false;
     const activeAdvice = memory?.lastRecommendation;
-    if (activeAdvice?.opportunity) markOpportunityAccepted(activeAdvice.opportunity);
+    if (activeAdvice?.opportunity) {
+      loadLokiDismissModule()
+        .then(({ markOpportunityAccepted }) => markOpportunityAccepted(activeAdvice.opportunity))
+        .catch(error => logError(error, 'LokiProvider.opportunityAccepted'));
+    }
     const actionEvents = [];
     updateMemory({
       lastAction: { ...normalized, ts: new Date().toISOString() },
@@ -1087,6 +1205,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       const id = activeHistoryIdRef.current;
       updateHistory(prev => markLokiHistoryItem(prev, id, 'opened'));
     }
+    const { executeLokiAction } = await loadLokiActionExecutorModule();
     const execution = await executeLokiAction(normalized, {
       appActions,
       appState,
@@ -1099,6 +1218,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       }
       setCard(null);
       const personalityEvent = normalized.type === LOKI_APP_ACTIONS.START_EVENT_REGISTRATION ? 'registration_complete' : 'success';
+      const { rememberPersonalityPhrase, selectPersonalityPhrase } = await loadLokiPersonalityModule();
       const personalityPhrase = selectPersonalityPhrase({
         event: personalityEvent,
         mode: settings.personalityMode,
@@ -1130,6 +1250,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     const actionToRun = controlledExecutionContext?.result?.dispatch || controlledExecutionContext?.dispatcher?.action || null;
     if (!controlledExecutionContext?.executionReady || !actionToRun) return null;
     const actionEvents = [];
+    const { executeLokiAction } = await loadLokiActionExecutorModule();
     const execution = await executeLokiAction(actionToRun, {
       appActions,
       appState,
@@ -1137,6 +1258,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       onEvent: event => actionEvents.push(event),
     });
     actionEvents.forEach(event => recordActionEvent(event));
+    const { completeControlledExecutionResult } = await loadLokiHistoryModule('controlledExecution');
     const nextContext = {
       ...controlledExecutionContext,
       result: completeControlledExecutionResult(controlledExecutionContext.result, {
@@ -1173,11 +1295,15 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setBrainThinking(true);
     }, 1000);
     try {
+      const { buildLokiContext } = await loadLokiContextModule();
       const lokiContext = buildLokiContext({ appState, user, activePanel, memory, userMemory });
+      const { askLokiBrain } = await loadLokiBrainModule();
       const result = await askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory, userMemory, history, debug: isLokiDebugEnabled() });
       clearTimeout(thinkingTimer);
       setBrainThinking(false);
-      setUserMemory(prev => learnFromLokiQuery(prev, text, result));
+      loadLokiUserMemoryModule()
+        .then(({ learnFromLokiQuery }) => setUserMemory(prev => learnFromLokiQuery(prev, text, result)))
+        .catch(error => logError(error, 'LokiProvider.learnFromQuery'));
       if (result.toolContext?.events?.length) recordToolEvents(result.toolContext.events);
       if (result.knowledgeSnapshot) recordKnowledgeIndexSnapshot(result.knowledgeSnapshot, result.knowledgeIndexSearch);
       if (result.conversationContext) recordConversationContext(result.conversationContext);
@@ -1190,6 +1316,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (result.agentContext) recordAgentContext(result.agentContext);
       if (result.decisionContext) recordDecisionContext(result.decisionContext);
       if (result.evaluationSnapshot) recordEvaluationSnapshot(result.evaluationContext, result.evaluationSnapshot);
+      const personalityPatch = result.personalityPhraseId
+        ? { personalityHistory: (await loadLokiPersonalityModule()).rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) }
+        : {};
       if (result.knowledgeSnapshot || result.reasoningContext || result.conversationContext || result.capabilityContext || result.skillContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
         ...(result.knowledgeSnapshot ? { lastKnowledgeSnapshot: result.knowledgeSnapshot, lastKnowledgeIndexSearch: result.knowledgeIndexSearch || null } : {}),
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
@@ -1205,7 +1334,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(result.agentContext ? { lastAgentContext: result.agentContext, lastAgentSession: result.agentContext.session } : {}),
         ...(result.toolContext ? { lastToolContext: result.toolContext } : {}),
         ...(result.decisionContext ? { lastDecisionContext: result.decisionContext, decisionSnapshot: result.decisionContext } : {}),
-        ...(result.personalityPhraseId ? { personalityHistory: rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) } : {}),
+        ...personalityPatch,
         conversationCount: Number(memory.conversationCount || 0) + 1,
         lastSeenAt: new Date().toISOString(),
       });
@@ -1314,6 +1443,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         return { card: null, ...normalizedContextResult };
       }
       recordLokiMessageTrace('STEP 7 News context skipped', {});
+      const { buildLokiContext } = await loadLokiContextModule();
       const lokiContext = buildLokiContext({ appState: { ...appState, activeContext }, user, activePanel, memory: { ...memory, activeContext }, userMemory });
       recordLokiMessageTrace('STEP 8 LokiContext built', {
         panel: lokiContext?.appState?.activePanel || lokiContext?.currentScreen?.id || activePanel,
@@ -1325,6 +1455,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         events: lokiContext?.appState?.events?.length || appState?.events?.length || 0,
       });
       recordLokiMessageTrace('STEP 9 LokiBrain start', {});
+      const { askLokiBrain } = await loadLokiBrainModule();
       const result = await withLokiAnswerTimeout(askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() }), text);
       recordLokiPipelineReturn('LokiProvider askLokiBrain await', result);
       recordLokiMessageTrace('STEP 16 LokiBrain returned to Provider', { hasResult: Boolean(result), intent: result?.intent || '', timeout: Boolean(result?.debug?.timeout) });
@@ -1379,6 +1510,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       setEmotion(normalizedResult.executeAction || normalizedResult.autoAction ? 'excited' : 'helper');
       setAction(normalizedResult.executeAction || normalizedResult.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
       recordLokiMessageTrace('STEP 17 Provider state updated from result', { hasText: Boolean(normalizedResult.text), hasAction: Boolean(normalizedResult.executeAction || normalizedResult.autoAction) });
+      const personalityPatch = normalizedResult.personalityPhraseId
+        ? { personalityHistory: (await loadLokiPersonalityModule()).rememberPersonalityPhrase(memory.personalityHistory, { id: normalizedResult.personalityPhraseId }) }
+        : { personalityHistory: memory.personalityHistory };
       updateMemory({
         lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: normalizedResult.text, payload: { card: normalizedResult.card, cards: normalizedResult.cards } },
         lastConversation: { userText: text, answer: normalizedResult.text, action: normalizedResult.executeAction ?? normalizedResult.autoAction ?? normalizedResult.card?.action ?? null },
@@ -1398,7 +1532,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(normalizedResult.agentContext ? { lastAgentContext: normalizedResult.agentContext, lastAgentSession: normalizedResult.agentContext.session } : {}),
         ...(normalizedResult.toolContext ? { lastToolContext: normalizedResult.toolContext } : {}),
         ...(normalizedResult.decisionContext ? { lastDecisionContext: normalizedResult.decisionContext, decisionSnapshot: normalizedResult.decisionContext } : {}),
-        personalityHistory: normalizedResult.personalityPhraseId ? rememberPersonalityPhrase(memory.personalityHistory, { id: normalizedResult.personalityPhraseId }) : memory.personalityHistory,
+        ...personalityPatch,
         conversationCount: Number(memory.conversationCount || 0) + 1,
         lastSeenAt: new Date().toISOString(),
       });
@@ -1414,7 +1548,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (normalizedResult.decisionContext) recordDecisionContext(normalizedResult.decisionContext);
       if (normalizedResult.evaluationSnapshot) recordEvaluationSnapshot(normalizedResult.evaluationContext, normalizedResult.evaluationSnapshot);
       if (normalizedResult.toolContext?.events?.length) recordToolEvents(normalizedResult.toolContext.events);
-      setUserMemory(prev => learnFromLokiQuery(prev, text, normalizedResult));
+      loadLokiUserMemoryModule()
+        .then(({ learnFromLokiQuery }) => setUserMemory(prev => learnFromLokiQuery(prev, text, normalizedResult)))
+        .catch(error => logError(error, 'LokiProvider.learnFromExperience'));
       userAction('loki:analytics', {
         payload: {
           query: text,
@@ -1509,12 +1645,29 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
   }, [activePanel, updateMemory]);
 
+  useEffect(() => {
+    if (!experienceOpen && activePanel !== 'loki') return;
+    let cancelled = false;
+    Promise.all([loadLokiContextModule(), loadLokiRecommendationModule()])
+      .then(([contextModule, recommendationModule]) => {
+        if (cancelled) return;
+        const lokiContext = contextModule.buildLokiContext({ appState, user, activePanel, memory, userMemory });
+        const state = lokiContext.appState;
+        const interestProfile = recommendationModule.buildInterestProfile({ appState: state, memory, userMemory });
+        const recommendationFeed = lokiContext.recommendations?.feed?.slice(0, 8) ?? recommendationModule.buildRecommendationFeed({ appState: state, memory, userMemory, limit: 8 });
+        const scenarioCollections = recommendationModule.buildScenarioCollections({ appState: state, memory, userMemory }).filter(item => item.cards.length);
+        setLokiDerived({ lokiContext, interestProfile, recommendationFeed, scenarioCollections });
+      })
+      .catch(error => logError(error, 'LokiProvider.deriveContext'));
+    return () => { cancelled = true; };
+  }, [activePanel, appState, experienceOpen, memory, user, userMemory]);
+
   const value = useMemo(() => {
-    const lokiContext = buildLokiContext({ appState, user, activePanel, memory, userMemory });
+    const lokiContext = lokiDerived?.lokiContext || buildLightweightLokiContext({ appState, user, activePanel });
     const state = lokiContext.appState;
-    const interestProfile = buildInterestProfile({ appState: state, memory, userMemory });
-    const recommendationFeed = lokiContext.recommendations?.feed?.slice(0, 8) ?? buildRecommendationFeed({ appState: state, memory, userMemory, limit: 8 });
-    const scenarioCollections = buildScenarioCollections({ appState: state, memory, userMemory }).filter(item => item.cards.length);
+    const interestProfile = lokiDerived?.interestProfile || appState?.interestProfile || null;
+    const recommendationFeed = lokiDerived?.recommendationFeed || [];
+    const scenarioCollections = lokiDerived?.scenarioCollections || [];
     const dashboard = buildLokiHomeDashboard({ appState: state, user, recommendationFeed });
     return {
     action,
@@ -1594,7 +1747,11 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         updateHistory(prev => markLokiHistoryItem(prev, id, 'ignored'));
       }
       if (memory?.lastRecommendation) {
-        if (memory.lastRecommendation.opportunity) markOpportunityDismissed(memory.lastRecommendation.opportunity);
+        if (memory.lastRecommendation.opportunity) {
+          loadLokiDismissModule()
+            .then(({ markOpportunityDismissed }) => markOpportunityDismissed(memory.lastRecommendation.opportunity))
+            .catch(error => logError(error, 'LokiProvider.opportunityDismissed'));
+        }
         updateMemory({ learning: learnFromRecommendationResult(memory.learning, memory.lastRecommendation, 'ignored') });
       }
       setAction(LOKI_ACTIONS.WAVE);
@@ -1612,7 +1769,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setMode: (mode) => persistSettings({ ...settings, mode }),
     setPersonalityMode: (personalityMode) => persistSettings({ ...settings, personalityMode }),
   };
-  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
+  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, lokiDerived, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

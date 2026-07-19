@@ -81,6 +81,11 @@ function formatMemory(device = {}) {
   return device.deviceMemory ? `${device.deviceMemory} GB device` : '—';
 }
 
+function formatKb(value) {
+  const num = Number(value || 0);
+  return num > 0 ? `${Math.round(num * 10) / 10} KB` : '—';
+}
+
 export function ApgHealthPage({ nav = 'health', user = null, partners = [], experts = [], events = [], news = [], customTasks = [], userCount = 0, totalScans = 0, onBack, onGoAdmin }) {
   const [checks, setChecks]           = useState(null);
   const [checking, setChecking]       = useState(true);
@@ -620,6 +625,10 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <DiagnosticLine label="Build time" value={performanceReport?.buildTime || 'unknown'} />
                 <DiagnosticLine label="Bundle version" value={performanceReport?.bundleVersion || '—'} />
                 <DiagnosticLine label="Service Worker" value={performanceReport?.serviceWorkerVersion || '—'} />
+                <DiagnosticLine label="Bundle chunks" value={performanceReport?.bundle?.totals?.chunks || 0} />
+                <DiagnosticLine label="Bundle transfer" value={formatKb(performanceReport?.bundle?.totals?.transferKb)} />
+                <DiagnosticLine label="Bundle encoded" value={formatKb(performanceReport?.bundle?.totals?.encodedKb)} />
+                <DiagnosticLine label="Bundle decoded" value={formatKb(performanceReport?.bundle?.totals?.decodedKb)} />
                 <DiagnosticLine label="Browser" value={performanceReport?.device?.browser || '—'} />
                 <DiagnosticLine label="Platform" value={performanceReport?.device?.platform || '—'} />
                 <DiagnosticLine label="Mode" value={`${performanceReport?.device?.displayMode || 'browser'} · standalone=${performanceReport?.device?.standalone ? 'yes' : 'no'}`} />
@@ -628,6 +637,23 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <DiagnosticLine label="Memory" value={formatMemory(performanceReport?.device || {})} />
                 <DiagnosticLine label="Render counts" value={Object.entries(performanceReport?.renderCounts || {}).map(([key, value]) => `${key}:${value}`).join(', ') || '—'} />
               </GlassCard>
+            </GlassSection>
+
+            <GlassSection title="Bundle Analysis">
+              <div style={{ display: 'grid', gap: 10 }}>
+                {Object.entries(performanceReport?.bundle?.categories || {}).length === 0 ? (
+                  <EmptyStateV2 icon="📦" title="Bundle Analysis пуст" text="Данные появятся после загрузки production assets в текущей сессии." />
+                ) : Object.entries(performanceReport.bundle.categories).map(([category, row]) => (
+                  <GlassCard key={category} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                    <DiagnosticLine label={category} value={`${row.chunks} chunks · ${formatKb(row.encodedKb)} encoded · ${formatKb(row.decodedKb)} decoded`} />
+                  </GlassCard>
+                ))}
+                {(performanceReport?.bundle?.chunks || []).slice(0, 8).map(chunk => (
+                  <GlassCard key={chunk.name} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                    <DiagnosticLine label={chunk.name} value={`${chunk.category} · ${formatKb(chunk.encodedKb)} / ${formatKb(chunk.decodedKb)}`} />
+                  </GlassCard>
+                ))}
+              </div>
             </GlassSection>
 
             <GlassSection title="Diagnostics">

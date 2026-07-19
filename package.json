@@ -53,6 +53,7 @@
     "test:bootstrap-scheduler": "node scripts/bootstrap-scheduler-test.mjs",
     "test:home-hydration": "node scripts/home-hydration-test.mjs",
     "test:home-cache": "node scripts/home-cache-test.mjs",
+    "test:bundle-analysis": "node scripts/bundle-report.mjs",
     "test:firebase-startup-resilience": "node scripts/firebase-startup-resilience-test.mjs",
     "test:pwa-user-mode": "node scripts/pwa-user-mode-regression.mjs",
     "test:pwa-update": "node scripts/pwa-update-manager-test.mjs",
