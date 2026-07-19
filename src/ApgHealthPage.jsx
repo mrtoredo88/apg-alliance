@@ -204,6 +204,12 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       'home_cache_miss',
       'home_cache_refresh',
       'home_cache_update',
+      'firebase_start',
+      'firebase_retry',
+      'firebase_recovered',
+      'firebase_offline',
+      'firebase_online',
+      'firebase_auth_ready',
       'bootstrap_critical_start',
       'bootstrap_critical_complete',
       'bootstrap_interactive_start',
@@ -227,6 +233,10 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     .slice(-18);
   const homeCache = performanceReport?.homeCache || {};
   const homeCacheSections = homeCache.sections || {};
+  const firebaseStartup = performanceReport?.firebaseStartup || {};
+  const firebaseStartupRows = performanceTimeline
+    .filter(item => String(item.stage || '').startsWith('firebase_'))
+    .slice(-18);
 
   const warnColor = { error: 'rgba(230,70,70,0.34)', warn: 'rgba(255,165,0,0.34)', info: 'rgba(215,184,106,0.28)' };
   const warnIcon  = { error: '🔴', warn: '🟡', info: 'ℹ️' };
@@ -469,6 +479,32 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                   <EmptyStateV2 icon="⏱" title="Таймлайн пуст" text="Метки появятся после запуска приложения." />
                 ) : startupRows.map((item, index) => (
                   <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px', border: item.severity === 'critical' ? '1px solid rgba(248,113,113,0.34)' : item.severity === 'slow' ? '1px solid rgba(251,191,36,0.34)' : '1px solid rgba(255,255,255,0.10)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
+                      <span style={{ color: item.severity === 'critical' ? '#f87171' : item.severity === 'slow' ? '#fbbf24' : APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>
+                        +{Math.round(item.relativeMs || 0)} ms · {formatMs(item.durationMs)}
+                      </span>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Firebase Startup">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Status" value={firebaseStartup.status || '—'} tone={firebaseStartup.status === 'recovered' || firebaseStartup.status === 'auth_ready' ? 'ok' : firebaseStartup.status === 'degraded' ? 'bad' : 'default'} />
+                <DiagnosticLine label="Attempts" value={`${firebaseStartup.attempts || 0} / ${firebaseStartup.maxAttempts || 5}`} />
+                <DiagnosticLine label="Startup" value={formatMs(firebaseStartup.startupMs)} />
+                <DiagnosticLine label="Recovery" value={formatMs(firebaseStartup.recoveryMs || performanceReport?.metrics?.firebaseRecoveryMs)} />
+                <DiagnosticLine label="Offline" value={firebaseStartup.offline ? 'yes' : 'no'} tone={firebaseStartup.offline ? 'bad' : 'ok'} />
+                <DiagnosticLine label="Last stage" value={firebaseStartup.lastStage || '—'} />
+                <DiagnosticLine label="Last error" value={firebaseStartup.lastError ? `${firebaseStartup.lastError.code || 'error'} · ${firebaseStartup.lastError.message}` : '—'} tone={firebaseStartup.lastError ? 'bad' : 'default'} />
+              </GlassCard>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                {firebaseStartupRows.length === 0 ? (
+                  <EmptyStateV2 icon="⏱" title="Firebase Startup пуст" text="Метки auth/retry/recovery появятся после следующего запуска." />
+                ) : firebaseStartupRows.map((item, index) => (
+                  <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
                       <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
                       <span style={{ color: item.severity === 'critical' ? '#f87171' : item.severity === 'slow' ? '#fbbf24' : APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>

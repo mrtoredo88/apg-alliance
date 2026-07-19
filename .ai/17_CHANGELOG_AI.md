@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Firebase Startup Resilience v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/firebase/resilience/*`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/firebase-startup-resilience-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only resilience-слой Firebase startup: единый anonymous auth promise, retry queue с backoff 1/2/5/10/30 секунд, offline gate и recovery tasks.
+- `UserApp` больше не блокирует Home ожиданием anonymous auth; temporary `identitytoolkit/accounts:signUp` ошибки фиксируются диагностикой и восстанавливаются в фоне.
+- Performance Observatory/APG Health получили Firebase Startup snapshot, retry/recovery marks и export diagnostics.
+**Почему:** временные ошибки Firebase не должны превращать быстрый startup в пользовательскую проблему, если Home уже может работать из локального кэша.
+
+---
+
 ## [2026-07-19] feat: APG Smart Home Cache v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/home/cache/*`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/home-cache-test.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`

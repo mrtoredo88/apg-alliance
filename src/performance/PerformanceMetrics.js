@@ -73,6 +73,8 @@ export function buildStageMetrics(timeline = []) {
     startupMs: timeline.at(-1)?.relativeMs || 0,
     reactMs: between('react_render_start', 'react_render_complete') || between('react_render_start', 'app_mounted'),
     firebaseMs: between('firebase_start', 'firebase_ready'),
+    firebaseAuthReadyMs: between('firebase_start', 'firebase_auth_ready'),
+    firebaseRecoveryMs: between('firebase_retry', 'firebase_recovered'),
     authMs: between('auth_start', 'auth_ready'),
     homeMs: between('home_render', 'home_ready'),
     lokiMs: between('loki_ready_start', 'loki_ready'),

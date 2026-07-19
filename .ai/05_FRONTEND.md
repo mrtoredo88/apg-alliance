@@ -58,6 +58,13 @@ src/
 │       ├── HomeCacheStorage.js   ← localStorage storage with 1 MB limit and build-version cleanup
 │       ├── HomeCacheMetrics.js   ← Performance Observatory marks for cache hit/miss/refresh/update
 │       └── HomeCacheValidator.js ← schema validation and sensitive field stripping
+├── firebase/
+│   └── resilience/
+│       ├── FirebaseStartupResilience.js ← shared anonymous auth startup promise
+│       ├── FirebaseRetryQueue.js        ← exponential backoff for temporary Firebase errors
+│       ├── FirebaseStartupMetrics.js    ← Performance/APG Health startup diagnostics
+│       ├── FirebaseAvailability.js      ← online/offline recovery gate
+│       └── FirebaseRecovery.js          ← local recovery task registry
 ├── utils/
 │   ├── geo.js
 │   ├── parseVideoUrl.js
@@ -145,6 +152,9 @@ import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkont
 - Offline detection: `navigator.onLine` + `online`/`offline` events
 
 **Загрузка данных (loadData):**
+- Home cache восстанавливается до сетевых запросов.
+- Anonymous Auth запускается через `ensureFirebaseAnonymousAuth()` и не блокирует Home.
+- Ошибки `identitytoolkit/accounts:signUp` фиксируются в Performance/APG Health и уходят в retry/backoff, но не превращаются в Fatal Error для пользователя.
 ```js
 // Параллельный batch запрос
 const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] =

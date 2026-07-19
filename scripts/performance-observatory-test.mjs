@@ -137,6 +137,7 @@ assert(health.includes('Startup Timeline'), 'Performance tab shows startup timel
 assert(health.includes('Bootstrap Timeline'), 'Performance tab shows bootstrap timeline');
 assert(health.includes('Home Hydration Timeline'), 'Performance tab shows home hydration timeline');
 assert(health.includes('Home Cache'), 'Performance tab shows home cache');
+assert(health.includes('Firebase Startup'), 'Performance tab shows Firebase Startup');
 assert(health.includes('Последние 20 запусков'), 'Performance tab shows last launches');
 assert(health.includes('Скопировать отчёт'), 'Performance tab can copy export');
 assert(packageJson.includes('test:performance-observatory'), 'package script registered');

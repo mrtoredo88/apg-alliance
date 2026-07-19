@@ -61,6 +61,11 @@ import {
   restoreHomeCache,
 } from './home/cache/index.js';
 import { countRender, finalizePerformanceRun, markFirebase, markPerformanceStage, markRouteReady } from './performance/index.js';
+import {
+  ensureFirebaseAnonymousAuth,
+  markFirebaseStartup,
+  registerFirebaseRecoveryTask,
+} from './firebase/resilience/index.js';
 import { BOOTSTRAP_PRIORITIES, scheduleBootstrapTask } from './bootstrap/index.js';
 import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
@@ -798,9 +803,13 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   const ensureAnonymous = async (reason) => {
     if (auth.currentUser) return auth.currentUser;
     traceAuthStage('firebase_auth_start', { source, reason });
-    await signInAnonymously(auth);
-    traceAuthStage('firebase_auth_ready', { source, uid: auth.currentUser?.uid ?? null });
-    return auth.currentUser;
+    const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+      source: `owner_${source}_${reason}`,
+      waitMs: 4200,
+    });
+    if (!current) throw Object.assign(new Error('firebase_auth_unavailable'), { code: 'FIREBASE_AUTH_UNAVAILABLE' });
+    traceAuthStage('firebase_auth_ready', { source, uid: current.uid ?? null });
+    return current;
   };
 
   const checkOrCreateMap = async () => {
@@ -834,12 +843,24 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
 
   traceAuthStage('auth_map_mismatch', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
   await signOut(auth).catch(() => {});
-  await signInAnonymously(auth);
-  const current = auth.currentUser;
+  const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+    source: `owner_recreate_${source}`,
+    waitMs: 4200,
+    restart: true,
+  });
   if (!current) throw new Error('firebase_auth_unavailable');
   await userAction('auth:linkUser', { userId: targetUserId, source });
   traceAuthStage('owner_session_recreated', { source, uid: current.uid, userId: targetUserId });
   return current;
+}
+
+function isFirebaseStartupOnlyError(error) {
+  const text = `${error?.code || ''} ${error?.message || ''}`.toLowerCase();
+  return text.includes('firebase_auth_unavailable')
+    || text.includes('auth_timeout')
+    || text.includes('identitytoolkit')
+    || text.includes('accounts:signup')
+    || text.includes('auth/');
 }
 
 function LazyFallback() {
@@ -1444,8 +1465,6 @@ export function UserApp() {
       return;
     }
     setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
-    markFirebase('firebase_start', { source: 'UserApp.loadData' });
-
     const restoredHomeCache = restoreHomeCache();
     setHomeCacheSnapshot(restoredHomeCache.snapshot);
     const cachedPartners = Array.isArray(restoredHomeCache.values.partners)
@@ -1472,21 +1491,22 @@ export function UserApp() {
     try {
     // Firebase Auth и vkBridge — параллельно
     vkBridge.send('VKWebAppInit');
+    markFirebase('firebase_start', { source: 'UserApp.loadData' });
     markFirebase('auth_start', { source: 'UserApp.loadData' });
-    const authReady = new Promise(resolve => {
-      let unsub = () => {};
-      unsub = onAuthStateChanged(auth, (user) => {
-        unsub();
-        if (user) {
-          resolve();
-        } else {
-          Promise.race([
-            signInAnonymously(auth),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), 1800)),
-          ]).catch(e => logError(e, 'UserApp.auth.anonymous')).finally(resolve);
-        }
+    const authReady = Promise.resolve()
+      .then(() => ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+        source: 'UserApp.loadData',
+        waitMs: 0,
+      }))
+      .catch(e => {
+        logError(e, 'UserApp.auth.anonymous');
+        markFirebaseStartup('firebase_retry', {
+          source: 'UserApp.loadData',
+          errorCode: e?.code || '',
+          errorMessage: e?.message || String(e),
+        });
+        return null;
       });
-    });
 
     const [, rawUserData] = await Promise.all([
       authReady,
@@ -1529,7 +1549,12 @@ export function UserApp() {
         if (!sid) {
           sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
           sessionStorage.setItem(GS_KEY, sid);
-          if (!auth.currentUser) await signInAnonymously(auth).catch(() => {});
+          if (!auth.currentUser) {
+            ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+              source: 'UserApp.guestSession',
+              waitMs: 0,
+            }).catch(e => logError(e, 'UserApp.auth.guestAnonymous'));
+          }
           userAction('guest:session', {
             sid,
             date: new Date().toISOString().slice(0, 10),
@@ -2007,7 +2032,15 @@ export function UserApp() {
       }
     } catch (e) {
       logError(e, 'UserApp.loadData.fatal');
-      if (isMounted.current) setError('Не удалось загрузить данные.');
+      if (isFirebaseStartupOnlyError(e)) {
+        markFirebaseStartup('firebase_retry', {
+          source: 'UserApp.loadData.fatal',
+          errorCode: e?.code || '',
+          errorMessage: e?.message || String(e),
+        });
+      } else if (isMounted.current) {
+        setError('Не удалось загрузить данные.');
+      }
     } finally {
       markFirebase('firebase_ready', { source: 'UserApp.loadData.finally' });
       if (isMounted.current) setLoading(false);
@@ -3257,6 +3290,22 @@ export function UserApp() {
       if (!silent) showToast('❌ Не удалось включить уведомления', 'error');
     }
   }, [user, showToast]);
+
+  useEffect(() => {
+    return registerFirebaseRecoveryTask(async (detail = {}) => {
+      markFirebaseStartup('firebase_recovered', { source: 'UserApp.recovery', trigger: detail.source || '' });
+      await loadData(mountedRef);
+      if (
+        !isVK()
+        && user?.id
+        && localStorage.getItem('apg_notif_enabled') === '1'
+        && typeof Notification !== 'undefined'
+        && Notification.permission === 'granted'
+      ) {
+        await requestWebPushPermission({ silent: true });
+      }
+    });
+  }, [loadData, requestWebPushPermission, user?.id]);
 
   useEffect(() => {
     if (isVK() || !user?.id) return;

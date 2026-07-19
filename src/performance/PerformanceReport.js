@@ -1,6 +1,7 @@
 import { getPwaUpdateDiagnostics } from '../pwa/PwaUpdateManager.js';
 import { getBootstrapSnapshot } from '../bootstrap/index.js';
 import { getHomeCacheSnapshot } from '../home/cache/index.js';
+import { getFirebaseStartupSnapshot } from '../firebase/resilience/index.js';
 import { collectDeviceMetrics, summarizeRuns } from './PerformanceMetrics.js';
 import { readPerformanceRuns } from './PerformanceStorage.js';
 
@@ -20,6 +21,7 @@ function swVersion() {
 export function buildPerformanceExport(report) {
   const device = report?.device || collectDeviceMetrics();
   const metrics = report?.metrics || {};
+  const firebaseStartup = report?.firebaseStartup || {};
   return [
     'APG Performance Report',
     `Version: ${report?.version || buildVersion()}`,
@@ -33,6 +35,9 @@ export function buildPerformanceExport(report) {
     `Startup: ${metrics.startupMs || 0} ms`,
     `React: ${metrics.reactMs || 0} ms`,
     `Firebase: ${metrics.firebaseMs || 0} ms`,
+    `Firebase Startup: ${firebaseStartup.status || '—'}`,
+    `Firebase Attempts: ${firebaseStartup.attempts || 0}`,
+    `Firebase Recovery: ${firebaseStartup.recoveryMs || metrics.firebaseRecoveryMs || 0} ms`,
     `Auth: ${metrics.authMs || 0} ms`,
     `Home: ${metrics.homeMs || 0} ms`,
     `Loki: ${metrics.lokiMs || 0} ms`,
@@ -64,6 +69,7 @@ export function buildPerformanceReport({ timeline = [], metrics = {}, fps = 0, r
     serviceWorkerVersion: swVersion(),
     bootstrap: getBootstrapSnapshot(),
     homeCache: getHomeCacheSnapshot(),
+    firebaseStartup: getFirebaseStartupSnapshot(),
     device: collectDeviceMetrics(),
     timeline,
     metrics,
