@@ -164,6 +164,7 @@ function floatingLokiState() {
       height: buttonStyle.height,
     } : null,
     lastInputNearLoki: window.__APG_LAST_LOKI_INPUT__ || null,
+    tapTrace: Array.isArray(window.__APG_LOKI_TAP_TRACE__) ? window.__APG_LOKI_TAP_TRACE__.slice(-40) : [],
   };
 }
 

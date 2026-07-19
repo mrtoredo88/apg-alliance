@@ -37,6 +37,31 @@ function getIdentityState(emotion, action) {
   return 'ready';
 }
 
+function recordLokiTapTrace(step, detail = {}) {
+  if (typeof window === 'undefined') return;
+  const trace = Array.isArray(window.__APG_LOKI_TAP_TRACE__) ? window.__APG_LOKI_TAP_TRACE__ : [];
+  const entry = {
+    step,
+    detail,
+    at: new Date().toISOString(),
+  };
+  window.__APG_LOKI_TAP_TRACE__ = [...trace.slice(-39), entry];
+}
+
+function eventDetail(event) {
+  const touch = event.changedTouches?.[0] || event.touches?.[0] || null;
+  return {
+    type: event.type,
+    pointerType: event.pointerType || '',
+    cancelable: Boolean(event.cancelable),
+    defaultPrevented: Boolean(event.defaultPrevented),
+    x: Math.round(touch?.clientX ?? event.clientX ?? 0),
+    y: Math.round(touch?.clientY ?? event.clientY ?? 0),
+    target: event.target?.getAttribute?.('aria-label') || event.target?.tagName || '',
+    currentTarget: event.currentTarget?.getAttribute?.('aria-label') || event.currentTarget?.tagName || '',
+  };
+}
+
 export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnreadCount = 0 }) {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -47,6 +72,8 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
   const [rendered, setRendered] = useState(loki.visible);
   const [leaving, setLeaving] = useState(false);
   const rafRef = useRef(null);
+  const floatingButtonRef = useRef(null);
+  const openGuardRef = useRef(0);
   const shouldShowRestore = loki.dismissed || !loki.settings.enabled || loki.isHiddenOnPanel;
   const motionName = getMotionName(loki.emotion);
   const actionName = getActionName(loki.action);
@@ -87,6 +114,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
     }
   })();
   const markFloatingButtonEvent = (event) => {
+    recordLokiTapTrace(`react_capture_${event.type}`, eventDetail(event));
     if (!hitDebug || typeof window === 'undefined') return;
     const target = event.target;
     window.__apgLokiHitDebug = {
@@ -95,6 +123,26 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
       currentTarget: event.currentTarget?.getAttribute?.('aria-label') || event.currentTarget?.tagName || '',
       time: Date.now(),
     };
+  };
+  const openFromFloatingButton = (event, source) => {
+    recordLokiTapTrace(`open_request_${source}`, event ? eventDetail(event) : {});
+    const now = Date.now();
+    if (now - openGuardRef.current < 650) {
+      recordLokiTapTrace('open_guard_skip', { source });
+      return;
+    }
+    openGuardRef.current = now;
+    setMenuOpen(false);
+    setBrainOpen(false);
+    setHistoryOpen(false);
+    recordLokiTapTrace('provider_open_call', { source });
+    loki.openExperience();
+    requestAnimationFrame(() => {
+      recordLokiTapTrace('after_open_raf', {
+        experienceOpenBeforeRender: Boolean(loki.experienceOpen),
+        dialogPresent: Boolean(document.querySelector('[role="dialog"][aria-label="Локи"]')),
+      });
+    });
   };
   const messageFab = showMessageFab ? (
     <button
@@ -174,9 +222,40 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
     return () => clearTimeout(t);
   }, [loki.visible, rendered]);
 
+  useEffect(() => {
+    const node = floatingButtonRef.current;
+    if (!node) return undefined;
+    recordLokiTapTrace('native_listener_attached', {
+      tag: node.tagName,
+      label: node.getAttribute('aria-label') || '',
+    });
+    const handleNativeStart = (event) => {
+      recordLokiTapTrace(`native_${event.type}`, eventDetail(event));
+    };
+    const handleNativeOpen = (event) => {
+      recordLokiTapTrace(`native_${event.type}`, eventDetail(event));
+      if (event.cancelable && (event.type === 'touchend' || event.type === 'pointerup')) event.preventDefault();
+      openFromFloatingButton(event, `native_${event.type}`);
+    };
+    node.addEventListener('touchstart', handleNativeStart, { capture: true, passive: true });
+    node.addEventListener('pointerdown', handleNativeStart, { capture: true, passive: true });
+    node.addEventListener('touchend', handleNativeOpen, { capture: true, passive: false });
+    node.addEventListener('pointerup', handleNativeOpen, { capture: true, passive: false });
+    node.addEventListener('click', handleNativeOpen, { capture: true });
+    return () => {
+      node.removeEventListener('touchstart', handleNativeStart, { capture: true });
+      node.removeEventListener('pointerdown', handleNativeStart, { capture: true });
+      node.removeEventListener('touchend', handleNativeOpen, { capture: true });
+      node.removeEventListener('pointerup', handleNativeOpen, { capture: true });
+      node.removeEventListener('click', handleNativeOpen, { capture: true });
+      recordLokiTapTrace('native_listener_removed');
+    };
+  }, [loki.visible, rendered, shouldShowRestore]);
+
   const identityState = getIdentityState(loki.emotion, loki.action);
 
   if (loki.experienceOpen) {
+    recordLokiTapTrace('assistant_render_experience');
     return createPortal(<LokiExperience loki={loki} />, document.body);
   }
 
@@ -197,6 +276,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
       >
         {messageFab}
         <button
+          ref={floatingButtonRef}
           type="button"
           onClick={() => {
             loki.setHintsEnabled(true);
@@ -402,6 +482,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
           </div>
         )}
         <button
+          ref={floatingButtonRef}
           type="button"
           onPointerDownCapture={markFloatingButtonEvent}
           onPointerUpCapture={markFloatingButtonEvent}
@@ -409,7 +490,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
           onTouchEndCapture={markFloatingButtonEvent}
           onClick={(event) => {
             markFloatingButtonEvent(event);
-            loki.openExperience();
+            openFromFloatingButton(event, 'react_click');
           }}
           aria-label="Локи"
           data-floating-loki-button="true"

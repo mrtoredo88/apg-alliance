@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] fix: Loki installed PWA tap chain tracing
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiProvider.jsx`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-floating-button-hit-test.mjs`, `scripts/pwa-runtime-diagnostics-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Добавлена runtime-трассировка цепочки тапа Локи в `window.__APG_LOKI_TAP_TRACE__`: native/React events, вызов открытия, вход в provider, изменение `experienceOpen`, render portal.
+- К floating button подключены native DOM listeners `touchend`, `pointerup`, `click` на самой кнопке, чтобы проверить и обойти возможный разрыв React Synthetic Events в установленной iOS PWA.
+- PWA diagnostics теперь возвращает `tapTrace` внутри `window.__APG_LOKI_PWA_HIT_DIAGNOSTICS__()`.
+- Smoke-тест проверяет не только hit-test owner, но и прохождение цепочки до `provider_state_experience=true`.
+**Почему:** пользователь подтвердил, что в установленной iPhone PWA кнопка не реагирует вообще; задачу нельзя считать закрытой без трассировки реальной цепочки на устройстве и личного подтверждения пользователя.
+
+---
+
 ## [2026-07-19] fix: Installed PWA Loki safe-area hit testing
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/lokiPosition.js`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-floating-button-hit-test.mjs`, `scripts/pwa-runtime-diagnostics-test.mjs`, `.ai/17_CHANGELOG_AI.md`

@@ -8,11 +8,17 @@ assert.match(source, /data-floating-loki-button="true"/, 'Floating Loki button m
 assert.match(source, /data-loki-floating-root="active"/, 'Floating Loki root must have a stable diagnostic marker.');
 assert.match(source, /data-loki-floating-root="restore"/, 'Floating Loki restore root must have a stable diagnostic marker.');
 assert.match(source, /aria-label="Локи"/, 'Floating Loki button must keep its accessible label.');
+assert.match(source, /window\.__APG_LOKI_TAP_TRACE__/, 'Floating Loki tap chain must keep a runtime trace buffer.');
+assert.match(source, /floatingButtonRef/, 'Floating Loki button must expose the real DOM button to native listeners.');
+assert.match(source, /addEventListener\('touchend'[\s\S]{0,120}passive:\s*false/, 'Floating Loki must listen to native touchend outside React synthetic events.');
+assert.match(source, /addEventListener\('pointerup'[\s\S]{0,120}passive:\s*false/, 'Floating Loki must listen to native pointerup outside React synthetic events.');
+assert.match(source, /addEventListener\('click'[\s\S]{0,80}capture:\s*true/, 'Floating Loki must listen to native click outside React synthetic events.');
+assert.match(source, /openFromFloatingButton/, 'Floating Loki open path must be shared by React and native handlers.');
 assert.match(source, /onPointerDownCapture=\{markFloatingButtonEvent\}/, 'Floating Loki button must observe pointerdown on the button owner.');
 assert.match(source, /onPointerUpCapture=\{markFloatingButtonEvent\}/, 'Floating Loki button must observe pointerup on the button owner.');
 assert.match(source, /onTouchStartCapture=\{markFloatingButtonEvent\}/, 'Floating Loki button must observe touchstart on the button owner.');
 assert.match(source, /onTouchEndCapture=\{markFloatingButtonEvent\}/, 'Floating Loki button must observe touchend on the button owner.');
-assert.match(source, /onClick=\{\(event\) => \{\s*markFloatingButtonEvent\(event\);\s*loki\.openExperience\(\);/s, 'Floating Loki click must open the Loki experience from the button owner.');
+assert.match(source, /onClick=\{\(event\) => \{\s*markFloatingButtonEvent\(event\);\s*openFromFloatingButton\(event,\s*'react_click'\);/s, 'Floating Loki React click must use the shared open path from the button owner.');
 assert.match(source, /width: 92,[\s\S]{0,80}height: 92,/, 'Floating Loki hitbox must stay larger than 56x56.');
 assert.match(source, /data-loki-hit-debug="true"/, 'Development hit debug overlay must be available.');
 assert.match(source, /import\.meta\.env\.DEV[\s\S]{0,180}apg_loki_hit_debug/, 'Hit debug mode must be gated to development builds.');
@@ -98,8 +104,13 @@ if (runtimeUrl) {
     assert.equal(hit.topMarker, 'true', 'Runtime hit-test owner must keep the Loki marker.');
     await page.locator('[data-floating-loki-button="true"]').click({ timeout: 10000 });
     await page.waitForTimeout(800);
-    const opened = await page.evaluate(() => Boolean(document.querySelector('button[aria-label="Закрыть Локи"]')) && document.body.innerText.includes('Пространство Локи'));
-    assert.equal(opened, true, 'Runtime click must open the Loki experience.');
+    const opened = await page.evaluate(() => ({
+      dialog: Boolean(document.querySelector('button[aria-label="Закрыть Локи"]')) && document.body.innerText.includes('Пространство Локи'),
+      trace: window.__APG_LOKI_TAP_TRACE__ || [],
+    }));
+    assert.equal(opened.trace.some(item => item.step === 'provider_open_enter'), true, 'Runtime click must enter the Loki provider open path.');
+    assert.equal(opened.trace.some(item => item.step === 'provider_state_experience' && item.detail?.experienceOpen === true), true, 'Runtime click must update provider experienceOpen state.');
+    assert.equal(opened.dialog, true, 'Runtime click must open the Loki experience.');
   } finally {
     await browser.close();
   }

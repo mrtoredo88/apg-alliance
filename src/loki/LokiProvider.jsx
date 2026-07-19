@@ -66,6 +66,16 @@ function isLokiDebugEnabled() {
   }
 }
 
+function recordLokiTapTrace(step, detail = {}) {
+  if (typeof window === 'undefined') return;
+  const trace = Array.isArray(window.__APG_LOKI_TAP_TRACE__) ? window.__APG_LOKI_TAP_TRACE__ : [];
+  window.__APG_LOKI_TAP_TRACE__ = [...trace.slice(-39), {
+    step,
+    detail,
+    at: new Date().toISOString(),
+  }];
+}
+
 function safeString(value) {
   return String(value ?? '').trim();
 }
@@ -780,6 +790,10 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   }, [settings, user?.id, user?.isGuest]);
 
   useEffect(() => {
+    recordLokiTapTrace('provider_state_experience', { experienceOpen });
+  }, [experienceOpen]);
+
+  useEffect(() => {
     if (!settings.enabled || !user) return;
     if (!hasSeenLokiGreeting(userId)) {
       const t = setTimeout(() => {
@@ -1286,11 +1300,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     resetUserMemory,
     visible,
     openExperience: () => {
+      recordLokiTapTrace('provider_open_enter', {
+        activePanel,
+        hasActiveContext: Boolean(activeContext),
+        hasLastContext: Boolean(memory?.lastContext),
+        currentExperienceOpen: experienceOpen,
+      });
       setExperienceOpen(true);
       setVisible(false);
       setDismissed(false);
       if (!activeContext && memory?.lastContext) setActiveContext(memory.lastContext);
       updateMemory({ inDialog: true, lastPanel: activePanel, activeContext: activeContext ?? memory?.lastContext ?? null });
+      recordLokiTapTrace('provider_open_exit', { requestedExperienceOpen: true });
     },
     openContextExperience,
     closeExperience: () => {
