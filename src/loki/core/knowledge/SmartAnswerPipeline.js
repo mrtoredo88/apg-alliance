@@ -17,6 +17,7 @@ import { explainLastCapability, isCapabilityExplainQuery, runLokiCapabilityEngin
 import { explainLastSkill, isSkillExplainQuery, runLokiSkillResolver } from '../skills/index.js';
 import { explainLastExecution, isExecutionExplainQuery, runCapabilityExecutionBridge } from '../execution/index.js';
 import { explainLastControlledExecution, isControlledExecutionExplainQuery, runControlledExecutionEngine } from '../controlledExecution/index.js';
+import { recordLokiPipelineError, recordLokiPipelineReturn } from '../../lokiMessageTrace.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -286,7 +287,7 @@ function attachKnowledgeIndex(result, indexResult = {}) {
   };
 }
 
-export function runLokiKnowledgeEngine({ text: question, appState = {}, context = null, traceMessage = null } = {}) {
+function runLokiKnowledgeEngineImpl({ text: question, appState = {}, context = null, traceMessage = null } = {}) {
   const trace = typeof traceMessage === 'function' ? traceMessage : () => {};
   if (isKnowledgeIndexExplainQuery(question)) {
     return attachDecision(explainLastKnowledgeIndex(context?.memory || {}), question, context);
@@ -520,4 +521,19 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   if (effectiveIntent.id === 'reviews.question') return finalize({ ...answerReviews({ knowledge }), conversationContext });
   if (effectiveIntent.id === 'context.card') return finalize({ ...answerContext({ intent: effectiveIntent, knowledge }), conversationContext });
   return null;
+}
+
+export function runLokiKnowledgeEngine(input = {}) {
+  const trace = typeof input.traceMessage === 'function' ? input.traceMessage : () => {};
+  trace('SmartAnswerPipeline REQUEST START', { textLength: String(input.text || '').length });
+  try {
+    const result = runLokiKnowledgeEngineImpl(input);
+    recordLokiPipelineReturn('SmartAnswerPipeline', result);
+    trace('SmartAnswerPipeline REQUEST END', { returned: Boolean(result), intent: result?.intent || '', hasText: Boolean(result?.text) });
+    return result;
+  } catch (error) {
+    recordLokiPipelineError('SmartAnswerPipeline', error);
+    trace('STOP SmartAnswerPipeline ERROR', { error: error?.message || String(error), stack: error?.stack || '' });
+    throw error;
+  }
 }

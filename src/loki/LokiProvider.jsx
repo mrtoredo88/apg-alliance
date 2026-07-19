@@ -41,7 +41,7 @@ import { buildKnowledgeHistoryPatch } from './core/knowledgeIndex/index.js';
 import { buildSkillHistoryPatch } from './core/skills/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
-import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics } from './lokiMessageTrace.js';
+import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics, recordLokiPipelineError, recordLokiPipelineReturn } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, normalizeLokiResponseText } from './lokiResponseText.js';
 import {
   DEFAULT_LOKI_SETTINGS,
@@ -1295,6 +1295,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       });
       recordLokiMessageTrace('STEP 9 LokiBrain start', {});
       const result = await withLokiAnswerTimeout(askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() }), text);
+      recordLokiPipelineReturn('LokiProvider askLokiBrain await', result);
       recordLokiMessageTrace('STEP 16 LokiBrain returned to Provider', { hasResult: Boolean(result), intent: result?.intent || '', timeout: Boolean(result?.debug?.timeout) });
       if (!result) {
         recordLokiMessageTrace('STOP LokiBrain returned null', {});
@@ -1412,6 +1413,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       return normalizedResult;
     } catch (e) {
       setBrainThinking(false);
+      recordLokiPipelineError('LokiProvider askExperience', e);
       recordLokiMessageTrace('STOP Provider caught exception', { error: e?.message || String(e) });
       recordLokiRequestDiagnostics({
         contextType: activeContext?.type || '',

@@ -29,7 +29,7 @@ import { runProactiveAnswer } from './proactive/ProactiveEngine.js';
 import { runLokiActionCenter } from './actions/ActionCenter.js';
 import { runLokiDecisionEngine } from './decision/index.js';
 import { runLokiEvaluationEngine } from './evaluation/index.js';
-import { recordLokiMessageTrace } from '../lokiMessageTrace.js';
+import { recordLokiMessageTrace, recordLokiPipelineError, recordLokiPipelineReturn } from '../lokiMessageTrace.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -174,7 +174,7 @@ function finishResult({ shaped, question, context, trace, debugPayload = null, d
   };
 }
 
-export async function askLokiCore({ text, appState, memory, userMemory, history = [], debug = false }) {
+async function askLokiCoreImpl({ text, appState, memory, userMemory, history = [], debug = false }) {
   const start = nowMs();
   const query = normalizeText(text);
   const trace = [];
@@ -433,4 +433,17 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const result = PersonalityEngine.shape({ result: decisionReady, context, selectedModule: selected });
   trace.push({ module: PersonalityEngine.id, ms: Math.round(nowMs() - personalityStart), decision: result.tone });
   return finishResult({ shaped: result, question: text, context, trace, debugPayload: { provider, selectedModule: selected?.id ?? null, totalMs: Math.round(nowMs() - start) }, debug });
+}
+
+export async function askLokiCore(args) {
+  recordLokiMessageTrace('LokiCore REQUEST START', { textLength: String(args?.text || '').length });
+  try {
+    const result = await askLokiCoreImpl(args);
+    recordLokiPipelineReturn('LokiCore', result);
+    recordLokiMessageTrace('LokiCore REQUEST END', { returned: Boolean(result), intent: result?.intent || '' });
+    return result;
+  } catch (error) {
+    recordLokiPipelineError('LokiCore', error);
+    throw error;
+  }
 }

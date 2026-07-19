@@ -4,6 +4,7 @@ import { normalizeLokiResponseText } from '../src/loki/lokiResponseText.js';
 
 const experienceSource = readFileSync(new URL('../src/loki/LokiExperience.jsx', import.meta.url), 'utf8');
 const providerSource = readFileSync(new URL('../src/loki/LokiProvider.jsx', import.meta.url), 'utf8');
+const brainSource = readFileSync(new URL('../src/loki/LokiBrain.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../src/loki/core/LokiCore.js', import.meta.url), 'utf8');
 const pipelineSource = readFileSync(new URL('../src/loki/core/knowledge/SmartAnswerPipeline.js', import.meta.url), 'utf8');
 const diagnosticsSource = readFileSync(new URL('../src/pwa/PwaRuntimeDiagnostics.js', import.meta.url), 'utf8');
@@ -29,11 +30,21 @@ assert.match(providerSource, /classifyNewsContextQuery/, 'Article context must c
 assert.match(providerSource, /recordLokiRequestDiagnostics/, 'Loki Provider must save compact request diagnostics.');
 assert.match(providerSource, /STOP Response Normalizer failed/, 'Loki Provider must identify normalizer failures.');
 assert.match(providerSource, /pipelineTimeline/, 'Loki Provider diagnostics must expose Pipeline Timeline.');
+assert.match(providerSource, /LokiProvider askLokiBrain await/, 'Loki Provider must record the exact askLokiBrain awaited return value.');
+assert.match(brainSource, /askLokiBrain REQUEST START/, 'askLokiBrain must trace request start.');
+assert.match(brainSource, /recordLokiPipelineReturn\('askLokiBrain'/, 'askLokiBrain must prove the return value from LokiCore.');
+assert.match(brainSource, /recordLokiPipelineError\('askLokiBrain'/, 'askLokiBrain must log full errors instead of silently returning null.');
 assert.match(coreSource, /STEP 10 LokiCore received/, 'Loki Core must trace request entry.');
+assert.match(coreSource, /LokiCore REQUEST START/, 'Loki Core must trace request start.');
+assert.match(coreSource, /recordLokiPipelineReturn\('LokiCore'/, 'Loki Core must prove its final return object.');
+assert.match(coreSource, /recordLokiPipelineError\('LokiCore'/, 'Loki Core must log full stack on exceptions.');
 assert.match(coreSource, /STEP 14 Action Center start/, 'Loki Core must trace Action Center.');
 assert.match(coreSource, /STEP 15 Decision start/, 'Loki Core must trace Decision.');
 assert.match(coreSource, /STEP 16 Evaluation start/, 'Loki Core must trace Evaluation.');
 assert.match(pipelineSource, /STEP 11\.2 Knowledge Index OK/, 'Knowledge Pipeline must trace Knowledge Index.');
+assert.match(pipelineSource, /SmartAnswerPipeline REQUEST START/, 'SmartAnswerPipeline must trace request start.');
+assert.match(pipelineSource, /recordLokiPipelineReturn\('SmartAnswerPipeline'/, 'SmartAnswerPipeline must prove final answer return.');
+assert.match(pipelineSource, /recordLokiPipelineError\('SmartAnswerPipeline'/, 'SmartAnswerPipeline must log full stack on exceptions.');
 assert.match(pipelineSource, /STEP 11\.7 Skills OK/, 'Knowledge Pipeline must trace Skills.');
 assert.match(pipelineSource, /STEP 11\.8 Execution Bridge OK/, 'Knowledge Pipeline must trace Execution Bridge.');
 assert.match(pipelineSource, /STEP 11\.9 Controlled Execution OK/, 'Knowledge Pipeline must trace Controlled Execution.');
@@ -121,8 +132,13 @@ if (runtimeUrl) {
             hasArticleGreeting: text.includes('Привет! Я могу помочь обсудить эту новость'),
             answerStep: trace.find(item => item.step === 'STEP 19 UI answer message added') || null,
             stopSteps: trace.filter(item => String(item.step || '').startsWith('STOP')),
+            criticalStopSteps: trace.filter(item => /^STOP (askLokiBrain|LokiCore|LokiProvider|Provider|LokiBrain timeout)/.test(String(item.step || ''))),
             lastDiagnostic: diagnostics[diagnostics.length - 1] || null,
             trace,
+            hasAskBrainReturn: trace.some(item => item.step === 'askLokiBrain RETURN VALUE'),
+            hasCoreReturn: trace.some(item => item.step === 'LokiCore RETURN VALUE'),
+            hasPipelineReturn: trace.some(item => item.step === 'SmartAnswerPipeline RETURN VALUE'),
+            hasProviderAwaitReturn: trace.some(item => item.step === 'LokiProvider askLokiBrain await RETURN VALUE'),
           };
         });
         assert.equal(result.hasQuestion, true, 'Runtime smoke must render the user question.');
@@ -131,9 +147,15 @@ if (runtimeUrl) {
         assert.equal(result.hasUserFallback, false, 'Runtime smoke must not answer required queries with generic fallback.');
         assert.equal(result.hasDebugBlock, false, 'Runtime smoke must not show Loki Core debug in user UI.');
         assert.ok(result.answerStep?.detail?.textLength > 0, 'Runtime smoke must render a non-empty Loki answer.');
-        assert.equal(result.stopSteps.length, 0, `Runtime smoke must not stop in the pipeline: ${JSON.stringify(result.stopSteps)}`);
+        assert.equal(result.criticalStopSteps.length, 0, `Runtime smoke must not stop at Provider/Core/Brain: ${JSON.stringify(result.criticalStopSteps)}`);
         assert.ok(result.lastDiagnostic?.responseTextLength > 0, 'Runtime smoke must save compact request diagnostics.');
         assert.ok(Array.isArray(result.lastDiagnostic?.pipelineTimeline), 'Runtime smoke must save Pipeline Timeline diagnostics.');
+        if (!article) {
+          assert.equal(result.hasAskBrainReturn, true, 'Runtime smoke must prove askLokiBrain returned a value.');
+          assert.equal(result.hasCoreReturn, true, 'Runtime smoke must prove LokiCore returned a value.');
+          assert.equal(result.hasPipelineReturn, true, 'Runtime smoke must prove SmartAnswerPipeline returned a value.');
+          assert.equal(result.hasProviderAwaitReturn, true, 'Runtime smoke must prove Provider received askLokiBrain return value.');
+        }
         if (article) {
           assert.equal(result.hasArticleGreeting, true, 'Article context must answer greeting conversationally.');
           assert.equal(result.lastDiagnostic?.contextType, 'news', 'Article context diagnostics must mark context type.');

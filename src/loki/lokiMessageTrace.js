@@ -33,6 +33,51 @@ export function recordLokiMessageTrace(step, detail = {}) {
   if (isMessageDebugEnabled()) console.info('[APG Loki Message]', step, detail);
 }
 
+export function describeLokiReturnValue(value) {
+  const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+  const keys = value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).slice(0, 24) : [];
+  const text = value && typeof value === 'object' ? value.text : '';
+  const cards = value && typeof value === 'object' ? value.cards : null;
+  return {
+    type,
+    isNull: value === null,
+    isUndefined: typeof value === 'undefined',
+    isPromise: Boolean(value && typeof value.then === 'function'),
+    isObject: Boolean(value && typeof value === 'object' && !Array.isArray(value)),
+    isEmptyObject: Boolean(value && typeof value === 'object' && !Array.isArray(value) && keys.length === 0),
+    keys,
+    intent: value?.intent || '',
+    hasText: typeof text === 'string' ? text.trim().length > 0 : Boolean(text),
+    textLength: typeof text === 'string' ? text.trim().length : 0,
+    cardCount: Array.isArray(cards) ? cards.length : value?.card ? 1 : 0,
+    hasDebug: Boolean(value?.debug),
+    timeout: Boolean(value?.debug?.timeout),
+  };
+}
+
+export function isInvalidLokiReturnValue(value) {
+  const described = describeLokiReturnValue(value);
+  return described.isNull || described.isUndefined || described.isPromise || described.isEmptyObject || !described.hasText;
+}
+
+export function recordLokiPipelineReturn(stage, value, detail = {}) {
+  const described = describeLokiReturnValue(value);
+  recordLokiMessageTrace(`${stage} RETURN VALUE`, { ...detail, ...described });
+  if (isInvalidLokiReturnValue(value)) {
+    recordLokiMessageTrace(`STOP ${stage} RETURNED INVALID`, { ...detail, ...described, errorCode: `${stage.replace(/\s+/g, '_').toUpperCase()}_INVALID_RETURN` });
+  }
+  return described;
+}
+
+export function recordLokiPipelineError(stage, error, detail = {}) {
+  recordLokiMessageTrace(`STOP ${stage} ERROR`, {
+    ...detail,
+    error: error?.message || String(error),
+    stack: error?.stack || '',
+    errorName: error?.name || '',
+  });
+}
+
 export function recordLokiRequestDiagnostics(input = {}) {
   if (typeof window === 'undefined') return null;
   const trace = getLokiMessageTrace();

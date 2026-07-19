@@ -3912,6 +3912,13 @@
 - Shared-normalizer `buildDialogContext` расширен только производными полями из уже переданного объекта: время, рейтинг, открытость, филиал, акция, скидка, срок, автор и свободные места.
 - Добавлен smoke/unit-скрипт `scripts/messaging-smart-conversations-test.mjs` на 500 сценариев Smart Conversations, sticky markers, context types, actions и read-only контракт.
 
+# 2026-07-19 — Loki Brain Return Diagnostics
+
+- Добавлена доказательная трассировка `LokiProvider → askLokiBrain → LokiCore → SmartAnswerPipeline`: REQUEST START, RETURN VALUE, REQUEST END, TYPE, ERROR и STACK.
+- `askLokiBrain` больше не является чёрным ящиком: diagnostics фиксирует, вернул ли он `null`, `undefined`, `{}`, Promise, timeout или валидный объект с `text`.
+- `LokiCore` и `SmartAnswerPipeline` обёрнуты диагностически без изменения пользовательского ответа, fallback, UI и ResponseNormalizer.
+- Runtime-smoke теперь различает полезный `SmartAnswerPipeline null` (когда дальше отвечает Brain Layer) и критический отказ `Provider/Core/Brain`.
+
 # 2026-07-19 — Loki Pipeline Fallback Fix
 
 - Исправлен критический сценарий, где валидный ответ Локи мог превращаться в общий fallback из-за агрессивной нормализации `undefined/null` внутри текста.
