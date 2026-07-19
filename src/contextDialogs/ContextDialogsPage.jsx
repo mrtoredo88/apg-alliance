@@ -20,34 +20,90 @@ function timeText(value) {
   return new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+function dayLabel(value) {
+  const ms = tsMs(value);
+  if (!ms) return 'Сегодня';
+  const date = new Date(ms);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toLocaleDateString('sv') === today.toLocaleDateString('sv')) return 'Сегодня';
+  if (date.toLocaleDateString('sv') === yesterday.toLocaleDateString('sv')) return 'Вчера';
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+function compactTime(value) {
+  const ms = tsMs(value);
+  if (!ms) return '';
+  const date = new Date(ms);
+  const today = new Date();
+  if (date.toLocaleDateString('sv') === today.toLocaleDateString('sv')) return timeText(value);
+  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
 function userIdOf(user) {
   return user?.id ? String(user.id) : '';
 }
 
+function useDesktopLayout() {
+  const read = () => typeof window !== 'undefined' && window.innerWidth >= 920;
+  const [wide, setWide] = useState(read);
+  useEffect(() => {
+    const onResize = () => setWide(read());
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return wide;
+}
+
+function typeChip(context = {}) {
+  const type = context?.type || 'direct';
+  if (type === 'partner') return { icon: '🏢', label: 'Партнёр' };
+  if (type === 'event') return { icon: '📅', label: 'Мероприятие' };
+  if (type === 'expert') return { icon: '⭐', label: 'Эксперт' };
+  if (type === 'promotion') return { icon: '🎁', label: 'Акция' };
+  if (type === 'news') return { icon: '📰', label: 'Новость' };
+  if (type === 'booking') return { icon: '📅', label: 'Запись' };
+  return { icon: '💬', label: 'Личный' };
+}
+
 function ContextBadge({ context }) {
-  return <GlassBadge tone={context?.type === 'promotion' ? 'gold' : 'glass'}>{getDialogObjectLabel(context)}</GlassBadge>;
+  const chip = typeChip(context);
+  return (
+    <span data-context-chip style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 24, borderRadius: 999, padding: '4px 9px', background: context?.type === 'promotion' ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: context?.type === 'promotion' ? '1px solid rgba(215,184,106,0.30)' : APG2_PROFILE.glass.border, color: context?.type === 'promotion' ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, fontSize: 11, lineHeight: '14px', fontWeight: 850, whiteSpace: 'nowrap' }}>
+      <span>{chip.icon}</span>
+      <span>{chip.label}</span>
+    </span>
+  );
 }
 
 function DialogListItem({ dialog, active, onClick }) {
   const context = dialog.header?.context || dialog.context || {};
   const preview = dialog.header?.lastMessage?.text || dialog.lastMessage?.text || 'Диалог создан. Задайте вопрос по объекту.';
+  const title = dialog.header?.title || context.title || 'Диалог АПГ';
+  const subtitle = dialog.header?.subtitle || context.parentTitle || context.subtitle || getDialogObjectLabel(context);
+  const unread = Number(dialog.unreadCount || 0);
+  const typing = Object.values(dialog.typing || {}).some(Boolean);
+  const online = dialog.online === true || dialog.header?.online === true;
   return (
-    <GlassCard onClick={onClick} style={{ borderRadius: 22, padding: 12, display: 'grid', gridTemplateColumns: '42px 1fr auto', gap: 10, alignItems: 'center', border: active ? '1px solid rgba(215,184,106,0.44)' : APG2_PROFILE.glass.border }}>
-      <div style={{ width: 42, height: 42, borderRadius: 16, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 20, overflow: 'hidden' }}>
+    <button data-dialog-list-item data-unread={unread > 0 ? 'true' : 'false'} onClick={onClick} style={{ width: '100%', border: active ? '1px solid rgba(215,184,106,0.46)' : unread ? '1px solid rgba(74,144,217,0.24)' : APG2_PROFILE.glass.border, background: unread ? 'linear-gradient(135deg, rgba(74,144,217,0.16), rgba(255,255,255,0.08))' : active ? 'rgba(215,184,106,0.12)' : 'rgba(var(--apg2-glass-a,255,255,255),0.055)', borderRadius: 20, padding: 11, display: 'grid', gridTemplateColumns: '56px minmax(0,1fr) auto', gap: 11, alignItems: 'center', boxShadow: unread ? '0 12px 32px rgba(74,144,217,0.12)' : 'none', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', transition: 'background 160ms ease, border-color 160ms ease, transform 160ms ease' }}>
+      <div style={{ position: 'relative', width: 56, height: 56, borderRadius: 22, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 23, overflow: 'hidden', flexShrink: 0 }}>
         {context.image ? <img src={context.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (dialog.header?.avatar || (context.type === 'event' ? '🎫' : context.type === 'expert' ? '✦' : context.type === 'promotion' ? '🎁' : '🏪'))}
+        <span data-presence={typing ? 'typing' : online ? 'online' : 'offline'} style={{ position: 'absolute', right: 2, bottom: 2, width: 13, height: 13, borderRadius: '50%', background: typing ? APG2_PROFILE.gold : online ? '#4BB34B' : 'rgba(160,160,160,0.75)', border: '2px solid var(--apg2-panel, rgba(20,20,24,0.92))' }} />
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-          <div style={{ color: APG2_PROFILE.text, fontSize: 14, fontWeight: 870, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dialog.header?.title || context.title || 'Диалог АПГ'}</div>
+        <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 4, minWidth: 0 }}>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '19px', fontWeight: unread ? 930 : 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{title}</div>
         </div>
-        <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 780, marginBottom: 3 }}>{dialog.header?.subtitle || context.parentTitle || context.subtitle || getDialogObjectLabel(context)}</div>
-        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>
+        <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, fontWeight: 760, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{typing ? 'печатает...' : subtitle}</div>
+        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12.5, lineHeight: '17px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{preview}</div>
       </div>
       <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+        <span style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px' }}>{compactTime(dialog.header?.lastActivity || dialog.lastMessageAt || dialog.updatedAt)}</span>
         <ContextBadge context={context} />
-        {dialog.unreadCount > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 999, background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900 }}>{dialog.unreadCount}</span>}
+        {unread > 0 && <span style={{ minWidth: 23, height: 23, borderRadius: 999, background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 920 }}>{unread}</span>}
       </div>
-    </GlassCard>
+    </button>
   );
 }
 
@@ -164,6 +220,47 @@ function MessagingContextInfo({ context, onOpenObject }) {
       {context.phone && <GlassButton onClick={() => window.open(`tel:${String(context.phone).replace(/\s+/g, '')}`)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
       <GlassButton onClick={() => onOpenObject?.(context)} style={{ minHeight: 34, borderRadius: 15, padding: '7px 10px', fontSize: 12 }}>Открыть карточку</GlassButton>
     </GlassCard>
+  );
+}
+
+function CompactContextCard({ context, isOwner, collapsed, onToggle, onOpenObject, onAction }) {
+  if (!context) return null;
+  const rows = buildSmartContextRows(context).filter(([, value]) => value).slice(0, collapsed ? 1 : 6);
+  const actions = buildSmartActions({ context, isOwner, onOpenObject, onAction }).slice(0, collapsed ? 2 : 5);
+  const title = context.type === 'booking' ? smartValue(context.parentTitle, context.title, 'Запись АПГ') : smartValue(context.title, context.parentTitle, 'АПГ');
+  return (
+    <div data-compact-context-card data-collapsed={collapsed ? 'true' : 'false'} style={{ borderRadius: 22, padding: collapsed ? 10 : 13, minHeight: collapsed ? 70 : 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.075)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', display: 'grid', gap: collapsed ? 6 : 10, transition: 'padding 160ms ease, min-height 160ms ease' }}>
+      <button type="button" onClick={onToggle} style={{ border: 0, background: 'transparent', padding: 0, display: 'grid', gridTemplateColumns: '42px minmax(0,1fr) auto', gap: 10, alignItems: 'center', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+        <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 20, overflow: 'hidden' }}>
+          {context.image ? <img src={context.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : contextIcon(context.type)}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 3 }}>
+            <ContextBadge context={context} />
+          </div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 14.5, lineHeight: '18px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+          {rows[0] && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rows.map(([label, value]) => `${label}: ${value}`).join(' · ')}</div>}
+        </div>
+        <span style={{ color: APG2_PROFILE.textMuted, fontSize: 16 }}>{collapsed ? '⌄' : '⌃'}</span>
+      </button>
+      {!collapsed && (
+        <>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: 8, color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '17px' }}>
+                <span style={{ color: APG2_PROFILE.textMuted }}>{label}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+          {actions.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+              {actions.map(action => <GlassButton key={action.id} tone={action.tone} onClick={action.onClick} style={{ flex: '0 0 auto', minHeight: 32, borderRadius: 15, padding: '6px 10px', color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, fontSize: 12 }}>{action.label}</GlassButton>)}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -381,9 +478,9 @@ function MessageBubble({ message, own }) {
     );
   }
   return (
-    <div style={{ display: 'flex', justifyContent: own ? 'flex-end' : 'flex-start' }}>
-      <div style={{ maxWidth: '82%', borderRadius: own ? '22px 22px 6px 22px' : '22px 22px 22px 6px', padding: 12, background: loki ? APG2_PROFILE.goldSoft : own ? 'rgba(215,184,106,0.18)' : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', border: loki ? '1px solid rgba(215,184,106,0.36)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', color: APG2_PROFILE.text }}>
-        <div style={{ color: loki ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{loki ? 'Локи' : message.senderName || 'Участник'}</div>
+    <div data-message-bubble style={{ display: 'flex', justifyContent: own ? 'flex-end' : 'flex-start', padding: '2px 0' }}>
+      <div style={{ maxWidth: 'min(74%, 620px)', borderRadius: own ? '22px 22px 7px 22px' : '22px 22px 22px 7px', padding: '10px 12px 8px', background: loki ? APG2_PROFILE.goldSoft : own ? 'linear-gradient(135deg, rgba(215,184,106,0.34), rgba(215,184,106,0.18))' : 'rgba(var(--apg2-glass-a,255,255,255),0.09)', border: loki ? '1px solid rgba(215,184,106,0.36)' : own ? '1px solid rgba(215,184,106,0.22)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', color: APG2_PROFILE.text, boxShadow: own ? '0 10px 24px rgba(215,184,106,0.10)' : '0 10px 26px rgba(0,0,0,0.06)' }}>
+        {!own && <div style={{ color: loki ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 850, marginBottom: 4 }}>{loki ? 'Локи' : message.senderName || 'Участник'}</div>}
         {message.text && <div style={{ fontSize: 14, lineHeight: '20px', whiteSpace: 'pre-wrap' }}>{message.text}</div>}
         {message.attachments?.length > 0 && (
           <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
@@ -392,8 +489,18 @@ function MessageBubble({ message, own }) {
               : <a key={file.url || index} href={file.url} target="_blank" rel="noreferrer" style={{ color: APG2_PROFILE.gold }}>{file.name || 'Файл'}</a>)}
           </div>
         )}
-        <div style={{ marginTop: 5, color: APG2_PROFILE.textMuted, fontSize: 10.5, textAlign: 'right' }}>{timeText(message.createdAt)} · {message.status || 'delivered'}</div>
+        <div style={{ marginTop: 5, color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '14px', textAlign: 'right' }}>{timeText(message.createdAt)}</div>
       </div>
+    </div>
+  );
+}
+
+function MessageDayGroup({ label }) {
+  return (
+    <div data-message-day-group style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'center', margin: '10px 0 6px' }}>
+      <div style={{ height: 1, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }} />
+      <span style={{ minHeight: 24, borderRadius: 999, padding: '4px 10px', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 820 }}>{label}</span>
+      <div style={{ height: 1, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)' }} />
     </div>
   );
 }
@@ -429,6 +536,8 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const [aiAssist, setAiAssist] = useState(Boolean(user?.contextDialogAiAssist));
   const [attachment, setAttachment] = useState(null);
   const [contextCollapsed, setContextCollapsed] = useState(false);
+  const [contextExpanded, setContextExpanded] = useState(false);
+  const desktopLayout = useDesktopLayout();
   const messagesEndRef = useRef(null);
   const lastRequestRef = useRef(0);
 
@@ -492,7 +601,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     };
   }, [activeDialogId]);
 
-  const activeDialog = useMemo(() => dialogs.find(dialog => dialog.id === activeDialogId) || dialogs[0] || null, [dialogs, activeDialogId]);
+  const activeDialog = useMemo(() => dialogs.find(dialog => dialog.id === activeDialogId) || (desktopLayout ? dialogs[0] : null), [desktopLayout, dialogs, activeDialogId]);
   const activeMessages = useMemo(() => messages.filter(message => message.dialogId === activeDialog?.dialogId || message.dialogId === activeDialog?.id), [messages, activeDialog]);
   const unifiedDialogs = useMemo(() => buildUnifiedDialogList({ dialogs, messages, actor: user, filter, query }), [dialogs, messages, user, filter, query]);
   const messagingSnapshot = useMemo(() => buildMessagingSnapshot({ dialogs, messages, actor: user }), [dialogs, messages, user]);
@@ -500,6 +609,20 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const isOwner = activeDialog?.ownerUserIds?.includes?.(uid);
   const lastQuestion = [...activeMessages].reverse().find(message => message.senderRole === 'user')?.text || '';
   const typingUsers = Object.entries(activeDialog?.typing || {}).filter(([id, value]) => id !== uid && value).length;
+  const activeHeader = activeDialog?.header || {};
+  const groupedMessages = useMemo(() => {
+    const rows = [];
+    let currentDay = '';
+    activeMessages.forEach(message => {
+      const label = dayLabel(message.createdAt);
+      if (label !== currentDay) {
+        currentDay = label;
+        rows.push({ kind: 'day', id: `day-${label}-${message.id}`, label });
+      }
+      rows.push({ kind: 'message', id: message.id, message });
+    });
+    return rows;
+  }, [activeMessages]);
 
   const sendText = async (overrideText = '', senderRole = '') => {
     const body = String(overrideText || text || '').trim();
@@ -557,76 +680,141 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     return <GlassPanel><ScreenHeader title="Диалоги" subtitle="Войдите, чтобы задавать вопросы по объектам АПГ" onBack={onBack} /><EmptyStateV2 icon="💬" title="Нужна авторизация" text="Контекстные диалоги доступны участникам АПГ." /></GlassPanel>;
   }
 
+  const dialogList = (
+    <div data-dialog-list-panel style={{ display: 'grid', gap: 10, minWidth: 0 }}>
+      <div data-messaging-search-sticky style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 6px)', zIndex: 12, display: 'grid', gap: 9, padding: '2px 0 8px', background: 'linear-gradient(180deg, var(--apg2-bg, rgba(14,14,18,0.92)) 72%, transparent)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+          <input data-messaging-search value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск сообщений..." style={{ width: '100%', minHeight: 44, borderRadius: 18, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', color: APG2_PROFILE.text, padding: '0 14px', outline: 'none', fontFamily: 'inherit', fontSize: 14, boxSizing: 'border-box' }} />
+          <span style={{ minWidth: 34, height: 34, borderRadius: 999, background: messagingSnapshot.unread ? APG2_PROFILE.gold : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: messagingSnapshot.unread ? '#17120a' : APG2_PROFILE.textMuted, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 900 }}>{messagingSnapshot.unread}</span>
+        </div>
+        <div data-messaging-filter-chips style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 2 }}>
+          {[
+            { id: 'all', label: 'Все' },
+            { id: 'partners', label: 'Партнёры' },
+            { id: 'personal', label: 'Личные' },
+            { id: 'events', label: 'Мероприятия' },
+            { id: 'groups', label: 'Группы' },
+            { id: 'unread', label: 'Непрочитанные' },
+          ].map(item => (
+            <button key={item.id} type="button" onClick={() => setFilter(item.id)} style={{ flex: '0 0 auto', border: filter === item.id ? '1px solid rgba(215,184,106,0.48)' : APG2_PROFILE.glass.border, background: filter === item.id ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: filter === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, borderRadius: 999, minHeight: 34, padding: '7px 12px', fontFamily: 'inherit', fontSize: 12, fontWeight: 840, whiteSpace: 'nowrap', cursor: 'pointer' }}>{item.label}</button>
+          ))}
+        </div>
+      </div>
+      {pending && !dialogs.length ? (
+        <div data-messaging-skeleton style={{ display: 'grid', gap: 9 }}>
+          {[0, 1, 2, 3].map(item => <div key={item} style={{ height: 78, borderRadius: 20, background: 'linear-gradient(90deg, rgba(var(--apg2-glass-a,255,255,255),0.06), rgba(var(--apg2-glass-a,255,255,255),0.12), rgba(var(--apg2-glass-a,255,255,255),0.06))' }} />)}
+        </div>
+      ) : unifiedDialogs.length ? (
+        <div style={{ display: 'grid', gap: 9 }}>
+          {unifiedDialogs.map(dialog => <DialogListItem key={dialog.id} dialog={dialog} active={dialog.id === activeDialog?.id} onClick={() => setActiveDialogId(dialog.id)} />)}
+        </div>
+      ) : (
+        <GlassCard style={{ borderRadius: 22, padding: 16, color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>По этому фильтру диалогов нет.</GlassCard>
+      )}
+    </div>
+  );
+
+  const chatHeader = activeDialog ? (
+    <div data-messaging-chat-header style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 4px)', zIndex: 14, minHeight: 64, borderRadius: desktopLayout ? 22 : 0, background: desktopLayout ? 'rgba(var(--apg2-glass-a,255,255,255),0.075)' : 'var(--apg2-bg, rgba(14,14,18,0.96))', border: desktopLayout ? APG2_PROFILE.glass.border : 'none', padding: desktopLayout ? 10 : '8px 0 10px', display: 'grid', gridTemplateColumns: desktopLayout ? '48px minmax(0,1fr) auto' : '36px 48px minmax(0,1fr) auto', gap: 10, alignItems: 'center' }}>
+      {!desktopLayout && <button type="button" onClick={() => setActiveDialogId('')} aria-label="К списку диалогов" style={{ width: 36, height: 36, borderRadius: '50%', border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, cursor: 'pointer' }}>‹</button>}
+      <div style={{ width: 48, height: 48, borderRadius: 19, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 22, overflow: 'hidden' }}>
+        {activeContext?.image ? <img src={activeContext.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : contextIcon(activeContext?.type)}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 930, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeHeader.title || activeContext?.title || 'Диалог АПГ'}</div>
+        <div style={{ color: typingUsers ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', marginTop: 2 }}>{typingUsers ? 'печатает...' : responseHint(activeContext)}</div>
+      </div>
+      <ContextBadge context={activeContext} />
+    </div>
+  ) : null;
+
+  const chatPane = activeDialog ? (
+    <div data-chat-pane style={{ display: 'grid', gridTemplateRows: 'auto minmax(260px,1fr) auto', gap: 12, minHeight: desktopLayout ? 'calc(100svh - 154px)' : 'calc(100svh - 128px)', minWidth: 0 }}>
+      {chatHeader}
+      <div data-message-thread style={{ display: 'grid', alignContent: 'end', gap: 7, minHeight: 260, padding: desktopLayout ? '2px 2px 8px' : '0 0 8px' }}>
+        {!desktopLayout && <CompactContextCard context={activeContext} isOwner={isOwner} collapsed={!contextExpanded} onToggle={() => setContextExpanded(value => !value)} onOpenObject={onOpenObject} onAction={runBookingAction} />}
+        {groupedMessages.length ? groupedMessages.map(item => item.kind === 'day'
+          ? <MessageDayGroup key={item.id} label={item.label} />
+          : <MessageBubble key={item.id} message={item.message} own={item.message.senderId === uid && item.message.senderRole !== 'loki'} />) : (
+          <div data-messaging-empty-state style={{ minHeight: 220, display: 'grid', placeItems: 'center', textAlign: 'center', color: APG2_PROFILE.textSoft }}>
+            <div>
+              <div style={{ width: 70, height: 70, borderRadius: 26, margin: '0 auto 14px', background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 30 }}>💬</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 920 }}>Сообщений пока нет.</div>
+              <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px' }}>Начните общение с партнёром,<br />экспертом или новым знакомым.</div>
+            </div>
+          </div>
+        )}
+        {typingUsers > 0 && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, paddingLeft: 4 }}>Собеседник печатает...</div>}
+        <div ref={messagesEndRef} />
+      </div>
+      <div data-message-composer style={{ position: 'sticky', bottom: 'calc(var(--safe-bottom, 0px) + 8px)', zIndex: 15, borderRadius: 24, padding: 10, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', border: APG2_PROFILE.glass.border, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gap: 8 }}>
+        <QuickReplyChips context={activeContext} onPick={value => setText(current => current.trim() ? current : value)} />
+        {attachment && (
+          <div style={{ borderRadius: 16, padding: 8, display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>
+            <img src={attachment.url} alt="" style={{ width: 38, height: 38, borderRadius: 12, objectFit: 'cover' }} />
+            <div style={{ flex: 1, minWidth: 0, color: APG2_PROFILE.textSoft, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</div>
+            <button onClick={() => setAttachment(null)} style={{ border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, fontSize: 18, cursor: 'pointer' }}>×</button>
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '44px minmax(0,1fr) 44px', gap: 8, alignItems: 'end' }}>
+          <label style={{ width: 44, height: 44, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, cursor: 'pointer' }}>
+            📷
+            <input type="file" accept="image/*" onChange={e => handlePhoto(e.target.files?.[0])} style={{ display: 'none' }} />
+          </label>
+          <textarea
+            value={text}
+            onFocus={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: true }).catch(() => {})}
+            onBlur={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: false }).catch(() => {})}
+            onChange={e => setText(e.target.value)}
+            placeholder="Напишите сообщение..."
+            style={{ minHeight: 44, maxHeight: 112, resize: 'vertical', border: 0, outline: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', borderRadius: 20, color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontFamily: 'inherit', padding: '12px 14px', boxSizing: 'border-box' }}
+          />
+          <button type="button" onClick={() => sendText()} disabled={pending || (!text.trim() && !attachment)} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(215,184,106,0.34)', background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 17, fontWeight: 920, cursor: pending ? 'default' : 'pointer', opacity: pending || (!text.trim() && !attachment) ? 0.54 : 1, transition: 'opacity 160ms ease, transform 160ms ease' }}>↑</button>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div data-messaging-empty-state style={{ minHeight: 420, display: 'grid', placeItems: 'center', textAlign: 'center', color: APG2_PROFILE.textSoft }}>
+      <div>
+        <div style={{ width: 76, height: 76, borderRadius: 28, margin: '0 auto 14px', background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 32 }}>💬</div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 19, lineHeight: '24px', fontWeight: 930 }}>Сообщений пока нет.</div>
+        <div style={{ marginTop: 7, fontSize: 13.5, lineHeight: '21px' }}>Начните общение с партнёром,<br />экспертом или новым знакомым.</div>
+      </div>
+    </div>
+  );
+
+  const contextPane = desktopLayout ? (
+    <aside data-context-side-panel style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
+      <CompactContextCard context={activeContext} isOwner={isOwner} collapsed={false} onToggle={() => {}} onOpenObject={onOpenObject} onAction={runBookingAction} />
+      <MessagingContextInfo context={activeContext} onOpenObject={onOpenObject} />
+      {isOwner && <OwnerAssist enabled={aiAssist} onToggle={toggleAiAssist} context={activeContext} lastQuestion={lastQuestion} onUse={value => setText(value)} />}
+      <GlassCard data-messaging-dev-panel style={{ borderRadius: 20, padding: 12, display: 'grid', gap: 7 }}>
+        <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '15px', fontWeight: 900, textTransform: 'uppercase' }}>Messaging Dev</div>
+        {[
+          ['Realtime', messagingSnapshot.realtime],
+          ['Dialog Type', activeDialog?.context?.type || activeDialog?.type || 'direct'],
+          ['Unread', String(messagingSnapshot.unread)],
+          ['Participants', String((activeDialog?.participantIds || activeDialog?.ownerUserIds || []).length || 1)],
+          ['Context', activeDialog?.context?.title || 'АПГ'],
+        ].map(([label, value]) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px' }}>
+            <span>{label}</span>
+            <strong style={{ color: APG2_PROFILE.text, fontWeight: 820, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</strong>
+          </div>
+        ))}
+      </GlassCard>
+    </aside>
+  ) : null;
+
   return (
     <GlassPanel>
       <ScreenHeader title="Сообщения" subtitle="Единая система диалогов АПГ" kicker="Messaging" onBack={onBack} />
       {error && <GlassCard style={{ borderRadius: 20, padding: 12, marginBottom: 12, color: '#ff8e8e' }}>{error}</GlassCard>}
-      {pending && !dialogs.length && <GlassCard style={{ borderRadius: 22, padding: 18, color: APG2_PROFILE.textSoft }}>Открываем диалог...</GlassCard>}
-      {!activeDialog ? (
-        <EmptyStateV2 icon="💬" title="Диалогов пока нет" text="Откройте партнера, эксперта, мероприятие или акцию и нажмите «Задать вопрос»." />
-      ) : (
-        <div style={{ display: 'grid', gap: 14 }}>
-          <GlassCard data-messaging-dev-panel style={{ borderRadius: 22, padding: 12, display: 'grid', gap: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, alignItems: 'center' }}>
-              <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск по имени, объекту или сообщению" style={{ width: '100%', minHeight: 38, borderRadius: 16, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2_PROFILE.text, padding: '0 12px', outline: 'none', fontFamily: 'inherit', fontSize: 13 }} />
-              <GlassBadge tone="gold">{messagingSnapshot.unread} unread</GlassBadge>
-            </div>
-            <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 2 }}>
-              {MESSAGING_FILTERS.map(item => (
-                <button key={item.id} type="button" onClick={() => setFilter(item.id)} style={{ border: filter === item.id ? '1px solid rgba(215,184,106,0.48)' : APG2_PROFILE.glass.border, background: filter === item.id ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: filter === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, borderRadius: 999, minHeight: 32, padding: '6px 10px', fontFamily: 'inherit', fontSize: 12, fontWeight: 820, whiteSpace: 'nowrap' }}>{item.label}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px' }}>
-              <span>Messaging · Realtime: {messagingSnapshot.realtime}</span>
-              <span>Dialog Type: {activeDialog?.context?.type || activeDialog?.type || 'direct'}</span>
-              <span>Permissions: {unifiedDialogs.find(item => item.id === activeDialog?.id)?.permissions?.reason || 'participant'}</span>
-              <span>Participants: {(activeDialog?.participantIds || activeDialog?.ownerUserIds || []).length || 1}</span>
-              <span>Context: {activeDialog?.context?.title || 'АПГ'}</span>
-            </div>
-          </GlassCard>
-          {dialogs.length > 1 && (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {unifiedDialogs.length ? unifiedDialogs.slice(0, 8).map(dialog => <DialogListItem key={dialog.id} dialog={dialog} active={dialog.id === activeDialog.id} onClick={() => setActiveDialogId(dialog.id)} />) : (
-                <GlassCard style={{ borderRadius: 22, padding: 14, color: APG2_PROFILE.textSoft }}>По этому фильтру диалогов нет.</GlassCard>
-              )}
-            </div>
-          )}
-          <SmartConversationHeader context={activeContext} isOwner={isOwner} collapsed={contextCollapsed} onOpenObject={onOpenObject} onAction={runBookingAction} />
-          {isOwner && <OwnerAssist enabled={aiAssist} onToggle={toggleAiAssist} context={activeContext} lastQuestion={lastQuestion} onUse={value => setText(value)} />}
-          <div style={{ display: 'grid', gap: 9, minHeight: 220 }}>
-            {activeMessages.length ? activeMessages.map(message => <MessageBubble key={message.id} message={message} own={message.senderId === uid && message.senderRole !== 'loki'} />) : (
-              <ConversationIntro context={activeContext} />
-            )}
-            {typingUsers > 0 && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>Собеседник печатает...</div>}
-            <div ref={messagesEndRef} />
-          </div>
-          {attachment && (
-            <GlassCard style={{ borderRadius: 18, padding: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={attachment.url} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover' }} />
-              <div style={{ flex: 1, minWidth: 0, color: APG2_PROFILE.textSoft, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</div>
-              <button onClick={() => setAttachment(null)} style={{ border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, fontSize: 18 }}>×</button>
-            </GlassCard>
-          )}
-          <GlassCard style={{ borderRadius: 26, padding: 10, display: 'grid', gap: 8 }}>
-            <QuickReplyChips context={activeContext} onPick={value => setText(current => current.trim() ? current : value)} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, alignItems: 'end' }}>
-              <label style={{ width: 42, height: 42, borderRadius: 17, display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, cursor: 'pointer' }}>
-                📷
-                <input type="file" accept="image/*" onChange={e => handlePhoto(e.target.files?.[0])} style={{ display: 'none' }} />
-              </label>
-              <textarea
-                value={text}
-                onFocus={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: true }).catch(() => {})}
-                onBlur={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: false }).catch(() => {})}
-                onChange={e => setText(e.target.value)}
-                placeholder={isOwner ? 'Ответить по этому объекту...' : 'Задать вопрос по этому объекту...'}
-                style={{ minHeight: 42, maxHeight: 110, resize: 'vertical', border: 0, outline: 0, background: 'transparent', color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontFamily: 'inherit', padding: '10px 0' }}
-              />
-              <GlassButton onClick={() => sendText()} tone="gold" style={{ minHeight: 42, borderRadius: 17, color: '#17120a', opacity: pending ? 0.6 : 1 }}>Отправить</GlassButton>
-            </div>
-          </GlassCard>
-        </div>
-      )}
+      <div data-messaging-premium-layout data-layout={desktopLayout ? 'desktop-three-pane' : 'mobile-native'} style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(290px, 0.78fr) minmax(430px, 1.42fr) minmax(260px, 0.7fr)' : 'minmax(0,1fr)', gap: desktopLayout ? 14 : 12, alignItems: 'start' }}>
+        {(desktopLayout || !activeDialog) && dialogList}
+        {chatPane}
+        {contextPane}
+      </div>
     </GlassPanel>
   );
 }

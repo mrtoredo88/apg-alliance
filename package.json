@@ -72,6 +72,7 @@
     "test:messaging": "node scripts/messaging-foundation-test.mjs",
     "test:messaging-start": "node scripts/messaging-start-conversations-test.mjs",
     "test:messaging-smart": "node scripts/messaging-smart-conversations-test.mjs",
+    "test:messaging-ux": "node scripts/messaging-ux-polish-test.mjs",
     "test:social-messaging": "node scripts/social-messaging-test.mjs",
     "test:social-messaging-server": "node scripts/social-messaging-server-test.mjs",
     "test:connections": "node scripts/connections-test.mjs",

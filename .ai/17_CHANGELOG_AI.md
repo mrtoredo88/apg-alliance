@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] ux: APG Messaging UX/UI Polish v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/contextDialogs/ContextDialogsPage.jsx`, `scripts/messaging-ux-polish-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Messaging переведён на premium UI: современный список диалогов с крупными аватарами, context chips, unread-card state, sticky search и горизонтальными filter chips.
+- Экран диалога получил mobile-native flow, desktop three-pane layout, sticky chat header, day separators, обновлённые message bubbles и компактный composer с circular send.
+- Context Card стала compact/collapsible на mobile и вынесена в правую колонку на desktop; существующие smart actions и `dialog:*` flow сохранены.
+- Добавлен `npm run test:messaging-ux`: 500 сценариев проверяют UX-маркеры, responsive layout, grouped messages, composer, compact context и неизменность backend/API архитектуры.
+**Почему:** сообщения должны ощущаться как самостоятельный продуктовый модуль АПГ, а не как техническая панель поверх Dialog Engine.
+
+---
+
 ## [2026-07-19] feat: APG Connections v1 Digital Handshake
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server-shared/social-messaging.js`, `server/src/routes/user-actions.js`, `firestore.rules`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `scripts/connections-test.mjs`, `scripts/social-messaging-server-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
