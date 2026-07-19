@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] fix: Installed PWA Loki safe-area hit testing
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/lokiPosition.js`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-floating-button-hit-test.mjs`, `scripts/pwa-runtime-diagnostics-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Floating root Локи больше не зависит от схемы `pointer-events: none` на родителе и `pointer-events: auto` на дочерней кнопке; end-anchor теперь shrink-wrap, чтобы root не растягивался на весь viewport.
+- В resting state убраны `transform: translate3d(0,0,0) scale(1)` и `filter: blur(0)`, которые создавали лишний compositing/stacking context в installed PWA.
+- Restore-кнопка поднята выше нижней safe-area/VisualViewport зоны, а PWA diagnostics теперь показывает `getBoundingClientRect()`, `visualViewport`, computed safe-area, `elementsFromPoint()` и последние pointer/touch/click рядом с Локи.
+- Расширены `npm run test:loki-floating-button` и `npm run test:pwa-runtime` для проверки root hit-testing, safe-area diagnostics и отсутствия resting transform/filter слоёв.
+**Почему:** если в установленной iOS PWA нет вообще никаких событий, проблема вероятнее находится на уровне safe-area/fixed/compositing hit-testing, а не в React handler или z-index.
+
+---
+
 ## [2026-07-19] fix: Installed PWA build diagnostics
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `vite.config.js`, `src/main.jsx`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/pwa-runtime-diagnostics-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

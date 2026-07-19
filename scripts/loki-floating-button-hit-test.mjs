@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../src/loki/LokiAssistant.jsx', import.meta.url), 'utf8');
+const positionSource = readFileSync(new URL('../src/loki/lokiPosition.js', import.meta.url), 'utf8');
 
 assert.match(source, /data-floating-loki-button="true"/, 'Floating Loki button must have a stable test marker.');
+assert.match(source, /data-loki-floating-root="active"/, 'Floating Loki root must have a stable diagnostic marker.');
+assert.match(source, /data-loki-floating-root="restore"/, 'Floating Loki restore root must have a stable diagnostic marker.');
 assert.match(source, /aria-label="Локи"/, 'Floating Loki button must keep its accessible label.');
 assert.match(source, /onPointerDownCapture=\{markFloatingButtonEvent\}/, 'Floating Loki button must observe pointerdown on the button owner.');
 assert.match(source, /onPointerUpCapture=\{markFloatingButtonEvent\}/, 'Floating Loki button must observe pointerup on the button owner.');
@@ -14,12 +17,24 @@ assert.match(source, /width: 92,[\s\S]{0,80}height: 92,/, 'Floating Loki hitbox 
 assert.match(source, /data-loki-hit-debug="true"/, 'Development hit debug overlay must be available.');
 assert.match(source, /import\.meta\.env\.DEV[\s\S]{0,180}apg_loki_hit_debug/, 'Hit debug mode must be gated to development builds.');
 assert.doesNotMatch(source, /zIndex:\s*100000|zIndex:\s*999999|zIndex:\s*2147483647/, 'Fix must not rely on magic z-index escalation.');
+assert.match(positionSource, /width:\s*'fit-content'/, 'Mobile Loki floating position must shrink-wrap its interactive layer.');
+assert.doesNotMatch(positionSource, /left:\s*SIDE_INSET/, 'Mobile Loki floating root must not span the viewport with left and right anchors.');
 
 const lokiButtonStart = source.indexOf('data-floating-loki-button="true"');
 const lokiButtonEnd = source.indexOf('aria-label="Настройки Локи"', lokiButtonStart);
 const lokiButton = source.slice(lokiButtonStart, lokiButtonEnd);
+const activeRootStart = source.indexOf('data-loki-floating-root="active"');
+const activeRoot = source.slice(activeRootStart, lokiButtonStart);
+const restoreRootStart = source.indexOf('data-loki-floating-root="restore"');
+const restoreRootEnd = source.indexOf('aria-label="Вернуть Локи"', restoreRootStart);
+const restoreRoot = source.slice(restoreRootStart, restoreRootEnd);
 
 assert.match(lokiButton, /pointerEvents:\s*'auto'/, 'The button itself must remain the pointer-event owner.');
+assert.match(activeRoot, /pointerEvents:\s*'auto'/, 'The active floating root must not depend on child pointer-events revival.');
+assert.match(restoreRoot, /pointerEvents:\s*'auto'/, 'The restore floating root must not depend on child pointer-events revival.');
+assert.match(activeRoot, /transform:\s*leaving \?[\s\S]{0,120}:\s*'none'/, 'Resting floating root must avoid transform-created hit-test layers.');
+assert.match(activeRoot, /filter:\s*leaving \?[\s\S]{0,100}:\s*'none'/, 'Resting floating root must avoid filter-created hit-test layers.');
+assert.match(activeRoot, /animation:\s*'none'/, 'The active floating root must not animate transform/filter hit-test layers.');
 assert.match(lokiButton, /animation:[\s\S]{0,260}pointerEvents:\s*'none'/, 'Animated visual wrapper must not own pointer events.');
 assert.match(lokiButton, /LokiIdentity[\s\S]{0,180}pointerEvents:\s*'none'/, 'Loki identity artwork must not intercept taps.');
 
@@ -52,8 +67,10 @@ if (runtimeUrl) {
     await page.waitForSelector('[data-floating-loki-button="true"]', { timeout: 45000 });
     const hit = await page.evaluate(() => {
       const button = document.querySelector('[data-floating-loki-button="true"]');
+      const root = document.querySelector('[data-loki-floating-root="active"]');
       if (!button) return { found: false };
       const rect = button.getBoundingClientRect();
+      const rootRect = root?.getBoundingClientRect?.();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       const top = document.elementsFromPoint(cx, cy)[0];
@@ -61,6 +78,10 @@ if (runtimeUrl) {
         found: true,
         width: Math.round(rect.width),
         height: Math.round(rect.height),
+        rootWidth: Math.round(rootRect?.width || 0),
+        rootPointerEvents: root ? getComputedStyle(root).pointerEvents : '',
+        rootTransform: root ? getComputedStyle(root).transform : '',
+        rootFilter: root ? getComputedStyle(root).filter : '',
         topTag: top?.tagName || '',
         topLabel: top?.getAttribute?.('aria-label') || '',
         topMarker: top?.getAttribute?.('data-floating-loki-button') || '',
@@ -68,6 +89,10 @@ if (runtimeUrl) {
     });
     assert.equal(hit.found, true, 'Runtime smoke must find the floating Loki button.');
     assert.ok(hit.width >= 56 && hit.height >= 56, 'Runtime Loki hitbox must be at least 56x56.');
+    assert.ok(hit.rootWidth <= 360, 'Runtime Loki floating root should shrink-wrap instead of spanning the viewport.');
+    assert.equal(hit.rootPointerEvents, 'auto', 'Runtime Loki floating root must receive pointer hit testing normally.');
+    assert.equal(hit.rootTransform, 'none', 'Runtime Loki floating root must not create a resting transform layer.');
+    assert.equal(hit.rootFilter, 'none', 'Runtime Loki floating root must not create a resting filter layer.');
     assert.equal(hit.topTag, 'BUTTON', 'Runtime hit-test owner must be the button.');
     assert.equal(hit.topLabel, 'Локи', 'Runtime hit-test owner must be the Loki button.');
     assert.equal(hit.topMarker, 'true', 'Runtime hit-test owner must keep the Loki marker.');

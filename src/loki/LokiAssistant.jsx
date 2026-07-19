@@ -65,6 +65,17 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
   const isLongMessage = bubbleText.length > 86;
   const isCelebrating = loki.emotion === 'happy' || loki.emotion === 'excited';
   const isThinking = loki.emotion === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND;
+  const rootWidth = desktopMode
+    ? position.width
+    : (loki.message && loki.canTalk)
+      ? 'min(334px, calc(100vw - 28px))'
+      : brainOpen
+        ? 'min(304px, calc(100vw - 28px))'
+        : historyOpen
+          ? 'min(294px, calc(100vw - 28px))'
+          : menuOpen
+            ? 190
+            : 92;
   const safeMessageUnread = Math.max(0, Math.min(99, Number(messageUnreadCount || 0) || 0));
   const showMessageFab = !desktopMode && typeof onOpenMessages === 'function';
   const hasLokiSignal = Boolean(loki.card || (loki.message && loki.canTalk));
@@ -172,15 +183,16 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
   if (shouldShowRestore) {
     return (
       <div
+        data-loki-floating-root="restore"
         style={{
           position: 'fixed',
           right: 'max(14px, env(safe-area-inset-right, 0px))',
-          bottom: desktopMode ? 'max(18px, env(safe-area-inset-bottom, 0px))' : 'calc(84px + env(safe-area-inset-bottom, 0px))',
+          bottom: desktopMode ? 'max(18px, env(safe-area-inset-bottom, 0px))' : 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
           zIndex: 10040,
           display: 'grid',
           gap: 10,
           justifyItems: 'end',
-          pointerEvents: 'none',
+          pointerEvents: 'auto',
         }}
       >
         {messageFab}
@@ -225,19 +237,21 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
 
   return (
     <div
+      data-loki-floating-root="active"
       style={{
         position: 'fixed',
         ...position,
+        width: rootWidth,
         zIndex: 10040,
         display: 'grid',
         gap: 10,
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
         opacity: leaving ? 0 : 1,
-        transform: leaving ? 'translate3d(12px, 18px, 0) scale(0.92) rotate(2deg)' : 'translate3d(0, 0, 0) scale(1)',
-        filter: leaving ? 'blur(6px) saturate(0.82)' : 'blur(0) saturate(1)',
+        transform: leaving ? 'translate3d(12px, 18px, 0) scale(0.92) rotate(2deg)' : 'none',
+        filter: leaving ? 'blur(6px) saturate(0.82)' : 'none',
         transition: 'right 760ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), bottom 760ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), opacity 520ms ease, transform 680ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)), filter 520ms ease',
-        animation: 'lokiAppear 640ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
-        willChange: 'transform, opacity, filter',
+        animation: 'none',
+        willChange: leaving ? 'transform, opacity, filter' : 'auto',
       }}
     >
       {loki.message && loki.canTalk && !desktopMode && (

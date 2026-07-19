@@ -29,6 +29,175 @@ function styleEntries() {
     });
 }
 
+function px(value) {
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function rectOf(element) {
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  return {
+    left: Math.round(rect.left),
+    top: Math.round(rect.top),
+    right: Math.round(rect.right),
+    bottom: Math.round(rect.bottom),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+    centerX: Math.round(rect.left + rect.width / 2),
+    centerY: Math.round(rect.top + rect.height / 2),
+  };
+}
+
+function selectorLabel(element) {
+  if (!element) return '';
+  const marker = element.getAttribute?.('data-floating-loki-button')
+    || element.getAttribute?.('data-floating-messages-button')
+    || element.getAttribute?.('data-loki-floating-root')
+    || element.getAttribute?.('data-apg-tab-slot')
+    || '';
+  const label = element.getAttribute?.('aria-label') || element.getAttribute?.('role') || '';
+  const id = element.id ? `#${element.id}` : '';
+  return [element.tagName, id, marker, label].filter(Boolean).join(':');
+}
+
+function elementsAt(x, y) {
+  if (typeof document.elementsFromPoint !== 'function') return [];
+  return document.elementsFromPoint(x, y).slice(0, 8).map(element => ({
+    label: selectorLabel(element),
+    pointerEvents: getComputedStyle(element).pointerEvents,
+    position: getComputedStyle(element).position,
+    zIndex: getComputedStyle(element).zIndex,
+    transform: getComputedStyle(element).transform,
+  }));
+}
+
+function safeAreaInsets() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);visibility:hidden;pointer-events:none;';
+  document.body.appendChild(probe);
+  const style = getComputedStyle(probe);
+  const result = {
+    top: Math.round(px(style.paddingTop)),
+    right: Math.round(px(style.paddingRight)),
+    bottom: Math.round(px(style.paddingBottom)),
+    left: Math.round(px(style.paddingLeft)),
+  };
+  probe.remove();
+  return result;
+}
+
+function visualViewportState() {
+  const viewport = window.visualViewport;
+  if (!viewport) {
+    return {
+      supported: false,
+      windowInnerWidth: window.innerWidth,
+      windowInnerHeight: window.innerHeight,
+    };
+  }
+  return {
+    supported: true,
+    width: Math.round(viewport.width),
+    height: Math.round(viewport.height),
+    offsetLeft: Math.round(viewport.offsetLeft),
+    offsetTop: Math.round(viewport.offsetTop),
+    pageLeft: Math.round(viewport.pageLeft),
+    pageTop: Math.round(viewport.pageTop),
+    scale: Number(viewport.scale || 1),
+    windowInnerWidth: window.innerWidth,
+    windowInnerHeight: window.innerHeight,
+    bottomInset: Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)),
+  };
+}
+
+function floatingLokiState() {
+  const button = document.querySelector('[data-floating-loki-button="true"]');
+  const root = button?.closest?.('[data-loki-floating-root]') || null;
+  const messages = document.querySelector('[data-floating-messages-button="true"]');
+  const buttonRect = rectOf(button);
+  const rootRect = rectOf(root);
+  const messagesRect = rectOf(messages);
+  const safeArea = safeAreaInsets();
+  const visualViewport = visualViewportState();
+  const homeIndicatorRiskBottom = Math.max(24, safeArea.bottom || visualViewport.bottomInset || 0);
+  const viewportHeight = visualViewport.height || window.innerHeight;
+  const inSystemGestureZone = buttonRect
+    ? buttonRect.bottom > viewportHeight - homeIndicatorRiskBottom
+    : false;
+  const centerElements = buttonRect ? elementsAt(buttonRect.centerX, buttonRect.centerY) : [];
+  const lowerElements = buttonRect ? elementsAt(buttonRect.centerX, Math.max(buttonRect.top, buttonRect.bottom - 8)) : [];
+  const rootStyle = root ? getComputedStyle(root) : null;
+  const buttonStyle = button ? getComputedStyle(button) : null;
+  return {
+    found: Boolean(button),
+    buttonRect,
+    rootRect,
+    messagesRect,
+    safeArea,
+    visualViewport,
+    homeIndicatorRiskBottom,
+    inSystemGestureZone,
+    centerElements,
+    lowerElements,
+    rootStyle: rootStyle ? {
+      position: rootStyle.position,
+      zIndex: rootStyle.zIndex,
+      pointerEvents: rootStyle.pointerEvents,
+      transform: rootStyle.transform,
+      filter: rootStyle.filter,
+      bottom: rootStyle.bottom,
+      right: rootStyle.right,
+      left: rootStyle.left,
+      width: rootStyle.width,
+      height: rootStyle.height,
+    } : null,
+    buttonStyle: buttonStyle ? {
+      position: buttonStyle.position,
+      zIndex: buttonStyle.zIndex,
+      pointerEvents: buttonStyle.pointerEvents,
+      touchAction: buttonStyle.touchAction,
+      transform: buttonStyle.transform,
+      bottom: buttonStyle.bottom,
+      right: buttonStyle.right,
+      width: buttonStyle.width,
+      height: buttonStyle.height,
+    } : null,
+    lastInputNearLoki: window.__APG_LAST_LOKI_INPUT__ || null,
+  };
+}
+
+function installLokiInputProbe() {
+  if (window.__APG_LOKI_INPUT_PROBE_INSTALLED__) return;
+  window.__APG_LOKI_INPUT_PROBE_INSTALLED__ = true;
+  const record = (event) => {
+    const touch = event.changedTouches?.[0] || event.touches?.[0] || null;
+    const x = touch?.clientX ?? event.clientX;
+    const y = touch?.clientY ?? event.clientY;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const button = document.querySelector('[data-floating-loki-button="true"]');
+    const rect = button?.getBoundingClientRect?.();
+    const near = rect
+      ? x >= rect.left - 28 && x <= rect.right + 28 && y >= rect.top - 28 && y <= rect.bottom + 28
+      : false;
+    if (!near) return;
+    window.__APG_LAST_LOKI_INPUT__ = {
+      type: event.type,
+      x: Math.round(x),
+      y: Math.round(y),
+      target: selectorLabel(event.target),
+      currentTarget: selectorLabel(event.currentTarget),
+      path: typeof event.composedPath === 'function' ? event.composedPath().slice(0, 8).map(selectorLabel) : [],
+      atPoint: elementsAt(x, y),
+      time: new Date().toISOString(),
+    };
+    console.info('[APG Loki Hit] Input near Loki:', window.__APG_LAST_LOKI_INPUT__);
+  };
+  ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach(type => {
+    document.addEventListener(type, record, { capture: true, passive: true });
+  });
+}
+
 async function versionJson() {
   try {
     const res = await fetch(`/version.json?_=${Date.now()}`, { cache: 'no-store' });
@@ -94,6 +263,7 @@ export async function collectPwaRuntimeDiagnostics() {
     loadedStyles,
     serviceWorker,
     cacheStorage,
+    floatingLoki: floatingLokiState(),
     manifestHref: document.querySelector('link[rel="manifest"]')?.href || '/manifest.json',
     standalone: window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true,
     userAgent: navigator.userAgent,
@@ -115,6 +285,8 @@ export function installPwaRuntimeDiagnostics() {
   window.__APG_BUILD_VERSION__ = BUILD_VERSION;
   window.__APG_BUILD_TIME__ = BUILD_TIME;
   window.__APG_COLLECT_PWA_DIAGNOSTICS__ = collectPwaRuntimeDiagnostics;
+  window.__APG_LOKI_PWA_HIT_DIAGNOSTICS__ = floatingLokiState;
+  installLokiInputProbe();
   collectPwaRuntimeDiagnostics().catch(error => {
     console.warn('[APG Runtime] Diagnostics failed:', error?.message || String(error));
   });
