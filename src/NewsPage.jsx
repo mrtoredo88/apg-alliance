@@ -30,7 +30,7 @@ import { ArticleContentRenderer } from './components/ArticleContentRenderer.jsx'
 import { openUrl } from './vk.js';
 import { API_BASE_URL } from './constants.js';
 import { logError } from './errorLogger.js';
-import { auth } from './firebase.js';
+import { apgIdentity } from './apg/index.js';
 import { shareLink } from './utils/shareLink.js';
 import { useLoki } from './loki/LokiProvider.jsx';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
@@ -607,7 +607,7 @@ function ArticleActions({ item, saved, later, reaction, subscriptions, onReact, 
 }
 
 async function requestNewsComments(path, options = {}) {
-  const token = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => '') : '';
+  const token = apgIdentity.getCurrentIdentity() ? await apgIdentity.getSessionToken().catch(() => '') : '';
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Firebase-Auth': token } : {}), ...(options.headers || {}) },

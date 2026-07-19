@@ -1,9 +1,9 @@
-import { db, auth } from './firebase.js';
+import { db } from './firebase.js';
 import { API_BASE_URL } from './constants.js';
 import { doc, getDoc } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
 import { userAction } from './userApi.js';
 import { getPwaVersion } from './pwa/PwaUpdateManager.js';
+import { apgIdentity } from './apg/index.js';
 
 let _version = '?';
 getPwaVersion().then(v => { _version = v || '?'; }).catch(() => {});
@@ -49,7 +49,7 @@ async function checkWithTimeout(fn, ms = 8000) {
 export async function runServiceChecks() {
   const [authCheck, firestoreCheck, backendCheck] = await Promise.all([
     checkWithTimeout(async () => {
-      if (!auth.currentUser) await signInAnonymously(auth);
+      if (!apgIdentity.getCurrentIdentity()) await apgIdentity.authenticate({ provider: 'anonymous' });
     }),
     checkWithTimeout(() => getDoc(doc(db, 'config', 'health'))),
     checkWithTimeout(() =>
@@ -68,8 +68,8 @@ export async function sendDiagReport({
   userId = null,
 } = {}) {
   try {
-    if (!auth.currentUser) await signInAnonymously(auth).catch(() => {});
-    if (!auth.currentUser) return;
+    if (!apgIdentity.getCurrentIdentity()) await apgIdentity.authenticate({ provider: 'anonymous' }).catch(() => {});
+    if (!apgIdentity.getCurrentIdentity()) return;
     await userAction('log:diagnostic', {
       payload: {
         ...getDeviceInfo(),

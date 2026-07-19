@@ -12,12 +12,12 @@ import { confirmQrScan } from './rewardApi.js';
 import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
 import { db, auth } from './firebase';
-import { signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   doc, getDoc,
   collection, getDocs, query, orderBy,
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
+import { apgIdentity } from './apg/index.js';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { EmailAuth } from './EmailAuth.jsx';
 import { recordEmailLoginStage } from './auth/emailLoginDiagnostics.js';
@@ -769,31 +769,11 @@ function getAuthErrorMessage(error) {
 }
 
 function waitForFirebaseUser(expectedUid, timeoutMs = 4200) {
-  if (auth.currentUser?.uid === expectedUid) return Promise.resolve(auth.currentUser);
-  return new Promise((resolve, reject) => {
-    let done = false;
-    let unsubscribe = () => {};
-    const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      unsubscribe();
-      reject(Object.assign(new Error('auth_state_timeout'), { code: 'AUTH_STATE_TIMEOUT' }));
-    }, timeoutMs);
-    unsubscribe = onAuthStateChanged(auth, current => {
-      if (current?.uid !== expectedUid) return;
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      unsubscribe();
-      resolve(current);
-    }, error => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      unsubscribe();
-      reject(error);
-    });
-  });
+  return apgIdentity.waitForIdentity(expectedUid, timeoutMs);
+}
+
+function signInAnonymousThroughIdentity() {
+  return apgIdentity.authenticate({ provider: 'anonymous' });
 }
 
 async function ensureOwnerAuthSession(userId, source = 'auth') {
@@ -804,7 +784,7 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   const ensureAnonymous = async (reason) => {
     if (auth.currentUser) return auth.currentUser;
     traceAuthStage('firebase_auth_start', { source, reason });
-    const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+    const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
       source: `owner_${source}_${reason}`,
       waitMs: 4200,
     });
@@ -843,8 +823,8 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   if (await checkOrCreateMap()) return auth.currentUser;
 
   traceAuthStage('auth_map_mismatch', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
-  await signOut(auth).catch(() => {});
-  const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+  await apgIdentity.invalidateSession().catch(() => {});
+  const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
     source: `owner_recreate_${source}`,
     waitMs: 4200,
     restart: true,
@@ -1495,7 +1475,7 @@ export function UserApp() {
     markFirebase('firebase_start', { source: 'UserApp.loadData' });
     markFirebase('auth_start', { source: 'UserApp.loadData' });
     const authReady = Promise.resolve()
-      .then(() => ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+      .then(() => ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
         source: 'UserApp.loadData',
         waitMs: 0,
       }))
@@ -1551,7 +1531,7 @@ export function UserApp() {
           sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
           sessionStorage.setItem(GS_KEY, sid);
           if (!auth.currentUser) {
-            ensureFirebaseAnonymousAuth(auth, signInAnonymously, {
+            ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
               source: 'UserApp.guestSession',
               waitMs: 0,
             }).catch(e => logError(e, 'UserApp.auth.guestAnonymous'));
@@ -1589,7 +1569,7 @@ export function UserApp() {
           const _uid = String(userData.id);
           if (_uid.startsWith('email:')) localStorage.removeItem('apg_email_user');
           if (_uid.startsWith('tg_')) localStorage.removeItem('apg_tg_user');
-          await signOut(auth).catch(() => {});
+          await apgIdentity.invalidateSession().catch(() => {});
           window.location.reload();
           return;
         }
@@ -2917,7 +2897,7 @@ export function UserApp() {
     try {
       if (authPayload?.token) {
         recordEmailLoginStage('firebase_custom_token_start', { profileId: emailUser.id, hasToken: true });
-        await signInWithCustomToken(auth, authPayload.token);
+        await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: authPayload.token });
         recordEmailLoginStage('firebase_custom_token_end', { profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
         traceAuthStage('AUTH_SUCCESS', { provider: 'email', profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
         refLog('auth success', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId });
@@ -3120,7 +3100,7 @@ export function UserApp() {
         const uid = String(targetUser.id);
         if (uid.startsWith('email:')) localStorage.removeItem('apg_email_user');
         if (uid.startsWith('tg_')) localStorage.removeItem('apg_tg_user');
-        signOut(auth).catch(() => {});
+        apgIdentity.invalidateSession().catch(() => {});
         setConsentError('Сессия истекла. Нажмите «Выйти и войти заново».');
         setConsentReloginNeeded(true);
       } else {
@@ -3145,7 +3125,7 @@ export function UserApp() {
     setLokiKnowledge([]);
     setUserBookings([]);
     clearUserAuthStorage();
-    try { await signOut(auth); } catch {}
+    try { await apgIdentity.invalidateSession(); } catch {}
     window.location.reload();
   }, []);
 

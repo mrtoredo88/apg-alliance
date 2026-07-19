@@ -4047,6 +4047,17 @@
 - Debug-only окно Локи получило блок `Pipeline Timeline`; в production он остаётся скрытым без явного debug mode.
 - `loki-message-chain` расширен runtime-проверками обязательных запросов: `Привет`, `Что ты умеешь?`, `О чём статья?`, `Расскажи подробнее`, `Какие мероприятия сегодня?`, `Покажи партнёров`, `Кто такой Локи?`.
 
+# 2026-07-19 — APG Foundation v1
+
+- Добавлен внутренний APG Foundation SDK: `src/apg` с Identity Layer, Data Access Layer, Infrastructure adapters, DI container и feature flags `IDENTITY_PROVIDER`, `DATA_PROVIDER`, `MESSAGE_PROVIDER`, `SEARCH_PROVIDER`, `STORAGE_PROVIDER`.
+- Identity Layer получил единый интерфейс `resolveIdentity/createIdentity/authenticate/refreshSession/verifySession/invalidateSession/getCurrentIdentity/getCurrentUser/linkEmail/linkTelegram/unlinkProvider/getUserRoles/updateIdentity/changePrimaryProvider`.
+- Текущая реализация `FirebaseIdentityProvider` инкапсулирует Firebase Auth, а `YandexIdentityProvider` и `NativeApgProvider` добавлены как будущие провайдеры без изменения бизнес-логики.
+- Data Access Layer получил repositories `User/Partner/Expert/Event/News/Promotion/Booking/Meeting/Dialog/Message/Reward/Key/Referral/Workspace/Notification/Config/Analytics` и adapters `Firestore/Postgres/Ydb/Memory`.
+- Добавлен backend-side foundation layer `server/src/apg`: `FirebaseAdminIdentityProvider`, stubs для Yandex/Native APG, `FirestoreAdminAdapter` и server repositories.
+- Критичные auth paths переведены на APG Identity: `UserApp` email custom-token/anonymous/logout, `ProfilePanel` Telegram custom-token/token header, `AdminPanel` admin custom-token/auth-state wait, `userAction` session token, `diagnostics` anonymous auth, `NewsPage` comment token.
+- `server/src/routes/email-auth.js` больше не обращается к Firebase Admin Auth напрямую: custom token и verifyIdToken идут через `serverFoundation.identity`.
+- Добавлен regression-тест `scripts/apg-foundation-test.mjs` и npm script `test:apg-foundation`.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

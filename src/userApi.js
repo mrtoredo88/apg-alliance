@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './constants.js';
-import { auth } from './firebase.js';
+import { apgIdentity } from './apg/index.js';
 import { getPwaVersion } from './pwa/PwaUpdateManager.js';
 import {
   APG_EVENT_TYPES,
@@ -43,8 +43,9 @@ function toActionEntityType(action = '') {
 function normalizeEventFromAction(action, payload = {}, result = {}) {
   const normalized = String(action || '').trim();
   const normalizedPayload = payload && typeof payload === 'object' ? { ...payload } : {};
+  const identity = apgIdentity.getCurrentIdentity();
   const actor = {
-    id: safeValue(auth.currentUser?.id) || safeValue(auth.currentUser?.uid),
+    id: safeValue(identity?.id) || safeValue(identity?.uid),
     source: safeValue(normalizedPayload.source) || 'web-app',
     platform: 'web-app',
   };
@@ -127,13 +128,13 @@ function normalizeEventFromAction(action, payload = {}, result = {}) {
 }
 
 export async function userAction(action, payload = {}) {
-  const current = auth.currentUser;
+  const current = apgIdentity.getCurrentIdentity();
   if (!current) {
     const error = new Error('Требуется авторизация.');
     error.code = 'AUTH_REQUIRED';
     throw error;
   }
-  const [token, version] = await Promise.all([current.getIdToken(), getPwaVersion()]);
+  const [token, version] = await Promise.all([apgIdentity.getSessionToken(), getPwaVersion()]);
   const response = await fetch(`${API_BASE_URL}/api/user-actions`, {
     method: 'POST',
     headers: {

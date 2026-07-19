@@ -1,12 +1,13 @@
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { APP_URL } from '../lib/config.js';
-import { getDb, getDbAuth } from '../lib/firebase.js';
+import { getDb } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { resolveEmailIdentity, resolveFirebaseIdentity } from '../lib/identityCore.js';
 import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
+import { serverFoundation } from '../apg/index.js';
 
 const FROM = 'noreply@myapg.ru';
 
@@ -118,7 +119,7 @@ async function getActor(request, db) {
     error.statusCode = 401;
     throw error;
   }
-  const decoded = await getDbAuth().verifyIdToken(token);
+  const decoded = await serverFoundation.identity.verifySession({ token });
   const uid = decoded.uid;
   const identity = await resolveFirebaseIdentity(db, uid).catch(() => null);
   if (identity?.userId) return identity;
@@ -151,7 +152,7 @@ async function createFirebaseToken(userId, user = {}) {
     ...(hasRole(user, ROLES.owner) ? { owner: true } : {}),
     ...(hasCapability(user, CAPABILITIES.canOpenAdminPanel) ? { admin: true } : {}),
   };
-  return getDbAuth().createCustomToken(String(userId), claims);
+  return serverFoundation.identity.authenticate({ provider: 'customToken', uid: String(userId), claims });
 }
 
 function createEmailLoginTrace(request) {

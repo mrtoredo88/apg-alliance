@@ -4,12 +4,12 @@ import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
-import { signInWithCustomToken } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { collection, onSnapshot } from 'firebase/firestore';
 
 import { APP_URL, API_BASE_URL } from './constants.js';
 import { auth, db } from './firebase.js';
+import { apgIdentity } from './apg/index.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
 import { APG2_PROFILE as APG2, ApgModal, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection } from './components/Apg2ProfileGlass.jsx';
@@ -81,7 +81,7 @@ function EmailVerifyBanner({ userId }) {
 }
 
 async function getAuthHeaders() {
-  const token = await auth.currentUser?.getIdToken?.();
+  const token = await apgIdentity.getSessionToken?.();
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'X-Firebase-Auth': token } : {}),
@@ -872,7 +872,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             setTgStep('linked');
           } else {
             if (data.token) {
-              await signInWithCustomToken(auth, data.token);
+              await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: data.token });
               traceAuthStage('telegram_firebase_token_ready', { state, userId: data.user?.id ?? null, uid: auth.currentUser?.uid ?? null });
             }
             localStorage.setItem('apg_tg_user', JSON.stringify(data.user));

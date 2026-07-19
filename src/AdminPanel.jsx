@@ -11,8 +11,8 @@ import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
 import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
-import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { apgIdentity } from './apg/index.js';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
 import { normalizeExternalUrl, validateExternalUrl } from './utils/externalUrls.js';
@@ -231,11 +231,9 @@ function adminLoadErrorDetails(error) {
 }
 
 async function collectAdminAuthDiagnostics() {
-  const user = auth.currentUser;
+  const user = apgIdentity.getCurrentIdentity();
   let tokenClaims = null;
-  if (user?.getIdTokenResult) {
-    tokenClaims = await user.getIdTokenResult().catch(() => null);
-  }
+  tokenClaims = await apgIdentity.getSessionClaims?.().catch(() => null);
   const role = tokenClaims?.claims?.role || tokenClaims?.claims?.userRole || null;
   return {
     uid: user?.uid ?? null,
@@ -319,14 +317,14 @@ async function waitForAdminAuth(onStage) {
     authDomain: FIREBASE_CLIENT_DIAGNOSTICS.authDomain,
   });
 
-  if (auth.currentUser) {
+  if (apgIdentity.getCurrentIdentity()) {
     emit('auth_cached_user_detected');
-    return auth.currentUser;
+    return apgIdentity.getCurrentIdentity();
   }
 
   let unsubscribe = null;
   const authReady = new Promise(resolve => {
-    unsubscribe = onAuthStateChanged(auth, user => {
+    unsubscribe = apgIdentity.onIdentityChanged(user => {
       unsubscribe?.();
       emit('onAuthStateChanged_fired', {
         detected: Boolean(user),
@@ -341,11 +339,11 @@ async function waitForAdminAuth(onStage) {
   emit('auth_state_wait_started');
   const user = await withTimeout(authReady, 8000, 'admin auth initial state').catch(error => {
     emit('auth_state_wait_failed', { error: error?.message ?? String(error) });
-    return auth.currentUser;
+    return apgIdentity.getCurrentIdentity();
   });
   unsubscribe?.();
 
-  if (!user && !auth.currentUser) {
+  if (!user && !apgIdentity.getCurrentIdentity()) {
     const error = Object.assign(
       new Error('Firebase Auth не подтверждён: войдите в приложение под owner/admin аккаунтом и откройте админку снова.'),
       { code: 'admin/auth-not-ready' },
@@ -355,11 +353,11 @@ async function waitForAdminAuth(onStage) {
   }
 
   emit('auth_user_detected', {
-    uid: (user || auth.currentUser)?.uid ?? null,
-    email: (user || auth.currentUser)?.email ?? null,
-    isAnonymous: (user || auth.currentUser)?.isAnonymous ?? null,
+    uid: (user || apgIdentity.getCurrentIdentity())?.uid ?? null,
+    email: (user || apgIdentity.getCurrentIdentity())?.email ?? null,
+    isAnonymous: (user || apgIdentity.getCurrentIdentity())?.isAnonymous ?? null,
   });
-  return user || auth.currentUser;
+  return user || apgIdentity.getCurrentIdentity();
 }
 
 // Admin panel always uses dark theme
@@ -3547,7 +3545,7 @@ function AdminLoginGate({ onAllow }) {
         throw new Error('Введите email администратора и пароль.');
       }
       const loginData = await adminLoginRequest(login.trim(), password);
-      await signInWithCustomToken(auth, loginData.customToken);
+      await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: loginData.customToken });
       const data = await adminSecurityRequest('status');
       if (data.actor?.mustChangePassword) {
         setPendingActor(data.actor);
