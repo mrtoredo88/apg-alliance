@@ -104,7 +104,9 @@
     "test:migration-center": "node scripts/migration-center-test.mjs",
     "test:identity-cutover": "node scripts/identity-cutover-test.mjs",
     "firestore:recovery-audit": "node scripts/firestore-recovery-audit.mjs",
-    "identity:conflict-resolution-audit": "node scripts/identity-conflict-resolution-audit.mjs"
+    "identity:conflict-resolution-audit": "node scripts/identity-conflict-resolution-audit.mjs",
+    "identity:conflicts": "node scripts/identity-conflict-center.mjs",
+    "test:identity-conflict-center": "node scripts/identity-conflict-center-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

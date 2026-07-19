@@ -4146,6 +4146,7 @@
 - Identity resolver больше не создаёт новую PostgreSQL identity, если Firestore fallback недоступен из-за `RESOURCE_EXHAUSTED`; вместо этого возвращается диагностируемая `IDENTITY_FALLBACK_UNAVAILABLE`, чтобы не породить дубликаты пользователей.
 - Добавлен read-only `npm run firestore:recovery-audit`: проверяет Firebase Auth, Firestore metadata/data-plane, REST reads, Service Usage и Billing API без вывода секретов, чтобы определить, можно ли безопасно снять Identity Snapshot.
 - Добавлен read-only `npm run identity:conflict-resolution-audit`: строит forensic-карточки duplicate email/orphan tgLink и non-destructive resolution manifest с `approved:false`, не меняя Firestore и не запуская import.
+- Добавлен `Identity Conflict Center` (`src/admin/identity/conflicts/`) и CLI `npm run identity:conflicts`: форматирует ручные карточки конфликтов, считает explainable risk, создаёт backup marker и `backups/identity/resolution-manifest.json` только с `keepSeparate`/`approved:false`.
 
 # 2026-07-14 — Workspace Meetings CRM
 
