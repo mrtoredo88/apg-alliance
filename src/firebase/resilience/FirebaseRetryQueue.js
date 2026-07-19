@@ -13,21 +13,49 @@ export class FirebaseRetryQueue {
     this.maxAttempts = maxAttempts;
     this.sleep = sleepFn;
     this.running = false;
+    this.cancelled = false;
+    this.pendingTimers = new Set();
+  }
+
+  wait(delay) {
+    if (this.sleep !== sleep) return this.sleep(delay);
+    return new Promise(resolve => {
+      const entry = { timer: 0, resolve };
+      entry.timer = setTimeout(() => {
+        this.pendingTimers.delete(entry);
+        resolve();
+      }, delay);
+      this.pendingTimers.add(entry);
+    });
+  }
+
+  cancelAll() {
+    this.cancelled = true;
+    for (const entry of [...this.pendingTimers]) {
+      clearTimeout(entry.timer);
+      entry.resolve();
+      this.pendingTimers.delete(entry);
+    }
+    this.running = false;
   }
 
   async run(task, { source = 'firebase', onRecovered } = {}) {
     if (this.running) return null;
     this.running = true;
+    this.cancelled = false;
     const startedAt = Date.now();
     try {
       for (let index = 0; index < this.maxAttempts; index += 1) {
+        if (this.cancelled) return null;
         const attempt = index + 1;
         if (!isFirebaseStartupOnline()) {
           await waitForFirebaseOnline();
         }
+        if (this.cancelled) return null;
         if (attempt > 1) markFirebaseStartup('firebase_retry', { source, attempt, delayMs: this.delays[index - 1] || 0 });
         try {
           const result = await task({ attempt });
+          if (this.cancelled) return null;
           if (attempt > 1) {
             markFirebaseStartup('firebase_recovered', { source, attempt, recoveryMs: Date.now() - startedAt });
             await onRecovered?.({ source, attempt, result });
@@ -41,7 +69,7 @@ export class FirebaseRetryQueue {
             errorMessage: error?.message || String(error),
           });
           const delay = this.delays[index] || this.delays.at(-1) || 30000;
-          if (attempt < this.maxAttempts) await this.sleep(delay);
+          if (attempt < this.maxAttempts) await this.wait(delay);
         }
       }
       return null;

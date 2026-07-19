@@ -1,10 +1,11 @@
 import { FirebaseRetryQueue } from './FirebaseRetryQueue.js';
-import { isFirebaseStartupOnline } from './FirebaseAvailability.js';
+import { disposeFirebaseAvailability, isFirebaseStartupOnline } from './FirebaseAvailability.js';
 import { markFirebaseStartup, resetFirebaseStartupSnapshot } from './FirebaseStartupMetrics.js';
-import { runFirebaseRecovery } from './FirebaseRecovery.js';
+import { clearFirebaseRecoveryTasks, runFirebaseRecovery } from './FirebaseRecovery.js';
 
 let anonymousAuthPromise = null;
 let anonymousAuthStarted = false;
+const defaultAnonymousAuthQueue = new FirebaseRetryQueue();
 
 function timeout(ms, value = null) {
   if (!ms || ms <= 0) return Promise.resolve(value);
@@ -17,6 +18,14 @@ export function resetFirebaseStartupResilience() {
   resetFirebaseStartupSnapshot();
 }
 
+export function disposeFirebaseStartupResilience() {
+  defaultAnonymousAuthQueue.cancelAll();
+  disposeFirebaseAvailability();
+  clearFirebaseRecoveryTasks();
+  anonymousAuthPromise = null;
+  anonymousAuthStarted = false;
+}
+
 export function getFirebaseAnonymousStartupPromise() {
   return anonymousAuthPromise;
 }
@@ -26,11 +35,14 @@ export function ensureFirebaseAnonymousAuth(auth, signInAnonymously, options = {
     source = 'startup',
     waitMs = 0,
     maxAttempts = 5,
-    queue = new FirebaseRetryQueue({ maxAttempts }),
+    queue = maxAttempts === 5 ? defaultAnonymousAuthQueue : new FirebaseRetryQueue({ maxAttempts }),
     restart = false,
   } = options;
 
-  if (restart) anonymousAuthPromise = null;
+  if (restart) {
+    queue.cancelAll?.();
+    anonymousAuthPromise = null;
+  }
 
   if (auth?.currentUser) {
     markFirebaseStartup('firebase_auth_ready', { source, uid: auth.currentUser.uid, reused: true });

@@ -50,9 +50,12 @@ const resilience = await import('../src/firebase/resilience/index.js');
 const {
   FIREBASE_RETRY_DELAYS_MS,
   FirebaseRetryQueue,
+  clearFirebaseRecoveryTasks,
+  disposeFirebaseStartupResilience,
   ensureFirebaseAnonymousAuth,
   getFirebaseAnonymousStartupPromise,
   getFirebaseStartupSnapshot,
+  registerFirebaseRecoveryTask,
   resetFirebaseStartupResilience,
   waitForFirebaseOnline,
 } = resilience;
@@ -123,5 +126,30 @@ const health = read('src/ApgHealthPage.jsx');
 ok(perfMetrics.includes('firebaseRecoveryMs'), 'Performance metrics expose Firebase recovery');
 ok(perfReport.includes('firebaseStartup'), 'Performance report includes Firebase startup snapshot');
 ok(health.includes('Firebase Startup'), 'APG Health shows Firebase Startup');
+
+const longQueue = new FirebaseRetryQueue({ delays: [10000], maxAttempts: 2 });
+let longAttempts = 0;
+const longRun = longQueue.run(async () => {
+  longAttempts += 1;
+  throw new Error('temporary');
+}, { source: 'cancel_test' });
+await Promise.resolve();
+longQueue.cancelAll();
+assert.equal(await longRun, null);
+assert.equal(longAttempts, 1);
+ok(true, 'Retry queue cancelAll releases pending backoff');
+
+let recoveryCalled = 0;
+registerFirebaseRecoveryTask(() => {
+  recoveryCalled += 1;
+});
+clearFirebaseRecoveryTasks();
+await resilience.runFirebaseRecovery({ source: 'clear_test' });
+assert.equal(recoveryCalled, 0);
+ok(true, 'Recovery clear prevents tasks after cleanup');
+
+disposeFirebaseStartupResilience();
+assert.equal(getFirebaseAnonymousStartupPromise(), null);
+ok(true, 'Firebase startup resilience dispose clears shared promise');
 
 console.log('\nFirebase startup resilience tests passed.');

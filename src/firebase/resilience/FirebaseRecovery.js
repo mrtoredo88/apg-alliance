@@ -1,14 +1,22 @@
 import { markFirebaseStartup } from './FirebaseStartupMetrics.js';
 
 const recoveryTasks = new Set();
+let disposed = false;
 
 export function registerFirebaseRecoveryTask(task) {
   if (typeof task !== 'function') return () => {};
+  disposed = false;
   recoveryTasks.add(task);
   return () => recoveryTasks.delete(task);
 }
 
+export function clearFirebaseRecoveryTasks() {
+  recoveryTasks.clear();
+  disposed = true;
+}
+
 export async function runFirebaseRecovery(detail = {}) {
+  if (disposed) return [];
   markFirebaseStartup('firebase_recovered', { ...detail, tasks: recoveryTasks.size });
   const results = [];
   for (const task of [...recoveryTasks]) {

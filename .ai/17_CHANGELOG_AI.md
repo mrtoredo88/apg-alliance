@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] test: APG Startup Stability Test Hardening v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/startup-stability-test.mjs`, `scripts/firebase-startup-resilience-test.mjs`, `src/firebase/resilience/FirebaseAvailability.js`, `src/firebase/resilience/FirebaseRetryQueue.js`, `src/firebase/resilience/FirebaseRecovery.js`, `src/firebase/resilience/FirebaseStartupResilience.js`, `src/firebase/resilience/index.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** test
+**Что изменено:**
+- `test:startup-stability` получил прогресс по каждому сценарию, per-scenario/total timeouts, диагностику failedStage/bootstrap/Firebase/performance и явный cleanup Playwright context/page/service worker.
+- Firebase resilience получил идемпотентный dispose/cancel API для отмены backoff timers, online waiters и recovery tasks без изменения production backoff policy.
+- Regression-тест Firebase Startup Resilience покрывает cancelAll, recovery clear и dispose shared anonymous auth promise.
+**Почему:** зависший без вывода regression-тест был слепой зоной после resilience-слоя; теперь он детерминированно завершается и показывает точку отказа.
+
+---
+
 ## [2026-07-19] feat: APG Firebase Startup Resilience v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/firebase/resilience/*`, `src/UserApp.jsx`, `src/performance/PerformanceMetrics.js`, `src/performance/PerformanceReport.js`, `src/ApgHealthPage.jsx`, `scripts/firebase-startup-resilience-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
