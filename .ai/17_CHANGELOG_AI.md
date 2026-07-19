@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Identity Migration Orchestrator v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/identity-migration-orchestrator.mjs`, `scripts/identity-migration-orchestrator-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен gate-based read-only оркестратор Identity Migration: Review → Validation → Dry Run → Verify Package.
+- При текущем состоянии оркестратор останавливается на Review gate из-за 3 deferred owner decisions, не запускает validation/dry-run/verify и оставляет Canary/Cutover locked.
+- Добавлен regression-тест, подтверждающий STOP-поведение, отсутствие Verify Package при failed gate и запрет production mutation calls.
+**Почему:** перед реальным Verify нужен контроллер, который не позволит случайно перепрыгнуть через owner decisions, clean dry-run и explicit approval.
+
 ## [2026-07-20] chore: Identity Final Readiness Review v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/identity-final-readiness-review.mjs`, `scripts/identity-final-readiness-review-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

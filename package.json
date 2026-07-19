@@ -121,7 +121,9 @@
     "identity:owner-forensic": "node scripts/identity-owner-deep-forensic.mjs",
     "test:identity-owner-forensic": "node scripts/identity-owner-deep-forensic-test.mjs",
     "identity:readiness": "node scripts/identity-final-readiness-review.mjs",
-    "test:identity-readiness": "node scripts/identity-final-readiness-review-test.mjs"
+    "test:identity-readiness": "node scripts/identity-final-readiness-review-test.mjs",
+    "identity:orchestrator": "node scripts/identity-migration-orchestrator.mjs",
+    "test:identity-orchestrator": "node scripts/identity-migration-orchestrator-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
