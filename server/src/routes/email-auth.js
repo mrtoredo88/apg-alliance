@@ -2,8 +2,7 @@ import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { APP_URL } from '../lib/config.js';
 import { getDb } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { resolveEmailIdentity, resolveFirebaseIdentity } from '../lib/identityCore.js';
-import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
+import { resolveFirebaseIdentity } from '../lib/identityCore.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
@@ -144,15 +143,7 @@ async function auditAccountLink(db, request, payload) {
 }
 
 async function createFirebaseToken(userId, user = {}) {
-  const role = getPrimaryRole(user);
-  const roles = getUserRoles(user);
-  const claims = {
-    role,
-    ...(roles.length ? { roles } : {}),
-    ...(hasRole(user, ROLES.owner) ? { owner: true } : {}),
-    ...(hasCapability(user, CAPABILITIES.canOpenAdminPanel) ? { admin: true } : {}),
-  };
-  return serverFoundation.identity.authenticate({ provider: 'customToken', uid: String(userId), claims });
+  return serverFoundation.identityV2.createCustomToken(userId, user);
 }
 
 function createEmailLoginTrace(request) {
@@ -249,11 +240,70 @@ async function sendVerificationEmail(db, email, userId, appUrl) {
 }
 
 async function resolveEmailUser(db, email, ref) {
-  const identity = await resolveEmailIdentity(db, { email, ref, createIfMissing: true });
+  const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email, ref, createIfMissing: true });
   const userId = identity.userId;
   db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
-  await attachPendingPartnerInvites(db, email, userId).catch(() => {});
-  return userId;
+  attachPendingPartnerInvites(db, email, userId).catch(() => {});
+  return identity;
+}
+
+async function getEmailOtp(codeRef, email) {
+  try {
+    return { source: 'identity_v2', data: await serverFoundation.identityV2.getEmailOtp(email) };
+  } catch (error) {
+    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
+    const snap = await codeRef.get();
+    return { source: 'firestore_fallback', data: snap.exists ? snap.data() : null };
+  }
+}
+
+async function setEmailOtp(codeRef, email, code) {
+  const expiresAt = new Date(Date.now() + 10 * 60_000);
+  try {
+    await serverFoundation.identityV2.putEmailOtp({ email, code, expiresAt });
+    return 'identity_v2';
+  } catch (error) {
+    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
+    await codeRef.set({
+      code,
+      expiresAt: Timestamp.fromMillis(expiresAt.getTime()),
+      attempts: 0,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return 'firestore_fallback';
+  }
+}
+
+async function deleteEmailOtp(codeRef, email) {
+  try {
+    await serverFoundation.identityV2.deleteEmailOtp(email);
+  } catch (error) {
+    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
+    await codeRef.delete();
+  }
+}
+
+async function incrementEmailOtpAttempts(codeRef, email) {
+  try {
+    await serverFoundation.identityV2.incrementEmailOtpAttempts(email);
+  } catch (error) {
+    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
+    await codeRef.update({ attempts: FieldValue.increment(1) });
+  }
+}
+
+function otpCreatedMs(data) {
+  if (!data) return 0;
+  if (data.createdAt?.toMillis) return data.createdAt.toMillis();
+  if (data.createdAt) return new Date(data.createdAt).getTime();
+  return 0;
+}
+
+function otpExpiresMs(data) {
+  if (!data) return 0;
+  if (data.expiresAt?.toMillis) return data.expiresAt.toMillis();
+  if (data.expiresAt) return new Date(data.expiresAt).getTime();
+  return 0;
 }
 
 export default async function emailAuthRoutes(fastify) {
@@ -307,21 +357,16 @@ export default async function emailAuthRoutes(fastify) {
 
     // ── SEND ────────────────────────────────────────────────────────────────────
     if (action === 'send') {
-      const snap = await codeRef.get();
-      if (snap.exists) {
-        const created = snap.data().createdAt?.toMillis?.() ?? 0;
+      const existing = await getEmailOtp(codeRef, email);
+      if (existing.data) {
+        const created = otpCreatedMs(existing.data);
         if (Date.now() - created < 60_000) {
           return reply.code(429).send({ ok: false, error: 'rate_limited', message: 'Подождите минуту перед повторным запросом' });
         }
       }
 
       const newCode = generateCode();
-      await codeRef.set({
-        code: newCode,
-        expiresAt: Timestamp.fromMillis(Date.now() + 10 * 60_000),
-        attempts: 0,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+      await setEmailOtp(codeRef, email, newCode);
 
       try {
         await sendEmail(
@@ -340,7 +385,7 @@ export default async function emailAuthRoutes(fastify) {
           ].join('\n'),
         );
       } catch (e) {
-        await codeRef.delete().catch(() => {});
+        await deleteEmailOtp(codeRef, email).catch(() => {});
         request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox send failed');
         return reply.code(500).send({ ok: false, error: 'email_error', message: 'Не удалось отправить письмо. Проверьте адрес или попробуйте позже.' });
       }
@@ -354,15 +399,15 @@ export default async function emailAuthRoutes(fastify) {
         return reply.code(400).send({ ok: false, error: 'invalid_code', message: 'Введите 6-значный код' });
       }
 
-      const snap = await codeRef.get();
-      if (!snap.exists) {
+      const otp = await getEmailOtp(codeRef, email);
+      if (!otp.data) {
         return reply.code(400).send({ ok: false, error: 'code_not_found', message: 'Код не найден. Запросите новый' });
       }
 
-      const data = snap.data();
+      const data = otp.data;
 
-      if (data.expiresAt.toMillis() < Date.now()) {
-        await codeRef.delete().catch(() => {});
+      if (otpExpiresMs(data) < Date.now()) {
+        await deleteEmailOtp(codeRef, email).catch(() => {});
         return reply.code(400).send({ ok: false, error: 'code_expired', message: 'Код истёк. Запросите новый' });
       }
 
@@ -371,16 +416,16 @@ export default async function emailAuthRoutes(fastify) {
       }
 
       if (data.code !== String(code)) {
-        await codeRef.update({ attempts: FieldValue.increment(1) });
+        await incrementEmailOtpAttempts(codeRef, email);
         const left = 4 - (data.attempts ?? 0);
         return reply.code(400).send({ ok: false, error: 'wrong_code', message: `Неверный код. Осталось попыток: ${left}` });
       }
 
-      await codeRef.delete();
+      await deleteEmailOtp(codeRef, email);
 
-      const userId = await resolveEmailUser(db, email, ref ?? null);
-      const userSnap = await db.collection('users').doc(userId).get();
-      const ud = userSnap.data() ?? {};
+      const identity = await resolveEmailUser(db, email, ref ?? null);
+      const userId = identity.userId;
+      const ud = identity.user ?? {};
       if (ref || referralContext.referralFlowId) {
         recordReferralEventAsync(db, {
           ...referralContext,
@@ -424,32 +469,12 @@ export default async function emailAuthRoutes(fastify) {
         return reply.code(403).send({ ok: false, error: 'owner_mismatch', message: 'Нельзя привязать Telegram к другому аккаунту.' });
       }
 
-      const otherUserByTg = await db.collection('users').where('linkedTelegram.tgId', '==', normalizedTgId).limit(1).get();
-      if (!otherUserByTg.empty && otherUserByTg.docs[0].id !== String(userId)) {
-        await auditAccountLink(db, request, { action: 'link-telegram', result: 'blocked_existing_user_link', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId, existingUserId: otherUserByTg.docs[0].id });
-        return reply.code(409).send({ ok: false, error: 'already_linked', message: 'Этот Telegram уже привязан к другому аккаунту.' });
-      }
-
       try {
-        await db.runTransaction(async tx => {
-          const linkRef = db.collection('tgLinks').doc(normalizedTgId);
-          const userRef = db.collection('users').doc(String(userId));
-          const [existingLink, userSnap] = await Promise.all([tx.get(linkRef), tx.get(userRef)]);
-          if (!userSnap.exists) throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404 });
-          if (existingLink.exists && String(existingLink.data().userId) !== String(userId)) {
-            throw Object.assign(new Error('Этот Telegram уже привязан к другому аккаунту.'), { statusCode: 409 });
-          }
-          tx.set(linkRef, {
-            userId: String(userId),
-            telegramId: normalizedTgId,
-            firebaseUid: actor.uid,
-            updatedAt: FieldValue.serverTimestamp(),
-            createdAt: existingLink.exists ? existingLink.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
-          }, { merge: true });
-          tx.set(userRef, {
-            linkedTelegram: { tgId: normalizedTgId, firstName: firstName ?? null, lastName: lastName ?? null, username: username ?? null, photo: photo ?? null, linkedAt: FieldValue.serverTimestamp() },
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
+        await serverFoundation.identityV2.linkTelegram({
+          telegramId: normalizedTgId,
+          userId: String(userId),
+          firebaseUid: actor.uid,
+          telegram: { firstName: firstName ?? null, lastName: lastName ?? null, username: username ?? null, photo: photo ?? null },
         });
       } catch (e) {
         return reply.code(e.statusCode || 500).send({ ok: false, error: e.statusCode === 409 ? 'already_linked' : 'link_failed', message: e.message || 'Не удалось привязать Telegram.' });
@@ -470,29 +495,8 @@ export default async function emailAuthRoutes(fastify) {
         return reply.code(403).send({ ok: false, error: 'owner_mismatch', message: 'Нельзя привязать email к другому аккаунту.' });
       }
 
-      const existing = await db.collection('users').where('email', '==', email).limit(1).get();
-      if (!existing.empty && existing.docs[0].id !== userId) {
-        await auditAccountLink(db, request, { action: 'link-email', result: 'blocked_existing_user_email', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), email, existingUserId: existing.docs[0].id });
-        return reply.code(409).send({ ok: false, error: 'already_used', message: 'Этот email уже привязан к другому аккаунту' });
-      }
-
       try {
-        await db.runTransaction(async tx => {
-          const userRef = db.collection('users').doc(String(userId));
-          const emailRef = db.collection('emailIndex').doc(email);
-          const [userSnap, emailSnap] = await Promise.all([tx.get(userRef), tx.get(emailRef)]);
-          if (!userSnap.exists) throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404 });
-          if (emailSnap.exists && String(emailSnap.data().userId) !== String(userId)) {
-            throw Object.assign(new Error('Этот email уже привязан к другому аккаунту.'), { statusCode: 409 });
-          }
-          tx.set(emailRef, {
-            userId: String(userId),
-            firebaseUid: actor.uid,
-            updatedAt: FieldValue.serverTimestamp(),
-            createdAt: emailSnap.exists ? emailSnap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
-          }, { merge: true });
-          tx.set(userRef, { linkedEmail: email, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-        });
+        await serverFoundation.identityV2.linkEmail({ email, userId: String(userId), firebaseUid: actor.uid });
       } catch (e) {
         return reply.code(e.statusCode || 500).send({ ok: false, error: e.statusCode === 409 ? 'already_used' : 'link_failed', message: e.message || 'Не удалось привязать email.' });
       }
@@ -526,9 +530,9 @@ export default async function emailAuthRoutes(fastify) {
       try {
         trace.mark('request', 'START', { action, emailDomain: email.split('@')[1] || '' });
         const { ref } = request.body ?? {};
-        const userId = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null), 9000);
-        const userSnap = await withEmailLoginStage(trace, 'load_user_profile', () => db.collection('users').doc(userId).get(), 7000);
-        const ud = userSnap.data() ?? {};
+        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null), 9000);
+        const userId = identity.userId;
+        const ud = await withEmailLoginStage(trace, 'load_user_profile', async () => identity.user || await serverFoundation.identityV2.getUser(userId), 7000) || {};
         if (ref || referralContext.referralFlowId) {
           recordReferralEventAsync(db, {
             ...referralContext,
@@ -554,6 +558,7 @@ export default async function emailAuthRoutes(fastify) {
           canonicalUserId: userId,
           diagnostics: {
             requestId: trace.requestId,
+            identity: serverFoundation.identityV2.snapshot(),
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
           user: {
@@ -594,6 +599,7 @@ export default async function emailAuthRoutes(fastify) {
             failedStage,
             statusCode: classified.statusCode,
             error: classified.code,
+            identity: serverFoundation.identityV2.snapshot(),
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
         });

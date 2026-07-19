@@ -138,7 +138,7 @@ console.log('OK FirebaseAdminIdentityProvider wraps Firebase Admin Auth');
 const emailAuth = read('server/src/routes/email-auth.js');
 assert.ok(emailAuth.includes("import { serverFoundation } from '../apg/index.js';"), 'email-auth imports server foundation');
 assert.ok(emailAuth.includes('serverFoundation.identity.verifySession'), 'email-auth verifies tokens through server identity');
-assert.ok(emailAuth.includes('serverFoundation.identity.authenticate'), 'email-auth creates custom tokens through server identity');
+assert.ok(emailAuth.includes('serverFoundation.identityV2.createCustomToken'), 'email-auth creates custom tokens through Identity v2');
 assert.ok(!emailAuth.includes('getDbAuth'), 'email-auth no longer imports Firebase Admin Auth directly');
 console.log('OK email-auth critical auth path uses Server Identity');
 

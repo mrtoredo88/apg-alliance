@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Identity v2
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/apg/identity/*`, `server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js`, `server/src/apg/infrastructure/adapters/FirestoreIdentityFallbackAdapter.js`, `server/src/routes/email-auth.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/identity-v2-test.mjs`, `scripts/identity-v2-architecture-guard.mjs`, `scripts/identity-v2-import.mjs`, `package.json`, `server/package.json`, `server/package-lock.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Identity v2 поверх APG Foundation: PostgreSQL schema, Identity/User/EmailIndex/IdentityLink/Session/Role repositories, Postgres adapter, legacy Firestore fallback adapter и dual-read/dual-write service.
+- `/api/email-auth` переведён на Identity v2 для email resolution, OTP/session storage, custom token creation, email/Telegram link; Firestore в login path остаётся только fallback при отсутствии/пустом Postgres.
+- Добавлены migration import script, architecture guard против прямых Firestore вызовов внутри Identity и regression test `npm run test:identity-v2`.
+**Почему:** email login не должен зависеть от Firestore quota; Identity становится первым доменом, который можно перенести на независимое transactional storage без миграции остальных коллекций.
+
+---
+
 ## [2026-07-19] fix: Email Login Forensic Diagnostics
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/EmailAuth.jsx`, `src/UserApp.jsx`, `src/auth/emailLoginDiagnostics.js`, `src/ApgHealthPage.jsx`, `server/src/routes/email-auth.js`, `scripts/email-login-forensic-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

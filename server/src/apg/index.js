@@ -1,5 +1,6 @@
 import { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 import { ServerRepository } from './data/ServerRepository.js';
+import { createIdentityV2 } from './createIdentityV2.js';
 import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 import { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 import { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
@@ -21,8 +22,10 @@ export const SERVER_REPOSITORY_DEFINITIONS = {
 };
 
 export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter(), identityProvider = new FirebaseAdminIdentityProvider() } = {}) {
+  const identityV2 = createIdentityV2({ tokenProvider: identityProvider });
   return {
     identity: identityProvider,
+    identityV2,
     data: {
       adapter: dataAdapter,
       repositories: Object.fromEntries(
@@ -46,6 +49,11 @@ export { ServerIdentityProvider } from './identity/ServerIdentityProvider.js';
 export { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 export { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
 export { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
+export { ApgIdentityV2Service } from './identity/ApgIdentityV2Service.js';
+export { createIdentityV2 } from './createIdentityV2.js';
+export * from './identity/repositories/index.js';
 export { ServerDataAdapter } from './data/ServerDataAdapter.js';
 export { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 export { ServerRepository } from './data/ServerRepository.js';
+export { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';
+export { FirestoreIdentityFallbackAdapter } from './infrastructure/adapters/FirestoreIdentityFallbackAdapter.js';

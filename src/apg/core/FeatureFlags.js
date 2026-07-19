@@ -1,5 +1,9 @@
 const DEFAULT_FLAGS = {
   IDENTITY_PROVIDER: 'firebase',
+  IDENTITY_STORAGE: 'postgres',
+  IDENTITY_FALLBACK: '1',
+  IDENTITY_DUAL_WRITE: '1',
+  IDENTITY_DUAL_READ: '1',
   DATA_PROVIDER: 'firestore',
   MESSAGE_PROVIDER: 'firestore',
   SEARCH_PROVIDER: 'firestore',

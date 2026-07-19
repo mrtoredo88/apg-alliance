@@ -1,5 +1,6 @@
 import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission } from '../lib/adminSecurity.js';
+import { serverFoundation } from '../apg/index.js';
 
 async function countSafe(db, collectionName, limit = 1000) {
   try {
@@ -37,6 +38,10 @@ export default async function systemStatusRoutes(fastify) {
         checkedAt: new Date().toISOString(),
         latencyMs: Date.now() - startedAt,
         api: { ok: true, runtime: 'yandex-fastify', version: process.env.APP_VERSION || '' },
+        identity: {
+          ok: true,
+          ...serverFoundation.identityV2.snapshot(),
+        },
         firestore: { ok: Boolean(ping || pingRef), collections: { news, comments, users, errors, adminActivity } },
         queues: { ok: true, pending: 0, note: 'Очередь задач пока не вынесена в отдельный сервис.' },
         telegramAuth: (() => {
