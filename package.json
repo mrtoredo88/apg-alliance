@@ -51,6 +51,7 @@
     "test:pwa-update": "node scripts/pwa-update-manager-test.mjs",
     "test:startup-stability": "node scripts/startup-stability-test.mjs",
     "test:pwa": "npm run test:pwa-update && npm run test:pwa-user-mode && node scripts/pwa-build-compat-test.mjs",
+    "test:loki-floating-button": "node scripts/loki-floating-button-hit-test.mjs",
     "test:scanner-camera": "node scripts/scanner-camera-diagnostics-test.mjs",
     "test:partner-social-links": "node scripts/partner-social-links-test.mjs",
     "test:roles": "node scripts/role-engine-test.mjs",

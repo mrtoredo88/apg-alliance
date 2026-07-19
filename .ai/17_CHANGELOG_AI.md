@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] fix: Loki floating button hit-test owner
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/LokiAssistant.jsx`, `scripts/loki-floating-button-hit-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Проведён аудит floating слоя Локи: bottom navigation, safe-area wrappers и messaging FAB не перекрывали центр кнопки; hit-test владельцем были анимированные decorative spans внутри самой кнопки.
+- Декоративные слои и `LokiIdentity` внутри floating button переведены в passive pointer layer, а `button[aria-label="Локи"]` стал явным владельцем `pointerdown`, `pointerup`, `touchstart`, `touchend` и `click`.
+- Добавлен dev-only hit debug mode через `localStorage.apg_loki_hit_debug=1` и regression-smoke `npm run test:loki-floating-button` с optional runtime click smoke.
+**Почему:** предыдущая z-index правка не устраняла первопричину: проблема была не в внешнем overlay, а в том, что transformed visual children могли владеть touch hit-test в Safari/VK WebView.
+
+---
+
 ## [2026-07-19] ux: APG Messaging UX/UI Polish v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/contextDialogs/ContextDialogsPage.jsx`, `scripts/messaging-ux-polish-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

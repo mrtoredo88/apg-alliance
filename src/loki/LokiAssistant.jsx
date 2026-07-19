@@ -68,6 +68,23 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
   const safeMessageUnread = Math.max(0, Math.min(99, Number(messageUnreadCount || 0) || 0));
   const showMessageFab = !desktopMode && typeof onOpenMessages === 'function';
   const hasLokiSignal = Boolean(loki.card || (loki.message && loki.canTalk));
+  const hitDebug = import.meta.env.DEV && (() => {
+    try {
+      return localStorage.getItem('apg_loki_hit_debug') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  const markFloatingButtonEvent = (event) => {
+    if (!hitDebug || typeof window === 'undefined') return;
+    const target = event.target;
+    window.__apgLokiHitDebug = {
+      type: event.type,
+      target: target?.getAttribute?.('aria-label') || target?.tagName || '',
+      currentTarget: event.currentTarget?.getAttribute?.('aria-label') || event.currentTarget?.tagName || '',
+      time: Date.now(),
+    };
+  };
   const messageFab = showMessageFab ? (
     <button
       type="button"
@@ -291,6 +308,21 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
 
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
         {messageFab && <div style={{ display: 'grid', justifyItems: 'end', gap: 10, marginBottom: 10, pointerEvents: 'auto' }}>{messageFab}</div>}
+        {hitDebug && (
+          <div
+            aria-hidden="true"
+            data-loki-hit-debug="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              border: '2px dashed rgba(120,214,255,0.78)',
+              borderRadius: 38,
+              pointerEvents: 'none',
+              zIndex: 4,
+              boxShadow: '0 0 0 1px rgba(215,184,106,0.64)',
+            }}
+          />
+        )}
         {menuOpen && (
           <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 190, borderRadius: 24, padding: 9, display: 'grid', gap: 7, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
             <button type="button" onClick={() => { loki.executeAction(createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI)); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
@@ -357,8 +389,16 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
         )}
         <button
           type="button"
-          onClick={loki.openExperience}
+          onPointerDownCapture={markFloatingButtonEvent}
+          onPointerUpCapture={markFloatingButtonEvent}
+          onTouchStartCapture={markFloatingButtonEvent}
+          onTouchEndCapture={markFloatingButtonEvent}
+          onClick={(event) => {
+            markFloatingButtonEvent(event);
+            loki.openExperience();
+          }}
           aria-label="Локи"
+          data-floating-loki-button="true"
           style={{
             width: 92,
             height: 92,
@@ -381,10 +421,10 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
           }}
         >
           <span style={{ position: 'absolute', inset: -8, borderRadius: 38, background: isThinking ? 'radial-gradient(circle, rgba(120,214,255,0.18), transparent 68%)' : 'radial-gradient(circle, rgba(232,201,122,0.22), transparent 70%)', filter: 'blur(7px)', opacity: 0.9, animation: 'lokiAmbientGlow 4.8s ease-in-out infinite', pointerEvents: 'none' }} />
-          {hasLokiSignal && <span style={{ position: 'absolute', right: 10, top: 10, width: 11, height: 11, borderRadius: '50%', background: '#78D6FF', border: '2px solid rgba(9,10,16,0.96)', boxShadow: '0 0 18px rgba(120,214,255,0.72)' }} />}
-          <span style={{ display: 'block', transformOrigin: '50% 80%', animation: `${motionName} ${loki.emotion === 'excited' ? '1180ms' : '6.2s'} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite` }}>
-            <span style={{ display: 'block', transform: `translate3d(${look.x}px, ${look.y}px, 0) rotate(${look.x * 0.55}deg)`, transition: 'transform 420ms cubic-bezier(0.16,1,0.3,1)', animation: actionName === 'none' ? 'none' : `${actionName} 1800ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both`, willChange: 'transform' }}>
-              <LokiIdentity size={82} state={identityState} showText={false} style={{ placeItems: 'center', willChange: 'transform' }} />
+          {hasLokiSignal && <span style={{ position: 'absolute', right: 10, top: 10, width: 11, height: 11, borderRadius: '50%', background: '#78D6FF', border: '2px solid rgba(9,10,16,0.96)', boxShadow: '0 0 18px rgba(120,214,255,0.72)', pointerEvents: 'none' }} />}
+          <span style={{ display: 'block', transformOrigin: '50% 80%', animation: `${motionName} ${loki.emotion === 'excited' ? '1180ms' : '6.2s'} var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) infinite`, pointerEvents: 'none' }}>
+            <span style={{ display: 'block', transform: `translate3d(${look.x}px, ${look.y}px, 0) rotate(${look.x * 0.55}deg)`, transition: 'transform 420ms cubic-bezier(0.16,1,0.3,1)', animation: actionName === 'none' ? 'none' : `${actionName} 1800ms var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both`, willChange: 'transform', pointerEvents: 'none' }}>
+              <LokiIdentity size={82} state={identityState} showText={false} style={{ placeItems: 'center', willChange: 'transform', pointerEvents: 'none' }} />
               {(loki.action === LOKI_ACTIONS.POINT || loki.action === LOKI_ACTIONS.SPARK || loki.action === LOKI_ACTIONS.CATCH_KEY) && (
                 <span style={{ position: 'absolute', right: -7, top: 16, width: 20, height: 20, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,240,184,0.95), rgba(215,184,106,0.58) 44%, transparent 70%)', boxShadow: '0 0 18px rgba(215,184,106,0.62)', animation: 'lokiSparkle 960ms ease-in-out infinite', pointerEvents: 'none' }} />
               )}
