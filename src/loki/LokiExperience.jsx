@@ -3,6 +3,7 @@ import { APG2_PROFILE, GlassButton, GlassCard } from '../components/Apg2ProfileG
 import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
 import { LokiIdentity } from './LokiIdentity.jsx';
+import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrace.js';
 
 const QUICK_ACTIONS = [
   { label: '📍 Что рядом?', text: 'Что рядом?', action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS) },
@@ -155,12 +156,39 @@ export function LokiExperience({ loki }) {
 
   const ask = async (text, quickAction = null, options = {}) => {
     const question = text.trim();
-    if (!question || loki.brainThinking) return;
+    resetLokiMessageTrace({ question, source: quickAction ? 'quick_action' : 'input' });
+    recordLokiMessageTrace('STEP 1 Message/Input received', { questionLength: question.length, brainThinking: loki.brainThinking });
+    if (!question || loki.brainThinking) {
+      recordLokiMessageTrace('STOP input ignored', { empty: !question, brainThinking: loki.brainThinking });
+      return;
+    }
     setInput('');
     const userMessage = { id: `user-${Date.now()}`, from: 'user', text: question, cards: [] };
     setConversation(prev => [...prev, userMessage]);
-    const result = await loki.askExperience(question, { autoExecute: false });
-    if (!result) return;
+    recordLokiMessageTrace('STEP 2 Conversation user message added', { messageId: userMessage.id });
+    let result = null;
+    try {
+      recordLokiMessageTrace('STEP 3 Provider askExperience start', { autoExecute: false });
+      result = await loki.askExperience(question, { autoExecute: false });
+      recordLokiMessageTrace('STEP 18 Provider askExperience returned', { hasResult: Boolean(result), intent: result?.intent || '', hasText: Boolean(result?.text) });
+    } catch (error) {
+      recordLokiMessageTrace('STOP Provider askExperience rejected', { error: error?.message || String(error) });
+      result = {
+        text: 'Что-то пошло не так. Сейчас попробуем разобраться.',
+        card: null,
+        cards: [],
+        debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
+      };
+    }
+    if (!result) {
+      recordLokiMessageTrace('STOP Provider returned empty result', {});
+      result = {
+        text: 'Я получил сообщение, но внутренний обработчик не вернул ответ. Попробуйте ещё раз коротко.',
+        card: null,
+        cards: [],
+        debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
+      };
+    }
     const cards = result.cards?.length ? result.cards : result.card ? [result.card] : [];
     setConversation(prev => [...prev, {
       id: `loki-${Date.now()}`,
@@ -169,6 +197,7 @@ export function LokiExperience({ loki }) {
       cards,
       debug: result.debug ?? null,
     }]);
+    recordLokiMessageTrace('STEP 19 UI answer message added', { textLength: String(result.text || '').length, cardCount: cards.length });
     const action = result.executeAction || quickAction || (question.toLowerCase().includes('покажи') ? result.autoAction : null);
     if (options.speak) speak(result.text);
     if (action) setTimeout(() => loki.executeAction(action), 520);

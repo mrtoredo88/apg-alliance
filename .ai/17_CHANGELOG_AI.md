@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] fix: Loki message response chain tracing
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/lokiMessageTrace.js`, `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/core/LokiCore.js`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-message-chain-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Добавлена runtime-трассировка цепочки пользовательского сообщения Локи в `window.__APG_LOKI_MESSAGE_TRACE__`: Input, Conversation, Knowledge, Knowledge Index, Reasoning, Capability, Skills, Execution, Controlled Execution, Planner, Tool Calling, Action Center, Decision, Evaluation, Provider и UI.
+- `LokiExperience` больше не оставляет диалог без ответа при пустом/ошибочном результате Provider, а `LokiProvider.askExperience` получил 5-секундный timeout для зависшего `askLokiBrain`.
+- PWA diagnostics теперь включает `messageTrace`, а smoke-тест проверяет отправку `Привет` и появление ответа в runtime.
+**Почему:** пользователь подтвердил, что окно Локи открывается и сообщение отправляется, но ответ не приходит; нужно было локализовать обрыв цепочки и убрать бесконечное ожидание ответа.
+
+---
+
 ## [2026-07-19] fix: Loki installed PWA tap chain tracing
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `src/loki/LokiProvider.jsx`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/loki-floating-button-hit-test.mjs`, `scripts/pwa-runtime-diagnostics-test.mjs`, `.ai/17_CHANGELOG_AI.md`

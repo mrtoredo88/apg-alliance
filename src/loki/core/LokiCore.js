@@ -29,6 +29,7 @@ import { runProactiveAnswer } from './proactive/ProactiveEngine.js';
 import { runLokiActionCenter } from './actions/ActionCenter.js';
 import { runLokiDecisionEngine } from './decision/index.js';
 import { runLokiEvaluationEngine } from './evaluation/index.js';
+import { recordLokiMessageTrace } from '../lokiMessageTrace.js';
 
 const LOKI_MODULES = [
   ActionRouter,
@@ -112,11 +113,13 @@ export function buildLokiBrainContext(appState = {}, memory = {}, userMemory = {
 }
 
 function applyActions(result, context, appState) {
+  recordLokiMessageTrace('STEP 14 Action Center start', { hasResult: Boolean(result), intent: result?.intent || '' });
   return runLokiActionCenter({ result, context, appState });
 }
 
 function applyDecision({ question, result, context }) {
   if (!result) return result;
+  recordLokiMessageTrace('STEP 15 Decision start', { intent: result.intent || '', hasText: Boolean(result.text) });
   return {
     ...result,
     decisionContext: runLokiDecisionEngine({ question, result, context }),
@@ -142,6 +145,7 @@ function pushDecisionTrace(trace, decisionContext) {
 
 function applyEvaluation({ question, result, context, trace }) {
   if (!result) return result;
+  recordLokiMessageTrace('STEP 16 Evaluation start', { intent: result.intent || '', traceLength: trace.length });
   const evaluation = runLokiEvaluationEngine({ question, result, context, trace });
   trace.push({
     module: 'evaluationEngine',
@@ -175,8 +179,10 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   const query = normalizeText(text);
   const trace = [];
   const provider = getActiveLokiAiProvider();
+  recordLokiMessageTrace('STEP 10 LokiCore received', { queryLength: query.length, provider });
   const contextStart = nowMs();
   const context = buildLokiBrainContext(appState, memory, userMemory);
+  recordLokiMessageTrace('STEP 10 Conversation/Context OK', { ms: Math.round(nowMs() - contextStart), role: context?.actor?.role || '' });
   trace.push({ module: MemoryEngine.id, ms: Math.round(nowMs() - contextStart), decision: 'context_enriched' });
 
   if (!query) {
@@ -191,7 +197,9 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const knowledgeStart = nowMs();
-  const knowledgeResult = runLokiKnowledgeEngine({ text, appState, context });
+  recordLokiMessageTrace('STEP 11 Knowledge Engine start', {});
+  const knowledgeResult = runLokiKnowledgeEngine({ text, appState, context, traceMessage: recordLokiMessageTrace });
+  recordLokiMessageTrace('STEP 11 Knowledge Engine returned', { hasResult: Boolean(knowledgeResult), intent: knowledgeResult?.intent || '' });
   trace.push({ module: 'knowledgeEngine', ms: Math.round(nowMs() - knowledgeStart), decision: knowledgeResult?.intent ?? 'skipped' });
   if (knowledgeResult?.knowledgeSnapshot) {
     trace.push({
@@ -315,6 +323,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const personalOnlyStart = nowMs();
+  recordLokiMessageTrace('STEP 12 Personalization fallback start', {});
   const personalOnly = runPersonalizationEngine({ question: text, result: null, context, appState });
   trace.push({ module: 'personalizationEngine', ms: Math.round(nowMs() - personalOnlyStart), decision: personalOnly?.intent ?? 'skipped' });
   if (personalOnly) {
@@ -327,6 +336,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const proactiveStart = nowMs();
+  recordLokiMessageTrace('STEP 12 Proactive fallback start', {});
   const proactiveAnswer = runProactiveAnswer({ question: text, memory });
   trace.push({ module: 'proactiveEngine', ms: Math.round(nowMs() - proactiveStart), decision: proactiveAnswer?.intent ?? 'skipped' });
   if (proactiveAnswer) {
@@ -339,6 +349,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const v2Start = nowMs();
+  recordLokiMessageTrace('STEP 12 V2 plugins start', {});
   const v2Resolution = await LOKI_CORE_REGISTRY.plugins.resolve({ query, text, context, history });
   trace.push({ module: v2Resolution.module?.id ?? 'v2Plugins', ms: Math.round(nowMs() - v2Start), decision: v2Resolution.result?.intent ?? 'skipped' });
   if (v2Resolution.result) {
@@ -356,6 +367,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const intelligenceStart = nowMs();
+  recordLokiMessageTrace('STEP 12 Loki Intelligence start', {});
   let intelligenceResult = null;
   if (includesAny(query, ['почему ты', 'почему предлож', 'зачем предлож', 'объясни рекомендац'])) {
     intelligenceResult = explainLastRecommendation(memory);
@@ -382,6 +394,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
   }
 
   const brainStart = nowMs();
+  recordLokiMessageTrace('STEP 12 Brain Layer start', {});
   const brainResult = runBrainLayer({ query, context, history, debug });
   trace.push({ module: 'brainLayer', ms: Math.round(nowMs() - brainStart), decision: brainResult?.intent ?? 'skipped' });
   if (brainResult) {
@@ -395,6 +408,7 @@ export async function askLokiCore({ text, appState, memory, userMemory, history 
 
   let selected = null;
   let rawResult = null;
+  recordLokiMessageTrace('STEP 12 Legacy modules start', { moduleCount: LOKI_MODULES.length });
   for (const module of LOKI_MODULES) {
     const moduleStart = nowMs();
     const accepted = module.canHandle({ query, context, text });

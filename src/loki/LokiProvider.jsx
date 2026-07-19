@@ -41,6 +41,7 @@ import { buildKnowledgeHistoryPatch } from './core/knowledgeIndex/index.js';
 import { buildSkillHistoryPatch } from './core/skills/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
+import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace } from './lokiMessageTrace.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -74,6 +75,19 @@ function recordLokiTapTrace(step, detail = {}) {
     detail,
     at: new Date().toISOString(),
   }];
+}
+
+function withLokiAnswerTimeout(promise, text) {
+  let timer = null;
+  const timeout = new Promise(resolve => {
+    timer = setTimeout(() => {
+      recordLokiMessageTrace('STOP LokiBrain timeout', { ms: 5000 });
+      resolve(buildLokiMessageTimeoutFallback(text));
+    }, 5000);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function safeString(value) {
@@ -1112,15 +1126,22 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   }, [activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordKnowledgeIndexSnapshot, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateMemory, user, userMemory]);
 
   const askExperience = useCallback(async (text, options = {}) => {
-    if (!settings.enabled) return null;
+    recordLokiMessageTrace('STEP 4 LokiProvider askExperience received', { enabled: settings.enabled, textLength: String(text || '').length });
+    if (!settings.enabled) {
+      recordLokiMessageTrace('STOP Loki disabled', {});
+      return null;
+    }
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     setBrainThinking(true);
     setEmotion('thinking');
     setAction(LOKI_ACTIONS.LOOK_AROUND);
+    recordLokiMessageTrace('STEP 5 Provider thinking state set', { activePanel });
     updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text, activeContext });
     try {
+      recordLokiMessageTrace('STEP 6 News context check start', { activeContextType: activeContext?.type || '' });
       const contextResult = buildNewsContextAnswer(activeContext, text, appState);
       if (contextResult) {
+        recordLokiMessageTrace('STEP 7 News context answer returned', { hasText: Boolean(contextResult.text) });
         setBrainThinking(false);
         setEmotion('helper');
         setAction(LOKI_ACTIONS.LISTEN);
@@ -1142,11 +1163,29 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         }));
         return { card: null, ...contextResult };
       }
+      recordLokiMessageTrace('STEP 7 News context skipped', {});
       const lokiContext = buildLokiContext({ appState: { ...appState, activeContext }, user, activePanel, memory: { ...memory, activeContext }, userMemory });
-      const result = await askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() });
+      recordLokiMessageTrace('STEP 8 LokiContext built', {
+        panel: lokiContext?.appState?.activePanel || lokiContext?.currentScreen?.id || activePanel,
+        partners: lokiContext?.appState?.partners?.length || appState?.partners?.length || 0,
+        events: lokiContext?.appState?.events?.length || appState?.events?.length || 0,
+      });
+      recordLokiMessageTrace('STEP 9 LokiBrain start', {});
+      const result = await withLokiAnswerTimeout(askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() }), text);
+      recordLokiMessageTrace('STEP 16 LokiBrain returned to Provider', { hasResult: Boolean(result), intent: result?.intent || '', timeout: Boolean(result?.debug?.timeout) });
+      if (!result) {
+        recordLokiMessageTrace('STOP LokiBrain returned null', {});
+        return {
+          text: 'Я получил сообщение, но внутренний обработчик не вернул ответ. Попробуйте ещё раз коротко.',
+          card: null,
+          cards: [],
+          debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
+        };
+      }
       setBrainThinking(false);
       setEmotion(result.executeAction || result.autoAction ? 'excited' : 'helper');
       setAction(result.executeAction || result.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
+      recordLokiMessageTrace('STEP 17 Provider state updated from result', { hasText: Boolean(result.text), hasAction: Boolean(result.executeAction || result.autoAction) });
       updateMemory({
         lastMessage: { eventType: LOKI_EVENTS.BRAIN_RESPONSE, text: result.text, payload: { card: result.card, cards: result.cards } },
         lastConversation: { userText: text, answer: result.text, action: result.executeAction ?? result.autoAction ?? result.card?.action ?? null },
@@ -1206,15 +1245,18 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       const actionToRun = result.executeAction ?? (options.autoExecute ? result.autoAction : null);
       if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
       else if (result.controlledExecutionContext?.executionReady) setTimeout(() => dispatchControlledExecution(result.controlledExecutionContext), 120);
+      recordLokiMessageTrace('STEP 18 Provider returns result to UI', { textLength: String(result.text || '').length });
       return result;
     } catch (e) {
       setBrainThinking(false);
+      recordLokiMessageTrace('STOP Provider caught exception', { error: e?.message || String(e) });
       logError(e, 'LokiProvider.askExperience');
       showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_experience', priority: LOKI_MESSAGE_PRIORITY.HIGH });
       return {
         text: 'Что-то пошло не так. Сейчас попробуем разобраться.',
         card: null,
         cards: [],
+        debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
       };
     }
   }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordKnowledgeIndexSnapshot, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);

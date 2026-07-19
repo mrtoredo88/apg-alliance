@@ -286,7 +286,8 @@ function attachKnowledgeIndex(result, indexResult = {}) {
   };
 }
 
-export function runLokiKnowledgeEngine({ text: question, appState = {}, context = null } = {}) {
+export function runLokiKnowledgeEngine({ text: question, appState = {}, context = null, traceMessage = null } = {}) {
+  const trace = typeof traceMessage === 'function' ? traceMessage : () => {};
   if (isKnowledgeIndexExplainQuery(question)) {
     return attachDecision(explainLastKnowledgeIndex(context?.memory || {}), question, context);
   }
@@ -306,15 +307,28 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     return attachDecision(explainLastDecision(context?.memory || {}), question, context);
   }
   const sourceState = context?.appState || appState?.appState || appState;
+  trace('STEP 11.1 Knowledge provider start', {});
   const knowledge = buildLokiKnowledgeProvider({ ...sourceState, activeContext: context?.memory?.activeContext || sourceState.activeContext });
+  trace('STEP 11.1 Knowledge provider OK', { partners: knowledge?.counts?.partners || 0, events: knowledge?.counts?.events || 0, news: knowledge?.counts?.news || 0 });
+  trace('STEP 11.2 Knowledge Index start', {});
   const knowledgeIndexResult = runLokiKnowledgeIndex({ question, knowledge, appState: sourceState });
+  trace('STEP 11.2 Knowledge Index OK', {
+    entities: knowledgeIndexResult?.knowledgeSnapshot?.Entities || 0,
+    relations: knowledgeIndexResult?.knowledgeSnapshot?.Relations || 0,
+    searchResults: knowledgeIndexResult?.knowledgeIndexSearch?.entities?.length || 0,
+  });
   knowledge.knowledgeIndex = knowledgeIndexResult.knowledgeIndex;
   knowledge.knowledgeSnapshot = knowledgeIndexResult.knowledgeSnapshot;
   knowledge.knowledgeIndexSearch = knowledgeIndexResult.knowledgeIndexSearch;
   knowledge.expandedKnowledgeContext = knowledgeIndexResult.expandedKnowledgeContext;
   const intent = detectLokiIntent(question, knowledge);
+  trace('STEP 11.3 Intent OK', { intent: intent?.id || '', confidence: intent?.confidence || 0 });
+  trace('STEP 11.4 Reasoning start', {});
   const contextReasoning = runReasoningEngine({ question, intent, knowledge, context });
+  trace('STEP 11.4 Reasoning OK', { handled: Boolean(contextReasoning?.reasoningHandled), intent: contextReasoning?.intent || '' });
+  trace('STEP 11.5 Conversation start', {});
   const conversationResult = runLokiConversationEngine({ question, intent, reasoningResult: contextReasoning, context });
+  trace('STEP 11.5 Conversation OK', { needsClarification: Boolean(conversationResult?.needsClarification), effectiveQuestion: conversationResult?.effectiveQuestion || '' });
   const conversationContext = conversationResult?.conversationContext || null;
   if (conversationResult?.needsClarification) {
     return attachDecision({
@@ -354,6 +368,7 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     memory: context?.memory || {},
     knowledge,
   });
+  trace('STEP 11.6 Capability OK', { capability: capabilityResult?.capabilityContext?.capability || '', confidence: capabilityResult?.capabilityContext?.confidence || 0 });
   const skillResult = runLokiSkillResolver({
     question: effectiveQuestion,
     intent: effectiveIntent,
@@ -364,6 +379,7 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     memory: context?.memory || {},
     knowledge,
   });
+  trace('STEP 11.7 Skills OK', { skill: skillResult?.skillContext?.skill || '', confidence: skillResult?.skillContext?.confidence || 0 });
   const executionResult = runCapabilityExecutionBridge({
     question: effectiveQuestion,
     capabilityContext: capabilityResult.capabilityContext,
@@ -372,6 +388,7 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     knowledge,
     parameters: skillResult.skillContext?.preparedParameters || {},
   });
+  trace('STEP 11.8 Execution Bridge OK', { capability: executionResult?.executionContext?.capability || '', ready: Boolean(executionResult?.executionContext?.ready), missing: executionResult?.executionContext?.missing || [] });
   const controlledExecutionResult = runControlledExecutionEngine({
     question: effectiveQuestion,
     executionContext: executionResult.executionContext,
@@ -379,6 +396,7 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     memory: context?.memory || {},
     appState: sourceState,
   });
+  trace('STEP 11.9 Controlled Execution OK', { ready: Boolean(controlledExecutionResult?.controlledExecutionContext?.executionReady), status: controlledExecutionResult?.controlledExecutionContext?.result?.status || '' });
   const contextWithCapability = {
     ...contextWithConversation,
     capabilityContext: capabilityResult.capabilityContext,
@@ -412,7 +430,9 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
     },
   };
   const contextJourney = runJourneyEngine({ question: effectiveQuestion, intent: effectiveIntent, knowledge, reasoningResult: effectiveReasoning, context: contextWithCapability });
+  trace('STEP 11.10 Journey OK', { handled: Boolean(contextJourney?.journeyHandled), intent: contextJourney?.intent || '' });
   const memoryResult = runLokiMemoryEngine({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithCapability, appState: sourceState });
+  trace('STEP 11.11 Memory OK', { empty: Boolean(memoryResult?.memoryContext?.empty), used: memoryResult?.memoryContext?.used?.length || 0 });
   const contextWithMemory = memoryResult?.context || context;
   const workflowSnapshot = buildWorkflowSnapshot(contextWithMemory?.memory || {});
   const contextWithWorkflow = {
@@ -432,20 +452,33 @@ export function runLokiKnowledgeEngine({ text: question, appState = {}, context 
   };
   const finalize = result => attachKnowledgeIndex(attachDecision(attachControlledExecution(attachExecution(attachSkill(attachCapability(result, capabilityResult), skillResult), executionResult), controlledExecutionResult), effectiveQuestion, contextWithWorkflow), knowledgeIndexResult);
   const continuationResult = runLokiAgentContinuation({ question: effectiveQuestion, context: contextWithWorkflow });
+  trace('STEP 12 Agent continuation checked', { handled: Boolean(continuationResult) });
   if (continuationResult) return finalize({ ...continuationResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });
+  trace('STEP 13 Planner start', {});
   const plannerResult = runLokiPlanner({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+  trace('STEP 13 Planner returned', { hasResult: Boolean(plannerResult), intent: plannerResult?.intent || '', goal: plannerResult?.planContext?.goal || '' });
   if (plannerResult) {
+    trace('STEP 13.1 Workflow start', {});
     const workflowResult = runLokiWorkflowEngine({ question: effectiveQuestion, intent: effectiveIntent, plannerResult, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+    trace('STEP 13.1 Workflow returned', { hasResult: Boolean(workflowResult), workflow: workflowResult?.workflowContext?.workflowId || '' });
     if (workflowResult) {
+      trace('STEP 13.2 Agent start', { source: 'workflow' });
       const agentResult = runLokiAgentEngine({ question: effectiveQuestion, result: workflowResult, context: contextWithWorkflow, appState: sourceState });
+      trace('STEP 13.2 Agent returned', { hasResult: Boolean(agentResult), intent: agentResult?.intent || '' });
       return finalize({ ...agentResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });
     }
+    trace('STEP 13.2 Agent start', { source: 'planner' });
     const agentResult = runLokiAgentEngine({ question: effectiveQuestion, result: plannerResult, context: contextWithWorkflow, appState: sourceState });
+    trace('STEP 13.2 Agent returned', { hasResult: Boolean(agentResult), intent: agentResult?.intent || '' });
     return finalize({ ...agentResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });
   }
+  trace('STEP 13 Tool Calling start', {});
   const toolResult = runLokiToolLayer({ question: effectiveQuestion, intent: effectiveIntent, reasoningResult: effectiveReasoning, journeyResult: contextJourney, knowledge, context: contextWithWorkflow, appState: sourceState });
+  trace('STEP 13 Tool Calling returned', { hasResult: Boolean(toolResult), status: toolResult?.toolContext?.status || '', tool: toolResult?.toolContext?.call?.id || '' });
   if (toolResult && toolResult.toolContext?.status !== 'denied') {
+    trace('STEP 13.2 Agent start', { source: 'tool' });
     const agentResult = runLokiAgentEngine({ question: effectiveQuestion, result: toolResult, context: contextWithWorkflow, appState: sourceState });
+    trace('STEP 13.2 Agent returned', { hasResult: Boolean(agentResult), intent: agentResult?.intent || '' });
     return finalize({ ...agentResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });
   }
   if (contextJourney?.journeyHandled) return finalize({ ...contextJourney, conversationContext });
