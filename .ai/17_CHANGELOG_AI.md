@@ -4144,6 +4144,7 @@
 - Backend deploy подключён к Yandex Cloud VPC network `enpa19j9jpki1f67p6kq`, чтобы Serverless Container мог резолвить private Managed PostgreSQL host.
 - PostgreSQL adapter нормализует connection string и убирает `sslmode` из URL, чтобы TLS policy управлялась единообразно через `pg` config и не падала на Yandex CA chain.
 - Identity resolver больше не создаёт новую PostgreSQL identity, если Firestore fallback недоступен из-за `RESOURCE_EXHAUSTED`; вместо этого возвращается диагностируемая `IDENTITY_FALLBACK_UNAVAILABLE`, чтобы не породить дубликаты пользователей.
+- Добавлен read-only `npm run firestore:recovery-audit`: проверяет Firebase Auth, Firestore metadata/data-plane, REST reads, Service Usage и Billing API без вывода секретов, чтобы определить, можно ли безопасно снять Identity Snapshot.
 
 # 2026-07-14 — Workspace Meetings CRM
 
