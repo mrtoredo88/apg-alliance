@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: First Journey v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/firstJourney.js`, `src/components/onboarding/FirstJourneyCard.jsx`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `scripts/first-journey-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен client-only First Journey из пяти реальных шагов: installed PWA, email login, первый успешный ответ Локи, подарки и первый полезный раздел.
+- На главной появляется компактная карточка прогресса с кнопкой “Продолжить”; внутри Journey используются существующие email-вход, Локи, подарки, партнёры, мероприятия и сообщения.
+- Локи получает готовые вопросы из Journey через локальное browser-событие, а шаг завершается только после успешного ответа.
+**Почему:** первый путь пользователя должен вести к существующим возможностям АПГ без искусственного шага редактирования профиля и без изменений Firestore/API/backend.
+
+---
+
 ## [2026-07-19] feat: mobile browser first-launch PWA onboarding
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/components/onboarding/PwaInstallGuide.jsx`, `src/UserApp.jsx`, `src/ProfilePanel.jsx`, `scripts/pwa-first-launch-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

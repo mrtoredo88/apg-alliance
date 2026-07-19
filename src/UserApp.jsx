@@ -44,6 +44,14 @@ import { formatRelativeTime } from './utils/time.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
 import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import {
+  FIRST_JOURNEY_EVENT,
+  getFirstJourneyState,
+  loadFirstJourneyProgress,
+  markFirstJourneyStep,
+  requestFirstJourneyLokiQuestion,
+  syncFirstJourneyDerived,
+} from './firstJourney.js';
 import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
@@ -932,6 +940,7 @@ export function UserApp() {
   const [showPwaInstallGuide, setShowPwaInstallGuide] = useState(false);
   const [showPwaEmailHint, setShowPwaEmailHint] = useState(false);
   const [showPwaEmailAuth, setShowPwaEmailAuth] = useState(false);
+  const [firstJourneyStored, setFirstJourneyStored] = useState(() => loadFirstJourneyProgress());
   const [showScannerHint, setShowScannerHint]   = useState(false);
   const [isOnline, setIsOnline]                 = useState(navigator.onLine);
   const [recentReviews, setRecentReviews]       = useState([]);
@@ -956,6 +965,22 @@ export function UserApp() {
     setShowPwaInstallGuide(shouldShowPwaInstallGuide({ user, isVk: vkShell }));
     setShowPwaEmailHint(shouldShowPwaEmailHint({ user, isVk: vkShell }));
   }, [loading, loggedOut, consentRequest, user?.id]);
+
+  useEffect(() => {
+    const handler = event => setFirstJourneyStored(event.detail || loadFirstJourneyProgress());
+    window.addEventListener(FIRST_JOURNEY_EVENT, handler);
+    return () => window.removeEventListener(FIRST_JOURNEY_EVENT, handler);
+  }, []);
+
+  useEffect(() => {
+    if (loading || loggedOut) return;
+    setFirstJourneyStored(syncFirstJourneyDerived({ user, activePanel }));
+  }, [activePanel, loading, loggedOut, user?.id, user?.email, user?.emailVerified]);
+
+  const firstJourney = useMemo(
+    () => getFirstJourneyState({ user, activePanel, stored: firstJourneyStored }),
+    [activePanel, firstJourneyStored, user?.id, user?.email, user?.emailVerified],
+  );
 
   // Реферальный параметр из URL должен переживать refresh/PWA-install до подтверждённого profile:sync.
   const pendingRefId = useMemo(() => readPendingReferral({ source: 'UserApp.mount' }), []);
@@ -2873,11 +2898,27 @@ export function UserApp() {
   }, []);
 
   const handlePwaEmailAuthSuccess = useCallback((emailUser, authPayload) => {
+    markFirstJourneyStep('email');
     setShowPwaEmailAuth(false);
     setShowPwaInstallGuide(false);
     setShowPwaEmailHint(false);
     handleEmailAuthSuccess(emailUser, authPayload);
   }, [handleEmailAuthSuccess]);
+
+  const handleFirstJourneyEmailLogin = useCallback(() => {
+    setShowPwaInstallGuide(false);
+    setShowPwaEmailHint(false);
+    setShowPwaEmailAuth(true);
+  }, []);
+
+  const handleFirstJourneyAskLoki = useCallback((text) => {
+    requestFirstJourneyLokiQuestion(text);
+  }, []);
+
+  const handleFirstJourneyOpenPanel = useCallback((panel) => {
+    if (!panel) return;
+    goPanel(panel);
+  }, [goPanel]);
 
   const handleConsentAccept = useCallback(async ({ termsAccepted, privacyAccepted, notificationsAccepted }) => {
     const targetUser = consentRequest?.user;
@@ -3961,6 +4002,10 @@ export function UserApp() {
     homeExperience,
     continueExperience,
     recommendations,
+    firstJourney,
+    onFirstJourneyEmailLogin: handleFirstJourneyEmailLogin,
+    onFirstJourneyAskLoki: handleFirstJourneyAskLoki,
+    onFirstJourneyOpenPanel: handleFirstJourneyOpenPanel,
   };
 
   const handleOpenHome = useCallback(() => goPanel('home'), [goPanel]);

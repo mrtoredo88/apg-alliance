@@ -207,6 +207,13 @@ export function LokiExperience({ loki }) {
     if (action) setTimeout(() => loki.executeAction(action), 520);
   };
 
+  useEffect(() => {
+    const pending = loki.pendingFirstJourneyQuestion;
+    if (!pending?.text || loki.brainThinking) return;
+    loki.clearPendingFirstJourneyQuestion?.();
+    ask(pending.text, null, { source: 'first_journey' });
+  }, [loki.pendingFirstJourneyQuestion?.id]);
+
   const startVoiceMode = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {

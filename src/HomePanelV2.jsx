@@ -12,6 +12,7 @@ import { formatNewsDate, getNewsCategory, getNewsCategoryLabel, getNewsImage, ge
 import { buildAdaptiveHomeData } from './interestEngine.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { DesktopTopOverview } from './components/DesktopUI.jsx';
+import { FirstJourneyCard } from './components/onboarding/FirstJourneyCard.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
@@ -2848,6 +2849,10 @@ export function HomePanelV2({
   homeExperience = null,
   continueExperience = null,
   recommendations = null,
+  firstJourney = null,
+  onFirstJourneyEmailLogin,
+  onFirstJourneyAskLoki,
+  onFirstJourneyOpenPanel,
 }) {
   // Главная показывает только актуальные события: не удалённые/архивные и не завершившиеся, ближайшие первыми
   const events = useMemo(() => selectActualEvents(rawEvents), [rawEvents]);
@@ -2999,6 +3004,16 @@ export function HomePanelV2({
         desktopWorkspaceMode={desktopWorkspaceMode}
         desktopMode={desktopMode}
         homeExperience={homeExperience}
+      />
+
+      <FirstJourneyCard
+        journey={firstJourney}
+        onEmailLogin={onFirstJourneyEmailLogin}
+        onAskLoki={onFirstJourneyAskLoki}
+        onOpenRewards={onOpenRewards}
+        onOpenPanel={onFirstJourneyOpenPanel}
+        onOpenLoki={onOpenLoki}
+        onOpenHome={() => onFirstJourneyOpenPanel?.('home')}
       />
 
       {/* Pull-to-refresh indicator */}

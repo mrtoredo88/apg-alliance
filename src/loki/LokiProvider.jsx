@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { logError } from '../errorLogger.js';
 import { userAction } from '../userApi.js';
+import { FIRST_JOURNEY_LOKI_QUESTION_EVENT, markFirstJourneyStep } from '../firstJourney.js';
 import { LOKI_EVENTS } from './lokiEvents.js';
 import { getLokiPhrase } from './lokiPhrases.js';
 import { subscribeLoki } from './lokiBus.js';
@@ -76,6 +77,10 @@ function recordLokiTapTrace(step, detail = {}) {
     detail,
     at: new Date().toISOString(),
   }];
+}
+
+function markFirstJourneyLokiAnswered() {
+  markFirstJourneyStep('loki');
 }
 
 function withLokiAnswerTimeout(promise, text) {
@@ -515,6 +520,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const [card, setCard] = useState(null);
   const [brainThinking, setBrainThinking] = useState(false);
   const [experienceOpen, setExperienceOpen] = useState(false);
+  const [pendingFirstJourneyQuestion, setPendingFirstJourneyQuestion] = useState(null);
   const [activeContext, setActiveContext] = useState(() => loadLokiMemory().activeContext ?? loadLokiMemory().lastContext ?? null);
   const [anchor, setAnchor] = useState('home');
   const [action, setAction] = useState(LOKI_ACTIONS.IDLE);
@@ -523,6 +529,22 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const queueRef = useRef([]);
   const activeHistoryIdRef = useRef(null);
   const currentPriorityRef = useRef(LOKI_MESSAGE_PRIORITY.LOW);
+
+  useEffect(() => {
+    const handler = event => {
+      const text = String(event.detail?.text || '').trim();
+      if (!text) return;
+      setActiveContext(null);
+      setPendingFirstJourneyQuestion({ id: event.detail?.id || `${Date.now()}`, text });
+      setExperienceOpen(true);
+      setVisible(false);
+      setDismissed(false);
+      setEmotion('helper');
+      setAction(LOKI_ACTIONS.LISTEN);
+    };
+    window.addEventListener(FIRST_JOURNEY_LOKI_QUESTION_EVENT, handler);
+    return () => window.removeEventListener(FIRST_JOURNEY_LOKI_QUESTION_EVENT, handler);
+  }, []);
   const lastUserActionAtRef = useRef(Date.now());
   const lastPanelChangeAtRef = useRef(Date.now());
   const observerTimerRef = useRef(null);
@@ -1284,6 +1306,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           pipelineStep: contextInspection.fallbackUsed ? 'Response Normalizer' : 'UI',
           pipelineTimeline: traceTimeline(),
         });
+        if (!contextInspection.fallbackUsed) markFirstJourneyLokiAnswered();
         return { card: null, ...normalizedContextResult };
       }
       recordLokiMessageTrace('STEP 7 News context skipped', {});
@@ -1406,6 +1429,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         pipelineStep: normalizedResult.debug?.timeout ? normalizedResult.debug?.stoppedAt || 'LokiBrain timeout' : resultInspection.fallbackUsed ? 'Response Normalizer' : 'UI',
         pipelineTimeline: traceTimeline(),
       });
+      if (!normalizedResult.debug?.timeout && !resultInspection.fallbackUsed) markFirstJourneyLokiAnswered();
       const actionToRun = normalizedResult.executeAction ?? (options.autoExecute ? normalizedResult.autoAction : null);
       if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
       else if (normalizedResult.controlledExecutionContext?.executionReady) setTimeout(() => dispatchControlledExecution(normalizedResult.controlledExecutionContext), 120);
@@ -1485,6 +1509,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     emotionalState,
     executeAction,
     experienceOpen,
+    pendingFirstJourneyQuestion,
+    clearPendingFirstJourneyQuestion: () => setPendingFirstJourneyQuestion(null),
     isHiddenOnPanel,
     lastEvent,
     history,
@@ -1563,7 +1589,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setMode: (mode) => persistSettings({ ...settings, mode }),
     setPersonalityMode: (personalityMode) => persistSettings({ ...settings, personalityMode }),
   };
-  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
+  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }
