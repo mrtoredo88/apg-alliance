@@ -621,7 +621,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, desktopOverview = null, desktopMode = false, onBack }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', desktopOverview = null, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -675,6 +675,15 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   });
   const [socialLoading, setSocialLoading] = useState(false);
   const [socialError, setSocialError] = useState('');
+  const [connections, setConnections] = useState([]);
+  const [connectionRequests, setConnectionRequests] = useState([]);
+  const [connectionLoading, setConnectionLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState('');
+  const [showConnectionsModal, setShowConnectionsModal] = useState(false);
+  const [showBusinessCard, setShowBusinessCard] = useState(false);
+  const [connectionFilter, setConnectionFilter] = useState('all');
+  const [connectionSearch, setConnectionSearch] = useState('');
+  const [connectionTarget, setConnectionTarget] = useState(null);
 
   useEffect(() => {
     try {
@@ -743,6 +752,49 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       unsubBlocks();
     };
   }, [isGuest, saveSocialMessagingState, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || isGuest) return;
+    let cancelled = false;
+    setConnectionLoading(true);
+    setConnectionError('');
+    userAction('connections:list')
+      .then(data => {
+        if (cancelled) return;
+        setConnections(Array.isArray(data.contacts) ? data.contacts : []);
+        setConnectionRequests(Array.isArray(data.requests) ? data.requests : []);
+      })
+      .catch(e => {
+        if (!cancelled) setConnectionError(e?.message || 'Не удалось загрузить контакты.');
+      })
+      .finally(() => {
+        if (!cancelled) setConnectionLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isGuest, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || isGuest) return undefined;
+    return onSnapshot(collection(db, 'users', String(user.id), 'connections'), snap => {
+      const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setConnections(rows.filter(item => item.status === 'connected').sort((a, b) => new Date(b.connectedAt || b.updatedAt || 0).getTime() - new Date(a.connectedAt || a.updatedAt || 0).getTime()));
+    }, () => {});
+  }, [isGuest, user?.id]);
+
+  useEffect(() => {
+    const targetId = String(initialConnectionTargetId || '').trim();
+    if (!targetId || !user?.id || targetId === String(user.id) || isGuest) {
+      setConnectionTarget(null);
+      return;
+    }
+    let cancelled = false;
+    setConnectionLoading(true);
+    userAction('connections:check', { targetUserId: targetId })
+      .then(data => { if (!cancelled) setConnectionTarget(data); })
+      .catch(e => { if (!cancelled) setConnectionError(e?.message || 'Не удалось открыть профиль для знакомства.'); })
+      .finally(() => { if (!cancelled) setConnectionLoading(false); });
+    return () => { cancelled = true; };
+  }, [initialConnectionTargetId, isGuest, user?.id]);
 
   const updateSocialPrivacyServer = useCallback(async (privacy) => {
     const next = normalizeSocialPrivacy(privacy);
@@ -1206,6 +1258,35 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   ].filter(Boolean), [isDark, notificationsEnabled, onEnableNotifications, onOpenActivity, onOpenReferral, onOpenPartnerCabinet, onOpenExpertCabinet, ownedPartner, ownedExpert]);
   const socialIncomingRequests = useMemo(() => socialRequests.filter(item => String(item.toUserId || '') === String(user?.id || '')), [socialRequests, user?.id]);
   const socialOutgoingRequests = useMemo(() => socialRequests.filter(item => String(item.fromUserId || '') === String(user?.id || '')), [socialRequests, user?.id]);
+  const incomingConnectionRequests = useMemo(() => connectionRequests.filter(item => item.connection === true && item.direction === 'incoming' && item.status === 'pending'), [connectionRequests]);
+  const outgoingConnectionRequests = useMemo(() => connectionRequests.filter(item => item.connection === true && item.direction === 'outgoing' && item.status === 'pending'), [connectionRequests]);
+  const businessCardUrl = useMemo(() => `${APP_URL.replace(/\/+$/, '')}/profile/${encodeURIComponent(String(user?.id || ''))}`, [user?.id]);
+  const filteredConnections = useMemo(() => {
+    const q = connectionSearch.trim().toLowerCase();
+    return connections.filter(item => {
+      const contact = item.contact || {};
+      const role = String(contact.role || '').toLowerCase();
+      const haystack = [contact.displayName, contact.company, contact.role, contact.city].join(' ').toLowerCase();
+      if (q && !haystack.includes(q)) return false;
+      if (connectionFilter === 'new') return new Date(item.connectedAt || item.updatedAt || 0).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
+      if (connectionFilter === 'partners') return role.includes('partner') || role.includes('парт');
+      if (connectionFilter === 'experts') return role.includes('expert') || role.includes('эксп');
+      if (connectionFilter === 'users') return !role.includes('partner') && !role.includes('парт') && !role.includes('expert') && !role.includes('эксп');
+      return true;
+    });
+  }, [connectionFilter, connectionSearch, connections]);
+  const connectionDevPanel = useMemo(() => {
+    const latest = connections[0] || null;
+    const target = connectionTarget || {};
+    return {
+      ConnectionStatus: target.status || latest?.status || 'none',
+      Source: target.connectionContext?.sourceLabel || latest?.sourceLabel || 'none',
+      SharedEvents: String(target.shared?.events?.length ?? latest?.shared?.events?.length ?? 0),
+      SharedPartners: String(target.shared?.partners?.length ?? latest?.shared?.partners?.length ?? 0),
+      Dialog: target.dialogId || latest?.dialogId || 'none',
+      SocialGraph: `${connections.length} contacts`,
+    };
+  }, [connectionTarget, connections]);
   const socialDevPanel = useMemo(() => buildSocialMessagingDevPanel({
     actor: { ...user, socialMessagingPrivacy: socialPrivacy },
     requests: socialRequests,
@@ -1237,6 +1318,32 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       })
       .catch(e => setSocialError(e?.message || 'Не удалось обновить блокировку.'));
   }, [saveSocialMessagingState, socialBlockedIds]);
+  const requestConnection = useCallback((targetId, source = 'manual') => {
+    const id = String(targetId || '').trim();
+    if (!id) return;
+    setConnectionError('');
+    userAction('connections:request', { targetUserId: id, source })
+      .then(data => {
+        if (data.request) setConnectionRequests(prev => [data.request, ...prev.filter(item => String(item.id) !== String(data.request.id))]);
+        if (data.dialogId) onOpenDialog?.(data.dialogId);
+        if (connectionTarget?.target?.id === id) setConnectionTarget(prev => ({ ...(prev || {}), ...data, action: data.dialogId ? 'message' : 'pending' }));
+      })
+      .catch(e => setConnectionError(e?.message || 'Не удалось отправить запрос на знакомство.'));
+  }, [connectionTarget?.target?.id, onOpenDialog]);
+  const updateConnectionRequest = useCallback((requestId, status) => {
+    const action = status === 'accepted' ? 'connections:accept' : 'connections:decline';
+    setConnectionError('');
+    userAction(action, { requestId })
+      .then(data => {
+        if (data.request) setConnectionRequests(prev => prev.map(item => String(item.id) === String(requestId) ? data.request : item));
+        if (data.dialogId) onOpenDialog?.(data.dialogId);
+      })
+      .catch(e => setConnectionError(e?.message || 'Не удалось обновить знакомство.'));
+  }, [onOpenDialog]);
+  const openConnectionDialog = useCallback((item) => {
+    const dialogId = item?.dialogId || '';
+    if (dialogId) onOpenDialog?.(dialogId);
+  }, [onOpenDialog]);
   const handleDesktopReschedule = useCallback((item) => {
     const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
     if (!startAt) return;
@@ -1610,6 +1717,100 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
           </section>
         )}
+
+        <GlassSection title="Контакты">
+          <GlassCard data-connections-panel style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 17, background: 'rgba(74,144,217,0.14)', color: '#4A90D9', display: 'grid', placeItems: 'center', flexShrink: 0 }}>🤝</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: APG2.text, fontSize: 16, lineHeight: '20px', fontWeight: 860 }}>Цифровые знакомства</div>
+                <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 3 }}>Контакты появляются после подтверждения знакомства и сразу используют личный диалог АПГ.</div>
+              </div>
+            </div>
+            {connectionTarget?.target && (
+              <div data-connection-target-card style={{ borderRadius: 18, border: '1px solid rgba(74,144,217,0.24)', background: 'rgba(74,144,217,0.08)', padding: 12, display: 'grid', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  {connectionTarget.target.photo
+                    ? <img src={connectionTarget.target.photo} alt="" style={{ width: 44, height: 44, borderRadius: 16, objectFit: 'cover' }} />
+                    : <div style={{ width: 44, height: 44, borderRadius: 16, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{(connectionTarget.target.displayName || 'А')[0]}</div>
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: APG2.text, fontSize: 14, fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{connectionTarget.target.displayName}</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px' }}>{connectionTarget.reason === 'manual_request_available' ? 'Можно отправить запрос на знакомство' : connectionTarget.reason || 'Профиль АПГ'}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {(connectionTarget.action === 'message' || connectionTarget.status === 'connected') && connectionTarget.dialogId
+                    ? <GlassButton tone="gold" onClick={() => onOpenDialog?.(connectionTarget.dialogId)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>💬 Написать</GlassButton>
+                    : connectionTarget.action === 'pending' || connectionTarget.status === 'pending'
+                      ? <GlassButton disabled style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Запрос отправлен</GlassButton>
+                      : <GlassButton tone="gold" onClick={() => requestConnection(connectionTarget.target.id, 'qr')} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>🤝 Познакомиться</GlassButton>
+                  }
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {[
+                ['Контакты', connections.length],
+                ['Новые', connections.filter(item => new Date(item.connectedAt || item.updatedAt || 0).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000).length],
+                ['Запросы', incomingConnectionRequests.length + outgoingConnectionRequests.length],
+              ].map(([label, value]) => (
+                <div key={label} style={{ borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', padding: 10, textAlign: 'center' }}>
+                  <div style={{ color: APG2.text, fontSize: 18, lineHeight: '21px', fontWeight: 900 }}>{value}</div>
+                  <div style={{ color: APG2.textMuted, fontSize: 10.5, lineHeight: '14px', marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {connectionLoading && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>Синхронизируем знакомства...</div>}
+            {connectionError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px' }}>{connectionError}</div>}
+            {incomingConnectionRequests.slice(0, 3).map(item => (
+              <div key={item.id} style={{ borderRadius: 16, padding: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.08)', display: 'grid', gap: 8 }}>
+                <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 820 }}>{item.sender?.displayName || item.senderId || 'Участник АПГ'} хочет познакомиться</div>
+                <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px' }}>{item.connectionSourceTitle || item.connectionSourceLabel || 'Ручной запрос'}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <GlassButton onClick={() => updateConnectionRequest(item.id, 'accepted')} tone="gold" style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Принять</GlassButton>
+                  <GlassButton onClick={() => updateConnectionRequest(item.id, 'declined')} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Отклонить</GlassButton>
+                </div>
+              </div>
+            ))}
+            {connections.length > 0 ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {connections.slice(0, 3).map(item => (
+                  <button key={item.id} type="button" onClick={() => openConnectionDialog(item)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 16, padding: 10, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: item.dialogId ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 13, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(item.contact?.displayName || 'А')[0]}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.contact?.displayName || item.contactUserId}</div>
+                      <div style={{ color: APG2.textMuted, fontSize: 11, lineHeight: '15px' }}>{item.sourceTitle || item.sourceLabel || 'Знакомство АПГ'}</div>
+                    </div>
+                    {item.dialogId && <span style={{ color: APG2.gold, fontSize: 13 }}>💬</span>}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px' }}>Контактов пока нет. Покажите QR-карточку на мероприятии или примите входящий запрос.</div>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <GlassButton data-my-contacts-button onClick={() => setShowConnectionsModal(true)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мои контакты</GlassButton>
+              <GlassButton data-digital-business-card onClick={() => setShowBusinessCard(true)} tone="gold" style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
+            </div>
+            <div data-connections-dev-panel style={{ borderRadius: 16, border: '1px solid rgba(74,144,217,0.22)', background: 'rgba(74,144,217,0.08)', padding: 10, display: 'grid', gap: 5 }}>
+              <div style={{ color: '#4A90D9', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6 }}>Dev Panel · Connections</div>
+              {[
+                ['Connection Status', connectionDevPanel.ConnectionStatus],
+                ['Source', connectionDevPanel.Source],
+                ['Shared Events', connectionDevPanel.SharedEvents],
+                ['Shared Partners', connectionDevPanel.SharedPartners],
+                ['Dialog', connectionDevPanel.Dialog],
+                ['Social Graph', connectionDevPanel.SocialGraph],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: APG2.textMuted, fontSize: 11.5, lineHeight: '15px' }}>
+                  <span>{label}</span>
+                  <strong style={{ color: APG2.text, fontWeight: 820 }}>{value}</strong>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        </GlassSection>
 
         {isGuest && !isVK() && (
           <GlassSection title="Вход">
@@ -2981,6 +3182,103 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </button>
           </div>
         </ApgModal>
+      )}
+
+      {showConnectionsModal && createPortal(
+        <ApgModal
+          title="Мои контакты"
+          subtitle="Люди, с которыми вы подтвердили цифровое знакомство."
+          onClose={() => setShowConnectionsModal(false)}
+          maxWidth={540}
+        >
+          <div data-connections-list style={{ display: 'grid', gap: 12 }}>
+            <GlassInput
+              value={connectionSearch}
+              onChange={e => setConnectionSearch(e.target.value)}
+              placeholder="Поиск по имени, компании или роли"
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                ['all', 'Все'],
+                ['new', 'Новые'],
+                ['partners', 'Партнёры'],
+                ['experts', 'Эксперты'],
+                ['users', 'Пользователи'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setConnectionFilter(id)}
+                  style={{ minHeight: 34, borderRadius: 14, border: `1px solid ${connectionFilter === id ? 'rgba(201,168,76,0.44)' : 'rgba(var(--apg2-glass-a,255,255,255),0.14)'}`, background: connectionFilter === id ? APG2.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: connectionFilter === id ? APG2.gold : APG2.text, padding: '7px 10px', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {filteredConnections.length ? filteredConnections.map(item => (
+              <div key={item.id} style={{ ...APG2.glass, borderRadius: 18, padding: 12, display: 'flex', gap: 11, alignItems: 'center' }}>
+                <div style={{ width: 42, height: 42, borderRadius: 16, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(item.contact?.displayName || 'А')[0]}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.contact?.displayName || item.contactUserId}</div>
+                  <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{item.contact?.company || item.contact?.role || item.sourceTitle || item.sourceLabel || 'Контакт АПГ'}</div>
+                  {(item.shared?.events?.length || item.shared?.partners?.length || item.shared?.contacts?.length) ? (
+                    <div style={{ color: APG2.textSoft, fontSize: 10.5, lineHeight: '15px', marginTop: 4 }}>
+                      {item.shared?.contacts?.length || 0} общих контакта · {item.shared?.events?.length || 0} мероприятий · {item.shared?.partners?.length || 0} партнёров
+                    </div>
+                  ) : null}
+                </div>
+                <GlassButton onClick={() => openConnectionDialog(item)} disabled={!item.dialogId} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>💬</GlassButton>
+              </div>
+            )) : (
+              <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 16 }}>Контакты по этому фильтру не найдены.</div>
+            )}
+          </div>
+        </ApgModal>,
+        document.body
+      )}
+
+      {showBusinessCard && createPortal(
+        <ApgModal
+          title="Цифровая карточка"
+          subtitle="Покажите QR на мероприятии, чтобы другой участник открыл ваш профиль."
+          onClose={() => setShowBusinessCard(false)}
+          maxWidth={430}
+        >
+          <div data-business-card-modal style={{ display: 'grid', gap: 14 }}>
+            <div style={{ ...APG2.glass, borderRadius: 24, padding: 16, textAlign: 'center', display: 'grid', gap: 10, justifyItems: 'center' }}>
+              {safeUser.photo_200
+                ? <img src={safeUser.photo_200} alt="" style={{ width: 74, height: 74, borderRadius: 26, objectFit: 'cover', border: '2px solid rgba(201,168,76,0.36)' }} />
+                : <div style={{ width: 74, height: 74, borderRadius: 26, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 900 }}>{displayName[0] || 'А'}</div>
+              }
+              <div>
+                <div style={{ color: APG2.text, fontSize: 20, lineHeight: '25px', fontWeight: 920 }}>{displayName}</div>
+                <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{user?.role || user?.city || 'Участник АПГ'}</div>
+              </div>
+              {(user?.about || user?.bio || user?.company || ownedPartner?.name || ownedExpert?.name) && (
+                <div style={{ color: APG2.textSoft, fontSize: 12.5, lineHeight: '18px', maxWidth: 310 }}>
+                  {user?.about || user?.bio || user?.company || ownedPartner?.name || ownedExpert?.name}
+                </div>
+              )}
+              <div style={{ background: '#fff', borderRadius: 18, padding: 12 }}>
+                <QRCodeSVG value={businessCardUrl} size={178} level="M" includeMargin />
+              </div>
+              <div style={{ color: APG2.textMuted, fontSize: 11, lineHeight: '15px', overflowWrap: 'anywhere', userSelect: 'text' }}>{businessCardUrl}</div>
+            </div>
+            <GlassButton
+              tone="gold"
+              onClick={async () => {
+                const text = `${displayName} в АПГ: ${businessCardUrl}`;
+                if (navigator.share) {
+                  try { await navigator.share({ title: 'Цифровая карточка АПГ', text, url: businessCardUrl }); return; } catch (err) { if (err.name === 'AbortError') return; }
+                }
+                try { await navigator.clipboard.writeText(text); } catch {}
+              }}
+            >
+              Поделиться карточкой
+            </GlassButton>
+          </div>
+        </ApgModal>,
+        document.body
       )}
 
       {showShareModal && createPortal(

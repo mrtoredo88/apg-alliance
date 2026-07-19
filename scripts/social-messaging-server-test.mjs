@@ -86,7 +86,7 @@ scenario('security rules protect server-owned social documents', () => {
   assert.ok(rules.includes('allow write: if false;'));
   assert.ok(rules.includes('match /socialMessagingRequests/{requestId}'));
   assert.ok(rules.includes('match /blockedUsers/{blockedUserId}'));
-  assert.ok(rules.includes("!(sub in ['socialMessagingRequests', 'blockedUsers'])"));
+  assert.ok(rules.includes("!(sub in ['socialMessagingRequests', 'blockedUsers', 'connections'])"));
 });
 
 scenario('client social panel is server-backed with realtime mirrors', () => {

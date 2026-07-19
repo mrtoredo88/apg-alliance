@@ -84,18 +84,23 @@ import {
   workspaceEventStatus,
 } from '../../../server-shared/workspace-events.js';
 import {
+  CONNECTION_STATUS,
   SOCIAL_DECLINE_COOLDOWN_MS,
   SOCIAL_EVENTS,
   SOCIAL_PRIVACY,
   SOCIAL_REQUEST_LIMIT,
   SOCIAL_REQUEST_STATUS,
+  buildConnectionSharedContext,
   cleanSocialId,
+  createConnectionContext,
   createSocialRequestRecord,
   isDeclineCooldownActive,
   isRecentSocialRequest,
+  normalizeConnectionStatus,
   normalizeSocialPair,
   normalizeSocialPrivacy,
   normalizeSocialRequestStatus,
+  socialPublicUser,
   socialDirectDialogId,
   socialRequestId,
 } from '../../../server-shared/social-messaging.js';
@@ -3197,8 +3202,14 @@ async function hasSocialBlock(db, a = '', b = '') {
 }
 
 function socialFriends(a = {}, b = {}, aId = '', bId = '') {
-  const aFriends = Array.isArray(a.friendIds) ? a.friendIds : Array.isArray(a.friends) ? a.friends : [];
-  const bFriends = Array.isArray(b.friendIds) ? b.friendIds : Array.isArray(b.friends) ? b.friends : [];
+  const mergeIds = (value = {}) => [
+    ...(Array.isArray(value.friendIds) ? value.friendIds : []),
+    ...(Array.isArray(value.friends) ? value.friends : []),
+    ...(Array.isArray(value.connectionIds) ? value.connectionIds : []),
+    ...(Array.isArray(value.socialConnectionIds) ? value.socialConnectionIds : []),
+  ];
+  const aFriends = mergeIds(a);
+  const bFriends = mergeIds(b);
   return aFriends.map(String).includes(String(bId)) || bFriends.map(String).includes(String(aId));
 }
 
@@ -3276,6 +3287,15 @@ function socialRequestMirror(data = {}, viewerId = '') {
     acceptedAt: data.acceptedAt || null,
     declinedAt: data.declinedAt || null,
     cancelledAt: data.cancelledAt || null,
+    connection: data.connection === true,
+    connectionStatus: data.connectionStatus || '',
+    connectionSource: data.connectionSource || '',
+    connectionSourceLabel: data.connectionSourceLabel || '',
+    connectionSourceId: data.connectionSourceId || '',
+    connectionSourceTitle: data.connectionSourceTitle || '',
+    connectionSourceDate: data.connectionSourceDate || '',
+    shared: data.shared || null,
+    history: Array.isArray(data.history) ? data.history.slice(-12) : [],
   };
 }
 
@@ -3285,6 +3305,89 @@ async function mirrorSocialRequest(db, data = {}) {
     batch.set(db.collection('users').doc(participantId).collection('socialMessagingRequests').doc(data.id), socialRequestMirror(data, participantId), { merge: true });
   }
   await batch.commit();
+}
+
+function connectionMirror(data = {}, viewerId = '') {
+  const otherId = String(data.senderId) === String(viewerId) ? data.recipientId : data.senderId;
+  const other = String(data.senderId) === String(viewerId) ? data.recipient : data.sender;
+  return {
+    id: otherId,
+    requestId: data.id,
+    pairKey: data.pairKey,
+    userId: viewerId,
+    contactUserId: otherId,
+    status: normalizeConnectionStatus(data.connectionStatus || data.status),
+    source: data.connectionSource || data.source || 'manual',
+    sourceLabel: data.connectionSourceLabel || data.sourceLabel || 'Ручной запрос',
+    sourceId: data.connectionSourceId || data.sourceId || '',
+    sourceTitle: data.connectionSourceTitle || data.sourceTitle || '',
+    sourceDate: data.connectionSourceDate || data.sourceDate || '',
+    introducedAt: data.createdAt || FieldValue.serverTimestamp(),
+    connectedAt: data.connectedAt || data.acceptedAt || null,
+    dialogId: data.dialogId || '',
+    contact: other || null,
+    shared: data.shared || { events: [], partners: [], contacts: [] },
+    history: Array.isArray(data.history) ? data.history.slice(-12) : [],
+    updatedAt: data.updatedAt || FieldValue.serverTimestamp(),
+    createdAt: data.createdAt || FieldValue.serverTimestamp(),
+  };
+}
+
+async function mirrorConnection(db, data = {}) {
+  const senderId = cleanSocialId(data.senderId);
+  const recipientId = cleanSocialId(data.recipientId);
+  if (!senderId || !recipientId) return;
+  const batch = db.batch();
+  batch.set(db.collection('users').doc(senderId).collection('connections').doc(recipientId), connectionMirror(data, senderId), { merge: true });
+  batch.set(db.collection('users').doc(recipientId).collection('connections').doc(senderId), connectionMirror(data, recipientId), { merge: true });
+  batch.set(db.collection('users').doc(senderId), {
+    connectionIds: FieldValue.arrayUnion(recipientId),
+    socialConnectionIds: FieldValue.arrayUnion(recipientId),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  batch.set(db.collection('users').doc(recipientId), {
+    connectionIds: FieldValue.arrayUnion(senderId),
+    socialConnectionIds: FieldValue.arrayUnion(senderId),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await batch.commit();
+}
+
+function connectionSourceFromRequest(req = {}) {
+  return createConnectionContext({
+    source: req.body?.source || req.body?.connectionSource || 'manual',
+    sourceId: req.body?.sourceId || req.body?.connectionSourceId || '',
+    sourceTitle: req.body?.sourceTitle || req.body?.connectionSourceTitle || '',
+    sourceDate: req.body?.sourceDate || req.body?.connectionSourceDate || '',
+  });
+}
+
+function connectionHistoryEntry(type = 'requested', actorId = '', context = {}) {
+  return {
+    type,
+    actorId: cleanSocialId(actorId),
+    source: context.source || 'manual',
+    sourceLabel: context.sourceLabel || 'Ручной запрос',
+    sourceId: context.sourceId || '',
+    sourceTitle: context.sourceTitle || '',
+    sourceDate: context.sourceDate || '',
+    at: new Date().toISOString(),
+  };
+}
+
+function connectionSnapshot(data = {}, viewerId = '') {
+  return {
+    id: data.id,
+    requestId: data.id,
+    status: normalizeConnectionStatus(data.connectionStatus || data.status),
+    source: data.connectionSource || 'manual',
+    sourceLabel: data.connectionSourceLabel || 'Ручной запрос',
+    sourceTitle: data.connectionSourceTitle || '',
+    dialogId: data.dialogId || '',
+    contact: String(data.senderId) === String(viewerId) ? data.recipient : data.sender,
+    shared: data.shared || { events: [], partners: [], contacts: [] },
+    history: Array.isArray(data.history) ? data.history.slice(-12) : [],
+  };
 }
 
 async function writeSocialNotification(db, userId, data = {}) {
@@ -3812,11 +3915,44 @@ async function actionSocialResolveRequest(db, req, actor, status) {
     declinedAt: status === SOCIAL_REQUEST_STATUS.DECLINED ? FieldValue.serverTimestamp() : request.declinedAt || null,
     cancelledAt: status === SOCIAL_REQUEST_STATUS.CANCELLED ? FieldValue.serverTimestamp() : request.cancelledAt || null,
   };
+  if (request.connection === true) {
+    patch.connectionStatus = status === SOCIAL_REQUEST_STATUS.ACCEPTED
+      ? CONNECTION_STATUS.CONNECTED
+      : status === SOCIAL_REQUEST_STATUS.DECLINED || status === SOCIAL_REQUEST_STATUS.CANCELLED
+        ? CONNECTION_STATUS.DECLINED
+        : normalizeConnectionStatus(request.connectionStatus);
+    patch.connectedAt = status === SOCIAL_REQUEST_STATUS.ACCEPTED ? FieldValue.serverTimestamp() : request.connectedAt || null;
+    patch.history = [
+      ...(Array.isArray(request.history) ? request.history.slice(-10) : []),
+      connectionHistoryEntry(status === SOCIAL_REQUEST_STATUS.ACCEPTED ? 'connected' : status, actor.userId, {
+        source: request.connectionSource,
+        sourceLabel: request.connectionSourceLabel,
+        sourceId: request.connectionSourceId,
+        sourceTitle: request.connectionSourceTitle,
+        sourceDate: request.connectionSourceDate,
+      }),
+    ];
+  }
   await db.collection('conversationRequests').doc(request.id).set(patch, { merge: true });
-  const mirrored = { ...request, ...patch, updatedAt: new Date().toISOString(), acceptedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? new Date().toISOString() : request.acceptedAt || null, declinedAt: status === SOCIAL_REQUEST_STATUS.DECLINED ? new Date().toISOString() : request.declinedAt || null, cancelledAt: status === SOCIAL_REQUEST_STATUS.CANCELLED ? new Date().toISOString() : request.cancelledAt || null };
+  const mirrored = {
+    ...request,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+    acceptedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? new Date().toISOString() : request.acceptedAt || null,
+    declinedAt: status === SOCIAL_REQUEST_STATUS.DECLINED ? new Date().toISOString() : request.declinedAt || null,
+    cancelledAt: status === SOCIAL_REQUEST_STATUS.CANCELLED ? new Date().toISOString() : request.cancelledAt || null,
+    connectedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED && request.connection === true ? new Date().toISOString() : request.connectedAt || null,
+  };
   await mirrorSocialRequest(db, mirrored);
+  if (status === SOCIAL_REQUEST_STATUS.ACCEPTED && request.connection === true) await mirrorConnection(db, mirrored);
   if (status === SOCIAL_REQUEST_STATUS.ACCEPTED) {
-    await writeSocialNotification(db, request.senderId, { type: 'socialMessageRequestAccepted', title: 'Запрос на общение принят', body: 'Можно перейти к переписке.', requestId: request.id, dialogId }).catch(() => {});
+    await writeSocialNotification(db, request.senderId, {
+      type: request.connection === true ? 'connectionAccepted' : 'socialMessageRequestAccepted',
+      title: request.connection === true ? 'Знакомство подтверждено' : 'Запрос на общение принят',
+      body: request.connection === true ? 'Контакт добавлен, можно перейти к переписке.' : 'Можно перейти к переписке.',
+      requestId: request.id,
+      dialogId,
+    }).catch(() => {});
     await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_ACCEPTED, 'conversationRequests', request.id, 'success', { dialogId });
     await audit(db, req, actor, SOCIAL_EVENTS.DIALOG_LINKED, 'contextDialog', dialogId, 'success', { requestId: request.id });
   } else if (status === SOCIAL_REQUEST_STATUS.DECLINED) {
@@ -3849,6 +3985,166 @@ async function actionSocialUpdatePrivacy(db, req, actor) {
   await db.collection('users').doc(actor.userId).set({ messagingPrivacy: privacy, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   await audit(db, req, actor, 'socialMessaging:updatePrivacy', 'users', actor.userId, 'success', { privacy });
   return { ok: true, privacy };
+}
+
+async function actionConnectionsCheck(db, req, actor) {
+  const targetUserId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
+  const result = await evaluateServerSocialEligibility(db, actor, targetUserId);
+  const request = targetUserId ? await getSocialRequest(db, socialRequestId(actor.userId, targetUserId)) : null;
+  const target = result.recipient || await getSocialUser(db, targetUserId);
+  const shared = buildConnectionSharedContext(actor.user || {}, target?.data || {});
+  const connectionStatus = request?.connection === true
+    ? normalizeConnectionStatus(request.connectionStatus || request.status)
+    : result.ok && result.reason === 'existing_conversation'
+      ? CONNECTION_STATUS.CONNECTED
+      : CONNECTION_STATUS.PENDING;
+  return {
+    ok: true,
+    eligible: result.ok,
+    reason: result.reason,
+    dialogId: result.dialogId || request?.dialogId || '',
+    status: connectionStatus,
+    request: request ? socialRequestMirror(request, actor.userId) : null,
+    target: target ? socialPublicUser(target.data, target.id) : null,
+    shared,
+    action: connectionStatus === CONNECTION_STATUS.CONNECTED || result.ok ? 'message' : request?.status === SOCIAL_REQUEST_STATUS.PENDING ? 'pending' : 'request',
+    connectionContext: {
+      source: request?.connectionSource || '',
+      sourceLabel: request?.connectionSourceLabel || '',
+      shared,
+    },
+  };
+}
+
+async function actionConnectionsList(db, req, actor) {
+  const [contactsSnap, requests] = await Promise.all([
+    db.collection('users').doc(actor.userId).collection('connections').limit(100).get().catch(() => null),
+    querySocialRequestsForUser(db, actor.userId).catch(() => []),
+  ]);
+  const contacts = (contactsSnap?.docs || [])
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(item => normalizeConnectionStatus(item.status) === CONNECTION_STATUS.CONNECTED)
+    .sort((a, b) => new Date(b.connectedAt || b.updatedAt || 0).getTime() - new Date(a.connectedAt || a.updatedAt || 0).getTime());
+  const connectionRequests = requests
+    .filter(item => item.connection === true)
+    .map(item => socialRequestMirror(item, actor.userId));
+  return {
+    ok: true,
+    contacts,
+    requests: connectionRequests,
+    count: contacts.length,
+    lastConnections: contacts.slice(0, 5),
+    connectionContext: {
+      contactCount: contacts.length,
+      pendingIncoming: connectionRequests.filter(item => item.direction === 'incoming' && item.status === SOCIAL_REQUEST_STATUS.PENDING).length,
+      pendingOutgoing: connectionRequests.filter(item => item.direction === 'outgoing' && item.status === SOCIAL_REQUEST_STATUS.PENDING).length,
+    },
+  };
+}
+
+async function actionConnectionsRequest(db, req, actor) {
+  const senderId = cleanSocialId(actor.userId);
+  const recipientId = cleanSocialId(req.body?.recipientId || req.body?.targetUserId || req.body?.userId);
+  if (!recipientId || senderId === recipientId) throw Object.assign(new Error('Некорректный получатель.'), { statusCode: 400, code: 'INVALID_RECIPIENT' });
+  const eligibility = await evaluateServerSocialEligibility(db, actor, recipientId);
+  if (!eligibility.recipient) throw Object.assign(new Error('Получатель не найден.'), { statusCode: 404, code: 'RECIPIENT_NOT_FOUND' });
+  if (eligibility.reason === 'blocked') throw Object.assign(new Error('Знакомство недоступно.'), { statusCode: 403, code: 'CONNECTION_BLOCKED' });
+  if (eligibility.reason === 'privacy') throw Object.assign(new Error('Пользователь ограничил новые знакомства.'), { statusCode: 403, code: 'CONNECTION_PRIVACY_DENIED' });
+  if (eligibility.ok) {
+    return {
+      ok: true,
+      eligible: true,
+      reason: eligibility.reason,
+      status: CONNECTION_STATUS.CONNECTED,
+      dialogId: eligibility.dialogId || '',
+      target: socialPublicUser(eligibility.recipient.data, recipientId),
+    };
+  }
+
+  const requestId = socialRequestId(senderId, recipientId);
+  const ref = db.collection('conversationRequests').doc(requestId);
+  const recent = await db.collection('conversationRequests').where('senderId', '==', senderId).limit(50).get().catch(() => null);
+  const recentCount = (recent?.docs?.map(doc => doc.data() || {}) || []).filter(item => isRecentSocialRequest(item)).length;
+  if (recentCount >= SOCIAL_REQUEST_LIMIT) throw Object.assign(new Error('Лимит запросов на сегодня исчерпан.'), { statusCode: 429, code: 'CONNECTION_RATE_LIMITED' });
+  const existing = await ref.get();
+  if (existing.exists) {
+    const data = { id: existing.id, ...(existing.data() || {}) };
+    const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
+    if (status === SOCIAL_REQUEST_STATUS.PENDING) return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror({ ...data, status, connection: true }, senderId) };
+    if (status === SOCIAL_REQUEST_STATUS.ACCEPTED) return { ok: true, status: CONNECTION_STATUS.CONNECTED, dialogId: data.dialogId || '', request: socialRequestMirror({ ...data, status }, senderId) };
+    if (isDeclineCooldownActive({ ...data, status })) throw Object.assign(new Error('Повторное знакомство пока недоступно.'), { statusCode: 429, code: 'CONNECTION_DECLINE_COOLDOWN' });
+  }
+
+  const context = connectionSourceFromRequest(req);
+  const shared = buildConnectionSharedContext(eligibility.sender?.data || actor.user || {}, eligibility.recipient.data);
+  const record = {
+    ...createSocialRequestRecord({
+      senderId,
+      recipientId,
+      sender: eligibility.sender?.data || actor.user || {},
+      recipient: eligibility.recipient.data,
+      relationshipReason: 'digital_handshake',
+      now: Date.now(),
+    }),
+    connection: true,
+    connectionStatus: CONNECTION_STATUS.PENDING,
+    connectionSource: context.source,
+    connectionSourceLabel: context.sourceLabel,
+    connectionSourceId: context.sourceId,
+    connectionSourceTitle: context.sourceTitle,
+    connectionSourceDate: context.sourceDate,
+    shared,
+    history: [connectionHistoryEntry('requested', senderId, context)],
+  };
+  await ref.set({ ...record, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, { merge: true });
+  const saved = { ...record, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  await mirrorSocialRequest(db, saved);
+  await writeSocialNotification(db, recipientId, {
+    type: 'connectionRequest',
+    title: `${actorName(actor)} хочет познакомиться`,
+    body: context.sourceTitle ? `Источник: ${context.sourceTitle}` : 'Откройте профиль, чтобы принять или отклонить знакомство.',
+    requestId,
+  }).catch(() => {});
+  await audit(db, req, actor, 'connections:request', 'conversationRequests', requestId, 'success', { recipientId, source: context.source });
+  return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror(saved, senderId), connection: connectionSnapshot(saved, senderId) };
+}
+
+async function actionConnectionsResolve(db, req, actor, status) {
+  const result = await actionSocialResolveRequest(db, req, actor, status);
+  const request = result.request || null;
+  return {
+    ...result,
+    connectionStatus: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? CONNECTION_STATUS.CONNECTED : CONNECTION_STATUS.DECLINED,
+    connection: request ? connectionSnapshot(request, actor.userId) : null,
+  };
+}
+
+async function actionConnectionsBlock(db, req, actor) {
+  const result = await actionSocialBlock(db, req, actor, true);
+  const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
+  const requestId = socialRequestId(actor.userId, targetId);
+  const request = await getSocialRequest(db, requestId);
+  if (request) {
+    const patch = {
+      connection: request.connection === true,
+      connectionStatus: CONNECTION_STATUS.BLOCKED,
+      status: request.status,
+      updatedAt: FieldValue.serverTimestamp(),
+      history: [
+        ...(Array.isArray(request.history) ? request.history.slice(-10) : []),
+        connectionHistoryEntry('blocked', actor.userId, {
+          source: request.connectionSource,
+          sourceLabel: request.connectionSourceLabel,
+          sourceId: request.connectionSourceId,
+          sourceTitle: request.connectionSourceTitle,
+          sourceDate: request.connectionSourceDate,
+        }),
+      ],
+    };
+    await db.collection('conversationRequests').doc(request.id).set(patch, { merge: true });
+    await mirrorSocialRequest(db, { ...request, ...patch, updatedAt: new Date().toISOString() });
+  }
+  return { ...result, connectionStatus: CONNECTION_STATUS.BLOCKED };
 }
 
 async function actionDialogTyping(db, req, actor) {
@@ -4112,6 +4408,12 @@ async function routeAction(db, req, actor) {
   if (action === 'socialMessaging:updatePrivacy') return actionSocialUpdatePrivacy(db, req, actor);
   if (action === 'socialMessaging:listRequests') return actionSocialListRequests(db, req, actor);
   if (action === 'socialMessaging:checkEligibility') return actionSocialCheckEligibility(db, req, actor);
+  if (action === 'connections:check') return actionConnectionsCheck(db, req, actor);
+  if (action === 'connections:list') return actionConnectionsList(db, req, actor);
+  if (action === 'connections:request') return actionConnectionsRequest(db, req, actor);
+  if (action === 'connections:accept') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.ACCEPTED);
+  if (action === 'connections:decline') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.DECLINED);
+  if (action === 'connections:block') return actionConnectionsBlock(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);
   if (action === 'dialog:message') return actionDialogMessage(db, req, actor);
   if (action === 'dialog:read') return actionDialogRead(db, req, actor);

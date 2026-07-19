@@ -183,6 +183,8 @@ function readAppDeepLink() {
     return { type: 'partner', id };
   }
   if (section === 'partnership') return { type: 'partnership', id: '' };
+  if (section === 'profile' && id) return { type: 'profile-user', id };
+  if (section === 'profile') return { type: 'profile', id: '' };
   if (section === 'expert' && id) return { type: 'expert', id };
   if (section === 'experts') return { type: 'experts', id: '' };
   if (section === 'dialogs' || section === 'messages') return { type: 'dialogs', id: params.get('dialogId') || id || '' };
@@ -195,6 +197,7 @@ function getInitialPanelFromDeepLink(deepLink) {
   if (deepLink.type === 'event' || deepLink.type === 'events') return 'events';
   if (deepLink.type === 'partner') return 'partners';
   if (deepLink.type === 'partnership') return 'partnership';
+  if (deepLink.type === 'profile' || deepLink.type === 'profile-user') return 'profile';
   if (deepLink.type === 'expert' || deepLink.type === 'experts') return 'experts';
   if (deepLink.type === 'dialogs') return 'dialogs';
   return 'home';
@@ -3679,7 +3682,12 @@ export function UserApp() {
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
     workspace: { mode: workspaceMode },
-  }), [activePanel, adaptiveInterestProfile, apgNews, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
+    connectionContext: {
+      contactCount: Array.isArray(user?.connectionIds) ? user.connectionIds.length : 0,
+      activeTargetId: initialDeepLink.type === 'profile-user' ? initialDeepLink.id : '',
+      source: initialDeepLink.type === 'profile-user' ? 'profile_deeplink' : '',
+    },
+  }), [activePanel, adaptiveInterestProfile, apgNews, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, initialDeepLink, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {
@@ -4306,6 +4314,7 @@ export function UserApp() {
                     onOpenDialog={openContextDialogById}
                     onOpenBookingDialog={openBookingContextDialog}
                     onOpenBookingReview={openBookingReview}
+                    initialConnectionTargetId={initialDeepLink.type === 'profile-user' ? initialDeepLink.id : ''}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
                     onBack={() => goPanel('home')}

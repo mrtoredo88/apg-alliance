@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] feat: APG Connections v1 Digital Handshake
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server-shared/social-messaging.js`, `server/src/routes/user-actions.js`, `firestore.rules`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `scripts/connections-test.mjs`, `scripts/social-messaging-server-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен Digital Handshake поверх существующей Social Messaging Platform: `connections:*` actions используют `/api/user-actions`, `conversationRequests`, backend permissions и существующий direct Dialog Engine.
+- После подтверждения знакомства создаются owner-read зеркала `users/{id}/connections`, обновляется social graph пользователя и открывается существующий direct dialog без второй модели сообщений.
+- Профиль получил блок “Контакты”, входящие знакомства, список “Мои контакты”, цифровую бизнес-карточку с QR/deep link `/profile/:userId` и Dev Panel Connections.
+- Добавлен `npm run test:connections`: 1000 сценариев проверяют handshake ids, источники, общие связи, backend actions, rules, профильный UI, Loki `connectionContext` и отсутствие второго messaging API.
+**Почему:** АПГ получает социальную механику реальных знакомств с историей источника и переходом в сообщения, не превращая её в отдельную систему друзей или новый мессенджер.
+
+---
+
 ## [2026-07-19] ux: Messaging + Loki Navigation
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/UserApp.jsx`, `src/loki/LokiAssistant.jsx`, `src/components/DesktopUI.jsx`, `src/HomePanelV2.jsx`, `src/workspace/WorkspaceCore.js`, `scripts/pwa-user-mode-regression.mjs`, `scripts/desktop-ui-framework-test.mjs`, `.ai/17_CHANGELOG_AI.md`
