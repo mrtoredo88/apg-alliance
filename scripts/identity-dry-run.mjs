@@ -5,6 +5,7 @@ import {
   formatDryRunSummary,
   writeDryRunReports,
 } from '../src/admin/identity/dryrun/index.js';
+import { appendReviewAudit } from '../src/admin/identity/review/index.js';
 
 function latestFile(dir, predicate) {
   if (!fs.existsSync(dir)) return '';
@@ -38,6 +39,14 @@ const report = executeIdentityDryRun({
   manifest,
   source: { snapshotPath, manifestPath },
   writeReports: writeDryRunReports,
+});
+appendReviewAudit({
+  event: 'DRY_RUN_EXECUTED',
+  conflictId: null,
+  reviewedBy: 'system:dry-run',
+  decision: null,
+  previousDecision: null,
+  fingerprint: manifest.sourceFingerprint || null,
 });
 
 console.log(formatDryRunSummary(report));

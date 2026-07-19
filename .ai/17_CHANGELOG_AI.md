@@ -4152,6 +4152,7 @@
 - Расширен `Identity Manual Review Workflow`: добавлены owner decision cards, `decision-pack`, `show-next`, разделение `systemRecommendation`/`ownerDecision` и строгая валидация preservation/remap/delete metadata без автоматического принятия решений.
 - Добавлен read-only forensic CLI `npm run identity:forensic-conflict`: строит локальный Markdown/redacted отчёт по одному Identity conflict из snapshot/audit без Firestore-запросов и без изменения review session/manifest.
 - Добавлен read-only batch forensic CLI `npm run identity:forensic-conflicts`: генерирует отчёты по пяти оставшимся Identity conflict и сводку без owner decisions, manifest changes или production-запросов.
+- `identity:dry-run` теперь пишет локальный audit event `DRY_RUN_EXECUTED`, чтобы partial owner approval имел полный audit trail без запуска миграционных операций.
 
 # 2026-07-14 — Workspace Meetings CRM
 
