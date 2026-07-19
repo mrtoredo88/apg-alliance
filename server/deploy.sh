@@ -30,4 +30,10 @@ yc serverless container revision deploy \
   --environment YANDEX_EMAIL="$(get_env YANDEX_EMAIL)" \
   --environment YANDEX_EMAIL_PASS="$(get_env YANDEX_EMAIL_PASS)" \
   --environment POSTBOX_KEY_ID="$(get_env POSTBOX_KEY_ID)" \
-  --environment POSTBOX_SECRET="$(get_env POSTBOX_SECRET)"
+  --environment POSTBOX_SECRET="$(get_env POSTBOX_SECRET)" \
+  --environment APG_IDENTITY_DATABASE_URL="$(get_env APG_IDENTITY_DATABASE_URL)" \
+  --environment IDENTITY_PROVIDER="$(get_env IDENTITY_PROVIDER)" \
+  --environment IDENTITY_STORAGE="$(get_env IDENTITY_STORAGE)" \
+  --environment IDENTITY_DUAL_READ="$(get_env IDENTITY_DUAL_READ)" \
+  --environment IDENTITY_DUAL_WRITE="$(get_env IDENTITY_DUAL_WRITE)" \
+  --environment IDENTITY_FALLBACK="$(get_env IDENTITY_FALLBACK)"

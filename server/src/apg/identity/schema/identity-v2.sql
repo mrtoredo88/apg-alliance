@@ -66,6 +66,19 @@ CREATE TABLE IF NOT EXISTS apg_identity_email_otps (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS apg_identity_schema_versions (
+  version TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  checksum TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT ''
+);
+
+INSERT INTO apg_identity_schema_versions (version, checksum, description)
+VALUES ('identity-v2-2026-07-19', 'identity-v2-schema-v1', 'APG Identity v2 initial PostgreSQL schema')
+ON CONFLICT (version) DO NOTHING;
+
+ALTER DATABASE apg_identity SET timezone TO 'UTC';
+
 CREATE INDEX IF NOT EXISTS idx_apg_identity_users_email ON apg_identity_users(email);
 CREATE INDEX IF NOT EXISTS idx_apg_identity_links_user ON apg_identity_links(user_id);
 CREATE INDEX IF NOT EXISTS idx_apg_identity_sessions_user ON apg_identity_sessions(user_id);

@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Identity v2 Production Cutover tooling
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/routes/identity-v2-admin.js`, `server/src/server.js`, `server/src/apg/identity/schema/identity-v2.sql`, `server/deploy.sh`, `scripts/identity-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Создан production PostgreSQL cluster `apg-identity-pg` в Yandex Managed PostgreSQL и подготовлена передача `APG_IDENTITY_DATABASE_URL`/Identity flags в backend runtime без хранения секрета в git.
+- Добавлен защищённый route `/api/identity-v2-admin` для schema apply, Firestore Identity snapshot, dry-run import, production import и verification из Yandex runtime.
+- Identity v2 schema получила idempotent schema version marker и UTC timezone на уровне базы.
+**Почему:** код Identity v2 уже был задеплоен, но production не имел PostgreSQL DSN; cutover должен выполняться проверяемо и без возврата email login в Firestore dependency.
+
+---
+
 ## [2026-07-19] feat: APG Identity v2
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/apg/identity/*`, `server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js`, `server/src/apg/infrastructure/adapters/FirestoreIdentityFallbackAdapter.js`, `server/src/routes/email-auth.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/identity-v2-test.mjs`, `scripts/identity-v2-architecture-guard.mjs`, `scripts/identity-v2-import.mjs`, `package.json`, `server/package.json`, `server/package-lock.json`, `.ai/17_CHANGELOG_AI.md`

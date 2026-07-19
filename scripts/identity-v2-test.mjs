@@ -8,6 +8,7 @@ function read(file) {
 
 [
   'server/src/apg/identity/schema/identity-v2.sql',
+  'server/src/routes/identity-v2-admin.js',
   'server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js',
   'server/src/apg/infrastructure/adapters/FirestoreIdentityFallbackAdapter.js',
   'server/src/apg/identity/ApgIdentityV2Service.js',
@@ -30,6 +31,8 @@ const schema = read('server/src/apg/identity/schema/identity-v2.sql');
   'apg_identity_sessions',
   'apg_identity_email_otps',
 ].forEach(table => assert.ok(schema.includes(table), `${table} table is declared`));
+assert.ok(schema.includes('apg_identity_schema_versions'), 'schema version table is declared');
+assert.ok(schema.includes("ALTER DATABASE apg_identity SET timezone TO 'UTC'"), 'Identity database timezone is pinned to UTC');
 
 const service = read('server/src/apg/identity/ApgIdentityV2Service.js');
 assert.ok(service.includes('resolveEmailIdentity'), 'Identity v2 resolves email');
@@ -56,6 +59,31 @@ const flags = read('src/apg/core/FeatureFlags.js');
 const systemStatus = read('server/src/routes/system-status.js');
 assert.ok(systemStatus.includes('identityV2.snapshot'), 'APG Health backend exposes Identity v2 snapshot');
 
+const adminRoute = read('server/src/routes/identity-v2-admin.js');
+[
+  'apply-schema',
+  'snapshot',
+  'dry-run-import',
+  'import',
+  'verify',
+  'maintenance:write',
+  'duplicateReport',
+  'orphanReport',
+  'checksum',
+].forEach(token => assert.ok(adminRoute.includes(token), `Identity v2 admin route supports ${token}`));
+
+const server = read('server/src/server.js');
+assert.ok(server.includes('identityV2AdminRoutes'), 'server registers Identity v2 admin cutover route');
+
+const deploy = read('server/deploy.sh');
+[
+  'APG_IDENTITY_DATABASE_URL',
+  'IDENTITY_STORAGE',
+  'IDENTITY_DUAL_READ',
+  'IDENTITY_DUAL_WRITE',
+  'IDENTITY_FALLBACK',
+].forEach(flag => assert.ok(deploy.includes(flag), `deploy forwards ${flag}`));
+
 execFileSync('node', ['scripts/identity-v2-architecture-guard.mjs'], { stdio: 'inherit' });
 
 console.log(JSON.stringify({
@@ -67,5 +95,6 @@ console.log(JSON.stringify({
     firestoreFallback: 100,
     dualWrite: 100,
     architectureGuard: 100,
+    productionCutoverTooling: 100,
   },
 }, null, 2));
