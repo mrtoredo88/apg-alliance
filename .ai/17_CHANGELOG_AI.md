@@ -4148,6 +4148,7 @@
 - Добавлен read-only `npm run identity:conflict-resolution-audit`: строит forensic-карточки duplicate email/orphan tgLink и non-destructive resolution manifest с `approved:false`, не меняя Firestore и не запуская import.
 - Добавлен `Identity Conflict Center` (`src/admin/identity/conflicts/`) и CLI `npm run identity:conflicts`: форматирует ручные карточки конфликтов, считает explainable risk, создаёт backup marker и `backups/identity/resolution-manifest.json` только с `keepSeparate`/`approved:false`.
 - Добавлен локальный `Identity Manual Review Workflow` (`src/admin/identity/review/`) и CLI `npm run identity:review`: создаёт review sessions, fingerprints, audit jsonl, markdown report и `resolution-manifest-v2.json`, при этом `importAllowed` всегда остаётся `false`.
+- Добавлен read-only `Identity Dry Run Executor` (`src/admin/identity/dryrun/`) и CLI `npm run identity:dry-run`: симулирует manifest v2 в памяти, строит diff/rollback preview/invariants и отчёты без production-запросов, import/verify/cutover.
 
 # 2026-07-14 — Workspace Meetings CRM
 

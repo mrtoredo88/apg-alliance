@@ -108,7 +108,9 @@
     "identity:conflicts": "node scripts/identity-conflict-center.mjs",
     "test:identity-conflict-center": "node scripts/identity-conflict-center-test.mjs",
     "identity:review": "node scripts/identity-review.mjs",
-    "test:identity-review": "node scripts/identity-review-test.mjs"
+    "test:identity-review": "node scripts/identity-review-test.mjs",
+    "identity:dry-run": "node scripts/identity-dry-run.mjs",
+    "test:identity-dry-run": "node scripts/identity-dry-run-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
