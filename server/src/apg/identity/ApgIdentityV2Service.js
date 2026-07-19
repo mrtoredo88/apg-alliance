@@ -59,12 +59,21 @@ export class ApgIdentityV2Service {
     };
   }
 
+  isPostgresPrimary() {
+    return String(this.flags.identityStorage || '').toLowerCase() === 'postgres';
+  }
+
+  isLegacyDualWriteEnabled() {
+    return enabled(this.flags.identityDualWrite);
+  }
+
   async resolveEmailIdentity({ email, ref = '', createIfMissing = true } = {}) {
     const startedAt = Date.now();
     const normalized = normalizeEmail(email);
     if (!normalized) throw Object.assign(new Error('Некорректный email.'), { statusCode: 400, code: 'INVALID_EMAIL' });
     try {
       let identity = null;
+      let fallbackUnavailable = false;
       if (this.repository && enabled(this.flags.identityDualRead)) {
         try {
           this.metrics.yandexReads += 1;
@@ -78,7 +87,10 @@ export class ApgIdentityV2Service {
         this.metrics.fallbackCount += 1;
         const legacy = await this.legacySource.resolveEmailIdentity({ email: normalized, ref, createIfMissing: false }).catch(error => {
           this.metrics.lastError = classify(error);
-          if (classify(error) === 'FIRESTORE_RESOURCE_EXHAUSTED') return null;
+          if (classify(error) === 'FIRESTORE_RESOURCE_EXHAUSTED') {
+            fallbackUnavailable = true;
+            return null;
+          }
           throw error;
         });
         if (legacy?.userId && this.repository) {
@@ -87,6 +99,9 @@ export class ApgIdentityV2Service {
         } else if (legacy?.userId) {
           identity = legacy;
         }
+      }
+      if (!identity && fallbackUnavailable) {
+        throw Object.assign(new Error('Identity fallback is temporarily unavailable.'), { statusCode: 503, code: 'IDENTITY_FALLBACK_UNAVAILABLE' });
       }
       if (!identity && createIfMissing) {
         try {
@@ -180,6 +195,21 @@ export class ApgIdentityV2Service {
   async deleteEmailOtp(email) {
     this.metrics.yandexWrites += 1;
     return this.sessionRepository.deleteEmailOtp(email);
+  }
+
+  async putEmailVerifyToken(input) {
+    this.metrics.yandexWrites += 1;
+    return this.sessionRepository.putEmailVerifyToken(input);
+  }
+
+  async consumeEmailVerifyToken(token) {
+    this.metrics.yandexWrites += 1;
+    return this.sessionRepository.consumeEmailVerifyToken(token);
+  }
+
+  async markEmailVerified(userId) {
+    this.metrics.yandexWrites += 1;
+    return this.repository.users.markEmailVerified(userId);
   }
 
   async createCustomToken(userId, user = {}) {

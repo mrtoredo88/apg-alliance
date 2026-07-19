@@ -12,6 +12,7 @@ yc serverless container revision deploy \
   --image cr.yandex/crpvv13u8vr3qjftdvvg/apg-api:latest \
   --cores 1 --memory 512MB --execution-timeout 30s \
   --concurrency 16 --min-instances 1 \
+  --network-id enpa19j9jpki1f67p6kq \
   --service-account-id ajegfv96md2tqri8gjdp \
   --environment GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json \
   --environment YC_ACCESS_KEY="$(get_env YC_ACCESS_KEY)" \
@@ -35,5 +36,5 @@ yc serverless container revision deploy \
   --environment IDENTITY_PROVIDER="$(get_env IDENTITY_PROVIDER)" \
   --environment IDENTITY_STORAGE="$(get_env IDENTITY_STORAGE)" \
   --environment IDENTITY_DUAL_READ="$(get_env IDENTITY_DUAL_READ)" \
-  --environment IDENTITY_DUAL_WRITE="$(get_env IDENTITY_DUAL_WRITE)" \
+  --environment IDENTITY_DUAL_WRITE="${IDENTITY_DUAL_WRITE_OVERRIDE:-false}" \
   --environment IDENTITY_FALLBACK="$(get_env IDENTITY_FALLBACK)"

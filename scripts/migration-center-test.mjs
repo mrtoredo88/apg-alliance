@@ -22,10 +22,14 @@ const adminRoute = read('server/src/routes/identity-v2-admin.js');
   'speedPerSec',
   'etaSec',
   'enable-postgres',
+  'cutover-postgres',
   'disable-firestore-fallback',
   'rollback',
   'architecture-report',
   'dependencyMonitor',
+  'requireMigrationActor',
+  'x-maintenance-secret',
+  'timingSafeEqual',
   'requireAdminPermission(request, \'maintenance:write\')',
 ].forEach(token => assert.ok(adminRoute.includes(token), `identity admin route includes ${token}`));
 
@@ -39,6 +43,7 @@ const adminPanel = read('src/AdminPanel.jsx');
   'Import Identity',
   'Verify',
   'Enable PostgreSQL',
+  'Cutover PostgreSQL',
   'Disable Firestore Fallback',
   'Rollback',
   'Live Progress',
@@ -78,6 +83,7 @@ const packageJson = JSON.parse(read('package.json'));
 assert.ok(packageJson.scripts.build.includes('scripts/architecture-guard.mjs'), 'build runs Architecture Guard');
 assert.equal(packageJson.scripts['test:architecture-guard'], 'node scripts/architecture-guard.mjs', 'Architecture Guard test script exists');
 assert.equal(packageJson.scripts['test:migration-center'], 'node scripts/migration-center-test.mjs', 'Migration Center test script exists');
+assert.equal(packageJson.scripts['test:identity-cutover'], 'node scripts/identity-cutover-test.mjs', 'Identity cutover test script exists');
 
 const report = JSON.parse(read('docs/architecture-guard-report.json'));
 assert.equal(report.ok, true, 'Architecture Guard report is OK');

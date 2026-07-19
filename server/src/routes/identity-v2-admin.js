@@ -20,6 +20,7 @@ const MIGRATION_ACTIONS = [
   'import',
   'verify',
   'enable-postgres',
+  'cutover-postgres',
   'disable-firestore-fallback',
   'rollback',
   'architecture-report',
@@ -362,11 +363,29 @@ async function migrationStatus() {
   };
 }
 
+async function requireMigrationActor(request) {
+  const provided = safeString(request.headers['x-maintenance-secret'] || request.headers['x-cron-secret'] || '', 500);
+  const expected = safeString(process.env.IDENTITY_MIGRATION_SECRET || process.env.CRON_SECRET || '', 500);
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  if (provided && expected && providedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
+    return {
+      uid: 'system:migration-center',
+      role: 'owner',
+      userId: 'system:migration-center',
+      name: 'APG Migration Center',
+      authSource: 'maintenance-secret',
+    };
+  }
+  return requireAdminPermission(request, 'maintenance:write');
+}
+
 export default async function identityV2AdminRoutes(fastify) {
   fastify.post('/api/identity-v2-admin', async (request, reply) => {
     const action = safeString(request.body?.action, 80);
+    let actor = null;
     try {
-      const actor = await requireAdminPermission(request, 'maintenance:write');
+      actor = await requireMigrationActor(request);
       let result = null;
       if (action === 'status') {
         result = await migrationStatus();
@@ -385,6 +404,11 @@ export default async function identityV2AdminRoutes(fastify) {
       } else if (action === 'enable-postgres') {
         result = {
           identity: applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'true' }),
+          migration: await migrationStatus(),
+        };
+      } else if (action === 'cutover-postgres') {
+        result = {
+          identity: applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'false', identityFallback: 'firestore' }),
           migration: await migrationStatus(),
         };
       } else if (action === 'disable-firestore-fallback') {
@@ -406,6 +430,9 @@ export default async function identityV2AdminRoutes(fastify) {
       return { ok: true, action, result };
     } catch (error) {
       if (error?.report) return reply.code(error.statusCode || 500).send({ ok: false, error: error.code || 'IDENTITY_V2_ADMIN_FAILED', message: error.message, report: error.report });
+      if (actor?.authSource === 'maintenance-secret') {
+        return reply.code(error.statusCode || 500).send({ ok: false, error: error.code || 'IDENTITY_V2_ADMIN_FAILED', diagnostics: publicError(error) });
+      }
       return adminReplyError(reply, error);
     }
   });

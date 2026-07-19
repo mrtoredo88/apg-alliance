@@ -101,7 +101,8 @@
     "test:identity-v2": "node scripts/identity-v2-test.mjs",
     "test:identity-v2-guard": "node scripts/identity-v2-architecture-guard.mjs",
     "test:architecture-guard": "node scripts/architecture-guard.mjs",
-    "test:migration-center": "node scripts/migration-center-test.mjs"
+    "test:migration-center": "node scripts/migration-center-test.mjs",
+    "test:identity-cutover": "node scripts/identity-cutover-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

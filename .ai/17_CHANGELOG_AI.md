@@ -4133,6 +4133,18 @@
 - `npm run build` теперь запускает Architecture Guard перед сборкой, а backend image копирует `docs/architecture-guard-report.json` для production diagnostics.
 - Добавлен `scripts/migration-center-test.mjs`; Identity v2 тесты расширены проверками migration actions, dependency monitor и live progress contract.
 
+# 2026-07-19 — APG Identity Cutover hardening
+
+- Добавлен production cutover mode для Identity: PostgreSQL остаётся primary storage, Firestore fallback сохраняется аварийным источником, а dual-write отключается отдельным `cutover-postgres` action.
+- Email login больше не выполняет legacy Firestore side effects в cutover-режиме; `lastSeen` и email verification переведены в Identity PostgreSQL path.
+- В Identity PostgreSQL schema добавлена таблица `apg_identity_email_verify_tokens`, а `SessionRepository` получил методы хранения и одноразового consume verification token.
+- Migration Center получил server-to-server maintenance доступ через существующий секрет деплоя для production cutover операций, когда Firebase admin token недоступен из-за Firestore `RESOURCE_EXHAUSTED`.
+- Добавлены `scripts/identity-cutover-report.mjs` и `scripts/identity-cutover-test.mjs` для snapshot/dry-run/import/verify отчётов и regression-контроля cutover flags.
+- Identity schema приведена к managed-PostgreSQL safe режиму: privileged `ALTER DATABASE` удалён, schema использует `TIMESTAMPTZ` без database-level timezone mutation.
+- Backend deploy подключён к Yandex Cloud VPC network `enpa19j9jpki1f67p6kq`, чтобы Serverless Container мог резолвить private Managed PostgreSQL host.
+- PostgreSQL adapter нормализует connection string и убирает `sslmode` из URL, чтобы TLS policy управлялась единообразно через `pg` config и не падала на Yandex CA chain.
+- Identity resolver больше не создаёт новую PostgreSQL identity, если Firestore fallback недоступен из-за `RESOURCE_EXHAUSTED`; вместо этого возвращается диагностируемая `IDENTITY_FALLBACK_UNAVAILABLE`, чтобы не породить дубликаты пользователей.
+
 # 2026-07-14 — Workspace Meetings CRM
 
 - Раздел `Встречи` в Desktop Workspace переведён на CRM-экран: KPI на сегодня/завтра/неделю, ожидания, переносы, завершения, неявки и отмены, поиск по клиенту/контактам/услуге, фильтры и создание встречи вручную.

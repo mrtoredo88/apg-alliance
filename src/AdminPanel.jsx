@@ -1354,11 +1354,12 @@ function MigrationCenterPanel({ data, loading, busy, lastResult, onRefresh, onAc
     ['import', 'Import Identity', 'Перенести Identity в PostgreSQL.'],
     ['verify', 'Verify', 'Сравнить Firestore и PostgreSQL.'],
     ['enable-postgres', 'Enable PostgreSQL', 'Включить runtime PostgreSQL flags.'],
+    ['cutover-postgres', 'Cutover PostgreSQL', 'PostgreSQL primary, Firestore fallback сохранён, dual-write выключен.'],
     ['disable-firestore-fallback', 'Disable Firestore Fallback', 'Отключить fallback в активной revision.'],
     ['rollback', 'Rollback', 'Вернуть runtime flags к Firestore fallback.'],
   ];
   const confirmAction = (action, label) => {
-    const dangerous = ['import', 'disable-firestore-fallback', 'rollback'].includes(action);
+    const dangerous = ['import', 'cutover-postgres', 'disable-firestore-fallback', 'rollback'].includes(action);
     const text = dangerous
       ? `${label}: подтвердите выполнение production migration action. Данные не удаляются, но runtime flags могут измениться.`
       : `${label}: выполнить операцию Migration Center?`;
@@ -1410,9 +1411,9 @@ function MigrationCenterPanel({ data, loading, busy, lastResult, onRefresh, onAc
         <h2 style={s.h2}>Migration Actions</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
           {actionRows.map(([action, label, detail]) => (
-            <button key={action} type="button" disabled={busy} onClick={() => confirmAction(action, label)} style={{ ...s.btn, ...(action === 'import' || action === 'disable-firestore-fallback' ? s.btnPri : s.btnGray), justifyContent: 'flex-start', alignItems: 'flex-start', flexDirection: 'column', gap: 4, minHeight: 72, opacity: busy ? 0.55 : 1 }}>
+            <button key={action} type="button" disabled={busy} onClick={() => confirmAction(action, label)} style={{ ...s.btn, ...(action === 'import' || action === 'cutover-postgres' || action === 'disable-firestore-fallback' ? s.btnPri : s.btnGray), justifyContent: 'flex-start', alignItems: 'flex-start', flexDirection: 'column', gap: 4, minHeight: 72, opacity: busy ? 0.55 : 1 }}>
               <span style={{ fontSize: 13, fontWeight: 900 }}>{label}</span>
-              <span style={{ fontSize: 11, color: action === 'import' || action === 'disable-firestore-fallback' ? '#17120a' : A.textSec, lineHeight: '15px', textAlign: 'left' }}>{detail}</span>
+              <span style={{ fontSize: 11, color: action === 'import' || action === 'cutover-postgres' || action === 'disable-firestore-fallback' ? '#17120a' : A.textSec, lineHeight: '15px', textAlign: 'left' }}>{detail}</span>
             </button>
           ))}
         </div>

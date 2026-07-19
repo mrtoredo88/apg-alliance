@@ -72,4 +72,15 @@ export class UserRepository {
     );
     return mapUser(result.rows[0]);
   }
+
+  async markEmailVerified(id) {
+    const result = await this.adapter.query(`
+      UPDATE apg_identity_users
+      SET profile = profile || '{"emailVerified":true}'::jsonb,
+          updated_at = now()
+      WHERE id = $1
+      RETURNING *
+    `, [safeString(id, 260)]);
+    return mapUser(result.rows[0]);
+  }
 }

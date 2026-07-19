@@ -63,4 +63,29 @@ export class SessionRepository {
   async deleteEmailOtp(email) {
     await this.adapter.query('DELETE FROM apg_identity_email_otps WHERE email = $1', [normalizeEmail(email)]);
   }
+
+  async putEmailVerifyToken({ token, email, userId, expiresAt }) {
+    await this.adapter.query(`
+      INSERT INTO apg_identity_email_verify_tokens (token, email, user_id, expires_at)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (token) DO UPDATE SET
+        email = EXCLUDED.email,
+        user_id = EXCLUDED.user_id,
+        expires_at = EXCLUDED.expires_at
+    `, [safeString(token, 260), normalizeEmail(email), safeString(userId, 260), expiresAt]);
+    return { token: safeString(token, 260), userId: safeString(userId, 260) };
+  }
+
+  async consumeEmailVerifyToken(token) {
+    const normalized = safeString(token, 260);
+    const result = await this.adapter.query('DELETE FROM apg_identity_email_verify_tokens WHERE token = $1 RETURNING *', [normalized]);
+    const row = result.rows[0];
+    return row ? {
+      token: row.token,
+      email: row.email,
+      userId: row.user_id,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+    } : null;
+  }
 }

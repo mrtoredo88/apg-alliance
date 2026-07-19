@@ -214,11 +214,17 @@ async function withEmailLoginStage(trace, stage, fn, timeoutMs = 8000) {
 
 async function sendVerificationEmail(db, email, userId, appUrl) {
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
-  await db.collection('emailVerifyTokens').doc(token).set({
-    email, userId,
-    expiresAt: Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000),
-    createdAt: FieldValue.serverTimestamp(),
-  });
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  try {
+    await serverFoundation.identityV2.putEmailVerifyToken({ token, email, userId, expiresAt });
+  } catch (error) {
+    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
+    await db.collection('emailVerifyTokens').doc(token).set({
+      email, userId,
+      expiresAt: Timestamp.fromMillis(expiresAt.getTime()),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
   const verifyUrl = `${appUrl}/?verify_email=${token}`;
   await sendEmail(
     email,
@@ -239,12 +245,31 @@ async function sendVerificationEmail(db, email, userId, appUrl) {
   );
 }
 
+function shouldWriteLegacyIdentitySideEffects() {
+  return !serverFoundation.identityV2.isPostgresPrimary?.() || serverFoundation.identityV2.isLegacyDualWriteEnabled?.();
+}
+
 async function resolveEmailUser(db, email, ref) {
   const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email, ref, createIfMissing: true });
   const userId = identity.userId;
-  db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
-  attachPendingPartnerInvites(db, email, userId).catch(() => {});
+  if (shouldWriteLegacyIdentitySideEffects()) {
+    db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
+    attachPendingPartnerInvites(db, email, userId).catch(() => {});
+  }
   return identity;
+}
+
+async function consumeVerificationToken(db, token) {
+  try {
+    return { source: 'identity_v2', data: await serverFoundation.identityV2.consumeEmailVerifyToken(token) };
+  } catch (error) {
+    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
+    const ref = db.collection('emailVerifyTokens').doc(String(token));
+    const snap = await ref.get();
+    if (!snap.exists) return { source: 'firestore_fallback', data: null };
+    await ref.delete();
+    return { source: 'firestore_fallback', data: snap.data() || null };
+  }
 }
 
 async function getEmailOtp(codeRef, email) {
@@ -610,14 +635,17 @@ export default async function emailAuthRoutes(fastify) {
     if (action === 'verify-email') {
       const { token } = request.body ?? {};
       if (!token) return reply.code(400).send({ ok: false, error: 'missing_token' });
-      const tokenSnap = await db.collection('emailVerifyTokens').doc(String(token)).get();
-      if (!tokenSnap.exists) return reply.code(404).send({ ok: false, error: 'invalid_token' });
-      const { userId, expiresAt } = tokenSnap.data();
-      await db.collection('emailVerifyTokens').doc(String(token)).delete();
-      if (expiresAt.toMillis() < Date.now()) {
+      const consumed = await consumeVerificationToken(db, token);
+      if (!consumed.data) return reply.code(404).send({ ok: false, error: 'invalid_token' });
+      const { userId, expiresAt } = consumed.data;
+      const expiresMs = expiresAt?.toMillis ? expiresAt.toMillis() : new Date(expiresAt).getTime();
+      if (expiresMs < Date.now()) {
         return reply.code(400).send({ ok: false, error: 'token_expired' });
       }
-      await db.collection('users').doc(userId).update({ emailVerified: true }).catch(() => {});
+      await serverFoundation.identityV2.markEmailVerified(userId).catch(() => {});
+      if (shouldWriteLegacyIdentitySideEffects()) {
+        await db.collection('users').doc(userId).update({ emailVerified: true }).catch(() => {});
+      }
       return { ok: true, userId };
     }
 

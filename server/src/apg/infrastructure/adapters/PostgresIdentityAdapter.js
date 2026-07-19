@@ -6,13 +6,20 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function normalizeConfig(config = {}) {
-  const connectionString = config.connectionString
+  const rawConnectionString = config.connectionString
     || process.env.APG_IDENTITY_DATABASE_URL
     || process.env.IDENTITY_DATABASE_URL
     || process.env.POSTGRES_DATABASE_URL
     || process.env.DATABASE_URL
     || '';
-  return { connectionString };
+  if (!rawConnectionString) return { connectionString: '' };
+  try {
+    const url = new URL(rawConnectionString);
+    url.searchParams.delete('sslmode');
+    return { connectionString: url.toString() };
+  } catch {
+    return { connectionString: rawConnectionString.replace(/[?&]sslmode=[^&]+/, '') };
+  }
 }
 
 export class PostgresIdentityAdapter {

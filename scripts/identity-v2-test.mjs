@@ -32,7 +32,7 @@ const schema = read('server/src/apg/identity/schema/identity-v2.sql');
   'apg_identity_email_otps',
 ].forEach(table => assert.ok(schema.includes(table), `${table} table is declared`));
 assert.ok(schema.includes('apg_identity_schema_versions'), 'schema version table is declared');
-assert.ok(schema.includes("ALTER DATABASE apg_identity SET timezone TO 'UTC'"), 'Identity database timezone is pinned to UTC');
+assert.equal(schema.includes('ALTER DATABASE'), false, 'Identity schema avoids privileged database-level statements');
 
 const service = read('server/src/apg/identity/ApgIdentityV2Service.js');
 assert.ok(service.includes('resolveEmailIdentity'), 'Identity v2 resolves email');
@@ -67,6 +67,7 @@ const adminRoute = read('server/src/routes/identity-v2-admin.js');
   'import',
   'verify',
   'enable-postgres',
+  'cutover-postgres',
   'disable-firestore-fallback',
   'rollback',
   'architecture-report',
