@@ -33,9 +33,23 @@ if (runtimeUrl) {
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'ru-RU' });
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem('apg_loki_settings_v1', JSON.stringify({
+          enabled: true,
+          hiddenPanels: [],
+          bubbleEnabled: true,
+          mode: 'standard',
+          personalityMode: 'friendly',
+        }));
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('apg_loki_greeting_seen_v1') || key.startsWith('apg_loki_daily_visit_v1'))
+          .forEach(key => localStorage.removeItem(key));
+      } catch {}
+    });
     const page = await context.newPage();
     await page.goto(runtimeUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(9000);
+    await page.waitForSelector('[data-floating-loki-button="true"]', { timeout: 45000 });
     const hit = await page.evaluate(() => {
       const button = document.querySelector('[data-floating-loki-button="true"]');
       if (!button) return { found: false };
