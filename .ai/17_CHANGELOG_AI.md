@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] fix: Email Login Forensic Diagnostics
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/EmailAuth.jsx`, `src/UserApp.jsx`, `src/auth/emailLoginDiagnostics.js`, `src/ApgHealthPage.jsx`, `server/src/routes/email-auth.js`, `scripts/email-login-forensic-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Добавлена полная forensic-трасса email login: UI, HTTP request/response, backend request id, Firebase custom token, auth state и profile sync.
+- Backend `/api/email-auth` для `action=login` теперь логирует stage timeline и возвращает диагностические коды `EMAIL_FIRESTORE_QUOTA`, `EMAIL_STAGE_TIMEOUT`, `CUSTOM_TOKEN_FAILED` вместо слепого 504 при зависании этапа.
+- APG Health получил вкладку `Email` с последними попытками входа, failed stage и backend request id.
+**Почему:** production email login падал не на UI, а из-за backend/Firebase `RESOURCE_EXHAUSTED: Quota exceeded`; до восстановления квоты нужна точная диагностика каждого этапа, а не общий текст `Ошибка входа`.
+
+---
+
 ## [2026-07-19] perf: APG Bundle Analysis & Optimization v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/LokiProvider.jsx`, `src/performance/BundleMetrics.js`, `src/performance/PerformanceReport.js`, `src/performance/index.js`, `src/ApgHealthPage.jsx`, `scripts/bundle-report.mjs`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

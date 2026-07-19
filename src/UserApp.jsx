@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { EmailAuth } from './EmailAuth.jsx';
+import { recordEmailLoginStage } from './auth/emailLoginDiagnostics.js';
 import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassToast } from './components/Apg2ProfileGlass.jsx';
@@ -2915,17 +2916,22 @@ export function UserApp() {
     const emailReferralContext = getReferralContext({ ref: authRefId || '', source: 'UserApp.emailAuthSuccess' });
     try {
       if (authPayload?.token) {
+        recordEmailLoginStage('firebase_custom_token_start', { profileId: emailUser.id, hasToken: true });
         await signInWithCustomToken(auth, authPayload.token);
+        recordEmailLoginStage('firebase_custom_token_end', { profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
         traceAuthStage('AUTH_SUCCESS', { provider: 'email', profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
         refLog('auth success', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId });
       }
+      recordEmailLoginStage('auth_state_wait_start', { profileId: emailUser.id });
       await waitForFirebaseUser(String(emailUser.id));
+      recordEmailLoginStage('auth_state_wait_end', { profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
       traceAuthStage('AUTH_STATE_READY', {
         provider: 'email',
         profileId: emailUser.id,
         uid: auth.currentUser?.uid ?? null,
         isAnonymous: auth.currentUser?.isAnonymous ?? null,
       });
+      recordEmailLoginStage('profile_sync_start', { profileId: emailUser.id, hasReferral: !!authRefId });
       await ensureOwnerAuthSession(emailUser.id, 'email');
       refLog('profile sync started', { stage: 'email_auth_profile_sync', referrerId: authRefId || null, userId: emailUser.id });
       const profileResult = await userAction('profile:sync', {
@@ -2938,6 +2944,7 @@ export function UserApp() {
         referralPlatform: authPayload?.referralPlatform || emailReferralContext.platform,
         referralClientEvents: drainReferralEventQueue(),
       });
+      recordEmailLoginStage('profile_sync_end', { profileId: emailUser.id, created: !!profileResult?.created, consentRequired: !!profileResult?.consentRequired });
       if (profileResult?.created) {
         refLog('user created', { provider: 'email', userId: emailUser.id, referrerId: authRefId || null });
       }
@@ -2971,6 +2978,7 @@ export function UserApp() {
         consentFormatVersion: profileResult?.consentFormatVersion ?? null,
       });
       if (!consentRequired || CONSENT_SCREEN_DISABLED_FOR_DEMO) {
+        recordEmailLoginStage('completed', { profileId: emailUser.id, mode: 'email' });
         completeEmailLogin({
           ...emailUser,
           consents: data.consents,
@@ -2983,6 +2991,7 @@ export function UserApp() {
       if (authRefId) refLog('retry after reconnect', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: e?.message || String(e) });
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
       const error = Object.assign(e instanceof Error ? e : new Error(String(e)), { code: e?.code || 'PROFILE_BOOTSTRAP_FAILED' });
+      recordEmailLoginStage('failed', { profileId: emailUser.id, code: error.code, message: error.message, failedStage: 'profile_bootstrap' });
       logFinishLoginError('PROFILE_BOOTSTRAP_FAILED', emailUser, error, { provider: 'email' });
       setConsentError(getAuthErrorMessage(error));
       showToast('Ошибка входа: PROFILE_BOOTSTRAP_FAILED', 'error');

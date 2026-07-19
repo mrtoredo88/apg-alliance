@@ -154,6 +154,72 @@ async function createFirebaseToken(userId, user = {}) {
   return getDbAuth().createCustomToken(String(userId), claims);
 }
 
+function createEmailLoginTrace(request) {
+  const requestId = String(request.headers['x-request-id'] || '').trim() || `email_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    requestId,
+    startedAt: Date.now(),
+    timeline: [],
+    mark(stage, status = 'START', detail = {}) {
+      const now = Date.now();
+      const row = {
+        stage,
+        status,
+        at: new Date(now).toISOString(),
+        durationMs: now - this.startedAt,
+        detail,
+      };
+      this.timeline.push(row);
+      request.log.info({ requestId, stage, status, durationMs: row.durationMs, ...detail }, 'email-login-forensic');
+      return row;
+    },
+  };
+}
+
+function classifyEmailLoginError(error) {
+  const message = String(error?.message || error || '');
+  const code = String(error?.code || error?.error || '');
+  if (code === 'EMAIL_STAGE_TIMEOUT') return { code, statusCode: 504 };
+  if (code.includes('RESOURCE_EXHAUSTED') || message.includes('RESOURCE_EXHAUSTED') || message.includes('Quota exceeded')) {
+    return { code: 'EMAIL_FIRESTORE_QUOTA', statusCode: 503 };
+  }
+  if (code.includes('auth/') || message.includes('createCustomToken') || message.includes('custom token')) {
+    return { code: 'CUSTOM_TOKEN_FAILED', statusCode: 502 };
+  }
+  if (code === 'INVALID_EMAIL') return { code: 'INVALID_EMAIL', statusCode: 400 };
+  return { code: code || 'EMAIL_LOGIN_FAILED', statusCode: Number(error?.statusCode || 500) };
+}
+
+async function withEmailLoginStage(trace, stage, fn, timeoutMs = 8000) {
+  trace.mark(stage, 'START');
+  const startedAt = Date.now();
+  let timer = null;
+  try {
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error(`${stage} timed out after ${timeoutMs}ms`);
+        error.code = 'EMAIL_STAGE_TIMEOUT';
+        error.failedStage = stage;
+        error.statusCode = 504;
+        reject(error);
+      }, timeoutMs);
+    });
+    const result = await Promise.race([fn(), timeout]);
+    trace.mark(stage, 'END', { stageDurationMs: Date.now() - startedAt });
+    return result;
+  } catch (error) {
+    trace.mark(stage, 'FAILED', {
+      stageDurationMs: Date.now() - startedAt,
+      code: error?.code || null,
+      message: String(error?.message || error).slice(0, 300),
+    });
+    if (!error.failedStage) error.failedStage = stage;
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function sendVerificationEmail(db, email, userId, appUrl) {
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
   await db.collection('emailVerifyTokens').doc(token).set({
@@ -455,44 +521,82 @@ export default async function emailAuthRoutes(fastify) {
 
     // ── LOGIN ────────────────────────────────────────────────────────────────────
     if (action === 'login') {
-      const { ref } = request.body ?? {};
-      const userId  = await resolveEmailUser(db, email, ref ?? null);
-      const userSnap = await db.collection('users').doc(userId).get();
-      const ud = userSnap.data() ?? {};
-      if (ref || referralContext.referralFlowId) {
-        recordReferralEventAsync(db, {
-          ...referralContext,
-          referralCode: ref || referralContext.referralCode,
-          referrerId: ref || referralContext.referralCode,
-          referredUserId: userId,
-          type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
-          status: 'completed',
-          source: 'email-auth:login',
-          metadata: { email },
-        });
-      }
-      if (ud.emailVerified === false) {
-        sendVerificationEmail(db, email, userId, APP_URL).catch((e) => {
-          request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox verification email failed');
-        });
-      }
-      const token = await createFirebaseToken(userId, ud);
-      return {
-        ok: true,
-        token,
-        canonicalUserId: userId,
-        user: {
-          id: userId,
+      const trace = createEmailLoginTrace(request);
+      try {
+        trace.mark('request', 'START', { action, emailDomain: email.split('@')[1] || '' });
+        const { ref } = request.body ?? {};
+        const userId = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null), 9000);
+        const userSnap = await withEmailLoginStage(trace, 'load_user_profile', () => db.collection('users').doc(userId).get(), 7000);
+        const ud = userSnap.data() ?? {};
+        if (ref || referralContext.referralFlowId) {
+          recordReferralEventAsync(db, {
+            ...referralContext,
+            referralCode: ref || referralContext.referralCode,
+            referrerId: ref || referralContext.referralCode,
+            referredUserId: userId,
+            type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
+            status: 'completed',
+            source: 'email-auth:login',
+            metadata: { email },
+          });
+        }
+        if (ud.emailVerified === false) {
+          sendVerificationEmail(db, email, userId, APP_URL).catch((e) => {
+            request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox verification email failed');
+          });
+        }
+        const token = await withEmailLoginStage(trace, 'create_custom_token', () => createFirebaseToken(userId, ud), 5000);
+        trace.mark('request', 'END', { userId, totalMs: Date.now() - trace.startedAt });
+        return {
+          ok: true,
+          token,
           canonicalUserId: userId,
-          first_name: ud.firstName ?? email.split('@')[0],
-          last_name:  ud.lastName  ?? '',
-          photo_200:  ud.photo     ?? null,
-          email,
-          emailVerified: ud.emailVerified ?? null,
-          role: ud.role ?? null,
-          roles: Array.isArray(ud.roles) ? ud.roles : null,
-        },
-      };
+          diagnostics: {
+            requestId: trace.requestId,
+            timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+          },
+          user: {
+            id: userId,
+            canonicalUserId: userId,
+            first_name: ud.firstName ?? email.split('@')[0],
+            last_name:  ud.lastName  ?? '',
+            photo_200:  ud.photo     ?? null,
+            email,
+            emailVerified: ud.emailVerified ?? null,
+            role: ud.role ?? null,
+            roles: Array.isArray(ud.roles) ? ud.roles : null,
+          },
+        };
+      } catch (error) {
+        const classified = classifyEmailLoginError(error);
+        const failedStage = error?.failedStage || trace.timeline.findLast?.(item => item.status === 'FAILED')?.stage || 'unknown';
+        trace.mark('request', 'FAILED', {
+          failedStage,
+          code: classified.code,
+          message: String(error?.message || error).slice(0, 300),
+          totalMs: Date.now() - trace.startedAt,
+        });
+        request.log.error({
+          requestId: trace.requestId,
+          failedStage,
+          code: classified.code,
+          message: error?.message || String(error),
+          stack: String(error?.stack || '').slice(0, 1800),
+          timeline: trace.timeline,
+        }, 'email-login failed');
+        return reply.code(classified.statusCode).send({
+          ok: false,
+          error: classified.code,
+          message: 'Ошибка входа. Попробуйте снова.',
+          diagnostics: {
+            requestId: trace.requestId,
+            failedStage,
+            statusCode: classified.statusCode,
+            error: classified.code,
+            timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+          },
+        });
+      }
     }
 
     // ── VERIFY EMAIL ─────────────────────────────────────────────────────────────

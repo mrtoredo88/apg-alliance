@@ -95,7 +95,8 @@
     "preview": "vite preview",
     "tunnel": "vk-tunnel --http-protocol=http --host=localhost --port=5173",
     "deploy": "vite build && vk-miniapps-deploy",
-    "test:referral-recovery": "node scripts/referral-recovery-scan-test.mjs"
+    "test:referral-recovery": "node scripts/referral-recovery-scan-test.mjs",
+    "test:email-login-forensic": "node scripts/email-login-forensic-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

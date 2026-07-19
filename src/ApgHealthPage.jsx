@@ -5,6 +5,7 @@ import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
 import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';
 import { APG2_PROFILE, EmptyStateV2, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
+import { clearEmailLoginDiagnostics, readEmailLoginDiagnostics } from './auth/emailLoginDiagnostics.js';
 import {
   buildPerformanceExport,
   forcePerformanceSnapshot,
@@ -98,6 +99,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const [performanceReport, setPerformanceReport] = useState(() => getCurrentPerformanceReport());
   const [performanceRuns, setPerformanceRuns] = useState(() => readPerformanceRuns());
   const [performanceCopied, setPerformanceCopied] = useState(false);
+  const [emailLoginDiagnostics, setEmailLoginDiagnostics] = useState(() => readEmailLoginDiagnostics());
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -129,6 +131,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     const report = forcePerformanceSnapshot('health_refresh');
     setPerformanceReport(report);
     setPerformanceRuns(readPerformanceRuns());
+    setEmailLoginDiagnostics(readEmailLoginDiagnostics());
     return report;
   }, []);
 
@@ -251,8 +254,8 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       <GlassPanel>
         <ScreenHeader title="APG Health" subtitle="Диагностика системы" kicker="OWNER" onBack={onBack} />
 
-        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginTop: 0 }}>
-          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['performance', 'Perf']].map(([id, label]) => (
+        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 6, marginTop: 0 }}>
+          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['performance', 'Perf']].map(([id, label]) => (
             <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
@@ -458,6 +461,41 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                     <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, marginTop: 3 }}>{item.at}</div>
                   </GlassCard>
                 ))}
+              </div>
+            </GlassSection>
+          </>
+        )}
+
+        {activeTab === 'email' && (
+          <>
+            <GlassSection title="Email Login">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Последних этапов" value={emailLoginDiagnostics.length} />
+                <DiagnosticLine label="Последний этап" value={emailLoginDiagnostics[emailLoginDiagnostics.length - 1]?.stage || '—'} tone={String(emailLoginDiagnostics[emailLoginDiagnostics.length - 1]?.stage || '').includes('failed') ? 'bad' : 'default'} />
+                <DiagnosticLine label="Последний код" value={emailLoginDiagnostics.slice().reverse().find(item => item.code || item.error)?.code || emailLoginDiagnostics.slice().reverse().find(item => item.code || item.error)?.error || '—'} />
+                <DiagnosticLine label="Failed stage" value={emailLoginDiagnostics.slice().reverse().find(item => item.failedStage)?.failedStage || '—'} />
+                <DiagnosticLine label="Backend request" value={emailLoginDiagnostics.slice().reverse().find(item => item.requestIdBackend)?.requestIdBackend || '—'} />
+              </GlassCard>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                {emailLoginDiagnostics.length === 0 ? (
+                  <EmptyStateV2 icon="✉️" title="Email Login пуст" text="После попытки входа здесь появится forensic timeline." />
+                ) : emailLoginDiagnostics.slice().reverse().map((item, index) => (
+                  <GlassCard key={`${item.at}_${item.stage}_${index}`} style={{ borderRadius: 18, padding: '10px 12px', border: item.stage === 'failed' || item.stage === 'network_error' ? '1px solid rgba(248,113,113,0.34)' : '1px solid rgba(255,255,255,0.10)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850 }}>{String(item.stage || '').replace(/_/g, ' ')}</span>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850 }}>{item.durationMs != null ? `${item.durationMs} ms` : item.at}</span>
+                    </div>
+                    <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '16px', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {[item.code || item.error, item.failedStage, item.status ? `HTTP ${item.status}` : '', item.requestIdBackend || item.requestId].filter(Boolean).join(' · ') || 'OK'}
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+            <GlassSection title="Действия">
+              <div style={{ display: 'grid', gap: 8 }}>
+                <GlassButton onClick={() => setEmailLoginDiagnostics(readEmailLoginDiagnostics())} style={{ minHeight: 48 }}>↻ Обновить Email Login</GlassButton>
+                <GlassButton onClick={() => { clearEmailLoginDiagnostics(); setEmailLoginDiagnostics([]); }} style={{ minHeight: 48 }}>Очистить Email Login</GlassButton>
               </div>
             </GlassSection>
           </>
