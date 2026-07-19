@@ -81,6 +81,12 @@ function notify() {
   });
 }
 
+function markPerformance(stage, detail = {}) {
+  try {
+    window.__APG_PERFORMANCE_MARK__?.(stage, detail, 'service_worker');
+  } catch {}
+}
+
 function setState(patch = {}) {
   Object.assign(state, patch);
   notify();
@@ -194,6 +200,7 @@ function installServiceWorkerListener() {
 
 export async function requestPwaDiagnostics() {
   if (!hasWindow()) return getPwaUpdateDiagnostics();
+  markPerformance('cache_ready_start', {});
   await fetchPwaVersion({ force: true });
   try {
     if (navigator.serviceWorker?.controller) {
@@ -206,6 +213,10 @@ export async function requestPwaDiagnostics() {
       reg?.active?.postMessage?.({ type: 'APG_SW_DIAGNOSTICS' });
     }
   } catch {}
+  markPerformance('cache_ready', {
+    cacheKeys: state.cacheKeys.length,
+    sw: state.serviceWorkerVersion || '',
+  });
   return getPwaUpdateDiagnostics();
 }
 
@@ -230,10 +241,12 @@ export async function registerPwaServiceWorker({ noServiceWorker = false } = {})
   }
   if (!registrationPromise) {
     window.__APG_BOOT_MARK?.('pwa_update_sw_register_start');
+    markPerformance('sw_register_start', {});
     state.registrationCount += 1;
     registrationPromise = navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE })
       .then(reg => {
         window.__APG_BOOT_MARK?.('pwa_update_sw_registered');
+        markPerformance('sw_register', { active: Boolean(reg?.active), waiting: Boolean(reg?.waiting), installing: Boolean(reg?.installing) });
         window.__swRegPromise = registrationPromise;
         setState({ serviceWorkerRegistered: true, updateStatus: 'sw_registered' });
         return reg;
@@ -247,18 +260,23 @@ export async function registerPwaServiceWorker({ noServiceWorker = false } = {})
 }
 
 export async function checkPwaUpdate({ autoReload = true } = {}) {
+  markPerformance('update_check_start', {});
   const availableVersion = await fetchPwaVersion({ force: true });
   const installedVersion = readStorage(STORAGE_KEYS.installedVersion, '');
   const pendingVersion = readStorage(STORAGE_KEYS.pendingVersion, '');
   const sessionStorage = safeStorage('sessionStorage');
   const reloadedFor = sessionStorage?.getItem?.(SESSION_KEYS.reloadedForVersion) || '';
   setState({ installedVersion, availableVersion, bootstrapSource: installedVersion ? 'stored-version' : 'first-install' });
-  if (!availableVersion || availableVersion === '?') return getPwaUpdateDiagnostics();
+  if (!availableVersion || availableVersion === '?') {
+    markPerformance('update_check', { status: 'version_unavailable' });
+    return getPwaUpdateDiagnostics();
+  }
   if (pendingVersion === availableVersion && reloadedFor === availableVersion) {
     writeStorage(STORAGE_KEYS.installedVersion, availableVersion);
     writeStorage(STORAGE_KEYS.cacheVersion, availableVersion);
     removeStorage(STORAGE_KEYS.pendingVersion);
     setState({ installedVersion: availableVersion, cacheVersion: availableVersion, updateStatus: 'current', pendingReload: false });
+    markPerformance('update_check', { status: 'current_after_reload', version: availableVersion });
     return getPwaUpdateDiagnostics();
   }
   if (!installedVersion) {
@@ -266,10 +284,12 @@ export async function checkPwaUpdate({ autoReload = true } = {}) {
     writeStorage(STORAGE_KEYS.cacheVersion, availableVersion);
     removeStorage(STORAGE_KEYS.pendingVersion);
     setState({ installedVersion: availableVersion, cacheVersion: availableVersion, updateStatus: 'current' });
+    markPerformance('update_check', { status: 'first_install', version: availableVersion });
     return getPwaUpdateDiagnostics();
   }
   if (installedVersion === availableVersion && pendingVersion !== availableVersion) {
     setState({ updateStatus: 'current', cacheVersion: readStorage(STORAGE_KEYS.cacheVersion, installedVersion) });
+    markPerformance('update_check', { status: 'current', version: availableVersion });
     return getPwaUpdateDiagnostics();
   }
 
@@ -292,6 +312,7 @@ export async function checkPwaUpdate({ autoReload = true } = {}) {
     removeStorage(STORAGE_KEYS.pendingVersion);
     setState({ installedVersion: availableVersion, cacheVersion: availableVersion, updateStatus: 'current', pendingReload: false });
   }
+  markPerformance('update_check', { status: getPwaUpdateDiagnostics().updateStatus, version: availableVersion });
   return getPwaUpdateDiagnostics();
 }
 

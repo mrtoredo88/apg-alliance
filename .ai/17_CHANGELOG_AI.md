@@ -15,6 +15,18 @@
 
 ---
 
+## [2026-07-19] feat: APG Performance Observatory v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/performance/*`, `src/main.jsx`, `src/App.jsx`, `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/loki/LokiProvider.jsx`, `src/pwa/PwaUpdateManager.js`, `src/ApgHealthPage.jsx`, `scripts/performance-observatory-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен read-only слой Performance Observatory: runtime marks, startup timeline, stage metrics, FPS estimate, device/bundle/SW diagnostics and localStorage history for last 20 launches.
+- App lifecycle, Home, Firebase/Auth, Loki, routing and PWA update manager now write lightweight diagnostic marks without changing business logic or user-facing behavior.
+- В APG Health добавлена вкладка Performance с таймлайном, агрегатами запусков и копируемым performance report.
+**Почему:** дальнейшие оптимизации APG должны быть измеримыми по коммитам и устройствам, без субъективного “кажется быстрее”.
+
+---
+
 ## [2026-07-19] feat: First Journey v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/firstJourney.js`, `src/components/onboarding/FirstJourneyCard.jsx`, `src/HomePanelV2.jsx`, `src/UserApp.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `scripts/first-journey-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

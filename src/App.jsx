@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 import { SplashScreen } from './SplashScreen.jsx';
+import { markPerformanceStage } from './performance/index.js';
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
@@ -15,6 +16,8 @@ function AppFallback({ label = 'Загрузка...' }) {
 export function App() {
   useEffect(() => {
     window.__APG_BOOT_MARK?.('app_mounted');
+    markPerformanceStage('react_render_complete', {}, 'react');
+    markPerformanceStage('router_ready', { path: window.location.pathname }, 'routing');
     window.__APG_BOOT_OK = true;
   }, []);
   return (

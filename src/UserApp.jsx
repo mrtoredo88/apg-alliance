@@ -52,6 +52,7 @@ import {
   requestFirstJourneyLokiQuestion,
   syncFirstJourneyDerived,
 } from './firstJourney.js';
+import { countRender, finalizePerformanceRun, markFirebase, markPerformanceStage, markRouteReady } from './performance/index.js';
 import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
 import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
@@ -833,6 +834,9 @@ function LazyFallback() {
 }
 
 export function UserApp() {
+  countRender('UserApp');
+  const userAppMountedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const performanceReadyRef = useRef({ journey: false, loki: false, workspace: false, home: false });
   const initialDeepLink                         = useMemo(readAppDeepLink, []);
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
@@ -849,6 +853,14 @@ export function UserApp() {
     const unsubscribe = subscribePwaUpdate(() => {});
     requestPwaDiagnostics().catch(() => {});
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    markPerformanceStage('userapp_mount', {
+      ms: Math.max(0, Math.round(now - userAppMountedAt.current)),
+    }, 'react');
+    markPerformanceStage('loki_ready_start', {}, 'loki');
   }, []);
   const [splashDone, setSplashDone]             = useState(false);
   const [toast, setToast]                       = useState(null);
@@ -981,6 +993,15 @@ export function UserApp() {
     () => getFirstJourneyState({ user, activePanel, stored: firstJourneyStored }),
     [activePanel, firstJourneyStored, user?.id, user?.email, user?.emailVerified],
   );
+
+  useEffect(() => {
+    if (performanceReadyRef.current.journey || loading) return;
+    performanceReadyRef.current.journey = true;
+    markPerformanceStage('journey_ready', {
+      completed: Boolean(firstJourney?.completed),
+      completedSteps: firstJourney?.completedCount ?? firstJourney?.completedSteps ?? 0,
+    }, 'journey');
+  }, [firstJourney, loading]);
 
   // Реферальный параметр из URL должен переживать refresh/PWA-install до подтверждённого profile:sync.
   const pendingRefId = useMemo(() => readPendingReferral({ source: 'UserApp.mount' }), []);
@@ -1372,8 +1393,12 @@ export function UserApp() {
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
   const loadData = useCallback(async (isMounted) => {
+    markPerformanceStage('userapp_load_start', { activePanel }, 'react');
     if (publicSubmitRoute) {
-      if (isMounted.current) setLoading(false);
+      if (isMounted.current) {
+        markFirebase('firebase_ready', { source: 'public_submit' });
+        setLoading(false);
+      }
       return;
     }
     if (isManualLogoutFromStorage()) {
@@ -1381,6 +1406,7 @@ export function UserApp() {
       return;
     }
     setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
+    markFirebase('firebase_start', { source: 'UserApp.loadData' });
 
     // Показываем закэшированных партнёров, событий, новостей сразу (без мерцания)
     const cachedPartners = readCachedArray('apg_partners_cache').filter(item => item.catalogPublished !== false && isNotArchived(item));
@@ -1405,6 +1431,7 @@ export function UserApp() {
     try {
     // Firebase Auth и vkBridge — параллельно
     vkBridge.send('VKWebAppInit');
+    markFirebase('auth_start', { source: 'UserApp.loadData' });
     const authReady = new Promise(resolve => {
       let unsub = () => {};
       unsub = onAuthStateChanged(auth, (user) => {
@@ -1445,6 +1472,7 @@ export function UserApp() {
         return { id: guestId, first_name: 'Участник', last_name: 'АПГ', photo_200: null };
       }),
     ]);
+      markFirebase('auth_ready', { hasUser: Boolean(rawUserData?.id) });
       let userData = rawUserData;
 
       if (!isMounted.current) return;
@@ -1932,6 +1960,7 @@ export function UserApp() {
       logError(e, 'UserApp.loadData.fatal');
       if (isMounted.current) setError('Не удалось загрузить данные.');
     } finally {
+      markFirebase('firebase_ready', { source: 'UserApp.loadData.finally' });
       if (isMounted.current) setLoading(false);
     }
   }, [pendingRefId, publicSubmitRoute]);
@@ -3523,6 +3552,7 @@ export function UserApp() {
 
   useEffect(() => {
     safeScrollTop();
+    markRouteReady(activePanel, { desktopWorkspaceActive });
   }, [activePanel]);
 
   const tabBarShellStyle = {
@@ -3763,6 +3793,36 @@ export function UserApp() {
       source: initialDeepLink.type === 'profile-user' ? 'profile_deeplink' : '',
     },
   }), [activePanel, adaptiveInterestProfile, apgNews, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, initialDeepLink, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
+
+  useEffect(() => {
+    if (performanceReadyRef.current.loki || loading) return;
+    performanceReadyRef.current.loki = true;
+    markPerformanceStage('loki_ready', {
+      partners: enrichedPartners.length,
+      events: events.length,
+      news: apgNews.length,
+    }, 'loki');
+  }, [apgNews.length, enrichedPartners.length, events.length, loading]);
+
+  useEffect(() => {
+    if (performanceReadyRef.current.workspace || loading || !desktopWorkspaceAvailable) return;
+    performanceReadyRef.current.workspace = true;
+    markPerformanceStage('workspace_ready', {
+      active: desktopWorkspaceActive,
+      mode: resolvedAppMode,
+    }, 'workspace');
+  }, [desktopWorkspaceActive, desktopWorkspaceAvailable, loading, resolvedAppMode]);
+
+  useEffect(() => {
+    if (performanceReadyRef.current.home || loading || activePanel !== 'home') return;
+    performanceReadyRef.current.home = true;
+    markPerformanceStage('home_ready', {
+      partners: enrichedPartners.length,
+      events: events.length,
+      news: apgNews.length,
+    }, 'home');
+    finalizePerformanceRun('home_ready');
+  }, [activePanel, apgNews.length, enrichedPartners.length, events.length, loading]);
 
   const lokiAppActions = useMemo(() => ({
     [LOKI_APP_ACTIONS.OPEN_PARTNER]: ({ partnerId, id } = {}) => {

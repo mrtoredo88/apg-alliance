@@ -44,6 +44,7 @@ import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
 import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics, recordLokiPipelineError, recordLokiPipelineReturn } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, normalizeLokiResponseText } from './lokiResponseText.js';
+import { markLokiStage } from '../performance/index.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -1234,6 +1235,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
 
   const askExperience = useCallback(async (text, options = {}) => {
     recordLokiMessageTrace('STEP 4 LokiProvider askExperience received', { enabled: settings.enabled, textLength: String(text || '').length });
+    markLokiStage('conversation', { textLength: String(text || '').length, activePanel });
     if (!settings.enabled) {
       recordLokiMessageTrace('STOP Loki disabled', {});
       return null;
@@ -1246,6 +1248,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     updateMemory({ inDialog: true, lastPanel: activePanel, lastUserText: text, activeContext });
     try {
       recordLokiMessageTrace('STEP 6 News context check start', { activeContextType: activeContext?.type || '' });
+      markLokiStage('knowledge', { source: activeContext?.type === 'news' ? 'news_context' : 'context_engine' });
       const contextResult = buildNewsContextAnswer(activeContext, text, appState);
       if (contextResult) {
         const contextInspection = inspectLokiResponseText(contextResult.text);
@@ -1276,6 +1279,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           });
         }
         recordLokiMessageTrace('STEP 7 News context answer returned', { hasText: Boolean(normalizedContextResult.text), intent: normalizedContextResult.intent || '' });
+        markLokiStage('response', { source: 'news_context', textLength: normalizedContextResult.text.length });
         setBrainThinking(false);
         setEmotion('helper');
         setAction(LOKI_ACTIONS.LISTEN);
@@ -1316,11 +1320,16 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         partners: lokiContext?.appState?.partners?.length || appState?.partners?.length || 0,
         events: lokiContext?.appState?.events?.length || appState?.events?.length || 0,
       });
+      markLokiStage('reasoning', {
+        partners: lokiContext?.appState?.partners?.length || appState?.partners?.length || 0,
+        events: lokiContext?.appState?.events?.length || appState?.events?.length || 0,
+      });
       recordLokiMessageTrace('STEP 9 LokiBrain start', {});
       const result = await withLokiAnswerTimeout(askLokiBrain({ text, appState: { ...lokiContext, personality: { mode: settings.personalityMode } }, memory: { ...memory, activeContext }, userMemory, history, debug: isLokiDebugEnabled() }), text);
       recordLokiPipelineReturn('LokiProvider askLokiBrain await', result);
       recordLokiMessageTrace('STEP 16 LokiBrain returned to Provider', { hasResult: Boolean(result), intent: result?.intent || '', timeout: Boolean(result?.debug?.timeout) });
       if (!result) {
+        markLokiStage('response', { status: 'empty' });
         recordLokiMessageTrace('STOP LokiBrain returned null', {});
         recordLokiRequestDiagnostics({
           contextType: activeContext?.type || '',
@@ -1357,6 +1366,15 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           pipelineTimeline: traceTimeline(),
         },
       };
+      if (normalizedResult.capabilityContext) markLokiStage('capability', { capability: normalizedResult.capabilityContext.capability || normalizedResult.capabilitySnapshot?.Capability || '' });
+      if (normalizedResult.skillContext) markLokiStage('skills', { skill: normalizedResult.skillContext.skill || normalizedResult.skillSnapshot?.['Selected Skill'] || '' });
+      if (normalizedResult.executionContext || normalizedResult.controlledExecutionContext) markLokiStage('execution', { ready: Boolean(normalizedResult.executionContext?.ready || normalizedResult.controlledExecutionContext?.executionReady) });
+      if (normalizedResult.planContext) markLokiStage('planner', { planId: normalizedResult.planContext.id || '' });
+      if (normalizedResult.workflowContext) markLokiStage('workflow', { workflowId: normalizedResult.workflowContext.id || '' });
+      if (normalizedResult.agentContext) markLokiStage('agent', { decision: normalizedResult.agentContext.decision || '' });
+      if (normalizedResult.toolContext) markLokiStage('tool_calling', { events: normalizedResult.toolContext.events?.length || 0 });
+      if (normalizedResult.decisionContext) markLokiStage('decision', { confidence: normalizedResult.decisionContext.confidence ?? normalizedResult.decisionContext.score ?? null });
+      if (normalizedResult.evaluationSnapshot) markLokiStage('evaluation', { overall: normalizedResult.evaluationSnapshot.Overall ?? normalizedResult.evaluationSnapshot.overallScore ?? null });
       setBrainThinking(false);
       setEmotion(normalizedResult.executeAction || normalizedResult.autoAction ? 'excited' : 'helper');
       setAction(normalizedResult.executeAction || normalizedResult.autoAction ? LOKI_ACTIONS.POINT : LOKI_ACTIONS.LISTEN);
@@ -1434,9 +1452,14 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
       else if (normalizedResult.controlledExecutionContext?.executionReady) setTimeout(() => dispatchControlledExecution(normalizedResult.controlledExecutionContext), 120);
       recordLokiMessageTrace('STEP 18 Provider returns result to UI', { textLength: normalizedResult.text.length });
+      markLokiStage('response', {
+        status: normalizedResult.debug?.timeout ? 'timeout' : resultInspection.fallbackUsed ? 'fallback' : 'answered',
+        textLength: normalizedResult.text.length,
+      });
       return normalizedResult;
     } catch (e) {
       setBrainThinking(false);
+      markLokiStage('response', { status: 'exception', error: e?.message || String(e) });
       recordLokiPipelineError('LokiProvider askExperience', e);
       recordLokiMessageTrace('STOP Provider caught exception', { error: e?.message || String(e) });
       recordLokiRequestDiagnostics({

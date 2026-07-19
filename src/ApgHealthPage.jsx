@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
 import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';
 import { APG2_PROFILE, EmptyStateV2, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
+import {
+  buildPerformanceExport,
+  forcePerformanceSnapshot,
+  getCurrentPerformanceReport,
+  readPerformanceRuns,
+  summarizeRuns,
+} from './performance/index.js';
 
 function StatusDot({ ok, pending }) {
   if (pending) return <span style={{ fontSize: 16 }}>⏳</span>;
@@ -45,6 +52,35 @@ function DiagnosticLine({ label, value, tone = 'default' }) {
   );
 }
 
+function formatMs(value) {
+  const num = Number(value || 0);
+  return num > 0 ? `${Math.round(num)} ms` : '—';
+}
+
+function formatSummaryRow(row = {}) {
+  if (!row || row.avg == null) return '—';
+  return `avg ${Math.round(row.avg)} · min ${Math.round(row.min)} · max ${Math.round(row.max)} ms`;
+}
+
+function stageTone(severity) {
+  if (severity === 'critical') return 'bad';
+  if (severity === 'slow') return 'warn';
+  return 'ok';
+}
+
+function stageLabel(item = {}) {
+  return String(item.stage || '').replace(/_/g, ' ');
+}
+
+function formatMemory(device = {}) {
+  if (device.memory?.usedJSHeapSize) {
+    const used = Math.round(device.memory.usedJSHeapSize / 1024 / 1024);
+    const total = Math.round((device.memory.totalJSHeapSize || 0) / 1024 / 1024);
+    return `${used} / ${total} MB`;
+  }
+  return device.deviceMemory ? `${device.deviceMemory} GB device` : '—';
+}
+
 export function ApgHealthPage({ nav = 'health', user = null, partners = [], experts = [], events = [], news = [], customTasks = [], userCount = 0, totalScans = 0, onBack, onGoAdmin }) {
   const [checks, setChecks]           = useState(null);
   const [checking, setChecking]       = useState(true);
@@ -54,6 +90,9 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const [pushDiagnostics, setPushDiagnostics] = useState(null);
   const [pushBusy, setPushBusy] = useState('');
   const [pushResult, setPushResult] = useState(null);
+  const [performanceReport, setPerformanceReport] = useState(() => getCurrentPerformanceReport());
+  const [performanceRuns, setPerformanceRuns] = useState(() => readPerformanceRuns());
+  const [performanceCopied, setPerformanceCopied] = useState(false);
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -80,6 +119,19 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       .catch(() => {})
       .finally(() => setLoadingLogs(false));
   }, [refreshPushDiagnostics, runChecks]);
+
+  const refreshPerformance = useCallback(() => {
+    const report = forcePerformanceSnapshot('health_refresh');
+    setPerformanceReport(report);
+    setPerformanceRuns(readPerformanceRuns());
+    return report;
+  }, []);
+
+  useEffect(() => {
+    refreshPerformance();
+    const timer = window.setInterval(refreshPerformance, 2500);
+    return () => window.clearInterval(timer);
+  }, [refreshPerformance]);
 
   const runPushAction = async (action) => {
     setPushBusy(action);
@@ -121,6 +173,26 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     .slice(0, 5);
 
   const recentNews = [...news].slice(0, 5);
+  const performanceSummary = useMemo(() => summarizeRuns(performanceRuns), [performanceRuns]);
+  const performanceTimeline = Array.isArray(performanceReport?.timeline) ? performanceReport.timeline : [];
+  const slowStages = performanceTimeline.filter(item => item.severity === 'slow' || item.severity === 'critical');
+  const startupRows = performanceTimeline
+    .filter(item => [
+      'index_loaded',
+      'main_module_loaded',
+      'react_render_start',
+      'react_render_complete',
+      'router_ready',
+      'userapp_mount',
+      'firebase_ready',
+      'auth_ready',
+      'journey_ready',
+      'loki_ready',
+      'workspace_ready',
+      'home_ready',
+      'idle_complete',
+    ].includes(item.stage))
+    .slice(-18);
 
   const warnColor = { error: 'rgba(230,70,70,0.34)', warn: 'rgba(255,165,0,0.34)', info: 'rgba(215,184,106,0.28)' };
   const warnIcon  = { error: '🔴', warn: '🟡', info: 'ℹ️' };
@@ -130,8 +202,8 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
       <GlassPanel>
         <ScreenHeader title="APG Health" subtitle="Диагностика системы" kicker="OWNER" onBack={onBack} />
 
-        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginTop: 0 }}>
-          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push']].map(([id, label]) => (
+        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginTop: 0 }}>
+          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['performance', 'Perf']].map(([id, label]) => (
             <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
@@ -337,6 +409,94 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                     <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, marginTop: 3 }}>{item.at}</div>
                   </GlassCard>
                 ))}
+              </div>
+            </GlassSection>
+          </>
+        )}
+
+        {activeTab === 'performance' && (
+          <>
+            <GlassSection title="Startup Timeline">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Startup" value={formatMs(performanceReport?.metrics?.startupMs)} />
+                <DiagnosticLine label="React" value={formatMs(performanceReport?.metrics?.reactMs)} />
+                <DiagnosticLine label="Firebase" value={formatMs(performanceReport?.metrics?.firebaseMs)} />
+                <DiagnosticLine label="Auth" value={formatMs(performanceReport?.metrics?.authMs)} />
+                <DiagnosticLine label="Home" value={formatMs(performanceReport?.metrics?.homeMs)} />
+                <DiagnosticLine label="Loki" value={formatMs(performanceReport?.metrics?.lokiMs)} />
+                <DiagnosticLine label="SW register" value={formatMs(performanceReport?.metrics?.serviceWorkerMs)} />
+                <DiagnosticLine label="FPS startup" value={performanceReport?.fps ? `${performanceReport.fps}` : '—'} />
+              </GlassCard>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                {startupRows.length === 0 ? (
+                  <EmptyStateV2 icon="⏱" title="Таймлайн пуст" text="Метки появятся после запуска приложения." />
+                ) : startupRows.map((item, index) => (
+                  <GlassCard key={`${item.stage}_${index}_${item.relativeMs}`} style={{ borderRadius: 18, padding: '10px 12px', border: item.severity === 'critical' ? '1px solid rgba(248,113,113,0.34)' : item.severity === 'slow' ? '1px solid rgba(251,191,36,0.34)' : '1px solid rgba(255,255,255,0.10)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 850, textTransform: 'capitalize' }}>{stageLabel(item)}</span>
+                      <span style={{ color: item.severity === 'critical' ? '#f87171' : item.severity === 'slow' ? '#fbbf24' : APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 850, fontVariantNumeric: 'tabular-nums' }}>
+                        +{Math.round(item.relativeMs || 0)} ms · {formatMs(item.durationMs)}
+                      </span>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassSection>
+
+            <GlassSection title="Последние 20 запусков">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Запусков" value={performanceRuns.length} />
+                <DiagnosticLine label="Startup" value={formatSummaryRow(performanceSummary.startup)} />
+                <DiagnosticLine label="React" value={formatSummaryRow(performanceSummary.react)} />
+                <DiagnosticLine label="Firebase" value={formatSummaryRow(performanceSummary.firebase)} />
+                <DiagnosticLine label="Home" value={formatSummaryRow(performanceSummary.home)} />
+                <DiagnosticLine label="Loki" value={formatSummaryRow(performanceSummary.loki)} />
+                <DiagnosticLine label="SW" value={formatSummaryRow(performanceSummary.serviceWorker)} />
+              </GlassCard>
+            </GlassSection>
+
+            <GlassSection title="Bundle / Device">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Build version" value={performanceReport?.version || 'unknown'} />
+                <DiagnosticLine label="Build time" value={performanceReport?.buildTime || 'unknown'} />
+                <DiagnosticLine label="Bundle version" value={performanceReport?.bundleVersion || '—'} />
+                <DiagnosticLine label="Service Worker" value={performanceReport?.serviceWorkerVersion || '—'} />
+                <DiagnosticLine label="Browser" value={performanceReport?.device?.browser || '—'} />
+                <DiagnosticLine label="Platform" value={performanceReport?.device?.platform || '—'} />
+                <DiagnosticLine label="Mode" value={`${performanceReport?.device?.displayMode || 'browser'} · standalone=${performanceReport?.device?.standalone ? 'yes' : 'no'}`} />
+                <DiagnosticLine label="Viewport" value={performanceReport?.device?.viewport || '—'} />
+                <DiagnosticLine label="Network" value={performanceReport?.device?.network || '—'} />
+                <DiagnosticLine label="Memory" value={formatMemory(performanceReport?.device || {})} />
+                <DiagnosticLine label="Render counts" value={Object.entries(performanceReport?.renderCounts || {}).map(([key, value]) => `${key}:${value}`).join(', ') || '—'} />
+              </GlassCard>
+            </GlassSection>
+
+            <GlassSection title="Diagnostics">
+              {slowStages.length === 0 ? (
+                <EmptyStateV2 icon="✅" title="Медленных этапов нет" text="Этапы старта укладываются в текущие пороги." />
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {slowStages.slice(-10).map((item, index) => (
+                    <GlassCard key={`${item.stage}_${index}`} style={{ borderRadius: 18, padding: '10px 12px' }}>
+                      <DiagnosticLine label={stageLabel(item)} value={`${item.severity === 'critical' ? 'Critical' : 'Slow'} · ${formatMs(item.durationMs)}`} tone={stageTone(item.severity)} />
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                <GlassButton onClick={refreshPerformance} style={{ minHeight: 48, borderRadius: 20 }}>↻ Обновить</GlassButton>
+                <GlassButton
+                  tone="gold"
+                  onClick={async () => {
+                    const report = refreshPerformance();
+                    await navigator.clipboard?.writeText(buildPerformanceExport(report));
+                    setPerformanceCopied(true);
+                    window.setTimeout(() => setPerformanceCopied(false), 1400);
+                  }}
+                  style={{ minHeight: 48, borderRadius: 20, color: '#17120a' }}
+                >
+                  {performanceCopied ? 'Скопировано' : 'Скопировать отчёт'}
+                </GlassButton>
               </div>
             </GlassSection>
           </>

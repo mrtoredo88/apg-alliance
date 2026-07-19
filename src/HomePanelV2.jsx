@@ -16,6 +16,7 @@ import { FirstJourneyCard } from './components/onboarding/FirstJourneyCard.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
 import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
+import { countRender, markPerformanceStage } from './performance/index.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -2854,12 +2855,33 @@ export function HomePanelV2({
   onFirstJourneyAskLoki,
   onFirstJourneyOpenPanel,
 }) {
+  countRender('HomePanelV2');
   // Главная показывает только актуальные события: не удалённые/архивные и не завершившиеся, ближайшие первыми
   const events = useMemo(() => selectActualEvents(rawEvents), [rawEvents]);
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isOffline, setIsOffline] = useState(() => typeof navigator === 'undefined' ? false : !navigator.onLine);
+
+  useEffect(() => {
+    markPerformanceStage('home_render', {
+      loading,
+      partners: partners.length,
+      events: events.length,
+      news: news.length,
+      desktopMode,
+    }, 'home');
+  });
+
+  useEffect(() => {
+    if (loading) return;
+    markPerformanceStage('home_ready', {
+      partners: partners.length,
+      events: events.length,
+      news: news.length,
+      recommendations: Array.isArray(recommendations?.items) ? recommendations.items.length : 0,
+    }, 'home');
+  }, [events.length, loading, news.length, partners.length, recommendations]);
 
   // ─── Pull-to-refresh ────────────────────────────────────────────────────────
   const [pullY, setPullY] = useState(0);

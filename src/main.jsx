@@ -4,6 +4,7 @@ import { App } from './App.jsx';
 import { installNetworkDiagnostics } from './networkDiagnostics.js';
 import { startPwaUpdateManager } from './pwa/PwaUpdateManager.js';
 import { installPwaRuntimeDiagnostics } from './pwa/PwaRuntimeDiagnostics.js';
+import { installPerformanceObservatory, markPerformanceStage } from './performance/index.js';
 import { API_BASE_URL } from './constants.js';
 import { ensureServerReferralSession } from './referralDiagnostics.js';
 import './fonts.css';
@@ -32,9 +33,11 @@ if (_vkHash.includes('access_token=') && window.opener) {
   }
 
   window.__APG_BOOT_MARK?.('main_module_loaded');
+  installPerformanceObservatory();
   installPwaRuntimeDiagnostics();
   installNetworkDiagnostics();
   window.__APG_BOOT_MARK?.('network_diagnostics_installed');
+  markPerformanceStage('main_module_ready', {}, 'boot');
   window.__APG_REFERRAL_SESSION_PROMISE__ = ensureServerReferralSession({ apiBaseUrl: API_BASE_URL, source: 'main_bootstrap' }).catch((error) => {
     console.info('[REF] session bootstrap skipped', { message: error?.message || String(error) });
     return null;
@@ -47,8 +50,10 @@ if (_vkHash.includes('access_token=') && window.opener) {
       return;
     }
     window.__APG_BOOT_MARK?.('react_render_start');
+    markPerformanceStage('react_render_start', {}, 'react');
     createRoot(document.getElementById('root')).render(<App />);
     window.__APG_BOOT_MARK?.('react_render_called');
+    markPerformanceStage('react_render_called', {}, 'react');
   };
   window.__APG_BOOT_MARK?.('pwa_update_manager_start');
   window.__APG_PWA_UPDATE_PROMISE__ = startPwaUpdateManager({ noServiceWorker, autoReload: true })
