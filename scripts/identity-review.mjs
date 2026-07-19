@@ -2,14 +2,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   appendReviewAudit,
+  buildDecisionCards,
   buildMarkdownReviewReport,
   buildResolutionManifestV2,
   createReviewSession,
   ensureReviewDir,
+  formatDecisionSessionSummary,
   formatReviewSummary,
+  nextPendingConflict,
   REVIEW_DIR,
   sessionSummary,
   upsertDecision,
+  writeOwnerDecisionPack,
 } from '../src/admin/identity/review/index.js';
 
 const args = process.argv.slice(2);
@@ -68,6 +72,17 @@ function writeSession(session) {
       reviewedBy: item.reviewedBy,
       reviewedAt: item.reviewedAt,
       evidence: item.evidence,
+      sourceIds: item.sourceIds,
+      sourceUserId: item.sourceUserId,
+      targetCanonicalId: item.targetCanonicalId,
+      targetUserId: item.targetUserId,
+      preservationPlan: item.preservationPlan ? Object.keys(item.preservationPlan) : null,
+      telegramId: item.telegramId ? '[redacted]' : '',
+      currentTarget: item.currentTarget ? '[redacted]' : '',
+      newTarget: item.newTarget ? '[redacted]' : '',
+      evidenceForTarget: item.evidenceForTarget,
+      reasonNoValidTargetExists: item.reasonNoValidTargetExists,
+      lastKnownReferences: item.lastKnownReferences,
       destructive: item.destructive,
       secondReviewRequired: item.secondReviewRequired,
       ownerOverride: item.ownerOverride,
@@ -122,6 +137,28 @@ function requiredDecisionInput() {
   return { reason, reviewedBy, evidence };
 }
 
+function parseJsonOption(name, fallback = null) {
+  const raw = option(name);
+  if (!raw) return fallback;
+  return JSON.parse(raw);
+}
+
+function decisionMetadata() {
+  return {
+    sourceIds: option('sourceIds'),
+    sourceUserId: option('sourceUserId'),
+    targetCanonicalId: option('targetCanonicalId') || option('targetUserId') || option('newTarget'),
+    targetUserId: option('targetUserId') || option('targetCanonicalId') || option('newTarget'),
+    preservationPlan: parseJsonOption('preservationPlan'),
+    telegramId: option('telegramId') || option('tgLinkId'),
+    currentTarget: option('currentTarget'),
+    newTarget: option('newTarget') || option('targetCanonicalId') || option('targetUserId'),
+    evidenceForTarget: option('evidenceForTarget'),
+    reasonNoValidTargetExists: option('reasonNoValidTargetExists'),
+    lastKnownReferences: option('lastKnownReferences'),
+  };
+}
+
 function exportSession(session, sessionFile) {
   const manifest = buildResolutionManifestV2(session, { sourceAudit: 'backups/identity/reviews/identity-review-audit.jsonl' });
   const manifestPath = 'backups/identity/resolution-manifest-v2.json';
@@ -140,9 +177,25 @@ try {
   } else if (command === 'show') {
     const conflictId = args[1];
     const { session } = loadOrCreateSession();
-    const conflict = (session.conflicts || []).find(item => item.conflictId === conflictId);
-    if (!conflict) throw new Error(`Unknown conflictId: ${conflictId}`);
-    printConflict(conflict);
+    const card = buildDecisionCards(session).find(item => item.conflictId === conflictId);
+    if (!card) throw new Error(`Unknown conflictId: ${conflictId}`);
+    console.log(JSON.stringify(card, null, 2));
+  } else if (command === 'show-next') {
+    const { session } = loadOrCreateSession();
+    const conflict = nextPendingConflict(session);
+    if (!conflict) {
+      console.log('Identity Conflict Decision Session: no pending conflicts.');
+    } else {
+      const card = buildDecisionCards(session).find(item => item.conflictId === conflict.conflictId);
+      console.log(JSON.stringify(card, null, 2));
+    }
+  } else if (command === 'decision-pack') {
+    const loaded = loadOrCreateSession();
+    const pack = writeOwnerDecisionPack(loaded.session);
+    appendReviewAudit({ event: 'OWNER_DECISION_PACK_CREATED', conflictId: null, reviewedBy: loaded.session.reviewer || 'system', decision: null, previousDecision: null, fingerprint: null });
+    console.log(formatDecisionSessionSummary(loaded.session));
+    console.log(`Decision pack: ${pack.file}`);
+    console.log(`Redacted decision pack: ${pack.redacted}`);
   } else if (command === 'decide') {
     const conflictId = args[1];
     const decision = args[2];
@@ -153,6 +206,7 @@ try {
       decision,
       status: 'approved',
       ...input,
+      ...decisionMetadata(),
       notes: option('notes'),
       confirmationPhrase: option('confirmationPhrase'),
       secondReviewedBy: option('secondReviewedBy'),

@@ -1,6 +1,20 @@
 import { CONFIRMATION_PHRASE, DESTRUCTIVE_DECISIONS, REVIEW_DECISIONS, decisionFingerprint, sourceFingerprint } from './ReviewDecision.js';
 
 const REQUIRED = ['conflictId', 'decision', 'status', 'reason', 'reviewedBy', 'reviewedAt', 'evidence', 'sourceFingerprint', 'decisionFingerprint'];
+const PRESERVATION_FIELDS = [
+  'roles',
+  'ownership',
+  'bookings',
+  'dialogs',
+  'friends',
+  'keys',
+  'rewards',
+  'notifications',
+  'referrals',
+  'profileFields',
+  'telegramIdentity',
+  'authProviders',
+];
 
 export function validateDecision(decision = {}, conflict = null) {
   const errors = [];
@@ -24,9 +38,27 @@ export function validateDecision(decision = {}, conflict = null) {
     if (decision.confirmationPhrase !== CONFIRMATION_PHRASE) errors.push(`${decision.conflictId} destructive decision missing confirmation phrase`);
     if (!decision.secondReviewRequired) errors.push(`${decision.conflictId} destructive decision must require second review`);
   }
-  if (decision.decision === 'REMAP_TG_LINK' && !decision.targetCanonicalId) errors.push(`${decision.conflictId} tgLink remap requires targetCanonicalId`);
-  if ((decision.decision === 'MERGE_INTO_A' || decision.decision === 'MERGE_INTO_B') && decision.targetCanonicalId && (decision.sourceIds || []).includes(decision.targetCanonicalId)) {
-    errors.push(`${decision.conflictId} merge target cannot also be listed as source`);
+  if (decision.decision === 'REMAP_TG_LINK') {
+    if (!decision.telegramId) errors.push(`${decision.conflictId} tgLink remap requires telegramId`);
+    if (!decision.currentTarget) errors.push(`${decision.conflictId} tgLink remap requires currentTarget`);
+    if (!decision.newTarget && !decision.targetCanonicalId) errors.push(`${decision.conflictId} tgLink remap requires newTarget`);
+    if (!decision.evidenceForTarget?.length) errors.push(`${decision.conflictId} tgLink remap requires evidenceForTarget`);
+  }
+  if (decision.decision === 'DELETE_ORPHAN_TG_LINK') {
+    if (!decision.telegramId) errors.push(`${decision.conflictId} orphan delete requires telegramId`);
+    if (!decision.reasonNoValidTargetExists) errors.push(`${decision.conflictId} orphan delete requires reasonNoValidTargetExists`);
+    if (!decision.lastKnownReferences?.length) errors.push(`${decision.conflictId} orphan delete requires lastKnownReferences`);
+  }
+  if (decision.decision === 'MERGE_INTO_A' || decision.decision === 'MERGE_INTO_B') {
+    if (!decision.targetCanonicalId && !decision.targetUserId) errors.push(`${decision.conflictId} merge requires targetUserId`);
+    if (!decision.sourceUserId && !decision.sourceIds?.length) errors.push(`${decision.conflictId} merge requires sourceUserId`);
+    const target = decision.targetCanonicalId || decision.targetUserId;
+    const sources = decision.sourceIds?.length ? decision.sourceIds : [decision.sourceUserId].filter(Boolean);
+    if (target && sources.includes(target)) errors.push(`${decision.conflictId} merge target cannot also be listed as source`);
+    const plan = decision.preservationPlan || {};
+    PRESERVATION_FIELDS.forEach(field => {
+      if (!Object.prototype.hasOwnProperty.call(plan, field)) errors.push(`${decision.conflictId} preservationPlan missing ${field}`);
+    });
   }
   if (decision.status === 'stale') errors.push(`${decision.conflictId} stale decision cannot be exported`);
   if (errors.length && decision.decision !== 'DEFER') warnings.push(`${decision.conflictId} decision is not executable and remains documentation only`);

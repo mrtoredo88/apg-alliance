@@ -81,6 +81,17 @@ export function decisionFingerprint(decision = {}) {
     secondReviewRequired: Boolean(decision.secondReviewRequired),
     secondReviewedBy: decision.secondReviewedBy || null,
     ownerOverride: Boolean(decision.ownerOverride),
+    sourceIds: decision.sourceIds || [],
+    sourceUserId: decision.sourceUserId || '',
+    targetCanonicalId: decision.targetCanonicalId || '',
+    targetUserId: decision.targetUserId || '',
+    preservationPlan: decision.preservationPlan || null,
+    telegramId: decision.telegramId || '',
+    currentTarget: decision.currentTarget || '',
+    newTarget: decision.newTarget || '',
+    evidenceForTarget: decision.evidenceForTarget || [],
+    reasonNoValidTargetExists: decision.reasonNoValidTargetExists || '',
+    lastKnownReferences: decision.lastKnownReferences || [],
   });
 }
 
@@ -104,6 +115,17 @@ export function createReviewDecision(conflict, input = {}) {
     secondReviewedBy: input.secondReviewedBy ? String(input.secondReviewedBy).trim() : null,
     secondReviewedAt: input.secondReviewedAt || null,
     ownerOverride: Boolean(input.ownerOverride),
+    sourceIds: Array.isArray(input.sourceIds) ? input.sourceIds.map(item => String(item).trim()).filter(Boolean) : String(input.sourceIds || '').split(',').map(item => item.trim()).filter(Boolean),
+    sourceUserId: String(input.sourceUserId || '').trim(),
+    targetCanonicalId: String(input.targetCanonicalId || input.targetUserId || '').trim(),
+    targetUserId: String(input.targetUserId || input.targetCanonicalId || '').trim(),
+    preservationPlan: input.preservationPlan && typeof input.preservationPlan === 'object' ? input.preservationPlan : null,
+    telegramId: String(input.telegramId || input.tgLinkId || '').trim(),
+    currentTarget: String(input.currentTarget || '').trim(),
+    newTarget: String(input.newTarget || input.targetCanonicalId || input.targetUserId || '').trim(),
+    evidenceForTarget: Array.isArray(input.evidenceForTarget) ? input.evidenceForTarget.map(item => String(item).trim()).filter(Boolean) : String(input.evidenceForTarget || '').split(',').map(item => item.trim()).filter(Boolean),
+    reasonNoValidTargetExists: String(input.reasonNoValidTargetExists || '').trim(),
+    lastKnownReferences: Array.isArray(input.lastKnownReferences) ? input.lastKnownReferences.map(item => String(item).trim()).filter(Boolean) : String(input.lastKnownReferences || '').split(',').map(item => item.trim()).filter(Boolean),
   };
   record.decisionFingerprint = decisionFingerprint(record);
   return record;
