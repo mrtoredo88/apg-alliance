@@ -13,11 +13,13 @@ assert.ok(route.includes('rollback'), 'canary produces rollback checklist');
 assert.ok(route.includes("if (action !== 'canary')"), 'canary does not write Firestore audit log outside approved action');
 
 const cli = fs.readFileSync('scripts/identity-canary.mjs', 'utf8');
+const adapter = fs.readFileSync('server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js', 'utf8');
 assert.ok(cli.includes('backups/identity/canary'), 'CLI writes canary reports');
 assert.ok(cli.includes('rollback-checklist.md'), 'CLI writes rollback checklist');
 assert.ok(cli.includes('CANARY_STOPPED'), 'CLI records stopped status');
 assert.ok(cli.includes('CANARY_PASSED'), 'CLI records passed status');
 assert.doesNotMatch(cli, /setDoc|updateDoc|deleteDoc|collection\(|getFirestore|firebase-admin|cutover-postgres|rollback-postgres|deploy-frontend/i, 'local canary CLI does not mutate Firestore or cutover');
+assert.ok(adapter.includes("this.pool.on('error'"), 'Postgres pool handles idle connection errors without crashing the container');
 
 console.log(JSON.stringify({
   ok: true,

@@ -17,12 +17,13 @@
 
 ## [2026-07-20] chore: Identity Canary Execution v1
 **Коммит:** `см. финальный отчёт`
-**Файлы:** `server/src/routes/identity-v2-admin.js`, `scripts/identity-canary.mjs`, `scripts/identity-canary-test.mjs`, `scripts/identity-cutover-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Файлы:** `server/src/routes/identity-v2-admin.js`, `server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js`, `scripts/identity-canary.mjs`, `scripts/identity-canary-test.mjs`, `scripts/identity-cutover-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
 **Тип:** chore
 **Что изменено:**
 - Добавлен protected `canary` action в Identity Migration Center: он выполняет approved manifest actions по одному, в порядке orphan tgLinks → non-owner merge → owner merge.
 - После каждого canary action выполняются PostgreSQL invariant checks, owner access check, preservation/rollback checks; Cutover остаётся locked.
 - Локальный CLI `npm run identity:canary` вызывает production Migration Center, сохраняет canary report/summary/rollback checklist и фиксирует `CANARY_STOPPED` при инфраструктурной ошибке.
+- PostgreSQL adapter теперь обрабатывает idle pool `error` events, чтобы transient `ECONNRESET` не ронял serverless container после успешной операции.
 **Почему:** после read-only Verify нужен первый ограниченный execution gate, который доказывает совпадение реального PostgreSQL выполнения с Dry Run, без batch import и без Cutover.
 
 ## [2026-07-20] chore: Identity Final Owner Approval + Verify v1

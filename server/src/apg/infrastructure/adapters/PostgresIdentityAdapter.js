@@ -44,6 +44,13 @@ export class PostgresIdentityAdapter {
         connectionTimeoutMillis: 4_000,
         ssl: process.env.APG_IDENTITY_PG_SSL === '0' ? false : { rejectUnauthorized: false },
       });
+      this.pool.on('error', error => {
+        this.lastPoolError = {
+          code: error?.code || '',
+          message: String(error?.message || error).slice(0, 220),
+          at: new Date().toISOString(),
+        };
+      });
     }
     return this.pool;
   }
