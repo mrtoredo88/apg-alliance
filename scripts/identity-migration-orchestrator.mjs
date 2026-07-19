@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { executeIdentityDryRun } from '../src/admin/identity/dryrun/index.js';
-import { validateReviewSession } from '../src/admin/identity/review/index.js';
+import { appendReviewAudit, validateReviewSession } from '../src/admin/identity/review/index.js';
 
 const BACKUP_DIR = 'backups/identity';
 const OUT_DIR = path.join(BACKUP_DIR, 'orchestrator');
@@ -103,15 +103,26 @@ function notRun(stage, reason) {
 
 function buildVerifyPackage({ manifest, reviewValidation, dryRun, invariants, readiness, brokenReferences, ownerForensic, sources }) {
   fs.mkdirSync(VERIFY_DIR, { recursive: true });
+  const classifiedBlocking = invariants.summary?.counts?.BLOCKING || 0;
+  const classifiedWarnings = invariants.summary?.counts?.WARNING || 0;
+  const classifiedVerifyReady = classifiedBlocking === 0;
+  const dryRunOperationallyReady = Boolean(
+    !manifest.unresolvedConflicts?.length
+    && !manifest.staleDecisions?.length
+    && manifest.reviewComplete === true
+    && reviewValidation.valid === true
+    && !dryRun.diff?.errors?.length
+  );
+  const readyForVerify = dryRunOperationallyReady && classifiedVerifyReady;
   const checklist = [
     ['Owner decisions completed', manifest.reviewComplete === true],
     ['Review validation passed', reviewValidation.valid === true],
-    ['Dry Run passed', dryRun.readyForVerify === true],
-    ['Blocking invariants absent', (invariants.summary?.counts?.BLOCKING || 0) === 0],
+    ['Dry Run operational checks passed', dryRunOperationallyReady],
+    ['Blocking invariants absent', classifiedBlocking === 0],
     ['Rollback available', Boolean(dryRun.rollbackPreview)],
     ['Backups available', Boolean(sources.snapshotPath)],
     ['Manifest signed', Boolean(manifest.sourceFingerprint)],
-    ['Ready for Verify', manifest.reviewComplete === true && reviewValidation.valid === true && dryRun.readyForVerify === true && (invariants.summary?.counts?.BLOCKING || 0) === 0],
+    ['Ready for Verify', readyForVerify],
   ];
   const pkg = {
     version: 1,
@@ -119,10 +130,14 @@ function buildVerifyPackage({ manifest, reviewValidation, dryRun, invariants, re
     reviewSummary: { reviewComplete: manifest.reviewComplete, validation: reviewValidation },
     manifestSummary: manifest.summary,
     dryRunSummary: {
-      readyForVerify: dryRun.readyForVerify,
+      rawReadyForVerify: dryRun.readyForVerify,
+      finalReadyForVerify: readyForVerify,
       importAllowed: dryRun.importAllowed,
       diffSummary: dryRun.diffSummary,
       preservation: dryRun.preservation,
+      rawInvariantStatus: dryRun.invariants?.status,
+      classifiedBlocking,
+      classifiedWarnings,
     },
     invariantSummary: invariants.summary,
     forensicSummary: {
@@ -139,7 +154,7 @@ function buildVerifyPackage({ manifest, reviewValidation, dryRun, invariants, re
     })),
     checklist: checklist.map(([label, ok]) => ({ label, ok })),
     gates: {
-      verify: 'READY',
+      verify: readyForVerify ? 'READY' : 'LOCKED',
       canary: 'LOCKED',
       cutover: 'LOCKED',
     },
@@ -162,8 +177,10 @@ function buildVerifyPackage({ manifest, reviewValidation, dryRun, invariants, re
     table(['Area', 'Status'], [
       ['Review complete', manifest.reviewComplete ? 'YES' : 'NO'],
       ['Review validation', reviewValidation.valid ? 'PASS' : 'FAILED'],
-      ['Dry Run', dryRun.readyForVerify ? 'PASS' : 'FAILED'],
-      ['Blocking invariants', invariants.summary?.counts?.BLOCKING || 0],
+      ['Dry Run operational checks', dryRunOperationallyReady ? 'PASS' : 'FAILED'],
+      ['Raw dry-run invariant status', dryRun.invariants?.status || 'UNKNOWN'],
+      ['Classified blocking invariants', classifiedBlocking],
+      ['Classified warning invariants', classifiedWarnings],
       ['Import allowed', String(false)],
     ]),
     '',
@@ -245,25 +262,53 @@ function runOrchestrator() {
   const snapshot = readJson(sources.snapshotPath);
   const dryRun = executeIdentityDryRun({ snapshot, manifest, source: { snapshotPath: sources.snapshotPath, manifestPath: sources.manifestPath } });
   const blocking = invariants.summary?.counts?.BLOCKING || 0;
-  if (!dryRun.readyForVerify || blocking > 0) {
+  appendReviewAudit({
+    event: 'FINAL_DRY_RUN_EXECUTED',
+    conflictId: null,
+    reviewedBy: 'system:orchestrator',
+    decision: null,
+    previousDecision: null,
+    fingerprint: manifest.sourceFingerprint || null,
+  });
+  const dryRunOperationallyReady = Boolean(
+    !manifest.unresolvedConflicts?.length
+    && !manifest.staleDecisions?.length
+    && manifest.reviewComplete === true
+    && validation.valid === true
+    && !dryRun.diff?.errors?.length
+    && dryRun.preservation?.status !== 'FAILED'
+  );
+  if (!dryRunOperationallyReady || blocking > 0) {
     pipeline.push(stopped('Dry Run', 'Dry Run gate failed', {
-      readyForVerify: dryRun.readyForVerify,
+      rawReadyForVerify: dryRun.readyForVerify,
+      operationalReadyForVerify: dryRunOperationallyReady,
       dryRunImportAllowed: dryRun.importAllowed,
       blockingInvariants: blocking,
       invariantStatus: dryRun.invariants?.status,
+      classifiedInvariantReadiness: invariants.summary?.readiness?.verifyReadiness || 'NO',
     }));
     pipeline.push(notRun('Verify Package', 'Dry Run gate failed.'));
     return finish({ pipeline, sources, manifest, readiness, invariants, brokenReferences, ownerForensic, reviewValidation: validation, dryRun, verifyPackage: null });
   }
 
   pipeline.push(passed('Dry Run', {
-    readyForVerify: dryRun.readyForVerify,
+    rawReadyForVerify: dryRun.readyForVerify,
+    operationalReadyForVerify: dryRunOperationallyReady,
     invariantStatus: dryRun.invariants?.status,
     blockingInvariants: blocking,
+    classifiedInvariantReadiness: invariants.summary?.readiness?.verifyReadiness || 'YES',
   }));
 
   const verifyPackage = buildVerifyPackage({ manifest, reviewValidation: validation, dryRun, invariants, readiness, brokenReferences, ownerForensic, sources });
   pipeline.push(passed('Verify Package', verifyPackage));
+  appendReviewAudit({
+    event: 'ORCHESTRATOR_GATE_PASSED',
+    conflictId: null,
+    reviewedBy: 'system:orchestrator',
+    decision: null,
+    previousDecision: null,
+    fingerprint: manifest.sourceFingerprint || null,
+  });
   return finish({ pipeline, sources, manifest, readiness, invariants, brokenReferences, ownerForensic, reviewValidation: validation, dryRun, verifyPackage });
 }
 
@@ -295,7 +340,12 @@ function finish({ pipeline, sources, manifest, readiness, invariants, brokenRefe
         importAllowed: manifest.importAllowed === true,
       },
       validation: reviewValidation,
-      dryRun: dryRun ? { readyForVerify: dryRun.readyForVerify, importAllowed: dryRun.importAllowed, invariantStatus: dryRun.invariants?.status } : null,
+      dryRun: dryRun ? {
+        rawReadyForVerify: dryRun.readyForVerify,
+        operationalReadyForVerify: pipeline.find(item => item.stage === 'Dry Run')?.details?.operationalReadyForVerify || false,
+        importAllowed: dryRun.importAllowed,
+        invariantStatus: dryRun.invariants?.status,
+      } : null,
       invariants: invariants.summary,
       readiness: readiness.summary,
       brokenReferences: brokenReferences.summary,

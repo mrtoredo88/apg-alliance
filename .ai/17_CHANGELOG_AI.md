@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Identity Final Owner Approval + Verify v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/identity-final-owner-approval.mjs`, `scripts/identity-verify.mjs`, `scripts/identity-verify-test.mjs`, `scripts/identity-migration-orchestrator.mjs`, `scripts/identity-migration-orchestrator-test.mjs`, `scripts/identity-final-readiness-review.mjs`, `scripts/identity-final-readiness-review-test.mjs`, `scripts/identity-invariants-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен локальный final owner approval CLI, который фиксирует 3 оставшихся owner decisions, проверяет source fingerprints и оставляет `importAllowed=false`.
+- Оркестратор и readiness review переведены на gate-логику, где raw dry-run artifacts остаются видимыми, но Verify gate опирается на classified BLOCKING invariants.
+- Добавлен read-only Verify CLI и regression-тест: Verify Package проверяется, Canary/Cutover остаются locked, production/Firestore/runtime не изменяются.
+**Почему:** финальная стадия Identity Migration должна перейти к Verify только после явных owner decisions, clean operational dry-run и классифицированных invariants, без import/canary/cutover.
+
 ## [2026-07-20] chore: Identity Migration Orchestrator v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/identity-migration-orchestrator.mjs`, `scripts/identity-migration-orchestrator-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

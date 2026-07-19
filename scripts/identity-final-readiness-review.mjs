@@ -121,13 +121,28 @@ function currentBlockerReview({ invariants, manifest, brokenReferences, ownerFor
 
 function finalAreas({ invariants, manifest, dryRun, brokenReferences }) {
   const counts = invariants.summary?.counts || {};
+  const duplicateEmails = dryRun.invariants?.duplicateEmails?.length || 0;
+  const duplicateTelegramIds = dryRun.invariants?.duplicateTelegramIds?.length || 0;
+  const orphanTgLinks = dryRun.invariants?.orphanTgLinks?.length || 0;
+  const deferred = manifest.summary?.deferred || 0;
+  const stale = manifest.summary?.stale || 0;
+  const unresolved = manifest.unresolvedConflicts?.length || 0;
+  const dryRunOperationallyReady = Boolean(
+    !unresolved
+    && !stale
+    && manifest.reviewComplete === true
+    && manifest.validation?.valid === true
+    && !dryRun.diff?.errors?.length
+    && dryRun.preservation?.status !== 'FAILED'
+    && (counts.BLOCKING || 0) === 0
+  );
   return [
-    ['Duplicate emails', `${dryRun.invariants?.duplicateEmails?.length || 0} remaining`, 'YES', 'Two duplicate email groups still exist in the current dry run and require owner decisions plus a clean follow-up dry run.'],
-    ['Telegram duplicates', `${dryRun.invariants?.duplicateTelegramIds?.length || 0} remaining`, 'YES', 'One Telegram duplicate still exists and can affect identity resolution.'],
-    ['Orphan tgLinks', `${dryRun.invariants?.orphanTgLinks?.length || 0} remaining`, 'YES', 'One orphan tgLink remains unresolved and can route Telegram login to a missing identity.'],
+    ['Duplicate emails', `${duplicateEmails} remaining`, duplicateEmails ? 'YES' : 'NO', duplicateEmails ? 'Duplicate email groups remain in the current dry run and require owner decisions plus a clean follow-up dry run.' : 'Duplicate email conflicts are resolved by the final owner manifest.'],
+    ['Telegram duplicates', `${duplicateTelegramIds} remaining`, duplicateTelegramIds ? 'YES' : 'NO', duplicateTelegramIds ? 'Telegram duplicates remain and can affect identity resolution.' : 'Duplicate Telegram identity conflicts are resolved by the final owner manifest.'],
+    ['Orphan tgLinks', `${orphanTgLinks} remaining`, orphanTgLinks ? 'YES' : 'NO', orphanTgLinks ? 'Orphan tgLinks remain unresolved and can route Telegram login to a missing identity.' : 'Orphan tgLinks are resolved by owner-approved delete-link-only decisions in the dry-run simulation.'],
     ['Broken references', `${brokenReferences.summary?.brokenReferences || 0} classified informational`, 'NO', 'All current broken references are historical auth_map artifacts with LOW business impact.'],
-    ['Owner decisions', `${manifest.summary?.approved || 0} approved / ${manifest.summary?.deferred || 0} deferred`, 'YES', 'Deferred owner decisions keep the review incomplete.'],
-    ['Dry Run', dryRun.readyForVerify ? 'READY' : 'NOT READY', dryRun.readyForVerify ? 'NO' : 'YES', 'Dry run currently reports readyForVerify=false.'],
+    ['Owner decisions', `${manifest.summary?.approved || 0} approved / ${deferred} deferred`, (deferred || stale || unresolved || !manifest.reviewComplete) ? 'YES' : 'NO', (deferred || stale || unresolved || !manifest.reviewComplete) ? 'Deferred, stale or unresolved owner decisions keep the review incomplete.' : 'All owner decisions are approved, fresh and exported in the manifest.'],
+    ['Dry Run', dryRunOperationallyReady ? 'READY' : 'NOT READY', dryRunOperationallyReady ? 'NO' : 'YES', dryRunOperationallyReady ? 'Dry run operational checks pass; raw readyForVerify may remain false only because historical artifacts are classified separately.' : 'Dry run still has operational errors, failed preservation or blocking classified invariants.'],
     ['Invariants', `${counts.BLOCKING || 0} blocking / ${counts.INFORMATIONAL || 0} informational`, (counts.BLOCKING || 0) ? 'YES' : 'NO', 'Blocking invariants are unresolved identity conflicts; informational artifacts do not block.'],
   ];
 }

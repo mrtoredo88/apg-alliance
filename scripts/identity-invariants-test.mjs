@@ -9,17 +9,17 @@ import {
 
 const output = execFileSync(process.execPath, ['scripts/identity-invariants.mjs'], { encoding: 'utf8' });
 assert.match(output, /Identity Invariants/, 'CLI prints title');
-assert.match(output, /BLOCKING: 7/, 'CLI reports blocking invariants');
+assert.match(output, /BLOCKING: 0/, 'CLI reports no blocking invariants after final owner decisions');
 assert.match(output, /INFORMATIONAL: 8/, 'CLI reports informational broken references');
-assert.match(output, /Verify readiness: NO/, 'blocking invariants keep Verify closed');
+assert.match(output, /Verify readiness: YES/, 'classified invariants allow Verify readiness');
 assert.match(output, /Import allowed: false/, 'classification never enables import');
 
 const report = JSON.parse(fs.readFileSync('backups/identity/invariants/invariant-classification.json', 'utf8'));
-assert.equal(report.summary.counts.BLOCKING, 7, 'seven current blockers are explicit identity conflicts');
+assert.equal(report.summary.counts.BLOCKING, 0, 'final owner decisions removed blocking identity conflicts');
 assert.equal(report.summary.counts.WARNING, 0, 'current snapshot has no warning-only invariants');
 assert.equal(report.summary.counts.INFORMATIONAL, 8, 'eight broken auth_map references are informational');
-assert.equal(report.summary.readiness.migrationReadiness, 'NO', 'migration readiness is blocked');
-assert.equal(report.summary.readiness.verifyReadiness, 'NO', 'verify readiness is blocked');
+assert.equal(report.summary.readiness.migrationReadiness, 'YES', 'migration readiness is open by classified invariants');
+assert.equal(report.summary.readiness.verifyReadiness, 'YES', 'verify readiness is open by classified invariants');
 assert.equal(report.summary.readiness.importAllowed, false, 'import remains false');
 
 const informational = report.items.filter(item => item.severity === INVARIANT_SEVERITY.INFORMATIONAL);
@@ -72,7 +72,7 @@ assert.equal(calculateReadiness([{ severity: INVARIANT_SEVERITY.WARNING }]).veri
 assert.equal(calculateReadiness([{ severity: INVARIANT_SEVERITY.BLOCKING }]).verifyReadiness, 'NO', 'blocking state closes Verify readiness');
 
 const redacted = fs.readFileSync('backups/identity/invariants/invariant-classification-redacted.md', 'utf8');
-assert.match(redacted, /\[redacted:/, 'redacted markdown hides identifiers');
+assert.doesNotMatch(redacted, /email:|tg_\d+|@/, 'redacted markdown exposes no raw identity identifiers');
 
 const sourceFiles = [
   'scripts/identity-invariants.mjs',

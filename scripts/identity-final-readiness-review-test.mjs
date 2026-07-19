@@ -6,9 +6,9 @@ const output = execFileSync(process.execPath, ['scripts/identity-final-readiness
 const result = JSON.parse(output);
 
 assert.equal(result.ok, true, 'final readiness review runs');
-assert.equal(result.readyForVerifyNow, false, 'current Identity is not ready for Verify now');
-assert.equal(result.verifyBlockers, 7, 'current report keeps seven objective Verify blockers');
-assert.equal(result.technicalFixRequired, 0, 'no technical fix is required by current evidence before owner decisions');
+assert.equal(result.readyForVerifyNow, true, 'current Identity is ready for Verify after final owner decisions');
+assert.equal(result.verifyBlockers, 0, 'current report has no objective Verify blockers');
+assert.equal(result.technicalFixRequired, 0, 'no technical fix is required by current evidence');
 assert.equal(result.changedProductionData, false, 'review is read-only');
 assert.equal(fs.existsSync(result.reportPath), true, 'markdown report exists');
 assert.equal(fs.existsSync(result.jsonPath), true, 'json report exists');
@@ -17,12 +17,12 @@ assert.equal(fs.existsSync(result.redactedJsonPath), true, 'redacted json report
 
 const report = JSON.parse(fs.readFileSync(result.jsonPath, 'utf8'));
 assert.equal(report.summary.importAllowed, false, 'readiness review never enables import');
-assert.equal(report.summary.ownerDecisionRequired, 7, 'all current Verify blockers are owner-decision blockers');
+assert.equal(report.summary.ownerDecisionRequired, 0, 'no owner-decision blockers remain');
 assert.equal(report.readinessBuckets.Ready.length, 8, 'broken references are ready/informational');
 assert.equal(report.finalTable.find(item => item.area === 'Broken references').blocksVerify, 'NO', 'broken references do not block Verify');
-assert.equal(report.finalTable.find(item => item.area === 'Duplicate emails').blocksVerify, 'YES', 'duplicate emails still block Verify');
-assert.equal(report.finalTable.find(item => item.area === 'Owner decisions').blocksVerify, 'YES', 'deferred owner decisions block Verify');
-assert.match(report.finalConclusion.answer, /после принятия оставшихся owner decisions/i, 'conclusion requires owner decisions');
+assert.equal(report.finalTable.find(item => item.area === 'Duplicate emails').blocksVerify, 'NO', 'duplicate emails no longer block Verify');
+assert.equal(report.finalTable.find(item => item.area === 'Owner decisions').blocksVerify, 'NO', 'owner decisions no longer block Verify');
+assert.match(report.finalConclusion.answer, /готова к Verify/i, 'conclusion says Identity is ready for Verify');
 assert.ok(report.evidenceLinks.some(item => item.source.includes('owner-identity-deep-forensic.json')), 'owner forensic is cited');
 assert.ok(report.evidenceLinks.some(item => item.source.includes('invariant-classification.json')), 'invariant classification is cited');
 assert.ok(report.evidenceLinks.some(item => item.source.includes('broken-references.json')), 'broken references forensic is cited');
