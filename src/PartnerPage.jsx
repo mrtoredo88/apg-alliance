@@ -295,6 +295,36 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
     onReviewPromptHandled?.();
   }, [reviewPrompt, canReview, myReview?.stars, myReview?.text, onReviewPromptHandled]);
 
+  const photos = partner?.photos ?? [];
+  const gallery = partner?.gallery ?? partner?.photos ?? [];
+  const similar = partner ? partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6) : [];
+  const avgRating = partner?.avgRating ?? 0;
+  const reviewCount = partner?.reviewCount ?? reviews.length;
+  const locations = partner ? getProfileLocations(partner) : [];
+  const mainLocation = partner ? getMainLocation(partner) : null;
+  const multipleLocations = partner ? hasMultipleLocations(partner) : false;
+  const selectedLocation = partner && selectedLocationId ? getLocationById(partner, selectedLocationId) : mainLocation;
+  const displayLocation = selectedLocation || mainLocation;
+  const selectedLocationReviews = filterReviewsByLocation(reviews, displayLocation?.id || '');
+  const scopedReviews = multipleLocations && reviewScope === 'location' ? selectedLocationReviews : reviews;
+  const scopedReviewCount = scopedReviews.length;
+  const scopedAvgRating = scopedReviewCount
+    ? scopedReviews.reduce((sum, item) => sum + (Number(item.stars || item.rating || 0) || 0), 0) / scopedReviewCount
+    : 0;
+  const visibleReviewCount = multipleLocations && reviewScope === 'location' ? scopedReviewCount : reviewCount;
+  const visibleAvgRating = multipleLocations && reviewScope === 'location' ? scopedAvgRating : avgRating;
+  const visibleOffer = partner && offerMatchesLocation(partner, displayLocation?.id || '') ? partner.offer : '';
+  const offerLocationIds = partner && Array.isArray(partner.offerLocationIds || partner.promotionLocationIds || partner.promoLocationIds)
+    ? (partner.offerLocationIds || partner.promotionLocationIds || partner.promoLocationIds)
+    : [];
+  const offerLocationId = partner ? partner.offerLocationId || partner.promotionLocationId || partner.promoLocationId || offerLocationIds[0] || '' : '';
+  const offerLocation = partner && offerLocationId ? getLocationById(partner, offerLocationId) : null;
+  const orderedLocations = [...locations]
+    .sort((a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0));
+  const visibleLocations = selectedLocationId && selectedLocation
+    ? [selectedLocation, ...orderedLocations.filter(item => item.id !== selectedLocation.id)]
+    : orderedLocations;
+
   const submitReview = useCallback(async () => {
     if (!partner || !userId || formStars === 0 || submitting) return;
     setSubmitting(true);
@@ -343,36 +373,6 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate, reviewPromptBookingId, displayLocation?.id, displayLocation?.title]);
 
   if (!partner) return null;
-
-  const photos = partner.photos ?? [];
-  const gallery = partner.gallery ?? partner.photos ?? [];
-  const similar = partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6);
-  const avgRating = partner.avgRating ?? 0;
-  const reviewCount = partner.reviewCount ?? reviews.length;
-  const locations = getProfileLocations(partner);
-  const mainLocation = getMainLocation(partner);
-  const multipleLocations = hasMultipleLocations(partner);
-  const selectedLocation = selectedLocationId ? getLocationById(partner, selectedLocationId) : mainLocation;
-  const displayLocation = selectedLocation || mainLocation;
-  const selectedLocationReviews = filterReviewsByLocation(reviews, displayLocation?.id || '');
-  const scopedReviews = multipleLocations && reviewScope === 'location' ? selectedLocationReviews : reviews;
-  const scopedReviewCount = scopedReviews.length;
-  const scopedAvgRating = scopedReviewCount
-    ? scopedReviews.reduce((sum, item) => sum + (Number(item.stars || item.rating || 0) || 0), 0) / scopedReviewCount
-    : 0;
-  const visibleReviewCount = multipleLocations && reviewScope === 'location' ? scopedReviewCount : reviewCount;
-  const visibleAvgRating = multipleLocations && reviewScope === 'location' ? scopedAvgRating : avgRating;
-  const visibleOffer = offerMatchesLocation(partner, displayLocation?.id || '') ? partner.offer : '';
-  const offerLocationIds = Array.isArray(partner.offerLocationIds || partner.promotionLocationIds || partner.promoLocationIds)
-    ? (partner.offerLocationIds || partner.promotionLocationIds || partner.promoLocationIds)
-    : [];
-  const offerLocationId = partner.offerLocationId || partner.promotionLocationId || partner.promoLocationId || offerLocationIds[0] || '';
-  const offerLocation = offerLocationId ? getLocationById(partner, offerLocationId) : null;
-  const orderedLocations = [...locations]
-    .sort((a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0));
-  const visibleLocations = selectedLocationId && selectedLocation
-    ? [selectedLocation, ...orderedLocations.filter(item => item.id !== selectedLocation.id)]
-    : orderedLocations;
 
   const openVkGroup = () => {
     trackAppEvent('partner:site_open', {

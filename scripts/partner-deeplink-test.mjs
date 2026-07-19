@@ -10,6 +10,7 @@ const fail = message => {
 
 const userApp = read('src/UserApp.jsx');
 const qrSection = read('src/PartnerQRSection.jsx');
+const partnerPage = read('src/PartnerPage.jsx');
 
 if (!qrSection.includes("shareLink('partner', partner.id)")) {
   fail('public partner QR must be generated from shareLink(partner, partner.id)');
@@ -53,6 +54,12 @@ if (!/openPartner\(partner,\s*\{[\s\S]*navigationContext: createPublicCardNaviga
 
 if (!userApp.includes("panelHistoryRef.current = fallbackPanel === 'home' ? ['home'] : ['home', fallbackPanel];")) {
   fail('public-card back stack must be deterministic: home -> fallback -> card');
+}
+
+const displayLocationDeclaration = partnerPage.indexOf('const displayLocation = selectedLocation || mainLocation;');
+const submitReviewDeclaration = partnerPage.indexOf('const submitReview = useCallback');
+if (displayLocationDeclaration === -1 || submitReviewDeclaration === -1 || displayLocationDeclaration > submitReviewDeclaration) {
+  fail('PartnerPage must declare displayLocation before submitReview dependencies to avoid production TDZ crashes.');
 }
 
 console.log('partner-deeplink-test: ok');
