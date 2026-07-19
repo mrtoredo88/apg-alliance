@@ -3,6 +3,7 @@ import vkBridge from './vk.js';
 import { App } from './App.jsx';
 import { installNetworkDiagnostics } from './networkDiagnostics.js';
 import { startPwaUpdateManager } from './pwa/PwaUpdateManager.js';
+import { installPwaRuntimeDiagnostics } from './pwa/PwaRuntimeDiagnostics.js';
 import { API_BASE_URL } from './constants.js';
 import { ensureServerReferralSession } from './referralDiagnostics.js';
 import './fonts.css';
@@ -31,6 +32,7 @@ if (_vkHash.includes('access_token=') && window.opener) {
   }
 
   window.__APG_BOOT_MARK?.('main_module_loaded');
+  installPwaRuntimeDiagnostics();
   installNetworkDiagnostics();
   window.__APG_BOOT_MARK?.('network_diagnostics_installed');
   window.__APG_REFERRAL_SESSION_PROMISE__ = ensureServerReferralSession({ apiBaseUrl: API_BASE_URL, source: 'main_bootstrap' }).catch((error) => {

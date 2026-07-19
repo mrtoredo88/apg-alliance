@@ -5,33 +5,38 @@ import { execSync } from 'child_process'
 import { writeFileSync } from 'fs'
 import { resolve } from 'path'
 
+function resolveBuildVersion() {
+  const normalize = (value) => {
+    if (!value || typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^[0-9a-f]{4,}$/i.test(trimmed)) {
+      return trimmed.slice(0, 8);
+    }
+    return trimmed;
+  };
+  const candidates = [
+    process.env.VERCEL_GIT_COMMIT_SHA,
+    process.env.APG_BUILD_VERSION,
+    process.env.GITHUB_SHA,
+  ];
+
+  let v = candidates.map(normalize).find(Boolean);
+  if (!v) {
+    try {
+      v = execSync('git rev-parse --short HEAD').toString().trim();
+    } catch {
+      v = Date.now().toString(36);
+    }
+  }
+  return v;
+}
+
 function versionPlugin() {
   return {
     name: 'version-json',
     closeBundle() {
-      const normalize = (value) => {
-        if (!value || typeof value !== 'string') return '';
-        const trimmed = value.trim();
-        if (!trimmed) return '';
-        if (/^[0-9a-f]{4,}$/i.test(trimmed)) {
-          return trimmed.slice(0, 8);
-        }
-        return trimmed;
-      };
-      const candidates = [
-        process.env.VERCEL_GIT_COMMIT_SHA,
-        process.env.APG_BUILD_VERSION,
-        process.env.GITHUB_SHA,
-      ];
-
-      let v = candidates.map(normalize).find(Boolean);
-      if (!v) {
-        try {
-          v = execSync('git rev-parse --short HEAD').toString().trim();
-        } catch {
-          v = Date.now().toString(36);
-        }
-      }
+      const v = resolveBuildVersion();
 
       writeFileSync(
         resolve(__dirname, 'dist/version.json'),
@@ -43,6 +48,10 @@ function versionPlugin() {
 }
 
 export default defineConfig({
+  define: {
+    __APG_BUILD_VERSION__: JSON.stringify(resolveBuildVersion()),
+    __APG_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     legacy({

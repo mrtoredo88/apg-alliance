@@ -15,6 +15,19 @@
 
 ---
 
+## [2026-07-19] fix: Installed PWA build diagnostics
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `vite.config.js`, `src/main.jsx`, `src/pwa/PwaRuntimeDiagnostics.js`, `scripts/pwa-runtime-diagnostics-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- В JS bundle добавлен build fingerprint: `__APG_BUILD_VERSION__`, `__APG_BUILD_TIME__`, commit и console-log `[APG Runtime]`.
+- Runtime diagnostics собирает фактически загруженные JS/CSS, `/version.json`, Service Worker registration states, Cache Storage entries, manifest и standalone mode.
+- Диагностика доступна в установленной PWA через `window.__APG_BUILD_DIAGNOSTICS__` и `window.__APG_COLLECT_PWA_DIAGNOSTICS__()`, без отдельного API.
+- Добавлен `npm run test:pwa-runtime`: 500 сценариев проверяют build constants, SW/cache/script/style diagnostics, mismatch detection и update-flow invariants.
+**Почему:** проблему кнопки Локи в установленной PWA нельзя считать исправленной, пока не доказано, какой production bundle реально выполняется внутри installed PWA.
+
+---
+
 ## [2026-07-19] fix: Loki floating button hit-test owner
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/LokiAssistant.jsx`, `scripts/loki-floating-button-hit-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

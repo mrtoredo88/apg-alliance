@@ -49,6 +49,7 @@
     "test:home-profile-dashboard": "node scripts/home-profile-dashboard-test.mjs",
     "test:pwa-user-mode": "node scripts/pwa-user-mode-regression.mjs",
     "test:pwa-update": "node scripts/pwa-update-manager-test.mjs",
+    "test:pwa-runtime": "node scripts/pwa-runtime-diagnostics-test.mjs",
     "test:startup-stability": "node scripts/startup-stability-test.mjs",
     "test:pwa": "npm run test:pwa-update && npm run test:pwa-user-mode && node scripts/pwa-build-compat-test.mjs",
     "test:loki-floating-button": "node scripts/loki-floating-button-hit-test.mjs",
