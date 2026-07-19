@@ -133,6 +133,14 @@ if (!source.includes('role="tablist"') || !source.includes('role="tab"') || !sou
 if (!source.includes('onOpenMessages') || !source.includes('messageUnreadCount') || !source.includes('aria-label="Сообщения"')) {
   throw new Error('DesktopTopOverview must expose Messages in the desktop header with unread badge support.');
 }
+
+const desktopFirstScreenStart = homeSource.indexOf('function V2FirstScreenDesktop');
+const desktopFirstScreenBodyStart = homeSource.indexOf('}) {', desktopFirstScreenStart);
+const desktopFirstScreenProps = homeSource.slice(desktopFirstScreenStart, desktopFirstScreenBodyStart);
+if (!desktopFirstScreenProps.includes('onOpenMessages')) {
+  throw new Error('V2FirstScreenDesktop must receive onOpenMessages before passing it to DesktopTopOverview.');
+}
+
 if (!source.includes("top: 'calc(70px + var(--safe-top, 0px))'")
   || !source.includes("bottom: 3")
   || !source.includes("transition: motionTransition(['background', 'border-color', 'color'], 'base')")) {

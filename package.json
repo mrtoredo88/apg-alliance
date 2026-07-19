@@ -46,6 +46,7 @@
     "test:desktop-partners": "node scripts/desktop-partners-page-test.mjs",
     "test:desktop-experts": "node scripts/desktop-experts-page-test.mjs",
     "test:desktop-profile": "node scripts/desktop-profile-test.mjs",
+    "test:desktop-boot": "node scripts/desktop-boot-test.mjs",
     "test:home-profile-dashboard": "node scripts/home-profile-dashboard-test.mjs",
     "test:pwa-user-mode": "node scripts/pwa-user-mode-regression.mjs",
     "test:pwa-update": "node scripts/pwa-update-manager-test.mjs",

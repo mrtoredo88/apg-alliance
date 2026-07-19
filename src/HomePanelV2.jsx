@@ -768,6 +768,7 @@ function V2FirstScreenDesktop({
   unreadCount,
   counterPulse = false,
   onOpenNotifications,
+  onOpenMessages,
   onOpenPartner,
   onOpenNearby,
   onOpenEvents,
