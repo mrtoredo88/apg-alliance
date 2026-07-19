@@ -9,9 +9,10 @@ const pipelineSource = readFileSync(new URL('../src/loki/core/knowledge/SmartAns
 const diagnosticsSource = readFileSync(new URL('../src/pwa/PwaRuntimeDiagnostics.js', import.meta.url), 'utf8');
 
 const sanitized = normalizeLokiResponseText('Привет  Привет\n• первое • второе\nundefined');
-assert.equal(sanitized, 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.');
+assert.equal(sanitized, 'Привет Привет\n• первое\n• второе');
 const bullets = normalizeLokiResponseText('Могу: • кратко • главное');
 assert.match(bullets, /Могу:\n• кратко\n• главное/);
+assert.notEqual(normalizeLokiResponseText('Активный экран — undefined.'), 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.', 'Normalizer must not replace a valid answer because one field is undefined.');
 
 assert.match(experienceSource, /resetLokiMessageTrace/, 'Loki UI must reset a per-message trace before sending.');
 assert.match(experienceSource, /STEP 1 Message\/Input received/, 'Loki UI must trace message input.');
@@ -26,6 +27,8 @@ assert.match(providerSource, /STEP 18 Provider returns result to UI/, 'Loki Prov
 assert.match(providerSource, /context\.news\.greeting/, 'Article context must support greeting without falling through to summary or timeout.');
 assert.match(providerSource, /classifyNewsContextQuery/, 'Article context must classify simple chat vs article requests.');
 assert.match(providerSource, /recordLokiRequestDiagnostics/, 'Loki Provider must save compact request diagnostics.');
+assert.match(providerSource, /STOP Response Normalizer failed/, 'Loki Provider must identify normalizer failures.');
+assert.match(providerSource, /pipelineTimeline/, 'Loki Provider diagnostics must expose Pipeline Timeline.');
 assert.match(coreSource, /STEP 10 LokiCore received/, 'Loki Core must trace request entry.');
 assert.match(coreSource, /STEP 14 Action Center start/, 'Loki Core must trace Action Center.');
 assert.match(coreSource, /STEP 15 Decision start/, 'Loki Core must trace Decision.');
@@ -90,8 +93,17 @@ if (runtimeUrl) {
         await page.waitForSelector('[data-floating-loki-button="true"]', { timeout: 45000 });
         await page.locator('[data-floating-loki-button="true"]').click({ timeout: 10000 });
         await page.waitForSelector('input[placeholder*="Например"], input[placeholder*="Спроси"]', { timeout: 15000 });
-        await page.locator('input[placeholder*="Например"], input[placeholder*="Спроси"]').first().fill('Привет');
-        await page.locator('form button[type="submit"]').last().click({ timeout: 10000 });
+        const queries = article
+          ? ['Привет', 'О чём статья?', 'Расскажи подробнее']
+          : ['Привет', 'Что ты умеешь?', 'Какие мероприятия сегодня?', 'Покажи партнёров', 'Кто такой Локи?'];
+        for (const query of queries) {
+          await page.locator('input[placeholder*="Например"], input[placeholder*="Спроси"]').first().fill(query);
+          await page.locator('form button[type="submit"]').last().click({ timeout: 10000 });
+          await page.waitForFunction((expected) => {
+            const diagnostics = window.__APG_LOKI_REQUEST_DIAGNOSTICS__ || [];
+            return diagnostics.length >= expected;
+          }, queries.indexOf(query) + 1, { timeout: 18000 });
+        }
         await page.waitForFunction(() => {
           const trace = window.__APG_LOKI_MESSAGE_TRACE__ || [];
           return trace.some(item => item.step === 'STEP 19 UI answer message added');
@@ -104,6 +116,7 @@ if (runtimeUrl) {
             hasQuestion: text.includes('Привет'),
             hasThinking: text.includes('Думаю и смотрю данные АПГ'),
             hasTechnicalFallback: text.includes('внутренний обработчик') || text.includes('внутренних этапов'),
+            hasUserFallback: text.includes('Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.'),
             hasDebugBlock: text.includes('Loki Core debug'),
             hasArticleGreeting: text.includes('Привет! Я могу помочь обсудить эту новость'),
             answerStep: trace.find(item => item.step === 'STEP 19 UI answer message added') || null,
@@ -115,10 +128,12 @@ if (runtimeUrl) {
         assert.equal(result.hasQuestion, true, 'Runtime smoke must render the user question.');
         assert.equal(result.hasThinking, false, 'Runtime smoke must leave the thinking state after answer.');
         assert.equal(result.hasTechnicalFallback, false, 'Runtime smoke must not show technical fallback text.');
+        assert.equal(result.hasUserFallback, false, 'Runtime smoke must not answer required queries with generic fallback.');
         assert.equal(result.hasDebugBlock, false, 'Runtime smoke must not show Loki Core debug in user UI.');
         assert.ok(result.answerStep?.detail?.textLength > 0, 'Runtime smoke must render a non-empty Loki answer.');
         assert.equal(result.stopSteps.length, 0, `Runtime smoke must not stop in the pipeline: ${JSON.stringify(result.stopSteps)}`);
         assert.ok(result.lastDiagnostic?.responseTextLength > 0, 'Runtime smoke must save compact request diagnostics.');
+        assert.ok(Array.isArray(result.lastDiagnostic?.pipelineTimeline), 'Runtime smoke must save Pipeline Timeline diagnostics.');
         if (article) {
           assert.equal(result.hasArticleGreeting, true, 'Article context must answer greeting conversationally.');
           assert.equal(result.lastDiagnostic?.contextType, 'news', 'Article context diagnostics must mark context type.');

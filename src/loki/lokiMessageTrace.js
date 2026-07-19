@@ -55,6 +55,17 @@ export function recordLokiRequestDiagnostics(input = {}) {
     timeoutUsed: Boolean(input.timeoutUsed),
     responseTextLength: Number(input.responseTextLength || 0),
     errorCode: input.errorCode || lastStop?.detail?.errorCode || '',
+    error: input.error || lastStop?.detail?.error || '',
+    stack: input.stack || '',
+    pipelineStep: input.pipelineStep || lastStop?.step || lastCompleted?.step || '',
+    pipelineTimeline: Array.isArray(input.pipelineTimeline)
+      ? input.pipelineTimeline.slice(-30)
+      : trace.slice(-30).map((item, index) => ({
+        step: item.step || `STEP ${index + 1}`,
+        at: item.at || 0,
+        status: String(item.step || '').startsWith('STOP') ? 'failed' : 'ok',
+        output: item.detail || {},
+      })),
   };
   const history = Array.isArray(window.__APG_LOKI_REQUEST_DIAGNOSTICS__) ? window.__APG_LOKI_REQUEST_DIAGNOSTICS__ : [];
   window.__APG_LOKI_REQUEST_DIAGNOSTICS__ = [...history.slice(-(DIAGNOSTICS_LIMIT - 1)), diagnostic];

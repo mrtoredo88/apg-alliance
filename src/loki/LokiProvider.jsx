@@ -42,7 +42,7 @@ import { buildSkillHistoryPatch } from './core/skills/index.js';
 import { buildExecutionHistoryPatch } from './core/execution/index.js';
 import { buildControlledExecutionHistoryPatch, completeControlledExecutionResult } from './core/controlledExecution/index.js';
 import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics } from './lokiMessageTrace.js';
-import { normalizeLokiResponseText } from './lokiResponseText.js';
+import { inspectLokiResponseText, normalizeLokiResponseText } from './lokiResponseText.js';
 import {
   DEFAULT_LOKI_SETTINGS,
   hasLokiDailyVisit,
@@ -90,6 +90,17 @@ function withLokiAnswerTimeout(promise, text) {
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+function traceTimeline() {
+  if (typeof window === 'undefined') return [];
+  const trace = Array.isArray(window.__APG_LOKI_MESSAGE_TRACE__) ? window.__APG_LOKI_MESSAGE_TRACE__ : [];
+  return trace.slice(-30).map(item => ({
+    step: item.step || '',
+    at: item.at || 0,
+    status: String(item.step || '').startsWith('STOP') ? 'failed' : 'ok',
+    output: item.detail || {},
+  }));
 }
 
 function safeString(value) {
@@ -1215,10 +1226,33 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       recordLokiMessageTrace('STEP 6 News context check start', { activeContextType: activeContext?.type || '' });
       const contextResult = buildNewsContextAnswer(activeContext, text, appState);
       if (contextResult) {
+        const contextInspection = inspectLokiResponseText(contextResult.text);
         const normalizedContextResult = {
           ...contextResult,
-          text: normalizeLokiResponseText(contextResult.text),
+          text: contextInspection.text,
+          debug: {
+            ...(contextResult.debug || {}),
+            pipelineTimeline: traceTimeline(),
+          },
         };
+        if (contextInspection.fallbackUsed) {
+          recordLokiMessageTrace('STOP Response Normalizer failed', {
+            errorCode: contextInspection.rawEmpty ? 'EMPTY_CONTEXT_TEXT' : 'BLOCKED_CONTEXT_TEXT',
+            rawLength: contextInspection.raw.length,
+            blockedByTechnicalText: contextInspection.blockedByTechnicalText,
+          });
+          recordLokiRequestDiagnostics({
+            contextType: activeContext?.type || '',
+            intent: normalizedContextResult.intent || '',
+            resultStatus: 'failed',
+            fallbackUsed: true,
+            failedStage: 'Response Normalizer',
+            errorCode: contextInspection.rawEmpty ? 'EMPTY_CONTEXT_TEXT' : 'BLOCKED_CONTEXT_TEXT',
+            pipelineStep: 'Response Normalizer',
+            pipelineTimeline: traceTimeline(),
+            responseTextLength: normalizedContextResult.text.length,
+          });
+        }
         recordLokiMessageTrace('STEP 7 News context answer returned', { hasText: Boolean(normalizedContextResult.text), intent: normalizedContextResult.intent || '' });
         setBrainThinking(false);
         setEmotion('helper');
@@ -1242,8 +1276,13 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         recordLokiRequestDiagnostics({
           contextType: activeContext?.type || '',
           intent: normalizedContextResult.intent || '',
-          resultStatus: 'answered',
+          resultStatus: contextInspection.fallbackUsed ? 'failed' : 'answered',
+          fallbackUsed: contextInspection.fallbackUsed,
           responseTextLength: normalizedContextResult.text.length,
+          failedStage: contextInspection.fallbackUsed ? 'Response Normalizer' : '',
+          errorCode: contextInspection.fallbackUsed ? (contextInspection.rawEmpty ? 'EMPTY_CONTEXT_TEXT' : 'BLOCKED_CONTEXT_TEXT') : '',
+          pipelineStep: contextInspection.fallbackUsed ? 'Response Normalizer' : 'UI',
+          pipelineTimeline: traceTimeline(),
         });
         return { card: null, ...normalizedContextResult };
       }
@@ -1264,6 +1303,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           resultStatus: 'empty',
           fallbackUsed: true,
           errorCode: 'EMPTY_RESULT',
+          failedStage: 'LokiBrain',
+          pipelineStep: 'LokiBrain',
+          pipelineTimeline: traceTimeline(),
           responseTextLength: 67,
         });
         return {
@@ -1273,9 +1315,23 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
         };
       }
+      const resultInspection = inspectLokiResponseText(result.text || (result.debug?.timeout ? 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.' : 'Готово.'));
+      if (resultInspection.fallbackUsed && !result.debug?.timeout) {
+        recordLokiMessageTrace('STOP Response Normalizer failed', {
+          errorCode: resultInspection.rawEmpty ? 'EMPTY_RESULT_TEXT' : 'BLOCKED_RESULT_TEXT',
+          rawLength: resultInspection.raw.length,
+          blockedByTechnicalText: resultInspection.blockedByTechnicalText,
+          hadInlineTechnicalText: resultInspection.hadInlineTechnicalText,
+          intent: result.intent || '',
+        });
+      }
       const normalizedResult = {
         ...result,
-        text: normalizeLokiResponseText(result.text || (result.debug?.timeout ? 'Не получилось ответить с первого раза. Повторите вопрос, пожалуйста.' : 'Готово.')),
+        text: resultInspection.text,
+        debug: {
+          ...(result.debug || {}),
+          pipelineTimeline: traceTimeline(),
+        },
       };
       setBrainThinking(false);
       setEmotion(normalizedResult.executeAction || normalizedResult.autoAction ? 'excited' : 'helper');
@@ -1341,10 +1397,13 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         contextType: activeContext?.type || '',
         intent: normalizedResult.intent || '',
         resultStatus: normalizedResult.debug?.timeout ? 'timeout' : 'answered',
-        fallbackUsed: Boolean(normalizedResult.debug?.timeout),
+        fallbackUsed: Boolean(normalizedResult.debug?.timeout) || resultInspection.fallbackUsed,
         timeoutUsed: Boolean(normalizedResult.debug?.timeout),
         responseTextLength: normalizedResult.text.length,
-        errorCode: normalizedResult.debug?.timeout ? 'TIMEOUT' : '',
+        failedStage: normalizedResult.debug?.timeout ? 'LokiBrain timeout' : resultInspection.fallbackUsed ? 'Response Normalizer' : '',
+        errorCode: normalizedResult.debug?.timeout ? 'TIMEOUT' : resultInspection.fallbackUsed ? (resultInspection.rawEmpty ? 'EMPTY_RESULT_TEXT' : 'BLOCKED_RESULT_TEXT') : '',
+        pipelineStep: normalizedResult.debug?.timeout ? normalizedResult.debug?.stoppedAt || 'LokiBrain timeout' : resultInspection.fallbackUsed ? 'Response Normalizer' : 'UI',
+        pipelineTimeline: traceTimeline(),
       });
       const actionToRun = normalizedResult.executeAction ?? (options.autoExecute ? normalizedResult.autoAction : null);
       if (actionToRun) setTimeout(() => executeAction(actionToRun), 420);
@@ -1360,6 +1419,10 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         fallbackUsed: true,
         failedStage: 'Provider exception',
         errorCode: 'PROVIDER_EXCEPTION',
+        error: e?.message || String(e),
+        stack: e?.stack || '',
+        pipelineStep: 'Provider exception',
+        pipelineTimeline: traceTimeline(),
         responseTextLength: 67,
       });
       logError(e, 'LokiProvider.askExperience');

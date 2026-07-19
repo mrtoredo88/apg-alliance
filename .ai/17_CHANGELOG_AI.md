@@ -3912,6 +3912,14 @@
 - Shared-normalizer `buildDialogContext` расширен только производными полями из уже переданного объекта: время, рейтинг, открытость, филиал, акция, скидка, срок, автор и свободные места.
 - Добавлен smoke/unit-скрипт `scripts/messaging-smart-conversations-test.mjs` на 500 сценариев Smart Conversations, sticky markers, context types, actions и read-only контракт.
 
+# 2026-07-19 — Loki Pipeline Fallback Fix
+
+- Исправлен критический сценарий, где валидный ответ Локи мог превращаться в общий fallback из-за агрессивной нормализации `undefined/null` внутри текста.
+- `Response Normalizer` теперь вычищает inline-мусор из ответа, но не заменяет весь успешный pipeline-result на fallback без явной технической ошибки или пустого текста.
+- `LokiProvider` сохраняет compact Pipeline Timeline diagnostics с failed stage, error, stack, request id, pipeline step и output последних шагов.
+- Debug-only окно Локи получило блок `Pipeline Timeline`; в production он остаётся скрытым без явного debug mode.
+- `loki-message-chain` расширен runtime-проверками обязательных запросов: `Привет`, `Что ты умеешь?`, `О чём статья?`, `Расскажи подробнее`, `Какие мероприятия сегодня?`, `Покажи партнёров`, `Кто такой Локи?`.
+
 # 2026-07-14 — Desktop User Profile
 
 - Обычный пользовательский профиль получил отдельную desktop-композицию без встраивания Workspace: верхняя панель, компактная главная карточка, KPI и сетка из пользовательских блоков.

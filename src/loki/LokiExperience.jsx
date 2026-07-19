@@ -4,7 +4,7 @@ import { LOKI_ACTIONS } from './lokiBehavior.js';
 import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
 import { LokiIdentity } from './LokiIdentity.jsx';
 import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrace.js';
-import { isLokiUserDebugVisible, normalizeLokiResponseText } from './lokiResponseText.js';
+import { inspectLokiResponseText, isLokiUserDebugVisible } from './lokiResponseText.js';
 
 const QUICK_ACTIONS = [
   { label: '📍 Что рядом?', text: 'Что рядом?', action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS) },
@@ -191,7 +191,8 @@ export function LokiExperience({ loki }) {
         debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
       };
     }
-    const answerText = normalizeLokiResponseText(result.text || 'Готово.');
+    const answerInspection = inspectLokiResponseText(result.text || 'Готово.');
+    const answerText = answerInspection.text;
     const cards = result.cards?.length ? result.cards : result.card ? [result.card] : [];
     setConversation(prev => [...prev, {
       id: `loki-${Date.now()}`,
@@ -335,6 +336,14 @@ export function LokiExperience({ loki }) {
                   {item.debug.trace?.slice(0, 8).map(step => (
                     <span key={`${item.id}-${step.module}-${step.decision}`}>{step.module}: {step.decision} · {step.ms}ms</span>
                   ))}
+                  {!!item.debug.pipelineTimeline?.length && (
+                    <>
+                      <span style={{ color: APG2_PROFILE.gold, fontWeight: 850, marginTop: 4 }}>Pipeline Timeline</span>
+                      {item.debug.pipelineTimeline.slice(-10).map((step, index) => (
+                        <span key={`${item.id}-timeline-${index}`}>{step.step}: {step.status} · {JSON.stringify(step.output || {}).slice(0, 96)}</span>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
             </div>
