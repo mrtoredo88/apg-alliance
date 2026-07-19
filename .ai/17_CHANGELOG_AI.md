@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Owner Identity Deep Forensic
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/identity-owner-deep-forensic.mjs`, `scripts/identity-owner-deep-forensic-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен read-only forensic-скрипт для критического owner-конфликта `duplicate_email_d1c56991cfb3f8bb`.
+- Отчёт строит auth timeline, owner rights, ownership graph, active login path, business comparison, security impact, preservation plan и decision matrix.
+- Добавлен regression-тест, подтверждающий read-only режим, наличие redacted/full отчётов и итоговую рекомендацию без изменения manifest/review session.
+**Почему:** последний критический Identity-конфликт требует доказательного owner-досье перед ручным решением, а не автоматического merge/remap.
+
 ## [2026-07-20] chore: Identity Invariant Classification v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/admin/identity/invariants/*`, `scripts/identity-invariants.mjs`, `scripts/identity-invariants-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

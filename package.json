@@ -117,7 +117,9 @@
     "identity:broken-references": "node scripts/identity-broken-references-forensic.mjs",
     "test:identity-broken-references": "node scripts/identity-broken-references-test.mjs",
     "identity:invariants": "node scripts/identity-invariants.mjs",
-    "test:identity-invariants": "node scripts/identity-invariants-test.mjs"
+    "test:identity-invariants": "node scripts/identity-invariants-test.mjs",
+    "identity:owner-forensic": "node scripts/identity-owner-deep-forensic.mjs",
+    "test:identity-owner-forensic": "node scripts/identity-owner-deep-forensic-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
