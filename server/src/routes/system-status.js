@@ -1,6 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission } from '../lib/adminSecurity.js';
 import { serverFoundation } from '../apg/index.js';
+
+function architectureGuardReport() {
+  const candidates = [
+    path.resolve(process.cwd(), 'docs/architecture-guard-report.json'),
+    path.resolve(process.cwd(), '../docs/architecture-guard-report.json'),
+  ];
+  for (const reportPath of candidates) {
+    try {
+      return JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    } catch {}
+  }
+  return { ok: null, generatedAt: null, layers: {}, violations: [] };
+}
 
 async function countSafe(db, collectionName, limit = 1000) {
   try {
@@ -32,6 +47,8 @@ export default async function systemStatusRoutes(fastify) {
 
       const lastBackup = backups?.docs?.[0]?.data?.() || null;
       const vkData = vkSync?.exists ? vkSync.data() : null;
+      const identitySnapshot = serverFoundation.identityV2.snapshot();
+      const guard = architectureGuardReport();
       return {
         ok: true,
         actor: { id: actor.userId, role: actor.role, authSource: actor.authSource },
@@ -40,7 +57,28 @@ export default async function systemStatusRoutes(fastify) {
         api: { ok: true, runtime: 'yandex-fastify', version: process.env.APP_VERSION || '' },
         identity: {
           ok: true,
-          ...serverFoundation.identityV2.snapshot(),
+          ...identitySnapshot,
+        },
+        migration: {
+          ok: true,
+          identity: identitySnapshot,
+          dependencyMonitor: {
+            reads: { firestore: identitySnapshot.firestoreReads || 0, postgres: identitySnapshot.yandexReads || 0 },
+            writes: { firestore: identitySnapshot.firestoreWrites || 0, postgres: identitySnapshot.yandexWrites || 0 },
+            fallback: identitySnapshot.fallbackCount || identitySnapshot.firestoreFallbacks || 0,
+            fallbackEnabled: identitySnapshot.fallbackEnabled,
+            dualRead: identitySnapshot.dualRead,
+            dualWrite: identitySnapshot.dualWrite,
+          },
+        },
+        architecture: {
+          ok: guard.ok !== false,
+          identityProvider: identitySnapshot.provider,
+          dataProvider: identitySnapshot.storage,
+          repositoryCoverage: 'Foundation guarded',
+          firestoreDependency: guard.ok === false ? `${guard.violations?.length || 0} violations` : '0 guarded violations',
+          migrationStatus: identitySnapshot.storage === 'postgres' ? 'Identity PostgreSQL ready' : 'Identity fallback mode',
+          guard,
         },
         firestore: { ok: Boolean(ping || pingRef), collections: { news, comments, users, errors, adminActivity } },
         queues: { ok: true, pending: 0, note: 'Очередь задач пока не вынесена в отдельный сервис.' },

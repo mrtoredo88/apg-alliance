@@ -1274,9 +1274,13 @@ function AdminContextMenu({ menu, onClose, onEdit, onPublish, onPin, onDelete, o
 
 function SystemStatusPanel({ status, loading, onRefresh }) {
   const collections = status?.firestore?.collections || {};
+  const architecture = status?.architecture || {};
+  const migration = status?.migration || {};
   const rows = [
     ['API', status?.api?.ok, status?.api?.runtime || 'unknown', `${status?.latencyMs ?? 0} ms`],
     ['Firestore', status?.firestore?.ok, 'collections', Object.values(collections).filter(v => v?.ok).length],
+    ['Architecture Guard', architecture?.guard?.ok, architecture?.guard?.rule || 'foundation guard', `${architecture?.guard?.violations?.length || 0} violations`],
+    ['Identity Migration', migration?.dependencyMonitor?.fallbackEnabled === false || migration?.identity?.storage === 'postgres', migration?.identity?.storage || 'unknown', `fallback ${migration?.dependencyMonitor?.fallback || 0}`],
     ['VK News', status?.vkNews?.ok, status?.vkNews?.source || 'unknown', `${status?.vkNews?.count || 0} постов`],
     ['Очередь задач', status?.queues?.ok, status?.queues?.note || 'ok', status?.queues?.pending ?? 0],
     ['Backup', status?.backups?.configured, status?.backups?.note || 'нет данных', status?.backups?.lastBackupAt || '—'],
@@ -1312,6 +1316,163 @@ function SystemStatusPanel({ status, loading, onRefresh }) {
           </div>
         ))}
       </div>
+      <div style={{ ...s.card, marginTop: 16 }}>
+        <h2 style={s.h2}>Architecture</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+          {[
+            ['Identity Provider', status?.identity?.provider || '—'],
+            ['Data Provider', status?.identity?.storage || '—'],
+            ['Repository Coverage', architecture?.repositoryCoverage || '—'],
+            ['Firestore Dependency', architecture?.firestoreDependency || '—'],
+            ['Architecture Guard', architecture?.guard?.ok ? 'OK' : 'WARN'],
+            ['Migration Status', migration?.comparison?.users?.ok ? 'Verified' : 'Pending'],
+          ].map(([label, value]) => (
+            <div key={label} style={{ padding: 12, borderRadius: 14, background: A.chip, border: `1px solid ${A.border}` }}>
+              <div style={{ color: A.textSec, fontSize: 11, fontWeight: 850 }}>{label}</div>
+              <div style={{ color: A.text, fontSize: 14, fontWeight: 900, marginTop: 5 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MigrationCenterPanel({ data, loading, busy, lastResult, onRefresh, onAction }) {
+  const migration = data?.migrationCenter || {};
+  const pg = data?.postgres || {};
+  const fs = data?.firestore || {};
+  const comparison = data?.comparison || {};
+  const dependency = data?.dependencyMonitor || {};
+  const architecture = data?.architecture || {};
+  const active = migration.activeOperation;
+  const progress = active?.total ? Math.min(100, Math.round(((Number(active.imported || 0) + Number(active.skipped || 0)) / Number(active.total || 1)) * 100)) : 0;
+  const actionRows = [
+    ['apply-schema', 'Apply Schema', 'Применить PostgreSQL schema version.'],
+    ['snapshot', 'Create Snapshot', 'Собрать read-only snapshot Firestore Identity.'],
+    ['dry-run-import', 'Dry Run Import', 'Проверить импорт без записи.'],
+    ['import', 'Import Identity', 'Перенести Identity в PostgreSQL.'],
+    ['verify', 'Verify', 'Сравнить Firestore и PostgreSQL.'],
+    ['enable-postgres', 'Enable PostgreSQL', 'Включить runtime PostgreSQL flags.'],
+    ['disable-firestore-fallback', 'Disable Firestore Fallback', 'Отключить fallback в активной revision.'],
+    ['rollback', 'Rollback', 'Вернуть runtime flags к Firestore fallback.'],
+  ];
+  const confirmAction = (action, label) => {
+    const dangerous = ['import', 'disable-firestore-fallback', 'rollback'].includes(action);
+    const text = dangerous
+      ? `${label}: подтвердите выполнение production migration action. Данные не удаляются, но runtime flags могут измениться.`
+      : `${label}: выполнить операцию Migration Center?`;
+    if (!window.confirm(text)) return;
+    onAction(action);
+  };
+  const Metric = ({ label, value, tone = 'default' }) => (
+    <div style={{ padding: 13, borderRadius: 16, background: A.chip, border: `1px solid ${tone === 'bad' ? A.redBrd : tone === 'ok' ? 'rgba(75,179,75,0.3)' : A.border}` }}>
+      <div style={{ color: A.textSec, fontSize: 11, fontWeight: 850 }}>{label}</div>
+      <div style={{ color: tone === 'bad' ? A.red : tone === 'ok' ? '#4BB34B' : A.text, fontSize: 18, fontWeight: 950, marginTop: 5, overflowWrap: 'anywhere' }}>{value ?? '—'}</div>
+    </div>
+  );
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ ...s.card, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ ...s.h1, marginBottom: 4 }}>🧬 Identity Migration Center</h1>
+          <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px' }}>Единый сценарий миграции: snapshot → dry-run → import → verification → canary → cutover → rollback.</div>
+        </div>
+        <button type="button" onClick={onRefresh} disabled={loading || busy} style={{ ...s.btn, ...s.btnPri, opacity: loading || busy ? 0.55 : 1 }}>{loading ? 'Загружаем...' : '↻ Обновить'}</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+        <Metric label="PostgreSQL" value={pg.connection || 'unknown'} tone={pg.ok ? 'ok' : 'bad'} />
+        <Metric label="Schema version" value={pg.schemaVersions?.[0]?.version || '—'} />
+        <Metric label="PG Users" value={pg.counts?.users || 0} />
+        <Metric label="PG Email" value={pg.counts?.emailIndex || 0} />
+        <Metric label="Firestore Users" value={fs.counts?.users || 0} />
+        <Metric label="Fallback" value={dependency.fallbackEnabled ? 'enabled' : 'disabled'} tone={dependency.fallbackEnabled ? 'default' : 'ok'} />
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Сравнение</h2>
+        {[
+          ['Users', comparison.users],
+          ['Email Index', comparison.emailIndex],
+          ['Identity Links', comparison.identityLinks],
+        ].map(([label, row]) => (
+          <div key={label} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 80px', gap: 10, alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${A.rowBrd}`, color: A.textSec, fontSize: 12 }}>
+            <span style={{ color: A.text, fontWeight: 850 }}>{label}</span>
+            <span>Firestore {row?.firestore ?? 0}</span>
+            <span>PostgreSQL {row?.postgres ?? 0}</span>
+            <span style={{ color: row?.ok ? '#4BB34B' : A.gold, fontWeight: 900 }}>{row?.ok ? 'OK' : 'PENDING'}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Migration Actions</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+          {actionRows.map(([action, label, detail]) => (
+            <button key={action} type="button" disabled={busy} onClick={() => confirmAction(action, label)} style={{ ...s.btn, ...(action === 'import' || action === 'disable-firestore-fallback' ? s.btnPri : s.btnGray), justifyContent: 'flex-start', alignItems: 'flex-start', flexDirection: 'column', gap: 4, minHeight: 72, opacity: busy ? 0.55 : 1 }}>
+              <span style={{ fontSize: 13, fontWeight: 900 }}>{label}</span>
+              <span style={{ fontSize: 11, color: action === 'import' || action === 'disable-firestore-fallback' ? '#17120a' : A.textSec, lineHeight: '15px', textAlign: 'left' }}>{detail}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Live Progress</h2>
+        {active ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8, color: A.text, fontSize: 13, fontWeight: 850 }}>
+              <span>{active.action}</span>
+              <span>{progress}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 999, background: A.chip, overflow: 'hidden', border: `1px solid ${A.border}` }}>
+              <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg, #C9A84C, #E8C76D)' }} />
+            </div>
+            <div style={{ color: A.textSec, fontSize: 12, marginTop: 8 }}>Imported {active.imported || 0} / {active.total || 0} · skipped {active.skipped || 0} · {active.speedPerSec || 0}/s · ETA {active.etaSec ?? '—'}s · conflicts {active.conflicts || 0}</div>
+          </div>
+        ) : (
+          <div style={{ color: A.textSec, fontSize: 13 }}>Активной операции нет. Последняя: {migration.lastOperation?.action || '—'} · {migration.lastOperation?.status || '—'}</div>
+        )}
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Firestore Dependency Monitor</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+          <Metric label="Identity reads Firestore" value={dependency.reads?.firestore || 0} />
+          <Metric label="Identity reads PostgreSQL" value={dependency.reads?.postgres || 0} />
+          <Metric label="Identity writes Firestore" value={dependency.writes?.firestore || 0} />
+          <Metric label="Identity writes PostgreSQL" value={dependency.writes?.postgres || 0} />
+          <Metric label="Fallback Count" value={dependency.fallback || 0} />
+          <Metric label="Dual Read / Write" value={`${dependency.dualRead ? 'on' : 'off'} / ${dependency.dualWrite ? 'on' : 'off'}`} />
+        </div>
+      </div>
+
+      <div style={s.card}>
+        <h2 style={s.h2}>Architecture Guard Report</h2>
+        <div style={{ color: architecture.ok ? '#4BB34B' : A.gold, fontSize: 14, fontWeight: 900, marginBottom: 8 }}>{architecture.ok ? '0 violations' : `${architecture.violations?.length || 0} violations`}</div>
+        <div style={{ display: 'grid', gap: 7 }}>
+          {Object.entries(architecture.layers || {}).map(([label, row]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: A.textSec, fontSize: 12 }}>
+              <span>{label}</span>
+              <span style={{ color: row.violations ? A.red : A.gold }}>{row.checked} files · {row.violations || 0} violations</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {(lastResult || migration.history?.length > 0) && (
+        <div style={s.card}>
+          <h2 style={s.h2}>History</h2>
+          {lastResult && <pre style={{ margin: '0 0 10px', color: A.textSec, fontSize: 11, lineHeight: '16px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(lastResult, null, 2).slice(0, 2400)}</pre>}
+          {(migration.history || []).slice(0, 8).map(item => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: `1px solid ${A.rowBrd}`, color: A.textSec, fontSize: 12 }}>
+              <span>{item.action}</span>
+              <span style={{ color: item.status === 'completed' ? '#4BB34B' : A.gold }}>{item.status} · {item.finishedAt || item.startedAt}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -4558,6 +4719,10 @@ export const AdminPanel = () => {
   const [errDeletedCount, setErrDeletedCount] = useState(0);
   const [systemStatus, setSystemStatus] = useState(null);
   const [systemStatusLoading, setSystemStatusLoading] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState(null);
+  const [migrationLoading, setMigrationLoading] = useState(false);
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const [migrationLastResult, setMigrationLastResult] = useState(null);
 
   const loadErrors = useCallback(async () => {
     setErrorsLoading(true);
@@ -4612,6 +4777,46 @@ export const AdminPanel = () => {
       setSystemStatus({ ok: false, error: e.message || 'Состояние системы недоступно.' });
     } finally {
       setSystemStatusLoading(false);
+    }
+  }, []);
+
+  const runIdentityMigrationAction = useCallback(async (action = 'status', payload = {}) => {
+    const isStatus = action === 'status';
+    if (isStatus) setMigrationLoading(true);
+    else setMigrationBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/identity-v2-admin`, {
+        method: 'POST',
+        headers: await adminRequestHeaders(`identity_migration_${action}_${Date.now()}`),
+        body: JSON.stringify({ action, ...payload }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) {
+        const error = new Error(data?.message || data?.error || 'Identity migration action failed.');
+        error.code = data?.code || data?.error || 'IDENTITY_MIGRATION_FAILED';
+        error.responseBody = data;
+        throw error;
+      }
+      setMigrationLastResult({ action, at: new Date().toISOString(), result: data.result });
+      if (action === 'status') setMigrationStatus(data.result);
+      else {
+        const statusResponse = await fetch(`${API_BASE_URL}/api/identity-v2-admin`, {
+          method: 'POST',
+          headers: await adminRequestHeaders(`identity_migration_status_${Date.now()}`),
+          body: JSON.stringify({ action: 'status' }),
+        });
+        const statusData = await statusResponse.json().catch(() => ({}));
+        if (statusResponse.ok && statusData?.ok !== false) setMigrationStatus(statusData.result);
+      }
+      return data.result;
+    } catch (e) {
+      logError(e, `AdminPanel.identityMigration.${action}`);
+      setMigrationLastResult({ action, at: new Date().toISOString(), ok: false, error: e.message || 'Identity migration failed.', details: e.responseBody || null });
+      if (!isStatus) alert(e.message || 'Identity migration action failed.');
+      return null;
+    } finally {
+      if (isStatus) setMigrationLoading(false);
+      else setMigrationBusy(false);
     }
   }, []);
 
@@ -7129,12 +7334,13 @@ export const AdminPanel = () => {
 
   useEffect(() => {
     if (activeTab === 'system' && !systemStatus && !systemStatusLoading) loadSystemStatus();
+    if (activeTab === 'identity-migration' && !migrationStatus && !migrationLoading) runIdentityMigrationAction('status');
     if (activeTab === 'access' && !adminSecurity && !adminSecurityLoading) loadAdminSecurity();
     if ((activeTab === 'ai-import' || activeTab === 'moderation') && !aiImportRequests.length && !aiImportLoading) loadAiImportRequests();
     if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
     if ((activeTab === 'referrals' || activeTab === 'referral-monitoring') && !referralAudit && !referralLoading) loadReferralAudit(activeTab === 'referral-monitoring' ? 'referrals:monitoring' : 'referrals:diagnostics');
     if (activeTab === 'automation' && !automationAudit && !automationLoading) loadAutomationAudit();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit]);
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, migrationStatus, migrationLoading, runIdentityMigrationAction, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit]);
 
   const adminAssistantContext = useMemo(() => buildAdminContext({
     activeTab,
@@ -7371,6 +7577,7 @@ export const AdminPanel = () => {
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
             { id: 'access',    emoji: '🔐', label: 'Доступ' },
+            { id: 'identity-migration', emoji: '🧬', label: 'Identity Migration', count: migrationStatus?.architecture?.violations?.length || undefined },
             { id: 'system',    emoji: '🛡', label: 'Система' },
             { id: 'errors',    emoji: '🐛', label: 'Ошибки', count: errorLogs.filter(isErrorActive).length || undefined },
             { id: 'ai-import', emoji: '📥', label: 'ИИ-импорт', count: aiImportRequests.filter(item => item.status !== 'published' && item.status !== 'rejected').length || undefined },
@@ -7382,7 +7589,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'identity-migration') runIdentityMigrationAction('status'); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -10766,6 +10973,17 @@ export const AdminPanel = () => {
           status={systemStatus}
           loading={systemStatusLoading}
           onRefresh={loadSystemStatus}
+        />
+      )}
+
+      {activeTab === 'identity-migration' && (
+        <MigrationCenterPanel
+          data={migrationStatus}
+          loading={migrationLoading}
+          busy={migrationBusy}
+          lastResult={migrationLastResult}
+          onRefresh={() => runIdentityMigrationAction('status')}
+          onAction={runIdentityMigrationAction}
         />
       )}
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel } from '@vkontakte/vkui';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { API_BASE_URL } from './constants.js';
 import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
 import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';
 import { APG2_PROFILE, EmptyStateV2, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
@@ -100,6 +101,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const [performanceRuns, setPerformanceRuns] = useState(() => readPerformanceRuns());
   const [performanceCopied, setPerformanceCopied] = useState(false);
   const [emailLoginDiagnostics, setEmailLoginDiagnostics] = useState(() => readEmailLoginDiagnostics());
+  const [architectureStatus, setArchitectureStatus] = useState(null);
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -118,14 +120,35 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     return result;
   }, [user]);
 
+  const refreshArchitectureStatus = useCallback(async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken?.(false);
+      if (!token) {
+        setArchitectureStatus({ ok: false, error: 'Admin token unavailable' });
+        return null;
+      }
+      const response = await fetch(`${API_BASE_URL}/api/system-status`, {
+        headers: { 'X-Firebase-Auth': token, 'X-APG-Version': 'health-architecture-v1' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Architecture status unavailable');
+      setArchitectureStatus(data);
+      return data;
+    } catch (error) {
+      setArchitectureStatus({ ok: false, error: error?.message || 'Architecture status unavailable' });
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     runChecks();
     refreshPushDiagnostics();
+    refreshArchitectureStatus();
     getDocs(query(collection(db, 'errorLogs'), orderBy('createdAt', 'desc'), limit(20)))
       .then(snap => setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
       .catch(() => {})
       .finally(() => setLoadingLogs(false));
-  }, [refreshPushDiagnostics, runChecks]);
+  }, [refreshArchitectureStatus, refreshPushDiagnostics, runChecks]);
 
   const refreshPerformance = useCallback(() => {
     const report = forcePerformanceSnapshot('health_refresh');
@@ -255,7 +278,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
         <ScreenHeader title="APG Health" subtitle="Диагностика системы" kicker="OWNER" onBack={onBack} />
 
         <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 6, marginTop: 0 }}>
-          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['performance', 'Perf']].map(([id, label]) => (
+          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['architecture', 'Arch'], ['performance', 'Perf']].map(([id, label]) => (
             <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
@@ -497,6 +520,32 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <GlassButton onClick={() => setEmailLoginDiagnostics(readEmailLoginDiagnostics())} style={{ minHeight: 48 }}>↻ Обновить Email Login</GlassButton>
                 <GlassButton onClick={() => { clearEmailLoginDiagnostics(); setEmailLoginDiagnostics([]); }} style={{ minHeight: 48 }}>Очистить Email Login</GlassButton>
               </div>
+            </GlassSection>
+          </>
+        )}
+
+        {activeTab === 'architecture' && (
+          <>
+            <GlassSection title="Architecture">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Identity Provider" value={architectureStatus?.architecture?.identityProvider || architectureStatus?.identity?.provider || '—'} />
+                <DiagnosticLine label="Data Provider" value={architectureStatus?.architecture?.dataProvider || architectureStatus?.identity?.storage || '—'} />
+                <DiagnosticLine label="Repository Coverage" value={architectureStatus?.architecture?.repositoryCoverage || '—'} />
+                <DiagnosticLine label="Firestore Dependency" value={architectureStatus?.architecture?.firestoreDependency || '—'} />
+                <DiagnosticLine label="Architecture Guard" value={architectureStatus?.architecture?.guard?.ok ? 'OK' : architectureStatus?.error || 'WARN'} tone={architectureStatus?.architecture?.guard?.ok ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Migration Status" value={architectureStatus?.architecture?.migrationStatus || '—'} />
+              </GlassCard>
+            </GlassSection>
+            <GlassSection title="Identity Migration">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Identity reads Firestore" value={architectureStatus?.migration?.dependencyMonitor?.reads?.firestore ?? '—'} />
+                <DiagnosticLine label="Identity reads PostgreSQL" value={architectureStatus?.migration?.dependencyMonitor?.reads?.postgres ?? '—'} />
+                <DiagnosticLine label="Identity writes Firestore" value={architectureStatus?.migration?.dependencyMonitor?.writes?.firestore ?? '—'} />
+                <DiagnosticLine label="Identity writes PostgreSQL" value={architectureStatus?.migration?.dependencyMonitor?.writes?.postgres ?? '—'} />
+                <DiagnosticLine label="Fallback Count" value={architectureStatus?.migration?.dependencyMonitor?.fallback ?? '—'} />
+                <DiagnosticLine label="Dual Read / Write" value={`${architectureStatus?.migration?.dependencyMonitor?.dualRead ? 'on' : 'off'} / ${architectureStatus?.migration?.dependencyMonitor?.dualWrite ? 'on' : 'off'}`} />
+              </GlassCard>
+              <GlassButton onClick={refreshArchitectureStatus} style={{ width: '100%', marginTop: 10, minHeight: 48 }}>↻ Обновить Architecture</GlassButton>
             </GlassSection>
           </>
         )}

@@ -4124,6 +4124,15 @@
 - Старое действие `event:propose` оставлено совместимым с новым workspace-layer, чтобы кабинет партнёра/эксперта продолжал отправлять предложения на модерацию.
 - `scripts/workspace-core-test.mjs` расширен проверками партнёр/эксперт ownership, статусов, архивов, прошедших событий, конфликтов и безопасного дублирования.
 
+# 2026-07-19 — APG Migration Center + Architecture Guard v1
+
+- Добавлен управляемый Identity Migration Center в админке: статус PostgreSQL/Firestore, сравнение counts/checksums, protected actions, progress, history, dependency monitor и runtime rollback через Identity flags.
+- `/api/identity-v2-admin` расширен до migration gateway: `enable-postgres`, `disable-firestore-fallback`, `rollback`, `architecture-report`, in-memory progress/history и dependency snapshot поверх существующего Identity v2.
+- APG Health получил раздел `Architecture` и backend `/api/system-status` теперь отдаёт Identity Provider, Data Provider, Repository Coverage, Firestore Dependency, Architecture Guard и Migration Status.
+- Добавлен строгий `scripts/architecture-guard.mjs`: Foundation/Identity/Repository слои не могут напрямую импортировать Firebase/Firestore; разрешение остаётся только для infrastructure adapters/providers.
+- `npm run build` теперь запускает Architecture Guard перед сборкой, а backend image копирует `docs/architecture-guard-report.json` для production diagnostics.
+- Добавлен `scripts/migration-center-test.mjs`; Identity v2 тесты расширены проверками migration actions, dependency monitor и live progress contract.
+
 # 2026-07-14 — Workspace Meetings CRM
 
 - Раздел `Встречи` в Desktop Workspace переведён на CRM-экран: KPI на сегодня/завтра/неделю, ожидания, переносы, завершения, неявки и отмены, поиск по клиенту/контактам/услуге, фильтры и создание встречи вручную.

@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "rule": "foundation_layers_use_identity_repository_and_infrastructure_adapters",
+  "checkedFiles": 40,
+  "layers": {
+    "Client Foundation": {
+      "checked": 4,
+      "violations": 0,
+      "allowedInfrastructure": 0
+    },
+    "Repository Layer": {
+      "checked": 5,
+      "violations": 0,
+      "allowedInfrastructure": 1
+    },
+    "Domain Layer": {
+      "checked": 1,
+      "violations": 0,
+      "allowedInfrastructure": 0
+    },
+    "Identity Layer": {
+      "checked": 20,
+      "violations": 0,
+      "allowedInfrastructure": 7
+    },
+    "Infrastructure": {
+      "checked": 8,
+      "violations": 0,
+      "allowedInfrastructure": 8
+    },
+    "Server Foundation": {
+      "checked": 2,
+      "violations": 0,
+      "allowedInfrastructure": 0
+    }
+  },
+  "violations": [],
+  "allowed": [
+    "/infrastructure/adapters/",
+    "/identity/providers/",
+    "/data/FirestoreAdminAdapter.js",
+    "/schema/identity-v2.sql"
+  ],
+  "generatedAt": "2026-07-19T19:40:31.011Z"
+}

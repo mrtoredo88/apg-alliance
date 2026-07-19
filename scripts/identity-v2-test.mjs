@@ -66,10 +66,16 @@ const adminRoute = read('server/src/routes/identity-v2-admin.js');
   'dry-run-import',
   'import',
   'verify',
+  'enable-postgres',
+  'disable-firestore-fallback',
+  'rollback',
+  'architecture-report',
   'maintenance:write',
   'duplicateReport',
   'orphanReport',
   'checksum',
+  'dependencyMonitor',
+  'activeOperation',
 ].forEach(token => assert.ok(adminRoute.includes(token), `Identity v2 admin route supports ${token}`));
 
 const server = read('server/src/server.js');
