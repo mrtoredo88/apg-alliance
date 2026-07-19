@@ -4153,6 +4153,7 @@
 - Добавлен read-only forensic CLI `npm run identity:forensic-conflict`: строит локальный Markdown/redacted отчёт по одному Identity conflict из snapshot/audit без Firestore-запросов и без изменения review session/manifest.
 - Добавлен read-only batch forensic CLI `npm run identity:forensic-conflicts`: генерирует отчёты по пяти оставшимся Identity conflict и сводку без owner decisions, manifest changes или production-запросов.
 - `identity:dry-run` теперь пишет локальный audit event `DRY_RUN_EXECUTED`, чтобы partial owner approval имел полный audit trail без запуска миграционных операций.
+- Добавлен read-only `npm run identity:broken-references`: классифицирует 8 dangling identity references из Dry Run, строит Markdown/JSON/redacted отчёты и не меняет review/manifest/Firestore.
 
 # 2026-07-14 — Workspace Meetings CRM
 

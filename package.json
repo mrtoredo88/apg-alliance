@@ -113,7 +113,9 @@
     "test:identity-dry-run": "node scripts/identity-dry-run-test.mjs",
     "identity:forensic-conflict": "node scripts/identity-single-conflict-forensic.mjs",
     "identity:forensic-conflicts": "node scripts/identity-remaining-conflicts-forensic.mjs",
-    "test:identity-forensic-conflicts": "node scripts/identity-forensic-conflicts-test.mjs"
+    "test:identity-forensic-conflicts": "node scripts/identity-forensic-conflicts-test.mjs",
+    "identity:broken-references": "node scripts/identity-broken-references-forensic.mjs",
+    "test:identity-broken-references": "node scripts/identity-broken-references-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
