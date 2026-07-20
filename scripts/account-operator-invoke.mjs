@@ -34,6 +34,10 @@ function ensureDir(filePath) {
   fs.mkdirSync(filePath.split('/').slice(0, -1).join('/'), { recursive: true });
 }
 
+function joinUrl(baseUrl, path) {
+  return `${String(baseUrl || '').replace(/\/+$/, '')}/${String(path || '').replace(/^\/+/, '')}`;
+}
+
 function redactedRuntime() {
   const container = ycJson(['serverless', 'container', 'get', CONTAINER_NAME]);
   const revisions = ycJson(['serverless', 'container', 'revision', 'list', '--container-name', CONTAINER_NAME]);
@@ -108,7 +112,7 @@ async function main() {
     throw new Error('OPERATOR_INVOKE_ENV_INCOMPLETE');
   }
   const iamToken = run('yc', ['iam', 'create-token']);
-  const response = await fetch(`${env.OPERATOR_URL}/run`, {
+  const response = await fetch(joinUrl(env.OPERATOR_URL, '/run'), {
     method: 'POST',
     headers: {
       authorization: `Bearer ${iamToken}`,
