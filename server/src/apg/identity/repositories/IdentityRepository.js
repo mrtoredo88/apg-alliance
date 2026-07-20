@@ -152,10 +152,20 @@ export class IdentityRepository {
     return { userId, canonicalUserId: updated.canonicalUserId || userId, user: updated, source: 'identity_v2_link_email' };
   }
 
-  async linkTelegram({ telegramId, userId, telegram = {} }) {
-    const user = await this.users.get(userId);
-    if (!user) throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
+  async linkTelegram({ telegramId, userId, telegram = {}, debug = null }) {
     const normalizedTelegramId = normalizeTelegramId(telegramId);
+    const mark = typeof debug?.mark === 'function' ? debug.mark : () => {};
+    const requestId = safeString(debug?.requestId, 120);
+    const user = await this.users.get(userId);
+    if (!user) {
+      mark('identityRepository.linkTelegram.entered', 'FAIL', {
+        requestId,
+        userId: safeString(userId, 260),
+        telegramId: normalizedTelegramId,
+        reason: 'user_not_found',
+      });
+      throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
+    }
     const adapter = this.links.adapter;
     const identityId = `telegram:${normalizedTelegramId}`;
     const payload = {
@@ -164,49 +174,113 @@ export class IdentityRepository {
       telegramId: normalizedTelegramId,
       linkedAt: new Date().toISOString(),
     };
-
-    await adapter.transaction(async client => {
-      const upserted = await client.query(
-        `INSERT INTO apg_identity_links (id, provider, provider_user_id, user_id, canonical_user_id, metadata, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, now(), now())
-         ON CONFLICT (id) DO UPDATE SET
-           metadata = CASE
-             WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN apg_identity_links.metadata || EXCLUDED.metadata
-             ELSE apg_identity_links.metadata
-           END,
-           canonical_user_id = CASE
-             WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN COALESCE(NULLIF(EXCLUDED.canonical_user_id, ''), apg_identity_links.canonical_user_id)
-             ELSE apg_identity_links.canonical_user_id
-           END,
-           user_id = apg_identity_links.user_id,
-           updated_at = now()
-         RETURNING id, user_id, canonical_user_id, metadata
-         `,
-        [
-          identityId,
-          'telegram',
-          normalizedTelegramId,
-          safeString(userId, 260),
-          ensureCanonicalId(user),
-          JSON.stringify(payload),
-        ],
-      );
-      if (!upserted?.rows?.length || String(upserted.rows[0]?.user_id || '') !== String(safeString(userId, 260))) {
-        const error = Object.assign(
-          new Error('Этот Telegram уже привязан к другому аккаунту.'),
-          { statusCode: 409, code: 'TELEGRAM_ALREADY_USED' },
-        );
-        throw error;
-      }
+    mark('identityRepository.linkTelegram.entered', 'PASS', {
+      requestId,
+      userId: safeString(userId, 260),
+      telegramId: normalizedTelegramId,
     });
 
-    const existingLink = await this.links.get('telegram', normalizedTelegramId);
+    let repositoryLink = null;
+    try {
+      await adapter.transaction(async client => {
+        const upserted = await client.query(
+          `INSERT INTO apg_identity_links (id, provider, provider_user_id, user_id, canonical_user_id, metadata, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, now(), now())
+           ON CONFLICT (id) DO UPDATE SET
+             metadata = CASE
+               WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN apg_identity_links.metadata || EXCLUDED.metadata
+               ELSE apg_identity_links.metadata
+             END,
+             canonical_user_id = CASE
+               WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN COALESCE(NULLIF(EXCLUDED.canonical_user_id, ''), apg_identity_links.canonical_user_id)
+               ELSE apg_identity_links.canonical_user_id
+             END,
+             user_id = apg_identity_links.user_id,
+             updated_at = now()
+           RETURNING id, user_id, canonical_user_id, metadata
+           `,
+          [
+            identityId,
+            'telegram',
+            normalizedTelegramId,
+            safeString(userId, 260),
+            ensureCanonicalId(user),
+            JSON.stringify(payload),
+          ],
+        );
+        if (!upserted?.rows?.length || String(upserted.rows[0]?.user_id || '') !== String(safeString(userId, 260))) {
+          mark('identityRepository.linkTelegram.sql_write', 'FAIL', {
+            requestId,
+            userId: safeString(userId, 260),
+            telegramId: normalizedTelegramId,
+            reason: 'owner_or_conflict',
+          });
+          const error = Object.assign(
+            new Error('Этот Telegram уже привязан к другому аккаунту.'),
+            { statusCode: 409, code: 'TELEGRAM_ALREADY_USED' },
+          );
+          throw error;
+        }
+
+        mark('identityRepository.linkTelegram.sql_write', 'PASS', {
+          requestId,
+          userId: safeString(userId, 260),
+          telegramId: normalizedTelegramId,
+        });
+
+        const committed = await client.query(
+          'SELECT id, provider, provider_user_id, user_id, canonical_user_id, metadata FROM apg_identity_links WHERE provider = $1 AND provider_user_id = $2 LIMIT 1',
+          ['telegram', normalizedTelegramId],
+        );
+        const row = committed.rows?.[0] || null;
+        if (!row) {
+          mark('identityRepository.linkTelegram.tx_read', 'FAIL', {
+            requestId,
+            telegramId: normalizedTelegramId,
+            reason: 'missing_commit_row',
+          });
+          const error = Object.assign(new Error('Не удалось зафиксировать ссылку Telegram в БД.'), {
+            statusCode: 500,
+            code: 'TELEGRAM_LINK_PERSISTENCE_FAILED',
+          });
+          throw error;
+        }
+        repositoryLink = {
+          id: row.id,
+          provider: row.provider,
+          providerUserId: row.provider_user_id,
+          userId: row.user_id,
+          canonicalUserId: row.canonical_user_id,
+          metadata: row.metadata || {},
+        };
+        mark('identityRepository.linkTelegram.tx_read', 'PASS', {
+          requestId,
+          telegramId: normalizedTelegramId,
+          linkUserId: safeString(row.user_id, 260),
+        });
+      });
+    } catch (error) {
+      mark('identityRepository.linkTelegram.transaction', 'FAIL', {
+        requestId,
+        userId: safeString(userId, 260),
+        telegramId: normalizedTelegramId,
+        publicError: safeString(error?.message || error?.code || error?.error || '', 220),
+        internalCode: safeString(error?.code || error?.statusCode || error?.error || 'unknown', 120),
+      });
+      throw error;
+    }
+    mark('identityRepository.linkTelegram.transaction', 'PASS', {
+      requestId,
+      userId: safeString(userId, 260),
+      telegramId: normalizedTelegramId,
+    });
+
     const updated = await this.users.upsert({ ...user, id: userId, linkedTelegram: { ...telegram, tgId: normalizedTelegramId, linkedAt: new Date().toISOString() } });
     return {
       userId,
       canonicalUserId: updated.canonicalUserId || userId,
       user: updated,
-      link: existingLink,
+      link: repositoryLink || { userId: updated.id || userId, providerUserId: normalizedTelegramId },
       identityId,
       source: 'identity_v2_link_telegram',
     };

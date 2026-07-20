@@ -1171,8 +1171,23 @@ export default async function emailAuthRoutes(fastify) {
       const { userId, tgId, firstName, lastName, username, photo } = request.body ?? {};
       const normalizedTgId = normalizeTgId(tgId);
       if (!userId || !normalizedTgId) return reply.code(400).send({ ok: false, error: 'missing_fields' });
+      const attemptContext = getEmailAuthAttemptContext(request);
+      const stage = (name, status = 'PASS', detail = {}) => {
+        const row = {
+          stage: String(name || ''),
+          status: status === 'FAIL' ? 'FAIL' : 'PASS',
+          at: new Date().toISOString(),
+          requestId: attemptContext.requestId,
+          loginSessionId: attemptContext.loginSessionId,
+          authAttemptId: attemptContext.authAttemptId,
+          ...detail,
+        };
+        request.log.info(row, 'email-auth link-telegram trace');
+      };
+      stage('request_received', 'PASS', { telegramId: normalizedTgId, targetUserId: String(userId) });
 
       const actor = await getActor(request, db);
+      stage('actor_resolved', 'PASS', { actorUserId: String(actor.userId), requestUserId: String(userId) });
       if (String(actor.userId) !== String(userId)) {
         await auditAccountLink(db, request, { action: 'link-telegram', result: 'blocked_owner_mismatch', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId });
         return reply.code(403).send({ ok: false, error: 'owner_mismatch', message: 'Нельзя привязать Telegram к другому аккаунту.' });
@@ -1184,13 +1199,38 @@ export default async function emailAuthRoutes(fastify) {
           userId: String(userId),
           firebaseUid: actor.uid,
           telegram: { firstName: firstName ?? null, lastName: lastName ?? null, username: username ?? null, photo: photo ?? null },
+          debug: {
+            requestId: attemptContext.requestId,
+            actorUserId: actor.userId,
+            mark(name, status = 'PASS', detail = {}) {
+              stage(`service_${String(name || '')}`, status, detail);
+            },
+          },
         });
-        if (!linkResult?.link?.userId || String(linkResult.link.userId) !== String(userId)) {
+        const linkUserId = String(linkResult?.link?.userId || '').trim();
+        const linkTelegramId = String(linkResult?.link?.providerUserId || linkResult?.link?.telegramId || normalizedTgId || '').trim();
+        if (!linkUserId || String(linkUserId) !== String(userId) || !linkTelegramId) {
+          stage('response_blocked_missing_link', 'FAIL', {
+            linkUserId: linkUserId || 'empty',
+            expectedUserId: String(userId),
+            linkTelegramId: linkTelegramId || 'empty',
+          });
           return reply.code(500).send({ ok: false, error: 'link_data_missing', message: 'Привязка не завершена. Попробуйте ещё раз.' });
         }
+        stage('identity_link_returned_userId', 'PASS', { linkUserId, requestedUserId: String(userId) });
+        stage('identity_link_returned_telegramId', 'PASS', { linkTelegramId });
         await auditAccountLink(db, request, { action: 'link-telegram', result: 'success', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId });
+        stage('response_sent', 'PASS', {
+          linkUserId,
+          linkTelegramId,
+        });
         return { ok: true, link: { userId: String(linkResult.link.userId), telegramId: linkResult.link.providerUserId || normalizedTgId } };
       } catch (e) {
+        stage('identity_link_failed', 'FAIL', {
+          publicError: safeString(e?.error || e?.code || e?.message || 'unknown', 120),
+          internalCode: safeString(e?.code || e?.error || 'unknown', 120),
+          statusCode: safeString(String(e?.statusCode || 500), 40),
+        });
         return reply.code(e.statusCode || 500).send({ ok: false, error: e.statusCode === 409 ? 'already_linked' : 'link_failed', message: e.message || 'Не удалось привязать Telegram.' });
       }
     }

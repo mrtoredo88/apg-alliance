@@ -200,10 +200,51 @@ export class ApgIdentityV2Service {
     return result;
   }
 
-  async linkTelegram({ telegramId, userId, telegram = {}, firebaseUid = '' }) {
+  async linkTelegram({ telegramId, userId, telegram = {}, firebaseUid = '', debug = null } = {}) {
+    const mark = typeof debug?.mark === 'function'
+      ? debug.mark
+      : () => {};
+    const trace = {
+      requestId: safeString(debug?.requestId || '', 120),
+      userId: safeString(userId, 260),
+      telegramId: normalizeTelegramId(telegramId),
+      actor: safeString(debug?.actorUserId, 120),
+    };
+    mark('identityV2.linkTelegram.entered', 'PASS', trace);
+
     const normalizedTelegramId = normalizeTelegramId(telegramId);
     const normalizedUserId = safeString(userId, 260);
-    const result = await this.repository.linkTelegram({ telegramId: normalizedTelegramId, userId: normalizedUserId, telegram });
+    let result = null;
+    try {
+      result = await this.repository.linkTelegram({
+        telegramId: normalizedTelegramId,
+        userId: normalizedUserId,
+        telegram,
+        debug: {
+          requestId: trace.requestId,
+          mark,
+          actorUserId: trace.actor,
+        },
+      });
+    } catch (error) {
+      mark('identityV2.linkTelegram.entered_repository_result', 'FAIL', {
+        requestId: trace.requestId,
+        userId: normalizedUserId,
+        telegramId: normalizedTelegramId,
+        publicError: safeString(error?.message || error?.code || error?.error || '', 160),
+        internalCode: safeString(error?.code || error?.statusCode || error?.error || 'unknown', 120),
+      });
+      throw error;
+    }
+
+    mark('identityV2.linkTelegram.entered_repository_result', 'PASS', {
+      requestId: trace.requestId,
+      userId: normalizedUserId,
+      telegramId: normalizedTelegramId,
+      linkUserId: safeString(result?.link?.userId || '', 260),
+      linkTelegramId: safeString(result?.link?.providerUserId || result?.link?.telegramId || '', 120),
+    });
+
     const persistedLink = await this.repository.links.get('telegram', normalizedTelegramId).catch(() => null);
     const persistedUser = await this.repository.users.get(normalizedUserId).catch(() => null);
     const persistedTelegram = persistedUser?.linkedTelegram && typeof persistedUser.linkedTelegram === 'object'
@@ -224,8 +265,23 @@ export class ApgIdentityV2Service {
         { statusCode: 500, code: 'TELEGRAM_LINK_PERSISTENCE_FAILED' },
       );
       this.metrics.lastError = classify(error);
+      mark('identityV2.linkTelegram.persistence_verified', 'FAIL', {
+        requestId: trace.requestId,
+        expectedUserId: normalizedUserId,
+        expectedTelegramId: requestedTelegramId,
+        actualLinkUserId: safeString(persistedLink?.userId || '', 260),
+        actualTelegramId: safeString(persistedTelegramId || '', 120),
+        code: 'TELEGRAM_LINK_PERSISTENCE_FAILED',
+      });
       throw error;
     }
+
+    mark('identityV2.linkTelegram.persistence_verified', 'PASS', {
+      requestId: trace.requestId,
+      userId: normalizedUserId,
+      telegramId: requestedTelegramId,
+      source: result?.source || '',
+    });
 
     this.metrics.yandexWrites += 2;
     if (this.legacySource && enabled(this.flags.identityDualWrite)) {
