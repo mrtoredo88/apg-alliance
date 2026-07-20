@@ -20,6 +20,7 @@ function classify(error) {
   const code = String(error?.code || error?.error || '');
   if (code.includes('RESOURCE_EXHAUSTED') || message.includes('RESOURCE_EXHAUSTED') || message.includes('Quota exceeded')) return 'FIRESTORE_RESOURCE_EXHAUSTED';
   if (code === 'IDENTITY_POSTGRES_NOT_CONFIGURED') return code;
+  if (code === 'USER_NOT_FOUND' || Number(error?.statusCode) === 404) return 'USER_NOT_FOUND';
   return code || 'IDENTITY_ERROR';
 }
 
@@ -91,6 +92,7 @@ export class ApgIdentityV2Service {
             fallbackUnavailable = true;
             return null;
           }
+          if (classify(error) === 'USER_NOT_FOUND') return null;
           throw error;
         });
         if (legacy?.userId && this.repository) {

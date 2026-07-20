@@ -38,6 +38,7 @@ const service = read('server/src/apg/identity/ApgIdentityV2Service.js');
 assert.ok(service.includes('resolveEmailIdentity'), 'Identity v2 resolves email');
 assert.ok(service.includes('dualWriteLegacy'), 'Identity v2 keeps Firestore dual-write as best-effort');
 assert.ok(service.includes('FIRESTORE_RESOURCE_EXHAUSTED'), 'Identity v2 classifies Firestore quota fallback failures');
+assert.ok(service.includes("if (classify(error) === 'USER_NOT_FOUND') return null;"), 'Identity v2 treats missing legacy email as creatable in PostgreSQL');
 assert.ok(service.includes('snapshot()'), 'Identity v2 exposes metrics snapshot');
 
 const emailRoute = read('server/src/routes/email-auth.js');

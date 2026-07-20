@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-20] fix: Email Verify PostgreSQL Identity Creation
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/apg/identity/ApgIdentityV2Service.js`, `scripts/identity-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Identity v2 теперь трактует `USER_NOT_FOUND` из legacy Firestore fallback как отсутствие старой записи, а не как terminal error.
+- После успешного OTP `createIfMissing:true` продолжает путь к PostgreSQL `createEmailIdentity`, если legacy identity не найдена.
+**Почему:** у новых email-пользователей регистрация обрывалась после валидного OTP на `resolve_email_user`, потому что legacy fallback возвращал `USER_NOT_FOUND` до создания PostgreSQL identity.
+
 ## [2026-07-20] feat: Account Core Production Migration Phase 1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/account-operator-deploy.mjs`, `scripts/account-snapshot.mjs`, `scripts/account-conflicts.mjs`, `scripts/account-dry-run.mjs`, `.ai/17_CHANGELOG_AI.md`
