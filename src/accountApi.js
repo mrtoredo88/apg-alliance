@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './constants.js';
 import { apgIdentity } from './apg/index.js';
+import { getFoundationFlag } from './apg/core/FeatureFlags.js';
 import { getPwaVersion } from './pwa/PwaUpdateManager.js';
 
 export async function fetchAccountBootstrap(payload = {}) {
@@ -27,7 +28,9 @@ export async function fetchAccountBootstrap(payload = {}) {
 
 export function shouldUseAccountCoreCanary() {
   try {
-    return localStorage.getItem('apg_account_canary') === '1'
+    return getFoundationFlag('ACCOUNT_STORAGE') === 'postgres'
+      || getFoundationFlag('ACCOUNT_CANARY') === '1'
+      || localStorage.getItem('apg_account_canary') === '1'
       || localStorage.getItem('apg_account_storage') === 'postgres';
   } catch {
     return false;
