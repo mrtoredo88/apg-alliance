@@ -38,6 +38,10 @@ function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function cleanId(value) {
+  return String(value || '').trim();
+}
+
 function safeString(value, max = 500) {
   return String(value ?? '').trim().slice(0, max);
 }
@@ -100,7 +104,7 @@ function primaryRole(roles) {
 
 function ownerIdsFromEntity(entity) {
   const data = entity.data || {};
-  return [data.ownerId, data.ownerUserId, data.userId, data.partnerOwnerId, data.expertOwnerId].map(normalized).filter(Boolean);
+  return [data.ownerId, data.ownerUserId, data.userId, data.partnerOwnerId, data.expertOwnerId].map(cleanId).filter(Boolean);
 }
 
 function duplicateOwnerP0(users) {
@@ -172,7 +176,7 @@ function buildPlan(snapshot) {
     });
   }
   const profileIds = new Set(profiles.map(item => normalized(item.userId)));
-  const remapUser = userId => canonicalByLegacy.get(normalized(userId)) || userId;
+  const remapUser = userId => canonicalByLegacy.get(normalized(userId)) || usersById.get(normalized(userId))?.id || userId;
   const cabinets = [
     ...(snapshot.collections.partners || []).flatMap(item => ownerIdsFromEntity(item).map(userId => ({ type: 'partner', entityId: item.id, userId: remapUser(userId) }))),
     ...(snapshot.collections.experts || []).flatMap(item => ownerIdsFromEntity(item).map(userId => ({ type: 'expert', entityId: item.id, userId: remapUser(userId) }))),

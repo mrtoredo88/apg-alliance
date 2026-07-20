@@ -31,9 +31,13 @@ function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function cleanId(value) {
+  return String(value || '').trim();
+}
+
 function ownerIdsFromEntity(entity) {
   const data = entity.data || {};
-  return [data.ownerId, data.ownerUserId, data.userId, data.partnerOwnerId, data.expertOwnerId].map(normalized).filter(Boolean);
+  return [data.ownerId, data.ownerUserId, data.userId, data.partnerOwnerId, data.expertOwnerId].map(cleanId).filter(Boolean);
 }
 
 function plannedCabinets(snapshot) {
@@ -70,7 +74,8 @@ function dryRunPlan(snapshot) {
   const users = snapshot.collections.users || [];
   const p0 = duplicateOwnerP0(users);
   const canonicalByLegacy = new Map(p0 ? [[normalized(p0.legacyId), p0.canonicalId]] : []);
-  const remapUser = userId => canonicalByLegacy.get(normalized(userId)) || userId;
+  const usersById = new Map(users.map(user => [normalized(user.id), user]));
+  const remapUser = userId => canonicalByLegacy.get(normalized(userId)) || usersById.get(normalized(userId))?.id || userId;
   const profileIds = new Set(users.filter(user => normalized(user.id) !== normalized(p0?.legacyId)).map(user => normalized(user.id)));
   const tgLinks = (snapshot.collections.tgLinks || []).filter(item => profileIds.has(normalized(remapUser(item.data?.userId || item.data?.uid || item.data?.canonicalUserId || ''))));
   const sessions = (snapshot.collections.telegramAuthSessions || []).filter(item => profileIds.has(normalized(remapUser(item.data?.userId || item.data?.uid || ''))));
