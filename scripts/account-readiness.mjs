@@ -1,5 +1,8 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
+
+loadMigrationEnv();
 
 function exists(file) {
   return fs.existsSync(file);

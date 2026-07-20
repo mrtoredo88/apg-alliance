@@ -2,23 +2,19 @@
 
 Status: `BLOCKED`
 
-Production PostgreSQL could not be verified from this environment because no PostgreSQL DSN is configured.
+Production PostgreSQL DSN is now visible to the migration operator through `scripts/lib/migration-env-loader.mjs`, but connectivity is blocked by DNS/network resolution from this machine.
 
 ## Checked
 
-- `POSTGRES_DSN`: Missing
-- `APG_IDENTITY_DATABASE_URL`: Missing
-- `IDENTITY_DATABASE_URL`: Missing
-- `POSTGRES_DATABASE_URL`: Missing
-- `DATABASE_URL`: Missing
+- PostgreSQL DSN group: Found through migration environment loader.
 - Account Core schema file exists: `server/src/apg/account/schema/account-core.sql`
 - PostgreSQL adapter exists: `server/src/apg/account/adapters/PostgresAccountAdapter.js`
 - Expected schema version: `account-core-v1-2026-07-20`
 
 ## Not Proven
 
-- Production database existence.
 - Connectivity.
+- Production database existence from this operator network.
 - Account Core schema applied in production.
 - Schema version table contents.
 - User permissions.
@@ -33,6 +29,6 @@ Production PostgreSQL could not be verified from this environment because no Pos
 
 ## Blocker
 
-`POSTGRES_DSN_NOT_CONFIGURED`
+`postgres_connectivity`: DNS/network resolution failed for the configured PostgreSQL host. The host value is redacted in reports.
 
 No production writes were performed.

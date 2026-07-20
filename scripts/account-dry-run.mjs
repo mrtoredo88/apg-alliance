@@ -1,4 +1,7 @@
 import fs from 'node:fs';
+import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
+
+loadMigrationEnv();
 
 const required = [
   'server/src/apg/account/schema/account-core.sql',

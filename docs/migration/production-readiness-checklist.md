@@ -8,9 +8,9 @@ Scope: Account Core infrastructure readiness only. No snapshot, import, verify, 
 
 | Component | Status | Blocker |
 |---|---|---|
-| PostgreSQL | BLOCKED | Production DSN is not configured in this operator environment, so connectivity, schema, permissions, indexes, transactions, advisory locks, storage, latency, pool, timeout, SSL, and backup policy cannot be proven. |
-| Firebase Admin | BLOCKED | Firebase Admin credentials are not configured in this operator environment, so read access and immutable snapshot capability cannot be proven. |
-| Secrets | BLOCKED | PostgreSQL DSN, Firebase Admin credentials, encryption key, backup path, and monitoring credentials are missing from this environment. |
+| PostgreSQL | BLOCKED | DSN is visible to migration scripts, but DNS/network resolution to the configured PostgreSQL host fails from this machine. |
+| Firebase Admin | PASS | Firebase Admin credentials are visible to migration scripts and preflight read access passes. |
+| Secrets | BLOCKED | Encryption key, backup path, and monitoring credentials are still missing; PostgreSQL/Firebase Admin are now loaded from the migration environment source. |
 | Rollback | BLOCKED | Rollback flags and script exist, but production rollback manifests, checkpoints, and reports are not yet proven. |
 | Monitoring | BLOCKED | Account metrics exist, but full post-cutover observability for PostgreSQL reads/writes, Firestore reads/writes, fallback, role/cabinet/owner bootstrap, and hidden bypasses is not yet proven in production. |
 | Backup | BLOCKED | Local directories and Git exclusions exist, but encrypted snapshot capability is blocked by missing encryption key and missing production read credentials. |
@@ -20,8 +20,7 @@ Scope: Account Core infrastructure readiness only. No snapshot, import, verify, 
 
 ## What Prevents `PREFLIGHT_PASS`
 
-- Production PostgreSQL credentials are missing from the current environment.
-- Firebase Admin credentials are missing from the current environment.
+- Production PostgreSQL host is not resolvable/reachable from the current operator environment.
 - Migration encryption/backup/monitoring secrets are missing from the current environment.
 - Working tree is not clean because of existing local artifacts and `.DS_Store`.
 - Rollback infrastructure is present only as a flag/script plan; production rollback artifacts are not proven.

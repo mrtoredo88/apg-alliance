@@ -151,6 +151,7 @@
     "account:observe": "node scripts/account-observe.mjs",
     "account:cutover": "node scripts/account-cutover.mjs",
     "account:rollback": "node scripts/account-rollback.mjs",
+    "audit:migration-env": "node scripts/migration-environment-audit.mjs",
     "readiness:account": "node scripts/account-readiness.mjs",
     "readiness:event": "node scripts/event-readiness.mjs",
     "readiness:production": "node scripts/production-readiness.mjs"

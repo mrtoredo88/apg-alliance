@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
 import { PostgresAccountAdapter } from '../server/src/apg/account/adapters/PostgresAccountAdapter.js';
 
 const OUT_DIR = 'backups/account-core';
@@ -8,6 +9,7 @@ const REPORT_PATH = path.join(OUT_DIR, 'preflight-report.json');
 const API_BASE_URL = process.env.APG_PRODUCTION_API_BASE_URL || 'https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net';
 const FRONTEND_VERSION_URL = process.env.APG_PRODUCTION_VERSION_URL || 'https://myapg.ru/version.json';
 const EXPECTED_COMMIT = 'fedb2135';
+const envLoad = loadMigrationEnv();
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -25,10 +27,22 @@ function shell(args, fallback = '') {
   }
 }
 
-function runCheck(name, fn, options = {}) {
+function sanitizeError(error) {
+  const code = error?.code || '';
+  const message = String(error?.message || error || '')
+    .replace(/postgres:\/\/[^@\s]+@[^\s]+/gi, 'postgres://REDACTED')
+    .replace(/mongodb:\/\/[^@\s]+@[^\s]+/gi, 'mongodb://REDACTED')
+    .replace(/getaddrinfo ENOTFOUND [^\s]+/gi, 'getaddrinfo ENOTFOUND REDACTED_HOST')
+    .replace(/password=[^&\s]+/gi, 'password=REDACTED')
+    .replace(/token=[^&\s]+/gi, 'token=REDACTED')
+    .slice(0, 500);
+  return code ? `${code}: ${message}` : message;
+}
+
+async function runCheck(name, fn, options = {}) {
   const startedAt = Date.now();
   try {
-    const details = fn();
+    const details = await fn();
     const ok = options.ok ? options.ok(details) : true;
     return { name, ok: Boolean(ok), durationMs: Date.now() - startedAt, details };
   } catch (error) {
@@ -36,27 +50,34 @@ function runCheck(name, fn, options = {}) {
       name,
       ok: false,
       durationMs: Date.now() - startedAt,
-      error: String(error?.message || error).slice(0, 500),
+      error: sanitizeError(error),
     };
   }
 }
 
-async function fetchJson(url, timeoutMs = 10000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
-    const text = await response.text();
-    let body = null;
+async function fetchJson(url, timeoutMs = 20000, attempts = 3) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      body = JSON.parse(text);
-    } catch {
-      body = text.slice(0, 500);
+      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      const text = await response.text();
+      let body = null;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text.slice(0, 500);
+      }
+      clearTimeout(timeout);
+      return { ok: response.ok, status: response.status, body, attempt };
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, 500 * attempt));
     }
-    return { ok: response.ok, status: response.status, body };
-  } finally {
-    clearTimeout(timeout);
   }
+  throw lastError;
 }
 
 function runNpmScript(script) {
@@ -114,43 +135,29 @@ async function main() {
   const freeKb = shell(['df', '-Pk', '.']);
   const checks = [];
 
-  checks.push(runCheck('working_tree_clean', () => ({
+  checks.push(await runCheck('working_tree_clean', () => ({
     clean: gitStatus.length === 0,
     statusLines: gitStatus.split('\n').filter(Boolean).slice(0, 40),
     omittedStatusLines: Math.max(0, gitStatus.split('\n').filter(Boolean).length - 40),
   }), { ok: details => details.clean }));
 
-  checks.push(runCheck('expected_source_commit', () => ({ currentCommit: commit, sourceCommit, expected: EXPECTED_COMMIT, sourceIsAncestor }), { ok: details => details.sourceCommit === details.expected && details.sourceIsAncestor }));
-  checks.push(runCheck('production_frontend_version', async () => fetchJson(FRONTEND_VERSION_URL), { ok: details => details.ok && Boolean(details.body?.v) }));
-  checks.push(runCheck('production_backend_health', async () => fetchJson(`${API_BASE_URL}/health`), { ok: details => details.ok && details.body?.ok === true }));
-  checks.push(runCheck('postgres_connectivity', async () => checkPostgres(), { ok: details => details.configured && details.connected && details.schemaApplied }));
-  checks.push(runCheck('firebase_firestore_read_access', async () => checkFirebaseReadAccess(), { ok: details => details.configured && details.readable }));
-  checks.push(runCheck('local_snapshot_space', () => ({ df: freeKb.split('\n').slice(-1)[0] || freeKb }), { ok: () => true }));
-  checks.push(runCheck('rollback_commands', () => ({ accountRollbackScript: fs.existsSync('scripts/account-rollback.mjs') }), { ok: details => details.accountRollbackScript }));
-  checks.push(runCheck('monitoring_surface', () => ({
+  checks.push(await runCheck('expected_source_commit', () => ({ currentCommit: commit, sourceCommit, expected: EXPECTED_COMMIT, sourceIsAncestor }), { ok: details => details.sourceCommit === details.expected && details.sourceIsAncestor }));
+  checks.push(await runCheck('production_frontend_version', async () => fetchJson(FRONTEND_VERSION_URL), { ok: details => details.ok && Boolean(details.body?.v) }));
+  checks.push(await runCheck('production_backend_health', async () => fetchJson(`${API_BASE_URL}/health`), { ok: details => details.ok && details.body?.ok === true }));
+  checks.push(await runCheck('postgres_connectivity', async () => checkPostgres(), { ok: details => details.configured && details.connected && details.schemaApplied }));
+  checks.push(await runCheck('firebase_firestore_read_access', async () => checkFirebaseReadAccess(), { ok: details => details.configured && details.readable }));
+  checks.push(await runCheck('local_snapshot_space', () => ({ df: freeKb.split('\n').slice(-1)[0] || freeKb }), { ok: () => true }));
+  checks.push(await runCheck('rollback_commands', () => ({ accountRollbackScript: fs.existsSync('scripts/account-rollback.mjs') }), { ok: details => details.accountRollbackScript }));
+  checks.push(await runCheck('monitoring_surface', () => ({
     systemStatusRoute: fs.existsSync('server/src/routes/system-status.js'),
     accountSnapshot: fs.existsSync('server/src/apg/account/services/AccountCoreService.js'),
   }), { ok: details => details.systemStatusRoute && details.accountSnapshot }));
 
   for (const name of ['test:account-core', 'test:account-core-guard', 'test:account-integration', 'test:account-firestore-outage', 'readiness:account', 'readiness:event']) {
-    checks.push(runCheck(name, () => runNpmScript(name), { ok: details => details.ok }));
+    checks.push(await runCheck(name, () => runNpmScript(name), { ok: details => details.ok }));
   }
 
-  const resolvedChecks = [];
-  for (const check of checks) {
-    if (check?.details && typeof check.details.then === 'function') {
-      try {
-        const details = await check.details;
-        resolvedChecks.push({ ...check, ok: check.name === 'production_frontend_version' ? details.ok && Boolean(details.body?.v) : check.name === 'production_backend_health' ? details.ok && details.body?.ok === true : check.name === 'postgres_connectivity' ? details.configured && details.connected && details.schemaApplied : check.name === 'firebase_firestore_read_access' ? details.configured && details.readable : check.ok, details });
-      } catch (error) {
-        resolvedChecks.push({ ...check, ok: false, details: undefined, error: String(error?.message || error).slice(0, 500) });
-      }
-    } else {
-      resolvedChecks.push(check);
-    }
-  }
-
-  const blockers = resolvedChecks.filter(item => !item.ok).map(item => ({
+  const blockers = checks.filter(item => !item.ok).map(item => ({
     name: item.name,
     error: item.error || item.details?.reason || item.details?.stderrTail || 'FAILED',
   }));
@@ -170,7 +177,13 @@ async function main() {
     currentCommit: commit,
     sourceCommit,
     expectedCommit: EXPECTED_COMMIT,
-    checks: resolvedChecks,
+    checks,
+    environment: {
+      loadedKeys: envLoad.loaded.map(item => item.key).sort(),
+      sources: Object.fromEntries(Object.entries(envLoad.sources).map(([key, source]) => [key, source])),
+      missingFiles: envLoad.missing,
+      redacted: true,
+    },
     blockers,
     nextSafeStep: blockers.length ? 'Resolve preflight blockers, then rerun npm run account:preflight. Do not snapshot/import/canary/cutover.' : 'Run npm run account:snapshot after explicit owner approval.',
   };

@@ -1,0 +1,1522 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-20T09:25:39.249Z",
+  "branch": "feature/migration-environment-loader",
+  "commit": "d9f74507",
+  "productionChanged": false,
+  "deployStarted": false,
+  "snapshotStarted": false,
+  "importStarted": false,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false,
+  "secretsPrinted": false,
+  "environmentLoad": {
+    "sourceOrder": [
+      "server/.env",
+      ".env.local",
+      ".env"
+    ],
+    "loadedKeys": [
+      "ACTIVITY_SECRET",
+      "APG_IDENTITY_DATABASE_URL",
+      "CRON_SECRET",
+      "FIREBASE_SERVICE_ACCOUNT",
+      "IDENTITY_DUAL_READ",
+      "IDENTITY_DUAL_WRITE",
+      "IDENTITY_FALLBACK",
+      "IDENTITY_PROVIDER",
+      "IDENTITY_STORAGE",
+      "PORT",
+      "POSTBOX_KEY_ID",
+      "POSTBOX_SECRET",
+      "PUSH_SECRET",
+      "RAFFLE_SECRET",
+      "TELEGRAM_BOT_TOKEN",
+      "VERCEL_OIDC_TOKEN",
+      "VK_GROUP_TOKEN",
+      "VK_SERVICE_TOKEN",
+      "WEB_PUSH_VAPID_PRIVATE_KEY",
+      "WEB_PUSH_VAPID_PUBLIC_KEY",
+      "WEB_PUSH_VAPID_SUBJECT",
+      "YANDEX_EMAIL",
+      "YANDEX_EMAIL_PASS",
+      "YC_ACCESS_KEY",
+      "YC_SECRET_KEY"
+    ],
+    "missingFiles": [
+      ".env"
+    ],
+    "redacted": true
+  },
+  "sourceKeys": {
+    "server/.env": [
+      "ACTIVITY_SECRET",
+      "APG_IDENTITY_DATABASE_URL",
+      "CRON_SECRET",
+      "FIREBASE_SERVICE_ACCOUNT",
+      "IDENTITY_DUAL_READ",
+      "IDENTITY_DUAL_WRITE",
+      "IDENTITY_FALLBACK",
+      "IDENTITY_PROVIDER",
+      "IDENTITY_STORAGE",
+      "PORT",
+      "POSTBOX_KEY_ID",
+      "POSTBOX_SECRET",
+      "PUSH_SECRET",
+      "RAFFLE_SECRET",
+      "TELEGRAM_BOT_TOKEN",
+      "VK_GROUP_TOKEN",
+      "VK_SERVICE_TOKEN",
+      "WEB_PUSH_VAPID_PRIVATE_KEY",
+      "WEB_PUSH_VAPID_PUBLIC_KEY",
+      "WEB_PUSH_VAPID_SUBJECT",
+      "YANDEX_EMAIL",
+      "YANDEX_EMAIL_PASS",
+      "YC_ACCESS_KEY",
+      "YC_SECRET_KEY"
+    ],
+    ".env.local": [
+      "VERCEL_OIDC_TOKEN"
+    ],
+    ".env.deploy.local": [
+      "MINI_APPS_ACCESS_TOKEN"
+    ],
+    "server/.env.example": [
+      "ACTIVITY_SECRET",
+      "CRON_SECRET",
+      "FIREBASE_SERVICE_ACCOUNT",
+      "PORT",
+      "POSTBOX_KEY_ID",
+      "POSTBOX_SECRET",
+      "PUSH_SECRET",
+      "RAFFLE_SECRET",
+      "TELEGRAM_BOT_TOKEN",
+      "VK_GROUP_TOKEN",
+      "YANDEX_EMAIL",
+      "YANDEX_EMAIL_PASS",
+      "YC_ACCESS_KEY",
+      "YC_SECRET_KEY"
+    ]
+  },
+  "statuses": [
+    {
+      "key": "APG_IDENTITY_DATABASE_URL",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "IDENTITY_DATABASE_URL",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "POSTGRES_DATABASE_URL",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "DATABASE_URL",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "FIREBASE_SERVICE_ACCOUNT",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "GOOGLE_APPLICATION_CREDENTIALS",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "APG_MIGRATION_ENCRYPTION_KEY",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "MIGRATION_ENCRYPTION_KEY",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "APG_BACKUP_PATH",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "BACKUP_PATH",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "APG_MONITORING_TOKEN",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "MONITORING_TOKEN",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "YC_TOKEN",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "YANDEX_TOKEN",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "WEB_PUSH_VAPID_PUBLIC_KEY",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "WEB_PUSH_VAPID_PRIVATE_KEY",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "WEB_PUSH_VAPID_SUBJECT",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "POSTBOX_KEY_ID",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "POSTBOX_SECRET",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "TELEGRAM_BOT_TOKEN",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "CRON_SECRET",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "PUSH_SECRET",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "RAFFLE_SECRET",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "ACTIVITY_SECRET",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "YC_ACCESS_KEY",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "YC_SECRET_KEY",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "VK_SERVICE_TOKEN",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "VK_USER_TOKEN",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "VK_GROUP_TOKEN",
+      "status": "FOUND",
+      "source": "server/.env"
+    },
+    {
+      "key": "MINI_APPS_ACCESS_TOKEN",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "VERCEL_OIDC_TOKEN",
+      "status": "FOUND",
+      "source": ".env.local"
+    },
+    {
+      "key": "IDENTITY_MIGRATION_SECRET",
+      "status": "MISSING",
+      "source": "unknown"
+    },
+    {
+      "key": "ACCOUNT_CANARY_ALLOWLIST",
+      "status": "MISSING",
+      "source": "unknown"
+    }
+  ],
+  "preflightGroups": {
+    "postgres": "FOUND",
+    "firebaseAdmin": "FOUND",
+    "encryption": "MISSING",
+    "backupPath": "MISSING",
+    "monitoring": "MISSING"
+  },
+  "envUsage": [
+    {
+      "file": "./src/main.jsx",
+      "line": 106,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/UserApp.jsx",
+      "line": 738,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/firebase.js",
+      "line": 25,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/utils/externalUrls.js",
+      "line": 112,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/AdminPanel.jsx",
+      "line": 276,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/AdminPanel.jsx",
+      "line": 277,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/AdminPanel.jsx",
+      "line": 7084,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/AdminPanel.jsx",
+      "line": 10600,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/constants.js",
+      "line": 3,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/vk.js",
+      "line": 152,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./apg-prod-target-smoke.mjs",
+      "line": 3,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./AGENTS.md",
+      "line": 94,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/loki/lokiResponseText.js",
+      "line": 71,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/apg/core/FeatureFlags.js",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./vite.config.js",
+      "line": 19,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./vite.config.js",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./vite.config.js",
+      "line": 21,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-repair.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-repair.mjs",
+      "line": 11,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/security-redacted-review.md",
+      "line": 5,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/security-redacted-review.md",
+      "line": 28,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/security-redacted-review.md",
+      "line": 29,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server-shared/reward-service.js",
+      "line": 17,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server-shared/reward-service.js",
+      "line": 18,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server-shared/reward-service.js",
+      "line": 19,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server-shared/reward-service.js",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server-shared/reward-service.js",
+      "line": 21,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 55,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 56,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 58,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 234,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 235,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 236,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/send-push.js",
+      "line": 330,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/production-readiness-checklist.md",
+      "line": 24,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/production-readiness-checklist.md",
+      "line": 31,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/production-readiness-checklist.md",
+      "line": 33,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/production-readiness-checklist.md",
+      "line": 46,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/preflight-blockers.md",
+      "line": 14,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/telegram-webhook.js",
+      "line": 16,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/telegram-webhook.js",
+      "line": 17,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/preflight-resolution-plan.md",
+      "line": 14,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/upload-photo.js",
+      "line": 34,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/upload-photo.js",
+      "line": 35,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/upload-photo.js",
+      "line": 61,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/migration-operator-environment.md",
+      "line": 57,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 5,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 14,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 21,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 38,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 47,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 56,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 59,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/migration/environment-loading.md",
+      "line": 63,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/backend-architecture.md",
+      "line": 132,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/backend-architecture.md",
+      "line": 134,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./docs/backend-architecture.md",
+      "line": 143,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/admin-actions.js",
+      "line": 1417,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/admin-actions.js",
+      "line": 1418,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/admin-actions.js",
+      "line": 1425,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/email-auth.js",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/email-auth.js",
+      "line": 21,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/account.js",
+      "line": 17,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/account.js",
+      "line": 19,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/verify-telegram.js",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/verify-telegram.js",
+      "line": 13,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/verify-telegram.js",
+      "line": 19,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-readiness.mjs",
+      "line": 24,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/server.js",
+      "line": 44,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/server.js",
+      "line": 90,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 17,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 18,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 19,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 21,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 22,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 23,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 24,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 25,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 26,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 27,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 28,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 29,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 30,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 31,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 32,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 33,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 34,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 35,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 36,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 37,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 38,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 39,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy.sh",
+      "line": 40,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/activity-index.js",
+      "line": 176,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/activity-index.js",
+      "line": 177,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-invariants.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-invariants.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-invariants.mjs",
+      "line": 11,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/system-status.js",
+      "line": 58,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/user-actions.js",
+      "line": 113,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/user-actions.js",
+      "line": 114,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/user-actions.js",
+      "line": 3162,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/user-actions.js",
+      "line": 3163,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/user-actions.js",
+      "line": 3165,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/raffle-draw.js",
+      "line": 84,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/raffle-draw.js",
+      "line": 85,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/content-lifecycle-repair.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/content-lifecycle-repair.mjs",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/vk-news.js",
+      "line": 191,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/vk-news.js",
+      "line": 192,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/vk-news.js",
+      "line": 193,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy-cron.sh",
+      "line": 35,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy-cron.sh",
+      "line": 36,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/deploy-cron.sh",
+      "line": 38,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js",
+      "line": 11,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js",
+      "line": 13,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js",
+      "line": 42,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js",
+      "line": 45,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 5,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 6,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 8,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 11,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/startup-stability-test.mjs",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/account/AccountFeatureFlags.js",
+      "line": 11,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/identity-v2-admin.js",
+      "line": 745,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/identity-v2-admin.js",
+      "line": 746,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/identity-v2-admin.js",
+      "line": 755,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/routes/identity-v2-admin.js",
+      "line": 822,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/identity/ApgIdentityV2Service.js",
+      "line": 6,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/identity/ApgIdentityV2Service.js",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/identity/ApgIdentityV2Service.js",
+      "line": 8,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/identity/ApgIdentityV2Service.js",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/apg/identity/ApgIdentityV2Service.js",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/loki/core/memory/MemoryValidator.js",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-single-conflict-forensic.mjs",
+      "line": 5,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-single-conflict-forensic.mjs",
+      "line": 518,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-controlled-cutover.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-controlled-cutover.mjs",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-controlled-cutover.mjs",
+      "line": 66,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-controlled-cutover.mjs",
+      "line": 67,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-controlled-cutover.mjs",
+      "line": 70,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-v2-import.mjs",
+      "line": 4,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/loki-floating-button-hit-test.mjs",
+      "line": 51,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 92,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 93,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 94,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 95,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/account-production-preflight.mjs",
+      "line": 114,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/auth-lifecycle-smoke.mjs",
+      "line": 3,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/auth-lifecycle-smoke.mjs",
+      "line": 4,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/seed-demo-partner.mjs",
+      "line": 5,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/seed-demo-partner.mjs",
+      "line": 13,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/seed-demo-partner.mjs",
+      "line": 17,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/seed-demo-partner.mjs",
+      "line": 81,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/firebase.js",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/firebase.js",
+      "line": 13,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/firebase.js",
+      "line": 18,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/firebase.js",
+      "line": 19,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/telegramUpdates.js",
+      "line": 32,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/telegramUpdates.js",
+      "line": 41,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/telegramUpdates.js",
+      "line": 49,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./server/src/lib/telegramUpdates.js",
+      "line": 319,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/lib/migration-env-loader.mjs",
+      "line": 43,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/lib/migration-env-loader.mjs",
+      "line": 47,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/lib/migration-env-loader.mjs",
+      "line": 65,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/lib/migration-env-loader.mjs",
+      "line": 68,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/lib/migration-env-loader.mjs",
+      "line": 69,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migrate-error-logs.mjs",
+      "line": 8,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/referral-recovery-audit.mjs",
+      "line": 8,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-dry-run.mjs",
+      "line": 20,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-dry-run.mjs",
+      "line": 22,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 68,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 69,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 70,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 71,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 72,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 73,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-migration-orchestrator.mjs",
+      "line": 74,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/loki-message-chain-test.mjs",
+      "line": 62,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-cutover-report.mjs",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-cutover-report.mjs",
+      "line": 21,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-cutover-report.mjs",
+      "line": 26,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-cutover-report.mjs",
+      "line": 27,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/desktop-boot-test.mjs",
+      "line": 3,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/desktop-boot-test.mjs",
+      "line": 4,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/firestore-recovery-audit.mjs",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-final-owner-approval.mjs",
+      "line": 136,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/bootstrap-owner.mjs",
+      "line": 42,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/bootstrap-owner.mjs",
+      "line": 50,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/bootstrap-owner.mjs",
+      "line": 51,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-owner-deep-forensic.mjs",
+      "line": 289,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migrate-expert-directory.mjs",
+      "line": 8,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/backfill-referral.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/backfill-referral.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/news-article-regression.mjs",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/news-article-regression.mjs",
+      "line": 8,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./src/loki/LokiAssistant.jsx",
+      "line": 109,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 4,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 83,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 100,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 104,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 139,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 141,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 142,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 143,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 144,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 145,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 160,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-environment-audit.mjs",
+      "line": 192,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-conflict-center.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-conflict-center.mjs",
+      "line": 12,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-conflict-resolution-audit.mjs",
+      "line": 9,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-conflict-resolution-audit.mjs",
+      "line": 10,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/prod-smoke.mjs",
+      "line": 3,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/prod-smoke.mjs",
+      "line": 4,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/prod-smoke.mjs",
+      "line": 5,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/migration-center-test.mjs",
+      "line": 32,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-broken-references-forensic.mjs",
+      "line": 107,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-broken-references-forensic.mjs",
+      "line": 108,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/home-cache-test.mjs",
+      "line": 87,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/demo-content.mjs",
+      "line": 7,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/demo-content.mjs",
+      "line": 424,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-canary.mjs",
+      "line": 18,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-canary.mjs",
+      "line": 121,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-canary.mjs",
+      "line": 122,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-canary.mjs",
+      "line": 123,
+      "type": "environment_reference"
+    },
+    {
+      "file": "./scripts/identity-canary.mjs",
+      "line": 126,
+      "type": "environment_reference"
+    }
+  ],
+  "securityReview": [
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 316,
+      "type": "firebase_config_literal",
+      "severity": "LOW"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 317,
+      "type": "firebase_config_literal",
+      "severity": "LOW"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 3726,
+      "type": "temporary_bypass_or_backdoor",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 3737,
+      "type": "temporary_bypass_or_backdoor",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 3789,
+      "type": "temporary_bypass_or_backdoor",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 3833,
+      "type": "temporary_bypass_or_backdoor",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 7084,
+      "type": "hardcoded_secret_literal",
+      "severity": "HIGH"
+    },
+    {
+      "file": "src/AdminPanel.jsx",
+      "line": 10600,
+      "type": "hardcoded_secret_literal",
+      "severity": "HIGH"
+    }
+  ],
+  "gitHistoryRisk": [],
+  "gitignore": {
+    "envIgnored": true,
+    "serverEnvIgnored": true,
+    "serviceAccountIgnored": true,
+    "rawSnapshotDirIgnored": true,
+    "encryptedSnapshotIgnored": true,
+    "plainSnapshotJsonIgnored": false
+  }
+}

@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
+
+loadMigrationEnv();
 
 execFileSync('node', ['scripts/account-core-architecture-guard.mjs'], { stdio: 'inherit' });
 execFileSync('node', ['scripts/account-dry-run.mjs'], { stdio: 'inherit' });

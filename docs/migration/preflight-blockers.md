@@ -7,11 +7,10 @@ Current status: `PREFLIGHT_BLOCKED`
 | Blocker | Evidence | Resolution |
 |---|---|---|
 | Working tree is not clean | `git status --short` shows `.DS_Store` and many pre-existing untracked local artifacts. | Clean or isolate unrelated artifacts before production migration. Do not stage them into migration commits. |
-| PostgreSQL DSN missing | Environment check shows all supported DSN variables are missing. | Provide production PostgreSQL DSN through the approved secret channel. |
-| Firebase Admin credentials missing | Environment check shows `FIREBASE_SERVICE_ACCOUNT` and `GOOGLE_APPLICATION_CREDENTIALS` are missing. | Provide production Firebase Admin read credentials through the approved secret channel. |
-| Migration encryption key missing | Environment check shows no migration encryption key. | Provide encryption key before immutable snapshot creation. |
-| Backup path not configured | Environment check shows no explicit backup path. | Confirm approved local/encrypted snapshot location. |
-| Monitoring credentials missing | Environment check shows no monitoring credentials. | Provide monitoring credentials or confirm APG Health-only observation mode. |
+| PostgreSQL connectivity | PostgreSQL DSN is visible to migration scripts, but DNS/network resolution fails from this machine. | Confirm VPN/network/DNS access or run the migration operator from an allowed production network/runtime. |
+| Migration encryption key missing | Environment audit shows no migration encryption key. | Provide encryption key before immutable snapshot creation. |
+| Backup path not configured | Environment audit shows no explicit backup path. | Confirm approved local/encrypted snapshot location. |
+| Monitoring credentials missing | Environment audit shows no monitoring credentials. | Provide monitoring credentials or confirm APG Health-only observation mode. |
 | Rollback artifacts not proven | Rollback script exists, but production manifest/checkpoint/report are not proven. | Generate non-secret rollback artifacts before canary/cutover. |
 | Production Account Core monitoring incomplete | Metrics exist, but full cutover monitoring is not proven. | Verify production `/api/system-status`/APG Health and add missing non-runtime docs or metrics in a separate approved step if needed. |
 
@@ -19,6 +18,8 @@ Current status: `PREFLIGHT_BLOCKED`
 
 - Production frontend version endpoint is reachable.
 - Production backend `/health` is reachable.
+- Firebase Admin read access is reachable through the migration loader.
+- PostgreSQL DSN is visible to migration scripts.
 - Account Core local tests pass.
 - Account Core architecture guard passes.
 - Account Core Firestore outage simulation passes locally.

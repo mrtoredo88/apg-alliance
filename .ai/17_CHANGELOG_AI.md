@@ -45,6 +45,16 @@
 - Создан единый redacted readiness report и чек-листы по PostgreSQL, Firebase Admin, rollback, backup, monitoring и preflight blockers.
 **Почему:** перед реальной миграцией Account Core нужно доказать готовность production-инфраструктуры, а не продолжать pipeline на предположениях.
 
+## [2026-07-20] feat: Migration Environment Loader
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/lib/migration-env-loader.mjs`, `scripts/migration-environment-audit.mjs`, `scripts/account-production-preflight.mjs`, `scripts/account-readiness.mjs`, `scripts/account-dry-run.mjs`, `scripts/account-verify.mjs`, `scripts/account-core-import.mjs`, `docs/migration/environment-loading.md`, `docs/migration/migration-operator-environment.md`, `docs/migration/security-redacted-review.md`, `docs/migration/preflight-resolution-plan.md`, `backups/account-core/preflight/environment-audit-redacted.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен единый redacted environment loader для migration operator scripts, который читает `server/.env` без вывода значений и не требует ручного `export` десятков переменных.
+- `account:preflight`, `account:dry-run`, `account:import`, `account:verify` и `readiness:account` теперь используют единый env-loading path.
+- Добавлен read-only аудит окружения и security-redacted review по ранее отмеченным файлам; отчёты фиксируют только имена ключей, источники, статусы и типы риска.
+**Почему:** production secrets существовали в deploy source, но migration scripts их не получали; нужно устранить этот инфраструктурный разрыв без изменения production и без раскрытия секретов.
+
 ## [2026-07-20] feat: Account Core Migration v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/apg/account/*`, `server/src/apg/index.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/account-*.mjs`, `scripts/architecture-guard.mjs`, `docs/architecture-guard-report.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`

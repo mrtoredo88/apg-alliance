@@ -2,7 +2,7 @@
   "version": 1,
   "migration": "account-core-production-v1",
   "status": "PREFLIGHT_BLOCKED",
-  "generatedAt": "2026-07-20T09:04:58.594Z",
+  "generatedAt": "2026-07-20T09:28:25.070Z",
   "productionChanged": false,
   "firestoreChanged": false,
   "postgresWrites": 0,
@@ -10,8 +10,8 @@
   "snapshotStarted": false,
   "canaryStarted": false,
   "cutoverStarted": false,
-  "branch": "migration/account-core-production-v1",
-  "currentCommit": "52c7e62a",
+  "branch": "feature/migration-environment-loader",
+  "currentCommit": "d9f74507",
   "sourceCommit": "fedb2135",
   "expectedCommit": "fedb2135",
   "checks": [
@@ -25,7 +25,16 @@
           "M .DS_Store",
           " M .ai/17_CHANGELOG_AI.md",
           " M backups/account-core/preflight-report.json",
+          " M docs/migration/firebase-admin-readiness.md",
+          " M docs/migration/postgres-readiness.md",
+          " M docs/migration/preflight-blockers.md",
+          " M docs/migration/production-readiness-checklist.md",
+          " M package.json",
+          " M scripts/account-core-import.mjs",
+          " M scripts/account-dry-run.mjs",
           " M scripts/account-production-preflight.mjs",
+          " M scripts/account-readiness.mjs",
+          " M scripts/account-verify.mjs",
           "?? .ai/00_START_HERE.md",
           "?? .ai/01_PROJECT_OVERVIEW.md",
           "?? .ai/02_ARCHITECTURE.md",
@@ -52,18 +61,9 @@
           "?? apg-final-profile-light-d562ee02.png",
           "?? apg-final-workspace-dark-d562ee02.png",
           "?? apg-final-workspace-light-d562ee02.png",
-          "?? apg-prod-runtime-check.mjs",
-          "?? apg-prod-target-smoke.mjs",
-          "?? apg-theme-home-dark-682ed807.png",
-          "?? apg-theme-home-light-682ed807.png",
-          "?? apg-theme-partners-dark-682ed807.png",
-          "?? apg-theme-partners-light-682ed807.png",
-          "?? apg-theme-workspace-dark-682ed807.png",
-          "?? apg-theme-workspace-light-682ed807.png",
-          "?? backups/account-core/preflight/",
-          "?? backups/identity/"
+          "?? apg-prod-runtime-check.mjs"
         ],
-        "omittedStatusLines": 99
+        "omittedStatusLines": 107
       }
     },
     {
@@ -71,7 +71,7 @@
       "ok": true,
       "durationMs": 0,
       "details": {
-        "currentCommit": "52c7e62a",
+        "currentCommit": "d9f74507",
         "sourceCommit": "fedb2135",
         "expected": "fedb2135",
         "sourceIsAncestor": true
@@ -80,47 +80,44 @@
     {
       "name": "production_frontend_version",
       "ok": true,
-      "durationMs": 18,
+      "durationMs": 4122,
       "details": {
         "ok": true,
         "status": 200,
         "body": {
           "v": "b526041e"
-        }
+        },
+        "attempt": 1
       }
     },
     {
       "name": "production_backend_health",
       "ok": true,
-      "durationMs": 1,
+      "durationMs": 728,
       "details": {
         "ok": true,
         "status": 200,
         "body": {
           "ok": true,
-          "ts": 1784538298844
-        }
+          "ts": 1784539702619
+        },
+        "attempt": 1
       }
     },
     {
       "name": "postgres_connectivity",
       "ok": false,
-      "durationMs": 0,
-      "details": {
-        "configured": false,
-        "connected": false,
-        "schemaApplied": false,
-        "reason": "POSTGRES_DSN_NOT_CONFIGURED"
-      }
+      "durationMs": 5,
+      "error": "ENOTFOUND: getaddrinfo ENOTFOUND REDACTED_HOST"
     },
     {
       "name": "firebase_firestore_read_access",
-      "ok": false,
-      "durationMs": 0,
+      "ok": true,
+      "durationMs": 1694,
       "details": {
-        "configured": false,
-        "readable": false,
-        "reason": "FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED"
+        "configured": true,
+        "readable": true,
+        "sampleCount": 1
       }
     },
     {
@@ -128,7 +125,7 @@
       "ok": true,
       "durationMs": 0,
       "details": {
-        "df": "/dev/disk3s1   239331776 153942792  51985688    75%    /System/Volumes/Data"
+        "df": "/dev/disk3s1   239331776 154540700  51387776    76%    /System/Volumes/Data"
       }
     },
     {
@@ -151,7 +148,7 @@
     {
       "name": "test:account-core",
       "ok": true,
-      "durationMs": 139,
+      "durationMs": 173,
       "details": {
         "script": "test:account-core",
         "ok": true,
@@ -163,7 +160,7 @@
     {
       "name": "test:account-core-guard",
       "ok": true,
-      "durationMs": 130,
+      "durationMs": 132,
       "details": {
         "script": "test:account-core-guard",
         "ok": true,
@@ -175,7 +172,7 @@
     {
       "name": "test:account-integration",
       "ok": true,
-      "durationMs": 137,
+      "durationMs": 129,
       "details": {
         "script": "test:account-integration",
         "ok": true,
@@ -187,7 +184,7 @@
     {
       "name": "test:account-firestore-outage",
       "ok": true,
-      "durationMs": 138,
+      "durationMs": 135,
       "details": {
         "script": "test:account-firestore-outage",
         "ok": true,
@@ -199,19 +196,19 @@
     {
       "name": "readiness:account",
       "ok": true,
-      "durationMs": 206,
+      "durationMs": 202,
       "details": {
         "script": "readiness:account",
         "ok": true,
         "status": 0,
-        "stdoutTail": "\n> apg-app@0.0.0 readiness:account\n> node scripts/account-readiness.mjs\n\n{\n  \"ok\": true,\n  \"rule\": \"account_core_uses_repositories_not_firestore\",\n  \"checked\": 20\n}\n{\n  \"ok\": true,\n  \"scenarios\": 96,\n  \"coverage\": {\n    \"postgresRepositories\": 100,\n    \"sessionRestore\": 100,\n    \"roleResolution\": 100,\n    \"profileBootstrap\": 100,\n    \"workspaceBootstrap\": 100,\n    \"firestoreFallbackSimulation\": 100\n  }\n}\n{\n  \"ok\": true,\n  \"mode\": \"local_account_readiness\",\n  \"productionChanged\": false,\n  \"firestoreChanged\": false,\n  \"deployStarted\": false,\n  \"checks\": [\n    {\n      \"name\": \"Session restore\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Role resolution\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Workspace bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Profile bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Home bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Postgres\",\n      \"ok\": true,\n      \"configured\": false\n    },\n    {\n      \"name\": \"Firestore fallback\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Feature flags\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Architecture guards\",\n      \"ok\": true\n    }\n  ]\n}\n",
+        "stdoutTail": "\n> apg-app@0.0.0 readiness:account\n> node scripts/account-readiness.mjs\n\n{\n  \"ok\": true,\n  \"rule\": \"account_core_uses_repositories_not_firestore\",\n  \"checked\": 20\n}\n{\n  \"ok\": true,\n  \"scenarios\": 96,\n  \"coverage\": {\n    \"postgresRepositories\": 100,\n    \"sessionRestore\": 100,\n    \"roleResolution\": 100,\n    \"profileBootstrap\": 100,\n    \"workspaceBootstrap\": 100,\n    \"firestoreFallbackSimulation\": 100\n  }\n}\n{\n  \"ok\": true,\n  \"mode\": \"local_account_readiness\",\n  \"productionChanged\": false,\n  \"firestoreChanged\": false,\n  \"deployStarted\": false,\n  \"checks\": [\n    {\n      \"name\": \"Session restore\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Role resolution\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Workspace bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Profile bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Home bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Postgres\",\n      \"ok\": true,\n      \"configured\": true\n    },\n    {\n      \"name\": \"Firestore fallback\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Feature flags\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Architecture guards\",\n      \"ok\": true\n    }\n  ]\n}\n",
         "stderrTail": ""
       }
     },
     {
       "name": "readiness:event",
       "ok": true,
-      "durationMs": 307,
+      "durationMs": 311,
       "details": {
         "script": "readiness:event",
         "ok": true,
@@ -221,6 +218,66 @@
       }
     }
   ],
+  "environment": {
+    "loadedKeys": [
+      "ACTIVITY_SECRET",
+      "APG_IDENTITY_DATABASE_URL",
+      "CRON_SECRET",
+      "FIREBASE_SERVICE_ACCOUNT",
+      "IDENTITY_DUAL_READ",
+      "IDENTITY_DUAL_WRITE",
+      "IDENTITY_FALLBACK",
+      "IDENTITY_PROVIDER",
+      "IDENTITY_STORAGE",
+      "PORT",
+      "POSTBOX_KEY_ID",
+      "POSTBOX_SECRET",
+      "PUSH_SECRET",
+      "RAFFLE_SECRET",
+      "TELEGRAM_BOT_TOKEN",
+      "VERCEL_OIDC_TOKEN",
+      "VK_GROUP_TOKEN",
+      "VK_SERVICE_TOKEN",
+      "WEB_PUSH_VAPID_PRIVATE_KEY",
+      "WEB_PUSH_VAPID_PUBLIC_KEY",
+      "WEB_PUSH_VAPID_SUBJECT",
+      "YANDEX_EMAIL",
+      "YANDEX_EMAIL_PASS",
+      "YC_ACCESS_KEY",
+      "YC_SECRET_KEY"
+    ],
+    "sources": {
+      "FIREBASE_SERVICE_ACCOUNT": "server/.env",
+      "VK_GROUP_TOKEN": "server/.env",
+      "PUSH_SECRET": "server/.env",
+      "RAFFLE_SECRET": "server/.env",
+      "ACTIVITY_SECRET": "server/.env",
+      "CRON_SECRET": "server/.env",
+      "YC_ACCESS_KEY": "server/.env",
+      "YC_SECRET_KEY": "server/.env",
+      "POSTBOX_KEY_ID": "server/.env",
+      "POSTBOX_SECRET": "server/.env",
+      "TELEGRAM_BOT_TOKEN": "server/.env",
+      "YANDEX_EMAIL": "server/.env",
+      "YANDEX_EMAIL_PASS": "server/.env",
+      "PORT": "server/.env",
+      "VK_SERVICE_TOKEN": "server/.env",
+      "WEB_PUSH_VAPID_PUBLIC_KEY": "server/.env",
+      "WEB_PUSH_VAPID_PRIVATE_KEY": "server/.env",
+      "WEB_PUSH_VAPID_SUBJECT": "server/.env",
+      "APG_IDENTITY_DATABASE_URL": "server/.env",
+      "IDENTITY_PROVIDER": "server/.env",
+      "IDENTITY_STORAGE": "server/.env",
+      "IDENTITY_DUAL_READ": "server/.env",
+      "IDENTITY_DUAL_WRITE": "server/.env",
+      "IDENTITY_FALLBACK": "server/.env",
+      "VERCEL_OIDC_TOKEN": ".env.local"
+    },
+    "missingFiles": [
+      ".env"
+    ],
+    "redacted": true
+  },
   "blockers": [
     {
       "name": "working_tree_clean",
@@ -228,11 +285,7 @@
     },
     {
       "name": "postgres_connectivity",
-      "error": "POSTGRES_DSN_NOT_CONFIGURED"
-    },
-    {
-      "name": "firebase_firestore_read_access",
-      "error": "FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED"
+      "error": "ENOTFOUND: getaddrinfo ENOTFOUND REDACTED_HOST"
     }
   ],
   "nextSafeStep": "Resolve preflight blockers, then rerun npm run account:preflight. Do not snapshot/import/canary/cutover."
