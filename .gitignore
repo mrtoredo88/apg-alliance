@@ -10,6 +10,7 @@ dist/
 build.zip
 backups/account-core/preflight-report.json
 backups/account-core/preflight/*.json
+backups/account-core/remote-preflight/operator-invoke.env
 backups/account-core/snapshot/raw/
 backups/account-core/snapshot/*.enc
 backups/identity/

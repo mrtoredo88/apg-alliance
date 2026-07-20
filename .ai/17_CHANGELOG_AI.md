@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: One-Off Account Core Migration Operator
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `ops/migration-operator/Dockerfile`, `ops/migration-operator/server.mjs`, `scripts/account-operator-deploy.mjs`, `scripts/account-operator-invoke.mjs`, `docs/migration/one-off-migration-operator.md`, `package.json`, `.gitignore`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен отдельный no-data migration operator image/entrypoint для запуска только `account:remote-preflight -- --execute` в production VPC.
+- Добавлены deploy/invoke helpers, которые используют отдельный `apg-migration-operator`, не меняют `apg-api`, не печатают env values и сохраняют только redacted отчёты.
+- Зафиксирован runbook с guardrails: запрет snapshot/import/verify/canary/cutover/rollback, Firestore reads и PostgreSQL writes.
+**Почему:** remote preflight нужно доказать из production network path через временный operator container, не трогая production backend и не открывая PostgreSQL наружу.
+
 ## [2026-07-20] chore: PostgreSQL Production Network Integration
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/account-remote-preflight.mjs`, `docs/migration/postgres-network-topology.md`, `docs/migration/migration-operator-runtime.md`, `docs/migration/postgres-connectivity-runbook.md`, `docs/migration/remote-preflight-checklist.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
