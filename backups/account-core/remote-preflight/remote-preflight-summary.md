@@ -1,41 +1,38 @@
 # Account Core Remote Preflight
 
-Generated: 2026-07-20T10:18:10.000Z
+Generated: 2026-07-20T10:44:46.551Z
+Status: REMOTE_PREFLIGHT_BLOCKED
 
-Status: `REMOTE_PREFLIGHT_BLOCKED`
+## Runtime
 
-## Result
+- Operator container: apg-migration-operator
+- Operator container ID: bbatdc5luq828rcn1tav
+- Operator revision ID: bbavierknh9n40hoco0r
+- Image digest: sha256:e3072e32ff65dddea604ba649d887afd17cb3ad092a786c40f97a9057c8d9188
+- VPC: enpa19j9jpki1f67p6kq
+- Service account: ajegfv96md2tqri8gjdp
+- Source commit: fa432f0c
 
-The one-off operator flow stopped before remote preflight execution.
+## Checks
 
-Completed:
-
-- Created separate Serverless Container `apg-migration-operator`.
-- Built and pushed operator image `cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:ab88f027`.
-- Confirmed image digest `sha256:1d13806e6e37b9ad6396fe9b9970cfe5049709f97a265a4dcafcddf0bdfa915b`.
-
-Blocked:
-
-- Yandex `revision deploy` for `apg-migration-operator` failed with `code=13 Internal error`.
-- Operation ID: `bbac9l7ls7gbhu8igrac`.
-- No active operator revision exists, so `/run` was not invoked.
-
-## Production Safety
-
-- Production `apg-api` changed: `NO`
-- Production traffic switched: `NO`
-- PostgreSQL public access changed: `NO`
-- VPC/DNS/security groups changed: `NO`
-- Feature flags changed: `NO`
-- Snapshot/import/verify/canary/cutover/rollback: `NO`
+- DNS: PASS
+- TCP: PASS
+- TLS: BLOCKED
+- PostgreSQL auth: BLOCKED
+- Firebase Admin init: PASS
 
 ## Counters
 
-- Production data reads: `0`
-- Firestore reads: `0`
-- PostgreSQL writes: `0`
-- Firestore writes: `0`
+- Production data reads: 0
+- Firestore reads: 0
+- PostgreSQL writes: 0
+- Firestore writes: 0
 
-## Next Safe Step
+## Guardrails
 
-Investigate Yandex operation `bbac9l7ls7gbhu8igrac` or retry only the operator revision deploy after explicit owner approval. Do not run Account Core snapshot until remote preflight passes.
+- Snapshot started: false
+- Import started: false
+- Verify started: false
+- Canary started: false
+- Cutover started: false
+- Rollback started: false

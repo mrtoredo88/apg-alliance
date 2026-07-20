@@ -1,60 +1,247 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-20T10:18:10.000Z",
-  "status": "REMOTE_PREFLIGHT_BLOCKED",
-  "sourceCommit": "ab88f027",
-  "operator": {
-    "containerCreated": true,
-    "containerName": "apg-migration-operator",
+  "runtime": {
     "containerId": "bbatdc5luq828rcn1tav",
-    "revisionCreated": false,
-    "revisionId": null,
-    "imagePushed": true,
-    "image": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:ab88f027",
-    "imageDigest": "sha256:1d13806e6e37b9ad6396fe9b9970cfe5049709f97a265a4dcafcddf0bdfa915b",
-    "vpc": null,
-    "serviceAccount": null,
-    "executionStarted": false
+    "containerName": "apg-migration-operator",
+    "revisionId": "bbavierknh9n40hoco0r",
+    "imageDigest": "sha256:e3072e32ff65dddea604ba649d887afd17cb3ad092a786c40f97a9057c8d9188",
+    "imageUrl": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:fa432f0c",
+    "vpc": "enpa19j9jpki1f67p6kq",
+    "serviceAccount": "ajegfv96md2tqri8gjdp",
+    "executionTimestamp": "2026-07-20T10:44:46.551Z",
+    "sourceCommit": "fa432f0c"
   },
-  "production": {
-    "apgApiChanged": false,
-    "productionTrafficSwitched": false,
-    "featureFlagsChanged": false,
-    "postgresOpenedPublicly": false,
-    "vpcChanged": false,
-    "dnsChanged": false,
-    "securityGroupsChanged": false
-  },
-  "remotePreflight": {
-    "started": false,
-    "failedLayer": "operator_revision_deploy",
-    "yandexOperationId": "bbac9l7ls7gbhu8igrac",
-    "yandexErrorCode": 13,
-    "yandexErrorMessage": "Internal error",
-    "postgresDnsResolved": false,
-    "tcpSuccessful": false,
-    "tlsSuccessful": false,
-    "postgresSelect1Successful": false,
-    "firebaseAdminInitialized": false
-  },
-  "counters": {
-    "productionDataReads": 0,
-    "firestoreReads": 0,
-    "postgresWrites": 0,
-    "firestoreWrites": 0
-  },
-  "forbiddenActions": {
+  "httpStatus": 500,
+  "ok": false,
+  "status": "REMOTE_PREFLIGHT_BLOCKED",
+  "response": {
+    "ok": false,
+    "exitCode": 1,
+    "status": "REMOTE_PREFLIGHT_BLOCKED",
+    "report": {
+      "version": 2,
+      "generatedAt": "2026-07-20T10:44:42.218Z",
+      "mode": "remote_execution_no_data",
+      "status": "REMOTE_PREFLIGHT_BLOCKED",
+      "productionChanged": false,
+      "deployStarted": false,
+      "snapshotStarted": false,
+      "importStarted": false,
+      "verifyStarted": false,
+      "canaryStarted": false,
+      "cutoverStarted": false,
+      "rollbackStarted": false,
+      "postgresWrites": 0,
+      "firestoreReads": 0,
+      "productionDataReads": 0,
+      "secretsPrinted": false,
+      "dsnPrinted": false,
+      "productionNetwork": {
+        "backendRuntime": "Yandex Serverless Container",
+        "containerName": "apg-api",
+        "containerId": "bbangqkf2d4pa9855lu0",
+        "image": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-api:latest",
+        "networkId": "enpa19j9jpki1f67p6kq",
+        "serviceAccount": "configured in server/deploy.sh"
+      },
+      "requiredExecutionEnv": {
+        "APG_REMOTE_OPERATOR_RUNTIME": "production-vpc",
+        "APG_REMOTE_PREFLIGHT_EXECUTION": "1"
+      },
+      "localBlocker": "Local operator DNS cannot resolve the private PostgreSQL hostname.",
+      "recommendedRuntime": "Run the migration operator in a one-off container/job attached to the same Yandex VPC network as apg-api.",
+      "env": {
+        "loadedKeys": [],
+        "sourceCount": 0,
+        "redacted": true
+      },
+      "validation": {
+        "ok": false,
+        "checks": [
+          {
+            "name": "runtime_assertion",
+            "status": "PASS",
+            "durationMs": 0,
+            "details": {
+              "ok": true,
+              "expected": "production-vpc",
+              "asserted": "production-vpc"
+            }
+          },
+          {
+            "name": "environment_loader",
+            "status": "BLOCKED",
+            "durationMs": 0,
+            "details": {
+              "ok": false,
+              "loadedKeyCount": 0,
+              "dsnConfigured": true,
+              "firebaseAdminConfigured": true
+            }
+          },
+          {
+            "name": "dsn_parse",
+            "status": "PASS",
+            "durationMs": 0,
+            "details": {
+              "ok": true,
+              "hostname": "REDACTED_HOST",
+              "port": 6432,
+              "protocol": "postgresql",
+              "databaseConfigured": true,
+              "usernameConfigured": true,
+              "passwordConfigured": true,
+              "sslmode": "require"
+            }
+          },
+          {
+            "name": "dns",
+            "status": "PASS",
+            "durationMs": 8,
+            "details": {
+              "ok": true,
+              "addressCount": 1,
+              "families": [
+                4
+              ]
+            }
+          },
+          {
+            "name": "tcp",
+            "status": "PASS",
+            "durationMs": 10,
+            "details": {
+              "ok": true,
+              "port": 6432
+            }
+          },
+          {
+            "name": "tls",
+            "status": "BLOCKED",
+            "durationMs": 6046,
+            "error": {
+              "code": "TIMEOUT",
+              "name": "Error",
+              "message": "TLS handshake timed out"
+            }
+          },
+          {
+            "name": "postgres_auth",
+            "status": "BLOCKED",
+            "durationMs": 28,
+            "error": {
+              "code": "SELF_SIGNED_CERT_IN_CHAIN",
+              "name": "Error",
+              "message": "self-signed certificate in certificate chain"
+            }
+          },
+          {
+            "name": "firebase_admin_initialization",
+            "status": "PASS",
+            "durationMs": 480,
+            "details": {
+              "ok": true,
+              "initializedApps": 1,
+              "firestoreReads": 0,
+              "productionDataRead": false
+            }
+          },
+          {
+            "name": "migration_manifests",
+            "status": "PASS",
+            "durationMs": 1,
+            "details": {
+              "ok": true,
+              "files": [
+                {
+                  "file": "scripts/account-snapshot.mjs",
+                  "exists": true
+                },
+                {
+                  "file": "scripts/account-core-import.mjs",
+                  "exists": true
+                },
+                {
+                  "file": "scripts/account-dry-run.mjs",
+                  "exists": true
+                },
+                {
+                  "file": "scripts/account-verify.mjs",
+                  "exists": true
+                }
+              ]
+            }
+          },
+          {
+            "name": "rollback_manifests",
+            "status": "PASS",
+            "durationMs": 0,
+            "details": {
+              "ok": true,
+              "files": [
+                {
+                  "file": "scripts/account-rollback.mjs",
+                  "exists": true
+                },
+                {
+                  "file": "docs/migration/rollback-readiness.md",
+                  "exists": true
+                }
+              ]
+            }
+          },
+          {
+            "name": "monitoring",
+            "status": "PASS",
+            "durationMs": 0,
+            "details": {
+              "ok": true,
+              "files": [
+                {
+                  "file": "scripts/account-observe.mjs",
+                  "exists": true
+                },
+                {
+                  "file": "docs/migration/monitoring-readiness.md",
+                  "exists": true
+                },
+                {
+                  "file": "server/src/routes/system-status.js",
+                  "exists": true
+                }
+              ]
+            }
+          }
+        ],
+        "blocked": [
+          {
+            "name": "environment_loader",
+            "error": "BLOCKED"
+          },
+          {
+            "name": "tls",
+            "error": "TIMEOUT"
+          },
+          {
+            "name": "postgres_auth",
+            "error": "SELF_SIGNED_CERT_IN_CHAIN"
+          }
+        ],
+        "productionDataReads": 0,
+        "firestoreReads": 0,
+        "postgresWrites": 0
+      },
+      "nextSafeStep": "Run this no-data remote preflight from the production VPC runtime. Do not snapshot/import/verify/canary/cutover."
+    },
+    "stdoutTail": "\n> apg-app@0.0.0 account:remote-preflight\n> node scripts/account-remote-preflight.mjs --execute\n\n{\n  \"status\": \"REMOTE_PREFLIGHT_BLOCKED\",\n  \"mode\": \"remote_execution_no_data\",\n  \"report\": \"backups/account-core/preflight/remote-preflight-redacted.json\",\n  \"productionNetwork\": {\n    \"backendRuntime\": \"Yandex Serverless Container\",\n    \"containerName\": \"apg-api\",\n    \"containerId\": \"bbangqkf2d4pa9855lu0\",\n    \"networkId\": \"enpa19j9jpki1f67p6kq\"\n  },\n  \"command\": \"APG_REMOTE_OPERATOR_RUNTIME=production-vpc APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute\",\n  \"blocked\": [\n    {\n      \"name\": \"environment_loader\",\n      \"error\": \"BLOCKED\"\n    },\n    {\n      \"name\": \"tls\",\n      \"error\": \"TIMEOUT\"\n    },\n    {\n      \"name\": \"postgres_auth\",\n      \"error\": \"SELF_SIGNED_CERT_IN_CHAIN\"\n    }\n  ],\n  \"productionDataReads\": 0,\n  \"firestoreReads\": 0,\n  \"productionChanged\": false,\n  \"deployStarted\": false,\n  \"postgresWrites\": 0,\n  \"secretsPrinted\": false\n}\n",
+    "stderrTail": "(node:127) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.\nIn the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.\n\nTo prepare for this change:\n- If you want the current behavior, explicitly use 'sslmode=verify-full'\n- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'\n\nSee https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+    "productionChanged": false,
     "snapshotStarted": false,
     "importStarted": false,
     "verifyStarted": false,
-    "conflictAnalysisStarted": false,
-    "driftStarted": false,
     "canaryStarted": false,
     "cutoverStarted": false,
-    "rollbackStarted": false,
-    "productionDataExportStarted": false,
-    "firestoreCollectionsRead": false,
-    "postgresSchemaChanged": false
+    "rollbackStarted": false
   },
-  "nextSafeStep": "Investigate Yandex Serverless Container revision deploy operation bbac9l7ls7gbhu8igrac or retry operator revision deploy after owner approval. Do not run snapshot until remote preflight passes."
+  "productionChanged": false
 }
