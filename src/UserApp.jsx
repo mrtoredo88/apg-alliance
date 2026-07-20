@@ -880,6 +880,20 @@ export function UserApp() {
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
   const mountedRef                              = useRef(true);
+  const logoutFlowRef                           = useRef({
+    inProgress: false,
+    runId: 0,
+    userId: null,
+    startedAt: null,
+    reason: null,
+  });
+  const authRenderTraceRef                      = useRef({
+    userId: null,
+    panel: null,
+    authProvider: null,
+    hasUserAuth: null,
+    ts: null,
+  });
   const claimingPrizeRef                        = useRef(false);
   const tabBarRef                               = useRef(null);
   const tabSlotRefs                             = useRef([]);
@@ -1454,6 +1468,18 @@ export function UserApp() {
 
   const loadData = useCallback(async (isMounted) => {
     markPerformanceStage('userapp_load_start', { activePanel }, 'react');
+    if (logoutFlowRef.current.inProgress) {
+      traceAuthStage('loadData_blocked', {
+        reason: 'logout_in_progress',
+        logoutRun: logoutFlowRef.current.runId,
+        userId: logoutFlowRef.current.userId,
+      });
+      if (isMounted.current) {
+        setLoading(false);
+        setLoggedOut(true);
+      }
+      return;
+    }
     if (publicSubmitRoute) {
       if (isMounted.current) {
         markFirebase('firebase_ready', { source: 'public_submit' });
@@ -1462,6 +1488,7 @@ export function UserApp() {
       return;
     }
     if (isManualLogoutFromStorage()) {
+      traceAuthStage('logout_start', { source: 'loadData_manual_flag', reason: 'manualLogout_flag' });
       if (isMounted.current) { setLoading(false); setLoggedOut(true); }
       return;
     }
@@ -2095,6 +2122,45 @@ export function UserApp() {
       if (isMounted.current) setLoading(false);
     }
   }, [pendingRefId, publicSubmitRoute]);
+
+  useEffect(() => {
+    const onAuthSessionReady = () => {
+      if (logoutFlowRef.current.inProgress || loggedOut || isManualLogoutFromStorage()) return;
+      const im = { current: true };
+      traceAuthStage('home_render', { trigger: 'auth_session_ready_event' });
+      loadData(im);
+    };
+    window.addEventListener('apg:auth_session_ready', onAuthSessionReady);
+    return () => window.removeEventListener('apg:auth_session_ready', onAuthSessionReady);
+  }, [loadData, loggedOut]);
+
+  useEffect(() => {
+    if (loading || loggedOut || networkError || !user?.id) return;
+    const userId = String(user.id);
+    const authProvider = user.authProvider || 'guest';
+    const hasUserAuth = !!user?.email || !!user?.linkedTelegram || String(user.id).startsWith('tg_') || String(user.id).startsWith('email:');
+    if (
+      authRenderTraceRef.current.userId === userId
+      && authRenderTraceRef.current.panel === activePanel
+      && authRenderTraceRef.current.authProvider === authProvider
+      && authRenderTraceRef.current.hasUserAuth === hasUserAuth
+    ) {
+      return;
+    }
+    authRenderTraceRef.current = {
+      userId,
+      panel: activePanel,
+      authProvider,
+      hasUserAuth,
+      ts: Date.now(),
+    };
+    traceAuthStage('home_render', {
+      userId,
+      panel: activePanel,
+      authProvider,
+      hasUserAuth,
+    });
+  }, [activePanel, loading, loggedOut, networkError, user?.id, user?.authProvider, user?.email, user?.linkedTelegram]);
 
   useEffect(() => {
     const isMounted = { current: true };
@@ -3181,27 +3247,105 @@ export function UserApp() {
   }, [consentRequest, consentSaving, completeEmailLogin, showToast]);
 
   const handleLogout = useCallback(async () => {
+    if (logoutFlowRef.current.inProgress) return;
+    const runId = logoutFlowRef.current.runId + 1;
+    const reason = 'user_requested';
+    const targetUserId = String(user?.id || '');
+    let logoutOk = true;
+    logoutFlowRef.current = {
+      inProgress: true,
+      runId,
+      userId: targetUserId || null,
+      startedAt: Date.now(),
+      reason,
+    };
+    traceAuthStage('logout_start', {
+      source: 'handleLogout',
+      reason,
+      runId,
+      userId: targetUserId || null,
+    });
     localStorage.setItem('manualLogout', 'true');
-    setUser(null);
-    setLoggedOut(true);
-    setLoading(false);
-    setPartners([]);
-    setExperts([]);
-    setEvents([]);
-    setNews([]);
-    setNotifications([]);
-    setLokiKnowledge([]);
-    setUserBookings([]);
-    clearUserAuthStorage();
-    try { await apgIdentity.invalidateSession(); } catch {}
-    window.location.reload();
-  }, []);
+    traceAuthStage('identity_cleanup', {
+      runId,
+      hasManualLogoutStorage: true,
+    });
+    try {
+      await apgIdentity.invalidateSession();
+      traceAuthStage('firebase_signout', {
+        runId,
+        authUid: auth.currentUser?.uid || null,
+      });
+    } catch (error) {
+      logoutOk = false;
+      traceAuthStage('logout_error', {
+        runId,
+        userId: targetUserId || null,
+        reason,
+        error: error?.message || String(error),
+      });
+      logError(error, 'UserApp.handleLogout');
+    }
+    traceAuthStage('store_reset', {
+      runId,
+      hadUser: !!targetUserId,
+      hasAuthUser: !!auth.currentUser?.uid || false,
+    });
+    if (isMountedRef.current) {
+      setUser(null);
+      setUserBookings([]);
+      setPartners([]);
+      setExperts([]);
+      setEvents([]);
+      setNews([]);
+      setNotifications([]);
+      setLokiKnowledge([]);
+      setFavorites([]);
+      setScannedPartnerIds({});
+      setUserTickets(0);
+      setUserReputation(0);
+      setUserKeys(0);
+      setPostVisitMoment(null);
+      setError(null);
+      setNetworkError(false);
+      setConsentError('');
+      clearUserAuthStorage();
+      setLoading(false);
+      setLoggedOut(true);
+      traceAuthStage('guest_bootstrap', {
+        runId,
+        source: 'handleLogout',
+        manualLogout: true,
+        logoutOk,
+      });
+      traceAuthStage('logout_complete', {
+        runId,
+        userId: targetUserId || null,
+        durationMs: Date.now() - (logoutFlowRef.current.startedAt || Date.now()),
+        completed: logoutOk,
+      });
+    } finally {
+      if (logoutFlowRef.current.inProgress) {
+        logoutFlowRef.current.inProgress = false;
+      }
+    }
+  }, [user]);
 
   const handleLoginAfterLogout = useCallback(() => {
+    traceAuthStage('auth_session_restart', {
+      source: 'handleLoginAfterLogout',
+      previousRun: logoutFlowRef.current.runId,
+    });
+    logoutFlowRef.current.inProgress = false;
     localStorage.removeItem('manualLogout');
     clearUserAuthStorage();
-    window.location.reload();
-  }, []);
+    setError(null);
+    setNetworkError(false);
+    setLoggedOut(false);
+    setErrorLoggerUser(null);
+    setLoading(true);
+    loadData(mountedRef);
+  }, [loadData]);
 
   const handleDeleteProfile = useCallback(async () => {
     if (!user || String(user.id).startsWith('guest_')) return;
