@@ -887,6 +887,8 @@ export function UserApp() {
     startedAt: null,
     reason: null,
   });
+  const authLoadRunRef                          = useRef(0);
+  const loggedOutRef                            = useRef(false);
   const authRenderTraceRef                      = useRef({
     userId: null,
     panel: null,
@@ -1025,6 +1027,10 @@ export function UserApp() {
     return v ? Number(v) : null;
   });
   const [homeCacheSnapshot, setHomeCacheSnapshot] = useState(() => getHomeCacheSnapshot());
+
+  useEffect(() => {
+    loggedOutRef.current = loggedOut;
+  }, [loggedOut]);
 
   useEffect(() => {
     if (loading || loggedOut || consentRequest) return;
@@ -1466,18 +1472,42 @@ export function UserApp() {
 
   // ─── Загрузка данных ────────────────────────────────────────────────────────
 
-  const loadData = useCallback(async (isMounted) => {
-    markPerformanceStage('userapp_load_start', { activePanel }, 'react');
-    if (logoutFlowRef.current.inProgress) {
-      traceAuthStage('loadData_blocked', {
-        reason: 'logout_in_progress',
-        logoutRun: logoutFlowRef.current.runId,
-        userId: logoutFlowRef.current.userId,
+  const isAuthLoadAborted = (runId, stage, details = {}) => {
+    let manualLogout = false;
+    try {
+      manualLogout = localStorage.getItem('manualLogout') === 'true';
+    } catch {}
+    if (
+      runId !== authLoadRunRef.current
+      || logoutFlowRef.current.inProgress
+      || loggedOutRef.current
+      || manualLogout
+    ) {
+      traceAuthStage('loadData_aborted', {
+        runId,
+        activeRun: authLoadRunRef.current,
+        stage,
+        inProgress: logoutFlowRef.current.inProgress,
+        loggedOut: loggedOutRef.current,
+        manualLogout,
+        ...Object.fromEntries(Object.entries(details).map(([key, value]) => [key, value == null ? null : value])),
       });
-      if (isMounted.current) {
-        setLoading(false);
-        setLoggedOut(true);
-      }
+      return true;
+    }
+    return false;
+  };
+
+  const loadData = useCallback(async (isMounted) => {
+    const runId = ++authLoadRunRef.current;
+    markPerformanceStage('userapp_load_start', { activePanel }, 'react');
+    traceAuthStage('loadData_start', {
+      runId,
+      activePanel,
+      hasManualLogout: isManualLogoutFromStorage(),
+      loggedOut: loggedOutRef.current,
+    });
+    if (isAuthLoadAborted(runId, 'preconditions', { activePanel })) {
+      if (isMounted.current && isManualLogoutFromStorage()) setLoading(false);
       return;
     }
     if (publicSubmitRoute) {
@@ -1488,7 +1518,8 @@ export function UserApp() {
       return;
     }
     if (isManualLogoutFromStorage()) {
-      traceAuthStage('logout_start', { source: 'loadData_manual_flag', reason: 'manualLogout_flag' });
+      traceAuthStage('logout_start', { source: 'loadData_manual_flag', reason: 'manualLogout_flag', runId });
+      authLoadRunRef.current += 1;
       if (isMounted.current) { setLoading(false); setLoggedOut(true); }
       return;
     }
@@ -1580,10 +1611,11 @@ export function UserApp() {
         return { id: guestId, first_name: 'Участник', last_name: 'АПГ', photo_200: null };
       }),
     ]);
+      if (isAuthLoadAborted(runId, 'after_auth_ready')) return;
       markFirebase('auth_ready', { hasUser: Boolean(rawUserData?.id) });
       let userData = rawUserData;
 
-      if (!isMounted.current) return;
+      if (!isMounted.current || isAuthLoadAborted(runId, 'before_user_data_bootstrap')) return;
       setUser(userData);
       setErrorLoggerUser(String(userData.id));
 
@@ -1621,6 +1653,7 @@ export function UserApp() {
       }
 
       if (!isGuest) {
+        if (isAuthLoadAborted(runId, 'before_owner_session')) return;
         const ownerSource = userData.authProvider || (userData.email ? 'email_restore' : String(userData.id).startsWith('tg_') ? 'telegram_restore' : 'vk');
         let needsHardRelogin = false;
         await Promise.race([
@@ -1632,6 +1665,7 @@ export function UserApp() {
         });
 
         if (needsHardRelogin && isMounted.current) {
+          if (isAuthLoadAborted(runId, 'hard_relogin_required')) return;
           const _uid = String(userData.id);
           if (_uid.startsWith('email:')) localStorage.removeItem('apg_email_user');
           if (_uid.startsWith('tg_')) localStorage.removeItem('apg_tg_user');
@@ -1641,6 +1675,7 @@ export function UserApp() {
         }
 
         try {
+          if (isAuthLoadAborted(runId, 'before_identity_diagnostics')) return;
           const identity = await userAction('identity:diagnostics', {
             userId: String(userData.id),
             email: userData.email || userData.linkedEmail || '',
@@ -1664,6 +1699,7 @@ export function UserApp() {
         }
       }
 
+      if (isAuthLoadAborted(runId, 'before_account_bootstrap')) return;
       let accountBootstrap = null;
       if (!isGuest && shouldUseAccountCoreCanary()) {
         try {
@@ -1709,11 +1745,13 @@ export function UserApp() {
         safeLoad('lokiKnowledge', () => loadPublicSnap('lokiKnowledge', () => getDocs(query(collection(db, 'lokiKnowledge'), orderBy('priority', 'desc'), limit(120)))), emptySnap),
       ]);
 
+      if (isAuthLoadAborted(runId, 'before_critical_loads')) return;
       const homeCacheRefreshStartedAt = Date.now();
       const _loadResult = await _loadCritical();
       const [pSnap, eSnap, nSnap, vkPostsRaw, exSnap, statsSnap] = _loadResult;
+      if (isAuthLoadAborted(runId, 'after_critical_loads')) return;
 
-      if (!isMounted.current) return;
+      if (!isMounted.current || isAuthLoadAborted(runId, 'before_critical_state_sync')) return;
       const freshPartners = pSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(item => item.catalogPublished !== false && isNotArchived(item));
@@ -1800,7 +1838,7 @@ export function UserApp() {
       if (isMounted.current) setLoading(false);
 
       _loadSecondary().then(([notifSnap, reviewsSnap, ctSnap, lkSnap]) => {
-        if (!isMounted.current) return;
+        if (!isMounted.current || isAuthLoadAborted(runId, 'secondary_loads')) return;
         setRecentReviews(reviewsSnap.docs.slice(0, 20).map(d => ({ id: d.id, ...d.data() })));
         setLokiKnowledge(lkSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => item.active !== false));
         setCustomTasks(ctSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -1829,9 +1867,10 @@ export function UserApp() {
       if (!isGuest) {
         void (async () => {
           try {
+            if (isAuthLoadAborted(runId, 'before_profile_doc_load')) return;
             const userRef = doc(db, 'users', String(userData.id));
             const docSnap = await getDoc(userRef);
-            if (!isMounted.current) return;
+            if (!isMounted.current || isAuthLoadAborted(runId, 'after_profile_doc_load')) return;
 
             const todayKey = new Date().toLocaleDateString('sv');
 
@@ -1844,6 +1883,7 @@ export function UserApp() {
 
             if (docSnap.exists()) {
               const data = docSnap.data();
+              if (isAuthLoadAborted(runId, 'before_doc_exists_profile_data')) return;
               const needsLegalConsent = !CONSENT_SCREEN_DISABLED_FOR_DEMO && !hasAcceptedCurrentLegal(data);
               if (needsLegalConsent && isMounted.current) {
                 setConsentRequest({
@@ -1985,6 +2025,7 @@ export function UserApp() {
                 referralPlatform: existingReferralContext.platform,
                 referralClientEvents: drainReferralEventQueue(),
               };
+              if (isAuthLoadAborted(runId, 'before_profile_sync_payload_existing')) return;
               const handleReferralSyncResult = result => {
                 if (!isMounted.current) return;
                 if (result?.referralRecoveryStatus === 'already_rewarded') {
@@ -2011,6 +2052,7 @@ export function UserApp() {
 
               // Ежедневный бонус: +1 ключ за первый вход каждый день
               if (data.lastBonusDate !== todayKey) {
+                if (isAuthLoadAborted(runId, 'before_daily_sync')) return;
                 userAction('profile:sync', syncExistingPayload)
                   .then(result => {
                     if (!isMounted.current) return;
@@ -2032,6 +2074,7 @@ export function UserApp() {
               }
             } else {
               // Новый пользователь
+              if (isAuthLoadAborted(runId, 'before_new_user_profile_sync')) return;
               const isRealUser = !String(userData.id).startsWith('guest_');
               const activePendingRefId = readPendingReferral({ source: 'UserApp.profileSync.newUser' }) || pendingRefId;
               const refId = isRealUser ? activePendingRefId : null;
@@ -2063,6 +2106,7 @@ export function UserApp() {
                   notificationsAccepted: !!pendingConsents.notificationConsent,
                 } : null,
               });
+              if (isAuthLoadAborted(runId, 'after_new_user_profile_sync')) return;
               if (pendingConsents) localStorage.removeItem('apg_pending_consents');
 
               if (syncResult?.referralBonusAwarded) {
@@ -2125,9 +2169,9 @@ export function UserApp() {
 
   useEffect(() => {
     const onAuthSessionReady = () => {
-      if (logoutFlowRef.current.inProgress || loggedOut || isManualLogoutFromStorage()) return;
+      if (logoutFlowRef.current.inProgress || loggedOutRef.current || isManualLogoutFromStorage()) return;
       const im = { current: true };
-      traceAuthStage('home_render', { trigger: 'auth_session_ready_event' });
+      traceAuthStage('auth_session_ready_event', { inProgress: logoutFlowRef.current.inProgress, loggedOut: loggedOutRef.current });
       loadData(im);
     };
     window.addEventListener('apg:auth_session_ready', onAuthSessionReady);
@@ -2163,6 +2207,7 @@ export function UserApp() {
   }, [activePanel, loading, loggedOut, networkError, user?.id, user?.authProvider, user?.email, user?.linkedTelegram]);
 
   useEffect(() => {
+    if (loggedOutRef.current) return;
     const isMounted = { current: true };
     loadData(isMounted);
     return () => { isMounted.current = false; };
@@ -3251,6 +3296,7 @@ export function UserApp() {
     const runId = logoutFlowRef.current.runId + 1;
     const reason = 'user_requested';
     const targetUserId = String(user?.id || '');
+    authLoadRunRef.current += 1;
     let logoutOk = true;
     logoutFlowRef.current = {
       inProgress: true,
@@ -3265,10 +3311,13 @@ export function UserApp() {
       runId,
       userId: targetUserId || null,
     });
-    localStorage.setItem('manualLogout', 'true');
+    try {
+      localStorage.setItem('manualLogout', 'true');
+    } catch {}
     traceAuthStage('identity_cleanup', {
       runId,
       hasManualLogoutStorage: true,
+      targetUserId,
     });
     try {
       await apgIdentity.invalidateSession();
@@ -3285,46 +3334,51 @@ export function UserApp() {
         error: error?.message || String(error),
       });
       logError(error, 'UserApp.handleLogout');
-    }
-    traceAuthStage('store_reset', {
-      runId,
-      hadUser: !!targetUserId,
-      hasAuthUser: !!auth.currentUser?.uid || false,
-    });
-    if (isMountedRef.current) {
-      setUser(null);
-      setUserBookings([]);
-      setPartners([]);
-      setExperts([]);
-      setEvents([]);
-      setNews([]);
-      setNotifications([]);
-      setLokiKnowledge([]);
-      setFavorites([]);
-      setScannedPartnerIds({});
-      setUserTickets(0);
-      setUserReputation(0);
-      setUserKeys(0);
-      setPostVisitMoment(null);
-      setError(null);
-      setNetworkError(false);
-      setConsentError('');
-      clearUserAuthStorage();
-      setLoading(false);
-      setLoggedOut(true);
-      traceAuthStage('guest_bootstrap', {
-        runId,
-        source: 'handleLogout',
-        manualLogout: true,
-        logoutOk,
-      });
-      traceAuthStage('logout_complete', {
-        runId,
-        userId: targetUserId || null,
-        durationMs: Date.now() - (logoutFlowRef.current.startedAt || Date.now()),
-        completed: logoutOk,
-      });
+      const isInProgress = isFirebaseStartupOnlyError(error) || error?.code === 'auth/network-request-failed';
+      if (isInProgress && isMountedRef.current) {
+        showToast('Не удалось выйти из аккаунта. Закрываем сессию локально.');
+      }
     } finally {
+      if (isMountedRef.current) {
+        clearUserAuthStorage();
+        setUser(null);
+        setUserBookings([]);
+        setPartners([]);
+        setExperts([]);
+        setEvents([]);
+        setNews([]);
+        setNotifications([]);
+        setLokiKnowledge([]);
+        setFavorites([]);
+        setScannedPartnerIds({});
+        setUserTickets(0);
+        setUserReputation(0);
+        setUserKeys(0);
+        setPostVisitMoment(null);
+        setError(null);
+        setNetworkError(false);
+        setConsentError('');
+        setErrorLoggerUser(null);
+        traceAuthStage('store_reset', {
+          runId,
+          hadUser: !!targetUserId,
+          hasAuthUser: !!auth.currentUser?.uid || false,
+        });
+        setLoading(false);
+        setLoggedOut(true);
+        traceAuthStage('guest_bootstrap', {
+          runId,
+          source: 'handleLogout',
+          manualLogout: true,
+          logoutOk,
+        });
+        traceAuthStage('logout_complete', {
+          runId,
+          userId: targetUserId || null,
+          durationMs: Date.now() - (logoutFlowRef.current.startedAt || Date.now()),
+          completed: logoutOk,
+        });
+      }
       if (logoutFlowRef.current.inProgress) {
         logoutFlowRef.current.inProgress = false;
       }
@@ -3336,6 +3390,7 @@ export function UserApp() {
       source: 'handleLoginAfterLogout',
       previousRun: logoutFlowRef.current.runId,
     });
+    authLoadRunRef.current += 1;
     logoutFlowRef.current.inProgress = false;
     localStorage.removeItem('manualLogout');
     clearUserAuthStorage();
@@ -4185,6 +4240,149 @@ export function UserApp() {
     },
   }), [enrichedPartners, favorites, goPanel, handleOpenPartners, openNotifications, openPartner, openScanner, toggleFavorite]);
 
+  const handleOpenHome = useCallback(() => goPanel('home'), [goPanel]);
+  const handleOpenNews = useCallback(() => goPanel('news'), [goPanel]);
+  const handleOpenEvents = useCallback(() => goPanel('events'), [goPanel]);
+  const handleOpenExperts = useCallback(() => goPanel('experts'), [goPanel]);
+  const handleOpenOffers = useCallback(() => goPanel('offers'), [goPanel]);
+  const handleOpenRewards = useCallback(() => goPanel('rewards'), [goPanel]);
+  const handleOpenNearby = useCallback(() => goPanel('nearby'), [goPanel]);
+  const handleOpenLoki = useCallback(() => goPanel('loki'), [goPanel]);
+  const handleOpenProfile = useCallback(() => goPanel('profile'), [goPanel]);
+  const handleDesktopWorkspaceMode = useCallback(() => {
+    setAppModePersisted(resolvedAppMode === 'workspace' ? 'user' : 'workspace');
+  }, [resolvedAppMode, setAppModePersisted]);
+
+  const desktopOverviewSearch = useCallback((raw = '') => {
+    const query = String(raw || '').trim().toLowerCase().replace(/ё/g, 'е');
+    if (!query) return;
+    if (query.includes('новост') || query.includes('публикац')) handleOpenNews();
+    else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) handleOpenEvents();
+    else if (query.includes('акци') || query.includes('скид')) handleOpenOffers();
+    else if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) handleOpenPartners();
+    else if (query.includes('эксперт') || query.includes('консультац')) handleOpenExperts();
+    else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) handleOpenRewards();
+    else if (query.includes('рядом') || query.includes('карт')) handleOpenNearby();
+    else handleOpenLoki();
+  }, [handleOpenLoki, handleOpenEvents, handleOpenExperts, handleOpenNearby, handleOpenNews, handleOpenOffers, handleOpenPartners, handleOpenRewards]);
+  const desktopOverviewUserName = useMemo(
+    () => [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник',
+    [user?.first_name, user?.firstName, user?.last_name, user?.lastName, user?.displayName, user?.name],
+  );
+  const desktopOverviewInitials = useMemo(
+    () => desktopOverviewUserName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У',
+    [desktopOverviewUserName],
+  );
+  const desktopOverviewHero = useMemo(() => (
+    events.find(event => event?.title) || apgNews.find(item => item?.title || item?.text) || enrichedPartners[0] || null
+  ), [apgNews, events, enrichedPartners]);
+  const desktopOverviewHeroImage = useMemo(() => (
+    desktopOverviewHero?.coverPhoto || desktopOverviewHero?.imageUrl || desktopOverviewHero?.photoUrl || desktopOverviewHero?.photo || desktopOverviewHero?.image || ''
+  ), [desktopOverviewHero]);
+  const desktopOverview = useMemo(() => ({
+    navItems: [
+      { id: 'home', label: 'Главная', onClick: handleOpenHome },
+      { id: 'news', label: 'Новости', onClick: handleOpenNews },
+      { id: 'events', label: 'Мероприятия', onClick: handleOpenEvents },
+      { id: 'partners', label: 'Партнёры', onClick: handleOpenPartners },
+      { id: 'experts', label: 'Эксперты', onClick: handleOpenExperts },
+      { id: 'offers', label: 'Акции', onClick: handleOpenOffers },
+      { id: 'rewards', label: 'Подарки', onClick: handleOpenRewards },
+    ],
+    onSearchSubmit: desktopOverviewSearch,
+    onSearchClear: () => {},
+    unreadCount,
+    onOpenNotifications: openNotifications,
+    onOpenMessages: handleOpenMessages,
+    messageUnreadCount: unreadCount,
+    onOpenLoki: handleOpenLoki,
+    onOpenProfile: handleOpenProfile,
+    workspaceAction: desktopWorkspaceAvailable ? (
+      <button
+        type="button"
+        onClick={handleDesktopWorkspaceMode}
+        style={{ border: '1px solid rgba(201,168,76,0.42)', borderRadius: 999, background: 'linear-gradient(145deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))', color: APG2_PROFILE.text, cursor: 'pointer', minHeight: 30, padding: '0 10px', fontWeight: 760, fontSize: 10.8, fontFamily: 'inherit' }}
+      >
+        {resolvedAppMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
+      </button>
+    ) : null,
+    userName: desktopOverviewUserName,
+    userSubtitle: 'Мой профиль',
+    avatarUrl: user?.photo_200 || user?.photo || user?.avatarUrl || '',
+    initials: desktopOverviewInitials,
+    profileBadge: `${userKeys} ключей`,
+    heroTitle: desktopOverviewHero?.title || desktopOverviewHero?.name || 'Пульс города сегодня',
+    heroSubtitle: desktopOverviewHero?.date || desktopOverviewHero?.offer || 'Поиск, уведомления, быстрые действия и Локи остаются на одном месте.',
+    heroKicker: 'Сегодня в АПГ',
+    heroImage: desktopOverviewHeroImage,
+    heroActions: [
+      { id: 'events', label: 'Все мероприятия', onClick: handleOpenEvents },
+      { id: 'loki', label: 'Спросить Локи', tone: 'gold', onClick: handleOpenLoki },
+    ],
+    stats: [
+      { label: 'Ключи', value: userKeys, accent: APG2_PROFILE.gold },
+      { label: 'Событий', value: registeredEventIds.length },
+      { label: 'Новости', value: apgNews.length },
+      { label: 'Партнёров', value: enrichedPartners.length },
+      { label: 'Экспертов', value: experts.length },
+      { label: 'Увед.', value: unreadCount },
+    ],
+    progressTitle: personalHomeContext?.nextAchievement?.title || 'Сегодня для вас',
+    progressSubtitle: personalHomeContext?.lokiTip || 'Локи держит контекст приложения рядом.',
+    progressValue: Math.min(100, Math.max(8, Math.round((registeredEventIds.length + Object.keys(scannedPartnerIds).length + savedNews.length) * 7))),
+    quickActions: [
+      { id: 'profile', label: 'Профиль', tone: 'gold', onClick: handleOpenProfile },
+      { id: 'loki', label: 'Локи', onClick: handleOpenLoki },
+      { id: 'notify', label: 'Уведомления', onClick: openNotifications },
+    ],
+    isOffline: !isOnline,
+  }), [
+    desktopOverviewSearch,
+    desktopOverviewHeroImage,
+    handleDesktopWorkspaceMode,
+    handleOpenEvents,
+    handleOpenExperts,
+    handleOpenHome,
+    handleOpenLoki,
+    handleOpenMessages,
+    handleOpenNews,
+    handleOpenOffers,
+    handleOpenPartners,
+    handleOpenProfile,
+    handleOpenRewards,
+    handleOpenNearby,
+    unreadCount,
+    openNotifications,
+    desktopOverviewHero?.title,
+    desktopOverviewHero?.name,
+    desktopOverviewHero?.date,
+    desktopOverviewHero?.offer,
+    desktopOverviewInitials,
+    desktopOverviewUserName,
+    desktopWorkspaceAvailable,
+    registeredEventIds.length,
+    apgNews.length,
+    enrichedPartners.length,
+    experts.length,
+    personalHomeContext?.lokiTip,
+    personalHomeContext?.nextAchievement?.title,
+    scannedPartnerIds,
+    savedNews.length,
+    user?.avatar,
+    user?.avatarUrl,
+    user?.first_name,
+    user?.firstName,
+    user?.last_name,
+    user?.lastName,
+    user?.displayName,
+    user?.name,
+    user?.photo,
+    user?.photo_200,
+    userKeys,
+    isOnline,
+    resolvedAppMode,
+  ]);
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   if (publicSubmitRoute) {
@@ -4384,149 +4582,6 @@ export function UserApp() {
     onFirstJourneyAskLoki: handleFirstJourneyAskLoki,
     onFirstJourneyOpenPanel: handleFirstJourneyOpenPanel,
   };
-
-  const handleOpenHome = useCallback(() => goPanel('home'), [goPanel]);
-  const handleOpenNews = useCallback(() => goPanel('news'), [goPanel]);
-  const handleOpenEvents = useCallback(() => goPanel('events'), [goPanel]);
-  const handleOpenExperts = useCallback(() => goPanel('experts'), [goPanel]);
-  const handleOpenOffers = useCallback(() => goPanel('offers'), [goPanel]);
-  const handleOpenRewards = useCallback(() => goPanel('rewards'), [goPanel]);
-  const handleOpenNearby = useCallback(() => goPanel('nearby'), [goPanel]);
-  const handleOpenLoki = useCallback(() => goPanel('loki'), [goPanel]);
-  const handleOpenProfile = useCallback(() => goPanel('profile'), [goPanel]);
-  const handleDesktopWorkspaceMode = useCallback(() => {
-    setAppModePersisted(resolvedAppMode === 'workspace' ? 'user' : 'workspace');
-  }, [resolvedAppMode, setAppModePersisted]);
-
-  const desktopOverviewSearch = useCallback((raw = '') => {
-    const query = String(raw || '').trim().toLowerCase().replace(/ё/g, 'е');
-    if (!query) return;
-    if (query.includes('новост') || query.includes('публикац')) handleOpenNews();
-    else if (query.includes('мероприят') || query.includes('событ') || query.includes('афиш')) handleOpenEvents();
-    else if (query.includes('акци') || query.includes('скид')) handleOpenOffers();
-    else if (query.includes('партнер') || query.includes('партн') || query.includes('организац') || query.includes('бизнес')) handleOpenPartners();
-    else if (query.includes('эксперт') || query.includes('консультац')) handleOpenExperts();
-    else if (query.includes('подар') || query.includes('приз') || query.includes('наград')) handleOpenRewards();
-    else if (query.includes('рядом') || query.includes('карт')) handleOpenNearby();
-    else handleOpenLoki();
-  }, [handleOpenLoki, handleOpenEvents, handleOpenExperts, handleOpenNearby, handleOpenNews, handleOpenOffers, handleOpenPartners, handleOpenRewards]);
-  const desktopOverviewUserName = useMemo(
-    () => [user?.first_name || user?.firstName, user?.last_name || user?.lastName].filter(Boolean).join(' ') || user?.displayName || user?.name || 'Участник',
-    [user?.first_name, user?.firstName, user?.last_name, user?.lastName, user?.displayName, user?.name],
-  );
-  const desktopOverviewInitials = useMemo(
-    () => desktopOverviewUserName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'У',
-    [desktopOverviewUserName],
-  );
-  const desktopOverviewHero = useMemo(() => (
-    events.find(event => event?.title) || apgNews.find(item => item?.title || item?.text) || enrichedPartners[0] || null
-  ), [apgNews, events, enrichedPartners]);
-  const desktopOverviewHeroImage = useMemo(() => (
-    desktopOverviewHero?.coverPhoto || desktopOverviewHero?.imageUrl || desktopOverviewHero?.photoUrl || desktopOverviewHero?.photo || desktopOverviewHero?.image || ''
-  ), [desktopOverviewHero]);
-  const desktopOverview = useMemo(() => ({
-    navItems: [
-      { id: 'home', label: 'Главная', onClick: handleOpenHome },
-      { id: 'news', label: 'Новости', onClick: handleOpenNews },
-      { id: 'events', label: 'Мероприятия', onClick: handleOpenEvents },
-      { id: 'partners', label: 'Партнёры', onClick: handleOpenPartners },
-      { id: 'experts', label: 'Эксперты', onClick: handleOpenExperts },
-      { id: 'offers', label: 'Акции', onClick: handleOpenOffers },
-      { id: 'rewards', label: 'Подарки', onClick: handleOpenRewards },
-    ],
-    onSearchSubmit: desktopOverviewSearch,
-    onSearchClear: () => {},
-    unreadCount,
-    onOpenNotifications: openNotifications,
-    onOpenMessages: handleOpenMessages,
-    messageUnreadCount: unreadCount,
-    onOpenLoki: handleOpenLoki,
-    onOpenProfile: handleOpenProfile,
-    workspaceAction: desktopWorkspaceAvailable ? (
-      <button
-        type="button"
-        onClick={handleDesktopWorkspaceMode}
-        style={{ border: '1px solid rgba(201,168,76,0.42)', borderRadius: 999, background: 'linear-gradient(145deg, rgba(201,168,76,0.18), rgba(255,255,255,0.08))', color: APG2_PROFILE.text, cursor: 'pointer', minHeight: 30, padding: '0 10px', fontWeight: 760, fontSize: 10.8, fontFamily: 'inherit' }}
-      >
-        {resolvedAppMode === 'workspace' ? '📱 Пользовательский' : '💼 Workspace'}
-      </button>
-    ) : null,
-    userName: desktopOverviewUserName,
-    userSubtitle: 'Мой профиль',
-    avatarUrl: user?.photo_200 || user?.photo || user?.avatarUrl || '',
-    initials: desktopOverviewInitials,
-    profileBadge: `${userKeys} ключей`,
-    heroTitle: desktopOverviewHero?.title || desktopOverviewHero?.name || 'Пульс города сегодня',
-    heroSubtitle: desktopOverviewHero?.date || desktopOverviewHero?.offer || 'Поиск, уведомления, быстрые действия и Локи остаются на одном месте.',
-    heroKicker: 'Сегодня в АПГ',
-    heroImage: desktopOverviewHeroImage,
-    heroActions: [
-      { id: 'events', label: 'Все мероприятия', onClick: handleOpenEvents },
-      { id: 'loki', label: 'Спросить Локи', tone: 'gold', onClick: handleOpenLoki },
-    ],
-    stats: [
-      { label: 'Ключи', value: userKeys, accent: APG2_PROFILE.gold },
-      { label: 'Событий', value: registeredEventIds.length },
-      { label: 'Новости', value: apgNews.length },
-      { label: 'Партнёров', value: enrichedPartners.length },
-      { label: 'Экспертов', value: experts.length },
-      { label: 'Увед.', value: unreadCount },
-    ],
-    progressTitle: personalHomeContext?.nextAchievement?.title || 'Сегодня для вас',
-    progressSubtitle: personalHomeContext?.lokiTip || 'Локи держит контекст приложения рядом.',
-    progressValue: Math.min(100, Math.max(8, Math.round((registeredEventIds.length + Object.keys(scannedPartnerIds).length + savedNews.length) * 7))),
-    quickActions: [
-      { id: 'profile', label: 'Профиль', tone: 'gold', onClick: handleOpenProfile },
-      { id: 'loki', label: 'Локи', onClick: handleOpenLoki },
-      { id: 'notify', label: 'Уведомления', onClick: openNotifications },
-    ],
-    isOffline: !isOnline,
-  }), [
-    desktopOverviewSearch,
-    desktopOverviewHeroImage,
-    handleDesktopWorkspaceMode,
-    handleOpenEvents,
-    handleOpenExperts,
-    handleOpenHome,
-    handleOpenLoki,
-    handleOpenMessages,
-    handleOpenNews,
-    handleOpenOffers,
-    handleOpenPartners,
-    handleOpenProfile,
-    handleOpenRewards,
-    handleOpenNearby,
-    unreadCount,
-    openNotifications,
-    desktopOverviewHero?.title,
-    desktopOverviewHero?.name,
-    desktopOverviewHero?.date,
-    desktopOverviewHero?.offer,
-    desktopOverviewInitials,
-    desktopOverviewUserName,
-    desktopWorkspaceAvailable,
-    registeredEventIds.length,
-    apgNews.length,
-    enrichedPartners.length,
-    experts.length,
-    personalHomeContext?.lokiTip,
-    personalHomeContext?.nextAchievement?.title,
-    scannedPartnerIds,
-    savedNews.length,
-    user?.avatar,
-    user?.avatarUrl,
-    user?.first_name,
-    user?.firstName,
-    user?.last_name,
-    user?.lastName,
-    user?.displayName,
-    user?.name,
-    user?.photo,
-    user?.photo_200,
-    userKeys,
-    isOnline,
-    resolvedAppMode,
-  ]);
 
   return (
     <ConfigProvider appearance={appearance}>

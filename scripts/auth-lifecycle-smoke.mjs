@@ -10,11 +10,16 @@ const manualChecklist = [
   'Login → Logout → Login',
   'Login → Logout → Login → Logout',
   'Login → Refresh → Logout',
+  'Login → close PWA → reopen',
+  'Logout → close PWA → reopen',
+  'Logout → Telegram restore path',
   'Login → закрыть PWA → открыть → Logout',
   'Logout → Refresh',
   'Logout → открыть deep link',
   'Logout → повторный Login',
   'Несколько logout подряд',
+  'Telegram login (manual check) first attempt',
+  'Telegram login after cold reopen',
   'Logout при частично загруженных данных',
 ];
 
@@ -30,8 +35,11 @@ const platformChecklist = [
 const fatalMarkers = [
   'Minified React error',
   'APG-MRLR2SYM',
+  'React error #310',
+  'Error #310',
   'React error #300',
   'What happened',
+  'Что-то пошло не так',
 ];
 
 const userAppSource = fs.readFileSync('src/UserApp.jsx', 'utf8');
@@ -115,7 +123,7 @@ async function getScenarioRunner(page) {
     if (hasMarkers.length) {
       throw new Error(`Найден фатальный текст в интерфейсе: ${hasMarkers.join(', ')}`);
     }
-    if (errors.some((entry) => /Minified React error|APG-MRLR2SYM|React error #300/.test(entry.message))) {
+    if (errors.some((entry) => /Minified React error|APG-MRLR2SYM|React error #310|Error #310|React error #300/.test(entry.message))) {
       throw new Error(`Fatal runtime errors: ${errors.map((entry) => entry.message).join(' | ')}`);
     }
   };

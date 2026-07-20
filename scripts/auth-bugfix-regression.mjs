@@ -39,7 +39,8 @@ assertOrder(userApp, [
 ], 'logout lifecycle');
 assertContains(userApp, "traceAuthStage('logout_error'", 'logout lifecycle: error branch traced');
 assertContains(userApp, 'localStorage.setItem(\'manualLogout\', \'true\');', 'logout lifecycle: manual logout marker');
-assertContains(userApp, 'loadData_blocked', 'logout lifecycle: loadData block during logout flow');
+assertContains(userApp, 'traceAuthStage(\'loadData_aborted\'', 'logout lifecycle: loadData abort during logout flow');
+assertContains(userApp, 'isAuthLoadAborted', 'logout lifecycle: runtime abort helper');
 assertNo(userApp, "setError('Не удалось выйти. Проверьте подключение и попробуйте ещё раз.'", 'logout lifecycle: no hard error message');
 assertContains(userApp, "traceAuthStage('auth_session_restart'", 'logout restart trace');
 
