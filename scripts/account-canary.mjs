@@ -30,6 +30,18 @@ function hash(value) {
   return crypto.createHash('sha256').update(String(value || '')).digest('hex').slice(0, 16);
 }
 
+function diagnosticError(error) {
+  return {
+    message: String(error?.message || error).slice(0, 300),
+    code: error?.code || '',
+    status: error?.status || null,
+    stage: error?.stage || '',
+    causeCode: error?.cause?.code || '',
+    causeMessage: error?.cause?.message ? String(error.cause.message).slice(0, 180) : '',
+    blockers: error?.blockers || error?.missing || [],
+  };
+}
+
 function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -102,11 +114,16 @@ function firebaseApiKey() {
 
 async function idTokenFor(userId) {
   const customToken = await getDbAuth().createCustomToken(String(userId));
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseApiKey()}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token: customToken, returnSecureToken: true }),
-  });
+  let res;
+  try {
+    res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseApiKey()}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: customToken, returnSecureToken: true }),
+    });
+  } catch (error) {
+    throw Object.assign(new Error('FIREBASE_ID_TOKEN_EXCHANGE_FETCH_FAILED'), { stage: 'firebase_id_token_exchange', cause: error?.cause || error });
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.idToken) throw Object.assign(new Error('FIREBASE_ID_TOKEN_EXCHANGE_FAILED'), { status: res.status });
   return data.idToken;
@@ -118,14 +135,19 @@ async function bootstrapSmoke(user) {
   let last = null;
   for (let index = 0; index < 3; index += 1) {
     const started = Date.now();
-    const res = await fetch(`${API_BASE}/api/account/bootstrap`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-firebase-auth': token,
-      },
-      body: JSON.stringify({ userId: user.userId, sessionId: `canary-${user.category}-${index}` }),
-    });
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/account/bootstrap`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-firebase-auth': token,
+        },
+        body: JSON.stringify({ userId: user.userId, sessionId: `canary-${user.category}-${index}` }),
+      });
+    } catch (error) {
+      throw Object.assign(new Error('ACCOUNT_BOOTSTRAP_FETCH_FAILED'), { stage: `account_bootstrap_${user.category}`, cause: error?.cause || error });
+    }
     const data = await res.json().catch(() => ({}));
     timings.push(Date.now() - started);
     if (!res.ok || data.ok !== true) throw Object.assign(new Error('ACCOUNT_BOOTSTRAP_FAILED'), { status: res.status, code: data.code });
@@ -247,12 +269,7 @@ async function main() {
 main().catch(error => {
   const report = {
     status: 'CANARY_FAILED',
-    error: {
-      message: String(error?.message || error).slice(0, 300),
-      code: error?.code || '',
-      status: error?.status || null,
-      blockers: error?.blockers || error?.missing || [],
-    },
+    error: diagnosticError(error),
     firestoreAccountCoreWrites: 0,
     cutoverStarted: false,
     valuesPrinted: false,

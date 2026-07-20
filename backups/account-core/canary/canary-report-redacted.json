@@ -1,0 +1,224 @@
+{
+  "status": "CANARY_PASSED",
+  "generatedAt": "2026-07-20T12:10:01.037Z",
+  "startedAt": "2026-07-20T12:09:49.287Z",
+  "backendRevision": "bbamrpoia4eldt193mmo",
+  "sourceCommit": "5f02f785",
+  "snapshotSha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "canaryUsers": [
+    {
+      "category": "owner",
+      "userHash": "account_49cfeb6df78f46b4",
+      "roles": [
+        "owner",
+        "partner"
+      ]
+    },
+    {
+      "category": "admin",
+      "userHash": "account_96866ef26c2fd473",
+      "roles": [
+        "super_admin"
+      ]
+    },
+    {
+      "category": "partner",
+      "userHash": "account_49cfeb6df78f46b4",
+      "roles": [
+        "owner",
+        "partner"
+      ]
+    },
+    {
+      "category": "expert",
+      "userHash": "account_29dbc480578427be",
+      "roles": [
+        "expert",
+        "user"
+      ]
+    },
+    {
+      "category": "telegramUser",
+      "userHash": "account_39c7c8f0452d0b79",
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "category": "regularUser",
+      "userHash": "account_f9c704d12853d447",
+      "roles": []
+    },
+    {
+      "category": "multiRoleUser",
+      "userHash": "account_49cfeb6df78f46b4",
+      "roles": [
+        "owner",
+        "partner"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "category": "owner",
+      "userHash": "account_49cfeb6df78f46b4",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 1248,
+      "maxLatencyMs": 3355,
+      "roles": [
+        "owner",
+        "partner"
+      ],
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "admin",
+      "userHash": "account_96866ef26c2fd473",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 169,
+      "maxLatencyMs": 169,
+      "roles": [
+        "super_admin"
+      ],
+      "cabinetCount": 0,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "partner",
+      "userHash": "account_49cfeb6df78f46b4",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 173,
+      "maxLatencyMs": 177,
+      "roles": [
+        "owner",
+        "partner"
+      ],
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "expert",
+      "userHash": "account_29dbc480578427be",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 179,
+      "maxLatencyMs": 202,
+      "roles": [
+        "expert",
+        "user"
+      ],
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "telegramUser",
+      "userHash": "account_39c7c8f0452d0b79",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 186,
+      "maxLatencyMs": 212,
+      "roles": [
+        "user"
+      ],
+      "cabinetCount": 0,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "regularUser",
+      "userHash": "account_f9c704d12853d447",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 190,
+      "maxLatencyMs": 229,
+      "roles": [
+        "user"
+      ],
+      "cabinetCount": 0,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "multiRoleUser",
+      "userHash": "account_49cfeb6df78f46b4",
+      "ok": true,
+      "attempts": 3,
+      "avgLatencyMs": 206,
+      "maxLatencyMs": 237,
+      "roles": [
+        "owner",
+        "partner"
+      ],
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": true,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    }
+  ],
+  "metrics": {
+    "successRate": 1,
+    "authorizationFailures": 0,
+    "fallbackCount": 0,
+    "firestoreAccountCoreReads": 0,
+    "firestoreAccountCoreWrites": 0,
+    "postgresAccountCoreReads": 21,
+    "postgresAccountCoreWritesUpperBound": 7,
+    "p0": 0,
+    "p1": 0
+  },
+  "rollbackReady": true,
+  "productionChanged": true,
+  "firebaseAuthUnchanged": true,
+  "importStarted": false,
+  "verifyStarted": false,
+  "cutoverStarted": false
+}

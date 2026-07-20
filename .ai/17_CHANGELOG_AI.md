@@ -4305,6 +4305,14 @@
 - Старое действие `event:propose` оставлено совместимым с новым workspace-layer, чтобы кабинет партнёра/эксперта продолжал отправлять предложения на модерацию.
 - `scripts/workspace-core-test.mjs` расширен проверками партнёр/эксперт ownership, статусов, архивов, прошедших событий, конфликтов и безопасного дублирования.
 
+# 2026-07-20 — Account Core Production Cutover
+
+- Выполнен финальный Canary → Controlled Cutover для Account Core runtime: canary allowlist прошёл через PostgreSQL Account Core, затем production runtime переключён на PostgreSQL.
+- Backend `apg-api` получил canary gate для `/api/account/bootstrap`: при `ACCOUNT_CANARY=1` endpoint доступен только утверждённому allowlist; после cutover canary отключён.
+- Frontend production собран и задеплоен с `VITE_ACCOUNT_STORAGE=postgres`, Firebase Authentication остался без изменений.
+- Финальные отчёты сохранены в `backups/account-core/final/`: cutover report, summary и health report; rollback readiness подтверждён.
+- Firestore Account Core writes после canary/cutover остались `0`; PostgreSQL session writes отражены как консервативная upper-bound метрика, а не скрыты как `0`.
+
 # 2026-07-19 — APG Migration Center + Architecture Guard v1
 
 - Добавлен управляемый Identity Migration Center в админке: статус PostgreSQL/Firestore, сравнение counts/checksums, protected actions, progress, history, dependency monitor и runtime rollback через Identity flags.
