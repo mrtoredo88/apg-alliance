@@ -1,17 +1,17 @@
 # Account Core Remote Preflight
 
-Generated: 2026-07-20T11:08:47.837Z
+Generated: 2026-07-20T11:51:47.898Z
 Status: REMOTE_PREFLIGHT_PASSED
 
 ## Runtime
 
 - Operator container: apg-migration-operator
 - Operator container ID: bbatdc5luq828rcn1tav
-- Operator revision ID: bbaqatlcq7101bk9q7c8
-- Image digest: sha256:adec1e8b094f0cc9ac77f50f2afcc224ea151d16b87c3e02eb2af59c9ea51c4c
+- Operator revision ID: bba329u8ehmf79as947r
+- Image digest: sha256:2d3299dcb59f3791991caf30710fe6f661aa4addbdcb893e49e37a8ca43f90e9
 - VPC: enpa19j9jpki1f67p6kq
 - Service account: ajegfv96md2tqri8gjdp
-- Source commit: 4f56a07e
+- Source commit: 989ea8cf
 
 ## Checks
 

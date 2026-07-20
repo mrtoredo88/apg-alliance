@@ -3,13 +3,13 @@
   "runtime": {
     "containerId": "bbatdc5luq828rcn1tav",
     "containerName": "apg-migration-operator",
-    "revisionId": "bbaqatlcq7101bk9q7c8",
-    "imageDigest": "sha256:adec1e8b094f0cc9ac77f50f2afcc224ea151d16b87c3e02eb2af59c9ea51c4c",
-    "imageUrl": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:4f56a07e",
+    "revisionId": "bba329u8ehmf79as947r",
+    "imageDigest": "sha256:2d3299dcb59f3791991caf30710fe6f661aa4addbdcb893e49e37a8ca43f90e9",
+    "imageUrl": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:989ea8cf",
     "vpc": "enpa19j9jpki1f67p6kq",
     "serviceAccount": "ajegfv96md2tqri8gjdp",
-    "executionTimestamp": "2026-07-20T11:08:47.837Z",
-    "sourceCommit": "4f56a07e"
+    "executionTimestamp": "2026-07-20T11:51:47.898Z",
+    "sourceCommit": "989ea8cf"
   },
   "httpStatus": 200,
   "ok": true,
@@ -20,7 +20,7 @@
     "status": "REMOTE_PREFLIGHT_PASSED",
     "report": {
       "version": 2,
-      "generatedAt": "2026-07-20T11:08:43.188Z",
+      "generatedAt": "2026-07-20T11:51:43.802Z",
       "mode": "remote_execution_no_data",
       "status": "REMOTE_PREFLIGHT_PASSED",
       "productionChanged": false,
@@ -125,7 +125,7 @@
           {
             "name": "dns",
             "status": "PASS",
-            "durationMs": 9,
+            "durationMs": 8,
             "details": {
               "ok": true,
               "addressCount": 1,
@@ -146,7 +146,7 @@
           {
             "name": "yandex_ca_certificate",
             "status": "PASS",
-            "durationMs": 3,
+            "durationMs": 1,
             "details": {
               "ok": true,
               "file": "/app/certs/YandexInternalRootCA.crt",
@@ -159,7 +159,7 @@
           {
             "name": "postgres_auth",
             "status": "PASS",
-            "durationMs": 100,
+            "durationMs": 111,
             "details": {
               "ok": true,
               "query": "SELECT 1",
@@ -174,7 +174,7 @@
           {
             "name": "firebase_admin_initialization",
             "status": "PASS",
-            "durationMs": 539,
+            "durationMs": 451,
             "details": {
               "ok": true,
               "initializedApps": 1,
@@ -185,7 +185,7 @@
           {
             "name": "migration_manifests",
             "status": "PASS",
-            "durationMs": 0,
+            "durationMs": 1,
             "details": {
               "ok": true,
               "files": [
@@ -256,6 +256,100 @@
         "postgresWrites": 0
       },
       "nextSafeStep": "After explicit owner approval, create the first immutable Account Core production snapshot."
+    },
+    "checkpoint": {
+      "ok": true,
+      "status": "IMPORT_PASSED",
+      "dryRun": false,
+      "resume": true,
+      "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+      "startedAt": "2026-07-20T11:51:20.325Z",
+      "batches": [
+        {
+          "label": "profiles",
+          "batch": 1,
+          "size": 100,
+          "inserted": 0,
+          "updated": 0,
+          "skippedExisting": 100,
+          "committed": true,
+          "retryCount": 0
+        },
+        {
+          "label": "profiles",
+          "batch": 2,
+          "size": 26,
+          "inserted": 0,
+          "updated": 0,
+          "skippedExisting": 126,
+          "committed": true,
+          "retryCount": 0
+        },
+        {
+          "label": "roles",
+          "batch": 1,
+          "size": 100,
+          "inserted": 0,
+          "updated": 0,
+          "skippedExisting": 100,
+          "committed": true,
+          "retryCount": 0
+        },
+        {
+          "label": "roles",
+          "batch": 2,
+          "size": 26,
+          "inserted": 0,
+          "updated": 0,
+          "skippedExisting": 126,
+          "committed": true,
+          "retryCount": 0
+        },
+        {
+          "label": "cabinets",
+          "batch": 1,
+          "size": 4,
+          "inserted": 0,
+          "updated": 0,
+          "skippedExisting": 4,
+          "committed": true,
+          "retryCount": 0
+        },
+        {
+          "label": "telegramLinks",
+          "batch": 1,
+          "size": 7,
+          "inserted": 0,
+          "updated": 0,
+          "skippedExisting": 7,
+          "committed": true,
+          "retryCount": 0
+        }
+      ],
+      "productionChanged": true,
+      "firestoreChanged": false,
+      "firestoreWrites": 0,
+      "postgresWrites": 0,
+      "finishedAt": "2026-07-20T11:51:22.173Z",
+      "inserted": 0,
+      "updated": 0,
+      "skipped": 433,
+      "skippedExisting": 263,
+      "tableCountsBefore": {
+        "apg_account_profiles": 126,
+        "apg_account_roles": 126,
+        "apg_account_cabinets": 4,
+        "apg_account_telegram_links": 7,
+        "apg_account_sessions": 0
+      },
+      "tableCountsAfter": {
+        "apg_account_profiles": 126,
+        "apg_account_roles": 126,
+        "apg_account_cabinets": 4,
+        "apg_account_telegram_links": 7,
+        "apg_account_sessions": 0
+      },
+      "rollbackReady": true
     },
     "stdoutTail": "\n> apg-app@0.0.0 account:remote-preflight\n> node scripts/account-remote-preflight.mjs --execute\n\n{\n  \"status\": \"REMOTE_PREFLIGHT_PASSED\",\n  \"mode\": \"remote_execution_no_data\",\n  \"report\": \"backups/account-core/preflight/remote-preflight-redacted.json\",\n  \"productionNetwork\": {\n    \"backendRuntime\": \"Yandex Serverless Container\",\n    \"containerName\": \"apg-api\",\n    \"containerId\": \"bbangqkf2d4pa9855lu0\",\n    \"networkId\": \"enpa19j9jpki1f67p6kq\"\n  },\n  \"command\": \"APG_REMOTE_OPERATOR_RUNTIME=production-vpc APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute\",\n  \"blocked\": [],\n  \"productionDataReads\": 0,\n  \"firestoreReads\": 0,\n  \"productionChanged\": false,\n  \"deployStarted\": false,\n  \"postgresWrites\": 0,\n  \"secretsPrinted\": false\n}\n",
     "stderrTail": "",

@@ -4339,6 +4339,15 @@
 - `/api/identity-v2-admin` получил lightweight action `cutover-status`, который для pre/post cutover проверяет PostgreSQL counts, Identity flags и dependency monitor без полного Firestore snapshot, чтобы не ловить 30s timeout на операционном переключении.
 - Добавлен `npm run test:identity-controlled-cutover`: проверяет gate-based precheck, checkpoint-before-cutover, rollback readiness, monitoring report, запрет автоматического rollback/disable fallback/deploy и честную маркировку live-login checks.
 
+# 2026-07-20 — Account Core Production Import
+
+- Выполнен Account Core Import → Verify через `apg-migration-operator` в production VPC без изменения `apg-api`, feature flags, Canary или Cutover.
+- Импорт использует immutable snapshot `3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7`, resolution manifest и dry run gate.
+- Добавлен remote runner `account:operator:import` для управляемого import/resume/verify через operator endpoint.
+- Исправлено сохранение exact identity IDs для cabinet ownership, чтобы dry run и PostgreSQL FK использовали одну модель данных.
+- Исправлен idempotency key для `telegramLinks`; финальный resume прошёл с `0` inserts и `0` updates.
+- Verify подтвердил parity: profiles `126`, roles `126`, cabinets `4`, telegram links `7`, sessions `0`, orphan records `0`, duplicate canonical accounts `0`.
+
 # 2026-07-14 — Workspace Meetings CRM
 
 - Раздел `Встречи` в Desktop Workspace переведён на CRM-экран: KPI на сегодня/завтра/неделю, ожидания, переносы, завершения, неявки и отмены, поиск по клиенту/контактам/услуге, фильтры и создание встречи вручную.

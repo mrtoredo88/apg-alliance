@@ -194,9 +194,9 @@ async function main() {
 
   console.log(JSON.stringify({
     status: 'IMPORT_AND_VERIFY_PASSED',
-    importStatus: importResponse.report.status,
+    importStatus: finalImportReport.status,
     verifyStatus: verifyResponse.report.status,
-    snapshotSha256: importResponse.report.sourceSnapshotHash,
+    snapshotSha256: finalImportReport.sourceSnapshotHash,
     inserted: finalImportReport.inserted,
     updated: finalImportReport.updated,
     resumeInserted: resumeResponse.report.inserted,

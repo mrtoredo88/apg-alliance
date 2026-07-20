@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "status": "VERIFY_PASSED",
+  "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "countParity": true,
+  "expected": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 7,
+    "apg_account_sessions": 0
+  },
+  "actual": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 7,
+    "apg_account_sessions": 0
+  },
+  "duplicateCanonicalAccounts": 0,
+  "orphanRecords": 0,
+  "orphanBreakdown": {
+    "roles": 0,
+    "cabinets": 0,
+    "telegramLinks": 0,
+    "sessions": 0
+  },
+  "constraintViolations": 0,
+  "legacyAliasCount": 1,
+  "canonicalOwnerPreserved": true,
+  "rolesPreserved": true,
+  "cabinetsPreserved": true,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}
