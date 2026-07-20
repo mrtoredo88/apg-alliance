@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
 const urlList = (process.env.AUTH_LIFECYCLE_URLS || process.env.SMOKE_URL || 'https://myapg.ru/').split(',').map((url) => url.trim()).filter(Boolean);
@@ -31,6 +33,12 @@ const fatalMarkers = [
   'React error #300',
   'What happened',
 ];
+
+const userAppSource = fs.readFileSync('src/UserApp.jsx', 'utf8');
+assert.ok(userAppSource.includes('waitForInitialFirebaseAuth'), 'UserApp waits for Firebase auth restore before strong identity bootstrap');
+assert.ok(userAppSource.includes('hasStoredStrongIdentity'), 'UserApp detects stored email/Telegram identities before anonymous startup');
+assert.ok(userAppSource.includes("localStorage.getItem('apg_email_user') || localStorage.getItem('apg_tg_user')"), 'UserApp treats stored email/Telegram users as strong identities');
+assert.ok(userAppSource.includes("markFirebase('auth_restore_checked'"), 'UserApp records auth restore diagnostics');
 
 const ignoredConsoleErrors = [
   /ResizeObserver loop/i,

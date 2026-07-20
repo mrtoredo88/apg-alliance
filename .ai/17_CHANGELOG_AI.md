@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-20] fix: Email Session Restore Race
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/UserApp.jsx`, `scripts/auth-lifecycle-smoke.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- При наличии сохранённого email/Telegram профиля startup ждёт initial Firebase auth state перед запуском anonymous auth.
+- Добавлен regression guard, который запрещает возвращать anonymous startup race для strong identity restore.
+**Почему:** после успешного email login reload мог стартовать anonymous auth раньше восстановления Firebase custom-token session, затем `STRONG_IDENTITY_REQUIRED` удалял сохранённый профиль и пользователь снова видел экран авторизации.
+
 ## [2026-07-20] fix: Email Verify PostgreSQL Identity Creation
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/apg/identity/ApgIdentityV2Service.js`, `scripts/identity-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`

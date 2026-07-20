@@ -18,6 +18,7 @@ import {
   collection, getDocs, query, orderBy,
   where, getCountFromServer, limit,
 } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { apgIdentity } from './apg/index.js';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { EmailAuth } from './EmailAuth.jsx';
@@ -773,6 +774,24 @@ function waitForFirebaseUser(expectedUid, timeoutMs = 4200) {
   return apgIdentity.waitForIdentity(expectedUid, timeoutMs);
 }
 
+function waitForInitialFirebaseAuth(timeoutMs = 1800) {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  return new Promise(resolve => {
+    let done = false;
+    let timer = null;
+    let unsubscribe = null;
+    const finish = user => {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      if (unsubscribe) unsubscribe();
+      resolve(user || auth.currentUser || null);
+    };
+    unsubscribe = onAuthStateChanged(auth, finish, () => finish(auth.currentUser || null));
+    timer = setTimeout(() => finish(auth.currentUser || null), timeoutMs);
+  });
+}
+
 function signInAnonymousThroughIdentity() {
   return apgIdentity.authenticate({ provider: 'anonymous' });
 }
@@ -1475,11 +1494,30 @@ export function UserApp() {
     vkBridge.send('VKWebAppInit');
     markFirebase('firebase_start', { source: 'UserApp.loadData' });
     markFirebase('auth_start', { source: 'UserApp.loadData' });
+    const hasStoredStrongIdentity = (() => {
+      try {
+        return Boolean(localStorage.getItem('apg_email_user') || localStorage.getItem('apg_tg_user'));
+      } catch {
+        return false;
+      }
+    })();
     const authReady = Promise.resolve()
-      .then(() => ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
-        source: 'UserApp.loadData',
-        waitMs: 0,
-      }))
+      .then(async () => {
+        if (hasStoredStrongIdentity) {
+          const restored = await waitForInitialFirebaseAuth(1800);
+          markFirebase('auth_restore_checked', {
+            source: 'UserApp.loadData',
+            hasStoredStrongIdentity,
+            restored: Boolean(restored),
+            uid: restored?.uid ?? null,
+          });
+          return restored;
+        }
+        return ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
+          source: 'UserApp.loadData',
+          waitMs: 0,
+        });
+      })
       .catch(e => {
         logError(e, 'UserApp.auth.anonymous');
         markFirebaseStartup('firebase_retry', {
