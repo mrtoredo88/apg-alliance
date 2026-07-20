@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { appendReviewAudit } from '../src/admin/identity/review/index.js';
+import { createImmutableVerifyPackage } from './identity-verify-lock.mjs';
 
 const BACKUP_DIR = 'backups/identity';
 const VERIFY_DIR = path.join(BACKUP_DIR, 'verify');
@@ -218,6 +219,8 @@ function runVerify() {
     table(['Item', 'Status'], report.checks.map(item => [item.label, item.status])),
     '',
   ].join('\n'));
+  let immutablePackage = null;
+  if (!failed.length) immutablePackage = createImmutableVerifyPackage();
   appendReviewAudit({
     event: failed.length ? 'VERIFY_FAILED' : 'VERIFY_PASSED',
     conflictId: null,
@@ -226,17 +229,21 @@ function runVerify() {
     previousDecision: null,
     fingerprint: report.sourceHashes.manifestPath,
   });
-  return { report, files: { jsonPath, redactedJsonPath, mdPath, redactedMdPath, summaryPath, checklistPath } };
+  return { report, immutablePackage, files: { jsonPath, redactedJsonPath, mdPath, redactedMdPath, summaryPath, checklistPath } };
 }
 
 try {
-  const { report, files } = runVerify();
+  const { report, immutablePackage, files } = runVerify();
   console.log('Identity Verify');
   console.log(`Status: ${report.status}`);
   console.log(`Checks: ${report.checks.filter(item => item.status === 'PASS').length}/${report.checks.length}`);
   console.log(`Ready for Canary: ${report.readyForCanary}`);
   console.log(`Canary: ${report.gates.canary}`);
   console.log(`Cutover: ${report.gates.cutover}`);
+  if (immutablePackage) {
+    console.log(`Immutable Package: ${immutablePackage.packageDir}`);
+    console.log(`Signature: ${immutablePackage.lock.signatureHash}`);
+  }
   console.log(`Report: ${files.mdPath}`);
   console.log(`JSON: ${files.jsonPath}`);
   console.log(`Redacted report: ${files.redactedMdPath}`);

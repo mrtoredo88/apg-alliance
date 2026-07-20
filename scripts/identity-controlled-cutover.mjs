@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { validateVerifyLock } from './identity-verify-lock.mjs';
 
 const ROOT = process.cwd();
 const OUT_DIR = 'backups/identity/cutover';
@@ -93,13 +94,16 @@ function summarizeStatus(status = {}) {
   };
 }
 
-function validateCanary(canary, manifest, verify, dryRun) {
+function validateCanary(canary, manifest, dryRun, verifyLock) {
   return [
     check('Canary passed', canary.status === 'CANARY_PASSED', { status: canary.status }),
     check('Ready for Cutover', canary.readyForCutover === 'YES', { readyForCutover: canary.readyForCutover }),
     check('Cutover locked before execution', canary.cutover === 'LOCKED', { cutover: canary.cutover }),
+    check('VERIFY_LOCK exists', verifyLock.ok === true, { packageDir: verifyLock.packageDir, reason: verifyLock.reason }),
+    check('VERIFY_LOCK immutable', verifyLock.lock?.immutable === true, { immutable: verifyLock.lock?.immutable }),
+    check('VERIFY_LOCK signature valid', verifyLock.ok === true, { signatureHash: verifyLock.lock?.signatureHash }),
     check('Manifest hash unchanged', canary.sourceHashes?.manifest === sha(manifest), { expected: canary.sourceHashes?.manifest, actual: sha(manifest) }),
-    check('Verify hash unchanged', canary.sourceHashes?.verify === sha(verify), { expected: canary.sourceHashes?.verify, actual: sha(verify) }),
+    check('VERIFY_LOCK signature unchanged', canary.sourceHashes?.verifyLock === verifyLock.lock?.signatureHash, { expected: canary.sourceHashes?.verifyLock, actual: verifyLock.lock?.signatureHash }),
     check('Dry Run hash unchanged', canary.sourceHashes?.dryRun === sha(dryRun), { expected: canary.sourceHashes?.dryRun, actual: sha(dryRun) }),
     check('Every canary step passed invariants', (canary.steps || []).every(step => step.invariants?.passed === true), { steps: (canary.steps || []).length }),
     check('Every canary step has rollback', (canary.steps || []).every(step => step.rollback?.available === true), { steps: (canary.steps || []).length }),
@@ -195,9 +199,9 @@ function writeReports(report, manifest) {
 async function run() {
   loadEnv(path.join(ROOT, 'server/.env'));
   const manifest = readJson('backups/identity/resolution-manifest-v2.json');
-  const verify = readJson('backups/identity/verify/verify-report.json');
   const dryRun = readJson('backups/identity/dryrun/dry-run-report.json');
   const canary = readJson('backups/identity/canary/canary-report.json');
+  const verifyLock = validateVerifyLock();
   const gitCommit = shell(['git', 'rev-parse', '--short', 'HEAD']);
   const tagTarget = shell(['git', 'rev-list', '-n', '1', 'identity-migration-v1-canary-passed']);
   const backendRevisionsRaw = shell(['yc', 'serverless', 'container', 'revision', 'list', '--container-name', 'apg-api', '--format', 'json'], '[]');
@@ -206,7 +210,7 @@ async function run() {
   const preChecks = [
     check('Git tag identity-migration-v1-canary-passed exists', Boolean(tagTarget), { tag: 'identity-migration-v1-canary-passed' }),
     check('Current commit is available for audit', Boolean(gitCommit), { commit: gitCommit, canaryTagTarget: tagTarget ? tagTarget.slice(0, 12) : '' }),
-    ...validateCanary(canary, manifest, verify, dryRun),
+    ...validateCanary(canary, manifest, dryRun, verifyLock),
     ...validatePreStatus(preStatus),
   ];
   const precheck = {
@@ -214,7 +218,8 @@ async function run() {
     apiBase: API_BASE.replace(/https?:\/\/([^/]+).*/, 'https://$1/...'),
     git: { commit: gitCommit, canaryTag: 'identity-migration-v1-canary-passed', tagTarget: tagTarget ? tagTarget.slice(0, 12) : '' },
     backend: { revision: backendRevision },
-    sourceHashes: { manifest: sha(manifest), verify: sha(verify), dryRun: sha(dryRun), canary: sha(canary) },
+    sourceHashes: { manifest: sha(manifest), verifyLock: verifyLock.lock?.signatureHash || null, dryRun: sha(dryRun), canary: sha(canary) },
+    verifyLock: verifyLock.ok ? { packageDir: verifyLock.packageDir, version: verifyLock.version, signatureHash: verifyLock.lock.signatureHash, packageHash: verifyLock.lock.packageHash } : verifyLock,
     status: summarizeStatus(preStatus),
     checks: preChecks,
   };

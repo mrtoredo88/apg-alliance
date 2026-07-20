@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Immutable Verify Package v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/identity-verify-lock.mjs`, `scripts/identity-verify-lock-test.mjs`, `scripts/identity-verify.mjs`, `scripts/identity-canary.mjs`, `scripts/identity-controlled-cutover.mjs`, `scripts/identity-verify-drift.mjs`, `scripts/identity-canary-test.mjs`, `scripts/identity-controlled-cutover-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен immutable Verify Package с versioned директориями `verify-package-vN`, `VERIFY_LOCK.json`, `signature.json`, package hash и lock validation CLI.
+- Успешный `identity:verify` больше не полагается только на mutable verify report: он создаёт новый immutable package, не перезаписывая старые версии.
+- Canary и Controlled Cutover переведены на `VERIFY_LOCK.signatureHash`; Verify Drift учитывает lock и оставляет legacy canary без lock как intentionally unsafe.
+**Почему:** Controlled Cutover не должен зависеть от пересоздаваемого `verify-report.json`; Verify должен становиться неизменяемым gate artifact перед Canary/Cutover.
+
 ## [2026-07-20] chore: Verify Drift Root Cause Analysis v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/identity-verify-drift.mjs`, `scripts/identity-verify-drift-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { validateVerifyLock } from './identity-verify-lock.mjs';
 
 const ROOT = process.cwd();
 const OUT_DIR = 'backups/identity/canary';
@@ -146,7 +147,28 @@ async function runRemote({ manifest, verifyReport, dryRunReport }) {
 
 async function run() {
   const manifest = readJson(requireFile('backups/identity/resolution-manifest-v2.json', 'resolution manifest'));
-  const verifyReport = readJson(requireFile('backups/identity/verify/verify-report.json', 'verify report'));
+  const verifyLock = validateVerifyLock();
+  if (!verifyLock.ok) {
+    const report = {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      status: 'CANARY_STOPPED',
+      readyForCutover: 'NO',
+      cutover: 'LOCKED',
+      stopReason: `VERIFY_LOCK_INVALID:${verifyLock.reason}`,
+      verifyLock,
+      steps: [],
+      changedDocuments: [],
+    };
+    const files = writeReports(report);
+    console.log('Identity Canary Execution');
+    console.log(`Status: ${report.status}`);
+    console.log(`Stop reason: ${report.stopReason}`);
+    console.log(`Report: ${files.summaryPath}`);
+    process.exitCode = 1;
+    return;
+  }
+  const verifyReport = readJson(requireFile(path.join(verifyLock.packageDir, 'verify-report.json'), 'immutable verify report'));
   const dryRunReport = readJson(requireFile('backups/identity/dryrun/dry-run-report.json', 'dry-run report'));
   let result;
   try {
@@ -169,8 +191,16 @@ async function run() {
     ...result,
     sourceHashes: {
       manifest: hash(manifest),
-      verify: hash(verifyReport),
+      verifyLock: verifyLock.lock.signatureHash,
+      verifyPackage: hash(verifyLock.lock),
       dryRun: hash(dryRunReport),
+    },
+    verifyLock: {
+      packageDir: verifyLock.packageDir,
+      version: verifyLock.version,
+      signatureHash: verifyLock.lock.signatureHash,
+      packageHash: verifyLock.lock.packageHash,
+      immutable: verifyLock.lock.immutable === true,
     },
   };
   const files = writeReports(report);

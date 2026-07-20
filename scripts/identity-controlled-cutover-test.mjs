@@ -20,8 +20,11 @@ const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 [
   'Canary passed',
   'Ready for Cutover',
+  'VERIFY_LOCK exists',
+  'VERIFY_LOCK immutable',
+  'VERIFY_LOCK signature valid',
   'Manifest hash unchanged',
-  'Verify hash unchanged',
+  'VERIFY_LOCK signature unchanged',
   'Dry Run hash unchanged',
   'Every canary step passed invariants',
   'Every canary step has rollback',

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { validateVerifyLock } from './identity-verify-lock.mjs';
 
 const BACKUP_DIR = 'backups/identity';
 const OUT_DIR = path.join(BACKUP_DIR, 'verify-drift');
@@ -95,22 +96,26 @@ function classifyChange({ field, oldValue, newValue, reason, evidence = 'direct'
   };
 }
 
-function buildStructuralDiff({ canary, verify, sourceHashes, audit }) {
+function buildStructuralDiff({ canary, verify, sourceHashes, audit, verifyLock }) {
   const canaryTime = Date.parse(canary.generatedAt || canary.finishedAt || 0);
   const verifyTime = Date.parse(verify.generatedAt || 0);
+  const expectedLock = canary.sourceHashes?.verifyLock || null;
+  const currentLock = verifyLock.lock?.signatureHash || null;
   const postCanaryVerifyEvents = audit.filter(item => (
     (item.event === 'VERIFY_STARTED' || item.event === 'VERIFY_PASSED') &&
     Date.parse(item.timestamp || 0) > canaryTime
   ));
   const changes = [
     classifyChange({
-      field: 'verifyReport.hash',
-      oldValue: canary.sourceHashes?.verify || EXPECTED_VERIFY_HASH,
-      newValue: hash(verify),
+      field: expectedLock ? 'verifyLock.signatureHash' : 'legacyVerifyReport.hash',
+      oldValue: expectedLock || canary.sourceHashes?.verify || EXPECTED_VERIFY_HASH,
+      newValue: expectedLock ? currentLock : hash(verify),
       category: 'CATEGORY A',
       impact: 'Operational',
       evidence: 'direct',
-      reason: 'The canary-bound verify hash no longer matches the current verify-report.json hash.',
+      reason: expectedLock
+        ? 'The canary-bound VERIFY_LOCK signature is compared against the current immutable package signature.'
+        : 'Legacy Canary retained only verify-report hash; immutable VERIFY_LOCK was not available for that Canary.',
     }),
     classifyChange({
       field: 'verifyReport.generatedAt',
@@ -265,7 +270,25 @@ function summarizeBusiness({ manifest, dryRun, invariants, readiness, verify, ca
   };
 }
 
-function buildHashContribution({ canary, verify, sourceHashes, structuralDiff }) {
+function buildHashContribution({ canary, verify, sourceHashes, structuralDiff, verifyLock }) {
+  if (canary.sourceHashes?.verifyLock) {
+    return {
+      exactContributionAvailable: true,
+      reasonExactContributionUnavailable: null,
+      knownContributors: [
+        {
+          field: 'VERIFY_LOCK.signatureHash',
+          category: 'CATEGORY A',
+          impact: 'Operational',
+          contribution: canary.sourceHashes.verifyLock === verifyLock.lock?.signatureHash ? '100% stable package signature' : 'Changed package signature',
+        },
+      ],
+      excludedAsContributors: [],
+      changedFieldCount: structuralDiff.filter(item => item.oldValue !== item.newValue).length,
+      currentVerifyHash: verifyLock.lock?.signatureHash || null,
+      expectedVerifyHash: canary.sourceHashes.verifyLock,
+    };
+  }
   const exactAvailable = false;
   const changed = structuralDiff.filter(item => item.oldValue !== item.newValue);
   return {
@@ -372,13 +395,15 @@ function run() {
   const invariants = readJson(SOURCE_FILES.invariants);
   const readiness = readJson(SOURCE_FILES.readiness);
   const audit = auditEvents();
+  const verifyLock = validateVerifyLock();
   const sourceHashes = Object.fromEntries(Object.entries(SOURCE_FILES).map(([key, file]) => [key, fs.existsSync(file) ? fileHash(file, 12) : null]));
   const currentVerifyHash = hash(verify);
-  const expectedVerifyHash = canary.sourceHashes?.verify || EXPECTED_VERIFY_HASH;
-  const structuralDiff = buildStructuralDiff({ canary, verify, sourceHashes, audit });
+  const expectedVerifyHash = canary.sourceHashes?.verifyLock || canary.sourceHashes?.verify || EXPECTED_VERIFY_HASH;
+  const currentGateHash = canary.sourceHashes?.verifyLock ? verifyLock.lock?.signatureHash : currentVerifyHash;
+  const structuralDiff = buildStructuralDiff({ canary, verify, sourceHashes, audit, verifyLock });
   const business = summarizeBusiness({ manifest, dryRun, invariants, readiness, verify, canary, sourceHashes });
-  const hashContribution = buildHashContribution({ canary, verify, sourceHashes, structuralDiff });
-  const oldVerifyArtifactAvailable = false;
+  const hashContribution = buildHashContribution({ canary, verify, sourceHashes, structuralDiff, verifyLock });
+  const oldVerifyArtifactAvailable = Boolean(canary.sourceHashes?.verifyLock && verifyLock.ok);
   const manifestSafe = business.manifest.unchanged === true;
   const dryRunSafe = business.dryRun.unchanged === true;
   const businessSafe = manifestSafe && dryRunSafe && business.invariants.blockingCount === 0 && business.review.deferred === 0 && business.review.unresolved === 0 && business.review.stale === 0;
@@ -388,9 +413,13 @@ function run() {
     : businessSafe
       ? 'NOT SAFE - Repeat Verify Required'
       : 'Unsafe - Unexpected production drift';
-  const rootCause = 'verify-report.json was regenerated after Canary, while the canary-bound old verify payload was not retained for structural comparison.';
+  const rootCause = canary.sourceHashes?.verifyLock
+    ? 'Verify gate is bound to immutable VERIFY_LOCK; mutable verify-report regeneration is no longer a cutover blocker.'
+    : 'verify-report.json was regenerated after Canary, while the canary-bound old verify payload was not retained for structural comparison.';
   const recommendation = businessSafe
-    ? 'Do not update the baseline from this report alone. Re-run the gate sequence that intentionally produces and preserves a new Verify artifact, then bind a fresh Canary to that artifact before Controlled Cutover.'
+    ? canary.sourceHashes?.verifyLock
+      ? 'Proceed only if Canary and Cutover gates both reference this VERIFY_LOCK signature.'
+      : 'Do not update the baseline from this report alone. Re-run the gate sequence that intentionally produces and preserves a new Verify artifact, then bind a fresh Canary to that artifact before Controlled Cutover.'
     : 'Do not proceed. Investigate the changed business source hashes before any baseline update, Canary, or Cutover.';
   const report = {
     version: 1,
@@ -401,12 +430,19 @@ function run() {
     safetyClassification,
     hashes: {
       expectedVerify: expectedVerifyHash,
-      currentVerify: currentVerifyHash,
+      currentVerify: currentGateHash,
       expectedManifest: canary.sourceHashes?.manifest || null,
       currentManifest: sourceHashes.manifest,
       expectedDryRun: canary.sourceHashes?.dryRun || null,
       currentDryRun: sourceHashes.dryRun,
     },
+    verifyLock: verifyLock.ok ? {
+      packageDir: verifyLock.packageDir,
+      version: verifyLock.version,
+      signatureHash: verifyLock.lock.signatureHash,
+      packageHash: verifyLock.lock.packageHash,
+      valid: true,
+    } : verifyLock,
     timeline: {
       canaryGeneratedAt: canary.generatedAt,
       currentVerifyGeneratedAt: verify.generatedAt,
@@ -419,7 +455,9 @@ function run() {
     oldVerifyArtifact: {
       available: oldVerifyArtifactAvailable,
       searchedPaths: [CURRENT_VERIFY_PATH, path.join(BACKUP_DIR, 'verify')],
-      impact: 'Full structural diff against the canary-bound old verify payload cannot be completed without this artifact.',
+      impact: oldVerifyArtifactAvailable
+        ? 'Immutable VERIFY_LOCK is available; mutable verify-report drift is not used as the cutover gate.'
+        : 'Full structural diff against the canary-bound old verify payload cannot be completed without this artifact.',
     },
     structuralDiff,
     hashContribution,
@@ -464,7 +502,7 @@ function run() {
   console.log(`Status: ${report.status}`);
   console.log(`Root Cause: ${report.rootCause}`);
   console.log(`Safety: ${report.safetyClassification}`);
-  console.log(`Verify Hash: ${expectedVerifyHash} -> ${currentVerifyHash}`);
+  console.log(`Verify Gate Hash: ${expectedVerifyHash} -> ${currentGateHash}`);
   console.log(`Manifest: ${manifestSafe ? 'UNCHANGED' : 'CHANGED'}`);
   console.log(`Dry Run: ${dryRunSafe ? 'UNCHANGED' : 'CHANGED'}`);
   console.log(`Report: ${files.md}`);
