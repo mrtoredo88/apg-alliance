@@ -23,6 +23,10 @@ function canaryAllowed(userId) {
   return allowlist.length === 0 || allowlist.includes(String(userId));
 }
 
+function canaryModeEnabled() {
+  return ['1', 'true', 'on'].includes(String(process.env.ACCOUNT_CANARY || '').toLowerCase());
+}
+
 function publicProfile(profile = null) {
   if (!profile) return null;
   const {
@@ -89,6 +93,9 @@ export default async function accountRoutes(fastify) {
         ? requestedUserId
         : decoded.uid;
       const canary = canaryAllowed(userId);
+      if (canaryModeEnabled() && !canary) {
+        return reply.code(403).send({ ok: false, code: 'ACCOUNT_CANARY_NOT_ALLOWED', error: 'Account Core canary недоступен для пользователя.' });
+      }
       const result = await serverFoundation.account.bootstrapAccount({
         userId,
         firebaseUid: decoded.uid,

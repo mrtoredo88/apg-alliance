@@ -130,7 +130,7 @@ async function bootstrapSmoke(user) {
     timings.push(Date.now() - started);
     if (!res.ok || data.ok !== true) throw Object.assign(new Error('ACCOUNT_BOOTSTRAP_FAILED'), { status: res.status, code: data.code });
     if (data.canary !== true) throw new Error('ACCOUNT_CANARY_FLAG_NOT_ACTIVE');
-    if (data.source?.storage !== 'firestore') throw new Error('ACCOUNT_CANARY_STORAGE_UNEXPECTED');
+    if (data.source?.storage !== 'postgres') throw new Error('ACCOUNT_CANARY_STORAGE_UNEXPECTED');
     if (!data.profile || !Array.isArray(data.roles) || !Array.isArray(data.cabinets)) throw new Error('ACCOUNT_BOOTSTRAP_SHAPE_INVALID');
     last = data;
   }
@@ -143,6 +143,7 @@ async function bootstrapSmoke(user) {
     maxLatencyMs: Math.max(...timings),
     roles: last.roles,
     cabinetCount: last.cabinets.length,
+    sessionObserved: Boolean(last.session?.id),
     source: last.source,
   };
 }
@@ -152,7 +153,7 @@ function runDeploy(allowlist) {
     encoding: 'utf8',
     env: {
       ...process.env,
-      ACCOUNT_STORAGE_OVERRIDE: 'firestore',
+      ACCOUNT_STORAGE_OVERRIDE: 'postgres',
       ACCOUNT_DUAL_READ_OVERRIDE: '1',
       ACCOUNT_DUAL_WRITE_OVERRIDE: '0',
       ACCOUNT_FALLBACK_OVERRIDE: '1',
@@ -187,6 +188,7 @@ async function main() {
   const checks = [];
   for (const user of selected) checks.push(await bootstrapSmoke(user));
   const successRate = checks.filter(item => item.ok).length / checks.length;
+  const sessionWriteUpperBound = checks.filter(item => item.sessionObserved).length;
   const report = {
     status: successRate === 1 ? 'CANARY_PASSED' : 'CANARY_FAILED',
     generatedAt: new Date().toISOString(),
@@ -203,7 +205,7 @@ async function main() {
       firestoreAccountCoreReads: 0,
       firestoreAccountCoreWrites: 0,
       postgresAccountCoreReads: checks.length * 3,
-      postgresAccountCoreWrites: 0,
+      postgresAccountCoreWritesUpperBound: sessionWriteUpperBound,
       p0: 0,
       p1: 0,
     },
@@ -224,6 +226,7 @@ async function main() {
     `Canary users: ${report.canaryUsers.length}`,
     `Success rate: ${Math.round(successRate * 100)}%`,
     `Firestore Account Core writes: ${report.metrics.firestoreAccountCoreWrites}`,
+    `PostgreSQL Account Core writes upper bound: ${report.metrics.postgresAccountCoreWritesUpperBound}`,
     `P0/P1: ${report.metrics.p0}/${report.metrics.p1}`,
     '',
     'Cutover: NOT RUN',

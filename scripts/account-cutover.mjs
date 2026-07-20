@@ -139,6 +139,7 @@ async function bootstrapUser(user) {
     latencyMs: Date.now() - started,
     roleCount: data.roles.length,
     cabinetCount: data.cabinets?.length || 0,
+    sessionObserved: Boolean(data.session?.id),
     source: data.source,
   };
 }
@@ -173,6 +174,7 @@ async function main() {
   const deployedBackend = deployBackendPostgres();
   const backendRevision = latestBackendRevision();
   const postChecks = await smokeFromSnapshot(precheck.canary);
+  const sessionWriteUpperBound = postChecks.filter(item => item.sessionObserved).length;
   const outage = runRequired('firestore_outage_simulation', 'npm', ['run', 'test:account-firestore-outage']);
   const readinessAccount = runRequired('readiness_account', 'npm', ['run', 'readiness:account']);
   const build = runRequired('build_verification', 'npm', ['run', 'build']);
@@ -202,7 +204,7 @@ async function main() {
     firestoreAccountCoreReads: 0,
     firestoreAccountCoreWrites: 0,
     postgresAccountCoreReads: postChecks.length,
-    postgresAccountCoreWrites: 0,
+    postgresAccountCoreWritesUpperBound: sessionWriteUpperBound,
     firestoreOutageSimulation: 'PASSED',
     apgHealth: 'PASS',
     rollbackReadiness: 'READY',
@@ -240,7 +242,7 @@ async function main() {
     `- Firestore Account Core reads: ${report.firestoreAccountCoreReads}`,
     `- Firestore Account Core writes: ${report.firestoreAccountCoreWrites}`,
     `- PostgreSQL Account Core reads: ${report.postgresAccountCoreReads}`,
-    `- PostgreSQL Account Core writes: ${report.postgresAccountCoreWrites}`,
+    `- PostgreSQL Account Core writes upper bound: ${report.postgresAccountCoreWritesUpperBound}`,
     '',
     '## Final Status',
     '',
