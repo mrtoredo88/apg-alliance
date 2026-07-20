@@ -140,14 +140,20 @@
     "test:account-core-guard": "node scripts/account-core-architecture-guard.mjs",
     "test:account-integration": "node scripts/account-integration-test.mjs",
     "test:account-firestore-outage": "node scripts/account-firestore-outage-test.mjs",
+    "account:preflight": "node scripts/account-production-preflight.mjs",
+    "account:snapshot": "node scripts/account-snapshot.mjs",
+    "account:conflicts": "node scripts/account-conflicts.mjs",
     "account:import": "node scripts/account-core-import.mjs",
     "account:dry-run": "node scripts/account-dry-run.mjs",
     "account:verify": "node scripts/account-verify.mjs",
+    "account:drift": "node scripts/account-drift.mjs",
     "account:canary": "node scripts/account-canary.mjs",
+    "account:observe": "node scripts/account-observe.mjs",
     "account:cutover": "node scripts/account-cutover.mjs",
     "account:rollback": "node scripts/account-rollback.mjs",
     "readiness:account": "node scripts/account-readiness.mjs",
-    "readiness:event": "node scripts/event-readiness.mjs"
+    "readiness:event": "node scripts/event-readiness.mjs",
+    "readiness:production": "node scripts/production-readiness.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

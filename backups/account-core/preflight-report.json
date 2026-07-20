@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "migration": "account-core-production-v1",
+  "status": "PREFLIGHT_BLOCKED",
+  "generatedAt": "2026-07-20T08:57:46.874Z",
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "postgresWrites": 0,
+  "importStarted": false,
+  "snapshotStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false,
+  "branch": "migration/account-core-production-v1",
+  "currentCommit": "fedb2135",
+  "sourceCommit": "fedb2135",
+  "expectedCommit": "fedb2135",
+  "checks": [
+    {
+      "name": "working_tree_clean",
+      "ok": false,
+      "durationMs": 0,
+      "details": {
+        "clean": false,
+        "statusLines": [
+          "M .DS_Store",
+          " M .ai/17_CHANGELOG_AI.md",
+          " M .gitignore",
+          " M package.json",
+          "?? .ai/00_START_HERE.md",
+          "?? .ai/01_PROJECT_OVERVIEW.md",
+          "?? .ai/02_ARCHITECTURE.md",
+          "?? .ai/03_DATABASE.md",
+          "?? .ai/06_BACKEND.md",
+          "?? .ai/09_BUSINESS_LOGIC.md",
+          "?? .ai/10_CODING_RULES.md",
+          "?? .ai/14_ROADMAP.md",
+          "?? .ai/15_KNOWN_PROBLEMS.md",
+          "?? .ai/16_DECISIONS.md",
+          "?? .ai/18_AGENT_WORKFLOW.md",
+          "?? .ai/19_PROMPTS.md",
+          "?? .ai/20_GLOSSARY.md",
+          "?? .ai/memory/",
+          "?? .ai/templates/",
+          "?? AGENTS.md",
+          "?? AGENTS2.md",
+          "?? CLAUDE.md",
+          "?? apg-final-home-dark-d562ee02.png",
+          "?? apg-final-home-light-d562ee02.png",
+          "?? apg-final-partners-dark-d562ee02.png",
+          "?? apg-final-partners-light-d562ee02.png",
+          "?? apg-final-profile-dark-d562ee02.png",
+          "?? apg-final-profile-light-d562ee02.png",
+          "?? apg-final-workspace-dark-d562ee02.png",
+          "?? apg-final-workspace-light-d562ee02.png",
+          "?? apg-prod-runtime-check.mjs",
+          "?? apg-prod-target-smoke.mjs",
+          "?? apg-theme-home-dark-682ed807.png",
+          "?? apg-theme-home-light-682ed807.png",
+          "?? apg-theme-partners-dark-682ed807.png",
+          "?? apg-theme-partners-light-682ed807.png",
+          "?? apg-theme-workspace-dark-682ed807.png",
+          "?? apg-theme-workspace-light-682ed807.png",
+          "?? backups/account-core/preflight-report.json",
+          "?? backups/identity/"
+        ],
+        "omittedStatusLines": 98
+      }
+    },
+    {
+      "name": "expected_source_commit",
+      "ok": true,
+      "durationMs": 0,
+      "details": {
+        "currentCommit": "fedb2135",
+        "sourceCommit": "fedb2135",
+        "expected": "fedb2135",
+        "sourceIsAncestor": true
+      }
+    },
+    {
+      "name": "production_frontend_version",
+      "ok": true,
+      "durationMs": 19,
+      "details": {
+        "ok": true,
+        "status": 200,
+        "body": {
+          "v": "b526041e"
+        }
+      }
+    },
+    {
+      "name": "production_backend_health",
+      "ok": true,
+      "durationMs": 0,
+      "details": {
+        "ok": true,
+        "status": 200,
+        "body": {
+          "ok": true,
+          "ts": 1784537867113
+        }
+      }
+    },
+    {
+      "name": "postgres_connectivity",
+      "ok": false,
+      "durationMs": 0,
+      "details": {
+        "configured": false,
+        "connected": false,
+        "schemaApplied": false,
+        "reason": "POSTGRES_DSN_NOT_CONFIGURED"
+      }
+    },
+    {
+      "name": "firebase_firestore_read_access",
+      "ok": false,
+      "durationMs": 0,
+      "details": {
+        "configured": false,
+        "readable": false,
+        "reason": "FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED"
+      }
+    },
+    {
+      "name": "local_snapshot_space",
+      "ok": true,
+      "durationMs": 0,
+      "details": {
+        "df": "/dev/disk3s1   239331776 153917264  52011216    75%    /System/Volumes/Data"
+      }
+    },
+    {
+      "name": "rollback_commands",
+      "ok": true,
+      "durationMs": 0,
+      "details": {
+        "accountRollbackScript": true
+      }
+    },
+    {
+      "name": "monitoring_surface",
+      "ok": true,
+      "durationMs": 1,
+      "details": {
+        "systemStatusRoute": true,
+        "accountSnapshot": true
+      }
+    },
+    {
+      "name": "test:account-core",
+      "ok": true,
+      "durationMs": 137,
+      "details": {
+        "script": "test:account-core",
+        "ok": true,
+        "status": 0,
+        "stdoutTail": "\n> apg-app@0.0.0 test:account-core\n> node scripts/account-core-test.mjs\n\n{\n  \"ok\": true,\n  \"scenarios\": 96,\n  \"coverage\": {\n    \"postgresRepositories\": 100,\n    \"sessionRestore\": 100,\n    \"roleResolution\": 100,\n    \"profileBootstrap\": 100,\n    \"workspaceBootstrap\": 100,\n    \"firestoreFallbackSimulation\": 100\n  }\n}\n",
+        "stderrTail": ""
+      }
+    },
+    {
+      "name": "test:account-core-guard",
+      "ok": true,
+      "durationMs": 132,
+      "details": {
+        "script": "test:account-core-guard",
+        "ok": true,
+        "status": 0,
+        "stdoutTail": "\n> apg-app@0.0.0 test:account-core-guard\n> node scripts/account-core-architecture-guard.mjs\n\n{\n  \"ok\": true,\n  \"rule\": \"account_core_uses_repositories_not_firestore\",\n  \"checked\": 20\n}\n",
+        "stderrTail": ""
+      }
+    },
+    {
+      "name": "test:account-integration",
+      "ok": true,
+      "durationMs": 130,
+      "details": {
+        "script": "test:account-integration",
+        "ok": true,
+        "status": 0,
+        "stdoutTail": "\n> apg-app@0.0.0 test:account-integration\n> node scripts/account-integration-test.mjs\n\n{\n  \"ok\": true,\n  \"scenarios\": 120,\n  \"coverage\": {\n    \"accountBootstrap\": 100,\n    \"profileUpdatePathPrepared\": 70,\n    \"rolesCabinets\": 100,\n    \"ownerAdminAccess\": 100,\n    \"workspaceBootstrap\": 100,\n    \"fallbackBehavior\": 100,\n    \"canaryAllowlist\": 100,\n    \"duplicateRetryIdempotencyImporter\": 80\n  }\n}\n",
+        "stderrTail": ""
+      }
+    },
+    {
+      "name": "test:account-firestore-outage",
+      "ok": true,
+      "durationMs": 136,
+      "details": {
+        "script": "test:account-firestore-outage",
+        "ok": true,
+        "status": 0,
+        "stdoutTail": "\n> apg-app@0.0.0 test:account-firestore-outage\n> node scripts/account-firestore-outage-test.mjs\n\n{\n  \"ok\": true,\n  \"scenarios\": 80,\n  \"firestoreFallbackDisabled\": true,\n  \"sessionRestore\": \"PASS\",\n  \"profileRead\": \"PASS\",\n  \"roleResolution\": \"PASS\",\n  \"cabinets\": \"PASS\",\n  \"ownerAdminAccess\": \"PASS\",\n  \"homeBootstrap\": \"PASS\",\n  \"workspaceBootstrap\": \"PASS\"\n}\n",
+        "stderrTail": ""
+      }
+    },
+    {
+      "name": "readiness:account",
+      "ok": true,
+      "durationMs": 200,
+      "details": {
+        "script": "readiness:account",
+        "ok": true,
+        "status": 0,
+        "stdoutTail": "\n> apg-app@0.0.0 readiness:account\n> node scripts/account-readiness.mjs\n\n{\n  \"ok\": true,\n  \"rule\": \"account_core_uses_repositories_not_firestore\",\n  \"checked\": 20\n}\n{\n  \"ok\": true,\n  \"scenarios\": 96,\n  \"coverage\": {\n    \"postgresRepositories\": 100,\n    \"sessionRestore\": 100,\n    \"roleResolution\": 100,\n    \"profileBootstrap\": 100,\n    \"workspaceBootstrap\": 100,\n    \"firestoreFallbackSimulation\": 100\n  }\n}\n{\n  \"ok\": true,\n  \"mode\": \"local_account_readiness\",\n  \"productionChanged\": false,\n  \"firestoreChanged\": false,\n  \"deployStarted\": false,\n  \"checks\": [\n    {\n      \"name\": \"Session restore\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Role resolution\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Workspace bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Profile bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Home bootstrap\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Postgres\",\n      \"ok\": true,\n      \"configured\": false\n    },\n    {\n      \"name\": \"Firestore fallback\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Feature flags\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Architecture guards\",\n      \"ok\": true\n    }\n  ]\n}\n",
+        "stderrTail": ""
+      }
+    },
+    {
+      "name": "readiness:event",
+      "ok": true,
+      "durationMs": 304,
+      "details": {
+        "script": "readiness:event",
+        "ok": true,
+        "status": 0,
+        "stdoutTail": "\n> apg-app@0.0.0 readiness:event\n> node scripts/event-readiness.mjs\n\n{\n  \"ok\": true,\n  \"mode\": \"local_event_readiness\",\n  \"productionChanged\": false,\n  \"realEmailTelegramMessagesSent\": false,\n  \"checks\": [\n    {\n      \"name\": \"Account Core readiness\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Account Core Firestore outage simulation\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"Architecture guard\",\n      \"ok\": true\n    }\n  ]\n}\n",
+        "stderrTail": ""
+      }
+    }
+  ],
+  "blockers": [
+    {
+      "name": "working_tree_clean",
+      "error": "FAILED"
+    },
+    {
+      "name": "postgres_connectivity",
+      "error": "POSTGRES_DSN_NOT_CONFIGURED"
+    },
+    {
+      "name": "firebase_firestore_read_access",
+      "error": "FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED"
+    }
+  ],
+  "nextSafeStep": "Resolve preflight blockers, then rerun npm run account:preflight. Do not snapshot/import/canary/cutover."
+}

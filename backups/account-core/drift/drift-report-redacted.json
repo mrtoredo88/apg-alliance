@@ -1,0 +1,9 @@
+{
+  "status": "DRIFT_CHECK_BLOCKED",
+  "reason": "Requires SNAPSHOT_VERIFIED and IMPORT_PASSED before post-import drift can be checked.",
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "importStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}

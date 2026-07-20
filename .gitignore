@@ -7,3 +7,5 @@ dist/
 .backup/
 .tmp*
 build.zip
+backups/account-core/snapshot/raw/
+backups/account-core/snapshot/*.enc

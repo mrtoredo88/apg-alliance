@@ -25,6 +25,16 @@
 - Добавлены account import dry-run/manifest, verify redacted reports, Firestore outage simulation, event readiness integration и integration map оставшихся legacy вызовов.
 **Почему:** Account Core scaffold должен начать обслуживать реальные критические пути через PostgreSQL/service layer, прежде чем можно будет говорить о canary и production cutover.
 
+## [2026-07-20] chore: Account Core Production Migration Preflight
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/account-production-preflight.mjs`, `scripts/account-snapshot.mjs`, `scripts/account-conflicts.mjs`, `scripts/account-drift.mjs`, `scripts/account-observe.mjs`, `scripts/production-readiness.mjs`, `package.json`, `.gitignore`, `backups/account-core/preflight-report.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен gate-based Preflight для production Account Core migration: он проверяет ветку/commit, версии, backend health, PostgreSQL DSN/schema, Firebase Admin read access, rollback/monitoring и обязательные account tests.
+- Добавлены заблокированные команды snapshot/conflicts/drift/observe и общий `readiness:production`, которые не продолжают pipeline без выполненных gate.
+- Raw snapshot path исключён из Git, чтобы production data не могло случайно попасть в commit.
+**Почему:** Production Account Core migration должна останавливаться на первом доказанном блокере и не переходить к snapshot/import/canary/cutover без подтверждённой инфраструктурной готовности.
+
 ## [2026-07-20] feat: Account Core Migration v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/apg/account/*`, `server/src/apg/index.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/account-*.mjs`, `scripts/architecture-guard.mjs`, `docs/architecture-guard-report.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`

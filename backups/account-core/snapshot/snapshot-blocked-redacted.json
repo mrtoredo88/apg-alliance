@@ -1,0 +1,10 @@
+{
+  "status": "SNAPSHOT_BLOCKED",
+  "reason": "PREFLIGHT_NOT_PASSED",
+  "preflightStatus": "PREFLIGHT_BLOCKED",
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "importStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}

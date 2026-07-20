@@ -1,0 +1,9 @@
+{
+  "status": "CONFLICT_ANALYSIS_BLOCKED_NO_SNAPSHOT",
+  "snapshotManifests": [],
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "importStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}
