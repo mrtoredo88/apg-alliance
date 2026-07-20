@@ -15,16 +15,24 @@ Date: 2026-07-20
 ## Command
 
 ```bash
-APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute
+APG_REMOTE_OPERATOR_RUNTIME=production-vpc APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute
 ```
 
 ## Expected Checks
 
+- [ ] runtime assertion PASS
+- [ ] environment loader PASS
+- [ ] DSN parse PASS, without printing DSN
 - [ ] DNS PASS
 - [ ] TCP PASS
 - [ ] TLS PASS
-- [ ] read-only auth PASS
-- [ ] `account:preflight` PASS
+- [ ] PostgreSQL auth PASS via `SELECT 1`
+- [ ] Firebase Admin initialization PASS, without Firestore reads
+- [ ] migration manifests PASS
+- [ ] rollback manifests PASS
+- [ ] monitoring manifests PASS
+- [ ] productionDataReads 0
+- [ ] firestoreReads 0
 - [ ] productionChanged false
 - [ ] postgresWrites 0
 - [ ] snapshotStarted false
@@ -41,7 +49,10 @@ Stop if any of these happen:
 
 - DNS still returns `ENOTFOUND`;
 - TCP/TLS/auth fails;
-- `account:preflight` reports a blocker;
+- runtime assertion is missing;
+- Firebase Admin cannot initialize;
+- any step attempts a Firestore read;
+- any step attempts a PostgreSQL production data read or write;
 - a command attempts snapshot/import/verify/canary/cutover/rollback/deploy;
 - any report prints a DSN, token, private key, service account, or secret value.
 
@@ -50,7 +61,7 @@ Stop if any of these happen:
 Status:
 
 ```text
-REMOTE PREFLIGHT READY
+REMOTE PREFLIGHT PASSED
 ```
 
 Next step:

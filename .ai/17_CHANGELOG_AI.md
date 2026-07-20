@@ -21,7 +21,7 @@
 **Тип:** chore
 **Что изменено:**
 - Зафиксирован production network path: Yandex Serverless Container `apg-api` использует VPC network `enpa19j9jpki1f67p6kq` и тот же PostgreSQL DSN group.
-- Добавлен read-only `account:remote-preflight`, который выполняет `postgres:diagnostics` и только затем `account:preflight` в production-network runtime без snapshot/import/verify/canary/cutover/deploy.
+- Добавлен no-data `account:remote-preflight`, который проверяет runtime assertion, env loader, DNS/TCP/TLS, PostgreSQL auth через `SELECT 1`, Firebase Admin init и manifests без Firestore reads, PostgreSQL writes, snapshot/import/verify/canary/cutover/deploy.
 - Добавлены topology/runbook/checklist документы для запуска migration operator в том же сетевом контуре, без открытия PostgreSQL наружу.
 **Почему:** локальный `ENOTFOUND` является различием сетевого окружения; migration operator должен использовать уже работающий production VPC path, а не новый публичный доступ к базе.
 

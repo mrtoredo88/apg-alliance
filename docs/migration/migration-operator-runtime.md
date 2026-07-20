@@ -39,12 +39,17 @@ Therefore the current production API container can prove the network path, but i
 Prepared command:
 
 ```bash
-APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute
+APG_REMOTE_OPERATOR_RUNTIME=production-vpc APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute
 ```
 
-The command executes only:
+The command executes only no-data validation:
 
-1. `postgres:diagnostics`
-2. `account:preflight`, only if diagnostics pass
+1. runtime assertion for production VPC operator execution
+2. environment loader
+3. DSN parsing with redacted output
+4. DNS, TCP, and TLS checks
+5. PostgreSQL authentication with `SELECT 1`
+6. Firebase Admin initialization without Firestore reads
+7. migration, rollback, and monitoring manifest checks
 
-It does not run snapshot/import/verify/canary/cutover/rollback/deploy.
+It does not run the legacy `account:preflight` path, because that path can read Firestore and run PostgreSQL schema checks. It does not run snapshot/import/verify/canary/cutover/rollback/deploy and must report `firestoreReads: 0`, `productionDataReads: 0`, and `postgresWrites: 0`.
