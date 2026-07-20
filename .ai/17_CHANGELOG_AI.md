@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Full Firebase/Firestore migration audit
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/full-postgres-migration-audit.mjs`, `docs/migration/*`, `backups/migration/audit-summary-redacted.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен read-only аудит Firebase/Firestore зависимостей с redacted JSON-отчётом по доменам, операциям, hotspot-файлам и P0/P1 рискам.
+- Создан полный набор документов для PostgreSQL migration program: dependency audit, domain register, critical paths, failure matrix, target architecture, sequence, Firebase Auth decision и event readiness plan.
+- Добавлен npm-скрипт `audit:full-postgres-migration`; production, Firestore, feature flags, import/verify/canary/cutover и deploy не изменялись.
+**Почему:** после завершения Identity Migration нужно понять полный масштаб оставшейся Firebase/Firestore зависимости и спланировать безопасный перенос остальных доменов без новой инфраструктурной слепой зоны.
+
 ## [2026-07-20] chore: Immutable Verify Package v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/identity-verify-lock.mjs`, `scripts/identity-verify-lock-test.mjs`, `scripts/identity-verify.mjs`, `scripts/identity-canary.mjs`, `scripts/identity-controlled-cutover.mjs`, `scripts/identity-verify-drift.mjs`, `scripts/identity-canary-test.mjs`, `scripts/identity-controlled-cutover-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

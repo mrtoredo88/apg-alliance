@@ -134,7 +134,8 @@
     "identity:verify-drift": "node scripts/identity-verify-drift.mjs",
     "test:identity-verify-drift": "node scripts/identity-verify-drift-test.mjs",
     "identity:verify-lock": "node scripts/identity-verify-lock.mjs",
-    "test:identity-verify-lock": "node scripts/identity-verify-lock-test.mjs"
+    "test:identity-verify-lock": "node scripts/identity-verify-lock-test.mjs",
+    "audit:full-postgres-migration": "node scripts/full-postgres-migration-audit.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",
