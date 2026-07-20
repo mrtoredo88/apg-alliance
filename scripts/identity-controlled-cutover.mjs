@@ -50,7 +50,7 @@ function redact(input) {
     if (typeof input === 'string' && (input.includes('@') || /^(tg_|email:|telegram:|[A-Za-z0-9_-]{16,})/.test(input))) return `[redacted:${sha(input)}]`;
     return input;
   }
-  return Object.fromEntries(Object.entries(input).map(([key, value]) => [/email|telegram|user|uid|target|source|canonical|id/i.test(key) ? [key, redact(value)] : [key, redact(value)]]));
+  return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, redact(value)]));
 }
 
 function table(headers, rows) {
@@ -127,6 +127,13 @@ function validatePostStatus(status = {}) {
 }
 
 function renderSummary(report) {
+  const rollback = report.rollback || { status: '-' };
+  const monitoring = report.monitoring || { status: '-' };
+  const steps = report.steps || [];
+  const precheck = report.precheck || { checks: [] };
+  const postcheck = report.postcheck || { checks: [] };
+  const changedData = report.changedData || [];
+  const liveChecks = report.liveChecks || [];
   return [
     '# Identity Controlled Cutover',
     '',
@@ -134,30 +141,30 @@ function renderSummary(report) {
     `Status: ${report.status}`,
     `Cutover: ${report.cutover}`,
     `Ready for Cutover: ${report.readyForCutover}`,
-    `Rollback: ${report.rollback.status}`,
-    `Monitoring: ${report.monitoring.status}`,
-    `Commit: ${report.git.commit}`,
-    `Backend revision: ${report.backend.revision || 'unknown'}`,
+    `Rollback: ${rollback.status}`,
+    `Monitoring: ${monitoring.status}`,
+    `Commit: ${report.git?.commit || 'unknown'}`,
+    `Backend revision: ${report.backend?.revision || 'unknown'}`,
     '',
     '## Precheck',
     '',
-    table(['Check', 'Status', 'Details'], report.precheck.checks.map(item => [item.name, item.ok ? 'PASS' : 'FAILED', JSON.stringify(item.details || {})])),
+    table(['Check', 'Status', 'Details'], precheck.checks.map(item => [item.name, item.ok ? 'PASS' : 'FAILED', JSON.stringify(item.details || {})])),
     '',
     '## Cutover Action',
     '',
-    table(['Step', 'Status'], report.steps.map(item => [item.name, item.status])),
+    table(['Step', 'Status'], steps.map(item => [item.name, item.status])),
     '',
     '## Postcheck',
     '',
-    table(['Check', 'Status', 'Details'], report.postcheck.checks.map(item => [item.name, item.ok ? 'PASS' : 'FAILED', JSON.stringify(item.details || {})])),
+    table(['Check', 'Status', 'Details'], postcheck.checks.map(item => [item.name, item.ok ? 'PASS' : 'FAILED', JSON.stringify(item.details || {})])),
     '',
     '## Changed Data',
     '',
-    table(['Scope', 'Change'], report.changedData.map(item => [item.scope, item.change])),
+    table(['Scope', 'Change'], changedData.map(item => [item.scope, item.change])),
     '',
     '## Live Checks',
     '',
-    table(['Area', 'Status', 'Reason'], report.liveChecks.map(item => [item.area, item.status, item.reason])),
+    table(['Area', 'Status', 'Reason'], liveChecks.map(item => [item.area, item.status, item.reason])),
     '',
   ].join('\n');
 }
@@ -195,7 +202,7 @@ async function run() {
   const tagTarget = shell(['git', 'rev-list', '-n', '1', 'identity-migration-v1-canary-passed']);
   const backendRevisionsRaw = shell(['yc', 'serverless', 'container', 'revision', 'list', '--container-name', 'apg-api', '--format', 'json'], '[]');
   const backendRevision = JSON.parse(backendRevisionsRaw || '[]')?.[0]?.id || '';
-  const preStatus = await adminAction('status');
+  const preStatus = await adminAction('cutover-status');
   const preChecks = [
     check('Git tag identity-migration-v1-canary-passed exists', Boolean(tagTarget), { tag: 'identity-migration-v1-canary-passed' }),
     check('Current commit is available for audit', Boolean(gitCommit), { commit: gitCommit, canaryTagTarget: tagTarget ? tagTarget.slice(0, 12) : '' }),
@@ -253,7 +260,7 @@ async function run() {
   };
   writeReports(checkpoint, manifest);
   const cutoverResult = await adminAction('cutover-postgres');
-  const postStatus = await adminAction('status');
+  const postStatus = await adminAction('cutover-status');
   const postChecks = validatePostStatus(postStatus);
   const report = {
     version: 1,

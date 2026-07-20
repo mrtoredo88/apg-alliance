@@ -14,6 +14,7 @@ const MIGRATION_CENTER_STATE = {
 
 const MIGRATION_ACTIONS = [
   'status',
+  'cutover-status',
   'apply-schema',
   'snapshot',
   'dry-run-import',
@@ -39,6 +40,18 @@ function hash(value) {
 
 function publicError(error) {
   return { code: error?.code || '', message: String(error?.message || error).slice(0, 240) };
+}
+
+function withTimeout(promise, timeoutMs, code) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error(`${code} timed out after ${timeoutMs}ms.`), { code })), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function nowIso() {
@@ -676,6 +689,58 @@ async function migrationStatus() {
   };
 }
 
+async function cutoverStatus() {
+  const identity = serverFoundation.identityV2.snapshot();
+  const postgres = await withTimeout(postgresCounts({ ensure: false }), 8_000, 'IDENTITY_CUTOVER_POSTGRES_TIMEOUT')
+    .catch(error => ({ ok: false, error: publicError(error) }));
+  const architecture = architectureGuardReport();
+  const pgTables = postgres?.tables || {};
+  return {
+    migrationCenter: {
+      ok: true,
+      stages: MIGRATION_STAGES,
+      actions: MIGRATION_ACTIONS,
+      activeOperation: MIGRATION_CENTER_STATE.activeOperation,
+      lastOperation: MIGRATION_CENTER_STATE.lastOperation,
+      history: MIGRATION_CENTER_STATE.history,
+      flagsOverride: MIGRATION_CENTER_STATE.flagsOverride,
+      mode: 'cutover-lightweight',
+    },
+    postgres: {
+      ok: postgres?.ok !== false,
+      provider: 'PostgreSQL',
+      storage: identity.storage,
+      connection: postgres?.ok === false ? 'failed' : 'available',
+      schemaVersions: postgres?.schemaVersions || [],
+      counts: {
+        users: pgTables.apg_identity_users || 0,
+        emailIndex: pgTables.apg_identity_email_index || 0,
+        identityLinks: pgTables.apg_identity_links || 0,
+        roles: pgTables.apg_identity_roles || 0,
+        sessions: pgTables.apg_identity_sessions || 0,
+      },
+      error: postgres?.error || null,
+    },
+    firestore: {
+      ok: null,
+      source: 'Firestore fallback',
+      skipped: true,
+      reason: 'cutover-status does not run a full Firestore snapshot.',
+      counts: {},
+    },
+    dependencyMonitor: {
+      reads: { firestore: identity.firestoreReads || 0, postgres: identity.yandexReads || 0 },
+      writes: { firestore: identity.firestoreWrites || 0, postgres: identity.yandexWrites || 0 },
+      fallback: identity.fallbackCount || identity.firestoreFallbacks || 0,
+      dualRead: identity.dualRead,
+      dualWrite: identity.dualWrite,
+      fallbackEnabled: identity.fallbackEnabled,
+    },
+    architecture,
+    identity,
+  };
+}
+
 async function requireMigrationActor(request) {
   const provided = safeString(request.headers['x-maintenance-secret'] || request.headers['x-cron-secret'] || '', 500);
   const expected = safeString(process.env.IDENTITY_MIGRATION_SECRET || process.env.CRON_SECRET || '', 500);
@@ -702,6 +767,8 @@ export default async function identityV2AdminRoutes(fastify) {
       let result = null;
       if (action === 'status') {
         result = await migrationStatus();
+      } else if (action === 'cutover-status') {
+        result = await cutoverStatus();
       } else if (action === 'apply-schema') {
         result = await serverFoundation.identityV2.repository.users.adapter.ensureSchema();
         result.postgres = await postgresCounts();
@@ -726,9 +793,10 @@ export default async function identityV2AdminRoutes(fastify) {
           migration: await migrationStatus(),
         };
       } else if (action === 'cutover-postgres') {
+        const identity = applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'false', identityFallback: 'firestore' });
         result = {
-          identity: applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'false', identityFallback: 'firestore' }),
-          migration: await migrationStatus(),
+          identity,
+          migration: await cutoverStatus(),
         };
       } else if (action === 'disable-firestore-fallback') {
         result = {

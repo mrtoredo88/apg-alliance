@@ -66,6 +66,7 @@ const adminRoute = read('server/src/routes/identity-v2-admin.js');
   'dry-run-import',
   'import',
   'verify',
+  'cutover-status',
   'enable-postgres',
   'cutover-postgres',
   'disable-firestore-fallback',

@@ -4216,6 +4216,7 @@
 - `identity:dry-run` теперь пишет локальный audit event `DRY_RUN_EXECUTED`, чтобы partial owner approval имел полный audit trail без запуска миграционных операций.
 - Добавлен read-only `npm run identity:broken-references`: классифицирует 8 dangling identity references из Dry Run, строит Markdown/JSON/redacted отчёты и не меняет review/manifest/Firestore.
 - Добавлена controlled-процедура `npm run identity:cutover`: перед production `cutover-postgres` сверяет Canary/Manifest/Verify/Dry Run хэши, backend revision, PostgreSQL/Identity health, rollback readiness и создаёт checkpoint в `backups/identity/cutover/`.
+- `/api/identity-v2-admin` получил lightweight action `cutover-status`, который для pre/post cutover проверяет PostgreSQL counts, Identity flags и dependency monitor без полного Firestore snapshot, чтобы не ловить 30s timeout на операционном переключении.
 - Добавлен `npm run test:identity-controlled-cutover`: проверяет gate-based precheck, checkpoint-before-cutover, rollback readiness, monitoring report, запрет автоматического rollback/disable fallback/deploy и честную маркировку live-login checks.
 
 # 2026-07-14 — Workspace Meetings CRM

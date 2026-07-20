@@ -21,6 +21,7 @@ const adminRoute = read('server/src/routes/identity-v2-admin.js');
   'activeOperation',
   'speedPerSec',
   'etaSec',
+  'cutover-status',
   'enable-postgres',
   'cutover-postgres',
   'disable-firestore-fallback',

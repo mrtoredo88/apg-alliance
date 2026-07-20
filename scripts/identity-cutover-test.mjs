@@ -26,6 +26,7 @@ assert.ok(route.includes('if (shouldWriteLegacyIdentitySideEffects())'), 'legacy
 
 const admin = read('server/src/routes/identity-v2-admin.js');
 [
+  'cutover-status',
   'cutover-postgres',
   'canary',
   "identityDualWrite: 'false'",
