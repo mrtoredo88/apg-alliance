@@ -1150,10 +1150,23 @@ export default async function emailAuthRoutes(fastify) {
         return reply.code(403).send({ ok: false, error: 'owner_mismatch', message: 'Нельзя привязать email к другому аккаунту.' });
       }
 
-      try {
+    try {
         await serverFoundation.identityV2.linkEmail({ email, userId: String(userId), firebaseUid: actor.uid });
       } catch (e) {
-        return reply.code(e.statusCode || 500).send({ ok: false, error: e.statusCode === 409 ? 'already_used' : 'link_failed', message: e.message || 'Не удалось привязать email.' });
+        const code = e?.code;
+        if (code === 'EMAIL_ALREADY_USED') {
+          return reply.code(409).send({
+            ok: false,
+            error: 'identity_conflict',
+            code: 'IDENTITY_CONFLICT',
+            message: e.message || 'Email уже привязан к другому аккаунту.',
+          });
+        }
+        return reply.code(e.statusCode || 500).send({
+          ok: false,
+          error: e.statusCode === 409 ? 'already_used' : 'link_failed',
+          message: e.message || 'Не удалось привязать email.',
+        });
       }
       await auditAccountLink(db, request, { action: 'link-email', result: 'success', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), email });
       return { ok: true };

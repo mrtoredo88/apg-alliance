@@ -1208,6 +1208,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       });
       const data = await res.json();
       if (!data.ok) {
+        if (data.error === 'identity_conflict' || data.code === 'IDENTITY_CONFLICT') {
+          setLinkEmailError('Email уже привязан к другому аккаунту.');
+          return;
+        }
+        if (data.error === 'already_used' || data.error === 'owner_mismatch') {
+          setLinkEmailError(data.message || 'Нельзя привязать email к этому аккаунту.');
+          return;
+        }
         setLinkEmailError(data.message || 'Ошибка привязки. Попробуйте снова.');
       } else {
         setLinkEmailDone(true);

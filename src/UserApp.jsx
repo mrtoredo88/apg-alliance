@@ -1707,7 +1707,7 @@ export function UserApp() {
     const authReady = Promise.resolve()
       .then(async () => {
         if (hasStoredStrongIdentity) {
-          const restored = await waitForInitialFirebaseAuth(1800);
+          const restored = await waitForInitialFirebaseAuth(4500);
           markFirebase('auth_restore_checked', {
             source: 'UserApp.loadData',
             hasStoredStrongIdentity,
@@ -1812,10 +1812,37 @@ export function UserApp() {
         if (needsHardRelogin && isMounted.current) {
           if (isAuthLoadAborted(runId, 'hard_relogin_required')) return;
           const _uid = String(userData.id);
+          if (!auth.currentUser?.uid) {
+            traceAuthStage('owner_session_deferred', {
+              source: ownerSource,
+              userId: _uid,
+              reason: 'strong_identity_current_user_missing_after_restore',
+            });
+            traceAuthStage('home_render', {
+              userId: userData.id,
+              panel: activePanel,
+              authProvider: userData.authProvider || ownerSource,
+              hasUserAuth: true,
+              reason: 'strong_identity_wait_retry',
+            });
+            await new Promise(resolve => setTimeout(resolve, 600));
+            if (!auth.currentUser?.uid) {
+              traceAuthStage('owner_session_deferred', {
+                source: ownerSource,
+                userId: _uid,
+                reason: 'strong_identity_retry_failed',
+              });
+            }
+          }
           if (_uid.startsWith('email:')) localStorage.removeItem('apg_email_user');
           if (_uid.startsWith('tg_')) localStorage.removeItem('apg_tg_user');
           await apgIdentity.invalidateSession().catch(() => {});
-          window.location.reload();
+          applyLogoutGuestState({
+            runId,
+            targetUserId: _uid,
+            source: 'loadData_strong_identity_required',
+            logoutOk: false,
+          });
           return;
         }
 
@@ -3388,8 +3415,15 @@ export function UserApp() {
     traceAuthStage('email_login_complete', { userId: emailUser?.id ?? null });
     localStorage.removeItem('manualLogout');
     localStorage.setItem('apg_email_user', JSON.stringify(emailUser));
-    window.location.reload();
-  }, []);
+    if (mountedRef.current) {
+      loggedOutRef.current = false;
+      setError(null);
+      setNetworkError(false);
+      setLoggedOut(false);
+      setLoading(true);
+    }
+    loadData(mountedRef);
+  }, [loadData]);
 
   const handleEmailAuthSuccess = useCallback(async (emailUser, authPayload = {}) => {
     if (!emailUser?.id) return;
@@ -3808,6 +3842,7 @@ export function UserApp() {
       previousRun: logoutFlowRef.current.runId,
     });
     authLoadRunRef.current += 1;
+    loggedOutRef.current = false;
     logoutFlowRef.current.inProgress = false;
     localStorage.removeItem('manualLogout');
     clearUserAuthStorage();

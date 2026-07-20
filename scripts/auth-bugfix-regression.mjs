@@ -9,6 +9,7 @@ function read(file) {
 const userApp = read('src/UserApp.jsx');
 const profile = read('src/ProfilePanel.jsx');
 const telegramCheck = read('server/src/routes/telegram-auth-check.js');
+const serverEmailAuth = read('server/src/routes/email-auth.js');
 
 function assertOrder(source, tokens, label) {
   let cursor = -1;
@@ -48,6 +49,9 @@ assertContains(userApp, 'traceAuthStage(\'loadData_aborted\'', 'logout lifecycle
 assertContains(userApp, 'isAuthLoadAborted', 'logout lifecycle: runtime abort helper');
 assertNo(userApp, "setError('Не удалось выйти. Проверьте подключение и попробуйте ещё раз.'", 'logout lifecycle: no hard error message');
 assertContains(userApp, "traceAuthStage('auth_session_restart'", 'logout restart trace');
+assertContains(userApp, 'waitForInitialFirebaseAuth(4500)', 'email restore: extended restore wait for strong identities');
+assertContains(userApp, 'loadData_strong_identity_required', 'strong identity mismatch handled via guest-state fallback');
+assertNo(userApp, 'window.location.reload();', 'email bootstrap path does not force full-page reload');
 
 assertContains(profile, "const waitForAuthStateChanged = useCallback(async (expectedUid", 'telegram pipeline: expectedUid aware wait');
 assertContains(profile, 'current?.uid === expected', 'telegram pipeline: strict uid guard');
@@ -60,12 +64,15 @@ assertContains(profile, "traceAuthStage('firebase_signin_done'", 'telegram pipel
 assertContains(profile, "traceAuthStage('user_loaded'", 'telegram pipeline: user loaded trace');
 assertContains(profile, "traceAuthStage('home_render'", 'telegram pipeline: home render trace');
 assertContains(profile, 'telegram_auth_signin_mismatch', 'telegram pipeline: repeated login mismatch guard');
+assertContains(profile, "identity_conflict", 'email link flow: identity conflict branch handled');
 
 assertContains(telegramCheck, "identityPath: 'identity_v2'", 'backend telegram check: identity_v2 path');
 assertContains(telegramCheck, 'identityResolved: true', 'backend telegram check: resolved flag');
 assertContains(telegramCheck, 'customTokenIssued: true', 'backend telegram check: token issued flag');
 assertContains(telegramCheck, 'createCustomToken', 'backend telegram check: firebase custom token');
 assertContains(telegramCheck, 'resolveTelegramIdentity', 'backend telegram check: identity resolver');
+assertContains(serverEmailAuth, "error: 'identity_conflict'", 'email link flow: explicit conflict code is returned');
+assertContains(serverEmailAuth, "code: 'IDENTITY_CONFLICT'", 'email link flow: backend exports conflict classification');
 
 console.log('AUTH_REGRESSION_CONTRACT_OK');
 console.log(JSON.stringify({
